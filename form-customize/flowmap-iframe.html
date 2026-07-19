@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>React Flow Viewport</title>
+
+  <script src="./assets/react.production.min.js"></script>
+  <script src="./assets/react-dom.production.min.js"></script>
+  <script src="./assets/reactflow.production.min.js"></script>
+  <link rel="stylesheet" href="./assets/reactflow-style.css">
+  <style>
+    html, body, #react-flow-root {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: var(--color-bg-app, #ffffff);
+    }
+    
+    /* テーマ同期用のCSS変数定義 */
+    :root {
+      --color-bg-app: #ffffff;
+      --color-bg-card: #ffffff;
+      --color-border: #cbd5e0;
+      --color-text: #2d3748;
+      --color-primary: #3182ce;
+      --color-secondary: #805ad5;
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    
+    /* ノードカードの基本スタイル */
+    .flow-node-card {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      box-sizing: border-box;
+      border-radius: 6px;
+      padding: 10px;
+      min-width: 180px;
+      font-size: 0.8rem;
+      box-shadow: var(--shadow-md);
+      position: relative;
+      cursor: move;
+      color: var(--color-text);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+    }
+
+    .node-root {
+      border-left: 4px solid var(--color-primary) !important;
+    }
+    .node-section {
+      border-left: 4px solid var(--color-secondary) !important;
+    }
+    .node-question {
+      border-left: 4px solid #48bb78 !important;
+    }
+    .node-option {
+      border-left: 4px solid #ed8936 !important;
+      background: rgba(237, 137, 54, 0.05) !important;
+    }
+    .node-special {
+      border-left: 4px solid #e53e3e !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="react-flow-root"></div>
+  <script>
+    // 親ウィンドウからテーマ色を同期する
+    function syncThemeFromParent() {
+      try {
+        const parentDoc = window.parent.document;
+        const parentStyle = window.parent.getComputedStyle(parentDoc.documentElement);
+        const rootStyle = document.documentElement.style;
+        
+        const variables = [
+          '--color-bg-app',
+          '--color-bg-card',
+          '--color-border',
+          '--color-text',
+          '--color-primary',
+          '--color-secondary'
+        ];
+        variables.forEach(v => {
+          const val = parentStyle.getPropertyValue(v).trim();
+          if (val) rootStyle.setProperty(v, val);
+        });
+      } catch (e) {
+        console.warn('Failed to sync theme:', e);
+      }
+    }
+    
+    syncThemeFromParent();
+    window.addEventListener('focus', syncThemeFromParent);
+  </script>
+  <script>
+    let reactFlowRoot = null;
+    let setReactFlowData = null;
+
+    // セクションを迂回するカスタムエッジコンポーネントの定義
+    const BypassingEdge = ({ id, sourceX, sourceY, targetX, targetY, style = {}, markerEnd }) => {
+      const isLongDistance = (targetX - sourceX) > 450;
+      let path = '';
+      if (isLongDistance) {
+        // 出発点から目的地の手前 30px まで水平にまっすぐ右へ伸ばし、そこで垂直に折れ曲がって直角に接続する（ユーザーの黒線指示通りの形状）
+        path = `M ${sourceX} ${sourceY} ` +
+               `L ${targetX - 30} ${sourceY} ` + // 目的地の手前まで水平に直進
+               `L ${targetX - 30} ${targetY} ` + // 目的地と同じ高さまで垂直に移動
+               `L ${targetX} ${targetY}`;        // 目的地に水平に合流
+      } else {
+        const midX = sourceX + (targetX - sourceX) / 2;
+        path = `M ${sourceX} ${sourceY} L ${midX} ${sourceY} L ${midX} ${targetY} L ${targetX} ${targetY}`;
+      }
+      return React.createElement('path', {
+        id: id,
+        style: style,
+        className: 'react-flow__edge-path',
+        d: path,
+        markerEnd: markerEnd
+      });
+    };
+
+    const edgeTypes = {
+      smoothstep: ReactFlow.SmoothStepEdge,
+      straight: ReactFlow.StraightEdge,
+      bypassing: BypassingEdge
+    };
+
+    // React Flow のカスタムノード定義
+    const FlowCard = (props) => {
+      const data = props.data;
+      const isTarget = data.hasTarget;
+      const isSource = data.hasSource;
+      
+      let cardClass = `flow-node-card node-${data.nodeType}`;
+      if (data.isBranch) cardClass += ' branch-node';
+
+      let badge = '';
+      let title = data.title || '';
+      let subText = '';
+      
+      if (data.nodeType === 'root') {
+        badge = '📋 フォーム';
+      } else if (data.nodeType === 'section') {
+        badge = '📂 セクション';
+        subText = data.nextActionLabel ? `➔ ${data.nextActionLabel}` : '';
+      } else if (data.nodeType === 'question') {
+        badge = `❓ 質問 (${data.qType})`;
+      } else if (data.nodeType === 'option') {
+        badge = '🔹 選択肢';
+        subText = data.nextSectionLabel ? `➔ ${data.nextSectionLabel}` : '';
+      } else if (data.nodeType === 'special') {
+        badge = '🏁 システム';
+      }
+
+      return React.createElement(
+        'div',
+        {
+          className: cardClass
+        },
+        isTarget && React.createElement(ReactFlow.Handle, {
+          type: 'target',
+          position: ReactFlow.Position.Left,
+          id: 'target-port-' + props.id,
+          style: { background: '#718096', border: '2px solid #ffffff', width: '14px', height: '14px', top: '50%', transform: 'translateY(-50%)', boxSizing: 'border-box', cursor: 'pointer' }
+        }),
+        React.createElement('div', { style: { fontSize: '0.65rem', opacity: 0.7, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' } }, badge),
+        React.createElement('div', { style: { fontWeight: '600', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, title),
+        subText && React.createElement('div', { style: { fontSize: '0.65rem', color: '#ed8936', marginTop: '2px', fontWeight: 'bold' } }, subText),
+        isSource && React.createElement(ReactFlow.Handle, {
+          type: 'source',
+          position: ReactFlow.Position.Right,
+          id: 'source-port-' + props.id,
+          style: {
+            background: data.nodeType === 'option' ? '#ed8936' : '#48bb78',
+            border: '2px solid #ffffff',
+            width: '14px',
+            height: '14px',
+            borderRadius: '50%',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            boxSizing: 'border-box',
+            cursor: 'pointer'
+          }
+        })
+      );
+    };
+
+    const LaneBg = (props) => {
+      const data = props.data;
+      return React.createElement(
+        'div',
+        {
+          style: {
+            width: '100%',
+            height: '100%',
+            border: '3px dashed #718096',
+            borderRadius: '14px',
+            backgroundColor: 'rgba(66, 153, 225, 0.05)',
+            padding: '12px',
+            boxSizing: 'border-box',
+            position: 'relative',
+            pointerEvents: 'none'
+          }
+        },
+        React.createElement('div', {
+          style: {
+            position: 'absolute',
+            top: '-20px',
+            left: '12px',
+            fontSize: '0.8rem',
+            fontWeight: '800',
+            color: '#2d3748',
+            backgroundColor: 'var(--color-bg-app, #ffffff)',
+            padding: '0 8px',
+            borderRadius: '4px'
+          }
+        }, data.title)
+      );
+    };
+
+    const FlowmapApp = () => {
+      const [nodes, setNodes, onNodesChange] = ReactFlow.useNodesState([]);
+      const [edges, setEdges, onEdgesChange] = ReactFlow.useEdgesState([]);
+
+      React.useEffect(() => {
+        setReactFlowData = (newNodes, newEdges) => {
+          setNodes(newNodes);
+          setEdges(newEdges);
+        };
+        const parentG = window.parent.G;
+        if (parentG) {
+          const { nodes: initialNodes, edges: initialEdges } = buildReactFlowData(parentG);
+          setNodes(initialNodes);
+          setEdges(initialEdges);
+        }
+        return () => {
+          setReactFlowData = null;
+        };
+      }, []);
+
+      const onConnect = React.useCallback((connection) => {
+        // 新しいエッジ（接続線）のスタイルを定義して即座に画面に追加
+        const isOpt = (connection.source || '').includes('_opt_');
+        const newEdge = {
+          ...connection,
+          type: isOpt ? 'bypassing' : 'smoothstep',
+          style: { stroke: isOpt ? '#ed8936' : '#4299e1', strokeWidth: 2, strokeDasharray: '5 5' },
+          animated: true
+        };
+        setEdges((eds) => ReactFlow.addEdge(newEdge, eds));
+        
+        // 裏側のデータ同期を実行
+        handleReactFlowConnect(connection);
+      }, [setEdges]);
+
+      const onNodesChangeWithSave = React.useCallback((changes) => {
+        onNodesChange(changes);
+        changes.forEach((change) => {
+          if (change.type === 'position' && change.position) {
+            let savedCoords = {};
+            try {
+              savedCoords = JSON.parse(localStorage.getItem('form_customize_flowmap_coords') || '{}');
+            } catch (e) {}
+            savedCoords[change.id] = change.position;
+            localStorage.setItem('form_customize_flowmap_coords', JSON.stringify(savedCoords));
+          }
+        });
+      }, [onNodesChange]);
+
+      return React.createElement(
+        ReactFlow.ReactFlowProvider,
+        null,
+        React.createElement(
+          ReactFlow.default,
+          {
+            nodes: nodes,
+            edges: edges,
+            edgeTypes: edgeTypes,
+            onNodesChange: onNodesChangeWithSave,
+            onEdgesChange: onEdgesChange,
+            onConnect: onConnect,
+            isValidConnection: (connection) => {
+              try {
+                if (!connection || !connection.source || !connection.target) return false;
+                if (connection.source === connection.target) return false;
+
+                const state = window.parent.G;
+                if (!state || !state.sections) return false;
+
+                // 1. 接続元のセクションを特定する
+                let sourceSecId = '';
+                if (connection.source.includes('_opt_')) {
+                  const qId = connection.source.split('_opt_')[0];
+                  const found = state.sections.find(s => (s.questions || []).some(q => q.id === qId));
+                  if (found) sourceSecId = found.id;
+                } else {
+                  const found = state.sections.find(s => (s.questions || []).some(q => q.id === connection.source));
+                  if (found) sourceSecId = found.id;
+                }
+
+                // 2. 接続先のセクションを特定する
+                let targetSecId = connection.target;
+                if (connection.target !== 'submit') {
+                  const found = state.sections.find(s => (s.questions || []).some(q => q.id === connection.target));
+                  if (found) targetSecId = found.id;
+                }
+
+                if (!sourceSecId || !targetSecId) return false;
+                if (targetSecId === 'submit') return true; // 送信して終了への遷移は常に許可
+
+                // 3. インデックスを比較する（未来のセクションへの遷移のみ許可）
+                const sourceIdx = state.sections.findIndex(s => s.id === sourceSecId);
+                const targetIdx = state.sections.findIndex(s => s.id === targetSecId);
+
+                if (sourceIdx === -1 || targetIdx === -1) return false;
+                return targetIdx > sourceIdx;
+              } catch(e) {
+                return false;
+              }
+            },
+            nodeTypes: { flowCard: FlowCard, laneBg: LaneBg },
+            fitView: true,
+            style: { width: '100%', height: '100%', background: 'var(--color-bg-app)' }
+          },
+          React.createElement(ReactFlow.Controls),
+          React.createElement(ReactFlow.Background, { color: '#cbd5e0', gap: 16 })
+        )
+      );
+    };
+
+    function getSectionTargetId(secId, state) {
+      const sec = (state.sections || []).find(s => s.id === secId);
+      if (sec && sec.questions && sec.questions.length > 0) {
+        return sec.questions[0].id;
+      }
+      return 'submit';
+    }
+
+    function buildReactFlowData(state) {
+      if (!state) return { nodes: [], edges: [] };
+
+      const nodes = [];
+      const edges = [];
+
+      const sections = state.sections || [];
+      const spacingX = 380;
+      const spacingY = 110;
+      const startX = 260;
+
+      let savedCoords = {};
+      try {
+        savedCoords = JSON.parse(localStorage.getItem('form_customize_flowmap_coords') || '{}');
+      } catch(err) {}
+
+      sections.forEach((sec, secIdx) => {
+        const secX = startX + secIdx * spacingX;
+        
+        // レーン（背景枠）の高さを事前に計算する
+        let tempY = 70;
+        (sec.questions || []).forEach(q => {
+          const isBranch = ['radio', 'select'].includes(q.type) && q.options && q.options.length > 0;
+          tempY += spacingY;
+          if (isBranch) {
+            tempY += q.options.length * spacingY;
+          }
+        });
+        const laneHeight = Math.max(tempY - 30, 160);
+
+        // 1. まず背後に敷くレーン背景（エリア）を追加 (DOMの最背面に配置するため先に追加)
+        nodes.push({
+          id: `lane_${sec.id}`,
+          type: 'laneBg',
+          data: { title: sec.title || `セクション ${secIdx + 1}` },
+          position: { x: secX - 15, y: 30 },
+          style: {
+            width: 250,
+            height: laneHeight,
+            zIndex: -1,
+            pointerEvents: 'none'
+          },
+          draggable: false,
+          selectable: false
+        });
+
+        // 2. その後に質問と選択肢を追加 (レーンの前面に描画されてマウスイベントが正常動作する)
+        let currentY = 70;
+        (sec.questions || []).forEach((q, qIdx) => {
+          const isBranch = ['radio', 'select'].includes(q.type) && q.options && q.options.length > 0;
+          
+          nodes.push({
+            id: q.id,
+            type: 'flowCard',
+            data: {
+              nodeType: 'question',
+              title: q.title || '無題の質問',
+              qType: q.type,
+              isBranch: isBranch,
+              hasTarget: true,
+              hasSource: !isBranch
+            },
+            position: savedCoords[q.id] || { x: secX, y: currentY }
+          });
+
+          // セクション内の質問同士の縦繋ぎエッジ
+          if (qIdx > 0) {
+            const prevQ = sec.questions[qIdx - 1];
+            edges.push({
+              id: `tree-edge-${prevQ.id}-${q.id}`,
+              source: prevQ.id,
+              target: q.id,
+              type: 'smoothstep',
+              style: { stroke: '#cbd5e0', strokeWidth: 1.5 },
+              animated: false,
+              focusable: false
+            });
+          }
+
+          currentY += spacingY;
+
+          if (isBranch) {
+            q.options.forEach((opt, oIdx) => {
+              const optId = `${q.id}_opt_${opt.id || oIdx}`;
+              
+              nodes.push({
+                id: optId,
+                type: 'flowCard',
+                data: {
+                  nodeType: 'option',
+                  title: opt.label || `選択肢 ${oIdx + 1}`,
+                  nextSectionLabel: getNextActionLabel(opt.nextSectionId, state, sec.id),
+                  hasTarget: true,
+                  hasSource: true
+                },
+                position: savedCoords[optId] || { x: secX + 25, y: currentY }
+              });
+
+              // 質問から選択肢への縦エッジ
+              edges.push({
+                id: `tree-edge-${q.id}-${optId}`,
+                source: q.id,
+                target: optId,
+                type: 'smoothstep',
+                style: { stroke: '#cbd5e0', strokeWidth: 1.5 },
+                animated: false,
+                focusable: false
+              });
+
+              currentY += spacingY;
+            });
+          }
+        });
+      });
+
+      // root（フォーム開始）の配置
+      const rootX = 50;
+      const rootY = 100;
+      nodes.push({
+        id: 'root',
+        type: 'flowCard',
+        data: { nodeType: 'root', title: state.title || '無題のフォーム', hasTarget: false, hasSource: true },
+        position: savedCoords['root'] || { x: rootX, y: rootY }
+      });
+
+      // 最初のセクションの最初の質問への接続
+      if (sections.length > 0) {
+        const firstTarget = getSectionTargetId(sections[0].id, state);
+        edges.push({
+          id: `tree-edge-root-${firstTarget}`,
+          source: 'root',
+          target: firstTarget,
+          type: 'smoothstep',
+          style: { stroke: '#cbd5e0', strokeWidth: 1.5 },
+          animated: false,
+          focusable: false
+        });
+      }
+
+      // submit（送信完了）の配置
+      const submitX = startX + sections.length * spacingX + 50;
+      const submitY = 100;
+      nodes.push({
+        id: 'submit',
+        type: 'flowCard',
+        data: { nodeType: 'special', title: '🏁 送信 (回答完了)', hasTarget: true, hasSource: false },
+        position: savedCoords['submit'] || { x: submitX, y: submitY }
+      });
+
+      // 遷移先エッジ (セクション内最後の質問 ➔ 次セクション最初の質問)
+      sections.forEach(sec => {
+        if (!sec.questions || sec.questions.length === 0) return;
+        
+        const lastQ = sec.questions[sec.questions.length - 1];
+        const isBranch = ['radio', 'select'].includes(lastQ.type);
+        if (isBranch) return; // 分岐タイプならデフォルトの接続矢印は不要
+
+        let act = sec.nextAction || 'next';
+        let targetId = '';
+        let label = '次の項目へ';
+        
+        if (act === 'next') {
+          const secIdx = sections.findIndex(s => s.id === sec.id);
+          const nextSec = sections[secIdx + 1];
+          targetId = nextSec ? getSectionTargetId(nextSec.id, state) : 'submit';
+        } else if (act === 'submit') {
+          targetId = 'submit';
+          label = '送信';
+        } else {
+          targetId = getSectionTargetId(act, state);
+          label = '指定先へ移動';
+        }
+
+        if (targetId) {
+          edges.push({
+            id: `flow-edge-${lastQ.id}`,
+            source: lastQ.id,
+            sourceHandle: 'source-port-' + lastQ.id,
+            target: targetId,
+            targetHandle: 'target-port-' + targetId,
+            type: 'smoothstep',
+            style: { stroke: '#4299e1', strokeWidth: 2, strokeDasharray: '5 5' },
+            animated: true,
+            label: label,
+            labelStyle: { fill: '#2b6cb0', fontSize: '9px', fontWeight: 600 }
+          });
+        }
+      });
+
+      // 遷移先エッジ (選択肢 ➔ 分岐先最初の質問)
+      sections.forEach(sec => {
+        (sec.questions || []).forEach(q => {
+          const isBranch = ['radio', 'select'].includes(q.type) && q.options && q.options.length > 0;
+          if (isBranch) {
+            q.options.forEach((opt, oIdx) => {
+              const optId = `${q.id}_opt_${opt.id || oIdx}`;
+              let targetId = opt.nextSectionId;
+              let label = `「${opt.label}」`;
+              
+              if (targetId === 'next') {
+                const secIdx = sections.findIndex(s => s.id === sec.id);
+                const nextSec = sections[secIdx + 1];
+                targetId = nextSec ? getSectionTargetId(nextSec.id, state) : 'submit';
+              } else if (targetId === 'submit') {
+                targetId = 'submit';
+              } else if (targetId) {
+                targetId = getSectionTargetId(targetId, state);
+              }
+
+              if (targetId) {
+                 edges.push({
+                   id: `flow-edge-${optId}`,
+                   source: optId,
+                   sourceHandle: 'source-port-' + optId,
+                   target: targetId,
+                   targetHandle: 'target-port-' + targetId,
+                   type: 'bypassing',
+                   style: { stroke: '#ed8936', strokeWidth: 2, strokeDasharray: '5 5' },
+                   animated: true,
+                   label: label,
+                   labelStyle: { fill: '#dd6b20', fontSize: '9px', fontWeight: 600 }
+                 });
+              }
+            });
+          }
+        });
+      });
+
+      return { nodes, edges };
+    }
+
+    function getNextActionLabel(act, state, currentSecId) {
+      if (act === 'submit') return '送信して終了';
+      
+      let targetId = act;
+      if (!act || act === 'next') {
+        if (currentSecId) {
+          const secIdx = (state.sections || []).findIndex(s => s.id === currentSecId);
+          if (secIdx !== -1 && state.sections[secIdx + 1]) {
+            targetId = state.sections[secIdx + 1].id;
+          } else {
+            return '送信して終了';
+          }
+        } else {
+          return '次の項目へ';
+        }
+      }
+      
+      const targetSec = (state.sections || []).find(s => s.id === targetId);
+      return targetSec ? `移動: ${targetSec.title}` : `移動: ${targetId}`;
+    }
+
+    function handleReactFlowConnect(connection) {
+      const { source, target } = connection;
+      if (!source || !target) return;
+
+      const state = window.parent.G;
+      if (!state) return;
+
+      const reactState = window.parent.n; // React 内部の現在の State 参照
+
+      // ターゲットの質問が属するセクションIDを特定する
+      let targetSectionId = target;
+      if (target !== 'submit') {
+        const foundSec = (state.sections || []).find(sec => 
+          (sec.questions || []).some(q => q.id === target)
+        );
+        if (foundSec) {
+          targetSectionId = foundSec.id;
+        }
+      }
+
+      let updated = false;
+
+      // 選択肢からの接続の場合
+      if (source.includes('_opt_')) {
+        const parts = source.split('_opt_');
+        const questionId = parts[0];
+        const optionIdOrIdx = parts[1];
+
+        // 1. window.parent.G (マスターデータ) の更新
+        (state.sections || []).forEach(sec => {
+          (sec.questions || []).forEach(q => {
+            if (q.id === questionId && q.options) {
+              const opt = q.options.find((o, idx) => o.id === optionIdOrIdx || idx.toString() === optionIdOrIdx);
+              if (opt) {
+                opt.nextSectionId = targetSectionId;
+                updated = true;
+              }
+            }
+          });
+        });
+
+        // 2. window.parent.n (React 内部状態) の更新
+        if (reactState && reactState.sections) {
+          (reactState.sections || []).forEach(sec => {
+            (sec.questions || []).forEach(q => {
+              if (q.id === questionId && q.options) {
+                const opt = q.options.find((o, idx) => o.id === optionIdOrIdx || idx.toString() === optionIdOrIdx);
+                if (opt) {
+                  opt.nextSectionId = targetSectionId;
+                }
+              }
+            });
+          });
+        }
+      } else {
+        // 接続元がセクション内最後の質問の場合 (質問カードからの接続)
+
+        // 1. window.parent.G (マスターデータ) の更新
+        const sourceSec = (state.sections || []).find(sec => 
+          (sec.questions || []).some(q => q.id === source)
+        );
+        if (sourceSec) {
+          const secIdx = state.sections.findIndex(s => s.id === sourceSec.id);
+          const nextSec = state.sections[secIdx + 1];
+          if (nextSec && nextSec.id === targetSectionId) {
+            sourceSec.nextAction = 'next';
+          } else {
+            sourceSec.nextAction = targetSectionId;
+          }
+          updated = true;
+        }
+
+        // 2. window.parent.n (React 内部状態) の更新
+        if (reactState && reactState.sections) {
+          const sourceSecN = (reactState.sections || []).find(sec => 
+            (sec.questions || []).some(q => q.id === source)
+          );
+          if (sourceSecN) {
+            const secIdx = reactState.sections.findIndex(s => s.id === sourceSecN.id);
+            const nextSec = reactState.sections[secIdx + 1];
+            if (nextSec && nextSec.id === targetSectionId) {
+              sourceSecN.nextAction = 'next';
+            } else {
+              sourceSecN.nextAction = targetSectionId;
+            }
+          }
+        }
+      }
+
+      if (updated) {
+        console.log('[React Flow iframe] Connected. Updating parent state & React states.');
+        window.parent.saveAndSyncMindmapData();
+        if (window.parent.parent && window.parent.parent.syncFormState) {
+          window.parent.parent.syncFormState(state);
+        }
+        mountReactFlow();
+      }
+    }
+
+
+    function mountReactFlow() {
+      syncThemeFromParent();
+      const container = document.getElementById('react-flow-root');
+      if (!container) return;
+      if (!reactFlowRoot) {
+        reactFlowRoot = ReactDOM.createRoot(container);
+        reactFlowRoot.render(React.createElement(FlowmapApp));
+      } else {
+        if (setReactFlowData && window.parent.G) {
+          const { nodes: newNodes, edges: newEdges } = buildReactFlowData(window.parent.G);
+          setReactFlowData(newNodes, newEdges);
+        }
+      }
+    }
+
+    window.triggerFlowmapRender = mountReactFlow;
+
+    window.addEventListener('load', () => {
+      mountReactFlow();
+      
+
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# Dependency directories
+node_modules/
+
+# Edge profile directories for testing
+edge-profile/
+edge-profile-test/
+edge-profile-test-final/
+edge-profile-test-final-auto/
+
+# Log files and scratch scripts
+*.log
+scratch/
+.gemini/
+
+# OS metadata
+.DS_Store
+Thumbs.db

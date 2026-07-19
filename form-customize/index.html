@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>フォーム構築・分岐フロー可視化システム</title>
+    <!-- Google Fonts: Inter & Noto Sans JP -->
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script type="module" src="./assets/index-W0nnFdhS-v3.js"></script>
+    <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css">
+    <link rel="stylesheet" href="./assets/custom-editor.css">
+    <script src="./assets/custom-editor-v3.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="header-logo">
+        <span class="logo-icon">📊</span>
+        <h1>フォーム構築基盤</h1>
+      </div>
+      <nav class="header-nav">
+        <button id="btn-tab-dashboard" class="nav-tab active" data-tab="dashboard">
+          <span class="tab-icon">🏠</span>
+          ホーム
+        </button>
+        <button id="btn-tab-editor" class="nav-tab" data-tab="editor">
+          <span class="tab-icon">✏️</span>
+          フォーム編集
+        </button>
+        <button id="btn-tab-flowmap" class="nav-tab" data-tab="flowmap">
+          <span class="tab-icon">🕸️</span>
+          フローマップ
+        </button>
+        <button id="btn-tab-preview" class="nav-tab" data-tab="preview">
+          <span class="tab-icon">👁️</span>
+          回答プレビュー
+        </button>
+      </nav>
+      <div class="header-actions">
+        <!-- ユーザープロフィール表示（ログイン状態） -->
+        <div class="user-profile-header" id="gf-user-profile" style="display: none;">
+          <span class="user-avatar">👤</span>
+          <div class="user-info">
+            <span class="user-name" id="gf-user-name">田中さん</span>
+            <span class="user-role" id="gf-user-role">閲覧者</span>
+          </div>
+          <button id="btn-logout" class="btn btn-sm btn-secondary">ログアウト</button>
+        </div>
+        <button id="btn-export-json" class="btn btn-primary">JSON出力</button>
+      </div>
+    </header>
+
+    <main class="app-content">
+      <!-- 0. フォームダッシュボード（ホーム画面） -->
+      <section id="panel-dashboard" class="tab-panel active">
+        <div class="dashboard-container">
+          <div class="dashboard-header-row">
+            <div class="dashboard-title-area">
+              <h2>フォーム一覧</h2>
+              <p>作成済みのフォームを管理・編集します。</p>
+            </div>
+            <div class="dashboard-header-buttons">
+              <button id="btn-dashboard-sample" class="btn btn-secondary">サンプルを追加</button>
+              <button id="btn-dashboard-create" class="btn btn-primary">＋ 新規フォーム作成</button>
+            </div>
+          </div>
+
+          <!-- 表示モード切り替えツールバー (Google Forms風) -->
+          <div class="dashboard-toolbar-gf">
+            <h3 id="dashboard-group-title" class="group-title">今日</h3>
+            <div class="toolbar-right-controls">
+              <div class="control-dropdown" id="btn-owner-filter" style="position: relative;">
+                <span id="owner-filter-text">オーナー指定なし</span>
+                <span class="arrow-down">▼</span>
+                <div class="owner-dropdown-menu" id="owner-dropdown-menu">
+                  <div class="owner-dropdown-item" data-filter="all">オーナー指定なし</div>
+                  <div class="owner-dropdown-item" data-filter="me">自分がオーナー</div>
+                  <div class="owner-dropdown-item" data-filter="others">自分以外がオーナー</div>
+                </div>
+              </div>
+              <span id="sort-label-text" class="sort-label-text">最終閲覧 (自分)</span>
+              <button id="btn-toggle-view-gf" class="control-icon-btn" title="表示形式切り替え">
+                <span class="control-icon" id="toggle-view-icon">田</span>
+              </button>
+              <button class="control-icon-btn" title="並び替え順">
+                <span class="control-icon">A↕</span>
+              </button>
+              <button class="control-icon-btn" title="フォルダ">
+                <span class="control-icon">📁</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- リスト表示エリア -->
+          <div id="dashboard-view-list" class="dashboard-view-content active">
+            <!-- JSで上から下に並ぶテーブルがレンダリングされます -->
+          </div>
+
+          <!-- プレビュー表示エリア -->
+          <div id="dashboard-view-preview" class="dashboard-view-content">
+            <!-- JSでミニプレビューカードのグリッドがレンダリングされます -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 1. フォームエディター画面 -->
+      <section id="panel-editor" class="tab-panel">
+        <div class="editor-layout">
+          <!-- 左サイドバー: 構成ナビゲーション -->
+          <aside class="editor-sidebar">
+            <div class="sidebar-header">
+              <h2>フォーム全体の構成</h2>
+            </div>
+            <!-- 全体の概要へのジャンプ -->
+            <div class="sidebar-overview-btn-area">
+              <button id="sidebar-item-overview" class="sidebar-overview-btn active">
+                📄 全体の概要・セクション一覧
+              </button>
+            </div>
+            
+            <div class="sidebar-header" style="border-top: 1px solid var(--color-border); padding-top: 15px;">
+              <h2>セクション一覧</h2>
+              <button id="btn-add-section" class="btn-sm btn-icon" title="セクションを追加">＋ 追加</button>
+            </div>
+            <ul id="section-list" class="sidebar-list">
+              <!-- JSでセクション項目が動的に追加されます -->
+            </ul>
+          </aside>
+
+          <!-- メイン編集エリア -->
+          <div class="editor-main">
+            <!-- A. 【全体概要画面】フォームに入ったら最初に見えるセクション一覧 -->
+            <div id="form-overview-editor" class="overview-editor-container">
+              <div class="form-title-desc-card">
+                <!-- 簡易版 / プロ版 モード切り替えスイッチ -->
+                <div class="mode-toggle-container" style="margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border);">
+                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-weight: 600; font-size: 0.95rem; color: var(--color-text);">エディターモード設定</span>
+                    <span style="font-size: 0.75rem; color: var(--color-text-muted);">機能のシンプルさを切り替えます</span>
+                  </div>
+                  <div class="mode-switch-buttons" style="display: flex; background: rgba(0,0,0,0.15); padding: 3px; border-radius: 6px; border: 1px solid var(--color-border);">
+                    <button type="button" id="btn-mode-simple" class="mode-switch-btn active" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s;">簡易版</button>
+                    <button type="button" id="btn-mode-pro" class="mode-switch-btn" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s;">プロ版 💎</button>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="editor-form-title">フォームのタイトル</label>
+                  <input type="text" id="editor-form-title" class="form-control title-input" placeholder="フォームのタイトルを入力..." />
+                </div>
+                <div class="form-group" style="margin-top: 12px;">
+                  <label for="editor-form-desc">フォームの説明</label>
+                  <input type="text" id="editor-form-desc" class="form-control desc-input" placeholder="フォームの説明を入力..." />
+                </div>
+                <div class="form-group" id="editor-lock-container" style="margin-top: 12px; display: none; align-items: center; gap: 8px;">
+                  <input type="checkbox" id="editor-form-lock" style="width: 16px; height: 16px; cursor: pointer;" />
+                  <label for="editor-form-lock" style="margin: 0; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; color: var(--color-danger);">
+                    <span>🔒 管理者専用ロック (管理者のみ閲覧・編集可能)</span>
+                  </label>
+                </div>
+
+                <!-- プロ版専用：高度なカスタマイズパネル（初期状態は非表示） -->
+                <div id="pro-settings-panel" class="pro-features-container" style="display: none; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--color-border); flex-direction: column; gap: 1.25rem;">
+                  <h4 style="font-size: 0.9rem; font-weight: 700; color: var(--color-primary); margin-bottom: 0.25rem; display: flex; align-items: center; gap: 6px;">💎 プロ版限定カスタマイズ設定</h4>
+                  
+                  <!-- ヘッダー情報 -->
+                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
+                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">🏢 会社ロゴ・ヘッダー編集</span>
+                    <div class="form-group">
+                      <label style="font-size: 0.75rem; color: var(--color-text-muted);">会社ロゴテキスト</label>
+                      <input type="text" id="editor-pro-logo" class="form-control form-control-sm" placeholder="例: 株式会社wayway" />
+                    </div>
+                    <div class="form-group-row" style="display: flex; gap: 10px;">
+                      <div class="form-group flex-1">
+                        <label style="font-size: 0.75rem; color: var(--color-text-muted);">大タイトル</label>
+                        <input type="text" id="editor-pro-title" class="form-control form-control-sm" placeholder="例: Yahoo!ショッピング" />
+                      </div>
+                      <div class="form-group flex-1">
+                        <label style="font-size: 0.75rem; color: var(--color-text-muted);">サブタイトル</label>
+                        <input type="text" id="editor-pro-subtitle" class="form-control form-control-sm" placeholder="例: 運営代行 お申し込みフォーム" />
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label style="font-size: 0.75rem; color: var(--color-text-muted);">免責事項テキスト</label>
+                      <input type="text" id="editor-pro-disclaimer" class="form-control form-control-sm" placeholder="例: ※ 公式フォームではありません。" />
+                    </div>
+                  </div>
+
+                  <!-- レイアウト・進捗表示 -->
+                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
+                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">📖 表示レイアウト ＆ 進捗インジケーター</span>
+                    <div class="form-group-row" style="display: flex; gap: 10px;">
+                      <div class="form-group flex-1">
+                        <label style="font-size: 0.75rem; color: var(--color-text-muted);">表示レイアウト</label>
+                        <select id="editor-pro-display-mode" class="form-control form-control-sm">
+                          <option value="scroll">1ページ縦並びスクロール方式</option>
+                          <option value="multistep">ページめくり（マルチステップ）方式</option>
+                        </select>
+                      </div>
+                      <div class="form-group flex-1" id="pro-progress-indicator-group">
+                        <label style="font-size: 0.75rem; color: var(--color-text-muted);">進捗の表示方法</label>
+                        <select id="editor-pro-progress-indicator" class="form-control form-control-sm">
+                          <option value="percentage">パーセンテージ表記 (50%完了)</option>
+                          <option value="page_number">ページ数表記 (Page 2 / 5)</option>
+                          <option value="section_title">セクション名表記 (現在の入力: 〇〇)</option>
+                          <option value="both">複合表示 (パーセント + ページ数)</option>
+                          <option value="none">非表示</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 2色カラーセット ＆ 濃淡コントラスト -->
+                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
+                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">🎨 おすすめ2色テーマカラー選択</span>
+                    <div id="pro-color-presets" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                      <!-- JSでプリセットのチップが動的生成されます -->
+                    </div>
+                    <div class="form-group-row" style="display: flex; gap: 10px; align-items: center;">
+                      <div class="form-group" style="flex: 2;">
+                        <label style="font-size: 0.75rem; color: var(--color-text-muted);">背景色の濃淡（明度・彩度）のコントラスト微調整</label>
+                        <input type="range" id="editor-pro-contrast" min="50" max="150" value="100" style="width: 100%;" />
+                      </div>
+                      <div class="form-group" style="flex: 1; display: flex; gap: 8px;">
+                        <div>
+                          <label style="font-size: 0.70rem; color: var(--color-text-muted); display: block;">テーマ色</label>
+                          <input type="color" id="editor-pro-color-primary" style="width: 40px; height: 30px; border: 1px solid var(--color-border); border-radius: 4px; padding: 0; cursor: pointer;" />
+                        </div>
+                        <div>
+                          <label style="font-size: 0.70rem; color: var(--color-text-muted); display: block;">背景色</label>
+                          <input type="color" id="editor-pro-color-bg" style="width: 40px; height: 30px; border: 1px solid var(--color-border); border-radius: 4px; padding: 0; cursor: pointer;" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 文字サイズ調整 -->
+                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
+                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">📐 各要素の文字サイズ調整</span>
+                    <div class="form-group-row" style="display: flex; gap: 10px;">
+                      <div class="form-group flex-1">
+                        <label style="font-size: 0.75rem; color: var(--color-text-muted);">大タイトルサイズ</label>
+                        <select id="editor-pro-size-title" class="form-control form-control-sm">
+                          <option value="small">S (小)</option>
+                          <option value="medium">M (中)</option>
+                          <option value="large" selected>L (大)</option>
+                        </select>
+                      </div>
+                      <div class="form-group flex-1">
+                        <label style="font-size: 0.75rem; color: var(--color-text-muted);">セクション見出し</label>
+                        <select id="editor-pro-size-section" class="form-control form-control-sm">
+                          <option value="small">S (小)</option>
+                          <option value="medium" selected>M (中)</option>
+                          <option value="large">L (大)</option>
+                        </select>
+                      </div>
+                      <div class="form-group flex-1">
+                        <label style="font-size: 0.75rem; color: var(--color-text-muted);">質問項目ラベル</label>
+                        <select id="editor-pro-size-label" class="form-control form-control-sm">
+                          <option value="small">S (小)</option>
+                          <option value="medium" selected>M (中)</option>
+                          <option value="large">L (大)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- アラート ＆ 所要時間設定 -->
+                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
+                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">🕒 所要時間 ＆ ⚠️ 注意事項アラートボックス</span>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                      <input type="checkbox" id="editor-pro-show-duration" style="width: 16px; height: 16px; cursor: pointer;" />
+                      <label for="editor-pro-show-duration" style="font-size: 0.8rem; margin: 0; cursor: pointer;">所要時間目安を表示する</label>
+                    </div>
+                    <div class="form-group" id="pro-duration-input-group" style="display: none;">
+                      <input type="text" id="editor-pro-duration-text" class="form-control form-control-sm" placeholder="例: 所要時間 目安5~10分" />
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                      <input type="checkbox" id="editor-pro-show-alert" style="width: 16px; height: 16px; cursor: pointer;" />
+                      <label for="editor-pro-show-alert" style="font-size: 0.8rem; margin: 0; cursor: pointer;">注意事項アラートボックスを表示する</label>
+                    </div>
+                    <div class="form-group" id="pro-alert-input-group" style="display: none;">
+                      <textarea id="editor-pro-alert-text" class="form-control form-control-sm" rows="2" placeholder="例: 全項目を半角・全角の指定に沿ってご入力ください..."></textarea>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              <div class="overview-sections-header">
+                <h3>セクション構成一覧</h3>
+                <span id="overview-sections-count" class="badge">0個のセクション</span>
+              </div>
+
+              <div id="overview-sections-list" class="overview-sections-grid">
+                <!-- JSでセクション全体図がカードリストでレンダリングされます -->
+              </div>
+
+              <div class="overview-add-section-footer">
+                <button id="btn-overview-add-section" class="btn btn-secondary">＋ 新しいセクションを追加</button>
+              </div>
+            </div>
+
+            <!-- B. 【詳細編集画面】選択されたセクションの質問編集 -->
+            <div id="active-section-editor" class="section-editor-card" style="display: none;">
+              <div class="section-meta-edit">
+                <div class="form-group">
+                  <label for="editor-section-title">セクションタイトル</label>
+                  <input type="text" id="editor-section-title" class="form-control sec-title-input" />
+                </div>
+                <div class="form-group">
+                  <label for="editor-section-desc">セクション説明</label>
+                  <textarea id="editor-section-desc" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="form-group inline-group">
+                  <label for="editor-section-next">このセクション完了後の動作：</label>
+                  <select id="editor-section-next" class="form-control inline-select">
+                    <!-- 動的に他のセクションが追加されます -->
+                  </select>
+                </div>
+              </div>
+
+              <div class="questions-header">
+                <h3>質問項目</h3>
+                <div class="editor-question-actions" style="display: flex; gap: 10px; align-items: center;">
+                  <select id="select-preset-question" class="form-control" style="width: auto; font-size: 0.8rem; height: 32px; padding: 4px 8px; background-color: var(--color-bg-input);">
+                    <option value="">-- プリセットから追加 --</option>
+                    <option value="name">氏名</option>
+                    <option value="email">メールアドレス</option>
+                    <option value="tel">電話番号</option>
+                    <option value="zip">郵便番号</option>
+                    <option value="bank_account">口座番号</option>
+                    <option value="invoice">インボイス登録番号</option>
+                    <option value="address">住所</option>
+                    <option value="prefecture">都道府県</option>
+                    <option value="password">パスワード（確認用付き）</option>
+                  </select>
+                  <button id="btn-add-question" class="btn btn-secondary btn-sm">＋ 質問を追加</button>
+                </div>
+              </div>
+
+              <div id="questions-container" class="questions-list">
+                <!-- 質問カードが動的に挿入されます -->
+              </div>
+
+              <div class="section-footer-actions-row">
+                <button id="btn-back-to-overview" class="btn btn-secondary">← 全体概要に戻る</button>
+                <button id="btn-delete-section" class="btn btn-danger">このセクションを削除</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右サイドバー: リアルタイム ライブプレビュー (NEW!) -->
+          <div class="editor-live-preview-pane">
+            <div class="live-preview-header">
+              <span>👁️ リアルタイム ライブプレビュー (回答者画面イメージ)</span>
+            </div>
+            <div class="live-preview-scroll-container">
+              <!-- スマホ風の美しいデバイスモックアップ -->
+              <div class="device-mockup">
+                <div class="device-notch"></div>
+                <div class="device-status-bar">
+                  <span>9:41</span>
+                  <span style="letter-spacing: 1px;">📶 🛜 🔋</span>
+                </div>
+                <div class="device-screen-content">
+                  <div id="live-preview-logo-area" class="preview-logo-container" style="display: none; text-align: center; margin-bottom: 0.5rem; font-size: 0.75rem; font-weight: 500; color: var(--color-text-muted);">
+                    <span id="live-preview-logo-text">株式会社wayway</span>
+                  </div>
+                  <div id="live-preview-form-header" class="preview-form-header" style="text-align: center; margin-bottom: 1.2rem;">
+                    <h1 id="live-preview-form-title" style="font-size: 1.2rem; margin-bottom: 4px; font-weight: 700;">フォームのタイトル</h1>
+                    <p id="live-preview-form-subtitle" class="preview-form-subtitle-pro" style="display: none; text-align: center; font-size: 0.85rem; font-weight: 600; margin-top: 0.25rem; color: var(--color-primary);"></p>
+                    <p id="live-preview-form-desc" style="font-size: 0.7rem; color: var(--color-text-muted); line-height: 1.4;">フォームの説明</p>
+                    <p id="live-preview-form-disclaimer" class="preview-form-disclaimer-pro" style="display: none; text-align: center; font-size: 0.6rem; color: var(--color-text-muted); margin-top: 0.5rem; line-height: 1.4;"></p>
+                  </div>
+                  
+                  <div id="live-preview-announcement-area" class="preview-announcement-container" style="display: none; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; width: 100%;">
+                    <div id="live-preview-duration-box" class="preview-duration-badge" style="display: none; align-items: center; gap: 4px; font-size: 0.65rem; color: var(--color-text-muted); font-weight: 500; padding: 0.25rem 0;">
+                      <span>🕒</span> <span id="live-preview-duration-value">所要時間 目安5~10分</span>
+                    </div>
+                    <div id="live-preview-alert-box" class="preview-alert-card" style="display: none; padding: 6px 8px; background: #fffdf0; border: 1px solid #ffeeba; border-radius: var(--border-radius-sm); font-size: 0.65rem; color: #856404; line-height: 1.4; font-weight: 500;">
+                      <span id="live-preview-alert-value">注意事項が入ります</span>
+                    </div>
+                  </div>
+
+                  <div class="progress-bar-container" id="live-progress-bar-container" style="margin-bottom: 1rem; height: 12px; background: rgba(0,0,0,0.05); border-radius: 6px; position: relative;">
+                    <div id="live-preview-progress-bar" class="progress-bar" style="width: 0%; height: 100%; border-radius: 6px;"></div>
+                    <span id="live-preview-progress-text" class="progress-text" style="font-size: 0.6rem; line-height: 12px; position: absolute; right: 8px; top: 0;">セクション 1 / 1</span>
+                  </div>
+
+                  <div id="live-preview-section-container">
+                    <!-- ここに編集中の質問項目が即時レンダリングされます -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. フローマップ画面 -->
+      <section id="panel-flowmap" class="tab-panel" style="height: calc(100vh - 80px); min-height: 750px;">
+        <div class="flowmap-container" style="display: flex; flex-direction: column; height: 100%; overflow: visible !important;">
+          <div class="flowmap-toolbar" style="display: flex; justify-content: space-between; align-items: center; gap: 20px; border-bottom: 1px solid var(--color-border); padding-bottom: 12px; margin-bottom: 12px; position: relative; z-index: 100;">
+            <div class="toolbar-info" style="flex: 1; margin-bottom: 0;">
+              <h2 style="margin-top: 0; margin-bottom: 4px;">分岐フロー可視化マップ</h2>
+              <p style="margin: 0; font-size: 0.75rem;">セクション間の遷移と、質問の回答選択肢による分岐ルートを自動描画します。右端のドットからドラッグして接続先を直感的に変更できます。</p>
+            </div>
+            <div class="toolbar-actions" style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="flowmap-form-select" style="font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted); margin: 0; white-space: nowrap;">表示するフォーム:</label>
+                <select id="flowmap-form-select" class="form-control" style="width: 220px; font-size: 0.75rem; height: 30px; padding: 2px 8px; border-radius: var(--border-radius-sm); border: 1px solid var(--color-border); background: var(--color-bg-card); color: var(--color-text); font-weight: 600; cursor: pointer; position: relative; z-index: 101;"></select>
+              </div>
+              <button id="btn-refresh-flowmap" class="btn btn-secondary btn-sm" style="height: 30px; font-size: 0.75rem; display: flex; align-items: center; gap: 4px;">🔄 再描画</button>
+            </div>
+          </div>
+          <div class="flowmap-viewport" style="flex: 1; min-height: 650px; height: calc(100vh - 180px); position: relative; border: 1px solid var(--color-border); border-radius: var(--border-radius-sm); overflow: hidden;">
+            <iframe id="flowmap-iframe" src="flowmap-iframe.html" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;" onload="if (window.F && window.G) { window.F(window.G); }"></iframe>
+            
+            <!-- Viteの初期化エラー防止用ダミー要素（非表示） -->
+            <svg id="flowmap-svg" style="display: none; width: 0; height: 0;">
+              <g id="flowmap-edges"></g>
+              <g id="flowmap-nodes"></g>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. フォーム回答プレビュー画面 -->
+      <section id="panel-preview" class="tab-panel">
+        <div class="preview-container">
+          <div class="preview-card">
+            <div class="preview-badge">プレビューモード</div>
+            
+            <!-- プロ版用：会社ロゴ表示エリア -->
+            <div id="preview-logo-area" class="preview-logo-container" style="display: none; text-align: center; margin-bottom: 0.5rem; font-size: 0.8rem; font-weight: 500; color: var(--color-text-muted);">
+              <span id="preview-logo-text">株式会社wayway</span>
+            </div>
+
+            <div id="preview-form-header" class="preview-form-header">
+              <h1 id="preview-form-title">フォームのタイトル</h1>
+              <p id="preview-form-subtitle" class="preview-form-subtitle-pro" style="display: none; text-align: center; font-size: 1.2rem; font-weight: 600; margin-top: 0.5rem; color: var(--color-primary);"></p>
+              <p id="preview-form-desc">フォームの説明</p>
+              <p id="preview-form-disclaimer" class="preview-form-disclaimer-pro" style="display: none; text-align: center; font-size: 0.75rem; color: var(--color-text-muted); margin-top: 0.75rem; line-height: 1.4;"></p>
+            </div>
+
+            <!-- プロ版用：所要時間目安 ＆ 注意事項アラートボックス -->
+            <div id="preview-announcement-area" class="preview-announcement-container" style="display: none; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; width: 100%;">
+              <div id="preview-duration-box" class="preview-duration-badge" style="display: none; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--color-text-muted); font-weight: 500; padding: 0.25rem 0;">
+                <span>🕒</span> <span id="preview-duration-value">所要時間 目安5~10分</span>
+              </div>
+              <div id="preview-alert-box" class="preview-alert-card" style="display: none; padding: 12px 16px; background: #fffdf0; border: 1px solid #ffeeba; border-radius: var(--border-radius-sm); font-size: 0.8rem; color: #856404; line-height: 1.6; font-weight: 500;">
+                <span id="preview-alert-value">ここに注意事項が入ります</span>
+              </div>
+            </div>
+
+            <div class="progress-bar-container">
+              <div id="preview-progress-bar" class="progress-bar" style="width: 0%"></div>
+              <span id="preview-progress-text" class="progress-text">セクション 1 / 1</span>
+            </div>
+
+            <div id="preview-section-container">
+              <!-- 動的に質問項目がレンダリングされます -->
+            </div>
+
+            <div class="preview-actions">
+              <button id="btn-preview-back" class="btn btn-secondary">戻る</button>
+              <button id="btn-preview-next" class="btn btn-primary">次へ</button>
+              <button id="btn-preview-submit" class="btn btn-success" style="display: none;">送信</button>
+            </div>
+          </div>
+
+          <div id="preview-success-card" class="preview-card success-card" style="display: none;">
+            <div class="success-icon">🎉</div>
+            <h2>回答が送信されました</h2>
+            <p>ご協力ありがとうございました。</p>
+            
+            <!-- 後からアップロード・追加できるエリア（ファイル質問がある場合のみ表示） -->
+            <div id="post-upload-container" style="display: none; margin-top: 20px; margin-bottom: 20px; padding: 16px; border: 1.5px dashed var(--color-border); border-radius: var(--border-radius-sm); background-color: rgba(255,255,255,0.01); text-align: left;">
+              <h3 style="font-size: 0.95rem; margin-bottom: 4px; color: var(--color-text);">📎 追加の画像・ファイルのアップロード</h3>
+              <p style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 12px;">回答送信後も、こちらからファイルを後から追加したり削除したりできます。</p>
+              <div id="post-upload-sections" style="display: flex; flex-direction: column; gap: 16px;">
+                <!-- JSで質問ごとの追加アップロードUIが動的に挿入されます -->
+              </div>
+            </div>
+
+            <div class="submitted-data-box">
+              <h3>送信されたデータ（デバッグ用）</h3>
+              <pre id="submitted-data-json"></pre>
+            </div>
+
+            <button id="btn-preview-reset" class="btn btn-primary">もう一度回答する</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- JSONエクスポート・モーダル -->
+    <div id="modal-export" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>フォーム定義JSONの出力</h3>
+          <button id="btn-close-modal" class="modal-close-btn">×</button>
+        </div>
+        <div class="modal-body">
+          <p>このフォームのデータ構造です。コピーして保存し、再読み込みに利用できます。</p>
+          <textarea id="export-json-textarea" class="form-control code-textarea" readonly></textarea>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-copy-json" class="btn btn-primary">クリップボードにコピー</button>
+          <button id="btn-close-modal-footer" class="btn btn-secondary">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 正規表現AIアシスタント・モーダル -->
+    <div id="modal-regex-ai" class="modal-overlay">
+      <div class="modal-content" style="max-width: 480px;">
+        <div class="modal-header">
+          <h3>🤖 正規表現AIアシスタント (スプシ互換)</h3>
+          <button id="btn-close-regex-ai" class="modal-close-btn">×</button>
+        </div>
+        <div class="modal-body" style="display: flex; flex-direction: column; height: 380px; padding: 0;">
+          <!-- チャット履歴 -->
+          <div id="regex-chat-history" style="flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background-color: rgba(0,0,0,0.2); text-align: left;">
+            <!-- 初期メッセージ -->
+            <div class="chat-msg system-msg" style="align-self: flex-start; background-color: var(--color-bg-sidebar); border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; max-width: 85%; line-height: 1.4; color: var(--color-text);">
+              こんにちは！Googleスプレッドシートの「正規表現に一致」で使える正規表現をご案内します。作成したい形式を教えていただくか、以下のよくあるパターンを選択してください。
+            </div>
+          </div>
+          <!-- クイック選択チップ -->
+          <div style="display: flex; gap: 6px; padding: 8px 16px; overflow-x: auto; white-space: nowrap; border-top: 1px solid var(--color-border); background-color: rgba(255,255,255,0.01);">
+            <span class="chat-chip" data-query="郵便番号の正規表現を教えて">📮 郵便番号</span>
+            <span class="chat-chip" data-query="メールアドレスの正規表現を教えて">📧 メールアドレス</span>
+            <span class="chat-chip" data-query="電話番号の正規表現を教えて">📞 電話番号</span>
+            <span class="chat-chip" data-query="口座番号の正規表現を教えて">💳 口座番号</span>
+            <span class="chat-chip" data-query="インボイス番号の正規表現を教えて">🧾 インボイス番号</span>
+            <span class="chat-chip" data-query="半角英数字のみの正規表現を教えて">🔤 半角英数字</span>
+            <span class="chat-chip" data-query="全角カタカナのみの正規表現を教えて">📝 カタカナ</span>
+            <span class="chat-chip" data-query="日付(YYYY/MM/DD)の正規表現を教えて">📅 日付</span>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding: 12px 16px; display: flex; gap: 8px; border-top: 1px solid var(--color-border);">
+          <input type="text" id="regex-chat-input" class="form-control" style="font-size: 0.85rem;" placeholder="メッセージを入力..." />
+          <button id="btn-send-regex-chat" class="btn btn-primary btn-sm">送信</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ログイン・モーダル（オーバーレイ） -->
+    <div id="login-overlay" class="login-overlay">
+      <div class="login-box">
+        <div class="login-logo">
+          <span class="login-logo-icon">🔒</span>
+          <h2>シミュレーションログイン</h2>
+        </div>
+        <p class="login-subtitle">フォームの管理や作成にはログインが必要です。<br>検証したい権限のユーザーを選択してください。</p>
+        <div class="login-users-list" id="login-users-list">
+          <!-- JSでユーザーカードが動的に挿入されます -->
+        </div>
+    </div>
+
+    <style id="theme-sync-styles">
+      /* ログインオーバーレイの背景を、固定の黒ではなく親の背景（--color-bg-app）の透過色にする */
+      .login-overlay {
+        background-color: rgba(var(--overlay-bg-rgb, 11, 15, 25), 0.9) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+      }
+      
+      /* ログインカードを親のカード背景と枠線に調和させる */
+      .login-box {
+        background-color: var(--color-bg-card) !important;
+        border-color: var(--color-border) !important;
+        color: var(--color-text) !important;
+      }
+
+      .login-subtitle {
+        color: var(--color-text-muted) !important;
+      }
+
+      .login-logo h2 {
+        color: var(--color-text) !important;
+      }
+      
+      /* ログインユーザーカードの背景を、親の枠線や背景と調和させる */
+      .login-user-card {
+        background-color: var(--color-bg-app) !important;
+        border-color: var(--color-border) !important;
+        color: var(--color-text) !important;
+      }
+      
+      .login-user-card .user-name {
+        color: var(--color-text) !important;
+      }
+      
+      .login-user-card:hover {
+        background-color: var(--color-bg-card-hover) !important;
+        border-color: var(--color-primary) !important;
+      }
+
+      .login-user-card .user-avatar {
+        background-color: var(--color-bg-card-hover) !important;
+        color: var(--color-text-muted) !important;
+        border: 1px solid var(--color-border) !important;
+      }
+      
+      /* Google Forms 風のダッシュボードやプレビュー全体の背景も親の背景色に完全に同期 */
+      .dashboard-container, .editor-main, .preview-container, .flowmap-container {
+        background-color: var(--color-bg-app) !important;
+      }
+      
+      /* 入力フォームのプレビューなども親の背景色・枠線・文字色と同期 */
+      .form-control {
+        background-color: var(--color-bg-input, var(--color-bg-card)) !important;
+        border-color: var(--color-border) !important;
+        color: var(--color-text) !important;
+      }
+
+      .form-control:focus {
+        background-color: var(--color-bg-input-focus, var(--color-bg-card-hover)) !important;
+        border-color: var(--color-border-focus) !important;
+      }
+      
+      /* プレビュー内のカード背景 */
+      .preview-card {
+        background-color: var(--color-bg-card) !important;
+        border-color: var(--color-border) !important;
+        color: var(--color-text) !important;
+      }
+
+      .preview-form-header h1 {
+        color: var(--color-text) !important;
+      }
+
+      .preview-form-header p {
+        color: var(--color-text-muted) !important;
+      }
+
+      .preview-q-card {
+        background-color: var(--color-bg-app) !important;
+        border-color: var(--color-border) !important;
+      }
+
+      .preview-q-title {
+        color: var(--color-text) !important;
+      }
+
+      .preview-q-desc {
+        color: var(--color-text-muted) !important;
+      }
+
+      .preview-option-label {
+        background-color: var(--color-bg-card) !important;
+        border-color: var(--color-border) !important;
+        color: var(--color-text) !important;
+      }
+
+      .preview-option-label:hover {
+        background-color: var(--color-bg-card-hover) !important;
+        border-color: var(--color-edge, var(--color-border)) !important;
+      }
+
+      .preview-option-label.selected {
+        background-color: var(--color-primary-glow) !important;
+        border-color: var(--color-primary) !important;
+      }
+      
+      /* ダッシュボードの一覧も親のカード背景と同期 */
+      .gf-list-container {
+        background-color: var(--color-bg-card) !important;
+        border-color: var(--color-border) !important;
+      }
+
+      .gf-list-row {
+        border-bottom-color: var(--color-border) !important;
+      }
+
+      .gf-list-row:hover {
+        background-color: var(--color-bg-card-hover) !important;
+      }
+
+      .gf-list-title-text {
+        color: var(--color-text) !important;
+      }
+
+      .gf-list-owner-area, .gf-list-time-area {
+        color: var(--color-text-muted) !important;
+      }
+      
+      /* カードグリッド形式 */
+      .form-preview-card {
+        background-color: var(--color-bg-card) !important;
+        border-color: var(--color-border) !important;
+      }
+
+      .form-preview-card:hover {
+        border-color: var(--color-primary) !important;
+      }
+
+      .card-preview-body, .card-form-thumbnail {
+        background-color: var(--color-bg-app) !important;
+      }
+
+      .card-preview-footer-gf {
+        background-color: var(--color-bg-card) !important;
+        border-top-color: var(--color-border) !important;
+      }
+
+      .card-preview-title-gf {
+        color: var(--color-text) !important;
+      }
+
+      .card-preview-meta-gf {
+        color: var(--color-text-muted) !important;
+      }
+
+      /* ヘッダー全体の背景を親の背景色に透過度をかけて同期 */
+      .app-header {
+        background-color: rgba(var(--overlay-bg-rgb, 11, 15, 25), 0.85) !important;
+        border-bottom-color: var(--color-border) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+      }
+      
+      /* ヘッダー内ナビゲーション（タブバーのコンテナ）の背景 */
+      .header-nav {
+        background-color: var(--color-bg-card) !important;
+        border-color: var(--color-border) !important;
+      }
+      
+      /* タブの文字色とホバー色 */
+      .nav-tab {
+        color: var(--color-text-muted) !important;
+      }
+
+      .nav-tab:hover {
+        color: var(--color-text) !important;
+        background-color: var(--color-bg-card-hover) !important;
+      }
+
+      .nav-tab.active {
+        color: #ffffff !important;
+        background-color: var(--color-primary) !important;
+        box-shadow: 0 4px 10px var(--color-primary-glow) !important;
+      }
+      
+      /* ユーザープロフィールの表示部分 */
+      .user-profile-header {
+        border-right-color: var(--color-border) !important;
+      }
+
+      .user-profile-header .user-name {
+        color: var(--color-text) !important;
+      }
+
+      .user-profile-header .user-role {
+        color: var(--color-primary) !important;
+      }
+      
+      /* ボタン（セカンダリ、アウトライン等） */
+      .btn-secondary {
+        background-color: var(--color-bg-card) !important;
+        border-color: var(--color-border) !important;
+        color: var(--color-text) !important;
+      }
+
+      .btn-secondary:hover {
+        background-color: var(--color-bg-card-hover) !important;
+      }
+
+      /* ロゴタイトルを親のプライマリ・セカンダリのグラデーションに同期 */
+      .header-logo h1 {
+        background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%) !important;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+      }
+    </style>
+
+    <!-- プロ版機能紹介ポップアップ（ヒント小窓） -->
+    <div id="pro-feature-popup" class="pro-popup-hint" style="display: none; position: fixed; bottom: 20px; right: 20px; z-index: 9999; max-width: 320px; padding: 16px; background: #ffffff; border-radius: 6px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); border: 1px solid rgba(0,0,0,0.15); border-left: 4px solid #0056b3; color: #212529;">
+      <div style="display: flex; align-items: flex-start; gap: 8px;">
+        <span style="font-size: 1.25rem;">💡</span>
+        <div style="flex: 1; text-align: left;">
+          <h5 style="margin: 0 0 4px 0; font-size: 0.85rem; font-weight: 700; color: #0056b3;">プロ版へのアップグレード特典</h5>
+          <p id="pro-popup-hint-text" style="margin: 0; font-size: 0.75rem; line-height: 1.4; color: #6c757d;">プロ版なら、より高度な分岐ロジックや自由度の高いデザイン編集が利用可能になります！</p>
+          <button type="button" id="btn-popup-switch-pro" class="btn btn-sm btn-primary" style="margin-top: 10px; width: 100%; font-size: 0.75rem; padding: 4px 8px; font-weight: 600; cursor: pointer;">プロ版を試す 💎</button>
+        </div>
+        <button type="button" id="btn-close-pro-popup" style="background: none; border: none; cursor: pointer; font-size: 1.2rem; color: #6c757d; font-weight: bold; padding: 0 4px; line-height: 1;">&times;</button>
+      </div>
+    </div>
+
+    <script id="theme-init-script">
+      (function() {
+        // OS・親テーマ同期を解除し、基本背景を「白」とするライトテーマ変数で固定化する
+        const rootStyle = document.documentElement.style;
+        rootStyle.setProperty('--color-bg-app', '#ffffff');
+        rootStyle.setProperty('--color-bg-card', '#f8f9fa');
+        rootStyle.setProperty('--color-bg-card-hover', '#e9ecef');
+        rootStyle.setProperty('--color-bg-sidebar', '#f8f9fa');
+        rootStyle.setProperty('--color-bg-input', '#ffffff');
+        rootStyle.setProperty('--color-text', '#212529');
+        rootStyle.setProperty('--color-text-muted', '#6c757d');
+        rootStyle.setProperty('--color-border', '#dee2e6');
+        rootStyle.setProperty('--color-primary', '#0056b3');
+        rootStyle.setProperty('--color-primary-hover', '#004085');
+        rootStyle.setProperty('--color-secondary', '#6c757d');
+        rootStyle.setProperty('--color-secondary-hover', '#5a6268');
+        
+        document.body.classList.remove('theme-dark');
+        document.body.classList.add('theme-light');
+        document.documentElement.style.setProperty('color-scheme', 'light');
+        document.documentElement.setAttribute('data-theme', 'light');
+      })();
+    </script>
+
+    <!-- モジュールスクリプトのエントリ -->
+  </body>
+</html>

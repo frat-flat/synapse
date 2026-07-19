@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Synapse</title>
+
+<link rel="stylesheet" href="styles.css?v=2.1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<div id="impersonate-preview-bar" style="display: none; background: #eab308; color: #1e293b; padding: 0.5rem 1rem; text-align: center; font-size: 0.9rem; font-weight: bold; position: sticky; top: 0; z-index: 10000; box-shadow: var(--shadow-md); align-items: center; justify-content: center; gap: 1rem;">
+<span>⚠️ 現在 <span id="previewing-user-name" style="text-decoration: underline;">-</span> の権限ビューをプレビュー中 (<span id="previewing-mode-name">-</span>)</span>
+<button id="preview-quit-btn" class="btn btn-sm" style="background: #1e293b; color: #ffffff; border: none; padding: 0.25rem 0.75rem; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.8rem;">プレビューを終了して管理者に復帰</button>
+</div>
+
+<div class="app-layout">
+<!-- 左サイドメニューバー（ログイン後に表示） -->
+<aside id="app-sidebar" class="sidebar-menu" style="display: none;">
+<div class="logo-section" id="sidebar-logo-btn" style="cursor: pointer;" title="ホーム画面へ">
+<div class="logo-icon">S</div>
+<span class="logo-text">Synapse</span>
+</div>
+<nav class="sidebar-nav">
+        <div class="sidebar-accordion" id="appoint-accordion" style="margin-top: 0.5rem;">
+          <button class="accordion-header" id="menu-appoint-parent">
+            <span>📅 アポイント</span>
+            <span class="accordion-icon">▼</span>
+          </button>
+          <div class="accordion-content" id="menu-appoint-content">
+            <button class="nav-item" id="menu-new-appoint" data-tab="appointment-new">新規アポイント</button>
+            <button class="nav-item" id="menu-existing-appoint" data-tab="appointment-existing">既存顧客アポイント</button>
+            <button class="nav-item" id="menu-drafts-list" data-tab="drafts-view-screen">一時保存一覧</button>
+            <button class="nav-item" id="menu-history-list" data-tab="history-view-screen">アポイント履歴</button>
+            <button class="nav-item" id="menu-link-official" data-tab="link-official-screen">本登録ID紐付け</button>
+          </div>
+        </div>
+        <!-- 代理店情報アコーディオン -->
+        <div class="sidebar-accordion" id="agency-accordion" style="margin-top: 0.5rem;">
+          <button class="accordion-header" id="menu-agency-parent">
+            <span>💼 代理店情報</span>
+            <span class="accordion-icon">▼</span>
+          </button>
+          <div class="accordion-content" id="menu-agency-content" style="padding-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
+            <button class="nav-item" id="menu-agency-info" data-tab="agency-info-screen">📊 代理店 基本マスタ</button>
+          </div>
+        </div>
+        <!-- JO情報アコーディオン -->
+        <div class="sidebar-accordion" id="jo-accordion" style="margin-top: 0.5rem;">
+          <button class="accordion-header" id="menu-jo-parent">
+            <span>📑 JO情報</span>
+            <span class="accordion-icon">▼</span>
+          </button>
+          <div class="accordion-content" id="menu-jo-content" style="padding-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
+            <button class="nav-item" id="menu-jo-info" data-tab="jo-info-screen">📊 JO 基本マスタ</button>
+          </div>
+        </div>
+        <!-- 申込者情報アコーディオン -->
+        <div class="sidebar-accordion" id="applicant-accordion" style="margin-top: 0.5rem;">
+          <button class="accordion-header" id="menu-applicant-parent">
+            <span>📋 申込者情報</span>
+            <span class="accordion-icon">▼</span>
+          </button>
+          <div class="accordion-content" id="menu-applicant-content" style="padding-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
+            <button class="nav-item" id="menu-applicant-info" data-tab="applicant-info-screen">📊 申込者 基本マスタ</button>
+          </div>
+        </div>
+
+        <button class="nav-item" id="menu-form-customize" data-tab="form-customize-screen" style="margin-top: 0.5rem;">📋 フォーム作成</button>
+        <button class="nav-item" id="menu-table-creator" data-tab="table-creator-screen" style="margin-top: 0.5rem;">📊 テーブル作成</button>
+
+</nav>
+<div class="user-profile-section" style="position: relative;">
+<!-- 設定ポップアップ (非表示) -->
+<div id="sidebar-settings-popup" class="settings-popup" style="display: none;">
+<!-- テーマ切り替え -->
+<div class="theme-selector-container" style="margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.35rem;">
+<span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">テーマ選択</span>
+<select id="theme-selector" style="background: var(--bg-surface-elevated); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.35rem 0.5rem; font-size: 0.8rem; cursor: pointer; outline: none; width: 100%; box-sizing: border-box;">
+<option value="dark">ダークモード</option>
+<option value="light">ライトモード</option>
+<option value="warm">ウォームモード</option>
+</select>
+</div>
+<!-- 色味調整 -->
+<div class="color-tone-selectors" style="display: flex; flex-direction: column; gap: 0.75rem;">
+<!-- 色合い (Hue) -->
+<div style="display: flex; flex-direction: column; gap: 0.25rem;">
+<div style="display: flex; align-items: center; justify-content: space-between;">
+<span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">色合いの微調整</span>
+<span id="hue-value-label" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">0°</span>
+</div>
+<input type="range" id="hue-slider" class="theme-slider-input" min="0" max="360" step="1" value="0">
+</div>
+<!-- 鮮やかさ (Saturation) -->
+<div style="display: flex; flex-direction: column; gap: 0.25rem;">
+<div style="display: flex; align-items: center; justify-content: space-between;">
+<span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">鮮やかさの微調整</span>
+<span id="saturation-value-label" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">100%</span>
+</div>
+<input type="range" id="saturation-slider" class="theme-slider-input" min="50" max="150" step="1" value="100">
+</div>
+</div>
+<!-- Supabase接続設定 -->
+<div style="margin-top: 1.25rem; border-top: 1px solid var(--border-color); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; text-align: left;">
+  <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">☁️ Supabase 接続設定</span>
+  <input type="text" id="supabase-url" placeholder="https://your-project.supabase.co" style="background: var(--bg-surface-elevated); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.35rem 0.5rem; font-size: 0.8rem; outline: none; width: 100%; box-sizing: border-box;">
+  <input type="password" id="supabase-anon-key" placeholder="Anon Key" style="background: var(--bg-surface-elevated); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.35rem 0.5rem; font-size: 0.8rem; outline: none; width: 100%; box-sizing: border-box;">
+  <button id="btn-save-supabase" class="btn btn-primary" style="font-size: 0.75rem; padding: 0.4rem; width: 100%; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.25rem;">
+    🔄 接続保存 & 同期
+  </button>
+</div>
+</div>
+
+<!-- 管理者用プレビュー切り替えパネル -->
+<div id="admin-preview-panel" style="display: none; margin-bottom: 0.75rem; padding: 0.5rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); width: 100%; box-sizing: border-box;">
+<div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.35rem;">👁️ 権限ビュープレビュー</div>
+<div style="display: flex; flex-direction: column; gap: 0.35rem;">
+<select id="preview-user-select" style="width: 100%; padding: 0.25rem 0.5rem; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.8rem; outline: none; cursor: pointer;">
+<option value="">-- アカウント選択 --</option>
+<option value="sales_01">営業担当A (sales_01)</option>
+<option value="sales_02">営業担当B (sales_02)</option>
+<option value="support_01">開設サポートA (support_01)</option>
+</select>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 0.25rem;">
+<label style="font-size: 0.7rem; color: var(--text-secondary); cursor: pointer; display: inline-flex; align-items: center; gap: 0.2rem;">
+<input type="checkbox" id="preview-grayout-chk" style="transform: scale(0.9);" /> グレー表示
+</label>
+<button id="preview-apply-btn" class="btn btn-sm btn-primary" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;">適用</button>
+</div>
+</div>
+</div>
+
+<div class="user-profile" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+<div style="display: flex; align-items: center; gap: 0.5rem;">
+<div class="user-avatar" id="logged-in-user-avatar">A</div>
+<span class="user-name" id="logged-in-user-name">営業担当A</span>
+</div>
+<button id="sidebar-settings-btn" class="btn-icon" style="background: none; border: none; font-size: 1.1rem; cursor: pointer; color: var(--text-secondary); padding: 0.25rem; transition: color 0.2s;" title="テーマ・色味設定">⚙</button>
+</div>
+<button class="btn-text" id="logout-btn" style="font-size: 0.8rem; margin-top: 0.5rem; text-align: left; padding: 0.5rem 0; width: 100%;">ログアウト</button>
+</div>
+</aside>
+
+<!-- サイドバー開閉矢印ボタン（ログイン後に表示） -->
+<button id="sidebar-toggle-btn" class="sidebar-toggle-arrow" style="display: none;">〈〈〈</button>
+
+<!-- 右側メインコンテンツ領域 -->
+<div class="main-content">
+<!-- トップバー（ログイン後に表示） -->
+<div id="main-header" class="main-header" style="display: none; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem;">
+<div class="header-title-section" style="font-weight: 600; font-size: 1rem; color: var(--text-primary);">
+ワークスペース
+</div>
+</div>
+
+<div style="display: flex; align-items: center; gap: 1rem;">
+<!-- 🔍 表示倍率（ズーム）コントロール -->
+<div id="global-zoom-controls" class="zoom-controls" style="display: flex; align-items: center; gap: 0.4rem; background: var(--bg-surface-elevated); padding: 0.25rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.8rem;">
+<span style="color: var(--text-muted); font-weight: 500;">表示倍率:</span>
+<button id="zoom-out-btn" class="btn-icon" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.1rem 0.25rem; font-size: 0.75rem;" title="縮小">➖</button>
+<span id="zoom-level-label" style="font-weight: 600; min-width: 36px; text-align: center; color: var(--text-primary);">100%</span>
+<button id="zoom-in-btn" class="btn-icon" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.1rem 0.25rem; font-size: 0.75rem;" title="拡大">➕</button>
+<button id="zoom-reset-btn" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xs); cursor: pointer; color: var(--text-secondary); margin-left: 0.25rem;" title="100%に戻す">リセット</button>
+</div>
+
+<!-- 表示モード切り替え -->
+<div id="global-mode-switch-container" class="mode-switch-container" style="display: flex; align-items: center; gap: 0.75rem;">
+<span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">表示モード:</span>
+<div class="mode-switch-tabs">
+<button id="btn-mode-sales" class="mode-switch-btn active">営業担当用</button>
+<button id="btn-mode-support" class="mode-switch-btn">開設サポート用</button>
+<button id="btn-mode-admin" class="mode-switch-btn">管理者用</button>
+</div>
+</div>
+</div>
+
+
+<!-- 画面上部のタブバー（ログイン後に表示） -->
+<div id="tabs-outer-wrapper" class="tabs-outer-wrapper" style="display: none;">
+<div id="tabs-container" class="tabs-container">
+<div id="app-tabs-bar" class="tabs-bar">
+<!-- JSで動的にタブを生成します -->
+</div>
+</div>
+<button id="tabs-toggle-btn" class="tabs-toggle-arrow" title="タブバーを折りたたむ">▲▲▲</button>
+</div>
+
+<main>
+<!-- ================= フォーム作成画面 ================= -->
+<section id="form-customize-screen" class="screen-view" style="padding: 0; height: calc(100vh - 120px); min-height: 600px;">
+<iframe src="form-customize/index.html" style="width: 100%; height: 100%; border: none;"></iframe>
+</section>
+
+<!-- ================= カスタムテーブル画面 ================= -->
+<section id="custom-table-screen" class="screen-view">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+    <div style="display: flex; align-items: center; gap: 1.5rem;">
+      <h1 style="margin-bottom: 0; display: flex; align-items: center; gap: 0.5rem;">
+        📊 <input type="text" id="ct-table-name-input" class="inline-edit-input" style="font-size: 1.5rem; font-weight: bold; border: none; background: transparent; outline: none; color: var(--text-primary); cursor: pointer;" title="クリックしてテーブル名を変更">
+      </h1>
+      
+      <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; background: var(--bg-surface-elevated); padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+        <span style="color: var(--text-secondary); font-weight: 500;">配置フォルダ:</span>
+        <select id="ct-table-parent-select" style="background: transparent; color: var(--text-primary); border: none; outline: none; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+          <option value="root">第一階層（ルート）</option>
+        </select>
+      </div>
+
+      <div id="ct-column-selector-container" style="position: relative;">
+        <button class="btn-secondary" id="ct-column-selector-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
+          ⚙️ 表示項目の選択 ▼
+        </button>
+        <div id="ct-column-selector-dropdown" class="filter-dropdown" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 5px; z-index: 100; min-width: 250px; padding: 0.75rem; max-height: 400px; overflow-y: auto;">
+          <!-- JSで動的チェックボックス -->
+        </div>
+      </div>
+      
+      <div id="ct-frame-fix-container" style="position: relative;">
+        <button class="btn-secondary" id="ct-frame-fix-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
+          📌 枠の固定 ▼
+        </button>
+        <div id="ct-frame-fix-dropdown" class="filter-dropdown" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 5px; z-index: 100; min-width: 220px; padding: 0.75rem;">
+          <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">ウィンドウ枠の固定</div>
+          <div style="margin-bottom: 0.75rem;">
+            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">列の固定基準</label>
+            <select id="ct-fix-col-select" style="width: 100%; padding: 0.3rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.8rem; border-radius: var(--radius-sm); outline: none;">
+              <option value="none">固定しない</option>
+            </select>
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">行の固定基準</label>
+            <select id="ct-fix-row-select" style="width: 100%; padding: 0.3rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.8rem; border-radius: var(--radius-sm); outline: none;">
+              <option value="none">固定しない</option>
+              <option value="1">1行目まで固定</option>
+              <option value="2">2行目まで固定</option>
+              <option value="3">3行目まで固定</option>
+              <option value="5">5行目まで固定</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="ct-format-toolbar" class="format-toolbar" style="margin-bottom: 0.5rem;">
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="ct-font-dec" title="文字サイズ縮小">➖</button>
+      <input type="number" id="ct-font-size-input" class="toolbar-input" value="10" min="6" max="24" title="文字サイズ" readonly>
+      <button class="toolbar-btn" id="ct-font-inc" title="文字サイズ拡大">➕</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn text-bold" id="ct-text-bold" title="太字">B</button>
+      <button class="toolbar-btn text-italic" id="ct-text-italic" title="斜体">/</button>
+      <button class="toolbar-btn text-strike" id="ct-text-strike" title="取り消し線">S</button>
+      <div style="position: relative; display: inline-block;">
+        <button class="toolbar-btn" id="ct-text-color-btn" title="文字色">
+          <span id="ct-text-color-indicator" style="border-bottom: 3px solid var(--text-primary); padding-bottom: 1px;">A</span>
+        </button>
+        <div id="ct-color-picker-dropdown" class="color-picker-dropdown" style="display: none;">
+          <div class="color-palette-grid">
+            <div class="color-swatch" style="background-color: var(--text-primary);" data-color="var(--text-primary)" title="標準色">A</div>
+            <div class="color-swatch" style="background-color: var(--cell-red-text);" data-color="var(--cell-red-text)" title="赤"></div>
+            <div class="color-swatch" style="background-color: var(--cell-orange-text);" data-color="var(--cell-orange-text)" title="オレンジ"></div>
+            <div class="color-swatch" style="background-color: var(--cell-yellow-text);" data-color="var(--cell-yellow-text)" title="黄"></div>
+            <div class="color-swatch" style="background-color: var(--cell-green-text);" data-color="var(--cell-green-text)" title="緑"></div>
+            <div class="color-swatch" style="background-color: var(--cell-blue-text);" data-color="var(--cell-blue-text)" title="青"></div>
+            <div class="color-swatch" style="background-color: var(--cell-purple-text);" data-color="var(--cell-purple-text)" title="紫"></div>
+            <div class="color-swatch" style="background-color: var(--cell-gray-text);" data-color="var(--cell-gray-text)" title="グレー"></div>
+          </div>
+          <div style="border-top: 1px solid var(--border-color); padding: 0.35rem 0.5rem; display: flex; align-items: center; gap: 0.35rem; justify-content: space-between;">
+            <span style="font-size: 0.7rem; color: var(--text-muted);">カスタム:</span>
+            <input type="color" id="ct-text-color-custom" style="width: 24px; height: 20px; border: none; cursor: pointer; background: transparent;">
+          </div>
+        </div>
+      </div>
+      <div style="position: relative; display: inline-block;">
+        <button class="toolbar-btn" id="ct-bg-color-btn" title="背景色">
+          <span id="ct-bg-color-indicator" style="border-bottom: 3px solid transparent; padding-bottom: 1px;">🎨</span>
+        </button>
+        <div id="ct-bg-color-picker-dropdown" class="color-picker-dropdown" style="display: none;">
+          <div class="color-palette-grid">
+            <div class="color-swatch" style="background-color: transparent; border: 1px solid var(--border-color);" data-color="transparent" title="なし">✖</div>
+            <div class="color-swatch" style="background-color: var(--cell-red-bg);" data-color="var(--cell-red-bg)" title="赤"></div>
+            <div class="color-swatch" style="background-color: var(--cell-orange-bg);" data-color="var(--cell-orange-bg)" title="オレンジ"></div>
+            <div class="color-swatch" style="background-color: var(--cell-yellow-bg);" data-color="var(--cell-yellow-bg)" title="黄"></div>
+            <div class="color-swatch" style="background-color: var(--cell-green-bg);" data-color="var(--cell-green-bg)" title="緑"></div>
+            <div class="color-swatch" style="background-color: var(--cell-blue-bg);" data-color="var(--cell-blue-bg)" title="青"></div>
+            <div class="color-swatch" style="background-color: var(--cell-purple-bg);" data-color="var(--cell-purple-bg)" title="紫"></div>
+            <div class="color-swatch" style="background-color: var(--cell-gray-bg);" data-color="var(--cell-gray-bg)" title="グレー"></div>
+          </div>
+          <div style="border-top: 1px solid var(--border-color); padding: 0.35rem 0.5rem; display: flex; align-items: center; gap: 0.35rem; justify-content: space-between;">
+            <span style="font-size: 0.7rem; color: var(--text-muted);">カスタム:</span>
+            <input type="color" id="ct-bg-color-custom" style="width: 24px; height: 20px; border: none; cursor: pointer; background: transparent;">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="ct-align-left" title="左揃え">左</button>
+      <button class="toolbar-btn" id="ct-align-center" title="中央揃え">中</button>
+      <button class="toolbar-btn" id="ct-align-right" title="右揃え">右</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="ct-valign-top" title="上揃え">上</button>
+      <button class="toolbar-btn" id="ct-valign-middle" title="中央揃え">均</button>
+      <button class="toolbar-btn" id="ct-valign-bottom" title="下揃え">下</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="ct-wrap-clip" title="切り詰め">⇥</button>
+      <button class="toolbar-btn" id="ct-wrap-wrap" title="折り返し">↵</button>
+      <button class="toolbar-btn" id="ct-wrap-overflow" title="はみ出し">⇄</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group" style="position: relative;">
+      <button class="toolbar-btn" id="ct-conditional-formatting-btn" title="条件付き書式">🎨 条件付き書式</button>
+      <button class="toolbar-btn" id="ct-format-paint-btn" title="書式のコピー（ペイントフォーマット）">🖌</button>
+    </div>
+  </div>
+
+  <!-- ⚙️ データ操作用アクションバー -->
+  <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; background: var(--bg-surface-elevated); padding: 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); align-items: center;">
+    <span style="font-size: 0.8rem; font-weight: bold; color: var(--text-secondary); margin-right: 0.5rem;">⚙️ データ操作:</span>
+    <button class="btn btn-primary" id="ct-add-single-row-btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem;">
+      ➕ 1件登録
+    </button>
+    <button class="btn btn-secondary" id="ct-csv-import-btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem;">
+      📥 CSVインポート
+    </button>
+    <input type="file" id="ct-csv-import-file-input" accept=".csv" style="display: none;">
+    <button class="btn btn-secondary" id="ct-csv-export-btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem;">
+      📤 CSVエクスポート
+    </button>
+    <div style="border-left: 1px solid var(--border-color); height: 18px; margin: 0 0.25rem;"></div>
+    <button class="btn btn-secondary" id="ct-add-row-btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem;">
+      ➕ 空白行追加
+    </button>
+    <button class="btn btn-danger" id="ct-delete-row-btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem; background: var(--danger); border-color: var(--danger); color: white;">
+      ❌ 選択行削除
+    </button>
+  </div>
+
+  <div class="list-section">
+    <div class="sticky-table-wrapper" style="max-height: calc(100vh - 250px); overflow: auto;">
+      <table class="spreadsheet-table" style="min-width: 100%; border-collapse: separate; border-spacing: 0;">
+        <thead id="ct-table-thead">
+          <!-- JSで動的描画 -->
+        </thead>
+        <tbody id="ct-table-body">
+          <!-- JSで動的描画 -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ログイン画面 ================= -->
+<section id="login-screen" class="screen-view active">
+<div class="login-layout">
+<div class="login-card">
+<div class="login-logo">
+<div class="logo-icon">S</div>
+<span class="logo-text">Synapse</span>
+</div>
+<h2>ログイン</h2>
+<form id="login-form">
+<div class="form-group" style="text-align: left;">
+<label for="login-id">担当者ID</label>
+<input type="text" id="login-id" value="sales_01" required>
+</div>
+<div class="form-group" style="text-align: left;">
+<label for="login-pass">パスワード</label>
+<input type="text" id="login-pass" value="password" required style="-webkit-text-security: disc;">
+</div>
+<button type="submit" class="btn-primary" style="width: 100%; padding: 0.85rem; font-size: 1rem; margin-top: 1rem;">ログイン</button>
+</form>
+</div>
+</div>
+</section>
+
+<!-- ================= ホーム画面 ================= -->
+<section id="home-screen" class="screen-view">
+<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+<h1 style="margin-bottom: 0; font-size: 1.4rem;">ホーム</h1>
+</div>
+<div class="list-section" style="padding: 1.5rem; background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); position: relative; margin-bottom: 1.5rem;">
+  <div style="margin-bottom: 0.5rem; display: flex; flex-direction: column; gap: 0.75rem;">
+    <p style="font-size: 0.9rem; color: var(--text-secondary); text-align: left; margin: 0; font-weight: 600;">🔍 顧客ID・名前・電話番号でマスタ横断検索</p>
+    <div style="display: flex; gap: 0.5rem; width: 100%;">
+      <input type="text" id="global-search-input" placeholder="顧客ID、名前、または電話番号を入力..." style="flex: 1; padding: 0.6rem 1rem; font-size: 0.9rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+      <button class="btn btn-primary" id="global-search-btn" style="padding: 0.6rem 1.5rem; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; cursor: pointer;">
+        🔍 検索
+      </button>
+    </div>
+    <!-- 検索結果表示エリア -->
+    <div id="global-search-results" style="display: none; margin-top: 1rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; max-height: 300px; overflow-y: auto; text-align: left;">
+      <!-- 検索結果が動的に追加されます -->
+    </div>
+    <div id="global-search-empty-msg" style="display: none; margin-top: 0.75rem; font-size: 0.85rem; color: var(--danger); font-weight: 500; text-align: left;">
+      ⚠️ 該当するマスタ情報が見つかりませんでした。入力内容をお確かめください。
+    </div>
+  </div>
+</div>
+
+<!-- 🔑 管理者専用コントロールパネル -->
+<div id="admin-home-panel" style="display: none; margin-top: 1rem; flex-direction: column; gap: 0.5rem; text-align: left;">
+<h2 style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); padding-bottom: 0.25rem; margin-top: 0.25rem; display: flex; align-items: center; gap: 0.3rem;">
+🛠️ 管理者コントロールパネル
+</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 0.75rem; margin-top: 0.25rem;">
+<!-- フォーム作成 -->
+<div class="admin-app-icon" id="admin-panel-form-btn" title="フォーム作成&#13;各種入力フォームの項目と表示規則をカスタマイズします。" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.6rem 0.4rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; aspect-ratio: 1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+<span style="font-size: 1.8rem; line-height: 1;">📄</span>
+<div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">フォーム作成</div>
+</div>
+<!-- テーブル作成 -->
+<div class="admin-app-icon" id="admin-panel-table-btn" title="テーブル作成&#13;新規のスプレッドシート型データテーブルを作成します。" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.6rem 0.4rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; aspect-ratio: 1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+<span style="font-size: 1.8rem; line-height: 1;">📊</span>
+<div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">テーブル作成</div>
+</div>
+<!-- 権限設定 -->
+<div class="admin-app-icon" id="admin-panel-perm-btn" title="権限設定&#13;フォルダ、テーブル、カラム、行の詳細なアクセス権を設定します。" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.6rem 0.4rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; aspect-ratio: 1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+<span style="font-size: 1.8rem; line-height: 1;">🔑</span>
+<div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">権限設定</div>
+</div>
+<!-- 操作ログ履歴 -->
+<div class="admin-app-icon" id="admin-panel-audit-btn" title="操作ログ履歴&#13;セル編集履歴をミリ秒精度で横断検索・閲覧します。" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.6rem 0.4rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; aspect-ratio: 1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+<span style="font-size: 1.8rem; line-height: 1;">📈</span>
+<div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">操作ログ履歴</div>
+</div>
+<!-- パートナーDB -->
+<div class="admin-app-icon" id="admin-panel-partner-btn" title="パートナーDB&#13;接続中のパートナー外部DBを閲覧します（閲覧専用）。" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.6rem 0.4rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; aspect-ratio: 1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+<span style="font-size: 1.8rem; line-height: 1;">🛢️</span>
+<div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">パートナーDB</div>
+</div>
+<!-- フォルダ管理 -->
+<div class="admin-app-icon" id="admin-panel-folder-btn" title="フォルダ管理&#13;サイドバーのカスタムフォルダの追加、編集、階層変更、削除を行います。" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.6rem 0.4rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; aspect-ratio: 1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+<span style="font-size: 1.8rem; line-height: 1;">📁</span>
+<div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">フォルダ管理</div>
+</div>
+</div>
+</div>
+</section>
+
+
+
+<!-- ================= アポイントダッシュボード画面 ================= -->
+<section id="dashboard-screen" class="screen-view">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <div>
+      <h1 style="margin-bottom: 0.25rem;">アポイント</h1>
+      <p style="margin-bottom: 0;">今日もアポイントの記録を取りこぼさずに残しましょう。</p>
+    </div>
+  </div>
+
+  <!-- 5つのメインアクションカード -->
+  <div class="dashboard-grid">
+    <div class="dashboard-card" id="card-new-appoint">
+      <div class="card-icon">➕</div>
+      <div class="card-info">
+        <h3>新規アポイント開始</h3>
+        <p>初めてお会いする方とのアポイント記録をすぐに開始します。</p>
+      </div>
+    </div>
+    
+    <div class="dashboard-card" id="card-existing-appoint">
+      <div class="card-icon">👤</div>
+      <div class="card-info">
+        <h3>既存顧客アポイント開始</h3>
+        <p>登録済みの既存顧客を検索し、アポイント履歴を紐付けて記録します。</p>
+      </div>
+    </div>
+
+    <div class="dashboard-card" id="card-drafts-list">
+      <div class="card-icon">📁</div>
+      <div class="card-info">
+        <h3>一時保存一覧</h3>
+        <p>下書き保存中のアポイントが <span id="drafts-count-badge" class="badge badge-draft">0</span> 件あります。追記して正式登録を行えます。</p>
+      </div>
+    </div>
+
+    <div class="dashboard-card" id="card-history-list">
+      <div class="card-icon">📜</div>
+      <div class="card-info">
+        <h3>アポイント履歴</h3>
+        <p>これまでに完了したアポイントの履歴を一覧で確認します。</p>
+      </div>
+    </div>
+
+    <div class="dashboard-card" id="card-link-official">
+      <div class="card-icon">🔗</div>
+      <div class="card-info">
+        <h3>本登録IDの紐付け</h3>
+        <p>新しく本登録した顧客の正式IDに、過去のアポイント履歴（仮ID）を紐付けます。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ダッシュボード下部: 最近の一時保存および登録履歴のプレビュー -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+    <!-- 一時保存プレビュー -->
+    <div class="list-section">
+      <div class="section-header">
+        <h2>最近の一時保存（下書き）</h2>
+        <button class="btn-text" id="view-all-drafts-btn">すべて見る</button>
+      </div>
+      <div class="history-list" id="dashboard-drafts-container">
+        <!-- JSで動的描画 -->
+      </div>
+    </div>
+
+    <!-- 履歴プレビュー -->
+    <div class="list-section">
+      <div class="section-header">
+        <h2>最近の正式登録履歴</h2>
+        <button class="btn-text" id="view-all-history-btn">すべて見る</button>
+      </div>
+      <div class="history-list" id="dashboard-history-container">
+        <!-- JSで動的描画 -->
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= テーブル作成画面 ================= -->
+<section id="table-creator-screen" class="screen-view">
+  <div style="max-width: 600px; margin: 0 auto; padding: 2rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-lg);">
+    <h2 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1.5rem; color: var(--text-primary); border-bottom: 2px solid var(--primary); padding-bottom: 0.5rem;">📊 新規テーブル作成</h2>
+    <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+      <div>
+        <label for="tc-table-name" style="display: block; font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.5rem;">テーブル名</label>
+        <input type="text" id="tc-table-name" placeholder="例: 販売実績、アンケート回答一覧など" style="width: 100%; padding: 0.6rem 0.8rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); outline: none; font-size: 0.9rem;" />
+      </div>
+      <div>
+        <label for="tc-table-parent" style="display: block; font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.5rem;">メニューバーでの配置先</label>
+        <select id="tc-table-parent" style="width: 100%; padding: 0.6rem 0.8rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); outline: none; font-size: 0.9rem; cursor: pointer;">
+          <option value="agency-info">💼 代理店情報 の配下</option>
+          <option value="jo-info">📑 JO情報 の配下</option>
+          <option value="applicant-info">📋 申込者情報 の配下</option>
+          <option value="appoint">📅 アポイント の配下</option>
+          <option value="root">🏠 ルート (独立メニューとして表示)</option>
+        </select>
+      </div>
+      <div>
+        <label style="display: block; font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.5rem;">カラム（列）の定義</label>
+        <div id="tc-columns-list" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <!-- JSで動的にカラム行が追加されます -->
+        </div>
+        <button class="btn btn-secondary" id="tc-add-col-btn" style="width: 100%; padding: 0.5rem; font-size: 0.85rem;">➕ カラムを追加</button>
+      </div>
+      <button class="btn btn-primary" id="tc-submit-btn" style="width: 100%; padding: 0.75rem; font-size: 0.95rem; font-weight: bold; margin-top: 1rem;">🚀 テーブルを作成</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= アポイント入力画面 ================= -->
+<section id="appointment-screen" class="screen-view">
+  <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+    <h1 id="appointment-screen-title" style="margin-bottom: 0;">新規アポイント登録</h1>
+  </div>
+
+  <!-- アポイント管理情報ヘッダー (IDとステータスを目立たせて配置) -->
+  <div style="background: var(--bg-surface-elevated); padding: 1rem 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-secondary);">📅 アポイントID:</span>
+      <span id="display-appoint-id" style="font-size: 1.25rem; font-weight: 800; font-family: monospace; color: var(--primary); letter-spacing: 0.05em; background: var(--bg-surface); padding: 0.25rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">-</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <span style="font-size: 0.85rem; color: var(--text-secondary);">状態:</span>
+      <span id="display-appoint-status" class="badge" style="font-size: 0.8rem; padding: 0.25rem 0.6rem;">下書き</span>
+    </div>
+  </div>
+
+  <!-- 新規・既存アポイント切り替えトグル -->
+  <div id="appointment-type-toggle-container" style="display: none; gap: 0.5rem; margin-bottom: 1.25rem;">
+    <button type="button" class="btn btn-secondary active" id="toggle-cust-new" style="flex: 1; padding: 0.6rem; font-size: 0.85rem; font-weight: 600;">新規顧客アポイント</button>
+    <button type="button" class="btn btn-secondary" id="toggle-cust-existing" style="flex: 1; padding: 0.6rem; font-size: 0.85rem; font-weight: 600;">既存顧客アポイント</button>
+  </div>
+
+  <!-- 既存顧客未選択時のプレースホルダー -->
+  <div id="top-customer-select-area" style="display: none; margin-bottom: 1.25rem;">
+    <div id="existing-customer-placeholder" style="background: var(--bg-surface); border: 1.5px dashed var(--border-color); padding: 2rem; border-radius: var(--radius-md); text-align: center; width: 100%; box-shadow: var(--shadow-sm);">
+      <p style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem;">アポイントを記録する既存顧客を選択してください。</p>
+      <button type="button" class="btn btn-primary" id="btn-select-existing-cust" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; cursor: pointer;">
+        <span>👤 既存顧客を選択する</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 既存顧客情報バナー -->
+  <div id="existing-customer-banner" class="customer-info-banner" style="display: none; margin-bottom: 1.25rem; padding: 1.25rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+      <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary);">👤 既存顧客情報（自動表示）</span>
+      <button type="button" class="btn btn-text" id="change-customer-btn" style="font-size: 0.75rem; color: var(--primary); text-decoration: underline; background: none; border: none; cursor: pointer; padding: 0.2rem 0.5rem;">顧客を変更する</button>
+    </div>
+    <div class="info-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+      <div class="info-item">
+        <span class="info-label" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">顧客名</span>
+        <span class="info-value" id="ext-info-name" style="font-weight: 700; color: var(--text-primary);">-</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">顧客ID</span>
+        <span class="info-value" id="ext-info-id" style="font-weight: 700; color: var(--text-primary);">-</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">電話番号</span>
+        <span class="info-value" id="ext-info-phone" style="font-weight: 700; color: var(--text-primary);">-</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">メールアドレス</span>
+        <span class="info-value" id="ext-info-email" style="font-weight: 700; color: var(--text-primary);">-</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">法人情報</span>
+        <span class="info-value" id="ext-info-corp" style="font-weight: 700; color: var(--text-primary);">-</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">登録サービス</span>
+        <span class="info-value" id="ext-info-service" style="font-weight: 700; color: var(--text-primary);">-</span>
+      </div>
+      <div class="info-item" style="grid-column: span 2;">
+        <span class="info-label" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">過去履歴件数</span>
+        <span class="info-value" id="ext-info-history" style="font-weight: 700; color: var(--text-primary);">-</span>
+      </div>
+    </div>
+    
+    <div class="ext-history-section" style="margin-top: 1rem; border-top: 1px dashed var(--border-color); padding-top: 0.75rem;">
+      <span class="info-label" style="display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">📁 過去のアポイント履歴（関連類似接続）:</span>
+      <div id="ext-info-history-list" class="ext-history-list" style="padding-left: 0.75rem; border-left: 2px solid var(--primary); display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem;">
+        <!-- JSでアポイントID履歴がツリー状に動的挿入される -->
+      </div>
+    </div>
+
+    <!-- 関連顧客ID (複数)の紐付け & ID表示切り替えトグル -->
+    <div class="related-id-section" style="margin-top: 1rem; border-top: 1px dashed var(--border-color); padding-top: 0.75rem;">
+      <span class="info-label" style="display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">🔗 関連顧客ID (複数)の紐付け:</span>
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+        <input type="text" id="ext-info-related-id" placeholder="8桁の顧客IDを入力" style="width: 160px; font-family: monospace; text-transform: uppercase; padding: 0.35rem 0.5rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.85rem;">
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-search-related-id" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">検索</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-clear-related-id" style="display: none; color: var(--danger); padding: 0.35rem 0.75rem; font-size: 0.8rem;">クリア</button>
+      </div>
+      <div id="id-switch-toggle-container" style="display: none; gap: 0.35rem; margin-bottom: 0.5rem; align-items: center;">
+        <button type="button" class="btn btn-xs btn-secondary" id="btn-switch-main-id" style="font-size: 0.75rem; padding: 0.2rem 0.4rem;">メインID</button>
+        <button type="button" class="btn btn-xs btn-secondary" id="btn-switch-related-id-view" style="font-size: 0.75rem; padding: 0.2rem 0.4rem;">関連ID</button>
+      </div>
+      <div id="ext-info-related-id-link-container" style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;"></div>
+    </div>
+
+    <!-- 接続された外部マスタデータベースのタブ表示 -->
+    <div class="ext-db-tabs-section" style="margin-top: 1rem; border-top: 1px dashed var(--border-color); padding-top: 0.75rem;">
+      <span class="info-label" style="display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">📊 接続された外部マスタ:</span>
+      <div style="display: flex; gap: 0.35rem; margin-bottom: 0.5rem;" class="ext-db-tabs">
+        <button type="button" class="btn btn-xs btn-secondary" id="tab-btn-partner" style="display: none; font-size: 0.75rem; padding: 0.2rem 0.4rem;">パートナー</button>
+        <button type="button" class="btn btn-xs btn-secondary" id="tab-btn-applicant" style="display: none; font-size: 0.75rem; padding: 0.2rem 0.4rem;">申込者</button>
+        <button type="button" class="btn btn-xs btn-secondary" id="tab-btn-agency" style="display: none; font-size: 0.75rem; padding: 0.2rem 0.4rem;">代理店</button>
+        <button type="button" class="btn btn-xs btn-secondary" id="tab-btn-jo" style="display: none; font-size: 0.75rem; padding: 0.2rem 0.4rem;">JO契約</button>
+      </div>
+      <div id="db-panel-empty-message" style="font-size: 0.8rem; color: var(--text-muted); padding: 0.5rem 0;">接続されたデータはありません。</div>
+      <div id="db-panel-partner" style="display: none; max-height: 200px; overflow-y: auto; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem;"></div>
+      <div id="db-panel-applicant" style="display: none; max-height: 200px; overflow-y: auto; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem;"></div>
+      <div id="db-panel-agency" style="display: none; max-height: 200px; overflow-y: auto; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem;"></div>
+      <div id="db-panel-jo" style="display: none; max-height: 200px; overflow-y: auto; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem;"></div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1fr 280px; gap: 1.5rem; align-items: start;">
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; box-shadow: var(--shadow-md);">
+      <div id="related-data-alert" class="related-detection-alert" style="display: none; margin-bottom: 1.25rem;">
+        <span class="related-alert-icon">⚠️</span>
+        <div class="related-alert-body">
+          <div class="related-alert-title">関連する既存顧客が検出されました</div>
+          <div class="related-alert-desc" id="related-data-alert-text">入力されたメールアドレスはすでに顧客データとして登録されています。</div>
+          <button type="button" class="btn-outline-primary" id="btn-merge-existing" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; margin-top: 0.35rem;">この顧客データに紐付ける</button>
+        </div>
+      </div>
+
+      <form id="appointment-form">
+        <div class="form-group required">
+          <label for="appoint-date">アポイント日時</label>
+          <input type="datetime-local" id="appoint-date" required>
+        </div>
+        <div class="form-group required" id="customer-name-group">
+          <label for="customer-name" id="label-customer-name">相手の名前または呼称</label>
+          <input type="text" id="customer-name" placeholder="氏名または「〇〇様紹介の男性」など" required>
+        </div>
+        <div class="form-group required">
+          <label for="appoint-memo">内容メモ</label>
+          <textarea id="appoint-memo" placeholder="面談時の主要なトピック、ニーズ、次回アクションなど" required style="min-height: 120px;"></textarea>
+        </div>
+        
+        <!-- 関連するアポイントIDの紐付け -->
+        <div class="form-group" style="margin-top: 1rem; border-top: 1px dotted var(--border-color); padding-top: 1rem; margin-bottom: 1.5rem;">
+          <label>関連するアポイントID (本登録前)</label>
+          <div id="appoint-related-appoint-links-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.5rem;"></div>
+        </div>
+
+        <div class="custom-fields-container" id="custom-fields-area">
+          <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">追加された入力項目</h3>
+          <div id="custom-fields-list">
+            <!-- JSで動的にフィールド行が追加されます -->
+          </div>
+        </div>
+        <div class="form-actions-bar" style="margin-top: 1.5rem;">
+          <button type="button" class="btn btn-danger" id="delete-draft-btn" style="display: none;">下書きを破棄</button>
+          <div style="margin-left: auto; display: flex; gap: 0.75rem;">
+            <button type="button" class="btn btn-secondary" id="btn-save-draft" style="border-color: var(--warning); color: var(--warning);">一時保存（下書き）</button>
+            <button type="submit" class="btn btn-success" id="btn-submit-official">正式登録</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="sidebar-panel">
+      <div class="sidebar-card">
+        <h3>⚙️ 入力項目の追加</h3>
+        <p style="font-size: 0.8rem; margin-bottom: 0.75rem;">必要な項目を複数選択してアポイントフォームに追加できます。</p>
+        
+        <!-- マルチセレクトドロップダウン -->
+        <div id="field-multiselect" style="position: relative; margin-bottom: 1rem;">
+          <div id="field-multiselect-box" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer;">
+            <span id="multiselect-label-text" style="font-size: 0.85rem; color: var(--text-secondary);">項目を選択して追加...</span>
+            <span style="font-size: 0.7rem; color: var(--text-muted);">▼</span>
+          </div>
+          <div id="multiselect-checkboxes-container" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem; z-index: 10; max-height: 250px; overflow-y: auto; box-shadow: var(--shadow-md); display: flex; flex-direction: column; gap: 0.4rem;">
+            <!-- JSで動的にチェックボックスが生成される -->
+          </div>
+        </div>
+      </div>
+      
+      <div class="sidebar-card" style="margin-top: 1rem;">
+        <h3>📁 マイパターン</h3>
+        <p style="font-size: 0.8rem; margin-bottom: 0.75rem;">よく使用する項目のセットを選択または新規保存して適用します。</p>
+        <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <select id="select-apply-pattern" style="width: 100%; padding: 0.4rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.8rem; outline: none; cursor: pointer;">
+            <!-- JSで動的にオプションが生成される -->
+          </select>
+        </div>
+        <div style="border-top: 1px dashed var(--border-color); padding-top: 0.75rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+          <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">現在の項目セットを保存:</span>
+          <input type="text" id="new-pattern-name" placeholder="パターン名を入力..." style="width: 100%; padding: 0.35rem 0.5rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.8rem;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-save-custom-pattern" style="width: 100%; font-size: 0.8rem; padding: 0.4rem; cursor: pointer;">パターンを保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 一時保存一覧画面 ================= -->
+<section id="drafts-view-screen" class="screen-view">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <h1 style="margin-bottom: 0;">📁 一時保存一覧（下書き）</h1>
+  </div>
+  <div id="full-drafts-container" class="history-list">
+    <!-- JSで下書きが動的描画されます -->
+  </div>
+</section>
+
+<!-- ================= アポイント履歴画面 ================= -->
+<section id="history-view-screen" class="screen-view">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <h1 style="margin-bottom: 0;">📜 アポイント履歴</h1>
+  </div>
+  <div id="full-history-container" class="history-list">
+    <!-- JSで履歴が動的描画されます -->
+  </div>
+</section>
+
+<!-- ================= 本登録IDの紐付け画面 ================= -->
+<section id="link-official-screen" class="screen-view">
+  <div style="max-width: 800px; margin: 0 auto; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 2rem; box-shadow: var(--shadow-lg);">
+    <h2 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; color: var(--text-primary); border-bottom: 2px solid var(--primary); padding-bottom: 0.5rem;">🔗 本登録IDの紐付け</h2>
+    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">仮IDで登録したアポイント履歴を、本登録された正式な顧客ID（8桁）に紐付け直します。</p>
+    <form id="link-official-form" style="display: flex; flex-direction: column; gap: 1.25rem;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group required">
+          <label for="link-temp-id">仮アポイントID (または顧客仮名)</label>
+          <input type="text" id="link-temp-id" placeholder="例: P3R4W7Y9" required>
+        </div>
+        <div class="form-group required">
+          <label for="link-real-id">本登録顧客ID (正式8桁ID)</label>
+          <input type="text" id="link-real-id" placeholder="例: J6K5M9N7" required>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary" style="padding: 0.75rem; font-weight: bold; align-self: flex-end;">🔗 紐付けを実行する</button>
+    </form>
+
+    <div style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+      <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">紐付け検索用アポイント一覧</h3>
+      <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); max-height: 250px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+          <thead>
+            <tr style="background: var(--bg-surface-elevated); border-bottom: 1px solid var(--border-color); text-align: left;">
+              <th style="padding: 0.5rem 0.75rem;">仮ID</th>
+              <th style="padding: 0.5rem 0.75rem;">相手の呼称</th>
+              <th style="padding: 0.5rem 0.75rem;">アポイント日時</th>
+              <th style="padding: 0.5rem 0.75rem;">メモ内容</th>
+              <th style="padding: 0.5rem 0.75rem; width: 80px;">ステータス</th>
+            </tr>
+          </thead>
+          <tbody id="link-appoints-table-body">
+            <!-- JSで動的描画 -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 代理店情報画面 ================= -->
+<section id="agency-info-screen" class="screen-view">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+    <div style="display: flex; align-items: center; gap: 1.5rem;">
+      <h1 style="margin-bottom: 0;">💼 代理店情報</h1>
+      <div id="ag-column-selector-container" style="position: relative;">
+        <button class="btn-secondary" id="ag-column-selector-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
+          ⚙️ 表示項目の選択 ▼
+        </button>
+        <div id="ag-column-selector-dropdown" class="filter-dropdown" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 5px; z-index: 100; min-width: 250px; padding: 0.75rem; max-height: 400px; overflow-y: auto;">
+          <div id="ag-column-selector" style="display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.85rem;">
+            <!-- JSで動的チェックボックス -->
+          </div>
+        </div>
+      </div>
+      <div id="ag-frame-fix-container" style="position: relative;">
+        <button class="btn-secondary" id="ag-frame-fix-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
+          📌 枠の固定 ▼
+        </button>
+        <div id="ag-frame-fix-dropdown" class="filter-dropdown" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 5px; z-index: 100; min-width: 220px; padding: 0.75rem;">
+          <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">ウィンドウ枠の固定</div>
+          <div style="margin-bottom: 0.75rem;">
+            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">列の固定基準</label>
+            <select id="ag-fix-col-select" style="width: 100%; padding: 0.3rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.8rem; border-radius: var(--radius-sm); outline: none;">
+              <option value="none">固定しない</option>
+            </select>
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">行の固定基準</label>
+            <select id="ag-fix-row-select" style="width: 100%; padding: 0.3rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.8rem; border-radius: var(--radius-sm); outline: none;">
+              <option value="none">固定しない</option>
+              <option value="1">1行目まで固定</option>
+              <option value="2">2行目まで固定</option>
+              <option value="3">3行目まで固定</option>
+              <option value="5">5行目まで固定</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="ag-format-toolbar" class="format-toolbar" style="margin-bottom: 0.5rem;">
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="ag-font-dec" title="文字サイズ縮小">➖</button>
+      <input type="number" id="ag-font-size-input" class="toolbar-input" value="10" min="6" max="24" title="文字サイズ" readonly>
+      <button class="toolbar-btn" id="ag-font-inc" title="文字サイズ拡大">➕</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn text-bold" id="ag-text-bold" title="太字">B</button>
+      <button class="toolbar-btn text-italic" id="ag-text-italic" title="斜体">/</button>
+      <button class="toolbar-btn text-strike" id="ag-text-strike" title="取り消し線">S</button>
+      <div style="position: relative; display: inline-block;">
+        <button class="toolbar-btn" id="ag-text-color-btn" title="文字色">
+          <span id="ag-text-color-indicator" style="border-bottom: 3px solid var(--text-primary); padding-bottom: 1px;">A</span>
+        </button>
+        <div id="ag-color-picker-dropdown" class="color-picker-dropdown" style="display: none;">
+          <div class="color-palette-grid">
+            <div class="color-swatch" style="background-color: var(--text-primary);" data-color="var(--text-primary)" title="標準色">A</div>
+            <div class="color-swatch" style="background-color: var(--cell-red-text);" data-color="var(--cell-red-text)" title="赤"></div>
+            <div class="color-swatch" style="background-color: var(--cell-orange-text);" data-color="var(--cell-orange-text)" title="オレンジ"></div>
+            <div class="color-swatch" style="background-color: var(--cell-yellow-text);" data-color="var(--cell-yellow-text)" title="黄"></div>
+            <div class="color-swatch" style="background-color: var(--cell-green-text);" data-color="var(--cell-green-text)" title="緑"></div>
+            <div class="color-swatch" style="background-color: var(--cell-blue-text);" data-color="var(--cell-blue-text)" title="青"></div>
+            <div class="color-swatch" style="background-color: var(--cell-purple-text);" data-color="var(--cell-purple-text)" title="紫"></div>
+            <div class="color-swatch" style="background-color: var(--cell-gray-text);" data-color="var(--cell-gray-text)" title="グレー"></div>
+          </div>
+          <div style="border-top: 1px solid var(--border-color); padding: 0.35rem 0.5rem; display: flex; align-items: center; gap: 0.35rem; justify-content: space-between;">
+            <span style="font-size: 0.7rem; color: var(--text-muted);">カスタム:</span>
+            <input type="color" id="ag-text-color-custom" style="width: 24px; height: 20px; border: none; cursor: pointer; background: transparent;">
+          </div>
+        </div>
+      </div>
+      <div style="position: relative; display: inline-block;">
+        <button class="toolbar-btn" id="ag-bg-color-btn" title="背景色">
+          <span id="ag-bg-color-indicator" style="border-bottom: 3px solid transparent; padding-bottom: 1px;">🎨</span>
+        </button>
+        <div id="ag-bg-color-picker-dropdown" class="color-picker-dropdown" style="display: none;">
+          <div class="color-palette-grid">
+            <div class="color-swatch" style="background-color: transparent; border: 1px solid var(--border-color);" data-color="transparent" title="なし">✖</div>
+            <div class="color-swatch" style="background-color: var(--cell-red-bg);" data-color="var(--cell-red-bg)" title="赤"></div>
+            <div class="color-swatch" style="background-color: var(--cell-orange-bg);" data-color="var(--cell-orange-bg)" title="オレンジ"></div>
+            <div class="color-swatch" style="background-color: var(--cell-yellow-bg);" data-color="var(--cell-yellow-bg)" title="黄"></div>
+            <div class="color-swatch" style="background-color: var(--cell-green-bg);" data-color="var(--cell-green-bg)" title="緑"></div>
+            <div class="color-swatch" style="background-color: var(--cell-blue-bg);" data-color="var(--cell-blue-bg)" title="青"></div>
+            <div class="color-swatch" style="background-color: var(--cell-purple-bg);" data-color="var(--cell-purple-bg)" title="紫"></div>
+            <div class="color-swatch" style="background-color: var(--cell-gray-bg);" data-color="var(--cell-gray-bg)" title="グレー"></div>
+          </div>
+          <div style="border-top: 1px solid var(--border-color); padding: 0.35rem 0.5rem; display: flex; align-items: center; gap: 0.35rem; justify-content: space-between;">
+            <span style="font-size: 0.7rem; color: var(--text-muted);">カスタム:</span>
+            <input type="color" id="ag-bg-color-custom" style="width: 24px; height: 20px; border: none; cursor: pointer; background: transparent;">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="ag-align-left" title="左揃え">左</button>
+      <button class="toolbar-btn" id="ag-align-center" title="中央揃え">中</button>
+      <button class="toolbar-btn" id="ag-align-right" title="右揃え">右</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="ag-valign-top" title="上揃え">上</button>
+      <button class="toolbar-btn" id="ag-valign-middle" title="中央揃え">均</button>
+      <button class="toolbar-btn" id="ag-valign-bottom" title="下揃え">下</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="ag-wrap-clip" title="切り詰め">⇥</button>
+      <button class="toolbar-btn" id="ag-wrap-wrap" title="折り返し">↵</button>
+      <button class="toolbar-btn" id="ag-wrap-overflow" title="はみ出し">⇄</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group" style="position: relative;">
+      <button class="toolbar-btn" id="ag-conditional-formatting-btn" title="条件付き書式">🎨 条件付き書式</button>
+      <button class="toolbar-btn" id="ag-format-paint-btn" title="書式のコピー（ペイントフォーマット）">🖌</button>
+    </div>
+  </div>
+
+  <div class="list-section">
+    <div class="sticky-table-wrapper" style="max-height: calc(100vh - 250px); overflow: auto;">
+      <table class="spreadsheet-table" style="min-width: 100%; border-collapse: separate; border-spacing: 0;">
+        <thead id="agency-table-thead">
+          <!-- JSで動的描画 -->
+        </thead>
+        <tbody id="agency-table-body">
+          <!-- JSで動的描画 -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ================= JO情報画面 ================= -->
+<section id="jo-info-screen" class="screen-view">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+    <div style="display: flex; align-items: center; gap: 1.5rem;">
+      <h1 style="margin-bottom: 0;">📑 JO情報</h1>
+      <div id="jo-column-selector-container" style="position: relative;">
+        <button class="btn-secondary" id="jo-column-selector-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
+          ⚙️ 表示項目の選択 ▼
+        </button>
+        <div id="jo-column-selector-dropdown" class="filter-dropdown" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 5px; z-index: 100; min-width: 250px; padding: 0.75rem; max-height: 400px; overflow-y: auto;">
+          <div id="jo-column-selector" style="display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.85rem;">
+            <!-- JSで動的チェックボックス -->
+          </div>
+        </div>
+      </div>
+      <div id="jo-frame-fix-container" style="position: relative;">
+        <button class="btn-secondary" id="jo-frame-fix-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
+          📌 枠の固定 ▼
+        </button>
+        <div id="jo-frame-fix-dropdown" class="filter-dropdown" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 5px; z-index: 100; min-width: 220px; padding: 0.75rem;">
+          <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">ウィンドウ枠の固定</div>
+          <div style="margin-bottom: 0.75rem;">
+            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">列の固定基準</label>
+            <select id="jo-fix-col-select" style="width: 100%; padding: 0.3rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.8rem; border-radius: var(--radius-sm); outline: none;">
+              <option value="none">固定しない</option>
+            </select>
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">行の固定基準</label>
+            <select id="jo-fix-row-select" style="width: 100%; padding: 0.3rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.8rem; border-radius: var(--radius-sm); outline: none;">
+              <option value="none">固定しない</option>
+              <option value="1">1行目まで固定</option>
+              <option value="2">2行目まで固定</option>
+              <option value="3">3行目まで固定</option>
+              <option value="5">5行目まで固定</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="jo-format-toolbar" class="format-toolbar" style="margin-bottom: 0.5rem;">
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="jo-font-dec" title="文字サイズ縮小">➖</button>
+      <input type="number" id="jo-font-size-input" class="toolbar-input" value="10" min="6" max="24" title="文字サイズ" readonly>
+      <button class="toolbar-btn" id="jo-font-inc" title="文字サイズ拡大">➕</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn text-bold" id="jo-text-bold" title="太字">B</button>
+      <button class="toolbar-btn text-italic" id="jo-text-italic" title="斜体">/</button>
+      <button class="toolbar-btn text-strike" id="jo-text-strike" title="取り消し線">S</button>
+      <div style="position: relative; display: inline-block;">
+        <button class="toolbar-btn" id="jo-text-color-btn" title="文字色">
+          <span id="jo-text-color-indicator" style="border-bottom: 3px solid var(--text-primary); padding-bottom: 1px;">A</span>
+        </button>
+        <div id="jo-color-picker-dropdown" class="color-picker-dropdown" style="display: none;">
+          <div class="color-palette-grid">
+            <div class="color-swatch" style="background-color: var(--text-primary);" data-color="var(--text-primary)" title="標準色">A</div>
+            <div class="color-swatch" style="background-color: var(--cell-red-text);" data-color="var(--cell-red-text)" title="赤"></div>
+            <div class="color-swatch" style="background-color: var(--cell-orange-text);" data-color="var(--cell-orange-text)" title="オレンジ"></div>
+            <div class="color-swatch" style="background-color: var(--cell-yellow-text);" data-color="var(--cell-yellow-text)" title="黄"></div>
+            <div class="color-swatch" style="background-color: var(--cell-green-text);" data-color="var(--cell-green-text)" title="緑"></div>
+            <div class="color-swatch" style="background-color: var(--cell-blue-text);" data-color="var(--cell-blue-text)" title="青"></div>
+            <div class="color-swatch" style="background-color: var(--cell-purple-text);" data-color="var(--cell-purple-text)" title="紫"></div>
+            <div class="color-swatch" style="background-color: var(--cell-gray-text);" data-color="var(--cell-gray-text)" title="グレー"></div>
+          </div>
+          <div style="border-top: 1px solid var(--border-color); padding: 0.35rem 0.5rem; display: flex; align-items: center; gap: 0.35rem; justify-content: space-between;">
+            <span style="font-size: 0.7rem; color: var(--text-muted);">カスタム:</span>
+            <input type="color" id="jo-text-color-custom" style="width: 24px; height: 20px; border: none; cursor: pointer; background: transparent;">
+          </div>
+        </div>
+      </div>
+      <div style="position: relative; display: inline-block;">
+        <button class="toolbar-btn" id="jo-bg-color-btn" title="背景色">
+          <span id="jo-bg-color-indicator" style="border-bottom: 3px solid transparent; padding-bottom: 1px;">🎨</span>
+        </button>
+        <div id="jo-bg-color-picker-dropdown" class="color-picker-dropdown" style="display: none;">
+          <div class="color-palette-grid">
+            <div class="color-swatch" style="background-color: transparent; border: 1px solid var(--border-color);" data-color="transparent" title="なし">✖</div>
+            <div class="color-swatch" style="background-color: var(--cell-red-bg);" data-color="var(--cell-red-bg)" title="赤"></div>
+            <div class="color-swatch" style="background-color: var(--cell-orange-bg);" data-color="var(--cell-orange-bg)" title="オレンジ"></div>
+            <div class="color-swatch" style="background-color: var(--cell-yellow-bg);" data-color="var(--cell-yellow-bg)" title="黄"></div>
+            <div class="color-swatch" style="background-color: var(--cell-green-bg);" data-color="var(--cell-green-bg)" title="緑"></div>
+            <div class="color-swatch" style="background-color: var(--cell-blue-bg);" data-color="var(--cell-blue-bg)" title="青"></div>
+            <div class="color-swatch" style="background-color: var(--cell-purple-bg);" data-color="var(--cell-purple-bg)" title="紫"></div>
+            <div class="color-swatch" style="background-color: var(--cell-gray-bg);" data-color="var(--cell-gray-bg)" title="グレー"></div>
+          </div>
+          <div style="border-top: 1px solid var(--border-color); padding: 0.35rem 0.5rem; display: flex; align-items: center; gap: 0.35rem; justify-content: space-between;">
+            <span style="font-size: 0.7rem; color: var(--text-muted);">カスタム:</span>
+            <input type="color" id="jo-bg-color-custom" style="width: 24px; height: 20px; border: none; cursor: pointer; background: transparent;">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="jo-align-left" title="左揃え">左</button>
+      <button class="toolbar-btn" id="jo-align-center" title="中央揃え">中</button>
+      <button class="toolbar-btn" id="jo-align-right" title="右揃え">右</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="jo-valign-top" title="上揃え">上</button>
+      <button class="toolbar-btn" id="jo-valign-middle" title="中央揃え">均</button>
+      <button class="toolbar-btn" id="jo-valign-bottom" title="下揃え">下</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="jo-wrap-clip" title="切り詰め">⇥</button>
+      <button class="toolbar-btn" id="jo-wrap-wrap" title="折り返し">↵</button>
+      <button class="toolbar-btn" id="jo-wrap-overflow" title="はみ出し">⇄</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group" style="position: relative;">
+      <button class="toolbar-btn" id="jo-conditional-formatting-btn" title="条件付き書式">🎨 条件付き書式</button>
+      <button class="toolbar-btn" id="jo-format-paint-btn" title="書式のコピー（ペイントフォーマット）">🖌</button>
+    </div>
+  </div>
+
+  <div class="list-section">
+    <div class="sticky-table-wrapper" style="max-height: calc(100vh - 250px); overflow: auto;">
+      <table class="spreadsheet-table" style="min-width: 100%; border-collapse: separate; border-spacing: 0;">
+        <thead id="jo-table-thead">
+          <!-- JSで動的描画 -->
+        </thead>
+        <tbody id="jo-table-body">
+          <!-- JSで動的描画 -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 申込者情報画面 ================= -->
+
+
+
+<!-- ================= アクセス権限設定 ================= -->
+<section id="permission-settings-screen" class="screen-view">
+  <div style="display: flex; gap: 1.5rem; height: calc(100vh - 120px); overflow: hidden;">
+    <!-- 左側: 設定対象のツリーリスト -->
+    <div style="width: 250px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
+      <h3 style="font-size: 0.95rem; font-weight: bold; color: var(--text-primary); margin: 0 0 0.5rem 0; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">📁 対象を選択</h3>
+      <div id="ps-target-tree" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+        <!-- JSでフォルダとテーブルの階層ツリーを動的生成 -->
+      </div>
+      
+      <!-- なりすましプレビュー機能 -->
+      <div style="border-top: 1px solid var(--border-color); padding-top: 0.75rem; margin-top: auto;">
+        <h4 style="font-size: 0.8rem; font-weight: bold; margin-bottom: 0.5rem;">👥 権限表示プレビュー</h4>
+        <select id="impersonation-user-select" style="width: 100%; padding: 0.35rem; font-size: 0.8rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); outline: none; margin-bottom: 0.4rem;">
+          <option value="">ユーザーを選択</option>
+          <option value="sales_01">営業担当者 (sales_01)</option>
+          <option value="support_01">サポート担当者 (support_01)</option>
+        </select>
+        <select id="impersonation-mode-select" style="width: 100%; padding: 0.35rem; font-size: 0.8rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); outline: none; margin-bottom: 0.5rem;">
+          <option value="grayout">プレビュー（グレーアウト表示）</option>
+          <option value="strict">本番（非表示・アクセス制限）</option>
+        </select>
+        <button class="btn btn-sm btn-primary" id="run-impersonation-preview-btn" style="width: 100%; font-size: 0.8rem; padding: 0.4rem;">👁️ プレビュー開始</button>
+      </div>
+    </div>
+
+    <!-- 右側: 詳細設定カード -->
+    <div style="flex: 1; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); display: flex; flex-direction: column; overflow: hidden;">
+      <!-- タイロールとタブ切り替え -->
+      <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); background: var(--bg-surface-elevated); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <h2 id="ps-selected-target-title" style="font-size: 1.25rem; font-weight: bold; color: var(--text-primary); margin: 0;">対象を選択してください</h2>
+        
+        <!-- 設定用タブボタン（ps-tab-bar） -->
+        <div id="ps-tab-bar" style="display: none; gap: 0.5rem;">
+          <button class="btn btn-sm btn-secondary tab-btn active" id="ps-tab-folder-btn" data-tab="folder-tab">📁 フォルダ閲覧権限</button>
+          <button class="btn btn-sm btn-secondary tab-btn" id="ps-tab-table-btn" data-tab="table-tab">📋 テーブル閲覧権限</button>
+          <button class="btn btn-sm btn-secondary tab-btn" id="ps-tab-col-btn" data-tab="column-tab">🧱 カラム権限</button>
+          <button class="btn btn-sm btn-secondary tab-btn" id="ps-tab-filter-btn" data-tab="row-filter-tab">🔍 行フィルタ</button>
+        </div>
+      </div>
+
+      <!-- 設定本体エリア -->
+      <div id="ps-tab-container" style="flex: 1; padding: 1.5rem; overflow-y: auto;">
+        <!-- 各タブコンテンツ用ペイン -->
+        <div id="folder-tab" class="tab-pane active"></div>
+        <div id="table-tab" class="tab-pane" style="display: none;"></div>
+        <div id="column-tab" class="tab-pane" style="display: none;"></div>
+        <div id="row-filter-tab" class="tab-pane" style="display: none;"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 操作ログ履歴 ================= -->
+<section id="audit-log-screen" class="screen-view">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <h1 style="margin-bottom: 0; display: flex; align-items: center; gap: 0.5rem;">📈 操作ログ履歴</h1>
+    <button class="btn btn-danger" id="audit-log-clear-btn">🗑️ 履歴をクリア</button>
+  </div>
+
+  <!-- 検索・フィルターバー -->
+  <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; box-shadow: var(--shadow-sm);">
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">操作者:</span>
+      <input type="text" id="audit-log-filter-user" placeholder="すべてのユーザー" style="padding: 0.4rem 0.6rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.85rem; outline: none; width: 160px;" />
+    </div>
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">テーブル:</span>
+      <input type="text" id="audit-log-filter-table" placeholder="すべてのテーブル" style="padding: 0.4rem 0.6rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.85rem; outline: none; width: 160px;" />
+    </div>
+  </div>
+
+  <div class="list-section">
+    <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md); max-height: calc(100vh - 300px);">
+      <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+        <thead>
+          <tr style="background: var(--bg-surface-elevated); border-bottom: 1px solid var(--border-color); text-align: left; position: sticky; top: 0; z-index: 10;">
+            <th style="padding: 0.75rem 1rem; width: 160px;">日時 (ミリ秒)</th>
+            <th style="padding: 0.75rem 1rem; width: 100px;">操作者</th>
+            <th style="padding: 0.75rem 1rem; width: 120px;">対象テーブル</th>
+            <th style="padding: 0.75rem 1rem; width: 80px;">セル</th>
+            <th style="padding: 0.75rem 1rem; width: 120px;">カラム名</th>
+            <th style="padding: 0.75rem 1rem;">変更前</th>
+            <th style="padding: 0.75rem 1rem;">変更後</th>
+          </tr>
+        </thead>
+        <tbody id="audit-log-table-body">
+          <!-- JSでログが動的に表示されます -->
+        </tbody>
+      </table>
+      <div id="audit-log-empty" style="padding: 3rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+        履歴がありません。
+      </div>
+    </div>
+  </div>
+</section>
+<section id="applicant-info-screen" class="screen-view">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+    <div style="display: flex; align-items: center; gap: 1.5rem;">
+      <h1 style="margin-bottom: 0;">📋 申込者情報</h1>
+      <div id="ap-column-selector-container" style="position: relative;">
+        <button class="btn-secondary" id="ap-column-selector-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
+          ⚙️ 表示項目の選択 ▼
+        </button>
+        <div id="ap-column-selector-dropdown" class="filter-dropdown" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 5px; z-index: 100; min-width: 250px; padding: 0.75rem; max-height: 400px; overflow-y: auto;">
+          <div id="ap-column-selector" style="display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.85rem;">
+            <!-- JSで動的チェックボックス -->
+          </div>
+        </div>
+      </div>
+      <div id="ap-frame-fix-container" style="position: relative;">
+        <button class="btn-secondary" id="ap-frame-fix-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
+          📌 枠の固定 ▼
+        </button>
+        <div id="ap-frame-fix-dropdown" class="filter-dropdown" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 5px; z-index: 100; min-width: 220px; padding: 0.75rem;">
+          <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">ウィンドウ枠 of 固定</div>
+          <div style="margin-bottom: 0.75rem;">
+            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">列の固定基準</label>
+            <select id="ap-fix-col-select" style="width: 100%; padding: 0.3rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.8rem; border-radius: var(--radius-sm); outline: none;">
+              <option value="none">固定しない</option>
+            </select>
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">行の固定基準</label>
+            <select id="ap-fix-row-select" style="width: 100%; padding: 0.3rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.8rem; border-radius: var(--radius-sm); outline: none;">
+              <option value="none">固定しない</option>
+              <option value="1">1行目まで固定</option>
+              <option value="2">2行目まで固定</option>
+              <option value="3">3行目まで固定</option>
+              <option value="5">5行目まで固定</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="ap-format-toolbar" class="format-toolbar" style="margin-bottom: 0.5rem;">
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="ap-font-dec" title="文字サイズ縮小">➖</button>
+      <input type="number" id="ap-font-size-input" class="toolbar-input" value="10" min="6" max="24" title="文字サイズ" readonly>
+      <button class="toolbar-btn" id="ap-font-inc" title="文字サイズ拡大">➕</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn text-bold" id="ap-text-bold" title="太字">B</button>
+      <button class="toolbar-btn text-italic" id="ap-text-italic" title="斜体">/</button>
+      <button class="toolbar-btn text-strike" id="ap-text-strike" title="取り消し線">S</button>
+      <div style="position: relative; display: inline-block;">
+        <button class="toolbar-btn" id="ap-text-color-btn" title="文字色">
+          <span id="ap-text-color-indicator" style="border-bottom: 3px solid var(--text-primary); padding-bottom: 1px;">A</span>
+        </button>
+        <div id="ap-color-picker-dropdown" class="color-picker-dropdown" style="display: none;">
+          <div class="color-palette-grid">
+            <div class="color-swatch" style="background-color: var(--text-primary);" data-color="var(--text-primary)" title="標準色">A</div>
+            <div class="color-swatch" style="background-color: var(--cell-red-text);" data-color="var(--cell-red-text)" title="赤"></div>
+            <div class="color-swatch" style="background-color: var(--cell-orange-text);" data-color="var(--cell-orange-text)" title="オレンジ"></div>
+            <div class="color-swatch" style="background-color: var(--cell-yellow-text);" data-color="var(--cell-yellow-text)" title="黄"></div>
+            <div class="color-swatch" style="background-color: var(--cell-green-text);" data-color="var(--cell-green-text)" title="緑"></div>
+            <div class="color-swatch" style="background-color: var(--cell-blue-text);" data-color="var(--cell-blue-text)" title="青"></div>
+            <div class="color-swatch" style="background-color: var(--cell-purple-text);" data-color="var(--cell-purple-text)" title="紫"></div>
+            <div class="color-swatch" style="background-color: var(--cell-gray-text);" data-color="var(--cell-gray-text)" title="グレー"></div>
+          </div>
+          <div style="border-top: 1px solid var(--border-color); padding: 0.35rem 0.5rem; display: flex; align-items: center; gap: 0.35rem; justify-content: space-between;">
+            <span style="font-size: 0.7rem; color: var(--text-muted);">カスタム:</span>
+            <input type="color" id="ap-text-color-custom" style="width: 24px; height: 20px; border: none; cursor: pointer; background: transparent;">
+          </div>
+        </div>
+      </div>
+      <div style="position: relative; display: inline-block;">
+        <button class="toolbar-btn" id="ap-bg-color-btn" title="背景色">
+          <span id="ap-bg-color-indicator" style="border-bottom: 3px solid transparent; padding-bottom: 1px;">🎨</span>
+        </button>
+        <div id="ap-bg-color-picker-dropdown" class="color-picker-dropdown" style="display: none;">
+          <div class="color-palette-grid">
+            <div class="color-swatch" style="background-color: transparent; border: 1px solid var(--border-color);" data-color="transparent" title="なし">✖</div>
+            <div class="color-swatch" style="background-color: var(--cell-red-bg);" data-color="var(--cell-red-bg)" title="赤"></div>
+            <div class="color-swatch" style="background-color: var(--cell-orange-bg);" data-color="var(--cell-orange-bg)" title="オレンジ"></div>
+            <div class="color-swatch" style="background-color: var(--cell-yellow-bg);" data-color="var(--cell-yellow-bg)" title="黄"></div>
+            <div class="color-swatch" style="background-color: var(--cell-green-bg);" data-color="var(--cell-green-bg)" title="緑"></div>
+            <div class="color-swatch" style="background-color: var(--cell-blue-bg);" data-color="var(--cell-blue-bg)" title="青"></div>
+            <div class="color-swatch" style="background-color: var(--cell-purple-bg);" data-color="var(--cell-purple-bg)" title="紫"></div>
+            <div class="color-swatch" style="background-color: var(--cell-gray-bg);" data-color="var(--cell-gray-bg)" title="グレー"></div>
+          </div>
+          <div style="border-top: 1px solid var(--border-color); padding: 0.35rem 0.5rem; display: flex; align-items: center; gap: 0.35rem; justify-content: space-between;">
+            <span style="font-size: 0.7rem; color: var(--text-muted);">カスタム:</span>
+            <input type="color" id="ap-bg-color-custom" style="width: 24px; height: 20px; border: none; cursor: pointer; background: transparent;">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="ap-align-left" title="左揃え">左</button>
+      <button class="toolbar-btn" id="ap-align-center" title="中央揃え">中</button>
+      <button class="toolbar-btn" id="ap-align-right" title="右揃え">右</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="ap-valign-top" title="上揃え">上</button>
+      <button class="toolbar-btn" id="ap-valign-middle" title="中央揃え">均</button>
+      <button class="toolbar-btn" id="ap-valign-bottom" title="下揃え">下</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="ap-wrap-clip" title="切り詰め">⇥</button>
+      <button class="toolbar-btn" id="ap-wrap-wrap" title="折り返し">↵</button>
+      <button class="toolbar-btn" id="ap-wrap-overflow" title="はみ出し">⇄</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group" style="position: relative;">
+      <button class="toolbar-btn" id="ap-conditional-formatting-btn" title="条件付き書式">🎨 条件付き書式</button>
+      <button class="toolbar-btn" id="ap-format-paint-btn" title="書式のコピー（ペイントフォーマット）">🖌</button>
+    </div>
+  </div>
+
+  <div class="list-section">
+    <div class="sticky-table-wrapper" style="max-height: calc(100vh - 250px); overflow: auto;">
+      <table class="spreadsheet-table" style="min-width: 100%; border-collapse: separate; border-spacing: 0;">
+        <thead id="applicant-table-thead">
+          <!-- JSで動的描画 -->
+        </thead>
+        <tbody id="applicant-table-body">
+          <!-- JSで動的描画 -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ================= パートナーDB管理画面 ================= -->
+<section id="dbmake-screen" class="screen-view">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+    <div style="display: flex; align-items: center; gap: 1.5rem;">
+      <h1 style="margin-bottom: 0;">🛢️ パートナーDB管理</h1>
+      <span style="font-size: 0.75rem; font-weight: 600; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 0.25rem 0.6rem; border-radius: 30px; display: inline-flex; align-items: center; gap: 0.35rem; border: 1px solid rgba(16, 185, 129, 0.2);">
+        <span class="status-pulse-dot" style="width: 6px; height: 6px; background: #10b981; border-radius: 50%; display: inline-block;"></span>
+        バックエンドDB接続中
+      </span>
+      
+      <!-- 表示項目の選択ドロップダウン -->
+      <div id="dbmake-column-selector-container" style="position: relative;">
+        <button class="btn-secondary" id="dbmake-column-selector-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
+          ⚙️ 表示項目の選択 ▼
+        </button>
+        <div id="dbmake-column-selector-dropdown" class="filter-dropdown" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 5px; z-index: 100; min-width: 250px; padding: 0.75rem; max-height: 400px; overflow-y: auto;">
+          <div id="dbmake-column-selector" style="display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.85rem;">
+            <!-- JSで動的チェックボックス -->
+          </div>
+        </div>
+      </div>
+      
+      <!-- ウィンドウ枠の固定ドロップダウン -->
+      <div id="dbmake-frame-fix-container" style="position: relative;">
+        <button class="btn-secondary" id="dbmake-frame-fix-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
+          📌 枠の固定 ▼
+        </button>
+        <div id="dbmake-frame-fix-dropdown" class="filter-dropdown" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 5px; z-index: 100; min-width: 220px; padding: 0.75rem;">
+          <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">ウィンドウ枠の固定</div>
+          <div style="margin-bottom: 0.75rem;">
+            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">列の固定基準</label>
+            <select id="dbmake-fix-col-select" style="width: 100%; padding: 0.3rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.8rem; border-radius: var(--radius-sm); outline: none;">
+              <option value="none">固定しない</option>
+            </select>
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">行の固定基準</label>
+            <select id="dbmake-fix-row-select" style="width: 100%; padding: 0.3rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.8rem; border-radius: var(--radius-sm); outline: none;">
+              <option value="none">固定しない</option>
+              <option value="1">1行目まで固定</option>
+              <option value="2">2行目まで固定</option>
+              <option value="3">3行目まで固定</option>
+              <option value="5">5行目まで固定</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="dbmake-format-toolbar" class="format-toolbar" style="margin-bottom: 0.5rem;">
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="dbmake-font-dec" title="文字サイズ縮小">➖</button>
+      <input type="number" id="dbmake-font-size-input" class="toolbar-input" value="10" min="6" max="24" title="文字サイズ" readonly>
+      <button class="toolbar-btn" id="dbmake-font-inc" title="文字サイズ拡大">➕</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn text-bold" id="dbmake-text-bold" title="太字">B</button>
+      <button class="toolbar-btn text-italic" id="dbmake-text-italic" title="斜体">/</button>
+      <button class="toolbar-btn text-strike" id="dbmake-text-strike" title="取り消し線">S</button>
+      <div style="position: relative; display: inline-block;">
+        <button class="toolbar-btn" id="dbmake-text-color-btn" title="文字色">
+          <span id="dbmake-text-color-indicator" style="border-bottom: 3px solid var(--text-primary); padding-bottom: 1px;">A</span>
+        </button>
+        <div id="dbmake-color-picker-dropdown" class="color-picker-dropdown" style="display: none;">
+          <div class="color-palette-grid">
+            <div class="color-swatch" style="background-color: var(--text-primary);" data-color="var(--text-primary)" title="標準色">A</div>
+            <div class="color-swatch" style="background-color: var(--cell-red-text);" data-color="var(--cell-red-text)" title="赤"></div>
+            <div class="color-swatch" style="background-color: var(--cell-orange-text);" data-color="var(--cell-orange-text)" title="オレンジ"></div>
+            <div class="color-swatch" style="background-color: var(--cell-yellow-text);" data-color="var(--cell-yellow-text)" title="黄"></div>
+            <div class="color-swatch" style="background-color: var(--cell-green-text);" data-color="var(--cell-green-text)" title="緑"></div>
+            <div class="color-swatch" style="background-color: var(--cell-blue-text);" data-color="var(--cell-blue-text)" title="青"></div>
+            <div class="color-swatch" style="background-color: var(--cell-purple-text);" data-color="var(--cell-purple-text)" title="紫"></div>
+            <div class="color-swatch" style="background-color: var(--cell-gray-text);" data-color="var(--cell-gray-text)" title="グレー"></div>
+          </div>
+          <div style="border-top: 1px solid var(--border-color); padding: 0.35rem 0.5rem; display: flex; align-items: center; gap: 0.35rem; justify-content: space-between;">
+            <span style="font-size: 0.7rem; color: var(--text-muted);">カスタム:</span>
+            <input type="color" id="dbmake-text-color-custom" style="width: 24px; height: 20px; border: none; cursor: pointer; background: transparent;">
+          </div>
+        </div>
+      </div>
+      <div style="position: relative; display: inline-block;">
+        <button class="toolbar-btn" id="dbmake-bg-color-btn" title="背景色">
+          <span id="dbmake-bg-color-indicator" style="border-bottom: 3px solid transparent; padding-bottom: 1px;">🎨</span>
+        </button>
+        <div id="dbmake-bg-color-picker-dropdown" class="color-picker-dropdown" style="display: none;">
+          <div class="color-palette-grid">
+            <div class="color-swatch" style="background-color: transparent; border: 1px solid var(--border-color);" data-color="transparent" title="なし">✖</div>
+            <div class="color-swatch" style="background-color: var(--cell-red-bg);" data-color="var(--cell-red-bg)" title="赤"></div>
+            <div class="color-swatch" style="background-color: var(--cell-orange-bg);" data-color="var(--cell-orange-bg)" title="オレンジ"></div>
+            <div class="color-swatch" style="background-color: var(--cell-yellow-bg);" data-color="var(--cell-yellow-bg)" title="黄"></div>
+            <div class="color-swatch" style="background-color: var(--cell-green-bg);" data-color="var(--cell-green-bg)" title="緑"></div>
+            <div class="color-swatch" style="background-color: var(--cell-blue-bg);" data-color="var(--cell-blue-bg)" title="青"></div>
+            <div class="color-swatch" style="background-color: var(--cell-purple-bg);" data-color="var(--cell-purple-bg)" title="紫"></div>
+            <div class="color-swatch" style="background-color: var(--cell-gray-bg);" data-color="var(--cell-gray-bg)" title="グレー"></div>
+          </div>
+          <div style="border-top: 1px solid var(--border-color); padding: 0.35rem 0.5rem; display: flex; align-items: center; gap: 0.35rem; justify-content: space-between;">
+            <span style="font-size: 0.7rem; color: var(--text-muted);">カスタム:</span>
+            <input type="color" id="dbmake-bg-color-custom" style="width: 24px; height: 20px; border: none; cursor: pointer; background: transparent;">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="dbmake-align-left" title="左揃え">左</button>
+      <button class="toolbar-btn" id="dbmake-align-center" title="中央揃え">中</button>
+      <button class="toolbar-btn" id="dbmake-align-right" title="右揃え">右</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="dbmake-valign-top" title="上揃え">上</button>
+      <button class="toolbar-btn" id="dbmake-valign-middle" title="中央揃え">均</button>
+      <button class="toolbar-btn" id="dbmake-valign-bottom" title="下揃え">下</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="dbmake-wrap-clip" title="切り詰め">⇥</button>
+      <button class="toolbar-btn" id="dbmake-wrap-wrap" title="折り返し">↵</button>
+      <button class="toolbar-btn" id="dbmake-wrap-overflow" title="はみ出し">⇄</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" id="dbmake-format-paint-btn" title="書式のコピー（ペイントフォーマット）">🖌</button>
+    </div>
+  </div>
+
+  <div class="list-section">
+    <div class="sticky-table-wrapper" style="max-height: calc(100vh - 250px); overflow: auto;">
+      <table class="spreadsheet-table" id="dbmake-spreadsheet-table" style="min-width: 100%; border-collapse: separate; border-spacing: 0;">
+        <thead id="dbmake-table-thead">
+          <!-- JSで動的描画 -->
+        </thead>
+        <tbody id="dbmake-table-body">
+          <!-- JSで動的描画 -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+</main>
+</div>
+</div>
+
+<!-- ================= フォルダ管理モーダル ================= -->
+<div class="modal-overlay" id="folder-manager-modal">
+  <div class="modal-box" style="max-width: 1100px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 1.5rem;">
+    <div class="modal-header" style="padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1rem;">
+      <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">
+        📁 フォルダ・階層構造管理 (管理パネル)
+      </h2>
+      <button class="btn-text" id="folder-manager-modal-close" style="font-size: 1.5rem; font-weight: bold; cursor: pointer; color: var(--text-muted);">✕</button>
+    </div>
+    
+    <div class="modal-body" style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 1.5rem; overflow-y: auto; flex: 1; min-height: 0;">
+      <!-- 左側：登録・編集フォーム -->
+      <div style="display: flex; flex-direction: column; gap: 1.25rem; min-height: 0; overflow-y: auto; padding-right: 0.25rem;">
+        <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; background: var(--bg-surface-elevated); box-shadow: var(--shadow-sm);">
+          <h3 style="font-size: 0.95rem; font-weight: 700; margin: 0 0 0.5rem 0; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+            ✨ 新しいフォルダを登録
+          </h3>
+          <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+              <label for="modal-folder-input" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">📁 フォルダ名</label>
+              <input type="text" id="modal-folder-input" placeholder="例: 開設マニュアル、営業資料 など..." style="padding: 0.5rem 0.75rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+            </div>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 0.35rem;">
+                <label for="modal-folder-parent-select" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">🔗 親フォルダ (初期配置)</label>
+                <select id="modal-folder-parent-select" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; cursor: pointer;">
+                  <option value="root">📁 ルート直下</option>
+                </select>
+              </div>
+              <button id="modal-folder-add-btn" class="btn-primary" style="padding: 0.55rem 1.25rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; align-self: flex-end; height: 36px; display: flex; align-items: center; gap: 0.3rem;">
+                ➕ 登録
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; background: var(--bg-surface-elevated); box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 0.75rem; min-height: 0; flex: 1;">
+          <h3 style="font-size: 0.95rem; font-weight: 700; margin: 0; color: var(--text-primary);">
+            ⚙️ フォルダ名変更と削除
+          </h3>
+          <div style="overflow-y: auto; flex: 1; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface);">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-secondary);">
+                  <th style="padding: 0.6rem 0.75rem; font-weight: 600;">📁 フォルダ名（編集）</th>
+                  <th style="padding: 0.6rem 0.75rem; font-weight: 600; text-align: center; width: 140px;">操作</th>
+                </tr>
+              </thead>
+              <tbody id="modal-folder-list-tbody">
+                <!-- JSで動的に追加されます -->
+              </tbody>
+            </table>
+            <div id="modal-folder-list-empty" style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+              登録されているフォルダはありません。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右側：ドラッグ＆ドロップ階層ツリー -->
+      <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; background: var(--bg-surface-elevated); box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 0.75rem; min-height: 0; height: 100%;">
+        <h3 style="font-size: 0.95rem; font-weight: 700; margin: 0; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+          🌳 ドラッグ＆ドロップ階層変更 (ツリー)
+        </h3>
+        <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0; line-height: 1.35;">
+          ツリー内の要素（フォルダやテーブル）をドラッグして、他のフォルダや「ルート直下」に重ねてドロップすることで、配属先（所属フォルダ）を直感的に変更できます。
+        </p>
+        <div id="modal-tree-root-dropzone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem; text-align: center; font-size: 0.8rem; color: var(--text-muted); background: var(--bg-surface); cursor: pointer; transition: all 0.2s;">
+          📥 ここにドロップしてルート直下 (第一階層) に移動
+        </div>
+        <div id="modal-folder-tree-container" style="flex: 1; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); padding: 0.75rem; overflow-y: auto;">
+          <!-- JSで動的に階層ツリーが構築されます -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- トースト通知用の容器 -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- JOテーブル用フィルタドロップダウンの容器 -->
+<div id="jo-filter-dropdown-container"></div>
+
+<script src="app.js"></script>
+
+<!-- ================= 条件付き書式設定モーダル ================= -->
+<div id="conditional-formatting-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; align-items: center; justify-content: center;">
+  <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 600px; max-width: 90%; max-height: 85%; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-lg);">
+    <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); background: var(--bg-surface-elevated); display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="font-size: 1.1rem; font-weight: bold; margin: 0; color: var(--text-primary);">🎨 条件付き書式ルール設定 (<span id="rules-screen-name">-</span>)</h3>
+      <button class="btn-text" id="close-rules-modal-btn" style="font-size: 1.25rem; line-height: 1; cursor: pointer;">✖</button>
+    </div>
+    <div style="padding: 1.5rem; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;">
+      <div id="cf-rules-list-view">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">設定済みのルール一覧:</p>
+        <div id="cf-rules-list-container" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;">
+          <!-- 動的ルールリスト -->
+        </div>
+        <button class="btn btn-secondary" id="add-rule-btn" style="width: 100%;">➕ 新規ルールを追加</button>
+      </div>
+
+      <!-- ルールエディタ部分 (非表示/表示) -->
+      <div id="cf-rule-editor-view" style="display: none; border-top: 1px dashed var(--border-color); padding-top: 1rem; flex-direction: column; gap: 0.75rem;">
+        <h4 style="font-size: 0.9rem; font-weight: bold; margin: 0;">新規ルール編集</h4>
+        <form id="new-rule-form" style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div class="form-group">
+              <label>適用カラム</label>
+              <select id="new-rule-col" required style="width: 100%;"></select>
+            </div>
+            <div class="form-group">
+              <label>条件</label>
+              <select id="new-rule-op" required style="width: 100%;">
+                <option value="contains">を含む</option>
+                <option value="not_contains">を含まない</option>
+                <option value="equals">と一致する</option>
+                <option value="not_equals">と一致しない</option>
+                <option value="starts_with">で始まる</option>
+                <option value="ends_with">で終わる</option>
+                <option value="is_empty">が空である</option>
+                <option value="is_not_empty">が空でない</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group" id="new-rule-val-container">
+            <label>比較文字列</label>
+            <input type="text" id="new-rule-val" style="width: 100%;" placeholder="例: 完了、保留など">
+          </div>
+
+          <!-- スタイル設定 -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius-sm); background: var(--bg-surface-elevated);">
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <span style="font-size: 0.8rem; font-weight: bold; color: var(--text-secondary);">装飾効果</span>
+              <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" id="new-rule-bold"> 太字にする
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" id="new-rule-italic"> 斜体にする
+              </label>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <span style="font-size: 0.8rem; font-weight: bold; color: var(--text-secondary);">色設定</span>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <span>文字:</span>
+                <input type="color" id="new-rule-color" value="#ef4444" style="border: none; background: transparent; cursor: pointer; width: 24px; height: 24px;">
+                <span>背景:</span>
+                <input type="color" id="new-rule-bg" value="#fee2e2" style="border: none; background: transparent; cursor: pointer; width: 24px; height: 24px;">
+              </div>
+            </div>
+          </div>
+
+          <!-- プレビュー -->
+          <div id="cf-style-preview" style="padding: 0.5rem; text-align: center; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 500;">
+            スタイル適用プレビュー（テキスト）
+          </div>
+        </form>
+      </div>
+    </div>
+    <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); background: var(--bg-surface-elevated); display: flex; justify-content: flex-end; gap: 0.75rem;">
+      <button class="btn btn-secondary" id="cf-cancel-btn">キャンセル</button>
+      <button class="btn btn-primary" id="cf-save-btn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 顧客検索モーダル ================= -->
+<div id="customer-search-modal" class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; align-items: center; justify-content: center;">
+  <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 500px; max-width: 90%; max-height: 80%; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-lg);">
+    <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); background: var(--bg-surface-elevated); display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="font-size: 1.1rem; font-weight: bold; margin: 0; color: var(--text-primary);">👤 既存顧客アポイント開始</h3>
+      <button class="btn-text modal-cancel-btn" id="close-modal-btn" style="font-size: 1.25rem; line-height: 1; cursor: pointer;">✖</button>
+    </div>
+    <div style="padding: 1.5rem; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;">
+      <div class="form-group">
+        <label for="modal-search-input">顧客名または電話番号・IDで検索</label>
+        <input type="text" id="modal-search-input" placeholder="例: テスト、090-1234-5678など" style="width: 100%;">
+      </div>
+      <div id="modal-customer-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem;">
+        <!-- 検索結果リスト -->
+      </div>
+    </div>
+    <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); background: var(--bg-surface-elevated); display: flex; justify-content: flex-end; gap: 0.75rem;">
+      <button class="btn btn-secondary modal-cancel-btn" id="modal-cancel-btn">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 重複データ競合解決モーダル ================= -->
+<div id="dbmake-duplicate-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; align-items: center; justify-content: center;">
+  <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 600px; max-width: 90%; max-height: 80%; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-lg);">
+    <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); background: var(--bg-surface-elevated); display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="font-size: 1.1rem; font-weight: bold; margin: 0; color: var(--text-primary);">⚠️ パートナーDB 重複データの競合解決</h3>
+      <button class="btn-text" id="dbmake-dup-modal-close" style="font-size: 1.25rem; line-height: 1; cursor: pointer;">✖</button>
+    </div>
+    <div style="padding: 1.5rem; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;">
+      <p style="font-size: 0.85rem; color: var(--text-secondary);">以下のインポート対象データは、既にデータベースに存在する企業コードと重複しています。競合処理方法を選択してください。</p>
+      <div id="dbmake-dup-list" style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); max-height: 250px; overflow-y: auto;">
+        <!-- 重複リスト -->
+      </div>
+    </div>
+    <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); background: var(--bg-surface-elevated); display: flex; justify-content: flex-end; gap: 0.75rem;">
+      <button class="btn btn-warning" id="dbmake-dup-overwrite-btn">📝 既存データを上書き</button>
+      <button class="btn btn-secondary" id="dbmake-dup-skip-btn">⏩ 重複データをスキップ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ➕ カスタムテーブル1件追加モーダル ================= -->
+<div class="modal-overlay" id="ct-single-add-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 2000; justify-content: center; align-items: center;">
+  <div class="modal-box" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 500px; max-width: 90%; max-height: 80%; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-lg);">
+    <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); background: var(--bg-surface-elevated); display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="font-size: 1.1rem; font-weight: bold; margin: 0; color: var(--text-primary);">➕ 新規データ登録</h3>
+      <button class="btn-text" id="ct-single-add-modal-close" style="font-size: 1.25rem; line-height: 1; cursor: pointer; background: none; border: none; color: var(--text-secondary);">✖</button>
+    </div>
+    <div id="ct-single-add-form-container" style="padding: 1.5rem; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; text-align: left;">
+      <!-- JavaScriptで動的入力フォームが生成されます -->
+    </div>
+    <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); background: var(--bg-surface-elevated); display: flex; justify-content: flex-end; gap: 0.75rem;">
+      <button class="btn btn-secondary" id="ct-single-add-modal-cancel">キャンセル</button>
+      <button class="btn btn-primary" id="ct-single-add-modal-submit">登録する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 📏 列幅・行高変更ダイアログ ================= -->
+<div class="modal-overlay" id="ct-resize-dialog-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 3000; justify-content: center; align-items: center;">
+  <div class="modal-box" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 360px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; box-shadow: var(--shadow-lg);">
+    <h3 id="ct-resize-dialog-title" style="font-size: 1rem; font-weight: bold; margin: 0; color: var(--text-primary); text-align: left;">列の幅を変更</h3>
+    
+    <div style="display: flex; flex-direction: column; gap: 0.75rem; text-align: left;">
+      <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-primary); cursor: pointer;">
+        <input type="radio" name="ct-resize-mode" id="ct-resize-mode-pixel" value="pixel" checked>
+        <span id="ct-resize-pixel-label">新しい列の幅をピクセル単位で入力してください (デフォルト: 120)。</span>
+      </label>
+      
+      <input type="number" id="ct-resize-pixel-val" value="120" min="20" max="1000" style="width: 100px; margin-left: 1.5rem; padding: 0.35rem 0.5rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); outline: none; font-size: 0.85rem;">
+      
+      <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-primary); cursor: pointer;">
+        <input type="radio" name="ct-resize-mode" id="ct-resize-mode-fit" value="fit">
+        データに合わせる
+      </label>
+    </div>
+    
+    <div style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+      <button class="btn btn-secondary" id="ct-resize-dialog-cancel" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">キャンセル</button>
+      <button class="btn btn-primary" id="ct-resize-dialog-submit" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 🖱️ カスタムコンテキストメニュー ================= -->
+<div id="ct-context-menu" class="filter-dropdown" style="display: none; position: fixed; z-index: 5000; min-width: 160px; padding: 0.25rem 0; box-shadow: var(--shadow-md); border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+  <div class="context-item" id="ct-menu-change-width" style="padding: 0.5rem 1rem; font-size: 0.85rem; color: var(--text-primary); cursor: pointer; transition: background 0.15s; text-align: left;">📏 列の幅を変更...</div>
+  <div class="context-item" id="ct-menu-change-height" style="padding: 0.5rem 1rem; font-size: 0.85rem; color: var(--text-primary); cursor: pointer; transition: background 0.15s; text-align: left;">📏 行の高さを変更...</div>
+  <div class="context-item" id="ct-menu-dropdown-settings" style="padding: 0.5rem 1rem; font-size: 0.85rem; color: var(--text-primary); cursor: pointer; transition: background 0.15s; text-align: left; border-top: 1px solid var(--border-color);">🏷️ 列の入力規則...</div>
+</div>
+
+<!-- ================= 🏷️ データの入力規則 (ドロップダウン) 設定サイドバー ================= -->
+<div id="validation-sidebar" class="validation-sidebar" style="display: none;">
+  <div class="validation-sidebar-header">
+    <span class="validation-sidebar-title">データの入力規則</span>
+    <button class="validation-sidebar-close" id="validation-sidebar-close-btn">&times;</button>
+  </div>
+  <div class="validation-sidebar-body">
+    <div class="sidebar-section">
+      <label class="sidebar-section-label">適用範囲</label>
+      <input type="text" id="validation-range-input" readonly placeholder="列名" class="sidebar-input-readonly" />
+    </div>
+
+    <div class="sidebar-section">
+      <label class="sidebar-section-label">基準</label>
+      <select id="validation-criteria-select" class="sidebar-select" style="cursor: pointer;">
+        <option value="text">テキスト</option>
+        <option value="number">数値</option>
+        <option value="list">ドロップダウン</option>
+        <option value="date">日付</option>
+      </select>
+    </div>
+
+    <div class="sidebar-section" id="validation-date-format-section" style="display: none;">
+      <label class="sidebar-section-label">日付の表示形式</label>
+      <select id="validation-date-format-select" style="width: 100%; padding: 0.45rem 0.6rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.8rem; outline: none; cursor: pointer;">
+        <option value="YYYY/MM/DD">西暦 (2008/09/26)</option>
+        <option value="YYYY年MM月DD日">西暦 (2008年09月26日)</option>
+        <option value="wareki">和暦 (平成20年09月26日)</option>
+        <option value="custom">カスタム表示形式</option>
+      </select>
+      <input type="text" id="validation-custom-date-format" placeholder="カスタム形式 (例: YYYY-MM-DD)" style="display: none; margin-top: 0.35rem; width: 100%; padding: 0.45rem 0.6rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.8rem; outline: none;" />
+    </div>
+
+    <div class="sidebar-section" id="validation-options-section">
+      <label class="sidebar-section-label">オプション (選択肢と色)</label>
+      <div id="validation-choices-list" class="validation-choices-list">
+        <!-- JSで動的に追加されます -->
+      </div>
+      <button type="button" class="btn-add-choice" id="validation-add-choice-btn">
+        <span style="font-size: 1.1rem; line-height: 1;">+</span> 別のアイテムを追加
+      </button>
+    </div>
+
+    <div class="sidebar-section" id="validation-advanced-section">
+      <div class="advanced-options-toggle" id="validation-advanced-toggle">
+        <span class="toggle-arrow">▶</span> 詳細オプション
+      </div>
+      <div class="advanced-options-content" id="validation-advanced-content" style="display: none;">
+        <div style="margin-bottom: 0.75rem;">
+          <label class="sidebar-section-sublabel" style="margin-bottom: 0.35rem; display: block;">表示スタイル</label>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem; padding-left: 0.25rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-primary); cursor: pointer;">
+              <input type="radio" name="validation-display-style" id="validation-style-chip" value="chip" checked>
+              チップ (丸枠)
+            </label>
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-primary); cursor: pointer;">
+              <input type="radio" name="validation-display-style" id="validation-style-arrow" value="arrow">
+              矢印 (通常セル + 矢印)
+            </label>
+          </div>
+        </div>
+
+        <div id="validation-chip-type-container">
+          <label class="sidebar-section-sublabel" style="margin-bottom: 0.35rem; display: block;">チップのカラー形式</label>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem; padding-left: 0.25rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-primary); cursor: pointer;">
+              <input type="radio" name="validation-chip-type" id="validation-chip-outline" value="outline" checked>
+              枠線とテキストに色を付ける (枠のみ)
+            </label>
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-primary); cursor: pointer;">
+              <input type="radio" name="validation-chip-type" id="validation-chip-fill" value="fill">
+              背景を塗りつぶす
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="validation-sidebar-footer">
+    <button class="btn btn-secondary" id="validation-remove-btn" style="flex: 1; padding: 0.5rem; font-size: 0.85rem;">ルールを削除</button>
+    <button class="btn btn-primary" id="validation-submit-btn" style="flex: 1; padding: 0.5rem; font-size: 0.85rem; font-weight: bold;">完了</button>
+  </div>
+</div>
+
+<!-- ================= 🎨 カラーパレットポップアップ (シングルトン) ================= -->
+<div id="validation-color-palette" class="validation-color-palette" style="display: none; position: absolute; z-index: 12000;">
+  <!-- JSで12色の丸パレットを動的に生成します -->
+</div>
+
+<!-- ================= 📊 選択セル統計情報ウィジェット ================= -->
+<div id="selection-stats-widget" class="selection-stats-widget" style="display: none;">
+  <div id="stats-display-value" class="stats-display-value">
+    個数: 0 ▼
+  </div>
+  <div id="stats-dropdown-menu" class="stats-dropdown-menu" style="display: none;"></div>
+</div>
+</body>
+</html>

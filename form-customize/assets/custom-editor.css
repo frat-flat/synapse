@@ -1,0 +1,795 @@
+/* 3ペイン分割レイアウトの調整（スクロールの修正） */
+.editor-layout {
+  display: flex !important;
+  height: calc(100vh - 65px) !important;
+  overflow: hidden !important;
+  background-color: #f7fafc !important;
+}
+
+.editor-sidebar {
+  width: 250px !important;
+  min-width: 250px !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  border-right: 1px solid #e2e8f0 !important;
+  background-color: #ffffff !important;
+}
+
+.editor-main {
+  flex: 1 !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  padding: 30px !important;
+  background: #ffffff !important;
+  box-sizing: border-box !important;
+}
+
+.editor-live-preview-pane {
+  width: 440px !important;
+  min-width: 440px !important;
+  height: 100% !important;
+  background: linear-gradient(135deg, #eef2f7 0%, #e2e8f0 100%) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  border-left: 1px solid #cbd5e0 !important;
+  padding: 15px !important;
+  box-sizing: border-box !important;
+}
+
+.live-preview-header {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #4a5568;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.live-preview-scroll-container {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+}
+
+/* スマホ風デバイスモックアップ */
+.device-mockup {
+  width: 375px;
+  min-height: 600px;
+  background: #ffffff;
+  border: 12px solid #1a202c; /* 高級感のある極細ベゼル */
+  border-radius: 36px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 5px 15px rgba(0, 0, 0, 0.06);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* 上部カメラノッチ */
+.device-notch {
+  width: 120px;
+  height: 18px;
+  background: #1a202c;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+}
+
+/* ステータスバー */
+.device-status-bar {
+  height: 28px;
+  background: transparent;
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 18px 0 18px;
+  align-items: center;
+  font-size: 0.65rem;
+  color: #a0aec0;
+  font-weight: 600;
+  z-index: 10;
+  user-select: none;
+}
+
+/* モック画面のスクロール部分 */
+.device-screen-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+  padding-top: 5px;
+  background-color: #ffffff;
+}
+
+/* スクロールバーの非表示（スマホ風にするため） */
+.device-screen-content::-webkit-scrollbar {
+  width: 4px;
+}
+.device-screen-content::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.1);
+  border-radius: 2px;
+}
+
+/* エディターモードスイッチ（より可愛らしくモダンに） */
+.mode-toggle-container {
+  background: linear-gradient(135deg, #f6f8fb 0%, #edf2f7 100%);
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+.mode-switch-btn {
+  background: transparent;
+  color: #718096;
+  border: none;
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.mode-switch-btn.active {
+  background: linear-gradient(135deg, var(--color-primary) 0%, #3182ce 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 10px rgba(49, 130, 206, 0.3);
+  transform: scale(1.02);
+}
+
+/* プリセット選択チップ */
+.preset-chip {
+  padding: 8px 16px;
+  font-size: 0.75rem;
+  border-radius: 30px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #4a5568;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+.preset-chip:hover {
+  border-color: var(--color-primary);
+  background: #f7fafc;
+  transform: translateY(-1px);
+}
+.preset-chip.active {
+  background: linear-gradient(135deg, var(--color-primary) 0%, #3182ce 100%);
+  color: #ffffff;
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 10px rgba(49, 130, 206, 0.2);
+}
+
+/* プロ版ヒントポップアップ */
+.pro-popup-hint {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* バリデーション警告 */
+.warning-message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: #975a16;
+  background-color: #fefcbf;
+  border: 1px solid #faf089;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+/* 入力エラーメッセージ（標準赤） */
+.preview-q-card.has-error {
+  border-left: 3.5px solid #e53e3e !important;
+  background: rgba(229, 62, 62, 0.01) !important;
+}
+
+/* 電話番号ハイフン切り替えスイッチ */
+.hyphen-toggle-container {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.7rem;
+  margin-top: 6px;
+}
+.hyphen-toggle-btn {
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #718096;
+  cursor: pointer;
+  font-weight: 500;
+}
+.hyphen-toggle-btn.active {
+  background: #718096;
+  color: #ffffff;
+  border-color: #718096;
+}
+
+/* 非活性化（グレーアウト）要素 */
+.q-card-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  filter: grayscale(80%);
+}
+
+/* ================= フローマップドラッグ編集スタイル ================= */
+.flow-node-card {
+  position: relative !important; /* ポートの絶対配置の基準にする */
+}
+
+/* 既存の flow-connector 要素を目に見える丸い端子に変換する */
+.flow-connector {
+  display: inline-block !important;
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 50% !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 0 5px rgba(0,0,0,0.3) !important;
+  cursor: crosshair !important;
+  transition: transform 0.2s, background-color 0.2s;
+  z-index: 1000;
+}
+
+/* デフォルト出力ポート (青い丸：カードの右端中央に絶対配置して出口を明確化) */
+.flow-connector[data-connector-type="default"] {
+  position: absolute !important;
+  right: -7px !important;
+  top: 50% !important;
+  margin-top: -7px !important;
+  background-color: #3182ce !important;
+}
+
+.flow-connector[data-connector-type="default"]:hover {
+  transform: scale(1.4) !important;
+  background-color: #2b6cb0 !important;
+}
+
+/* 質問選択肢ごとの条件分岐コネクタ (オレンジの丸：インラインの右側に配置) */
+.flow-connector[data-connector-type="conditional"] {
+  position: relative !important;
+  vertical-align: middle;
+  margin-left: 6px;
+  background-color: #ed8936 !important;
+}
+
+.flow-connector[data-connector-type="conditional"]:hover {
+  transform: scale(1.4) !important;
+  background-color: #dd6b20 !important;
+}
+
+/* 接続端子（インプットポート） */
+.flow-port {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #3182ce;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 5px rgba(0,0,0,0.2);
+  position: absolute;
+  cursor: crosshair;
+  z-index: 1000;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.2s;
+}
+
+.flow-port:hover {
+  transform: scale(1.4);
+  background-color: #2b6cb0;
+}
+
+/* 入力ポート（左側中央） */
+.flow-port-in {
+  left: -6px;
+  top: 50%;
+  margin-top: -6px;
+  background-color: #4a5568; /* シックなチャコールグレー */
+}
+
+.flow-port-in.drag-hover {
+  transform: scale(1.6);
+  background-color: #48bb78; /* ドラッグホバー時は緑に光る */
+  box-shadow: 0 0 10px rgba(72, 187, 120, 0.6);
+}
+
+/* 出力ポート（右側中央 - デフォルト遷移用） */
+.flow-port-out {
+  right: -6px;
+  top: 50%;
+  margin-top: -6px;
+  background-color: #3182ce; /* 鮮やかなブルー */
+}
+
+/* 条件付き出力ポート（各選択肢の右側にインライン配置） */
+.flow-port-conditional {
+  display: inline-block;
+  position: relative;
+  vertical-align: middle;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  background-color: #ed8936; /* 警告や条件を表すオレンジ */
+  cursor: crosshair;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 0 4px rgba(0,0,0,0.15);
+}
+
+.flow-port-conditional:hover {
+  transform: scale(1.3);
+  background-color: #dd6b20;
+}
+
+/* ドラッグ中の一時的なSVGパス（点線） */
+.temp-drag-path {
+  stroke-width: 3px;
+  fill: none;
+  stroke: #3182ce;
+  stroke-dasharray: 6,4;
+  animation: dashmove 0.6s linear infinite;
+  pointer-events: none !important; /* マウスイベントを透過させて背後のノードが掴めるようにする */
+}
+
+@keyframes dashmove {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+/* 孤立セクションノードのビジュアル警告 */
+.flow-node-isolated {
+  opacity: 0.65;
+  filter: grayscale(40%);
+  border: 2px dashed #e53e3e !important;
+  box-shadow: 0 0 8px rgba(229, 62, 62, 0.2) !important;
+}
+
+.flow-node-isolated::before {
+  content: "⚠️ 到達不能";
+  position: absolute;
+  top: -18px;
+  left: 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #e53e3e;
+  background: #fffdfd;
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid #fed7d7;
+}
+
+/* ================= フローマップキャンバス＆パン・ズームスタイル ================= */
+
+#flowmap-container {
+  position: relative !important;
+  width: 100% !important;
+  height: 680px !important;
+  min-height: 680px !important;
+  overflow: hidden !important; /* コンテナ外へのはみ出しを防ぎ、スクロールはドラッグ（パン）に委ねる */
+  background-color: #f8fafc !important; /* 薄いグレーの背景 */
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06) !important;
+  user-select: none !important;
+}
+
+/* キャンバスドラッグ（パン）中のカーソル設定 */
+.flowmap-panning {
+  cursor: grabbing !important;
+}
+
+.flowmap-pan-grab {
+  cursor: grab !important;
+}
+
+/* グリッド背景パターンのスタイル */
+.flowmap-grid-pattern {
+  fill: url(#grid-pattern);
+}
+
+/* ループ・循環参照などのトースト警告表示 */
+.flow-error-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  background-color: #fff5f5;
+  color: #c53030;
+  border: 1px solid #feb2b2;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes toastSlideIn {
+  from {
+    transform: translate(-50%, -30px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+/* ================= 黒背景ヘッダー内の文字色コントラスト改善 ================= */
+.header-logo h1 {
+  color: #ffffff !important; /* 濃い青から白に変更し見やすくする */
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.user-info .user-role {
+  color: #a0aec0 !important; /* 管理者ロールなどの文字を明るいグレーに変更 */
+  font-weight: 500;
+}
+
+/* ================= ダブルクリック・フォーカス時の黒潰れ・自動補完バグ修正 ================= */
+input.form-control:focus,
+textarea.form-control:focus,
+select.form-control:focus {
+  background-color: #ffffff !important;
+  color: #1a202c !important;
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.2) !important;
+}
+
+/* Chrome/Edgeでの自動保管・ダブルクリック選択時の黒潰れ防止 */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: #1a202c !important;
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* ドラッグ選択時のカラー保護 */
+input::selection,
+textarea::selection {
+  background-color: #bee3f8 !important;
+  color: #2b6cb0 !important;
+}
+
+/* ================= マインドマップ（ツリー）ノードスタイル ================= */
+
+/* 各種ノードカードのカラーテーマ定義 */
+.flow-node-card.node-root {
+  background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 100%) !important;
+  border: 2px solid #3182ce !important;
+  color: #2b6cb0 !important;
+  box-shadow: 0 4px 12px rgba(49, 130, 206, 0.15) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.flow-node-card.node-section {
+  background: linear-gradient(135deg, #faf5ff 0%, #e9d8fd 100%) !important;
+  border: 2px solid #805ad5 !important;
+  color: #553c9a !important;
+  box-shadow: 0 4px 12px rgba(128, 90, 213, 0.15) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.flow-node-card.node-question {
+  background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%) !important;
+  border: 2px solid #38a169 !important;
+  color: #22543d !important;
+  box-shadow: 0 4px 12px rgba(56, 161, 105, 0.15) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.flow-node-card.node-question.branch-node {
+  background: linear-gradient(135deg, #fffaf0 0%, #feebc8 100%) !important;
+  border: 2px solid #dd6b20 !important;
+  color: #7b341e !important;
+  box-shadow: 0 4px 12px rgba(221, 107, 32, 0.15) !important;
+}
+
+.flow-node-card.node-option {
+  background: linear-gradient(135deg, #fffff0 0%, #fefcbf 100%) !important;
+  border: 2px solid #ecc94b !important;
+  color: #744210 !important;
+  box-shadow: 0 4px 12px rgba(236, 201, 75, 0.15) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  position: relative;
+  box-sizing: border-box;
+}
+
+/* セクションカード内に内包される質問項目のスタイル */
+.mindmap-sec-question {
+  margin-top: 8px;
+  background: #ffffff !important;
+  border: 1px solid #cbd5e0 !important;
+  border-radius: 6px !important;
+  padding: 8px 10px !important;
+  color: #2d3748 !important;
+  position: relative !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+
+.mindmap-sec-question .question-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  margin-bottom: 4px !important;
+  color: #2d3748 !important;
+}
+
+.mindmap-sec-question .question-type-badge {
+  background-color: #edf2f7 !important;
+  color: #4a5568 !important;
+  padding: 1px 5px !important;
+  border-radius: 3px !important;
+  font-size: 0.65rem !important;
+}
+
+.mindmap-sec-question .question-title-text {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 150px !important;
+  display: inline-block !important;
+}
+
+.mindmap-sec-question .question-options-list {
+  margin-top: 6px !important;
+  border-top: 1px dashed #e2e8f0 !important;
+  padding-top: 4px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.mindmap-sec-question .question-option-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  font-size: 0.7rem !important;
+  background-color: #f7fafc !important;
+  padding: 4px 6px !important;
+  border-radius: 4px !important;
+  border: 1px solid #e2e8f0 !important;
+  position: relative !important;
+  min-height: 20px !important;
+}
+
+.mindmap-sec-question .question-option-row .option-label {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 150px !important;
+  color: #4a5568 !important;
+  font-weight: 500 !important;
+}
+
+/* 選択肢ごとの条件分岐コネクタ(オレンジ丸) */
+.flow-port-conditional {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+  background-color: #ed8936 !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 0 5px rgba(0,0,0,0.2) !important;
+  position: absolute !important;
+  right: -6px !important;
+  top: 50% !important;
+  margin-top: -6px !important;
+  cursor: crosshair !important;
+  z-index: 1000 !important;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.2s !important;
+}
+
+.flow-port-conditional:hover {
+  transform: scale(1.4) !important;
+  background-color: #dd6b20 !important;
+}
+
+/* 質問のインライン編集・削除ボタンのスタイル */
+.question-action-btn {
+  background: transparent !important;
+  border: none !important;
+  font-size: 0.65rem !important;
+  cursor: pointer !important;
+  padding: 2px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 3px !important;
+  transition: background-color 0.2s !important;
+}
+.question-action-btn:hover {
+  background-color: #e2e8f0 !important;
+}
+
+/* アクションエリア・コントロールボタンの浮遊表示スタイル */
+.flow-node-controls {
+  position: absolute;
+  top: -15px;
+  right: 10px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 10010;
+}
+
+.flow-node-card:hover .flow-node-controls,
+foreignObject:hover .flow-node-controls {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* アクションボタン単体のスタイル */
+.flow-node-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+  padding: 0;
+}
+
+.flow-node-btn:hover {
+  transform: scale(1.15);
+}
+
+.flow-node-btn.btn-add {
+  background-color: #38a169 !important;
+}
+.flow-node-btn.btn-add:hover {
+  background-color: #2f855a !important;
+}
+
+.flow-node-btn.btn-edit {
+  background-color: #3182ce !important;
+}
+.flow-node-btn.btn-edit:hover {
+  background-color: #2b6cb0 !important;
+}
+
+.flow-node-btn.btn-delete {
+  background-color: #e53e3e !important;
+}
+.flow-node-btn.btn-delete:hover {
+  background-color: #c53030 !important;
+}
+
+/* インライン・ポップアップ編集モーダルのスタイル */
+.mindmap-edit-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20000;
+  backdrop-filter: blur(4px);
+}
+
+.mindmap-edit-dialog {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  width: 440px;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15);
+  border: 1px solid #e2e8f0;
+  animation: modalScaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalScaleUp {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.mindmap-dialog-header {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #edf2f7;
+  padding-bottom: 10px;
+}
+
+.mindmap-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.mindmap-dialog-field label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #4a5568;
+}
+
+.mindmap-dialog-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  outline: none;
+  background-color: #ffffff !important;
+  color: #1a202c !important;
+}
+
+.mindmap-dialog-input:focus {
+  border-color: #3182ce;
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.2);
+}
+
+.mindmap-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+  border-top: 1px solid #edf2f7;
+  padding-top: 14px;
+}
+
+
+
