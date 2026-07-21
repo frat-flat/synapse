@@ -1931,7 +1931,10 @@ function renderCustomTableList() {
   // 2. 再帰的なアコーディオン・テーブルの再配置
   const renderMenuNode = (parentId, containerEl) => {
     // A. 親IDに属するアコーディオン（標準フォルダ ＋ カスタムフォルダ）を抽出
-    const childFolders = state.customAccordions.filter(acc => (acc.parentMenuId || 'root') === parentId);
+    // 「メニュー内の子フォルダは表示しない」仕様に基づき、ルート直下(parentId === 'root')のフォルダーのみ表示
+    const childFolders = parentId === 'root'
+      ? state.customAccordions.filter(acc => (acc.parentMenuId || 'root') === 'root')
+      : [];
 
     childFolders.forEach(acc => {
       const access = checkFolderAccess(acc.id);
@@ -2127,7 +2130,16 @@ function renderCustomTableList() {
     const childTables = state.customTables.filter(t => {
       const pId = t.parentMenuId || 'root';
       const normalizedPId = (pId === 'custom-tables' || pId === '') ? 'root' : pId;
-      return normalizedPId === parentId;
+      if (normalizedPId === parentId) return true;
+
+      // 子フォルダに属するテーブルも、親ルートフォルダ配下にフラット表示
+      let parentAcc = state.customAccordions.find(a => a.id === normalizedPId);
+      while (parentAcc) {
+        if ((parentAcc.parentMenuId || 'root') === parentId) return true;
+        parentAcc = state.customAccordions.find(a => a.id === parentAcc.parentMenuId);
+      }
+
+      return false;
     });
 
     childTables.forEach(tbl => {
