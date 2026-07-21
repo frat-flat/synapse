@@ -20634,8 +20634,8 @@ function renderModalFolderTree() {
     });
   }
 
-  // 2. 再帰的ツリーノードレンダラー
-  const renderTreeNode = (parentId, indentLevel) => {
+  // 2. 再帰的ツリーノードレンダラー (開閉トグル付き)
+  const renderTreeNode = (parentId, indentLevel, targetContainer) => {
     const targetParentId = normalizeFolderId(parentId);
 
     // フォルダの抽出
@@ -20657,7 +20657,17 @@ function renderModalFolderTree() {
       folderNode.style.fontWeight = '600';
       folderNode.style.transition = 'all 0.15s ease';
       
-      folderNode.textContent = `📁 ${acc.name}`;
+      // 開閉トグル矢印ボタン
+      const toggleArrow = document.createElement('span');
+      toggleArrow.textContent = '▼';
+      toggleArrow.style.cssText = 'cursor: pointer; font-size: 0.7rem; color: var(--text-muted); width: 14px; text-align: center; display: inline-block; user-select: none;';
+      
+      const folderLabel = document.createElement('span');
+      folderLabel.textContent = `📁 ${acc.name}`;
+      folderLabel.style.cursor = 'pointer';
+
+      folderNode.appendChild(toggleArrow);
+      folderNode.appendChild(folderLabel);
 
       // ドラッグ属性
       folderNode.draggable = true;
@@ -20735,10 +20745,27 @@ function renderModalFolderTree() {
         renderModalFolderTree();
       });
 
-      container.appendChild(folderNode);
+      targetContainer.appendChild(folderNode);
+
+      // 配下の子要素を格納するコンテナ
+      const childContainer = document.createElement('div');
+      childContainer.className = 'modal-tree-child-container';
+      childContainer.style.display = 'block';
+      targetContainer.appendChild(childContainer);
+
+      // 開閉クリックイベントの設定
+      const toggleExpand = (e) => {
+        if (e) e.stopPropagation();
+        const isHidden = childContainer.style.display === 'none';
+        childContainer.style.display = isHidden ? 'block' : 'none';
+        toggleArrow.textContent = isHidden ? '▼' : '▶';
+      };
+
+      toggleArrow.addEventListener('click', toggleExpand);
+      folderLabel.addEventListener('click', toggleExpand);
 
       // 子要素（子フォルダ・所属テーブル・サブメニュー項目）を再帰的描画
-      renderTreeNode(acc.id, indentLevel + 1);
+      renderTreeNode(acc.id, indentLevel + 1, childContainer);
     });
 
     // 所属テーブル・サブメニュー項目の抽出
@@ -20773,12 +20800,12 @@ function renderModalFolderTree() {
         tableNode.style.opacity = '1';
       });
 
-      container.appendChild(tableNode);
+      targetContainer.appendChild(tableNode);
     });
   };
 
   // ルートからツリー構築を開始
-  renderTreeNode('root', 0);
+  renderTreeNode('root', 0, container);
 }
 
 function renderPermissionTree() {
