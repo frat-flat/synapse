@@ -17272,14 +17272,22 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   // 外部クリックでポップアップ閉じる
-  // サイドバー設定ポップアップの制御
+  // 右上ヘッダー設定ポップアップの制御
   const settingsBtn = document.getElementById('sidebar-settings-btn');
   const settingsPopup = document.getElementById('sidebar-settings-popup');
   if (settingsBtn && settingsPopup) {
     settingsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const isHidden = settingsPopup.style.display === 'none' || !settingsPopup.style.display;
-      settingsPopup.style.display = isHidden ? 'block' : 'none';
+      if (isHidden) {
+        const rect = settingsBtn.getBoundingClientRect();
+        settingsPopup.style.position = 'fixed';
+        settingsPopup.style.top = `${rect.bottom + 8}px`;
+        settingsPopup.style.left = `${rect.right - 210}px`;
+        settingsPopup.style.display = 'block';
+      } else {
+        settingsPopup.style.display = 'none';
+      }
     });
   }
 

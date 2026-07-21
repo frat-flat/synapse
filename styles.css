@@ -2760,18 +2760,16 @@ textarea {
   color: #6b7280;
 }
 
-/* サイドバー設定ポップアップ */
+/* 右上ヘッダー設定ポップアップ */
 .settings-popup {
-  position: absolute;
-  left: calc(100% + 12px);
-  bottom: 30px;
+  position: fixed;
   width: 220px;
   background: var(--bg-surface-elevated);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   padding: 1rem;
-  z-index: 1010;
+  z-index: 10000;
   box-sizing: border-box;
   animation: settingsFadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -2779,24 +2777,24 @@ textarea {
 .settings-popup::before {
   content: '';
   position: absolute;
-  left: -6px;
-  bottom: 12px;
+  top: -6px;
+  right: 14px;
   width: 10px;
   height: 10px;
   background: var(--bg-surface-elevated);
   border-left: 1px solid var(--border-color);
-  border-bottom: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color);
   transform: rotate(45deg);
 }
 
 @keyframes settingsFadeIn {
   from {
     opacity: 0;
-    transform: translateX(-10px);
+    transform: translateY(-6px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
 }
 
