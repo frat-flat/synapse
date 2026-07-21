@@ -1354,7 +1354,8 @@ function ensureStandardTablesInState() {
     { id: 'appointment-existing', name: '既存顧客アポイント', parentMenuId: 'appoint-accordion' },
     { id: 'drafts-view-screen', name: '一時保存一覧', parentMenuId: 'appoint-accordion' },
     { id: 'history-view-screen', name: 'アポイント履歴', parentMenuId: 'appoint-accordion' },
-    { id: 'official-id-link', name: '本登録ID紐付け', parentMenuId: 'appoint-accordion' }
+    { id: 'official-id-link', name: '本登録ID紐付け', parentMenuId: 'appoint-accordion' },
+    { id: 'link-official-screen', name: '本登録ID紐付け', parentMenuId: 'appoint-accordion' }
   ];
 
   stds.forEach(std => {
@@ -1362,7 +1363,13 @@ function ensureStandardTablesInState() {
     if (!existing) {
       state.customTables.push(std);
     } else {
-      existing.parentMenuId = normalizeFolderId(existing.parentMenuId);
+      // 親IDが無効または未設定、あるいは標準設定が崩れている場合は本来の親フォルダ（例: appoint-accordion）に確実に復元接続
+      const norm = normalizeFolderId(existing.parentMenuId);
+      if (!norm || norm === 'root' || norm === 'none') {
+        existing.parentMenuId = std.parentMenuId;
+      } else {
+        existing.parentMenuId = norm;
+      }
     }
   });
 }
@@ -1645,8 +1652,9 @@ function getCurrentUserId() {
 // フォルダ（アコーディオン）の閲覧可否判定
 // 戻り値: { visible: boolean, grayout: boolean }
 function checkFolderAccess(folderId) {
-  // アポイント情報フォルダは常に表示する
-  if (folderId === 'appoint-accordion') {
+  // 標準アコーディオンフォルダ群は常に表示する
+  const stdFolders = ['appoint-accordion', 'agency-accordion', 'jo-accordion', 'applicant-accordion'];
+  if (stdFolders.includes(folderId)) {
     return { visible: true, grayout: false };
   }
 
@@ -1673,8 +1681,14 @@ function checkFolderAccess(folderId) {
 }
 // テーブル（シート）の閲覧可否判定
 function checkTableAccess(tableId) {
-  // アポイント画面（新規・既存・下書き・履歴等）は常に表示する
-  if (tableId === 'appoint-screen') {
+  // アポイント画面群および標準基本マスタ画面は常に表示する
+  const stdSystemTables = [
+    'appoint-screen', 'appointment-new', 'appointment-existing',
+    'drafts-view-screen', 'history-view-screen', 'official-id-link', 'link-official-screen',
+    'agency-info-screen', 'jo-info-screen', 'applicant-info-screen'
+  ];
+
+  if (stdSystemTables.includes(tableId)) {
     return { visible: true, grayout: false };
   }
 
