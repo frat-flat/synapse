@@ -1566,7 +1566,7 @@ function setupSidebarToggleBtnEvent() {
 
     sidebar.classList.toggle('collapsed');
     const isCollapsed = sidebar.classList.contains('collapsed');
-    sidebarToggleBtn.style.left = isCollapsed ? '14px' : '215px';
+    sidebarToggleBtn.style.left = isCollapsed ? '64px' : '215px';
     sidebarToggleBtn.textContent = isCollapsed ? '›' : '‹';
   });
 }

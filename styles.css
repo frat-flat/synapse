@@ -1648,9 +1648,9 @@ textarea {
   transform: scale(1.25);
 }
 
-/* When sidebar is collapsed, move toggle arrow to the left edge */
+/* When sidebar is collapsed, move toggle arrow outside sidebar edge (64px) so it never overlaps logo/icons */
 #app-sidebar.collapsed + .sidebar-toggle-arrow {
-  left: 14px;
+  left: 64px;
 }
 
 /* Shift main content padding-left to prevent toggle arrow from overlapping the title when collapsed */
