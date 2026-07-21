@@ -1653,6 +1653,26 @@
 <!-- トースト通知用の容器 -->
 <div class="toast-container" id="toast-container"></div>
 
+<!-- アプリ内カスタム確認/プロンプトダイアログモーダル -->
+<div class="modal-overlay" id="custom-dialog-overlay" style="z-index: 100005; display: none;">
+  <div class="modal-box" style="max-width: 420px; width: 90%; padding: 1.25rem; background: var(--bg-surface-elevated); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); animation: fadeIn 0.15s ease-out;">
+    <h3 id="custom-dialog-title" style="margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+      ❓ 確認
+    </h3>
+    <p id="custom-dialog-message" style="font-size: 0.85rem; color: var(--text-secondary); margin: 0 0 1rem 0; line-height: 1.45; white-space: pre-wrap;"></p>
+    
+    <!-- 入力欄 (プロンプト時のみ使用) -->
+    <div id="custom-dialog-input-container" style="display: none; margin-bottom: 1rem;">
+      <input type="text" id="custom-dialog-input" style="width: 100%; padding: 0.45rem 0.65rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+    </div>
+
+    <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+      <button id="custom-dialog-cancel-btn" class="btn-secondary" style="padding: 0.4rem 0.85rem; font-size: 0.82rem; border-radius: var(--radius-sm); cursor: pointer;">キャンセル</button>
+      <button id="custom-dialog-ok-btn" class="btn-primary" style="padding: 0.4rem 1rem; font-size: 0.82rem; font-weight: 600; border-radius: var(--radius-sm); cursor: pointer;">OK</button>
+    </div>
+  </div>
+</div>
+
 <!-- JOテーブル用フィルタドロップダウンの容器 -->
 <div id="jo-filter-dropdown-container"></div>
 

@@ -1870,36 +1870,33 @@ function deleteCustomAccordion(accId) {
   const hasChildren = state.customTables.some(t => t.parentMenuId === accId) ||
                       state.customAccordions.some(a => a.parentMenuId === accId);
   const msg = hasChildren
-    ? `フォルダ「${acc.name}」を削除しますか？\n（内包されているテーブルやフォルダの配置はルートメニューに戻ります）`
+    ? `フォルダ「${acc.name}」を削除しますか？\n（配下のテーブルやフォルダは親なし直下に戻ります）`
     : `フォルダ「${acc.name}」を削除しますか？`;
 
-  if (!confirm(msg)) return;
+  showAppConfirm('フォルダ削除の確認', msg, () => {
+    state.customTables.forEach(tbl => {
+      if (tbl.parentMenuId === accId) {
+        tbl.parentMenuId = 'root';
+      }
+    });
+    saveCustomTables();
 
-  state.customAccordions = state.customAccordions.filter(a => a.id !== accId);
-  saveCustomAccordions();
+    state.customAccordions.forEach(a => {
+      if (a.parentMenuId === accId) {
+        a.parentMenuId = 'root';
+      }
+    });
 
-  state.customTables.forEach(tbl => {
-    if (tbl.parentMenuId === accId) {
-      tbl.parentMenuId = 'root';
-    }
+    state.customAccordions = state.customAccordions.filter(a => a.id !== accId);
+    saveCustomAccordions();
+    
+    delete state.permissions.folders[accId];
+    savePermissions();
+
+    renderCustomTableList();
+    renderModalFolderTree();
+    showToast(`フォルダ「${acc.name}」を削除しました。`, 'success');
   });
-  saveCustomTables();
-
-  state.customAccordions.forEach(acc => {
-    if (acc.parentMenuId === accId) {
-      acc.parentMenuId = 'root';
-    }
-  });
-  saveCustomAccordions();
-  
-  delete state.permissions.folders[accId];
-  savePermissions();
-
-  renderCustomTableList();
-  updateParentSelectDropdowns();
-  updateAdminFolderAddDropdown();
-  renderAdminPanelFolderList();
-  showToast('フォルダを削除しました。', 'success');
 }
 
 // 標準メニュー要素のキャッシュ（DOM再構築時のロスト防止）
@@ -20611,6 +20608,88 @@ function renderAdminPanelFolderList() {
   renderModalFolderTree();
 }
 
+// ================= アプリ内カスタムダイアログ (confirm / prompt の代替) =================
+function showAppConfirm(title, message, onOk) {
+  const overlay = document.getElementById('custom-dialog-overlay');
+  const titleEl = document.getElementById('custom-dialog-title');
+  const msgEl = document.getElementById('custom-dialog-message');
+  const inputContainer = document.getElementById('custom-dialog-input-container');
+  const okBtn = document.getElementById('custom-dialog-ok-btn');
+  const cancelBtn = document.getElementById('custom-dialog-cancel-btn');
+
+  if (!overlay) {
+    if (confirm(message)) onOk();
+    return;
+  }
+
+  titleEl.textContent = title || '❓ 確認';
+  msgEl.textContent = message || '';
+  inputContainer.style.display = 'none';
+
+  overlay.style.display = 'flex';
+  overlay.classList.add('active');
+
+  const closeDialog = () => {
+    overlay.style.display = 'none';
+    overlay.classList.remove('active');
+  };
+
+  okBtn.onclick = () => {
+    closeDialog();
+    if (onOk) onOk();
+  };
+  cancelBtn.onclick = closeDialog;
+}
+
+function showAppPrompt(title, message, defaultValue, onOk) {
+  const overlay = document.getElementById('custom-dialog-overlay');
+  const titleEl = document.getElementById('custom-dialog-title');
+  const msgEl = document.getElementById('custom-dialog-message');
+  const inputContainer = document.getElementById('custom-dialog-input-container');
+  const inputEl = document.getElementById('custom-dialog-input');
+  const okBtn = document.getElementById('custom-dialog-ok-btn');
+  const cancelBtn = document.getElementById('custom-dialog-cancel-btn');
+
+  if (!overlay) {
+    const res = prompt(message, defaultValue);
+    if (res !== null) onOk(res);
+    return;
+  }
+
+  titleEl.textContent = title || '✏️ 入力';
+  msgEl.textContent = message || '';
+  inputContainer.style.display = 'block';
+  inputEl.value = defaultValue || '';
+
+  overlay.style.display = 'flex';
+  overlay.classList.add('active');
+
+  setTimeout(() => {
+    inputEl.focus();
+    inputEl.select();
+  }, 50);
+
+  const closeDialog = () => {
+    overlay.style.display = 'none';
+    overlay.classList.remove('active');
+  };
+
+  const handleOk = () => {
+    const val = inputEl.value.trim();
+    closeDialog();
+    if (val && onOk) onOk(val);
+  };
+
+  okBtn.onclick = handleOk;
+  cancelBtn.onclick = closeDialog;
+  inputEl.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleOk();
+    }
+  };
+}
+
 // 右クリックコンテキストメニューの状態管理
 let activeContextMenuTarget = null;
 
@@ -20666,18 +20745,24 @@ function initContextMenuEvents() {
       const { type, targetObj } = activeContextMenuTarget;
       hideContextMenu();
 
-      const newName = prompt(`新しい${type === 'folder' ? 'フォルダ名' : '名前'}を入力してください:`, targetObj.name);
-      if (newName && newName.trim() && newName.trim() !== targetObj.name) {
-        targetObj.name = newName.trim();
-        if (type === 'folder') {
-          saveCustomAccordions();
-        } else {
-          saveCustomTables();
+      showAppPrompt(
+        '名前の変更',
+        `新しい${type === 'folder' ? 'フォルダ名' : '名前'}を入力してください:`,
+        targetObj.name,
+        (newName) => {
+          if (newName && newName !== targetObj.name) {
+            targetObj.name = newName;
+            if (type === 'folder') {
+              saveCustomAccordions();
+            } else {
+              saveCustomTables();
+            }
+            renderCustomTableList();
+            renderModalFolderTree();
+            showToast('名前を変更しました。', 'success');
+          }
         }
-        renderCustomTableList();
-        renderModalFolderTree();
-        showToast('名前を変更しました。', 'success');
-      }
+      );
     });
   }
 
@@ -20701,9 +20786,9 @@ function initContextMenuEvents() {
       if (type === 'folder') {
         deleteCustomAccordion(targetObj.id);
       } else if (type === 'item') {
-        if (confirm(`「${targetObj.name}」を削除しますか？`)) {
+        showAppConfirm('削除の確認', `「${targetObj.name}」を削除しますか？`, () => {
           deleteCustomTable(targetObj.id);
-        }
+        });
       }
     });
   }
