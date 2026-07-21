@@ -20891,9 +20891,9 @@ function renderModalFolderTree() {
       folderNode.style.fontWeight = '600';
       folderNode.style.transition = 'all 0.15s ease';
       
-      // 開閉トグル矢印ボタン (初期は下向き▼で全展開)
+      // 開閉トグル矢印ボタン (検索語がある時以外は初期は親フォルダのみ見せて配下は閉じる ▶)
       const toggleArrow = document.createElement('span');
-      toggleArrow.textContent = '▼';
+      toggleArrow.textContent = searchTerm ? '▼' : '▶';
       toggleArrow.style.cssText = 'cursor: pointer; font-size: 0.65rem; color: var(--text-muted); width: 14px; text-align: center; display: inline-block; user-select: none;';
       
       // フォルダ管理内は全フォルダのアイコンを 📁 (フォルダマーク) で固定表示
@@ -20988,10 +20988,10 @@ function renderModalFolderTree() {
 
       targetContainer.appendChild(folderNode);
 
-      // 配下の子要素を格納するコンテナ (初期状態で全展開 block)
+      // 配下の子要素を格納するコンテナ (検索語がある時以外は初期状態は非表示 none で親のみ表示)
       const childContainer = document.createElement('div');
       childContainer.className = 'modal-tree-child-container';
-      childContainer.style.display = 'block';
+      childContainer.style.display = searchTerm ? 'block' : 'none';
       targetContainer.appendChild(childContainer);
 
       // 開閉クリックイベントの設定
@@ -21030,9 +21030,9 @@ function renderModalFolderTree() {
       tableNode.style.fontSize = '0.8rem';
       tableNode.style.transition = 'all 0.15s ease';
       
-      // テーブル項目は固定 📄 / その他機能項目は固定 📑
+      // テーブル項目は直感的なデータテーブルマーク 📊 / その他機能画面項目は 📝
       const isSub = ['appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link'].includes(tbl.id);
-      const itemIcon = isSub ? '📑' : '📄';
+      const itemIcon = isSub ? '📝' : '📊';
 
       tableNode.innerHTML = `<span class="user-custom-icon user-custom-icon-emoji">${itemIcon}</span> <span>${tbl.name}</span>`;
 
