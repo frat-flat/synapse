@@ -1386,7 +1386,10 @@ function getUserItemIconHtml(itemId, defaultIcon = null) {
     return `<span class="user-custom-icon user-custom-icon-emoji">${defaultIcon}</span>`;
   }
 
-  return '';
+  // テーブル(📊)とその他機能(📝)でデフォルトアイコンを判別
+  const isSubMenu = ['appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link'].includes(itemId);
+  const autoIcon = isSubMenu ? '📝' : '📊';
+  return `<span class="user-custom-icon user-custom-icon-emoji">${autoIcon}</span>`;
 }
 
 let currentIconTargetId = null;
@@ -20581,6 +20584,104 @@ function renderAdminPanelFolderList() {
   renderModalFolderTree();
 }
 
+// 右クリックコンテキストメニューの状態管理
+let activeContextMenuTarget = null;
+
+function hideContextMenu() {
+  const menu = document.getElementById('folder-context-menu');
+  if (menu) menu.style.display = 'none';
+  activeContextMenuTarget = null;
+}
+
+function showContextMenu(x, y, type, targetObj) {
+  const menu = document.getElementById('folder-context-menu');
+  if (!menu) return;
+
+  activeContextMenuTarget = { type, targetObj };
+  
+  // 削除ボタンの可否
+  const delBtn = document.getElementById('ctx-delete');
+  if (delBtn) {
+    if (type === 'folder' && targetObj.isSystem) {
+      delBtn.style.display = 'none';
+    } else if (type === 'item' && ['agency-info-screen', 'jo-info-screen', 'applicant-info-screen', 'appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link'].includes(targetObj.id)) {
+      delBtn.style.display = 'none';
+    } else {
+      delBtn.style.display = 'flex';
+    }
+  }
+
+  // 画面枠外にはみ出さないように配置
+  menu.style.display = 'block';
+  const menuWidth = menu.offsetWidth || 150;
+  const menuHeight = menu.offsetHeight || 120;
+  const posX = (x + menuWidth > window.innerWidth) ? window.innerWidth - menuWidth - 10 : x;
+  const posY = (y + menuHeight > window.innerHeight) ? window.innerHeight - menuHeight - 10 : y;
+
+  menu.style.left = `${posX}px`;
+  menu.style.top = `${posY}px`;
+}
+
+// コンテキストメニューのイベント初期化 (1回のみ)
+function initContextMenuEvents() {
+  const menu = document.getElementById('folder-context-menu');
+  if (!menu || menu.dataset.initialized) return;
+  menu.dataset.initialized = 'true';
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#folder-context-menu')) hideContextMenu();
+  });
+
+  const renameBtn = document.getElementById('ctx-rename');
+  if (renameBtn) {
+    renameBtn.addEventListener('click', () => {
+      if (!activeContextMenuTarget) return;
+      const { type, targetObj } = activeContextMenuTarget;
+      hideContextMenu();
+
+      const newName = prompt(`新しい${type === 'folder' ? 'フォルダ名' : '名前'}を入力してください:`, targetObj.name);
+      if (newName && newName.trim() && newName.trim() !== targetObj.name) {
+        targetObj.name = newName.trim();
+        if (type === 'folder') {
+          saveCustomAccordions();
+        } else {
+          saveCustomTables();
+        }
+        renderCustomTableList();
+        renderModalFolderTree();
+        showToast('名前を変更しました。', 'success');
+      }
+    });
+  }
+
+  const iconBtn = document.getElementById('ctx-change-icon');
+  if (iconBtn) {
+    iconBtn.addEventListener('click', () => {
+      if (!activeContextMenuTarget) return;
+      const { targetObj } = activeContextMenuTarget;
+      hideContextMenu();
+      openCustomIconModal(targetObj.id, targetObj.name);
+    });
+  }
+
+  const delBtn = document.getElementById('ctx-delete');
+  if (delBtn) {
+    delBtn.addEventListener('click', () => {
+      if (!activeContextMenuTarget) return;
+      const { type, targetObj } = activeContextMenuTarget;
+      hideContextMenu();
+
+      if (type === 'folder') {
+        deleteCustomAccordion(targetObj.id);
+      } else if (type === 'item') {
+        if (confirm(`「${targetObj.name}」を削除しますか？`)) {
+          deleteCustomTable(targetObj.id);
+        }
+      }
+    });
+  }
+}
+
 function renderModalFolderTree() {
   const container = document.getElementById('modal-folder-tree-container');
   const rootDropzone = document.getElementById('modal-tree-root-dropzone');
@@ -20588,11 +20689,23 @@ function renderModalFolderTree() {
 
   ensureStandardAccordionsInState();
   ensureStandardTablesInState();
+  initContextMenuEvents();
 
   container.innerHTML = '';
 
+  // 検索フィルターバインド
+  const searchInput = document.getElementById('modal-folder-search-input');
+  const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  if (searchInput && !searchInput.dataset.bound) {
+    searchInput.dataset.bound = 'true';
+    searchInput.addEventListener('input', () => {
+      renderModalFolderTree();
+    });
+  }
+
   // 1. ルートドロップゾーンのイベント設定
   if (rootDropzone) {
+    rootDropzone.innerHTML = '📥 ここにドロップして 🏠 メインメニュー直下 (フォルダ外) に移動';
     rootDropzone.addEventListener('dragover', (e) => {
       e.preventDefault();
       rootDropzone.style.borderColor = 'var(--primary)';
@@ -20601,13 +20714,13 @@ function renderModalFolderTree() {
     });
     rootDropzone.addEventListener('dragleave', () => {
       rootDropzone.style.borderColor = 'var(--border-color)';
-      rootDropzone.style.background = 'var(--bg-surface)';
+      rootDropzone.style.background = 'var(--bg-surface-elevated)';
       rootDropzone.style.color = 'var(--text-muted)';
     });
     rootDropzone.addEventListener('drop', (e) => {
       e.preventDefault();
       rootDropzone.style.borderColor = 'var(--border-color)';
-      rootDropzone.style.background = 'var(--bg-surface)';
+      rootDropzone.style.background = 'var(--bg-surface-elevated)';
       rootDropzone.style.color = 'var(--text-muted)';
 
       const dragSourceId = e.dataTransfer.getData('text/plain');
@@ -20619,59 +20732,75 @@ function renderModalFolderTree() {
         if (acc) {
           acc.parentMenuId = 'root';
           saveCustomAccordions();
-          showToast(`フォルダ「${acc.name}」をルート直下に移動しました。`, 'success');
+          showToast(`フォルダ「${acc.name}」をメインメニュー直下に移動しました。`, 'success');
         }
       } else if (dragType === 'table') {
         const tbl = state.customTables.find(t => t.id === dragSourceId);
         if (tbl) {
           tbl.parentMenuId = 'root';
           saveCustomTables();
-          showToast(`「${tbl.name}」をルート直下に移動しました。`, 'success');
+          showToast(`「${tbl.name}」をメインメニュー直下に移動しました。`, 'success');
         }
       }
 
       renderCustomTableList();
-      updateParentSelectDropdowns();
-      updateAdminFolderAddDropdown();
-      renderAdminPanelFolderList();
       renderModalFolderTree();
     });
   }
 
-  // 2. 再帰的ツリーノードレンダラー (開閉トグル付き)
+  // 2. 再帰的ツリーノードレンダラー (開閉トグル ＋ 右クリックメニュー ＋ 検索フィルタ)
   const renderTreeNode = (parentId, indentLevel, targetContainer) => {
     const targetParentId = normalizeFolderId(parentId);
 
     // フォルダの抽出
-    const childFolders = state.customAccordions.filter(acc => normalizeFolderId(acc.parentMenuId || 'root') === targetParentId);
+    let childFolders = state.customAccordions.filter(acc => normalizeFolderId(acc.parentMenuId || 'root') === targetParentId);
     
     childFolders.forEach(acc => {
+      // 検索一致判定（子要素に検索語が含まれるかも含む）
+      if (searchTerm && !acc.name.toLowerCase().includes(searchTerm)) {
+        const hasMatchingChild = state.customTables.some(t => normalizeFolderId(t.parentMenuId) === acc.id && t.name.toLowerCase().includes(searchTerm)) ||
+                                 state.customAccordions.some(a => normalizeFolderId(a.parentMenuId) === acc.id && a.name.toLowerCase().includes(searchTerm));
+        if (!hasMatchingChild) return;
+      }
+
       const folderNode = document.createElement('div');
-      folderNode.style.marginLeft = `${indentLevel * 1.25}rem`;
-      folderNode.style.padding = '0.4rem 0.6rem';
-      folderNode.style.margin = '0.25rem 0';
+      folderNode.className = 'tree-node-item';
+      folderNode.style.marginLeft = `${indentLevel * 1.1}rem`;
+      folderNode.style.padding = '0.35rem 0.6rem';
+      folderNode.style.margin = '0.2rem 0';
       folderNode.style.borderRadius = 'var(--radius-sm)';
       folderNode.style.border = '1px solid var(--border-color)';
-      folderNode.style.background = 'var(--bg-surface-elevated)';
+      folderNode.style.background = 'var(--bg-surface)';
       folderNode.style.cursor = 'grab';
       folderNode.style.display = 'flex';
       folderNode.style.alignItems = 'center';
       folderNode.style.gap = '0.4rem';
-      folderNode.style.fontSize = '0.85rem';
+      folderNode.style.fontSize = '0.83rem';
       folderNode.style.fontWeight = '600';
       folderNode.style.transition = 'all 0.15s ease';
       
       // 開閉トグル矢印ボタン
       const toggleArrow = document.createElement('span');
       toggleArrow.textContent = '▼';
-      toggleArrow.style.cssText = 'cursor: pointer; font-size: 0.7rem; color: var(--text-muted); width: 14px; text-align: center; display: inline-block; user-select: none;';
+      toggleArrow.style.cssText = 'cursor: pointer; font-size: 0.65rem; color: var(--text-muted); width: 14px; text-align: center; display: inline-block; user-select: none;';
       
+      const folderIconHtml = getUserItemIconHtml(acc.id, '📁');
       const folderLabel = document.createElement('span');
-      folderLabel.textContent = `📁 ${acc.name}`;
+      folderLabel.innerHTML = `${folderIconHtml} <span>${acc.name}</span>`;
       folderLabel.style.cursor = 'pointer';
+      folderLabel.style.display = 'flex';
+      folderLabel.style.alignItems = 'center';
+      folderLabel.style.gap = '0.35rem';
 
       folderNode.appendChild(toggleArrow);
       folderNode.appendChild(folderLabel);
+
+      // 右クリック（コンテキスト）メニュー
+      folderNode.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showContextMenu(e.clientX, e.clientY, 'folder', acc);
+      });
 
       // ドラッグ属性
       folderNode.draggable = true;
@@ -20693,9 +20822,8 @@ function renderModalFolderTree() {
         const dragSourceId = e.dataTransfer.getData('text/plain');
         const dragType = e.dataTransfer.getData('application/cos-type');
         
-        if (dragSourceId === acc.id) return; // 自分自身は拒否
+        if (dragSourceId === acc.id) return;
         
-        // 循環参照チェック
         if (dragType === 'folder') {
           const isDescendant = (parentAccId, childAccId) => {
             let current = state.customAccordions.find(a => a.id === childAccId);
@@ -20712,13 +20840,13 @@ function renderModalFolderTree() {
         folderNode.style.borderColor = 'var(--primary)';
       });
       folderNode.addEventListener('dragleave', () => {
-        folderNode.style.background = 'var(--bg-surface-elevated)';
+        folderNode.style.background = 'var(--bg-surface)';
         folderNode.style.borderColor = 'var(--border-color)';
       });
       folderNode.addEventListener('drop', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        folderNode.style.background = 'var(--bg-surface-elevated)';
+        folderNode.style.background = 'var(--bg-surface)';
         folderNode.style.borderColor = 'var(--border-color)';
 
         const dragSourceId = e.dataTransfer.getData('text/plain');
@@ -20743,9 +20871,6 @@ function renderModalFolderTree() {
         }
 
         renderCustomTableList();
-        updateParentSelectDropdowns();
-        updateAdminFolderAddDropdown();
-        renderAdminPanelFolderList();
         renderModalFolderTree();
       });
 
@@ -20754,7 +20879,7 @@ function renderModalFolderTree() {
       // 配下の子要素を格納するコンテナ
       const childContainer = document.createElement('div');
       childContainer.className = 'modal-tree-child-container';
-      childContainer.style.display = 'block';
+      childContainer.style.display = searchTerm ? 'block' : 'block';
       targetContainer.appendChild(childContainer);
 
       // 開閉クリックイベントの設定
@@ -20773,15 +20898,18 @@ function renderModalFolderTree() {
     });
 
     // 所属テーブル・サブメニュー項目の抽出
-    const childTables = state.customTables.filter(t => normalizeFolderId(t.parentMenuId || 'root') === targetParentId);
+    let childTables = state.customTables.filter(t => normalizeFolderId(t.parentMenuId || 'root') === targetParentId);
 
     childTables.forEach(tbl => {
+      if (searchTerm && !tbl.name.toLowerCase().includes(searchTerm)) return;
+
       const tableNode = document.createElement('div');
-      tableNode.style.marginLeft = `${indentLevel * 1.25}rem`;
-      tableNode.style.padding = '0.35rem 0.5rem';
+      tableNode.className = 'tree-node-item';
+      tableNode.style.marginLeft = `${indentLevel * 1.1}rem`;
+      tableNode.style.padding = '0.3rem 0.5rem';
       tableNode.style.margin = '0.15rem 0';
       tableNode.style.borderRadius = 'var(--radius-sm)';
-      tableNode.style.border = '1px solid rgba(var(--border-color-rgb), 0.5)';
+      tableNode.style.border = '1px solid rgba(var(--border-color-rgb), 0.6)';
       tableNode.style.background = 'var(--bg-surface)';
       tableNode.style.cursor = 'grab';
       tableNode.style.display = 'flex';
@@ -20790,7 +20918,19 @@ function renderModalFolderTree() {
       tableNode.style.fontSize = '0.8rem';
       tableNode.style.transition = 'all 0.15s ease';
       
-      tableNode.textContent = `📄 ${tbl.name}`;
+      // テーブル(📊) vs その他機能(📝) アイコンの出し分け
+      const isSub = ['appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link'].includes(tbl.id);
+      const defaultItemIcon = isSub ? '📝' : '📊';
+      const itemIconHtml = getUserItemIconHtml(tbl.id, defaultItemIcon);
+
+      tableNode.innerHTML = `${itemIconHtml} <span>${tbl.name}</span>`;
+
+      // 右クリック（コンテキスト）メニュー
+      tableNode.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showContextMenu(e.clientX, e.clientY, 'item', tbl);
+      });
 
       // テーブルはドラッグのみ可能
       tableNode.draggable = true;

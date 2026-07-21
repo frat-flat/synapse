@@ -3728,9 +3728,24 @@ h3 {
   align-items: center;
   pointer-events: none;
   white-space: nowrap;
-  z-index: 2;
-  padding: inherit;
-  box-sizing: border-box;
+  padding-left: 0.5rem;
+  z-index: 10;
+}
+
+/* ============================================================================
+   右クリック（コンテキスト）メニュー＆ツリーノード スタイル
+   ============================================================================ */
+.custom-context-menu {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  user-select: none;
+}
+
+.ctx-menu-item:hover {
+  background: rgba(var(--primary-rgb), 0.12);
+}
+
+.tree-node-item:hover {
+  border-color: var(--primary) !important;
 }
 
 .overflow-overlaid {
