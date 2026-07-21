@@ -1780,6 +1780,40 @@ textarea {
   stroke: var(--primary) !important;
 }
 
+/* 🛠️ 書式ツールバードロップダウンメニュー */
+.format-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.format-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  padding: 0.25rem;
+  gap: 0.25rem;
+  flex-direction: row;
+}
+
+.format-dropdown.active .format-dropdown-menu {
+  display: flex;
+}
+
+.format-dropdown-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.5rem !important;
+  font-size: 0.8rem;
+  width: auto !important;
+}
+
 .toolbar-input {
   width: 32px;
   height: 28px;
@@ -3490,5 +3524,36 @@ h3 {
   color: var(--text-muted);
   user-select: none;
   pointer-events: none;
+}
+
+/* ============================================================================
+   🌊 はみ出しテキスト (Overflow Overlay) 表示用スタイル
+   ============================================================================ */
+.spreadsheet-table td {
+  position: relative;
+}
+
+.cell-overflow-span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+  padding: inherit;
+  box-sizing: border-box;
+}
+
+.overflow-overlaid {
+  color: transparent !important;
+}
+
+.overflow-overlaid a,
+.overflow-overlaid span,
+.overflow-overlaid div {
+  visibility: hidden !important;
 }
 

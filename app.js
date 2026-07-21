@@ -77,7 +77,10 @@ const STORAGE_KEYS = {
   CUSTOM_TABLES: 'synapse_custom_tables',
   PERMISSIONS: 'synapse_permissions',
   AUDIT_LOGS: 'synapse_audit_logs',
-  CUSTOM_ACCORDIONS: 'synapse_custom_accordions'
+  CUSTOM_ACCORDIONS: 'synapse_custom_accordions',
+  JO_ROW_HEIGHTS: 'synapse_jo_row_heights',
+  AP_ROW_HEIGHTS: 'synapse_ap_row_heights',
+  AG_ROW_HEIGHTS: 'synapse_ag_row_heights'
 };
 
 const INITIAL_JO_COLUMNS = [
@@ -190,6 +193,7 @@ let state = {
   joVisibleColumns: [],
   joFilters: {},
   joColumnWidths: {},
+  joRowHeights: {},
   joFixedCol: 'none',
   joFixedRow: 'none',
   joCellStyles: {}, 
@@ -208,6 +212,7 @@ let state = {
   apVisibleColumns: [],
   apFilters: {},
   apColumnWidths: {},
+  apRowHeights: {},
   apFixedCol: 'none',
   apFixedRow: 'none',
   apCellStyles: {}, 
@@ -226,6 +231,7 @@ let state = {
   agVisibleColumns: [],
   agFilters: {},
   agColumnWidths: {},
+  agRowHeights: {},
   agFixedCol: 'none',
   agFixedRow: 'none',
   agCellStyles: {}, 
@@ -355,8 +361,96 @@ document.addEventListener('DOMContentLoaded', () => {
   setupCtButtonsEvents();      // 追加
   setupPermissionFeatures();
   updateParentSelectDropdowns();
+  initFormatDropdowns();
   checkLoginStatus();
+
+  // スクロール時にオーバーフローセルを再調整（バブリングしないためキャプチャフェーズを使用）
+  document.addEventListener('scroll', (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains('spreadsheet-table-container')) {
+      const table = e.target.querySelector('.spreadsheet-table');
+      if (table) {
+        adjustOverflowCells(table);
+      }
+    }
+  }, true);
+
+  // ウィンドウリサイズ時にもすべてのスプレッドシートテーブルのオーバーフローを再調整
+  window.addEventListener('resize', () => {
+    document.querySelectorAll('.spreadsheet-table').forEach(table => {
+      adjustOverflowCells(table);
+    });
+  });
 });
+
+// 書式設定ツールバーのアライメントドロップダウンを初期化する
+function initFormatDropdowns() {
+  const prefixes = ['ct', 'ag', 'jo', 'ap', 'dbmake'];
+  
+  prefixes.forEach(pfx => {
+    const types = ['align', 'valign', 'wrap'];
+    
+    types.forEach(type => {
+      const dropdown = document.getElementById(`${pfx}-${type}-dropdown`);
+      if (!dropdown) return;
+      
+      const btn = dropdown.querySelector('.format-dropdown-btn');
+      const menu = dropdown.querySelector('.format-dropdown-menu');
+      const iconSpan = btn ? btn.querySelector('.dropdown-icon') : null;
+      
+      if (btn && menu) {
+        // 開閉トグル
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          
+          // 他のドロップダウンをすべて閉じる
+          document.querySelectorAll('.format-dropdown').forEach(d => {
+            if (d !== dropdown) d.classList.remove('active');
+          });
+          document.querySelectorAll('.color-picker-dropdown').forEach(d => {
+            d.style.display = 'none';
+          });
+          
+          dropdown.classList.toggle('active');
+        });
+        
+        // 子要素のボタンがクリックされたときにメインボタンの表示を更新し、ドロップダウンを閉じる
+        menu.querySelectorAll('.toolbar-btn').forEach(subBtn => {
+          subBtn.addEventListener('click', () => {
+            if (iconSpan) {
+              iconSpan.innerHTML = subBtn.innerHTML;
+            }
+            dropdown.classList.remove('active');
+          });
+
+          // activeクラス変更時の親アイコン画像同期
+          const observer = new MutationObserver((mutations) => {
+            mutations.forEach(mutation => {
+              if (mutation.attributeName === 'class' && subBtn.classList.contains('active')) {
+                if (iconSpan) {
+                  iconSpan.innerHTML = subBtn.innerHTML;
+                }
+              }
+            });
+          });
+          observer.observe(subBtn, { attributes: true });
+
+          // 初期のactive同期
+          if (subBtn.classList.contains('active') && iconSpan) {
+            iconSpan.innerHTML = subBtn.innerHTML;
+          }
+        });
+      }
+    });
+  });
+  
+  // 外側クリックで閉じる
+  document.addEventListener('mousedown', (e) => {
+    if (e.target.closest('.format-dropdown')) return;
+    document.querySelectorAll('.format-dropdown').forEach(d => {
+      d.classList.remove('active');
+    });
+  }, true);
+}
 
 // 連番 (seq) から1対1 (全単射) で衝突のない8桁英数字IDを生成する暗号学的関数 (Format-Preserving Encryption 簡易版)
 function encodeSequenceToId(seq) {
@@ -730,6 +824,12 @@ function initDatabase() {
     setSettingItem(STORAGE_KEYS.JO_COLUMN_WIDTHS, JSON.stringify(state.joColumnWidths));
   }
 
+  // JO行高DB
+  if (!getSettingItem(STORAGE_KEYS.JO_ROW_HEIGHTS)) {
+    setSettingItem(STORAGE_KEYS.JO_ROW_HEIGHTS, JSON.stringify({}));
+  }
+  state.joRowHeights = JSON.parse(getSettingItem(STORAGE_KEYS.JO_ROW_HEIGHTS));
+
   // 固定列・行のDB
   if (!getSettingItem(STORAGE_KEYS.JO_FIXED_COL)) {
     setSettingItem(STORAGE_KEYS.JO_FIXED_COL, 'none');
@@ -810,6 +910,11 @@ function initDatabase() {
   }
   state.apColumnWidths = JSON.parse(getSettingItem(STORAGE_KEYS.AP_COLUMN_WIDTHS));
 
+  if (!getSettingItem(STORAGE_KEYS.AP_ROW_HEIGHTS)) {
+    setSettingItem(STORAGE_KEYS.AP_ROW_HEIGHTS, JSON.stringify({}));
+  }
+  state.apRowHeights = JSON.parse(getSettingItem(STORAGE_KEYS.AP_ROW_HEIGHTS));
+
   if (!getSettingItem(STORAGE_KEYS.AP_FIXED_COL)) {
     setSettingItem(STORAGE_KEYS.AP_FIXED_COL, 'none');
   }
@@ -851,6 +956,11 @@ function initDatabase() {
     setSettingItem(STORAGE_KEYS.AG_COLUMN_WIDTHS, JSON.stringify({}));
   }
   state.agColumnWidths = JSON.parse(getSettingItem(STORAGE_KEYS.AG_COLUMN_WIDTHS));
+
+  if (!getSettingItem(STORAGE_KEYS.AG_ROW_HEIGHTS)) {
+    setSettingItem(STORAGE_KEYS.AG_ROW_HEIGHTS, JSON.stringify({}));
+  }
+  state.agRowHeights = JSON.parse(getSettingItem(STORAGE_KEYS.AG_ROW_HEIGHTS));
 
   if (!getSettingItem(STORAGE_KEYS.AG_FIXED_COL)) {
     setSettingItem(STORAGE_KEYS.AG_FIXED_COL, 'none');
@@ -2246,6 +2356,138 @@ function setupCtRowResize(tbl, rowIndex, resizeHandle) {
   });
 }
 
+// マスタテーブル（jo, ap, ag）用の行高ドラッグ調整セットアップ
+function setupMasterRowResize(prefix, rowIndex, resizeHandle) {
+  let startY = 0;
+  let startHeight = 0;
+
+  const onMouseMove = (e) => {
+    const diff = e.clientY - startY;
+    const newHeight = Math.max(15, startHeight + diff);
+    
+    let rowHeightsObj;
+    let trIdPrefix;
+    
+    if (prefix === 'jo') {
+      rowHeightsObj = state.joRowHeights;
+      trIdPrefix = 'jo-table-body';
+    } else if (prefix === 'ap') {
+      rowHeightsObj = state.apRowHeights;
+      trIdPrefix = 'applicant-table-body';
+    } else if (prefix === 'ag') {
+      rowHeightsObj = state.agRowHeights;
+      trIdPrefix = 'agency-table-body';
+    }
+
+    rowHeightsObj[rowIndex] = newHeight;
+    
+    const trs = document.querySelectorAll(`#${trIdPrefix} tr`);
+    const tr = trs[rowIndex];
+    if (tr) {
+      tr.style.height = `${newHeight}px`;
+      tr.style.maxHeight = `${newHeight}px`;
+      tr.style.minHeight = `${newHeight}px`;
+      tr.querySelectorAll('td').forEach(td => {
+        td.style.height = `${newHeight}px`;
+        td.style.maxHeight = `${newHeight}px`;
+        td.style.minHeight = `${newHeight}px`;
+        if (td.classList.contains('row-number-col')) {
+          td.style.lineHeight = `${newHeight}px`;
+        }
+      });
+    }
+  };
+
+  const onMouseUp = () => {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    
+    let storageKey;
+    let renderFn;
+    let rowHeightsObj;
+    if (prefix === 'jo') {
+      storageKey = STORAGE_KEYS.JO_ROW_HEIGHTS;
+      rowHeightsObj = state.joRowHeights;
+      renderFn = renderJoInfo;
+    } else if (prefix === 'ap') {
+      storageKey = STORAGE_KEYS.AP_ROW_HEIGHTS;
+      rowHeightsObj = state.apRowHeights;
+      renderFn = renderApplicantInfo;
+    } else if (prefix === 'ag') {
+      storageKey = STORAGE_KEYS.AG_ROW_HEIGHTS;
+      rowHeightsObj = state.agRowHeights;
+      renderFn = renderAgencyInfo;
+    }
+    
+    setSettingItem(storageKey, JSON.stringify(rowHeightsObj));
+    renderFn();
+  };
+
+  resizeHandle.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    startY = e.clientY;
+    let rowHeightsObj = (prefix === 'jo') ? state.joRowHeights : ((prefix === 'ap') ? state.apRowHeights : state.agRowHeights);
+    startHeight = rowHeightsObj[rowIndex] || 30;
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  });
+}
+
+// マスタテーブル（jo, ap, ag）用の右クリック行高数値指定ダイアログ
+function setupMasterRowContextMenu(prefix, rowIndex, rowNumTd) {
+  rowNumTd.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    let rowHeightsObj;
+    let selectedRowsSet;
+    let storageKey;
+    let renderFn;
+    let displayPrefix;
+
+    if (prefix === 'jo') {
+      rowHeightsObj = state.joRowHeights;
+      selectedRowsSet = state.joSelectedRows;
+      storageKey = STORAGE_KEYS.JO_ROW_HEIGHTS;
+      renderFn = renderJoInfo;
+      displayPrefix = '案件マスタ';
+    } else if (prefix === 'ap') {
+      rowHeightsObj = state.apRowHeights;
+      selectedRowsSet = state.apSelectedRows;
+      storageKey = STORAGE_KEYS.AP_ROW_HEIGHTS;
+      renderFn = renderApplicantInfo;
+      displayPrefix = '申込者マスタ';
+    } else if (prefix === 'ag') {
+      rowHeightsObj = state.agRowHeights;
+      selectedRowsSet = state.agSelectedRows;
+      storageKey = STORAGE_KEYS.AG_ROW_HEIGHTS;
+      renderFn = renderAgencyInfo;
+      displayPrefix = '代理店マスタ';
+    }
+
+    const currentHeight = rowHeightsObj[rowIndex] || 30;
+    const isTargetInSelection = selectedRowsSet.has(rowIndex);
+    const targetRows = isTargetInSelection ? Array.from(selectedRowsSet) : [rowIndex];
+    const label = isTargetInSelection ? `選択された ${targetRows.length} 行` : `${displayPrefix} 行 [ ${rowIndex + 1} ]`;
+
+    const newHeightStr = prompt(`${label} の高さを入力してください (px):`, currentHeight);
+    if (newHeightStr !== null) {
+      const newHeight = parseInt(newHeightStr, 10);
+      if (!isNaN(newHeight) && newHeight >= 15) {
+        targetRows.forEach(rIdx => {
+          rowHeightsObj[rIdx] = newHeight;
+        });
+        setSettingItem(storageKey, JSON.stringify(rowHeightsObj));
+        renderFn();
+        showToast(`${label} の高さを ${newHeight}px に設定しました。`, 'success');
+      } else {
+        showToast('無効な数値です（15px以上の数値を入力してください）。', 'error');
+      }
+    }
+  });
+}
+
 // カスタムコンテキストメニューの表示
 function showCtContextMenu(x, y, tbl, type, targetId) {
   if (window.logToDebugPanel) {
@@ -2335,24 +2577,82 @@ function setupCtColumnResize(tbl, colId, resizeHandle) {
 
 // セルへのインラインスタイル（書式）の適用ヘルパー
 function applyInlineStylesToCell(element, style) {
-  element.style.fontWeight = style.fontWeight || 'normal';
-  element.style.fontStyle = style.fontStyle || 'normal';
-  element.style.textDecoration = style.textDecoration || 'none';
-  element.style.color = style.color || '';
-  element.style.backgroundColor = style.bg || '';
-  element.style.fontSize = style.fontSize || '0.85rem';
-  element.style.textAlign = style.textAlign || 'left';
-  element.style.verticalAlign = style.verticalAlign || 'middle';
+  const getStyleVal = (camel, kebab) => style[camel] !== undefined ? style[camel] : style[kebab];
+
+  element.style.fontWeight = getStyleVal('fontWeight', 'font-weight') || 'normal';
+  element.style.fontStyle = getStyleVal('fontStyle', 'font-style') || 'normal';
+  element.style.textDecoration = getStyleVal('textDecoration', 'text-decoration') || 'none';
+  element.style.color = getStyleVal('color', 'color') || '';
+  element.style.backgroundColor = getStyleVal('bg', 'background-color') || '';
+  element.style.fontSize = getStyleVal('fontSize', 'font-size') || '0.85rem';
+  element.style.textAlign = getStyleVal('textAlign', 'text-align') || 'left';
+  element.style.verticalAlign = getStyleVal('verticalAlign', 'vertical-align') || 'middle';
   
-  if (style.whiteSpace) {
-    element.style.whiteSpace = style.whiteSpace;
-    element.style.overflow = style.whiteSpace === 'nowrap' ? 'hidden' : '';
-    element.style.textOverflow = style.whiteSpace === 'nowrap' ? 'ellipsis' : '';
+  const whiteSpace = getStyleVal('whiteSpace', 'white-space');
+  const textOverflow = getStyleVal('textOverflow', 'text-overflow');
+  const overflow = getStyleVal('overflow', 'overflow');
+
+  if (whiteSpace === 'normal') {
+    // 折り返し (Wrap)
+    element.style.whiteSpace = 'normal';
+    element.style.overflow = 'visible';
+    element.style.textOverflow = '';
+  } else if (whiteSpace === 'nowrap' && (textOverflow === 'clip' || overflow === 'visible')) {
+    // はみ出し (Overflow) - 初期設定では nowrap / clip。後続の adjustOverflowCells で overflow を動的に調整する
+    element.style.whiteSpace = 'nowrap';
+    element.style.overflow = 'hidden';
+    element.style.textOverflow = 'clip';
+  } else if (whiteSpace === 'nowrap') {
+    // 切り詰め (Clip)
+    element.style.whiteSpace = 'nowrap';
+    element.style.overflow = 'hidden';
+    element.style.textOverflow = textOverflow || 'ellipsis';
   } else {
+    // デフォルト (切り詰め/三点リーダー)
     element.style.whiteSpace = 'nowrap';
     element.style.overflow = 'hidden';
     element.style.textOverflow = 'ellipsis';
   }
+}
+
+// はみ出し(Overflow)セルが右隣のセルと重なるか、または自動で切り落とされるかを動的に調整する
+function adjustOverflowCells(tableElement) {
+  if (!tableElement) return;
+  
+  const rows = tableElement.querySelectorAll('tbody tr');
+  rows.forEach(row => {
+    const cells = Array.from(row.querySelectorAll('td'));
+    
+    cells.forEach((td, idx) => {
+      // style.whiteSpace === 'nowrap' && style.textOverflow === 'clip' の場合が「はみ出し」設定
+      const isOverflowMode = td.style.whiteSpace === 'nowrap' && td.style.textOverflow === 'clip';
+      if (!isOverflowMode) return;
+      
+      const nextTd = cells[idx + 1];
+      let isNextEmpty = true;
+      
+      if (nextTd) {
+        // 右隣のセルに値があるか判定 (入力欄、選択肢チップ、プレーンテキストなど)
+        const text = nextTd.textContent.replace('▼', '').trim();
+        const input = nextTd.querySelector('input, select');
+        const inputValue = input ? input.value.trim() : '';
+        const chip = nextTd.querySelector('.ct-chip-fill, .ct-chip-outline, .badge');
+        const chipValue = chip ? chip.textContent.trim() : '';
+        
+        if (text || inputValue || chipValue) {
+          isNextEmpty = false;
+        }
+      }
+      
+      if (isNextEmpty) {
+        td.style.overflow = 'visible';
+        td.style.zIndex = '1';
+      } else {
+        td.style.overflow = 'hidden';
+        td.style.zIndex = '';
+      }
+    });
+  });
 }
 
 // 汎用カスタムテーブル画面の動的描画
@@ -2460,7 +2760,8 @@ function renderCustomTable(tableId) {
   if (fixedRowLimit > 0) {
     for (let i = 0; i < fixedRowLimit; i++) {
       topPosMap[i] = currentTop;
-      currentTop += 30; // 1データ行 30px
+      const rHeight = tbl.rowHeights && tbl.rowHeights[i] ? tbl.rowHeights[i] : 30;
+      currentTop += rHeight;
     }
   }
 
@@ -3003,6 +3304,7 @@ function renderCustomTable(tableId) {
   });
 
   updateCtSelectionHighlight();
+  adjustOverflowCells(document.querySelector('#custom-table-screen .spreadsheet-table'));
 }
 
 // --- カスタムテーブル用書式イベント ＆ セル選択 ＆ カラーピッカー ---
@@ -3023,11 +3325,11 @@ function setupCtColorPickers() {
       colorDropdown.style.display = isHidden ? 'block' : 'none';
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!colorDropdown.contains(e.target) && !colorBtn.contains(e.target)) {
         colorDropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 
   const bgColorBtn = document.getElementById('ct-bg-color-btn');
@@ -3043,11 +3345,11 @@ function setupCtColorPickers() {
       bgColorDropdown.style.display = isHidden ? 'block' : 'none';
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!bgColorDropdown.contains(e.target) && !bgColorBtn.contains(e.target)) {
         bgColorDropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 }
 
@@ -3509,11 +3811,45 @@ function setupCustomTableFormatToolbarEvents() {
   setupCtColorPickers();
 }
 
+function closeAllFilterMenus() {
+  const containerCt = document.getElementById('ct-filter-dropdown-container');
+  if (containerCt) {
+    containerCt.innerHTML = '';
+    delete containerCt.dataset.activeColId;
+  }
+  const containerJo = document.getElementById('jo-filter-dropdown-container');
+  if (containerJo) {
+    containerJo.innerHTML = '';
+    delete containerJo.dataset.activeColId;
+  }
+  document.querySelectorAll('.filter-menu-backdrop').forEach(el => el.remove());
+}
+
 // フィルタメニューの生成と配置
 function openCtFilterMenu(tbl, colId, colLabel, anchorElement) {
   const container = document.getElementById('ct-filter-dropdown-container');
   if (!container) return;
-  container.innerHTML = '';
+
+  const isAlreadyOpen = container.dataset.activeColId === `${tbl.id}_${colId}`;
+  closeAllFilterMenus();
+  if (isAlreadyOpen) return;
+
+  container.dataset.activeColId = `${tbl.id}_${colId}`;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'filter-menu-backdrop';
+  backdrop.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 999; background: transparent; cursor: default;';
+  
+  const handleBackdropClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeAllFilterMenus();
+  };
+  
+  backdrop.addEventListener('mousedown', handleBackdropClick, true);
+  backdrop.addEventListener('pointerdown', handleBackdropClick, true);
+  backdrop.addEventListener('touchstart', handleBackdropClick, true);
+  document.body.appendChild(backdrop);
 
   const rect = anchorElement.getBoundingClientRect();
   const dropdown = document.createElement('div');
@@ -3631,7 +3967,7 @@ function openCtFilterMenu(tbl, colId, colLabel, anchorElement) {
     if (state.ctFilters[tbl.id]) {
       delete state.ctFilters[tbl.id][colId];
     }
-    container.innerHTML = '';
+    closeAllFilterMenus();
     renderCustomTable(tbl.id);
   });
 
@@ -3640,20 +3976,17 @@ function openCtFilterMenu(tbl, colId, colLabel, anchorElement) {
       state.ctFilters[tbl.id] = {};
     }
     state.ctFilters[tbl.id][colId] = new Set(currentSelection);
-    container.innerHTML = '';
+    closeAllFilterMenus();
     renderCustomTable(tbl.id);
   });
 
-  const closeDropdownOnOuterClick = (e) => {
-    if (!dropdown.contains(e.target) && !anchorElement.contains(e.target)) {
-      container.innerHTML = '';
-      document.removeEventListener('click', closeDropdownOnOuterClick);
+  const onScrollAction = (e) => {
+    if (!dropdown.contains(e.target)) {
+      closeAllFilterMenus();
+      window.removeEventListener('scroll', onScrollAction, true);
     }
   };
-  
-  setTimeout(() => {
-    document.addEventListener('click', closeDropdownOnOuterClick);
-  }, 0);
+  window.addEventListener('scroll', onScrollAction, true);
 
   renderList();
 }
@@ -3672,11 +4005,11 @@ function setupCtButtonsEvents() {
       if (frameDropdown) frameDropdown.style.display = 'none';
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!colSelectorDropdown.contains(e.target) && !colSelectorBtn.contains(e.target)) {
         colSelectorDropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 
   const frameFixBtn = document.getElementById('ct-frame-fix-btn');
@@ -3691,11 +4024,11 @@ function setupCtButtonsEvents() {
       if (colDropdown) colDropdown.style.display = 'none';
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!frameFixDropdown.contains(e.target) && !frameFixBtn.contains(e.target)) {
         frameFixDropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 
   document.getElementById('ct-add-row-btn')?.addEventListener('click', () => {
@@ -3969,141 +4302,6 @@ function setupCtButtonsEvents() {
     closeSingleAddModal();
     showToast('新しいレコードを登録しました。', 'success');
   });
-
-  // 📥 CSVインポート処理
-  const csvFileInput = document.getElementById('ct-csv-import-file-input');
-  document.getElementById('ct-csv-import-btn')?.addEventListener('click', () => {
-    if (state.activeCustomTableId && isTableLocked(state.activeCustomTableId)) {
-      showToast('テーブルがロックされています。CSVをインポートするには上部の鍵アイコンでロックを解除してください。', 'warning');
-      return;
-    }
-    csvFileInput?.click();
-  });
-
-  csvFileInput?.addEventListener('change', (e) => {
-    if (!state.activeCustomTableId) return;
-    const tbl = state.customTables.find(t => t.id === state.activeCustomTableId);
-    if (!tbl) return;
-
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target.result;
-      const lines = text.split(/\r?\n/);
-      if (lines.length === 0 || (lines.length === 1 && !lines[0].trim())) {
-        showToast('CSVファイルが空です。', 'warning');
-        return;
-      }
-
-      // 簡易CSVパース関数
-      const parseCSVLine = (line) => {
-        const result = [];
-        let current = '';
-        let inQuotes = false;
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i];
-          if (char === '"') {
-            inQuotes = !inQuotes;
-          } else if (char === ',' && !inQuotes) {
-            result.push(current.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
-            current = '';
-          } else {
-            current += char;
-          }
-        }
-        result.push(current.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
-        return result;
-      };
-
-      const firstLineCells = parseCSVLine(lines[0]);
-      // 1行目のいずれかの値が、列定義のlabelのいずれかと一致すればヘッダーと判定
-      const isHeader = firstLineCells.some(h => tbl.columns.some(col => col.label.toLowerCase() === h.toLowerCase()));
-      let startIndex = 0;
-      const colMap = {};
-
-      if (isHeader) {
-        startIndex = 1;
-        tbl.columns.forEach(col => {
-          const idx = firstLineCells.findIndex(h => h.toLowerCase() === col.label.toLowerCase());
-          if (idx !== -1) colMap[col.id] = idx;
-        });
-      } else {
-        // ヘッダーがない場合は左から順番にマッピング
-        tbl.columns.forEach((col, idx) => {
-          colMap[col.id] = idx;
-        });
-      }
-
-      let importedCount = 0;
-      for (let i = startIndex; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-
-        const cells = parseCSVLine(line);
-        const newRow = { id: `row_${Date.now()}_${i}_${Math.floor(Math.random() * 1000)}` };
-        
-        tbl.columns.forEach(col => {
-          const csvIdx = colMap[col.id];
-          newRow[col.id] = (csvIdx !== undefined && cells[csvIdx] !== undefined) ? cells[csvIdx] : '';
-        });
-
-        tbl.rows.push(newRow);
-        importedCount++;
-      }
-
-      if (importedCount > 0) {
-        saveCustomTables();
-        renderCustomTable(tbl.id);
-        showToast(`${importedCount} 件のデータをインポートしました。`, 'success');
-      } else {
-        showToast('インポート可能なデータが見つかりませんでした。', 'warning');
-      }
-
-      // インプットのクリア
-      csvFileInput.value = '';
-    };
-
-    reader.onerror = () => {
-      showToast('ファイルの読み込みに失敗しました。', 'error');
-    };
-
-    reader.readAsText(file);
-  });
-
-  // 📤 CSVエクスポート処理
-  document.getElementById('ct-csv-export-btn')?.addEventListener('click', () => {
-    if (!state.activeCustomTableId) return;
-    const tbl = state.customTables.find(t => t.id === state.activeCustomTableId);
-    if (!tbl) return;
-
-    const csvRows = [];
-    // ヘッダーを追加
-    csvRows.push(tbl.columns.map(col => `"${col.label.replace(/"/g, '""')}"`).join(','));
-
-    // データ行を追加
-    tbl.rows.forEach(row => {
-      const values = tbl.columns.map(col => {
-        const val = row[col.id] || '';
-        return `"${val.replace(/"/g, '""')}"`;
-      });
-      csvRows.push(values.join(','));
-    });
-
-    const csvContent = "\uFEFF" + csvRows.join("\n"); // Excel文字化け防止BOM
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${tbl.name}_${new Date().toISOString().slice(0, 10)}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('CSVファイルをエクスポートしました。', 'success');
-  });
-
   // フィルターメニュー用色フィルターセクション生成ヘルパー
   function createColorFilterSection(col, onColorClick) {
     if (!col || col.type !== 'select' || !col.choices || col.choices.length === 0) {
@@ -4964,6 +5162,85 @@ function renderMasterDropdownCellMarkup(td, val, col, styleObj = {}) {
 }
 window.renderMasterDropdownCellMarkup = renderMasterDropdownCellMarkup;
 
+function getTableMeta(tableId) {
+  if (tableId === 'jo') {
+    return {
+      columns: state.joColumns,
+      rows: state.joContracts,
+      name: getDynamicMasterTableName('jo-info-screen') || 'JO基本マスタ',
+      idKey: 'customerId',
+      save: () => {
+        localStorage.setItem(STORAGE_KEYS.JO_CONTRACTS, JSON.stringify(state.joContracts));
+      },
+      render: () => {
+        if (typeof renderJoInfo === 'function') renderJoInfo();
+      }
+    };
+  } else if (tableId === 'ap') {
+    return {
+      columns: state.apColumns,
+      rows: state.apContracts,
+      name: getDynamicMasterTableName('applicant-info-screen') || '申込者基本マスタ',
+      idKey: 'customerPersonalityId',
+      save: () => {
+        localStorage.setItem(STORAGE_KEYS.AP_CONTRACTS, JSON.stringify(state.apContracts));
+      },
+      render: () => {
+        if (typeof renderApplicantInfo === 'function') renderApplicantInfo();
+      }
+    };
+  } else if (tableId === 'ag') {
+    return {
+      columns: state.agColumns,
+      rows: state.agContracts,
+      name: getDynamicMasterTableName('agency-info-screen') || '代理店基本マスタ',
+      idKey: 'customerId',
+      save: () => {
+        localStorage.setItem(STORAGE_KEYS.AG_CONTRACTS, JSON.stringify(state.agContracts));
+      },
+      render: () => {
+        if (typeof renderAgencyInfo === 'function') renderAgencyInfo();
+      }
+    };
+  } else if (tableId === 'dbmake') {
+    let partners = [];
+    if (typeof dbmakePartners !== 'undefined') {
+      partners = dbmakePartners;
+    } else if (typeof window.dbmakePartners !== 'undefined') {
+      partners = window.dbmakePartners;
+    }
+    return {
+      columns: state.dbmakeColumns,
+      rows: partners,
+      name: getDynamicMasterTableName('dbmake') || 'パートナーDB',
+      idKey: 'id',
+      save: () => {
+        localStorage.setItem('cos_dbmake_partners', JSON.stringify(partners));
+      },
+      render: () => {
+        if (typeof renderDbmakePartners === 'function') renderDbmakePartners();
+      }
+    };
+  } else {
+    const tbl = state.customTables.find(t => t.id === tableId);
+    if (tbl) {
+      return {
+        columns: tbl.columns,
+        rows: tbl.rows,
+        name: tbl.name,
+        idKey: 'id',
+        save: () => {
+          if (typeof saveCustomTables === 'function') saveCustomTables();
+        },
+        render: () => {
+          if (typeof renderCustomTable === 'function') renderCustomTable(tableId);
+        }
+      };
+    }
+  }
+  return null;
+}
+
 function renderTableControlBar(tableId, parentContainerEl) {
   const existing = parentContainerEl.querySelector(`.table-control-bar-${tableId}`);
   if (existing && existing.parentNode) {
@@ -4998,6 +5275,177 @@ function renderTableControlBar(tableId, parentContainerEl) {
     }
   });
   leftDiv.appendChild(addSingleBtn);
+
+  // 📥 CSVインポートボタン
+  const meta = getTableMeta(tableId);
+  if (meta) {
+    const importBtn = document.createElement('button');
+    importBtn.className = 'btn btn-secondary';
+    importBtn.style.padding = '0.4rem 0.75rem';
+    importBtn.style.fontSize = '0.8rem';
+    importBtn.style.display = 'flex';
+    importBtn.style.alignItems = 'center';
+    importBtn.style.gap = '0.25rem';
+    importBtn.innerHTML = '<span>📥</span> CSVインポート';
+
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.csv';
+    fileInput.style.display = 'none';
+
+    importBtn.addEventListener('click', () => {
+      if (isTableLocked(tableId)) {
+        showToast('テーブルがロックされています。CSVをインポートするには上部の鍵アイコンでロックを解除してください。', 'warning');
+        return;
+      }
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target.result;
+        const lines = text.split(/\r?\n/);
+        if (lines.length === 0 || (lines.length === 1 && !lines[0].trim())) {
+          showToast('CSVファイルが空です。', 'warning');
+          return;
+        }
+
+        // 簡易CSVパース関数
+        const parseCSVLine = (line) => {
+          const result = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+              result.push(current.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          result.push(current.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
+          return result;
+        };
+
+        const firstLineCells = parseCSVLine(lines[0]);
+        // 1行目のいずれかの値が、列定義のlabelのいずれかと一致すればヘッダーと判定
+        const isHeader = firstLineCells.some(h => meta.columns.some(col => col.label.toLowerCase() === h.toLowerCase()));
+        let startIndex = 0;
+        const colMap = {};
+
+        if (isHeader) {
+          startIndex = 1;
+          meta.columns.forEach(col => {
+            const idx = firstLineCells.findIndex(h => h.toLowerCase() === col.label.toLowerCase());
+            if (idx !== -1) colMap[col.id] = idx;
+          });
+        } else {
+          // ヘッダーがない場合は左から順番にマッピング
+          meta.columns.forEach((col, idx) => {
+            colMap[col.id] = idx;
+          });
+        }
+
+        let importedCount = 0;
+        for (let i = startIndex; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          const cells = parseCSVLine(line);
+          const newRow = {};
+
+          meta.columns.forEach(col => {
+            const csvIdx = colMap[col.id];
+            newRow[col.id] = (csvIdx !== undefined && cells[csvIdx] !== undefined) ? cells[csvIdx] : '';
+          });
+
+          // 自動採番処理
+          if (tableId === 'jo') {
+            if (!newRow.customerId) newRow.customerId = generateUniqueCustomerNumber();
+            if (!newRow.customerPersonalityId) newRow.customerPersonalityId = generate8DigitId();
+          } else if (tableId === 'ap') {
+            if (!newRow.customerPersonalityId) newRow.customerPersonalityId = generate8DigitId();
+            if (!newRow.customerId) newRow.customerId = generateUniqueCustomerNumber();
+          } else if (tableId === 'ag') {
+            if (!newRow.customerId) newRow.customerId = generateUniqueCustomerNumber();
+            if (!newRow.customerPersonalityId) newRow.customerPersonalityId = generate8DigitId();
+          } else if (tableId === 'dbmake') {
+            if (!newRow.id) newRow.id = `pt_${generate8DigitId()}`;
+          } else {
+            if (!newRow.id) newRow.id = `row_${Date.now()}_${i}_${Math.floor(Math.random() * 1000)}`;
+          }
+
+          meta.rows.push(newRow);
+          importedCount++;
+        }
+
+        if (importedCount > 0) {
+          meta.save();
+          meta.render();
+          showToast(`${importedCount} 件のデータをインポートしました。`, 'success');
+        } else {
+          showToast('インポート可能なデータが見つかりませんでした。', 'warning');
+        }
+
+        fileInput.value = '';
+      };
+
+      reader.onerror = () => {
+        showToast('ファイルの読み込みに失敗しました。', 'error');
+      };
+
+      reader.readAsText(file);
+    });
+
+    leftDiv.appendChild(importBtn);
+    leftDiv.appendChild(fileInput);
+
+    // 📤 CSVエクスポートボタン
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'btn btn-secondary';
+    exportBtn.style.padding = '0.4rem 0.75rem';
+    exportBtn.style.fontSize = '0.8rem';
+    exportBtn.style.display = 'flex';
+    exportBtn.style.alignItems = 'center';
+    exportBtn.style.gap = '0.25rem';
+    exportBtn.innerHTML = '<span>📤</span> CSVエクスポート';
+
+    exportBtn.addEventListener('click', () => {
+      const csvRows = [];
+      // ヘッダーを追加
+      csvRows.push(meta.columns.map(col => `"${col.label.replace(/"/g, '""')}"`).join(','));
+
+      // データ行を追加
+      meta.rows.forEach(row => {
+        const values = meta.columns.map(col => {
+          const val = row[col.id] || '';
+          return `"${String(val).replace(/"/g, '""')}"`;
+        });
+        csvRows.push(values.join(','));
+      });
+
+      const csvContent = "\uFEFF" + csvRows.join("\n"); // Excel文字化け防止BOM
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${meta.name}_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('CSVファイルをエクスポートしました。', 'success');
+    });
+
+    leftDiv.appendChild(exportBtn);
+  }
 
   const rightDiv = document.createElement('div');
   rightDiv.style.display = 'flex';
@@ -7108,13 +7556,13 @@ function setupEventListeners() {
     });
   }
 
-  document.addEventListener('click', (e) => {
+  document.addEventListener('mousedown', (e) => {
     const checkboxes = document.getElementById('multiselect-checkboxes-container');
     const multiselect = document.getElementById('field-multiselect');
     if (checkboxes && multiselect && !multiselect.contains(e.target)) {
       checkboxes.style.display = 'none';
     }
-  });
+  }, true);
 
   window.renderFieldCheckboxes();
   window.updateMultiselectLabel();
@@ -9658,11 +10106,11 @@ function setupCorpApiSearch() {
   });
 
   // ドロップダウン外クリックで閉じる
-  document.addEventListener('click', (e) => {
+  document.addEventListener('mousedown', (e) => {
     if (e.target !== searchInput && e.target !== dropdown) {
       dropdown.style.display = 'none';
     }
-  });
+  }, true);
 }
 
 // 紹介者検索DBシミュレーション
@@ -9728,11 +10176,11 @@ function setupIntroducerSearch(existingValue = null) {
   });
 
   // ドロップダウン外クリックで閉じる
-  document.addEventListener('click', (e) => {
+  document.addEventListener('mousedown', (e) => {
     if (e.target !== searchInput && e.target !== dropdown) {
       dropdown.style.display = 'none';
     }
-  });
+  }, true);
 }
 
 // 関連データ検知シミュレーション
@@ -11670,7 +12118,8 @@ function renderAgencyInfo() {
   if (fixedRowLimit > 0) {
     for (let i = 0; i < fixedRowLimit; i++) {
       topPosMap[i] = currentTop;
-      currentTop += 30;
+      const rHeight = state.agRowHeights[i] || 30;
+      currentTop += rHeight;
     }
   }
 
@@ -11986,18 +12435,23 @@ function renderAgencyInfo() {
   filteredContracts.forEach((contract, index) => {
     const rowAccess = checkRowAccess('agency-info-screen', contract);
 
+    const rowHeight = state.agRowHeights[index] || 30;
+
     const tr = document.createElement('tr');
     tr.setAttribute('data-row-id', contract.customerId);
     tr.style.borderBottom = '1px solid var(--border-color)';
-    tr.style.height = '30px';
+    tr.style.height = `${rowHeight}px`;
+    tr.style.maxHeight = `${rowHeight}px`;
+    tr.style.minHeight = `${rowHeight}px`;
 
     const rowNumTd = document.createElement('td');
     rowNumTd.className = 'row-number-col';
-    rowNumTd.style.height = '30px';
-    rowNumTd.style.lineHeight = '30px';
+    rowNumTd.style.height = `${rowHeight}px`;
+    rowNumTd.style.lineHeight = `${rowHeight}px`;
     rowNumTd.style.padding = '0';
     rowNumTd.style.fontSize = '0.75rem';
     rowNumTd.style.cursor = 'pointer';
+    rowNumTd.style.position = 'relative';
 
     if (rowAccess.grayout) {
       tr.classList.add('grayed-out-access');
@@ -12009,6 +12463,13 @@ function renderAgencyInfo() {
     } else {
       rowNumTd.textContent = index + 1;
     }
+
+    const rowResizer = document.createElement('div');
+    rowResizer.className = 'row-resizer';
+    rowResizer.style.zIndex = '50';
+    rowNumTd.appendChild(rowResizer);
+    setupMasterRowResize('ag', index, rowResizer);
+    setupMasterRowContextMenu('ag', index, rowNumTd);
 
     if (fixedColIds.length > 0) {
       rowNumTd.style.position = 'sticky';
@@ -12083,7 +12544,9 @@ function renderAgencyInfo() {
         const val = contract[col.id] || '';
         const td = document.createElement('td');
         td.style.padding = '0.3rem 0.6rem';
-        td.style.height = '30px';
+        td.style.height = `${rowHeight}px`;
+        td.style.maxHeight = `${rowHeight}px`;
+        td.style.minHeight = `${rowHeight}px`;
         td.style.boxSizing = 'border-box';
         td.style.fontSize = '0.8rem';
         td.setAttribute('data-col-id', col.id);
@@ -12114,16 +12577,7 @@ function renderAgencyInfo() {
         const cellKey = `${contract.customerId}_${col.id}`;
         const styleObj = getCellFormatStyles('ag', contract.customerId, col.id, contract, val);
 
-        if (styleObj['font-size']) td.style.fontSize = styleObj['font-size'];
-        if (styleObj['font-weight']) td.style.fontWeight = styleObj['font-weight'];
-        if (styleObj['font-style']) td.style.fontStyle = styleObj['font-style'];
-        if (styleObj['text-decoration']) td.style.textDecoration = styleObj['text-decoration'];
-        if (styleObj['text-align']) td.style.textAlign = styleObj['text-align'];
-
-        td.style.verticalAlign = styleObj['vertical-align'] || 'middle';
-        td.style.whiteSpace = styleObj['white-space'] || 'nowrap';
-        td.style.overflow = styleObj['overflow'] || 'hidden';
-        td.style.textOverflow = styleObj['text-overflow'] || 'ellipsis';
+        applyInlineStylesToCell(td, styleObj);
 
         if (styleObj['background-color']) {
           td.style.backgroundColor = styleObj['background-color'];
@@ -12282,6 +12736,7 @@ function renderAgencyInfo() {
   });
   
   updateSelectionStatsWidget();
+  adjustOverflowCells(document.querySelector('#agency-info-screen .spreadsheet-table'));
 }
 
 // 表示項目の選択ドロップダウンの制御
@@ -12304,11 +12759,11 @@ function setupJoColumnSelectorToggle() {
     });
 
     // 外側をクリックした際に閉じる
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
         dropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 }
 
@@ -12329,11 +12784,11 @@ function setupApColumnSelectorToggle() {
       dropdown.style.display = isHidden ? 'block' : 'none';
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
         dropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 }
 
@@ -12373,11 +12828,11 @@ function setupApFrameFixControls(columns) {
       }
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
         dropdown.style.display = 'none';
       }
-    });
+    }, true);
 
     colSelect.addEventListener('change', (e) => {
       state.apFixedCol = e.target.value;
@@ -12442,7 +12897,27 @@ function renderApColumnSelector() {
 function openApFilterMenu(colId, colLabel, anchorElement, allContracts) {
   const container = document.getElementById('jo-filter-dropdown-container');
   if (!container) return;
-  container.innerHTML = '';
+
+  const isAlreadyOpen = container.dataset.activeColId === `ap_${colId}`;
+  closeAllFilterMenus();
+  if (isAlreadyOpen) return;
+
+  container.dataset.activeColId = `ap_${colId}`;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'filter-menu-backdrop';
+  backdrop.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 999; background: transparent; cursor: default;';
+  
+  const handleBackdropClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeAllFilterMenus();
+  };
+  
+  backdrop.addEventListener('mousedown', handleBackdropClick, true);
+  backdrop.addEventListener('pointerdown', handleBackdropClick, true);
+  backdrop.addEventListener('touchstart', handleBackdropClick, true);
+  document.body.appendChild(backdrop);
 
   const rect = anchorElement.getBoundingClientRect();
   const dropdown = document.createElement('div');
@@ -12544,8 +13019,8 @@ function openApFilterMenu(colId, colLabel, anchorElement, allContracts) {
 
   clearBtn.addEventListener('click', () => {
     delete state.apFilters[colId];
+    closeAllFilterMenus();
     renderApplicantInfo();
-    dropdown.remove();
   });
 
   applyBtn.addEventListener('click', () => {
@@ -12554,19 +13029,17 @@ function openApFilterMenu(colId, colLabel, anchorElement, allContracts) {
     } else {
       state.apFilters[colId] = currentSelection;
     }
+    closeAllFilterMenus();
     renderApplicantInfo();
-    dropdown.remove();
   });
 
-  setTimeout(() => {
-    const closeMenu = (e) => {
-      if (!dropdown.contains(e.target) && !anchorElement.contains(e.target)) {
-        dropdown.remove();
-        document.removeEventListener('click', closeMenu);
-      }
-    };
-    document.addEventListener('click', closeMenu);
-  }, 10);
+  const onScrollAction = (e) => {
+    if (!dropdown.contains(e.target)) {
+      closeAllFilterMenus();
+      window.removeEventListener('scroll', onScrollAction, true);
+    }
+  };
+  window.addEventListener('scroll', onScrollAction, true);
 }
 
 // カラム幅のドラッグリサイズ設定（申込者）
@@ -12625,11 +13098,11 @@ function setupAgColumnSelectorToggle() {
       dropdown.style.display = isHidden ? 'block' : 'none';
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
         dropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 }
 
@@ -12669,11 +13142,11 @@ function setupAgFrameFixControls(columns) {
       }
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
         dropdown.style.display = 'none';
       }
-    });
+    }, true);
 
     colSelect.addEventListener('change', (e) => {
       state.agFixedCol = e.target.value;
@@ -12751,11 +13224,11 @@ function setupDbmakeColumnSelectorToggle() {
       dropdown.style.display = isHidden ? 'block' : 'none';
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
         dropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 }
 
@@ -12795,11 +13268,11 @@ function setupDbmakeFrameFixControls(columns) {
       }
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
         dropdown.style.display = 'none';
       }
-    });
+    }, true);
 
     colSelect.addEventListener('change', (e) => {
       state.dbmakeFixedCol = e.target.value;
@@ -12872,7 +13345,27 @@ function renderDbmakeColumnSelector() {
 function openAgFilterMenu(colId, colLabel, anchorElement, allContracts) {
   const container = document.getElementById('jo-filter-dropdown-container');
   if (!container) return;
-  container.innerHTML = '';
+
+  const isAlreadyOpen = container.dataset.activeColId === `ag_${colId}`;
+  closeAllFilterMenus();
+  if (isAlreadyOpen) return;
+
+  container.dataset.activeColId = `ag_${colId}`;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'filter-menu-backdrop';
+  backdrop.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 999; background: transparent; cursor: default;';
+  
+  const handleBackdropClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeAllFilterMenus();
+  };
+  
+  backdrop.addEventListener('mousedown', handleBackdropClick, true);
+  backdrop.addEventListener('pointerdown', handleBackdropClick, true);
+  backdrop.addEventListener('touchstart', handleBackdropClick, true);
+  document.body.appendChild(backdrop);
 
   const rect = anchorElement.getBoundingClientRect();
   const dropdown = document.createElement('div');
@@ -12974,8 +13467,8 @@ function openAgFilterMenu(colId, colLabel, anchorElement, allContracts) {
 
   clearBtn.addEventListener('click', () => {
     delete state.agFilters[colId];
+    closeAllFilterMenus();
     renderAgencyInfo();
-    dropdown.remove();
   });
 
   applyBtn.addEventListener('click', () => {
@@ -12984,19 +13477,17 @@ function openAgFilterMenu(colId, colLabel, anchorElement, allContracts) {
     } else {
       state.agFilters[colId] = currentSelection;
     }
+    closeAllFilterMenus();
     renderAgencyInfo();
-    dropdown.remove();
   });
 
-  setTimeout(() => {
-    const closeMenu = (e) => {
-      if (!dropdown.contains(e.target) && !anchorElement.contains(e.target)) {
-        dropdown.remove();
-        document.removeEventListener('click', closeMenu);
-      }
-    };
-    document.addEventListener('click', closeMenu);
-  }, 10);
+  const onScrollAction = (e) => {
+    if (!dropdown.contains(e.target)) {
+      closeAllFilterMenus();
+      window.removeEventListener('scroll', onScrollAction, true);
+    }
+  };
+  window.addEventListener('scroll', onScrollAction, true);
 }
 
 // カラム幅のドラッグリサイズ設定（代理店）
@@ -13076,11 +13567,11 @@ function setupJoFrameFixControls(columns) {
       }
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
         dropdown.style.display = 'none';
       }
-    });
+    }, true);
 
     colSelect.addEventListener('change', (e) => {
       state.joFixedCol = e.target.value;
@@ -13147,7 +13638,27 @@ function renderJoColumnSelector() {
 function openJoFilterMenu(colId, colLabel, anchorElement, allContracts) {
   const container = document.getElementById('jo-filter-dropdown-container');
   if (!container) return;
-  container.innerHTML = '';
+
+  const isAlreadyOpen = container.dataset.activeColId === `jo_${colId}`;
+  closeAllFilterMenus();
+  if (isAlreadyOpen) return;
+
+  container.dataset.activeColId = `jo_${colId}`;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'filter-menu-backdrop';
+  backdrop.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 999; background: transparent; cursor: default;';
+  
+  const handleBackdropClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeAllFilterMenus();
+  };
+  
+  backdrop.addEventListener('mousedown', handleBackdropClick, true);
+  backdrop.addEventListener('pointerdown', handleBackdropClick, true);
+  backdrop.addEventListener('touchstart', handleBackdropClick, true);
+  document.body.appendChild(backdrop);
 
   const rect = anchorElement.getBoundingClientRect();
   const dropdown = document.createElement('div');
@@ -13249,8 +13760,8 @@ function openJoFilterMenu(colId, colLabel, anchorElement, allContracts) {
 
   clearBtn.addEventListener('click', () => {
     delete state.joFilters[colId];
+    closeAllFilterMenus();
     renderJoInfo();
-    dropdown.remove();
   });
 
   applyBtn.addEventListener('click', () => {
@@ -13259,19 +13770,17 @@ function openJoFilterMenu(colId, colLabel, anchorElement, allContracts) {
     } else {
       state.joFilters[colId] = currentSelection;
     }
+    closeAllFilterMenus();
     renderJoInfo();
-    dropdown.remove();
   });
 
-  setTimeout(() => {
-    const closeMenu = (e) => {
-      if (!dropdown.contains(e.target) && !anchorElement.contains(e.target)) {
-        dropdown.remove();
-        document.removeEventListener('click', closeMenu);
-      }
-    };
-    document.addEventListener('click', closeMenu);
-  }, 10);
+  const onScrollAction = (e) => {
+    if (!dropdown.contains(e.target)) {
+      closeAllFilterMenus();
+      window.removeEventListener('scroll', onScrollAction, true);
+    }
+  };
+  window.addEventListener('scroll', onScrollAction, true);
 }
 
 // 列番号のアルファベット生成ヘルパー
@@ -13403,7 +13912,8 @@ function renderJoInfo() {
   if (fixedRowLimit > 0) {
     for (let i = 0; i < fixedRowLimit; i++) {
       topPosMap[i] = currentTop;
-      currentTop += 30; // データ行の高さは 30px
+      const rHeight = state.joRowHeights[i] || 30;
+      currentTop += rHeight;
     }
   }
 
@@ -13671,18 +14181,23 @@ function renderJoInfo() {
   filteredContracts.forEach((contract, index) => {
     const rowAccess = checkRowAccess('jo-info-screen', contract);
 
+    const rowHeight = state.joRowHeights[index] || 30;
+
     const tr = document.createElement('tr');
     tr.setAttribute('data-row-id', contract.customerId);
     tr.style.borderBottom = '1px solid var(--border-color)';
-    tr.style.height = '30px';
+    tr.style.height = `${rowHeight}px`;
+    tr.style.maxHeight = `${rowHeight}px`;
+    tr.style.minHeight = `${rowHeight}px`;
     
     // 行番号セルの追加
     const rowNumTd = document.createElement('td');
     rowNumTd.className = 'row-number-col';
-    rowNumTd.style.height = '30px';
-    rowNumTd.style.lineHeight = '30px';
+    rowNumTd.style.height = `${rowHeight}px`;
+    rowNumTd.style.lineHeight = `${rowHeight}px`;
     rowNumTd.style.padding = '0';
     rowNumTd.style.fontSize = '0.75rem';
+    rowNumTd.style.position = 'relative';
 
     if (rowAccess.grayout) {
       tr.classList.add('grayed-out-access');
@@ -13694,6 +14209,13 @@ function renderJoInfo() {
     } else {
       rowNumTd.textContent = index + 1;
     }
+
+    const rowResizer = document.createElement('div');
+    rowResizer.className = 'row-resizer';
+    rowResizer.style.zIndex = '50';
+    rowNumTd.appendChild(rowResizer);
+    setupMasterRowResize('jo', index, rowResizer);
+    setupMasterRowContextMenu('jo', index, rowNumTd);
     
     if (fixedColIds.length > 0) {
       rowNumTd.style.position = 'sticky';
@@ -13771,7 +14293,9 @@ function renderJoInfo() {
         const val = contract[col.id] || '';
         const td = document.createElement('td');
         td.style.padding = '0.3rem 0.6rem';
-        td.style.height = '30px';
+        td.style.height = `${rowHeight}px`;
+        td.style.maxHeight = `${rowHeight}px`;
+        td.style.minHeight = `${rowHeight}px`;
         td.style.boxSizing = 'border-box';
         td.style.fontSize = '0.8rem';
         td.setAttribute('data-col-id', col.id);
@@ -13803,17 +14327,8 @@ function renderJoInfo() {
         const cellKey = `${contract.customerId}_${col.id}`;
         const styleObj = getCellFormatStyles('jo', contract.customerId, col.id, contract, val);
         
-        if (styleObj['font-size']) td.style.fontSize = styleObj['font-size'];
-        if (styleObj['font-weight']) td.style.fontWeight = styleObj['font-weight'];
-        if (styleObj['font-style']) td.style.fontStyle = styleObj['font-style'];
-        if (styleObj['text-decoration']) td.style.textDecoration = styleObj['text-decoration'];
-        if (styleObj['text-align']) td.style.textAlign = styleObj['text-align'];
+        applyInlineStylesToCell(td, styleObj);
         
-        td.style.verticalAlign = styleObj['vertical-align'] || 'middle';
-        td.style.whiteSpace = styleObj['white-space'] || 'nowrap';
-        td.style.overflow = styleObj['overflow'] || 'hidden';
-        td.style.textOverflow = styleObj['text-overflow'] || 'ellipsis';
-
         if (styleObj['background-color']) {
           td.style.backgroundColor = styleObj['background-color'];
         } else if (isSticky) {
@@ -13991,6 +14506,7 @@ function renderJoInfo() {
   });
   
   updateSelectionStatsWidget();
+  adjustOverflowCells(document.querySelector('#jo-info-screen .spreadsheet-table'));
 }
 
 // 申込者情報の描画
@@ -14068,7 +14584,8 @@ function renderApplicantInfo() {
   if (fixedRowLimit > 0) {
     for (let i = 0; i < fixedRowLimit; i++) {
       topPosMap[i] = currentTop;
-      currentTop += 30;
+      const rHeight = state.apRowHeights[i] || 30;
+      currentTop += rHeight;
     }
   }
 
@@ -14382,18 +14899,24 @@ function renderApplicantInfo() {
   }
 
   filteredContracts.forEach((contract, index) => {
+    const rowAccess = checkRowAccess('applicant-info-screen', contract);
+    const rowHeight = state.apRowHeights[index] || 30;
+
     const tr = document.createElement('tr');
     tr.setAttribute('data-row-id', contract.customerId);
     tr.style.borderBottom = '1px solid var(--border-color)';
-    tr.style.height = '30px';
+    tr.style.height = `${rowHeight}px`;
+    tr.style.maxHeight = `${rowHeight}px`;
+    tr.style.minHeight = `${rowHeight}px`;
 
     const rowNumTd = document.createElement('td');
     rowNumTd.className = 'row-number-col';
-    rowNumTd.style.height = '30px';
-    rowNumTd.style.lineHeight = '30px';
+    rowNumTd.style.height = `${rowHeight}px`;
+    rowNumTd.style.lineHeight = `${rowHeight}px`;
     rowNumTd.style.padding = '0';
     rowNumTd.style.fontSize = '0.75rem';
     rowNumTd.style.cursor = 'pointer';
+    rowNumTd.style.position = 'relative';
 
     if (rowAccess.grayout) {
       tr.classList.add('grayed-out-access');
@@ -14405,6 +14928,13 @@ function renderApplicantInfo() {
     } else {
       rowNumTd.textContent = index + 1;
     }
+
+    const rowResizer = document.createElement('div');
+    rowResizer.className = 'row-resizer';
+    rowResizer.style.zIndex = '50';
+    rowNumTd.appendChild(rowResizer);
+    setupMasterRowResize('ap', index, rowResizer);
+    setupMasterRowContextMenu('ap', index, rowNumTd);
 
     if (fixedColIds.length > 0) {
       rowNumTd.style.position = 'sticky';
@@ -14479,7 +15009,9 @@ function renderApplicantInfo() {
         const val = contract[col.id] || '';
         const td = document.createElement('td');
         td.style.padding = '0.3rem 0.6rem';
-        td.style.height = '30px';
+        td.style.height = `${rowHeight}px`;
+        td.style.maxHeight = `${rowHeight}px`;
+        td.style.minHeight = `${rowHeight}px`;
         td.style.boxSizing = 'border-box';
         td.style.fontSize = '0.8rem';
         td.setAttribute('data-col-id', col.id);
@@ -14510,16 +15042,7 @@ function renderApplicantInfo() {
         const cellKey = `${contract.customerId}_${col.id}`;
         const styleObj = getCellFormatStyles('ap', contract.customerId, col.id, contract, val);
 
-        if (styleObj['font-size']) td.style.fontSize = styleObj['font-size'];
-        if (styleObj['font-weight']) td.style.fontWeight = styleObj['font-weight'];
-        if (styleObj['font-style']) td.style.fontStyle = styleObj['font-style'];
-        if (styleObj['text-decoration']) td.style.textDecoration = styleObj['text-decoration'];
-        if (styleObj['text-align']) td.style.textAlign = styleObj['text-align'];
-
-        td.style.verticalAlign = styleObj['vertical-align'] || 'middle';
-        td.style.whiteSpace = styleObj['white-space'] || 'nowrap';
-        td.style.overflow = styleObj['overflow'] || 'hidden';
-        td.style.textOverflow = styleObj['text-overflow'] || 'ellipsis';
+        applyInlineStylesToCell(td, styleObj);
 
         if (styleObj['background-color']) {
           td.style.backgroundColor = styleObj['background-color'];
@@ -14675,6 +15198,7 @@ function renderApplicantInfo() {
   });
   
   updateSelectionStatsWidget();
+  adjustOverflowCells(document.querySelector('#applicant-info-screen .spreadsheet-table'));
 }
 
 // 選択されているセルの書式情報を取得して、ツールバーのUI表示と同期する（申込者）
@@ -14984,11 +15508,11 @@ function setupApFormatToolbarEvents() {
       colorDropdown.style.display = isHidden ? 'block' : 'none';
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!colorDropdown.contains(e.target) && !colorBtn.contains(e.target)) {
         colorDropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 
   // 背景色 (カラーピッカー)
@@ -15005,11 +15529,11 @@ function setupApFormatToolbarEvents() {
       bgDropdown.style.display = isHidden ? 'block' : 'none';
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!bgDropdown.contains(e.target) && !bgBtn.contains(e.target)) {
         bgDropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 
 
@@ -15387,11 +15911,11 @@ function setupAgFormatToolbarEvents() {
       colorDropdown.style.display = isHidden ? 'block' : 'none';
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!colorDropdown.contains(e.target) && !colorBtn.contains(e.target)) {
         colorDropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 
   // 背景色 (カラーピッカー)
@@ -15408,11 +15932,11 @@ function setupAgFormatToolbarEvents() {
       bgDropdown.style.display = isHidden ? 'block' : 'none';
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!bgDropdown.contains(e.target) && !bgBtn.contains(e.target)) {
         bgDropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 
 
@@ -15780,11 +16304,11 @@ function setupJoFormatToolbarEvents() {
       colorDropdown.style.display = isHidden ? 'block' : 'none';
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!colorDropdown.contains(e.target) && !colorBtn.contains(e.target)) {
         colorDropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 
   // 背景色 (カラーピッカー)
@@ -15801,11 +16325,11 @@ function setupJoFormatToolbarEvents() {
       bgDropdown.style.display = isHidden ? 'block' : 'none';
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('mousedown', (e) => {
       if (!bgDropdown.contains(e.target) && !bgBtn.contains(e.target)) {
         bgDropdown.style.display = 'none';
       }
-    });
+    }, true);
   }
 
 
@@ -16473,7 +16997,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 外部クリックでポップアップ閉じる
-  document.addEventListener('click', (e) => {
+  document.addEventListener('mousedown', (e) => {
     if (textColPicker && !textColPicker.contains(e.target) && !textColBtn.contains(e.target)) {
       textColPicker.style.display = 'none';
     }
@@ -16483,7 +17007,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settingsPopup && !settingsPopup.contains(e.target) && !settingsBtn.contains(e.target)) {
       settingsPopup.style.display = 'none';
     }
-  });
+  }, true);
   
   // キャンセル、完了ボタン
   const cancelBtn = document.getElementById('cf-cancel-btn');
@@ -16794,7 +17318,8 @@ function renderDbmakePartners() {
   if (fixedRowLimit > 0) {
     for (let r = 0; r < fixedRowLimit; r++) {
       topPosMap[r] = currentTop;
-      currentTop += 30; // データの1行の高さは30px
+      const rHeight = state.dbmakeRowHeights[r] || 30;
+      currentTop += rHeight;
     }
   }
 
@@ -17193,23 +17718,13 @@ function renderDbmakePartners() {
         const cellKey = `${p.id}_${col.id}`;
         const styleObj = getCellFormatStyles('dbmake', p.id, col.id, p, val);
 
-        if (styleObj['font-size']) td.style.fontSize = styleObj['font-size'];
-        if (styleObj['font-weight']) td.style.fontWeight = styleObj['font-weight'];
-        if (styleObj['font-style']) td.style.fontStyle = styleObj['font-style'];
-        if (styleObj['text-decoration']) td.style.textDecoration = styleObj['text-decoration'];
-        if (styleObj['text-align']) td.style.textAlign = styleObj['text-align'];
-
-        td.style.verticalAlign = styleObj['vertical-align'] || 'middle';
-        td.style.whiteSpace = styleObj['white-space'] || 'nowrap';
-        td.style.overflow = styleObj['overflow'] || 'hidden';
-        td.style.textOverflow = styleObj['text-overflow'] || 'ellipsis';
+        applyInlineStylesToCell(td, styleObj);
 
         if (styleObj['background-color']) {
           td.style.backgroundColor = styleObj['background-color'];
         } else {
           td.style.backgroundColor = 'var(--bg-surface)';
         }
-        if (styleObj['color']) td.style.color = styleObj['color'];
 
         td.title = String(val);
 
@@ -17371,6 +17886,7 @@ function renderDbmakePartners() {
 
   // Write/Edit events are disabled in read-only mode
   updateSelectionStatsWidget();
+  adjustOverflowCells(document.querySelector('#partners-db-screen .spreadsheet-table'));
 }
 
 function initDbmakeColumnResize(th, colId) {
@@ -18277,6 +18793,12 @@ function updateSelectionStatsWidget() {
     stats.sum = formatNumberForStats(sum);
     stats.avg = formatNumberForStats(avg);
 
+    // 中央値の計算
+    const sorted = [...numberValues].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const medianVal = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    stats.median = formatNumberForStats(medianVal);
+
     if (dateValues.length === 0) {
       stats.min = formatNumberForStats(Math.min(...numberValues));
       stats.max = formatNumberForStats(Math.max(...numberValues));
@@ -18286,21 +18808,25 @@ function updateSelectionStatsWidget() {
   // ドロップダウンメニューの生成
   const items = [];
   
-  // 平均 (数値がある場合のみ)
+  // 平均値 (数値がある場合のみ)
   if (stats.avg !== undefined) {
-    items.push({ type: 'avg', label: '平均', value: stats.avg });
+    items.push({ type: 'avg', label: '平均値', value: stats.avg });
   }
-  // 最小
+  // 最小値
   if (stats.min !== undefined) {
-    items.push({ type: 'min', label: '最小', value: stats.min });
+    items.push({ type: 'min', label: '最小値', value: stats.min });
   }
-  // 最大
+  // 最大値
   if (stats.max !== undefined) {
-    items.push({ type: 'max', label: '最大', value: stats.max });
+    items.push({ type: 'max', label: '最大値', value: stats.max });
   }
-  // 合計 (数値がある場合のみ)
+  // 中央値 (数値がある場合のみ)
+  if (stats.median !== undefined) {
+    items.push({ type: 'median', label: '中央値', value: stats.median });
+  }
+  // 合計値 (数値がある場合のみ)
   if (stats.sum !== undefined) {
-    items.push({ type: 'sum', label: '合計', value: stats.sum });
+    items.push({ type: 'sum', label: '合計値', value: stats.sum });
   }
   // カウント
   items.push({ type: 'count', label: 'カウント', value: stats.count });
@@ -21407,11 +21933,11 @@ function showColorPalette(targetBtn, choiceIndex, colorProperty = 'color') {
   const closePalette = (e) => {
     if (!palette.contains(e.target) && e.target !== targetBtn) {
       palette.style.display = 'none';
-      document.removeEventListener('click', closePalette);
+      document.removeEventListener('mousedown', closePalette, true);
     }
   };
   setTimeout(() => {
-    document.addEventListener('click', closePalette);
+    document.addEventListener('mousedown', closePalette, true);
   }, 0);
 }
 

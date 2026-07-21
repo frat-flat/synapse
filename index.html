@@ -19,7 +19,9 @@
 <!-- 左サイドメニューバー（ログイン後に表示） -->
 <aside id="app-sidebar" class="sidebar-menu" style="display: none;">
 <div class="logo-section" id="sidebar-logo-btn" style="cursor: pointer;" title="ホーム画面へ">
-<div class="logo-icon">S</div>
+<div class="logo-icon" style="background: #ffffff; box-shadow: none; overflow: hidden; padding: 0; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+<img src="logo.png" alt="Synapse" style="width: 140%; height: 140%; object-fit: cover; object-position: 50% 28%;">
+</div>
 <span class="logo-text">Synapse</span>
 </div>
 <nav class="sidebar-nav">
@@ -299,22 +301,37 @@
       </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="ct-align-left" title="左揃え">左</button>
-      <button class="toolbar-btn" id="ct-align-center" title="中央揃え">中</button>
-      <button class="toolbar-btn" id="ct-align-right" title="右揃え">右</button>
+    <div class="format-dropdown" id="ct-align-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="水平方向の配置">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="ct-align-left" title="左揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line></svg></button>
+        <button class="toolbar-btn" id="ct-align-center" title="中央揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></button>
+        <button class="toolbar-btn" id="ct-align-right" title="右揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="ct-valign-top" title="上揃え">上</button>
-      <button class="toolbar-btn" id="ct-valign-middle" title="中央揃え">均</button>
-      <button class="toolbar-btn" id="ct-valign-bottom" title="下揃え">下</button>
+    <div class="format-dropdown" id="ct-valign-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="垂直方向の配置">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"></line><path d="M12 4v12M8 12l4 4 4-4"/></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="ct-valign-top" title="上揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="4" x2="20" y2="4"></line><path d="M12 20V8M8 12l4-4 4 4"/></svg></button>
+        <button class="toolbar-btn" id="ct-valign-middle" title="中央揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"></line><path d="M12 6v12M8 9l4-3 4 3M8 15l4 3 4-3"/></svg></button>
+        <button class="toolbar-btn" id="ct-valign-bottom" title="下揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"></line><path d="M12 4v12M8 12l4 4 4-4"/></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="ct-wrap-clip" title="切り詰め">⇥</button>
-      <button class="toolbar-btn" id="ct-wrap-wrap" title="折り返し">↵</button>
-      <button class="toolbar-btn" id="ct-wrap-overflow" title="はみ出し">⇄</button>
+    <div class="format-dropdown" id="ct-wrap-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="テキストを折り返す">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M8 8h6a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6M11 13l-3 3 3 3"/></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="ct-wrap-overflow" title="はみ出し"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><path d="M3 12h18M17 8l4 4-4 4"/></svg></button>
+        <button class="toolbar-btn" id="ct-wrap-wrap" title="折り返し"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M8 8h6a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6M11 13l-3 3 3 3"/></svg></button>
+        <button class="toolbar-btn" id="ct-wrap-clip" title="切り詰め"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M3 12h12M12 9l3 3-3 3"/></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
     <div class="toolbar-group" style="position: relative;">
@@ -326,17 +343,6 @@
   <!-- ⚙️ データ操作用アクションバー -->
   <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; background: var(--bg-surface-elevated); padding: 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); align-items: center;">
     <span style="font-size: 0.8rem; font-weight: bold; color: var(--text-secondary); margin-right: 0.5rem;">⚙️ データ操作:</span>
-    <button class="btn btn-primary" id="ct-add-single-row-btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem;">
-      ➕ 1件登録
-    </button>
-    <button class="btn btn-secondary" id="ct-csv-import-btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem;">
-      📥 CSVインポート
-    </button>
-    <input type="file" id="ct-csv-import-file-input" accept=".csv" style="display: none;">
-    <button class="btn btn-secondary" id="ct-csv-export-btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem;">
-      📤 CSVエクスポート
-    </button>
-    <div style="border-left: 1px solid var(--border-color); height: 18px; margin: 0 0.25rem;"></div>
     <button class="btn btn-secondary" id="ct-add-row-btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem;">
       ➕ 空白行追加
     </button>
@@ -364,7 +370,9 @@
 <div class="login-layout">
 <div class="login-card">
 <div class="login-logo">
-<div class="logo-icon">S</div>
+<div class="logo-icon" style="background: #ffffff; box-shadow: none; overflow: hidden; padding: 0; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; border-radius: 12px; margin-bottom: 0.5rem;">
+<img src="logo.png" alt="Synapse" style="width: 140%; height: 140%; object-fit: cover; object-position: 50% 28%;">
+</div>
 <span class="logo-text">Synapse</span>
 </div>
 <h2>ログイン</h2>
@@ -908,22 +916,37 @@
       </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="ag-align-left" title="左揃え">左</button>
-      <button class="toolbar-btn" id="ag-align-center" title="中央揃え">中</button>
-      <button class="toolbar-btn" id="ag-align-right" title="右揃え">右</button>
+    <div class="format-dropdown" id="ag-align-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="水平方向の配置">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="ag-align-left" title="左揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line></svg></button>
+        <button class="toolbar-btn" id="ag-align-center" title="中央揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></button>
+        <button class="toolbar-btn" id="ag-align-right" title="右揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="ag-valign-top" title="上揃え">上</button>
-      <button class="toolbar-btn" id="ag-valign-middle" title="中央揃え">均</button>
-      <button class="toolbar-btn" id="ag-valign-bottom" title="下揃え">下</button>
+    <div class="format-dropdown" id="ag-valign-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="垂直方向の配置">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"></line><path d="M12 4v12M8 12l4 4 4-4"/></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="ag-valign-top" title="上揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="4" x2="20" y2="4"></line><path d="M12 20V8M8 12l4-4 4 4"/></svg></button>
+        <button class="toolbar-btn" id="ag-valign-middle" title="中央揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"></line><path d="M12 6v12M8 9l4-3 4 3M8 15l4 3 4-3"/></svg></button>
+        <button class="toolbar-btn" id="ag-valign-bottom" title="下揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"></line><path d="M12 4v12M8 12l4 4 4-4"/></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="ag-wrap-clip" title="切り詰め">⇥</button>
-      <button class="toolbar-btn" id="ag-wrap-wrap" title="折り返し">↵</button>
-      <button class="toolbar-btn" id="ag-wrap-overflow" title="はみ出し">⇄</button>
+    <div class="format-dropdown" id="ag-wrap-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="テキストを折り返す">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M8 8h6a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6M11 13l-3 3 3 3"/></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="ag-wrap-overflow" title="はみ出し"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><path d="M3 12h18M17 8l4 4-4 4"/></svg></button>
+        <button class="toolbar-btn" id="ag-wrap-wrap" title="折り返し"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M8 8h6a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6M11 13l-3 3 3 3"/></svg></button>
+        <button class="toolbar-btn" id="ag-wrap-clip" title="切り詰め"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M3 12h12M12 9l3 3-3 3"/></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
     <div class="toolbar-group" style="position: relative;">
@@ -1043,22 +1066,37 @@
       </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="jo-align-left" title="左揃え">左</button>
-      <button class="toolbar-btn" id="jo-align-center" title="中央揃え">中</button>
-      <button class="toolbar-btn" id="jo-align-right" title="右揃え">右</button>
+    <div class="format-dropdown" id="jo-align-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="水平方向の配置">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="jo-align-left" title="左揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line></svg></button>
+        <button class="toolbar-btn" id="jo-align-center" title="中央揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></button>
+        <button class="toolbar-btn" id="jo-align-right" title="右揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="jo-valign-top" title="上揃え">上</button>
-      <button class="toolbar-btn" id="jo-valign-middle" title="中央揃え">均</button>
-      <button class="toolbar-btn" id="jo-valign-bottom" title="下揃え">下</button>
+    <div class="format-dropdown" id="jo-valign-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="垂直方向の配置">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"></line><path d="M12 4v12M8 12l4 4 4-4"/></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="jo-valign-top" title="上揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="4" x2="20" y2="4"></line><path d="M12 20V8M8 12l4-4 4 4"/></svg></button>
+        <button class="toolbar-btn" id="jo-valign-middle" title="中央揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"></line><path d="M12 6v12M8 9l4-3 4 3M8 15l4 3 4-3"/></svg></button>
+        <button class="toolbar-btn" id="jo-valign-bottom" title="下揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"></line><path d="M12 4v12M8 12l4 4 4-4"/></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="jo-wrap-clip" title="切り詰め">⇥</button>
-      <button class="toolbar-btn" id="jo-wrap-wrap" title="折り返し">↵</button>
-      <button class="toolbar-btn" id="jo-wrap-overflow" title="はみ出し">⇄</button>
+    <div class="format-dropdown" id="jo-wrap-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="テキストを折り返す">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M8 8h6a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6M11 13l-3 3 3 3"/></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="jo-wrap-overflow" title="はみ出し"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><path d="M3 12h18M17 8l4 4-4 4"/></svg></button>
+        <button class="toolbar-btn" id="jo-wrap-wrap" title="折り返し"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M8 8h6a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6M11 13l-3 3 3 3"/></svg></button>
+        <button class="toolbar-btn" id="jo-wrap-clip" title="切り詰め"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M3 12h12M12 9l3 3-3 3"/></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
     <div class="toolbar-group" style="position: relative;">
@@ -1277,22 +1315,37 @@
       </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="ap-align-left" title="左揃え">左</button>
-      <button class="toolbar-btn" id="ap-align-center" title="中央揃え">中</button>
-      <button class="toolbar-btn" id="ap-align-right" title="右揃え">右</button>
+    <div class="format-dropdown" id="ap-align-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="水平方向の配置">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="ap-align-left" title="左揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line></svg></button>
+        <button class="toolbar-btn" id="ap-align-center" title="中央揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></button>
+        <button class="toolbar-btn" id="ap-align-right" title="右揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="ap-valign-top" title="上揃え">上</button>
-      <button class="toolbar-btn" id="ap-valign-middle" title="中央揃え">均</button>
-      <button class="toolbar-btn" id="ap-valign-bottom" title="下揃え">下</button>
+    <div class="format-dropdown" id="ap-valign-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="垂直方向の配置">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"></line><path d="M12 4v12M8 12l4 4 4-4"/></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="ap-valign-top" title="上揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="4" x2="20" y2="4"></line><path d="M12 20V8M8 12l4-4 4 4"/></svg></button>
+        <button class="toolbar-btn" id="ap-valign-middle" title="中央揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"></line><path d="M12 6v12M8 9l4-3 4 3M8 15l4 3 4-3"/></svg></button>
+        <button class="toolbar-btn" id="ap-valign-bottom" title="下揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"></line><path d="M12 4v12M8 12l4 4 4-4"/></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="ap-wrap-clip" title="切り詰め">⇥</button>
-      <button class="toolbar-btn" id="ap-wrap-wrap" title="折り返し">↵</button>
-      <button class="toolbar-btn" id="ap-wrap-overflow" title="はみ出し">⇄</button>
+    <div class="format-dropdown" id="ap-wrap-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="テキストを折り返す">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M8 8h6a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6M11 13l-3 3 3 3"/></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="ap-wrap-overflow" title="はみ出し"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><path d="M3 12h18M17 8l4 4-4 4"/></svg></button>
+        <button class="toolbar-btn" id="ap-wrap-wrap" title="折り返し"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M8 8h6a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6M11 13l-3 3 3 3"/></svg></button>
+        <button class="toolbar-btn" id="ap-wrap-clip" title="切り詰め"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M3 12h12M12 9l3 3-3 3"/></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
     <div class="toolbar-group" style="position: relative;">
@@ -1420,22 +1473,37 @@
       </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="dbmake-align-left" title="左揃え">左</button>
-      <button class="toolbar-btn" id="dbmake-align-center" title="中央揃え">中</button>
-      <button class="toolbar-btn" id="dbmake-align-right" title="右揃え">右</button>
+    <div class="format-dropdown" id="dbmake-align-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="水平方向の配置">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="dbmake-align-left" title="左揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line></svg></button>
+        <button class="toolbar-btn" id="dbmake-align-center" title="中央揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></button>
+        <button class="toolbar-btn" id="dbmake-align-right" title="右揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="dbmake-valign-top" title="上揃え">上</button>
-      <button class="toolbar-btn" id="dbmake-valign-middle" title="中央揃え">均</button>
-      <button class="toolbar-btn" id="dbmake-valign-bottom" title="下揃え">下</button>
+    <div class="format-dropdown" id="dbmake-valign-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="垂直方向の配置">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"></line><path d="M12 4v12M8 12l4 4 4-4"/></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="dbmake-valign-top" title="上揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="4" x2="20" y2="4"></line><path d="M12 20V8M8 12l4-4 4 4"/></svg></button>
+        <button class="toolbar-btn" id="dbmake-valign-middle" title="中央揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"></line><path d="M12 6v12M8 9l4-3 4 3M8 15l4 3 4-3"/></svg></button>
+        <button class="toolbar-btn" id="dbmake-valign-bottom" title="下揃え"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"></line><path d="M12 4v12M8 12l4 4 4-4"/></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button class="toolbar-btn" id="dbmake-wrap-clip" title="切り詰め">⇥</button>
-      <button class="toolbar-btn" id="dbmake-wrap-wrap" title="折り返し">↵</button>
-      <button class="toolbar-btn" id="dbmake-wrap-overflow" title="はみ出し">⇄</button>
+    <div class="format-dropdown" id="dbmake-wrap-dropdown">
+      <button class="toolbar-btn format-dropdown-btn" title="テキストを折り返す">
+        <span class="dropdown-icon"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M8 8h6a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6M11 13l-3 3 3 3"/></svg></span> <span style="font-size: 0.5rem; margin-left: 2px;">▼</span>
+      </button>
+      <div class="format-dropdown-menu">
+        <button class="toolbar-btn" id="dbmake-wrap-overflow" title="はみ出し"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><path d="M3 12h18M17 8l4 4-4 4"/></svg></button>
+        <button class="toolbar-btn" id="dbmake-wrap-wrap" title="折り返し"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M8 8h6a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6M11 13l-3 3 3 3"/></svg></button>
+        <button class="toolbar-btn" id="dbmake-wrap-clip" title="切り詰め"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="4" x2="6" y2="20"></line><line x1="16" y1="4" x2="16" y2="20"></line><path d="M3 12h12M12 9l3 3-3 3"/></svg></button>
+      </div>
     </div>
     <div class="toolbar-separator"></div>
     <div class="toolbar-group">
