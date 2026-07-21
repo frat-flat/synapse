@@ -17291,6 +17291,56 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // 右上 Googleスタイル ユーザープロファイルカードポップアップの制御
+  const userProfileBtn = document.getElementById('header-user-profile-btn');
+  const userProfilePopover = document.getElementById('user-profile-popover');
+  const closeUserPopoverBtn = document.getElementById('close-user-popover-btn');
+  const addAccountBtn = document.getElementById('user-popover-add-account-btn');
+  const manageAccountBtn = document.getElementById('user-popover-manage-btn');
+
+  if (userProfileBtn && userProfilePopover) {
+    userProfileBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = userProfilePopover.style.display === 'none' || !userProfilePopover.style.display;
+      if (isHidden) {
+        const u = state.currentUser || { name: '営業担当A', id: 'sales_01' };
+        const emailEl = document.getElementById('user-popover-email');
+        const nameEl = document.getElementById('user-popover-name');
+        const avatarEl = document.getElementById('user-popover-avatar');
+
+        if (emailEl) emailEl.textContent = `${u.id || 'user'}@synapse.management`;
+        if (nameEl) nameEl.textContent = `${u.name || 'ユーザー'} 様`;
+        if (avatarEl) avatarEl.textContent = (u.name || 'A').charAt(0);
+
+        const rect = userProfileBtn.getBoundingClientRect();
+        userProfilePopover.style.position = 'fixed';
+        userProfilePopover.style.top = `${rect.bottom + 8}px`;
+        userProfilePopover.style.left = `${rect.right - 290}px`;
+        userProfilePopover.style.display = 'block';
+      } else {
+        userProfilePopover.style.display = 'none';
+      }
+    });
+  }
+
+  if (closeUserPopoverBtn && userProfilePopover) {
+    closeUserPopoverBtn.addEventListener('click', () => {
+      userProfilePopover.style.display = 'none';
+    });
+  }
+
+  if (addAccountBtn) {
+    addAccountBtn.addEventListener('click', () => {
+      showToast('ユーザー登録・アカウント追加画面は後日実装予定です。', 'info');
+    });
+  }
+
+  if (manageAccountBtn) {
+    manageAccountBtn.addEventListener('click', () => {
+      showToast('アカウント管理画面は後日実装予定です。', 'info');
+    });
+  }
+
   // 外部クリックでポップアップ閉じる
   document.addEventListener('mousedown', (e) => {
     if (textColPicker && !textColPicker.contains(e.target) && !textColBtn.contains(e.target)) {
@@ -17301,6 +17351,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (settingsPopup && !settingsPopup.contains(e.target) && !settingsBtn.contains(e.target)) {
       settingsPopup.style.display = 'none';
+    }
+    if (userProfilePopover && !userProfilePopover.contains(e.target) && !userProfileBtn.contains(e.target)) {
+      userProfilePopover.style.display = 'none';
     }
   }, true);
   

@@ -2798,6 +2798,20 @@ textarea {
   }
 }
 
+/* Googleスタイル ユーザーアカウントカードポップアップ */
+.user-profile-popover {
+  position: fixed;
+  width: 290px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 1.15rem;
+  z-index: 10000;
+  box-sizing: border-box;
+  animation: settingsFadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 /* 関連接続（横断類似接続）UI用のスタイル */
 .ext-connection-item {
   display: flex;
