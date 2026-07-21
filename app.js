@@ -20270,18 +20270,42 @@ function setupPermissionFeatures() {
     });
   }
 
-  // フォルダ管理モーダル内の新規フォルダ作成ロジック (作成ボタンを押してからフォルダ名を設定)
-  const createFolderBtn = document.getElementById('modal-folder-create-btn') || document.getElementById('modal-folder-add-btn');
-  if (createFolderBtn && !createFolderBtn.dataset.bound) {
+  // ポップアップ内 インライン新規フォルダ作成パネルの制御
+  const createFolderBtn = document.getElementById('modal-folder-create-btn');
+  const inlinePanel = document.getElementById('inline-folder-creation-panel');
+  const inlineInput = document.getElementById('inline-folder-name-input');
+  const inlineSubmit = document.getElementById('inline-folder-submit-btn');
+  const inlineCancel = document.getElementById('inline-folder-cancel-btn');
+
+  if (createFolderBtn && inlinePanel && !createFolderBtn.dataset.bound) {
     createFolderBtn.dataset.bound = 'true';
+    
+    // 作成ボタンを押すとインラインフォームを展開してフォーカス
     createFolderBtn.addEventListener('click', () => {
-      const name = prompt('新しいフォルダの名前を入力してください:');
-      if (!name || !name.trim()) return;
+      inlinePanel.style.display = 'block';
+      if (inlineInput) {
+        inlineInput.value = '';
+        inlineInput.focus();
+      }
+    });
+
+    if (inlineCancel) {
+      inlineCancel.addEventListener('click', () => {
+        inlinePanel.style.display = 'none';
+      });
+    }
+
+    const handleCreateFolder = () => {
+      const name = inlineInput ? inlineInput.value.trim() : '';
+      if (!name) {
+        showToast('フォルダ名を入力してください。', 'warning');
+        return;
+      }
 
       const folderId = 'cacc_' + Date.now();
       state.customAccordions.push({
         id: folderId,
-        name: name.trim(),
+        name: name,
         parentMenuId: 'root'
       });
       saveCustomAccordions();
@@ -20289,10 +20313,23 @@ function setupPermissionFeatures() {
       state.permissions.folders[folderId] = ['admin'];
       savePermissions();
 
+      inlinePanel.style.display = 'none';
       renderCustomTableList();
       renderModalFolderTree();
-      showToast(`新規フォルダ「${name.trim()}」を作成しました。`, 'success');
-    });
+      showToast(`新規フォルダ「${name}」を作成しました。`, 'success');
+    };
+
+    if (inlineSubmit) {
+      inlineSubmit.addEventListener('click', handleCreateFolder);
+    }
+    if (inlineInput) {
+      inlineInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleCreateFolder();
+        }
+      });
+    }
   }
 
   // 初回ロード時のフォルダ設定リストの構築
@@ -20771,14 +20808,14 @@ function renderModalFolderTree() {
       folderNode.style.fontWeight = '600';
       folderNode.style.transition = 'all 0.15s ease';
       
-      // 開閉トグル矢印ボタン
+      // 開閉トグル矢印ボタン (初期は下向き▼で全展開)
       const toggleArrow = document.createElement('span');
       toggleArrow.textContent = '▼';
       toggleArrow.style.cssText = 'cursor: pointer; font-size: 0.65rem; color: var(--text-muted); width: 14px; text-align: center; display: inline-block; user-select: none;';
       
-      const folderIconHtml = getUserItemIconHtml(acc.id, '📁');
+      // フォルダ管理内は全フォルダのアイコンを 📁 (フォルダマーク) で固定表示
       const folderLabel = document.createElement('span');
-      folderLabel.innerHTML = `${folderIconHtml} <span>${acc.name}</span>`;
+      folderLabel.innerHTML = `<span class="user-custom-icon user-custom-icon-emoji">📁</span> <span>${acc.name}</span>`;
       folderLabel.style.cursor = 'pointer';
       folderLabel.style.display = 'flex';
       folderLabel.style.alignItems = 'center';
@@ -20868,10 +20905,10 @@ function renderModalFolderTree() {
 
       targetContainer.appendChild(folderNode);
 
-      // 配下の子要素を格納するコンテナ
+      // 配下の子要素を格納するコンテナ (初期状態で全展開 block)
       const childContainer = document.createElement('div');
       childContainer.className = 'modal-tree-child-container';
-      childContainer.style.display = searchTerm ? 'block' : 'block';
+      childContainer.style.display = 'block';
       targetContainer.appendChild(childContainer);
 
       // 開閉クリックイベントの設定
@@ -20910,12 +20947,11 @@ function renderModalFolderTree() {
       tableNode.style.fontSize = '0.8rem';
       tableNode.style.transition = 'all 0.15s ease';
       
-      // テーブル(📊) vs その他機能(📝) アイコンの出し分け
+      // テーブル項目は固定 📄 / その他機能項目は固定 📑
       const isSub = ['appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link'].includes(tbl.id);
-      const defaultItemIcon = isSub ? '📝' : '📊';
-      const itemIconHtml = getUserItemIconHtml(tbl.id, defaultItemIcon);
+      const itemIcon = isSub ? '📑' : '📄';
 
-      tableNode.innerHTML = `${itemIconHtml} <span>${tbl.name}</span>`;
+      tableNode.innerHTML = `<span class="user-custom-icon user-custom-icon-emoji">${itemIcon}</span> <span>${tbl.name}</span>`;
 
       // 右クリック（コンテキスト）メニュー
       tableNode.addEventListener('contextmenu', (e) => {

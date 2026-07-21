@@ -1609,7 +1609,7 @@
     <div class="modal-body" style="display: flex; flex-direction: column; gap: 0.75rem; overflow: hidden; flex: 1;">
       <!-- アクションバー: 新規フォルダ作成ボタン & 絞り込み検索 -->
       <div style="display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; flex-wrap: wrap;">
-        <!-- 新規作成ボタン (押してからフォルダ名を設定) -->
+        <!-- 新規作成ボタン (押すと下のインライン入力フォームが展開) -->
         <button id="modal-folder-create-btn" class="btn-primary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; border-radius: var(--radius-sm); white-space: nowrap;">
           📁＋ 新規フォルダを作成
         </button>
@@ -1617,6 +1617,16 @@
         <!-- 絞り込み検索バー -->
         <div style="flex: 1; max-width: 280px; position: relative;">
           <input type="text" id="modal-folder-search-input" placeholder="🔍 フォルダや項目を名前で絞り込み..." style="width: 100%; padding: 0.4rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+        </div>
+      </div>
+
+      <!-- ポップアップ内 インライン新規フォルダ作成フォーム (初期非表示) -->
+      <div id="inline-folder-creation-panel" style="display: none; background: var(--bg-surface-elevated); padding: 0.6rem 0.85rem; border-radius: var(--radius-sm); border: 1.5px solid var(--primary); animation: fadeIn 0.15s ease-out;">
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); white-space: nowrap;">📁 フォルダ名:</span>
+          <input type="text" id="inline-folder-name-input" placeholder="例: 案件進捗、営業マニュアル..." style="flex: 1; padding: 0.4rem 0.65rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+          <button id="inline-folder-submit-btn" class="btn-primary" style="padding: 0.4rem 0.85rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); white-space: nowrap;">作成</button>
+          <button id="inline-folder-cancel-btn" class="btn-secondary" style="padding: 0.4rem 0.65rem; font-size: 0.82rem; cursor: pointer; border-radius: var(--radius-sm); white-space: nowrap;">キャンセル</button>
         </div>
       </div>
 
