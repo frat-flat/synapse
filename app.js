@@ -20270,36 +20270,28 @@ function setupPermissionFeatures() {
     });
   }
 
-  // フォルダ管理モーダル内のフォルダ追加ロジック
-  const addFolderInput = document.getElementById('modal-folder-input');
-  const addFolderBtn = document.getElementById('modal-folder-add-btn');
-  const addFolderParentSelect = document.getElementById('modal-folder-parent-select');
-  if (addFolderBtn && addFolderInput) {
-    addFolderBtn.addEventListener('click', () => {
-      const name = addFolderInput.value.trim();
-      if (!name) {
-        showToast('フォルダ名を入力してください。', 'warning');
-        return;
-      }
-      
-      const parentMenuId = addFolderParentSelect ? addFolderParentSelect.value : 'root';
+  // フォルダ管理モーダル内の新規フォルダ作成ロジック (作成ボタンを押してからフォルダ名を設定)
+  const createFolderBtn = document.getElementById('modal-folder-create-btn') || document.getElementById('modal-folder-add-btn');
+  if (createFolderBtn && !createFolderBtn.dataset.bound) {
+    createFolderBtn.dataset.bound = 'true';
+    createFolderBtn.addEventListener('click', () => {
+      const name = prompt('新しいフォルダの名前を入力してください:');
+      if (!name || !name.trim()) return;
+
       const folderId = 'cacc_' + Date.now();
       state.customAccordions.push({
         id: folderId,
-        name: name,
-        parentMenuId: parentMenuId
+        name: name.trim(),
+        parentMenuId: 'root'
       });
       saveCustomAccordions();
-      
+
       state.permissions.folders[folderId] = ['admin'];
       savePermissions();
 
-      updateParentSelectDropdowns();
-      updateAdminFolderAddDropdown();
       renderCustomTableList();
-      renderAdminPanelFolderList();
-      addFolderInput.value = '';
-      showToast(`フォルダ「${name}」を追加しました。`, 'success');
+      renderModalFolderTree();
+      showToast(`新規フォルダ「${name.trim()}」を作成しました。`, 'success');
     });
   }
 

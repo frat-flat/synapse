@@ -1607,34 +1607,27 @@
     </div>
     
     <div class="modal-body" style="display: flex; flex-direction: column; gap: 0.75rem; overflow: hidden; flex: 1;">
-      <!-- コンパクトツールバー: 検索 & 新規追加 -->
-      <div style="display: flex; gap: 0.5rem; align-items: center; background: var(--bg-surface-elevated); padding: 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); flex-wrap: wrap;">
-        <!-- 検索フィルター -->
-        <div style="flex: 1; min-width: 160px; position: relative;">
-          <input type="text" id="modal-folder-search-input" placeholder="🔍 フォルダ・項目名で絞り込み..." style="width: 100%; padding: 0.4rem 0.6rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
-        </div>
+      <!-- アクションバー: 新規フォルダ作成ボタン & 絞り込み検索 -->
+      <div style="display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+        <!-- 新規作成ボタン (押してからフォルダ名を設定) -->
+        <button id="modal-folder-create-btn" class="btn-primary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; border-radius: var(--radius-sm); white-space: nowrap;">
+          📁＋ 新規フォルダを作成
+        </button>
 
-        <!-- 新規フォルダ作成 -->
-        <div style="display: flex; gap: 0.35rem; align-items: center;">
-          <input type="text" id="modal-folder-input" placeholder="📁 新規フォルダ名..." style="width: 150px; padding: 0.4rem 0.6rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
-          <button id="modal-folder-add-btn" class="btn-primary" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.2rem; border-radius: var(--radius-sm); white-space: nowrap;">
-            ➕ 作成
-          </button>
+        <!-- 絞り込み検索バー -->
+        <div style="flex: 1; max-width: 280px; position: relative;">
+          <input type="text" id="modal-folder-search-input" placeholder="🔍 フォルダや項目を名前で絞り込み..." style="width: 100%; padding: 0.4rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
         </div>
-      </div>
-
-      <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; padding: 0 0.2rem;">
-        <span>💡 ドラッグ＆ドロップで配置移動 / 右クリックで編集・削除</span>
       </div>
 
       <!-- ルートドロップゾーン -->
-      <div id="modal-tree-root-dropzone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem; text-align: center; font-size: 0.8rem; color: var(--text-muted); background: var(--bg-surface-elevated); cursor: pointer; transition: all 0.2s;">
+      <div id="modal-tree-root-dropzone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-sm); padding: 0.55rem; text-align: center; font-size: 0.82rem; color: var(--text-muted); background: var(--bg-surface-elevated); cursor: pointer; transition: all 0.2s;">
         📥 ここにドロップして 🏠 メインメニュー直下 (フォルダ外) に移動
       </div>
 
-      <!-- ツリー表示エリア -->
-      <div id="modal-folder-tree-container" style="flex: 1; min-height: 250px; max-height: 400px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); padding: 0.6rem; overflow-y: auto;">
-        <!-- JSで動的に階層ツリーが構築されます -->
+      <!-- ツリー表示エリア (全フォルダ展開一覧表示) -->
+      <div id="modal-folder-tree-container" style="flex: 1; min-height: 260px; max-height: 420px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); padding: 0.65rem; overflow-y: auto;">
+        <!-- JSで動的に全フォルダ・アイテムの一覧階層ツリーが構築されます -->
       </div>
     </div>
   </div>
