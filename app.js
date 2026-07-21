@@ -17315,7 +17315,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const rect = userProfileBtn.getBoundingClientRect();
         userProfilePopover.style.position = 'fixed';
         userProfilePopover.style.top = `${rect.bottom + 8}px`;
-        userProfilePopover.style.left = `${rect.right - 290}px`;
+        userProfilePopover.style.left = `${Math.min(window.innerWidth - 305, rect.right - 290)}px`;
         userProfilePopover.style.display = 'block';
       } else {
         userProfilePopover.style.display = 'none';
@@ -17326,12 +17326,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (closeUserPopoverBtn && userProfilePopover) {
     closeUserPopoverBtn.addEventListener('click', () => {
       userProfilePopover.style.display = 'none';
-    });
-  }
-
-  if (addAccountBtn) {
-    addAccountBtn.addEventListener('click', () => {
-      showToast('ユーザー登録・アカウント追加画面は後日実装予定です。', 'info');
     });
   }
 
