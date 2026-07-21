@@ -1914,6 +1914,10 @@ function renderCustomTableList() {
   const sidebarNav = document.querySelector('.sidebar-nav');
   if (!sidebarNav) return;
 
+  // 標準アコーディオンおよび標準テーブル（アポイント配下の5機能含む）を状態として保証
+  ensureStandardAccordionsInState();
+  ensureStandardTablesInState();
+
   console.log('[Synapse Debug] renderCustomTableList called.');
   console.log('[Synapse Debug] Current customAccordions:', state.customAccordions);
   console.log('[Synapse Debug] Cached DOM elements exists:', !!cachedSysAccs);
@@ -1937,7 +1941,8 @@ function renderCustomTableList() {
       'appointment-existing': document.getElementById('menu-existing-appoint'),
       'drafts-view-screen': document.getElementById('menu-drafts-list'),
       'history-view-screen': document.getElementById('menu-history-list'),
-      'official-id-link': document.getElementById('menu-link-official')
+      'official-id-link': document.getElementById('menu-link-official'),
+      'link-official-screen': document.getElementById('menu-link-official')
     };
   }
   if (!cachedAppointSubMenus) {
