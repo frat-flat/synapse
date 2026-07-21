@@ -1282,18 +1282,33 @@ textarea {
 }
 
 /* エクスプローラー風ツリー用矢印 */
-.accordion-arrow {
+.accordion-arrow,
+.accordion-icon {
   font-size: 0.65rem;
   color: var(--text-muted);
   margin-right: 0.35rem;
-  transition: transform 0.15s ease;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: inline-block;
   width: 12px;
   text-align: center;
   flex-shrink: 0;
+  transform-origin: center;
 }
 
-.sidebar-menu.collapsed .accordion-arrow {
+/* 閉じている状態(collapsed)のときは右向き( -90deg 回転 ) */
+.accordion-header.collapsed .accordion-arrow,
+.accordion-header.collapsed .accordion-icon {
+  transform: rotate(-90deg);
+}
+
+/* 展開している状態のときは下向き( 0deg ) */
+.accordion-header:not(.collapsed) .accordion-arrow,
+.accordion-header:not(.collapsed) .accordion-icon {
+  transform: rotate(0deg);
+}
+
+.sidebar-menu.collapsed .accordion-arrow,
+.sidebar-menu.collapsed .accordion-icon {
   display: none !important;
 }
 

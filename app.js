@@ -2018,7 +2018,7 @@ function renderCustomTableList() {
         folderDiv.style.marginTop = '0.15rem';
 
         const header = document.createElement('button');
-        header.className = 'accordion-header';
+        header.className = 'accordion-header collapsed';
         header.id = `menu-${acc.id}-parent`;
         header.setAttribute('data-tooltip', acc.name);
 
@@ -2051,11 +2051,8 @@ function renderCustomTableList() {
 
         header.addEventListener('click', (e) => {
           e.stopPropagation();
-          header.classList.toggle('collapsed');
-          const isHidden = content.style.display === 'none' || !content.style.display;
-          content.style.display = isHidden ? 'flex' : 'none';
-          const arrow = header.querySelector('.accordion-arrow');
-          if (arrow) arrow.textContent = isHidden ? '▼' : '▶';
+          const isCollapsed = header.classList.toggle('collapsed');
+          content.style.display = isCollapsed ? 'none' : 'flex';
         });
 
         folderDiv.appendChild(header);

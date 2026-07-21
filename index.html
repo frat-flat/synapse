@@ -26,11 +26,11 @@
 </div>
 <nav class="sidebar-nav">
         <div class="sidebar-accordion" id="appoint-accordion" style="margin-top: 0.5rem;">
-          <button class="accordion-header" id="menu-appoint-parent">
-            <span>📅 アポイント</span>
+          <button class="accordion-header collapsed" id="menu-appoint-parent">
             <span class="accordion-icon">▼</span>
+            <span>📅 アポイント</span>
           </button>
-          <div class="accordion-content" id="menu-appoint-content">
+          <div class="accordion-content" id="menu-appoint-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
             <button class="nav-item" id="menu-new-appoint" data-tab="appointment-new">新規アポイント</button>
             <button class="nav-item" id="menu-existing-appoint" data-tab="appointment-existing">既存顧客アポイント</button>
             <button class="nav-item" id="menu-drafts-list" data-tab="drafts-view-screen">一時保存一覧</button>
@@ -40,31 +40,31 @@
         </div>
         <!-- 代理店情報アコーディオン -->
         <div class="sidebar-accordion" id="agency-accordion" style="margin-top: 0.5rem;">
-          <button class="accordion-header" id="menu-agency-parent">
-            <span>💼 代理店情報</span>
+          <button class="accordion-header collapsed" id="menu-agency-parent">
             <span class="accordion-icon">▼</span>
+            <span>💼 代理店情報</span>
           </button>
-          <div class="accordion-content" id="menu-agency-content" style="padding-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
+          <div class="accordion-content" id="menu-agency-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
             <button class="nav-item" id="menu-agency-info" data-tab="agency-info-screen">📊 代理店 基本マスタ</button>
           </div>
         </div>
         <!-- JO情報アコーディオン -->
         <div class="sidebar-accordion" id="jo-accordion" style="margin-top: 0.5rem;">
-          <button class="accordion-header" id="menu-jo-parent">
-            <span>📑 JO情報</span>
+          <button class="accordion-header collapsed" id="menu-jo-parent">
             <span class="accordion-icon">▼</span>
+            <span>📑 JO情報</span>
           </button>
-          <div class="accordion-content" id="menu-jo-content" style="padding-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
+          <div class="accordion-content" id="menu-jo-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
             <button class="nav-item" id="menu-jo-info" data-tab="jo-info-screen">📊 JO 基本マスタ</button>
           </div>
         </div>
         <!-- 申込者情報アコーディオン -->
         <div class="sidebar-accordion" id="applicant-accordion" style="margin-top: 0.5rem;">
-          <button class="accordion-header" id="menu-applicant-parent">
-            <span>📋 申込者情報</span>
+          <button class="accordion-header collapsed" id="menu-applicant-parent">
             <span class="accordion-icon">▼</span>
+            <span>📋 申込者情報</span>
           </button>
-          <div class="accordion-content" id="menu-applicant-content" style="padding-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
+          <div class="accordion-content" id="menu-applicant-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
             <button class="nav-item" id="menu-applicant-info" data-tab="applicant-info-screen">📊 申込者 基本マスタ</button>
           </div>
         </div>
