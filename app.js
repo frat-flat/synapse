@@ -1349,7 +1349,12 @@ function ensureStandardTablesInState() {
   const stds = [
     { id: 'agency-info-screen', name: '代理店 基本マスタ', parentMenuId: 'agency-accordion' },
     { id: 'jo-info-screen', name: 'JO 基本マスタ', parentMenuId: 'jo-accordion' },
-    { id: 'applicant-info-screen', name: '申込者 基本マスタ', parentMenuId: 'applicant-accordion' }
+    { id: 'applicant-info-screen', name: '申込者 基本マスタ', parentMenuId: 'applicant-accordion' },
+    { id: 'appointment-new', name: '新規アポイント', parentMenuId: 'appoint-accordion' },
+    { id: 'appointment-existing', name: '既存顧客アポイント', parentMenuId: 'appoint-accordion' },
+    { id: 'drafts-view-screen', name: '一時保存一覧', parentMenuId: 'appoint-accordion' },
+    { id: 'history-view-screen', name: 'アポイント履歴', parentMenuId: 'appoint-accordion' },
+    { id: 'official-id-link', name: '本登録ID紐付け', parentMenuId: 'appoint-accordion' }
   ];
 
   stds.forEach(std => {
@@ -1357,7 +1362,6 @@ function ensureStandardTablesInState() {
     if (!existing) {
       state.customTables.push(std);
     } else {
-      // 正規化されたIDで補正
       existing.parentMenuId = normalizeFolderId(existing.parentMenuId);
     }
   });
@@ -1922,7 +1926,12 @@ function renderCustomTableList() {
     cachedSysTables = {
       'agency-info-screen': document.getElementById('menu-agency-info'),
       'jo-info-screen': document.getElementById('menu-jo-info'),
-      'applicant-info-screen': document.getElementById('menu-applicant-info')
+      'applicant-info-screen': document.getElementById('menu-applicant-info'),
+      'appointment-new': document.getElementById('menu-new-appoint'),
+      'appointment-existing': document.getElementById('menu-existing-appoint'),
+      'drafts-view-screen': document.getElementById('menu-drafts-list'),
+      'history-view-screen': document.getElementById('menu-history-list'),
+      'official-id-link': document.getElementById('menu-link-official')
     };
   }
   if (!cachedAppointSubMenus) {
@@ -2094,52 +2103,6 @@ function renderCustomTableList() {
       const contentEl = folderDiv.querySelector('.accordion-content');
       if (contentEl) {
         contentEl.innerHTML = '';
-
-        // アポイント情報フォルダ専用サブメニューの配置
-        if (acc.id === 'appoint-accordion') {
-          appointSubMenus.forEach(btn => {
-            if (btn) {
-              const btnAccess = checkTableAccess('appoint-screen');
-              if (btnAccess.visible) {
-                btn.style.display = 'flex';
-                btn.style.alignItems = 'center';
-                const subName = btn.dataset.tab === 'appointment-new' ? '新規アポイント' :
-                                btn.dataset.tab === 'appointment-existing' ? '既存顧客アポイント' :
-                                btn.dataset.tab === 'drafts-view-screen' ? '一時保存一覧' :
-                                btn.dataset.tab === 'history-view-screen' ? 'アポイント履歴' : '本登録ID紐付け';
-                const subIcon = getUserItemIconHtml(btn.id, null);
-                btn.setAttribute('data-tooltip', subName);
-                btn.innerHTML = `${subIcon}<span class="nav-item-text">${subName}</span>`;
-
-                let editBtn = btn.querySelector('.custom-icon-edit-btn');
-                if (!editBtn) {
-                  editBtn = document.createElement('span');
-                  editBtn.textContent = '🎨';
-                  editBtn.className = 'custom-icon-edit-btn';
-                  editBtn.title = 'アイコンを変更';
-                  editBtn.style.cssText = 'cursor: pointer; margin-left: auto; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s; padding: 0 0.2rem;';
-                  editBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openCustomIconModal(btn.id, subName);
-                  });
-                  btn.appendChild(editBtn);
-
-                  btn.addEventListener('mouseenter', () => { editBtn.style.opacity = '0.7'; });
-                  btn.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; });
-                }
-
-                if (btnAccess.grayout) {
-                  btn.classList.add('grayed-out-access');
-                  appendInlineGrantBtn(btn, () => grantPermission('table', 'appoint-screen'));
-                } else {
-                  btn.classList.remove('grayed-out-access');
-                  removeInlineGrantBtn(btn);
-                }
-                contentEl.appendChild(btn);
-              }
-            }
-          });
-        }
 
         // ★ 子フォルダ・子テーブルを再帰アペンド（深さ + 1）
         renderMenuNode(acc.id, contentEl, depth + 1);
@@ -20619,6 +20582,9 @@ function renderModalFolderTree() {
   const rootDropzone = document.getElementById('modal-tree-root-dropzone');
   if (!container) return;
 
+  ensureStandardAccordionsInState();
+  ensureStandardTablesInState();
+
   container.innerHTML = '';
 
   // 1. ルートドロップゾーンのイベント設定
@@ -20656,7 +20622,7 @@ function renderModalFolderTree() {
         if (tbl) {
           tbl.parentMenuId = 'root';
           saveCustomTables();
-          showToast(`テーブル「${tbl.name}」をルート直下に移動しました。`, 'success');
+          showToast(`「${tbl.name}」をルート直下に移動しました。`, 'success');
         }
       }
 
@@ -20664,13 +20630,16 @@ function renderModalFolderTree() {
       updateParentSelectDropdowns();
       updateAdminFolderAddDropdown();
       renderAdminPanelFolderList();
+      renderModalFolderTree();
     });
   }
 
   // 2. 再帰的ツリーノードレンダラー
   const renderTreeNode = (parentId, indentLevel) => {
+    const targetParentId = normalizeFolderId(parentId);
+
     // フォルダの抽出
-    const childFolders = state.customAccordions.filter(acc => (acc.parentMenuId || 'root') === parentId);
+    const childFolders = state.customAccordions.filter(acc => normalizeFolderId(acc.parentMenuId || 'root') === targetParentId);
     
     childFolders.forEach(acc => {
       const folderNode = document.createElement('div');
@@ -20755,7 +20724,7 @@ function renderModalFolderTree() {
           if (srcTbl) {
             srcTbl.parentMenuId = acc.id;
             saveCustomTables();
-            showToast(`テーブル「${srcTbl.name}」を「${acc.name}」配下に配置しました。`, 'success');
+            showToast(`「${srcTbl.name}」を「${acc.name}」配下に配置しました。`, 'success');
           }
         }
 
@@ -20763,20 +20732,17 @@ function renderModalFolderTree() {
         updateParentSelectDropdowns();
         updateAdminFolderAddDropdown();
         renderAdminPanelFolderList();
+        renderModalFolderTree();
       });
 
       container.appendChild(folderNode);
 
-      // 子要素（子フォルダ・所属テーブル）を再帰的描画
+      // 子要素（子フォルダ・所属テーブル・サブメニュー項目）を再帰的描画
       renderTreeNode(acc.id, indentLevel + 1);
     });
 
-    // 所属テーブルの抽出
-    const childTables = state.customTables.filter(t => {
-      const pId = t.parentMenuId || 'root';
-      const normalizedPId = (pId === 'custom-tables' || pId === '') ? 'root' : pId;
-      return normalizedPId === parentId;
-    });
+    // 所属テーブル・サブメニュー項目の抽出
+    const childTables = state.customTables.filter(t => normalizeFolderId(t.parentMenuId || 'root') === targetParentId);
 
     childTables.forEach(tbl => {
       const tableNode = document.createElement('div');
