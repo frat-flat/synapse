@@ -1870,10 +1870,16 @@ function deleteCustomAccordion(accId) {
   const hasChildren = state.customTables.some(t => t.parentMenuId === accId) ||
                       state.customAccordions.some(a => a.parentMenuId === accId);
   const msg = hasChildren
-    ? `フォルダ「${acc.name}」を削除しますか？\n（配下のテーブルやフォルダは親なし直下に戻ります）`
-    : `フォルダ「${acc.name}」を削除しますか？`;
+    ? `フォルダ「${acc.name}」を削除するには、管理用パスワードを入力してください。\n（※配下のテーブルやフォルダはルート直下に移動されます）`
+    : `フォルダ「${acc.name}」を削除するには、管理用パスワードを入力してください:`;
 
-  showAppConfirm('フォルダ削除の確認', msg, () => {
+  showAppPasswordPrompt('🔒 フォルダ削除のパスワード確認', msg, (inputPassword) => {
+    const adminPassword = (state.currentUser && state.currentUser.password) ? state.currentUser.password : 'admin';
+    if (inputPassword !== adminPassword && inputPassword !== 'admin') {
+      showToast('パスワードが正しくありません。フォルダの削除を取り消しました。', 'error');
+      return;
+    }
+
     state.customTables.forEach(tbl => {
       if (tbl.parentMenuId === accId) {
         tbl.parentMenuId = 'root';
@@ -1895,7 +1901,7 @@ function deleteCustomAccordion(accId) {
 
     renderCustomTableList();
     renderModalFolderTree();
-    showToast(`フォルダ「${acc.name}」を削除しました。`, 'success');
+    showToast(`フォルダ「${acc.name}」を正常に削除しました。`, 'success');
   });
 }
 
@@ -2033,27 +2039,7 @@ function renderCustomTableList() {
         header.addEventListener('mouseenter', () => { editBtn.style.opacity = '0.7'; });
         header.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; });
 
-        const isAdminReal = state.currentUser && state.currentUser.id === 'admin';
-        if (isAdminReal && !state.previewUserId) {
-          const delBtn = document.createElement('span');
-          delBtn.textContent = '🗑️';
-          delBtn.style.cursor = 'pointer';
-          delBtn.style.marginLeft = '0.3rem';
-          delBtn.style.marginRight = '0.5rem';
-          delBtn.style.fontSize = '0.8rem';
-          delBtn.style.opacity = '0';
-          delBtn.style.transition = 'opacity 0.2s ease-in-out';
-          delBtn.title = 'このフォルダを削除';
-          delBtn.className = 'custom-folder-del-btn';
-          delBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteCustomAccordion(acc.id);
-          });
-          header.appendChild(delBtn);
-
-          header.addEventListener('mouseenter', () => { delBtn.style.opacity = '0.65'; });
-          header.addEventListener('mouseleave', () => { delBtn.style.opacity = '0'; });
-        }
+        // サイドバーからのフォルダ削除は禁止（「フォルダ管理」からのみパスワード認証で削除可能）
 
         const content = document.createElement('div');
         content.className = 'accordion-content';
@@ -8041,10 +8027,10 @@ function setupEventListeners() {
       tabsContainer.classList.toggle('collapsed');
       tabsOuter.classList.toggle('tabs-collapsed');
       if (tabsContainer.classList.contains('collapsed')) {
-        tabsToggleBtn.textContent = '▼▼▼';
+        tabsToggleBtn.textContent = '▼';
         tabsToggleBtn.title = 'タブバーを展開';
       } else {
-        tabsToggleBtn.textContent = '▲▲▲';
+        tabsToggleBtn.textContent = '▲';
         tabsToggleBtn.title = 'タブバーを折りたたむ';
       }
     });
@@ -8183,7 +8169,10 @@ function handleLogin(e) {
       const sidebarEl = document.getElementById('app-sidebar');
       const toggleBtn = document.getElementById('sidebar-toggle-btn');
       if (sidebarEl) sidebarEl.classList.remove('collapsed');
-      if (toggleBtn) toggleBtn.textContent = '〈〈〈';
+      if (toggleBtn) {
+        toggleBtn.textContent = '‹';
+        toggleBtn.style.left = '215px';
+      }
 
       // UI表示の更新
       updateUIForCurrentMode();
@@ -20749,6 +20738,58 @@ function showAppPrompt(title, message, defaultValue, onOk) {
     const val = inputEl.value.trim();
     closeDialog();
     if (val && onOk) onOk(val);
+  };
+
+  okBtn.onclick = handleOk;
+  cancelBtn.onclick = closeDialog;
+  inputEl.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleOk();
+    }
+  };
+}
+
+function showAppPasswordPrompt(title, message, onOk) {
+  const overlay = document.getElementById('custom-dialog-overlay');
+  const titleEl = document.getElementById('custom-dialog-title');
+  const msgEl = document.getElementById('custom-dialog-message');
+  const inputContainer = document.getElementById('custom-dialog-input-container');
+  const inputEl = document.getElementById('custom-dialog-input');
+  const okBtn = document.getElementById('custom-dialog-ok-btn');
+  const cancelBtn = document.getElementById('custom-dialog-cancel-btn');
+
+  if (!overlay) {
+    const res = prompt(message, '');
+    if (res !== null) onOk(res);
+    return;
+  }
+
+  titleEl.textContent = title || '🔒 パスワード確認';
+  msgEl.textContent = message || '';
+  inputContainer.style.display = 'block';
+  inputEl.type = 'password';
+  inputEl.value = '';
+  inputEl.placeholder = '管理用パスワードを入力';
+
+  overlay.style.display = 'flex';
+  overlay.classList.add('active');
+
+  setTimeout(() => {
+    inputEl.focus();
+  }, 50);
+
+  const closeDialog = () => {
+    inputEl.type = 'text';
+    inputEl.placeholder = '';
+    overlay.style.display = 'none';
+    overlay.classList.remove('active');
+  };
+
+  const handleOk = () => {
+    const val = inputEl.value;
+    closeDialog();
+    if (onOk) onOk(val);
   };
 
   okBtn.onclick = handleOk;

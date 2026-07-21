@@ -1119,41 +1119,41 @@ textarea {
   pointer-events: none;
 }
 
-/* Tabs toggle arrow styles */
+/* Tabs toggle arrow styles (frameless, smart arrow) */
 .tabs-toggle-arrow {
   position: absolute;
-  bottom: -12px;
+  bottom: -16px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
-  width: 60px;
-  height: 12px;
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-color);
-  border-top: none;
-  color: var(--text-secondary);
-  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  width: 24px;
+  height: 16px;
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   font-weight: bold;
   cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s, color 0.2s, bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: var(--shadow-sm);
+  transition: color 0.2s, transform 0.2s;
+  box-shadow: none !important;
   padding: 0;
   line-height: 1;
+  outline: none;
 }
 
 .tabs-toggle-arrow:hover {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-  box-shadow: 0 2px 6px var(--primary-glow);
+  background: transparent !important;
+  border: none !important;
+  color: var(--primary);
+  box-shadow: none !important;
+  transform: translateX(-50%) scale(1.25);
 }
 
 .tabs-outer-wrapper.tabs-collapsed .tabs-toggle-arrow {
-  bottom: -12px;
+  bottom: -16px;
 }
 
 .tabs-bar {
