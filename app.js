@@ -1334,20 +1334,26 @@ function ensureStandardAccordionsInState() {
   });
 }
 
-function getUserItemIconHtml(itemId, defaultIcon = '📁') {
+function getUserItemIconHtml(itemId, defaultIcon = null) {
   const userId = state.currentUser ? state.currentUser.id : 'default';
   const userIcons = state.userCustomIcons && state.userCustomIcons[userId];
   const custom = userIcons && userIcons[itemId];
 
   if (custom) {
-    if (custom.type === 'emoji') {
+    if (custom.type === 'none') {
+      return '';
+    } else if (custom.type === 'emoji' && custom.value) {
       return `<span class="user-custom-icon user-custom-icon-emoji">${custom.value}</span>`;
-    } else if (custom.type === 'image') {
+    } else if (custom.type === 'image' && custom.value) {
       return `<span class="user-custom-icon"><img src="${custom.value}" class="user-custom-icon-img" alt="icon"></span>`;
     }
   }
 
-  return `<span class="user-custom-icon user-custom-icon-emoji">${defaultIcon}</span>`;
+  if (defaultIcon) {
+    return `<span class="user-custom-icon user-custom-icon-emoji">${defaultIcon}</span>`;
+  }
+
+  return '';
 }
 
 let currentIconTargetId = null;
@@ -1369,7 +1375,9 @@ function openCustomIconModal(itemId, itemName) {
 
   if (fileInput) fileInput.value = '';
 
-  if (current && current.type === 'image') {
+  if (current && current.type === 'none') {
+    switchCustomIconTab('none');
+  } else if (current && current.type === 'image') {
     switchCustomIconTab('image');
     if (previewImg) previewImg.src = current.value;
     if (previewContainer) previewContainer.style.display = 'flex';
@@ -1385,19 +1393,28 @@ function openCustomIconModal(itemId, itemName) {
 function switchCustomIconTab(type) {
   const tabEmoji = document.getElementById('tab-btn-emoji');
   const tabImage = document.getElementById('tab-btn-image');
+  const tabNone = document.getElementById('tab-btn-none');
   const secEmoji = document.getElementById('icon-section-emoji');
   const secImage = document.getElementById('icon-section-image');
+  const secNone = document.getElementById('icon-section-none');
+
+  if (tabEmoji) tabEmoji.classList.remove('active');
+  if (tabImage) tabImage.classList.remove('active');
+  if (tabNone) tabNone.classList.remove('active');
+
+  if (secEmoji) secEmoji.style.display = 'none';
+  if (secImage) secImage.style.display = 'none';
+  if (secNone) secNone.style.display = 'none';
 
   if (type === 'emoji') {
     if (tabEmoji) tabEmoji.classList.add('active');
-    if (tabImage) tabImage.classList.remove('active');
     if (secEmoji) secEmoji.style.display = 'flex';
-    if (secImage) secImage.style.display = 'none';
-  } else {
+  } else if (type === 'image') {
     if (tabImage) tabImage.classList.add('active');
-    if (tabEmoji) tabEmoji.classList.remove('active');
     if (secImage) secImage.style.display = 'flex';
-    if (secEmoji) secEmoji.style.display = 'none';
+  } else if (type === 'none') {
+    if (tabNone) tabNone.classList.add('active');
+    if (secNone) secNone.style.display = 'flex';
   }
 }
 
@@ -1409,6 +1426,7 @@ function initCustomIconModalEvents() {
   const saveBtn = document.getElementById('custom-icon-save-btn');
   const tabEmoji = document.getElementById('tab-btn-emoji');
   const tabImage = document.getElementById('tab-btn-image');
+  const tabNone = document.getElementById('tab-btn-none');
   const fileInput = document.getElementById('custom-icon-file-input');
   const previewImg = document.getElementById('custom-icon-image-preview');
   const previewContainer = document.getElementById('custom-icon-image-preview-container');
@@ -1418,6 +1436,7 @@ function initCustomIconModalEvents() {
 
   if (tabEmoji) tabEmoji.addEventListener('click', () => switchCustomIconTab('emoji'));
   if (tabImage) tabImage.addEventListener('click', () => switchCustomIconTab('image'));
+  if (tabNone) tabNone.addEventListener('click', () => switchCustomIconTab('none'));
 
   document.querySelectorAll('.preset-emoji-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -1461,8 +1480,15 @@ function initCustomIconModalEvents() {
       if (!state.userCustomIcons) state.userCustomIcons = {};
       if (!state.userCustomIcons[userId]) state.userCustomIcons[userId] = {};
 
-      const isImageTab = document.getElementById('tab-btn-image').classList.contains('active');
-      if (isImageTab) {
+      const isNoneTab = document.getElementById('tab-btn-none')?.classList.contains('active');
+      const isImageTab = document.getElementById('tab-btn-image')?.classList.contains('active');
+
+      if (isNoneTab) {
+        state.userCustomIcons[userId][currentIconTargetId] = {
+          type: 'none',
+          value: ''
+        };
+      } else if (isImageTab) {
         if (previewImg && previewImg.src && previewImg.src.startsWith('data:image')) {
           state.userCustomIcons[userId][currentIconTargetId] = {
             type: 'image',
@@ -1487,7 +1513,7 @@ function initCustomIconModalEvents() {
       saveUserCustomIcons();
       if (modal) modal.classList.remove('active');
       renderCustomTableList();
-      showToast('カスタムアイコンを保存しました！', 'success');
+      showToast('カスタムアイコン設定を保存しました！', 'success');
     });
   }
 }
@@ -1495,6 +1521,8 @@ function initCustomIconModalEvents() {
 function setupSidebarToggleBtnEvent() {
   const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
   if (!sidebarToggleBtn) return;
+  if (sidebarToggleBtn.dataset.bound) return;
+  sidebarToggleBtn.dataset.bound = 'true';
 
   sidebarToggleBtn.addEventListener('click', () => {
     const sidebar = document.getElementById('app-sidebar');
@@ -2056,7 +2084,7 @@ function renderCustomTableList() {
                                 btn.dataset.tab === 'appointment-existing' ? '既存顧客アポイント' :
                                 btn.dataset.tab === 'drafts-view-screen' ? '一時保存一覧' :
                                 btn.dataset.tab === 'history-view-screen' ? 'アポイント履歴' : '本登録ID紐付け';
-                const subIcon = getUserItemIconHtml(btn.id, '📝');
+                const subIcon = getUserItemIconHtml(btn.id, null);
                 btn.setAttribute('data-tooltip', subName);
                 btn.innerHTML = `${subIcon}<span class="nav-item-text">${subName}</span>`;
 
@@ -2108,7 +2136,7 @@ function renderCustomTableList() {
 
       let btn = sysTables[tbl.id]; // 標準テーブルの場合
 
-      const tableIcon = getUserItemIconHtml(tbl.id, '📊');
+      const tableIcon = getUserItemIconHtml(tbl.id, null);
       if (btn) {
         btn.setAttribute('data-tooltip', tbl.name);
         btn.style.display = 'flex';
@@ -7230,19 +7258,7 @@ function setupEventListeners() {
     });
   }
 
-  // サイドメニューの開閉（ドロワー）イベント登録
-  const toggleBtn = document.getElementById('sidebar-toggle-btn');
-  const sidebarEl = document.getElementById('app-sidebar');
-  if (toggleBtn && sidebarEl) {
-    toggleBtn.addEventListener('click', () => {
-      sidebarEl.classList.toggle('collapsed');
-      if (sidebarEl.classList.contains('collapsed')) {
-        toggleBtn.textContent = '〉〉〉';
-      } else {
-        toggleBtn.textContent = '〈〈〈';
-      }
-    });
-  }
+
 
   // 表示モード切り替えボタンのイベント登録
   const btnSales = document.getElementById('btn-mode-sales');

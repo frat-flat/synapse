@@ -1544,9 +1544,10 @@
     </div>
 
     <!-- タイプ切替タブ -->
-    <div style="display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
-      <button class="btn-sm btn-secondary active" id="tab-btn-emoji" style="flex: 1; padding: 0.4rem; font-size: 0.8rem; cursor: pointer;">😀 絵文字・記号</button>
-      <button class="btn-sm btn-secondary" id="tab-btn-image" style="flex: 1; padding: 0.4rem; font-size: 0.8rem; cursor: pointer;">🖼️ 写真・画像ファイル</button>
+    <div style="display: flex; gap: 0.35rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+      <button class="btn-sm btn-secondary active" id="tab-btn-emoji" style="flex: 1; padding: 0.4rem; font-size: 0.75rem; cursor: pointer;">😀 絵文字</button>
+      <button class="btn-sm btn-secondary" id="tab-btn-image" style="flex: 1; padding: 0.4rem; font-size: 0.75rem; cursor: pointer;">🖼️ 画像ファイル</button>
+      <button class="btn-sm btn-secondary" id="tab-btn-none" style="flex: 1; padding: 0.4rem; font-size: 0.75rem; cursor: pointer;">🚫 アイコンなし</button>
     </div>
 
     <!-- 1. 絵文字入力エリア -->
@@ -1576,6 +1577,12 @@
       <div id="custom-icon-image-preview-container" style="display: none; align-items: center; justify-content: center; padding: 0.5rem; border: 1px dashed var(--border-color); border-radius: var(--radius-sm);">
         <img id="custom-icon-image-preview" src="" alt="Preview" style="max-width: 48px; max-height: 48px; object-fit: contain; border-radius: 4px;">
       </div>
+    </div>
+
+    <!-- 3. アイコンなしエリア -->
+    <div id="icon-section-none" style="display: none; flex-direction: column; gap: 0.5rem; text-align: center; padding: 1rem 0;">
+      <div style="font-size: 2rem;">🚫</div>
+      <div style="font-size: 0.85rem; color: var(--text-secondary);">このメニュー項目にはアイコンを表示しません。純粋なテキストのみで表示されます。</div>
     </div>
 
     <div class="modal-footer" style="display: flex; justify-content: space-between; gap: 0.5rem; margin-top: 0.5rem;">
