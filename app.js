@@ -1566,8 +1566,8 @@ function setupSidebarToggleBtnEvent() {
 
     sidebar.classList.toggle('collapsed');
     const isCollapsed = sidebar.classList.contains('collapsed');
-    sidebarToggleBtn.style.left = isCollapsed ? '50px' : '210px';
-    sidebarToggleBtn.textContent = isCollapsed ? '〉〉〉' : '〈〈〈';
+    sidebarToggleBtn.style.left = isCollapsed ? '14px' : '215px';
+    sidebarToggleBtn.textContent = isCollapsed ? '›' : '‹';
   });
 }
 
@@ -5885,7 +5885,10 @@ function checkLoginStatus() {
     const sidebarEl = document.getElementById('app-sidebar');
     const toggleBtn = document.getElementById('sidebar-toggle-btn');
     if (sidebarEl) sidebarEl.classList.remove('collapsed');
-    if (toggleBtn) toggleBtn.textContent = '〈〈〈';
+    if (toggleBtn) {
+      toggleBtn.textContent = '‹';
+      toggleBtn.style.left = '215px';
+    }
 
     // UI表示の更新
     updateUIForCurrentMode();

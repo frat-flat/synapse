@@ -1615,38 +1615,42 @@ textarea {
   box-shadow: 0 0 10px var(--primary-glow);
 }
 
-/* Sidebar toggle arrow styles */
+/* Sidebar toggle arrow styles (frameless, smart arrow only) */
 .sidebar-toggle-arrow {
   position: fixed;
-  top: 2.1rem;
-  left: 210px;
+  top: 1.5rem;
+  left: 215px;
   z-index: 100;
-  width: 36px;
-  height: 32px;
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  border-radius: var(--radius-sm);
+  width: 28px;
+  height: 28px;
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
-  font-weight: bold;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
   cursor: pointer;
-  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s, border-color 0.2s;
-  box-shadow: var(--shadow-sm);
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease, transform 0.2s ease;
+  box-shadow: none !important;
   padding: 0;
+  outline: none;
+  user-select: none;
 }
 
 .sidebar-toggle-arrow:hover {
-  background: var(--primary);
-  border-color: var(--primary);
-  box-shadow: 0 0 8px var(--primary-glow);
+  background: transparent !important;
+  border: none !important;
+  color: var(--primary);
+  box-shadow: none !important;
+  transform: scale(1.25);
 }
 
 /* When sidebar is collapsed, move toggle arrow to the left edge */
 #app-sidebar.collapsed + .sidebar-toggle-arrow {
-  left: 10px;
+  left: 14px;
 }
 
 /* Shift main content padding-left to prevent toggle arrow from overlapping the title when collapsed */
