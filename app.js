@@ -5999,6 +5999,13 @@ function showLoginScreen(show) {
     if (sidebar) sidebar.style.display = 'none';
     if (toggleBtn) toggleBtn.style.display = 'none';
     if (mainHeader) mainHeader.style.display = 'none';
+
+    // ポップアップ類を確実に非表示
+    const userPopover = document.getElementById('user-profile-popover');
+    if (userPopover) userPopover.style.display = 'none';
+    const settingsPopup = document.getElementById('sidebar-settings-popup');
+    if (settingsPopup) settingsPopup.style.display = 'none';
+
     if (login) {
       login.classList.add('active');
       login.style.display = 'flex'; // インラインで明示的に表示
@@ -8203,6 +8210,12 @@ function handleLogout() {
   state.currentUser = null;
   localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
   
+  // ポップアップを閉じる
+  const userPopover = document.getElementById('user-profile-popover');
+  if (userPopover) userPopover.style.display = 'none';
+  const settingsPopup = document.getElementById('sidebar-settings-popup');
+  if (settingsPopup) settingsPopup.style.display = 'none';
+
   // デフォルト（未ログイン状態）のDB設定を再ロード
   initDatabase();
   renderJoInfo();
