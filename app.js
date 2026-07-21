@@ -20508,6 +20508,7 @@ function renderAdminPanelFolderList() {
     saveBtn.style.fontSize = '0.8rem';
     saveBtn.style.marginRight = '0.5rem';
     saveBtn.textContent = '保存';
+    saveBtn.title = 'フォルダ名や配置場所の変更を確定して保存';
     saveBtn.addEventListener('click', () => {
       const newName = inputName.value.trim();
       if (!newName) {
@@ -20535,6 +20536,7 @@ function renderAdminPanelFolderList() {
       updateParentSelectDropdowns();
       updateAdminFolderAddDropdown();
       renderAdminPanelFolderList();
+      renderModalFolderTree();
       showToast('フォルダ設定を保存しました。', 'success');
     });
 
@@ -20544,6 +20546,7 @@ function renderAdminPanelFolderList() {
     deleteBtn.style.border = 'none';
     deleteBtn.style.color = '#fff';
     deleteBtn.style.borderRadius = 'var(--radius-sm)';
+    deleteBtn.style.marginLeft = '0.3rem';
     
     if (acc.isSystem) {
       deleteBtn.style.background = 'var(--text-muted)';
@@ -20551,8 +20554,9 @@ function renderAdminPanelFolderList() {
       deleteBtn.disabled = true;
       deleteBtn.title = 'システム標準フォルダは削除できません';
     } else {
-      deleteBtn.style.background = 'var(--text-danger)';
+      deleteBtn.style.background = '#ef4444';
       deleteBtn.style.cursor = 'pointer';
+      deleteBtn.title = 'このフォルダを削除します';
     }
     
     deleteBtn.textContent = '削除';
