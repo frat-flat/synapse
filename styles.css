@@ -1281,6 +1281,34 @@ textarea {
   width: 100%;
 }
 
+/* エクスプローラー風ツリー用矢印 */
+.accordion-arrow {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-right: 0.35rem;
+  transition: transform 0.15s ease;
+  display: inline-block;
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.sidebar-menu.collapsed .accordion-arrow {
+  display: none !important;
+}
+
+.accordion-content {
+  border-left: 1px dashed var(--border-color);
+  margin-left: 0.4rem;
+  padding-left: 0.2rem;
+}
+
+.sidebar-menu.collapsed .accordion-content {
+  border-left: none !important;
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
 .accordion-header {
   background: transparent;
   border: none;

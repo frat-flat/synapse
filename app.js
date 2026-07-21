@@ -1957,13 +1957,12 @@ function renderCustomTableList() {
   Object.values(sysTables).forEach(el => { if (el) el.remove(); });
   appointSubMenus.forEach(el => { if (el) el.remove(); });
 
-  // 2. 再帰的なアコーディオン・テーブルの再配置
-  const renderMenuNode = (parentId, containerEl) => {
+  // 2. 再帰的なアコーディオン・テーブルの再配置 (エクスプローラー風ツリー連動)
+  const renderMenuNode = (parentId, containerEl, depth = 0) => {
+    const normalizedParentId = normalizeFolderId(parentId);
+
     // A. 親IDに属するアコーディオン（標準フォルダ ＋ カスタムフォルダ）を抽出
-    // 「メニュー内の子フォルダは表示しない」仕様に基づき、ルート直下(parentId === 'root')のフォルダーのみ表示
-    const childFolders = parentId === 'root'
-      ? state.customAccordions.filter(acc => (acc.parentMenuId || 'root') === 'root')
-      : [];
+    const childFolders = state.customAccordions.filter(acc => normalizeFolderId(acc.parentMenuId || 'root') === normalizedParentId);
 
     childFolders.forEach(acc => {
       const access = checkFolderAccess(acc.id);
@@ -1980,7 +1979,7 @@ function renderCustomTableList() {
                               acc.id === 'jo-accordion' ? '📑' : '📋';
           const iconHtml = getUserItemIconHtml(acc.id, defaultIcon);
           headerEl.setAttribute('data-tooltip', acc.name);
-          headerEl.innerHTML = `${iconHtml}<span class="accordion-header-text">${acc.name}</span>`;
+          headerEl.innerHTML = `<span class="accordion-arrow">▼</span>${iconHtml}<span class="accordion-header-text">${acc.name}</span>`;
 
           const editBtn = document.createElement('span');
           editBtn.textContent = '🎨';
@@ -1995,18 +1994,13 @@ function renderCustomTableList() {
 
           headerEl.addEventListener('mouseenter', () => { editBtn.style.opacity = '0.7'; });
           headerEl.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; });
-
-          const arrowIcon = document.createElement('span');
-          arrowIcon.className = 'accordion-icon';
-          arrowIcon.textContent = '▼';
-          headerEl.appendChild(arrowIcon);
         }
       } else {
         // 新規カスタムアコーディオンを動的生成
         folderDiv = document.createElement('div');
         folderDiv.className = 'sidebar-accordion';
         folderDiv.id = acc.id;
-        folderDiv.style.marginTop = '0.5rem';
+        folderDiv.style.marginTop = '0.15rem';
 
         const header = document.createElement('button');
         header.className = 'accordion-header';
@@ -2014,7 +2008,7 @@ function renderCustomTableList() {
         header.setAttribute('data-tooltip', acc.name);
 
         const iconHtml = getUserItemIconHtml(acc.id, '📁');
-        header.innerHTML = `${iconHtml}<span class="accordion-header-text">${acc.name}</span>`;
+        header.innerHTML = `<span class="accordion-arrow">▼</span>${iconHtml}<span class="accordion-header-text">${acc.name}</span>`;
 
         const editBtn = document.createElement('span');
         editBtn.textContent = '🎨';
@@ -2052,24 +2046,21 @@ function renderCustomTableList() {
           header.addEventListener('mouseleave', () => { delBtn.style.opacity = '0'; });
         }
 
-        const icon = document.createElement('span');
-        icon.className = 'accordion-icon';
-        icon.textContent = '▼';
-        header.appendChild(icon);
-
         const content = document.createElement('div');
         content.className = 'accordion-content';
         content.id = `menu-${acc.id}-content`;
-        content.style.paddingLeft = '0.75rem';
         content.style.display = 'none';
         content.style.flexDirection = 'column';
-        content.style.gap = '0.25rem';
-        content.style.marginTop = '0.25rem';
+        content.style.gap = '0.2rem';
+        content.style.marginTop = '0.15rem';
 
-        header.addEventListener('click', () => {
+        header.addEventListener('click', (e) => {
+          e.stopPropagation();
           header.classList.toggle('collapsed');
           const isHidden = content.style.display === 'none' || !content.style.display;
           content.style.display = isHidden ? 'flex' : 'none';
+          const arrow = header.querySelector('.accordion-arrow');
+          if (arrow) arrow.textContent = isHidden ? '▼' : '▶';
         });
 
         folderDiv.appendChild(header);
@@ -2099,7 +2090,7 @@ function renderCustomTableList() {
         containerEl.appendChild(folderDiv);
       }
 
-      // フォルダの子要素をアペンド
+      // フォルダの子要素を再帰アペンド
       const contentEl = folderDiv.querySelector('.accordion-content');
       if (contentEl) {
         contentEl.innerHTML = '';
@@ -2150,27 +2141,13 @@ function renderCustomTableList() {
           });
         }
 
-        // フォルダ内の子要素（子フォルダ、所属テーブル）を再帰アペンド
-        renderMenuNode(acc.id, contentEl);
+        // ★ 子フォルダ・子テーブルを再帰アペンド（深さ + 1）
+        renderMenuNode(acc.id, contentEl, depth + 1);
       }
     });
 
-    // B. 親IDに属するテーブル（標準テーブル ＋ カスタムテーブル）を抽出
-    const targetFolderId = normalizeFolderId(parentId);
-    const childTables = state.customTables.filter(t => {
-      const pId = normalizeFolderId(t.parentMenuId || 'root');
-      if (pId === targetFolderId) return true;
-
-      // 子フォルダに属するテーブルも、親ルートフォルダ配下にフラット表示
-      let parentAcc = state.customAccordions.find(a => a.id === pId);
-      while (parentAcc) {
-        const parentAccPId = normalizeFolderId(parentAcc.parentMenuId || 'root');
-        if (parentAccPId === targetFolderId) return true;
-        parentAcc = state.customAccordions.find(a => a.id === parentAccPId);
-      }
-
-      return false;
-    });
+    // B. 親IDに直属するテーブル（標準テーブル ＋ カスタムテーブル）を抽出
+    const childTables = state.customTables.filter(t => normalizeFolderId(t.parentMenuId || 'root') === normalizedParentId);
 
     childTables.forEach(tbl => {
       const access = checkTableAccess(tbl.id);
