@@ -78,6 +78,7 @@ const STORAGE_KEYS = {
   PERMISSIONS: 'synapse_permissions',
   AUDIT_LOGS: 'synapse_audit_logs',
   CUSTOM_ACCORDIONS: 'synapse_custom_accordions',
+  USER_CUSTOM_ICONS: 'synapse_user_custom_icons',
   JO_ROW_HEIGHTS: 'synapse_jo_row_heights',
   AP_ROW_HEIGHTS: 'synapse_ap_row_heights',
   AG_ROW_HEIGHTS: 'synapse_ag_row_heights'
@@ -162,6 +163,7 @@ let state = {
   customTables: [], // 作成されたカスタムテーブルの配列
   activeCustomTableId: null, // 現在表示中のカスタムテーブルID
   customAccordions: [], // 管理者が新規作成したサイドバーフォルダ（アコーディオン）
+  userCustomIcons: {}, // ユーザーごとのカスタムアイコン設定
   permissions: { folders: {}, tables: {}, columns: {}, rowFilters: {} }, // 詳細アクセス権限データ
   auditLogs: [], // 変更監査ログ
   previewUserId: null, // プレビュー（なりすまし）中の対象ユーザーID
@@ -350,6 +352,8 @@ function setSettingItem(key, value) {
 // 1. 初期化処理
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
+  loadUserCustomIcons();
+  ensureStandardAccordionsInState();
   initDatabase();
   setupEventListeners();
   setupJoFormatToolbarEvents(); // 追加
@@ -362,6 +366,8 @@ document.addEventListener('DOMContentLoaded', () => {
   setupPermissionFeatures();
   updateParentSelectDropdowns();
   initFormatDropdowns();
+  initCustomIconModalEvents();
+  setupSidebarToggleBtnEvent();
   checkLoginStatus();
 
   // スクロール時にオーバーフローセルを再調整（バブリングしないためキャプチャフェーズを使用）
@@ -1294,6 +1300,213 @@ function saveCustomAccordions() {
   localStorage.setItem(STORAGE_KEYS.CUSTOM_ACCORDIONS, JSON.stringify(state.customAccordions));
 }
 
+function loadUserCustomIcons() {
+  const saved = localStorage.getItem(STORAGE_KEYS.USER_CUSTOM_ICONS);
+  if (saved) {
+    try {
+      state.userCustomIcons = JSON.parse(saved);
+    } catch(e) {
+      state.userCustomIcons = {};
+    }
+  }
+  if (!state.userCustomIcons) state.userCustomIcons = {};
+}
+
+function saveUserCustomIcons() {
+  localStorage.setItem(STORAGE_KEYS.USER_CUSTOM_ICONS, JSON.stringify(state.userCustomIcons));
+}
+
+function ensureStandardAccordionsInState() {
+  if (!state.customAccordions) state.customAccordions = [];
+  
+  const stdAccs = [
+    { id: 'applicant-accordion', name: '申込者情報', parentMenuId: 'root' },
+    { id: 'jo-accordion', name: 'JO情報', parentMenuId: 'root' },
+    { id: 'agency-accordion', name: '代理店情報', parentMenuId: 'root' },
+    { id: 'appoint-accordion', name: 'アポイント情報', parentMenuId: 'root' }
+  ];
+
+  stdAccs.forEach(std => {
+    const existing = state.customAccordions.find(a => a.id === std.id);
+    if (!existing) {
+      state.customAccordions.unshift(std);
+    }
+  });
+}
+
+function getUserItemIconHtml(itemId, defaultIcon = '📁') {
+  const userId = state.currentUser ? state.currentUser.id : 'default';
+  const userIcons = state.userCustomIcons && state.userCustomIcons[userId];
+  const custom = userIcons && userIcons[itemId];
+
+  if (custom) {
+    if (custom.type === 'emoji') {
+      return `<span class="user-custom-icon user-custom-icon-emoji">${custom.value}</span>`;
+    } else if (custom.type === 'image') {
+      return `<span class="user-custom-icon"><img src="${custom.value}" class="user-custom-icon-img" alt="icon"></span>`;
+    }
+  }
+
+  return `<span class="user-custom-icon user-custom-icon-emoji">${defaultIcon}</span>`;
+}
+
+let currentIconTargetId = null;
+
+function openCustomIconModal(itemId, itemName) {
+  currentIconTargetId = itemId;
+  const modal = document.getElementById('custom-icon-modal');
+  const nameEl = document.getElementById('custom-icon-target-name');
+  if (nameEl) nameEl.textContent = itemName;
+
+  const userId = state.currentUser ? state.currentUser.id : 'default';
+  const userIcons = state.userCustomIcons && state.userCustomIcons[userId];
+  const current = userIcons && userIcons[itemId];
+
+  const emojiInput = document.getElementById('custom-icon-emoji-input');
+  const previewImg = document.getElementById('custom-icon-image-preview');
+  const previewContainer = document.getElementById('custom-icon-image-preview-container');
+  const fileInput = document.getElementById('custom-icon-file-input');
+
+  if (fileInput) fileInput.value = '';
+
+  if (current && current.type === 'image') {
+    switchCustomIconTab('image');
+    if (previewImg) previewImg.src = current.value;
+    if (previewContainer) previewContainer.style.display = 'flex';
+  } else {
+    switchCustomIconTab('emoji');
+    if (emojiInput) emojiInput.value = (current && current.type === 'emoji') ? current.value : '';
+    if (previewContainer) previewContainer.style.display = 'none';
+  }
+
+  if (modal) modal.classList.add('active');
+}
+
+function switchCustomIconTab(type) {
+  const tabEmoji = document.getElementById('tab-btn-emoji');
+  const tabImage = document.getElementById('tab-btn-image');
+  const secEmoji = document.getElementById('icon-section-emoji');
+  const secImage = document.getElementById('icon-section-image');
+
+  if (type === 'emoji') {
+    if (tabEmoji) tabEmoji.classList.add('active');
+    if (tabImage) tabImage.classList.remove('active');
+    if (secEmoji) secEmoji.style.display = 'flex';
+    if (secImage) secImage.style.display = 'none';
+  } else {
+    if (tabImage) tabImage.classList.add('active');
+    if (tabEmoji) tabEmoji.classList.remove('active');
+    if (secImage) secImage.style.display = 'flex';
+    if (secEmoji) secEmoji.style.display = 'none';
+  }
+}
+
+function initCustomIconModalEvents() {
+  const modal = document.getElementById('custom-icon-modal');
+  const closeBtn = document.getElementById('custom-icon-modal-close');
+  const cancelBtn = document.getElementById('custom-icon-cancel-btn');
+  const resetBtn = document.getElementById('custom-icon-reset-btn');
+  const saveBtn = document.getElementById('custom-icon-save-btn');
+  const tabEmoji = document.getElementById('tab-btn-emoji');
+  const tabImage = document.getElementById('tab-btn-image');
+  const fileInput = document.getElementById('custom-icon-file-input');
+  const previewImg = document.getElementById('custom-icon-image-preview');
+  const previewContainer = document.getElementById('custom-icon-image-preview-container');
+
+  if (closeBtn && modal) closeBtn.addEventListener('click', () => modal.classList.remove('active'));
+  if (cancelBtn && modal) cancelBtn.addEventListener('click', () => modal.classList.remove('active'));
+
+  if (tabEmoji) tabEmoji.addEventListener('click', () => switchCustomIconTab('emoji'));
+  if (tabImage) tabImage.addEventListener('click', () => switchCustomIconTab('image'));
+
+  document.querySelectorAll('.preset-emoji-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const emojiInput = document.getElementById('custom-icon-emoji-input');
+      if (emojiInput) emojiInput.value = e.target.textContent.trim();
+    });
+  });
+
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          if (previewImg) previewImg.src = evt.target.result;
+          if (previewContainer) previewContainer.style.display = 'flex';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (!currentIconTargetId) return;
+      const userId = state.currentUser ? state.currentUser.id : 'default';
+      if (state.userCustomIcons && state.userCustomIcons[userId]) {
+        delete state.userCustomIcons[userId][currentIconTargetId];
+        saveUserCustomIcons();
+      }
+      if (modal) modal.classList.remove('active');
+      renderCustomTableList();
+      showToast('アイコンを初期設定に戻しました。', 'info');
+    });
+  }
+
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      if (!currentIconTargetId) return;
+      const userId = state.currentUser ? state.currentUser.id : 'default';
+      if (!state.userCustomIcons) state.userCustomIcons = {};
+      if (!state.userCustomIcons[userId]) state.userCustomIcons[userId] = {};
+
+      const isImageTab = document.getElementById('tab-btn-image').classList.contains('active');
+      if (isImageTab) {
+        if (previewImg && previewImg.src && previewImg.src.startsWith('data:image')) {
+          state.userCustomIcons[userId][currentIconTargetId] = {
+            type: 'image',
+            value: previewImg.src
+          };
+        } else {
+          showToast('画像ファイルを選択してください。', 'warning');
+          return;
+        }
+      } else {
+        const emojiVal = document.getElementById('custom-icon-emoji-input').value.trim();
+        if (!emojiVal) {
+          showToast('絵文字を入力してください。', 'warning');
+          return;
+        }
+        state.userCustomIcons[userId][currentIconTargetId] = {
+          type: 'emoji',
+          value: emojiVal
+        };
+      }
+
+      saveUserCustomIcons();
+      if (modal) modal.classList.remove('active');
+      renderCustomTableList();
+      showToast('カスタムアイコンを保存しました！', 'success');
+    });
+  }
+}
+
+function setupSidebarToggleBtnEvent() {
+  const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+  if (!sidebarToggleBtn) return;
+
+  sidebarToggleBtn.addEventListener('click', () => {
+    const sidebar = document.getElementById('app-sidebar');
+    if (!sidebar) return;
+
+    sidebar.classList.toggle('collapsed');
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    sidebarToggleBtn.style.left = isCollapsed ? '50px' : '210px';
+    sidebarToggleBtn.textContent = isCollapsed ? '〉〉〉' : '〈〈〈';
+  });
+}
+
 function savePermissions() {
   localStorage.setItem(STORAGE_KEYS.PERMISSIONS, JSON.stringify(state.permissions));
 }
@@ -1699,13 +1912,34 @@ function renderCustomTableList() {
       let folderDiv = sysAccs[acc.id]; // 標準フォルダの場合
 
       if (folderDiv) {
-        // 標準アコーディオンの名前変更を動的に反映
-        const spanName = folderDiv.querySelector('.accordion-header span');
-        if (spanName) {
-          const iconPrefix = acc.id === 'appoint-accordion' ? '📅' :
-                             acc.id === 'agency-accordion' ? '💼' :
-                             acc.id === 'jo-accordion' ? '📑' : '📋';
-          spanName.textContent = `${iconPrefix} ${acc.name}`;
+        // 標準アコーディオンの名前とカスタムアイコンを動的に反映
+        const headerEl = folderDiv.querySelector('.accordion-header');
+        if (headerEl) {
+          const defaultIcon = acc.id === 'appoint-accordion' ? '📅' :
+                              acc.id === 'agency-accordion' ? '💼' :
+                              acc.id === 'jo-accordion' ? '📑' : '📋';
+          const iconHtml = getUserItemIconHtml(acc.id, defaultIcon);
+          headerEl.setAttribute('data-tooltip', acc.name);
+          headerEl.innerHTML = `${iconHtml}<span class="accordion-header-text">${acc.name}</span>`;
+
+          const editBtn = document.createElement('span');
+          editBtn.textContent = '🎨';
+          editBtn.className = 'custom-icon-edit-btn';
+          editBtn.title = 'アイコンを変更';
+          editBtn.style.cssText = 'cursor: pointer; margin-left: auto; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s; padding: 0 0.2rem;';
+          editBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openCustomIconModal(acc.id, acc.name);
+          });
+          headerEl.appendChild(editBtn);
+
+          headerEl.addEventListener('mouseenter', () => { editBtn.style.opacity = '0.7'; });
+          headerEl.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; });
+
+          const arrowIcon = document.createElement('span');
+          arrowIcon.className = 'accordion-icon';
+          arrowIcon.textContent = '▼';
+          headerEl.appendChild(arrowIcon);
         }
       } else {
         // 新規カスタムアコーディオンを動的生成
@@ -1717,44 +1951,45 @@ function renderCustomTableList() {
         const header = document.createElement('button');
         header.className = 'accordion-header';
         header.id = `menu-${acc.id}-parent`;
+        header.setAttribute('data-tooltip', acc.name);
 
-        const spanName = document.createElement('span');
-        spanName.textContent = `📁 ${acc.name}`;
-        header.appendChild(spanName);
+        const iconHtml = getUserItemIconHtml(acc.id, '📁');
+        header.innerHTML = `${iconHtml}<span class="accordion-header-text">${acc.name}</span>`;
+
+        const editBtn = document.createElement('span');
+        editBtn.textContent = '🎨';
+        editBtn.className = 'custom-icon-edit-btn';
+        editBtn.title = 'アイコンを変更';
+        editBtn.style.cssText = 'cursor: pointer; margin-left: auto; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s; padding: 0 0.2rem;';
+        editBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openCustomIconModal(acc.id, acc.name);
+        });
+        header.appendChild(editBtn);
+
+        header.addEventListener('mouseenter', () => { editBtn.style.opacity = '0.7'; });
+        header.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; });
 
         const isAdminReal = state.currentUser && state.currentUser.id === 'admin';
         if (isAdminReal && !state.previewUserId) {
           const delBtn = document.createElement('span');
           delBtn.textContent = '🗑️';
           delBtn.style.cursor = 'pointer';
-          delBtn.style.marginLeft = 'auto';
-          delBtn.style.marginRight = '1.25rem'; // トグルボタンとマージンを十分空ける
+          delBtn.style.marginLeft = '0.3rem';
+          delBtn.style.marginRight = '0.5rem';
           delBtn.style.fontSize = '0.8rem';
-          delBtn.style.opacity = '0'; // 通常時は非表示
+          delBtn.style.opacity = '0';
           delBtn.style.transition = 'opacity 0.2s ease-in-out';
           delBtn.title = 'このフォルダを削除';
-          delBtn.className = 'custom-folder-del-btn'; // スタイル用クラス
+          delBtn.className = 'custom-folder-del-btn';
           delBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             deleteCustomAccordion(acc.id);
           });
           header.appendChild(delBtn);
 
-          // ホバーした時だけ表示する制御
-          header.addEventListener('mouseenter', () => {
-            delBtn.style.opacity = '0.65';
-          });
-          header.addEventListener('mouseleave', () => {
-            delBtn.style.opacity = '0';
-          });
-          delBtn.addEventListener('mouseenter', (e) => {
-            e.stopPropagation();
-            delBtn.style.opacity = '1';
-          });
-          delBtn.addEventListener('mouseleave', (e) => {
-            e.stopPropagation();
-            delBtn.style.opacity = '0.65';
-          });
+          header.addEventListener('mouseenter', () => { delBtn.style.opacity = '0.65'; });
+          header.addEventListener('mouseleave', () => { delBtn.style.opacity = '0'; });
         }
 
         const icon = document.createElement('span');
@@ -1783,7 +2018,7 @@ function renderCustomTableList() {
 
       folderDiv.draggable = false;
 
-      // グレーアウト制御 (なりすましプレビュー時のデバッグ機能)
+      // グレーアウト制御
       const headerEl = folderDiv.querySelector('.accordion-header');
       if (access.grayout) {
         folderDiv.classList.add('grayed-out-access');
@@ -1807,7 +2042,7 @@ function renderCustomTableList() {
       // フォルダの子要素をアペンド
       const contentEl = folderDiv.querySelector('.accordion-content');
       if (contentEl) {
-        contentEl.innerHTML = ''; // クリア
+        contentEl.innerHTML = '';
 
         // アポイント情報フォルダ専用サブメニューの配置
         if (acc.id === 'appoint-accordion') {
@@ -1815,7 +2050,33 @@ function renderCustomTableList() {
             if (btn) {
               const btnAccess = checkTableAccess('appoint-screen');
               if (btnAccess.visible) {
-                btn.style.display = 'block';
+                btn.style.display = 'flex';
+                btn.style.alignItems = 'center';
+                const subName = btn.dataset.tab === 'appointment-new' ? '新規アポイント' :
+                                btn.dataset.tab === 'appointment-existing' ? '既存顧客アポイント' :
+                                btn.dataset.tab === 'drafts-view-screen' ? '一時保存一覧' :
+                                btn.dataset.tab === 'history-view-screen' ? 'アポイント履歴' : '本登録ID紐付け';
+                const subIcon = getUserItemIconHtml(btn.id, '📝');
+                btn.setAttribute('data-tooltip', subName);
+                btn.innerHTML = `${subIcon}<span class="nav-item-text">${subName}</span>`;
+
+                let editBtn = btn.querySelector('.custom-icon-edit-btn');
+                if (!editBtn) {
+                  editBtn = document.createElement('span');
+                  editBtn.textContent = '🎨';
+                  editBtn.className = 'custom-icon-edit-btn';
+                  editBtn.title = 'アイコンを変更';
+                  editBtn.style.cssText = 'cursor: pointer; margin-left: auto; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s; padding: 0 0.2rem;';
+                  editBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openCustomIconModal(btn.id, subName);
+                  });
+                  btn.appendChild(editBtn);
+
+                  btn.addEventListener('mouseenter', () => { editBtn.style.opacity = '0.7'; });
+                  btn.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; });
+                }
+
                 if (btnAccess.grayout) {
                   btn.classList.add('grayed-out-access');
                   appendInlineGrantBtn(btn, () => grantPermission('table', 'appoint-screen'));
@@ -1847,15 +2108,36 @@ function renderCustomTableList() {
 
       let btn = sysTables[tbl.id]; // 標準テーブルの場合
 
+      const tableIcon = getUserItemIconHtml(tbl.id, '📊');
       if (btn) {
-        // 標準テーブルの名前変更を動的に反映
-        btn.textContent = `📊 ${tbl.name}`;
+        btn.setAttribute('data-tooltip', tbl.name);
+        btn.style.display = 'flex';
+        btn.style.alignItems = 'center';
+        btn.innerHTML = `${tableIcon}<span class="nav-item-text">${tbl.name}</span>`;
+
+        let editBtn = btn.querySelector('.custom-icon-edit-btn');
+        if (!editBtn) {
+          editBtn = document.createElement('span');
+          editBtn.textContent = '🎨';
+          editBtn.className = 'custom-icon-edit-btn';
+          editBtn.title = 'アイコンを変更';
+          editBtn.style.cssText = 'cursor: pointer; margin-left: auto; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s; padding: 0 0.2rem;';
+          editBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openCustomIconModal(tbl.id, tbl.name);
+          });
+          btn.appendChild(editBtn);
+
+          btn.addEventListener('mouseenter', () => { editBtn.style.opacity = '0.7'; });
+          btn.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; });
+        }
       } else {
         // 新規カスタムテーブルボタンを動的生成
         btn = document.createElement('button');
         btn.className = 'nav-item';
         btn.style.width = '100%';
-        btn.style.textAlign = 'left';
+        btn.style.display = 'flex';
+        btn.style.alignItems = 'center';
         btn.style.padding = '0.4rem 0.75rem';
         btn.style.fontSize = '0.85rem';
         btn.style.background = 'none';
@@ -1866,22 +2148,26 @@ function renderCustomTableList() {
         btn.style.transition = 'all 0.2s';
         btn.id = `menu-custom-table-${tbl.id}`;
         btn.dataset.tab = `custom-table-${tbl.id}`;
-        btn.textContent = `📋 ${tbl.name}`;
+        btn.setAttribute('data-tooltip', tbl.name);
+        btn.innerHTML = `${tableIcon}<span class="nav-item-text">${tbl.name}</span>`;
+
+        const editBtn = document.createElement('span');
+        editBtn.textContent = '🎨';
+        editBtn.className = 'custom-icon-edit-btn';
+        editBtn.title = 'アイコンを変更';
+        editBtn.style.cssText = 'cursor: pointer; margin-left: auto; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s; padding: 0 0.2rem;';
+        editBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openCustomIconModal(tbl.id, tbl.name);
+        });
+        btn.appendChild(editBtn);
+
+        btn.addEventListener('mouseenter', () => { editBtn.style.opacity = '0.7'; });
+        btn.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; });
 
         btn.addEventListener('click', () => {
-          openTab(`custom-table-${tbl.id}`, 'custom-table-screen', `📋 ${tbl.name}`);
-          renderTabBar();
-        });
-
-        btn.addEventListener('mouseenter', () => {
-          btn.style.background = 'var(--bg-surface-elevated)';
-          btn.style.color = 'var(--text-primary)';
-        });
-        btn.addEventListener('mouseleave', () => {
-          if (state.activeTabId !== `custom-table-${tbl.id}`) {
-            btn.style.background = 'none';
-            btn.style.color = 'var(--text-secondary)';
-          }
+          openTab(`custom-table-${tbl.id}-tab`, `custom-table-${tbl.id}-screen`, `📊 ${tbl.name}`);
+          renderCustomTable(tbl.id);
         });
       }
 
@@ -20089,15 +20375,15 @@ function updateParentSelectDropdowns() {
   const ctSelect = document.getElementById('ct-table-parent-select');
   
   const options = [
-    { value: 'agency-info', text: '🏢 代理店情報' },
-    { value: 'jo-info', text: '💼 JO情報' },
-    { value: 'applicant-info', text: '👥 申込者情報' },
-    { value: 'appoint', text: '📞 アポイント情報' },
-    { value: 'root', text: '📁 ルート直下' }
+    { value: 'agency-info', text: '代理店情報' },
+    { value: 'jo-info', text: 'JO情報' },
+    { value: 'applicant-info', text: '申込者情報' },
+    { value: 'appoint', text: 'アポイント情報' },
+    { value: 'root', text: 'ルート直下' }
   ];
 
   state.customAccordions.forEach(acc => {
-    options.push({ value: acc.id, text: `📁 ${getFolderMenuPath(acc.id)}` });
+    options.push({ value: acc.id, text: getFolderMenuPath(acc.id) });
   });
 
   const renderOpts = (selectEl) => {
@@ -20121,12 +20407,12 @@ function updateAdminFolderAddDropdown() {
   const selectEl = document.getElementById('modal-folder-parent-select');
   if (!selectEl) return;
   const currentVal = selectEl.value;
-  selectEl.innerHTML = '<option value="root">📁 ルート直下</option>';
+  selectEl.innerHTML = '<option value="root">ルート直下</option>';
   
   state.customAccordions.forEach(acc => {
     const el = document.createElement('option');
     el.value = acc.id;
-    el.textContent = `📁 ${getFolderMenuPath(acc.id)}`;
+    el.textContent = getFolderMenuPath(acc.id);
     selectEl.appendChild(el);
   });
   selectEl.value = currentVal || 'root';
@@ -20184,7 +20470,7 @@ function renderAdminPanelFolderList() {
 
     // 選択肢の生成（自身とその子孫を除外）
     const options = [
-      { value: 'root', text: '📁 ルート直下' }
+      { value: 'root', text: 'ルート直下' }
     ];
 
     // 自身の子孫かどうか判定する関数
@@ -20200,7 +20486,7 @@ function renderAdminPanelFolderList() {
     state.customAccordions.forEach(otherAcc => {
       if (otherAcc.id === acc.id) return; // 自分自身は除外
       if (isDescendant(acc.id, otherAcc.id)) return; // 自分の子孫フォルダは除外（循環参照防止）
-      options.push({ value: otherAcc.id, text: `📁 ${getFolderMenuPath(otherAcc.id)}` });
+      options.push({ value: otherAcc.id, text: getFolderMenuPath(otherAcc.id) });
     });
 
     options.forEach(opt => {
