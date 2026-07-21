@@ -21021,9 +21021,15 @@ function renderModalFolderTree() {
       toggleArrow.textContent = searchTerm ? '▼' : '▶';
       toggleArrow.style.cssText = 'cursor: pointer; font-size: 0.65rem; color: var(--text-muted); width: 14px; text-align: center; display: inline-block; user-select: none;';
       
-      // フォルダ管理内は全フォルダのアイコンを 📁 (フォルダマーク) で固定表示
+      // サイドバーと完全に同期したカスタムアイコン（デフォルト: 🎯, 📑, 💼, 📅, 📁等）を取得
+      const defaultFolderIcon = acc.id === 'appoint-accordion' ? '📅' :
+                                acc.id === 'agency-accordion' ? '💼' :
+                                acc.id === 'jo-accordion' ? '📑' :
+                                acc.id === 'applicant-accordion' ? '🎯' : '📁';
+      const folderIconHtml = getUserItemIconHtml(acc.id, defaultFolderIcon);
+
       const folderLabel = document.createElement('span');
-      folderLabel.innerHTML = `<span class="user-custom-icon user-custom-icon-emoji">📁</span> <span>${acc.name}</span>`;
+      folderLabel.innerHTML = `${folderIconHtml} <span>${acc.name}</span>`;
       folderLabel.style.cursor = 'pointer';
       folderLabel.style.display = 'flex';
       folderLabel.style.alignItems = 'center';
@@ -21155,11 +21161,12 @@ function renderModalFolderTree() {
       tableNode.style.fontSize = '0.8rem';
       tableNode.style.transition = 'all 0.15s ease';
       
-      // テーブル項目は直感的なデータテーブルマーク 📊 / その他機能画面項目は 📝
+      // サイドバーおよびテーブル一覧と同期したカスタムアイコンを取得
       const isSub = ['appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link'].includes(tbl.id);
-      const itemIcon = isSub ? '📝' : '📊';
+      const defaultTableIcon = isSub ? '📝' : '📊';
+      const tableIconHtml = getUserItemIconHtml(tbl.id, defaultTableIcon);
 
-      tableNode.innerHTML = `<span class="user-custom-icon user-custom-icon-emoji">${itemIcon}</span> <span>${tbl.name}</span>`;
+      tableNode.innerHTML = `${tableIconHtml} <span>${tbl.name}</span>`;
 
       // 右クリック（コンテキスト）メニュー
       tableNode.addEventListener('contextmenu', (e) => {
