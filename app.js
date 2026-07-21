@@ -20254,8 +20254,7 @@ function setupPermissionFeatures() {
   if (panelFolderBtn && folderManagerModal) {
     panelFolderBtn.addEventListener('click', () => {
       folderManagerModal.classList.add('active');
-      updateAdminFolderAddDropdown();
-      renderAdminPanelFolderList();
+      renderModalFolderTree();
     });
   }
 
@@ -20332,9 +20331,8 @@ function setupPermissionFeatures() {
     }
   }
 
-  // 初回ロード時のフォルダ設定リストの構築
-  updateAdminFolderAddDropdown();
-  renderAdminPanelFolderList();
+  // 初回ロード時のフォルダ設定リスト・ツリーの構築
+  renderModalFolderTree();
 
   // 旧アコーディオン追加・遷移ボタン用の退避的バインド（メニューからは隠れています）
   const addFolderBtnOld = document.getElementById('add-custom-accordion-btn');
