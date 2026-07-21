@@ -1630,12 +1630,12 @@
         </div>
       </div>
 
-      <!-- ルートドロップゾーン -->
-      <div id="modal-tree-root-dropzone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-sm); padding: 0.55rem; text-align: center; font-size: 0.82rem; color: var(--text-muted); background: var(--bg-surface-elevated); cursor: pointer; transition: all 0.2s;">
-        📥 ここにドロップして 🏠 メインメニュー直下 (フォルダ外) に移動
+      <!-- ルートドロップゾーン (最上位階層への復帰) -->
+      <div id="modal-tree-root-dropzone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-sm); padding: 0.6rem; text-align: center; font-size: 0.83rem; font-weight: 600; color: var(--text-primary); background: var(--bg-surface-elevated); cursor: pointer; transition: all 0.2s;">
+        📥 ここにドラッグ＆ドロップして 🏠 最上位（親フォルダ階層）へ取り出す
       </div>
 
-      <!-- ツリー表示エリア (全フォルダ展開一覧表示) -->
+      <!-- ツリー表示エリア -->
       <div id="modal-folder-tree-container" style="flex: 1; min-height: 260px; max-height: 420px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); padding: 0.65rem; overflow-y: auto;">
         <!-- JSで動的に全フォルダ・アイテムの一覧階層ツリーが構築されます -->
       </div>
@@ -1643,10 +1643,10 @@
   </div>
 
   <!-- フローティング右クリック（コンテキスト）メニュー -->
-  <div id="folder-context-menu" class="custom-context-menu" style="display: none; position: fixed; z-index: 100000; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); padding: 0.3rem 0; min-width: 140px; font-size: 0.82rem;">
-    <div class="ctx-menu-item" id="ctx-rename" style="padding: 0.4rem 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary);">✏️ 名前を変更</div>
-    <div class="ctx-menu-item" id="ctx-change-icon" style="padding: 0.4rem 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary);">🎨 アイコンを変更</div>
-    <div class="ctx-menu-item" id="ctx-delete" style="padding: 0.4rem 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; color: #ef4444; border-top: 1px solid var(--border-color); margin-top: 0.2rem; padding-top: 0.4rem;">🗑️ 削除</div>
+  <div id="folder-context-menu" class="custom-context-menu" style="display: none; position: fixed; z-index: 100000; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); padding: 0.3rem 0; min-width: 150px; font-size: 0.82rem;">
+    <div class="ctx-menu-item" id="ctx-rename" style="padding: 0.45rem 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary);">✏️ 名前を変更</div>
+    <div class="ctx-menu-item" id="ctx-move-root" style="padding: 0.45rem 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary); border-top: 1px solid var(--border-color); margin-top: 0.15rem; padding-top: 0.45rem;">🏠 最上位階層に戻す</div>
+    <div class="ctx-menu-item" id="ctx-delete" style="padding: 0.45rem 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; color: #ef4444; border-top: 1px solid var(--border-color); margin-top: 0.15rem; padding-top: 0.45rem;">🗑️ 削除</div>
   </div>
 </div>
 

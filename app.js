@@ -20717,9 +20717,16 @@ function showContextMenu(x, y, type, targetObj) {
     }
   }
 
+  // 「最上位階層に戻す」ボタンの可否（別の配下に入っている場合のみ表示）
+  const moveRootBtn = document.getElementById('ctx-move-root');
+  if (moveRootBtn) {
+    const parentId = normalizeFolderId(targetObj.parentMenuId || 'root');
+    moveRootBtn.style.display = (parentId !== 'root') ? 'flex' : 'none';
+  }
+
   // 画面枠外にはみ出さないように配置
   menu.style.display = 'block';
-  const menuWidth = menu.offsetWidth || 150;
+  const menuWidth = menu.offsetWidth || 160;
   const menuHeight = menu.offsetHeight || 120;
   const posX = (x + menuWidth > window.innerWidth) ? window.innerWidth - menuWidth - 10 : x;
   const posY = (y + menuHeight > window.innerHeight) ? window.innerHeight - menuHeight - 10 : y;
@@ -20766,13 +20773,22 @@ function initContextMenuEvents() {
     });
   }
 
-  const iconBtn = document.getElementById('ctx-change-icon');
-  if (iconBtn) {
-    iconBtn.addEventListener('click', () => {
+  const moveRootBtn = document.getElementById('ctx-move-root');
+  if (moveRootBtn) {
+    moveRootBtn.addEventListener('click', () => {
       if (!activeContextMenuTarget) return;
-      const { targetObj } = activeContextMenuTarget;
+      const { type, targetObj } = activeContextMenuTarget;
       hideContextMenu();
-      openCustomIconModal(targetObj.id, targetObj.name);
+
+      targetObj.parentMenuId = 'root';
+      if (type === 'folder') {
+        saveCustomAccordions();
+      } else {
+        saveCustomTables();
+      }
+      renderCustomTableList();
+      renderModalFolderTree();
+      showToast(`「${targetObj.name}」を最上位（親フォルダ階層）に戻しました。`, 'success');
     });
   }
 
@@ -20817,23 +20833,23 @@ function renderModalFolderTree() {
 
   // 1. ルートドロップゾーンのイベント設定
   if (rootDropzone) {
-    rootDropzone.innerHTML = '📥 ここにドロップして 🏠 メインメニュー直下 (フォルダ外) に移動';
+    rootDropzone.innerHTML = '📥 ここにドラッグ＆ドロップして 🏠 最上位（親フォルダ階層）へ取り出す';
     rootDropzone.addEventListener('dragover', (e) => {
       e.preventDefault();
       rootDropzone.style.borderColor = 'var(--primary)';
-      rootDropzone.style.background = 'var(--bg-surface-elevated)';
-      rootDropzone.style.color = 'var(--text-primary)';
+      rootDropzone.style.background = 'rgba(var(--primary-rgb), 0.1)';
+      rootDropzone.style.color = 'var(--primary)';
     });
     rootDropzone.addEventListener('dragleave', () => {
       rootDropzone.style.borderColor = 'var(--border-color)';
       rootDropzone.style.background = 'var(--bg-surface-elevated)';
-      rootDropzone.style.color = 'var(--text-muted)';
+      rootDropzone.style.color = 'var(--text-primary)';
     });
     rootDropzone.addEventListener('drop', (e) => {
       e.preventDefault();
       rootDropzone.style.borderColor = 'var(--border-color)';
       rootDropzone.style.background = 'var(--bg-surface-elevated)';
-      rootDropzone.style.color = 'var(--text-muted)';
+      rootDropzone.style.color = 'var(--text-primary)';
 
       const dragSourceId = e.dataTransfer.getData('text/plain');
       const dragType = e.dataTransfer.getData('application/cos-type');
@@ -20844,14 +20860,14 @@ function renderModalFolderTree() {
         if (acc) {
           acc.parentMenuId = 'root';
           saveCustomAccordions();
-          showToast(`フォルダ「${acc.name}」をメインメニュー直下に移動しました。`, 'success');
+          showToast(`フォルダ「${acc.name}」を最上位（親フォルダ階層）に取り出しました。`, 'success');
         }
       } else if (dragType === 'table') {
         const tbl = state.customTables.find(t => t.id === dragSourceId);
         if (tbl) {
           tbl.parentMenuId = 'root';
           saveCustomTables();
-          showToast(`「${tbl.name}」をメインメニュー直下に移動しました。`, 'success');
+          showToast(`「${tbl.name}」を最上位（親フォルダ階層）に取り出しました。`, 'success');
         }
       }
 
