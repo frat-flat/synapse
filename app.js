@@ -1316,6 +1316,15 @@ function saveUserCustomIcons() {
   localStorage.setItem(STORAGE_KEYS.USER_CUSTOM_ICONS, JSON.stringify(state.userCustomIcons));
 }
 
+function normalizeFolderId(id) {
+  if (!id || id === 'root' || id === 'custom-tables') return 'root';
+  if (id === 'appoint' || id === 'appoint-info' || id === 'appoint-accordion') return 'appoint-accordion';
+  if (id === 'agency' || id === 'agency-info' || id === 'agency-accordion') return 'agency-accordion';
+  if (id === 'jo' || id === 'jo-info' || id === 'jo-accordion') return 'jo-accordion';
+  if (id === 'applicant' || id === 'applicant-info' || id === 'applicant-accordion') return 'applicant-accordion';
+  return id;
+}
+
 function ensureStandardAccordionsInState() {
   if (!state.customAccordions) state.customAccordions = [];
   
@@ -1330,6 +1339,26 @@ function ensureStandardAccordionsInState() {
     const existing = state.customAccordions.find(a => a.id === std.id);
     if (!existing) {
       state.customAccordions.unshift(std);
+    }
+  });
+}
+
+function ensureStandardTablesInState() {
+  if (!state.customTables) state.customTables = [];
+
+  const stds = [
+    { id: 'agency-info-screen', name: '代理店 基本マスタ', parentMenuId: 'agency-accordion' },
+    { id: 'jo-info-screen', name: 'JO 基本マスタ', parentMenuId: 'jo-accordion' },
+    { id: 'applicant-info-screen', name: '申込者 基本マスタ', parentMenuId: 'applicant-accordion' }
+  ];
+
+  stds.forEach(std => {
+    let existing = state.customTables.find(t => t.id === std.id);
+    if (!existing) {
+      state.customTables.push(std);
+    } else {
+      // 正規化されたIDで補正
+      existing.parentMenuId = normalizeFolderId(existing.parentMenuId);
     }
   });
 }
@@ -2127,16 +2156,17 @@ function renderCustomTableList() {
     });
 
     // B. 親IDに属するテーブル（標準テーブル ＋ カスタムテーブル）を抽出
+    const targetFolderId = normalizeFolderId(parentId);
     const childTables = state.customTables.filter(t => {
-      const pId = t.parentMenuId || 'root';
-      const normalizedPId = (pId === 'custom-tables' || pId === '') ? 'root' : pId;
-      if (normalizedPId === parentId) return true;
+      const pId = normalizeFolderId(t.parentMenuId || 'root');
+      if (pId === targetFolderId) return true;
 
       // 子フォルダに属するテーブルも、親ルートフォルダ配下にフラット表示
-      let parentAcc = state.customAccordions.find(a => a.id === normalizedPId);
+      let parentAcc = state.customAccordions.find(a => a.id === pId);
       while (parentAcc) {
-        if ((parentAcc.parentMenuId || 'root') === parentId) return true;
-        parentAcc = state.customAccordions.find(a => a.id === parentAcc.parentMenuId);
+        const parentAccPId = normalizeFolderId(parentAcc.parentMenuId || 'root');
+        if (parentAccPId === targetFolderId) return true;
+        parentAcc = state.customAccordions.find(a => a.id === parentAccPId);
       }
 
       return false;
