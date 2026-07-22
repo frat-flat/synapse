@@ -23603,6 +23603,7 @@ function initMypageMemo() {
         name: '',
         url: '',
         note: '',
+        extra: '',
         accounts: [{ user: '', pwd: '' }]
       });
       if (accountListContainer) {
@@ -23649,7 +23650,7 @@ function initMypageMemo() {
   }
 
   // アカウント枠のHTMLを生成 (アコーディオンヘッダー＋詳細ボディ構成)
-  function createAccountFrameHtml(acc = { name: '', url: '', note: '', accounts: [{ user: '', pwd: '' }] }) {
+  function createAccountFrameHtml(acc = { name: '', url: '', note: '', extra: '', accounts: [{ user: '', pwd: '' }] }) {
     // 互換性チェック
     if (!acc.accounts) {
       acc.accounts = [{ user: '', pwd: '' }];
@@ -23663,11 +23664,13 @@ function initMypageMemo() {
 
     return `
       <div class="account-card-frame" style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0.5rem;">
-        <!-- ヘッダー（常に表示・トグル用） -->
+        <!-- ヘッダー（閉じたときは登録名テキストのみを表示） -->
         <div class="acc-card-header" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.55rem 0.75rem; background: var(--bg-surface); cursor: pointer; user-select: none;">
-          <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;">
             <span class="acc-toggle-arrow" style="font-size: 0.75rem; color: var(--text-muted); transition: transform 0.2s;">🔽</span>
-            <input type="text" class="acc-input-name" placeholder="登録名（サービス名）を入力" value="${acc.name || ''}" style="flex: 1; max-width: 300px; padding: 0.25rem 0.4rem; font-size: 0.82rem; font-weight: 700; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text-primary); outline: none;" onclick="event.stopPropagation();" onfocus="event.stopPropagation();">
+            <span class="acc-header-name-label" style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${acc.name.trim() || '無題のサービス'}
+            </span>
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem;">
             <button class="btn-text delete-account-frame-btn" style="color: #ef4444; font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none;" title="このアカウント枠を削除" onclick="event.stopPropagation();">🗑️</button>
@@ -23676,8 +23679,13 @@ function initMypageMemo() {
         
         <!-- ボディ（トグル展開部分・初期非表示） -->
         <div class="acc-card-body" style="display: none; padding: 0.75rem; border-top: 1px solid var(--border-color); flex-direction: column; gap: 0.75rem; background: var(--bg-surface-elevated);">
-          <!-- URL ＆ 備考欄 -->
+          <!-- 1. 登録名 ＆ URL の横並び (最上部) -->
           <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 0.75rem;">
+            <!-- 登録名 -->
+            <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
+              <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">登録名（サービス名）</label>
+              <input type="text" class="acc-input-name" placeholder="例: GitHub" value="${acc.name || ''}" style="padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+            </div>
             <!-- URL -->
             <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
               <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">URL</label>
@@ -23686,14 +23694,9 @@ function initMypageMemo() {
                 <button class="btn btn-secondary open-acc-url-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="URLを開く">🔗</button>
               </div>
             </div>
-            <!-- 備考欄 -->
-            <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
-              <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">備考（メモ）</label>
-              <textarea class="acc-input-note" placeholder="アカウントに関するメモや追加情報を書き込めます..." style="width: 100%; height: 32px; min-height: 32px; padding: 0.3rem 0.5rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; resize: vertical; font-family: sans-serif; line-height: 1.3;">${acc.note || ''}</textarea>
-            </div>
           </div>
 
-          <!-- サブアカウントログイン情報枠のリスト -->
+          <!-- 2. サブアカウントログイン情報枠のリスト (中部) -->
           <div class="acc-sub-list-container" style="display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px dashed var(--border-color); padding-top: 0.6rem;">
             <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-secondary); text-align: left; margin-bottom: 0.1rem;">👤 ログイン情報一覧</div>
             <div class="acc-sub-list" style="display: flex; flex-direction: column; gap: 0.4rem;">
@@ -23702,6 +23705,20 @@ function initMypageMemo() {
             <button class="btn btn-secondary add-sub-account-btn" style="padding: 0.3rem; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.25rem; border-radius: var(--radius-sm); border-style: dashed; width: fit-content; margin-top: 0.2rem;">
               ➕ ログイン情報を追加
             </button>
+          </div>
+
+          <!-- 3. タイトルのない入力枠 ＆ 備考欄 の横並び (最下部) -->
+          <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 0.75rem; border-top: 1px dashed var(--border-color); padding-top: 0.6rem;">
+            <!-- タイトルのない自由入力枠 (左) -->
+            <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
+              <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); visibility: hidden; height: 14px;">(タイトルなし)</label>
+              <input type="text" class="acc-input-extra" placeholder="追加情報（セキュリティコードや秘密の質問など）" value="${acc.extra || ''}" style="padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+            </div>
+            <!-- 備考欄 (右) -->
+            <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
+              <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">備考（メモ）</label>
+              <textarea class="acc-input-note" placeholder="備考・メモを入力..." style="width: 100%; height: 32px; min-height: 32px; padding: 0.3rem 0.5rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; resize: vertical; font-family: sans-serif; line-height: 1.3;">${acc.note || ''}</textarea>
+            </div>
           </div>
         </div>
       </div>
@@ -23784,6 +23801,15 @@ function initMypageMemo() {
     
     const urlInput = frameEl.querySelector('.acc-input-url');
     const subList = frameEl.querySelector('.acc-sub-list');
+    
+    // 登録名インプットの入力内容をヘッダーラベルに同期
+    const nameInput = frameEl.querySelector('.acc-input-name');
+    const headerLabel = frameEl.querySelector('.acc-header-name-label');
+    if (nameInput && headerLabel) {
+      nameInput.oninput = () => {
+        headerLabel.textContent = nameInput.value.trim() || '無題のサービス';
+      };
+    }
 
     // トグル開閉
     if (header && body && arrow) {
@@ -24031,16 +24057,15 @@ function initMypageMemo() {
           try {
             const raw = JSON.parse(memo.content) || [];
             accountData = raw.map(item => {
-              // 古いデータ構造（accountsプロパティがない）を検知してマイグレーション
-              if (!item.accounts) {
-                return {
-                  name: item.name || '',
-                  url: item.url || '',
-                  note: '',
-                  accounts: [{ user: item.user || '', pwd: item.pwd || '' }]
-                };
-              }
-              return item;
+              // 古いデータ構造（accountsプロパティがない）を検知してマイグレーション、および新設のextraフィールド補正
+              const accs = item.accounts || [{ user: item.user || '', pwd: item.pwd || '' }];
+              return {
+                name: item.name || '',
+                url: item.url || '',
+                note: item.note || '',
+                extra: item.extra || '',
+                accounts: accs
+              };
             });
           } catch(e) {
             accountData = [];
@@ -24052,6 +24077,7 @@ function initMypageMemo() {
               name: '',
               url: '',
               note: '',
+              extra: '',
               accounts: [{ user: '', pwd: '' }]
             });
           }
@@ -24063,15 +24089,15 @@ function initMypageMemo() {
           });
         }
 
-        // 登録名検索のリアルタイムフィルタリングロジックのバインド
+        // 登録名検索のリアルタイムフィルタリングロジックのバインド（ヘッダーラベルでフィルタリング）
         if (accountSearchInput) {
           accountSearchInput.oninput = (e) => {
             const keyword = e.target.value.toLowerCase().trim();
             const frames = accountListContainer.querySelectorAll('.account-card-frame');
             frames.forEach(frame => {
-              const nameInput = frame.querySelector('.acc-input-name');
-              const nameVal = nameInput ? nameInput.value.toLowerCase().trim() : '';
-              if (nameVal.includes(keyword)) {
+              const labelEl = frame.querySelector('.acc-header-name-label');
+              const labelVal = labelEl ? labelEl.textContent.toLowerCase().trim() : '';
+              if (labelVal.includes(keyword)) {
                 frame.style.display = 'block';
               } else {
                 frame.style.display = 'none';
@@ -24143,6 +24169,7 @@ function initMypageMemo() {
               const name = frame.querySelector('.acc-input-name').value.trim();
               const url = frame.querySelector('.acc-input-url').value.trim();
               const note = frame.querySelector('.acc-input-note').value.trim();
+              const extra = frame.querySelector('.acc-input-extra').value.trim();
               
               const subAccounts = [];
               const subFrames = frame.querySelectorAll('.account-sub-frame');
@@ -24156,6 +24183,7 @@ function initMypageMemo() {
                 name,
                 url,
                 note,
+                extra,
                 accounts: subAccounts
               });
             });
