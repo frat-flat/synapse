@@ -1520,7 +1520,18 @@ textarea {
   position: relative !important;
 }
 
-.sidebar-menu.collapsed .sidebar-accordion:hover .accordion-content {
+/* マイページには代替📄を表示せず、元々の👤アイコンのみ表示する */
+.sidebar-menu.collapsed #menu-mypage::before {
+  display: none !important;
+}
+
+/* 空のフォルダの場合は、ホバーしてもポップオーバーを表示しない */
+.sidebar-menu.collapsed .is-empty-folder:hover .accordion-content {
+  display: none !important;
+}
+
+/* 中身があるフォルダ（空ではない）の時のみポップオーバーを表示 */
+.sidebar-menu.collapsed .sidebar-accordion:not(.is-empty-folder):hover .accordion-content {
   display: flex !important;
   flex-direction: column !important;
   position: absolute !important;
@@ -1536,6 +1547,12 @@ textarea {
   z-index: 999999 !important;
   animation: popupFadeIn 0.15s ease-out;
   gap: 0.35rem !important;
+}
+
+/* 中身があるフォルダの場合は、ツールチップ（文字のみ）を非表示にする（ポップオーバーが出るため） */
+.sidebar-menu.collapsed .sidebar-accordion:not(.is-empty-folder) .accordion-header[data-tooltip]:hover::after,
+.sidebar-menu.collapsed .sidebar-accordion:not(.is-empty-folder) .accordion-header[data-tooltip]:hover::before {
+  display: none !important;
 }
 
 @keyframes popupFadeIn {

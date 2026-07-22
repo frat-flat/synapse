@@ -106,6 +106,16 @@
 <input type="range" id="saturation-slider" class="theme-slider-input" min="50" max="150" step="1" value="100">
 </div>
 </div>
+        <!-- 🔍 表示倍率（ズーム）コントロール -->
+        <div id="global-zoom-controls" class="zoom-controls" style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; display: flex; flex-direction: column; gap: 0.35rem;">
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">表示倍率</span>
+          <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-surface); padding: 0.35rem 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.8rem;">
+            <button id="zoom-out-btn" class="btn-icon" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.1rem 0.25rem; font-size: 0.75rem;" title="縮小">➖</button>
+            <span id="zoom-level-label" style="font-weight: 600; min-width: 36px; text-align: center; color: var(--text-primary);">100%</span>
+            <button id="zoom-in-btn" class="btn-icon" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.1rem 0.25rem; font-size: 0.75rem;" title="拡大">➕</button>
+            <button id="zoom-reset-btn" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-xs); cursor: pointer; color: var(--text-secondary); margin-left: 0.25rem;" title="100%に戻す">リセット</button>
+          </div>
+        </div>
 </div>
 
 <!-- 管理者用プレビュー切り替えパネル -->
@@ -142,14 +152,7 @@
 ワークスペース
 </div>
 
-<!-- 🔍 表示倍率（ズーム）コントロール -->
-<div id="global-zoom-controls" class="zoom-controls" style="display: flex; align-items: center; gap: 0.4rem; background: var(--bg-surface-elevated); padding: 0.25rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.8rem;">
-<span style="color: var(--text-muted); font-weight: 500;">表示倍率:</span>
-<button id="zoom-out-btn" class="btn-icon" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.1rem 0.25rem; font-size: 0.75rem;" title="縮小">➖</button>
-<span id="zoom-level-label" style="font-weight: 600; min-width: 36px; text-align: center; color: var(--text-primary);">100%</span>
-<button id="zoom-in-btn" class="btn-icon" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.1rem 0.25rem; font-size: 0.75rem;" title="拡大">➕</button>
-<button id="zoom-reset-btn" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xs); cursor: pointer; color: var(--text-secondary); margin-left: 0.25rem;" title="100%に戻す">リセット</button>
-</div>
+
 
 <!-- 表示モード切り替え -->
 <div id="global-mode-switch-container" class="mode-switch-container" style="display: flex; align-items: center; gap: 0.75rem;">
