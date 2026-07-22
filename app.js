@@ -695,14 +695,64 @@ function loadStateFromLocalStorage(keys) {
 }
 
 function ensureInitialUsersExist() {
+  const defaultUsers = [
+    { 
+      id: 'admin', 
+      name: 'システム管理者', 
+      password: 'password', 
+      role: 'admin',
+      createdAt: '2025-01-01T10:00:00Z',
+      lastLoginAt: new Date().toISOString(),
+      pwdChangedAt: '2025-01-01T10:00:00Z' // 半年以上前
+    },
+    { 
+      id: 'sales_01', 
+      name: '営業担当A', 
+      password: 'password', 
+      role: 'sales',
+      createdAt: '2025-01-01T10:00:00Z',
+      lastLoginAt: new Date().toISOString(),
+      pwdChangedAt: new Date().toISOString()
+    },
+    { 
+      id: 'sales_02', 
+      name: '営業担当B', 
+      password: 'password', 
+      role: 'sales',
+      createdAt: '2025-01-01T10:00:00Z',
+      lastLoginAt: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString(), // 100日前（3ヶ月以上前）
+      pwdChangedAt: new Date().toISOString()
+    },
+    { 
+      id: 'support_01', 
+      name: '開設サポート担当', 
+      password: 'password', 
+      role: 'support',
+      createdAt: '2025-01-01T10:00:00Z',
+      lastLoginAt: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(), // 120日前（3ヶ月以上前）
+      pwdChangedAt: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString() // 200日前（半年以上前）
+    }
+  ];
+
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-    const defaultUsers = [
-      { id: 'admin', name: 'システム管理者', password: 'password', role: 'admin' },
-      { id: 'sales_01', name: '営業担当A', password: 'password', role: 'sales' },
-      { id: 'sales_02', name: '営業担当B', password: 'password', role: 'sales' },
-      { id: 'support_01', name: '開設サポート担当', password: 'password', role: 'support' }
-    ];
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(defaultUsers));
+  } else {
+    // 既存のユーザーリストがある場合、欠けているフィールド（createdAt, lastLoginAt, pwdChangedAt）を自動補完する
+    try {
+      let users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+      let updated = false;
+      users = users.map(u => {
+        if (!u.createdAt) { u.createdAt = '2025-01-01T10:00:00Z'; updated = true; }
+        if (!u.lastLoginAt) { u.lastLoginAt = new Date().toISOString(); updated = true; }
+        if (!u.pwdChangedAt) { u.pwdChangedAt = u.createdAt; updated = true; }
+        return u;
+      });
+      if (updated) {
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      }
+    } catch (e) {
+      console.error(e);
+    }
   }
 }
 
@@ -5858,6 +5908,11 @@ function updateUIForCurrentMode() {
   
   if (agencyInfoBtn) agencyInfoBtn.style.display = mode === 'support' ? 'none' : 'block';
   if (joInfoBtn) joInfoBtn.style.display = 'block';
+  
+  const userManagerBtn = document.getElementById('menu-user-manager');
+  if (userManagerBtn) {
+    userManagerBtn.style.display = mode === 'admin' ? 'block' : 'none';
+  }
   if (applicantInfoBtn) applicantInfoBtn.style.display = 'block';
   if (dbmakeBtn) dbmakeBtn.style.display = mode === 'admin' ? 'block' : 'none';
   
@@ -7145,7 +7200,8 @@ function setupEventListeners() {
     { id: 'menu-applicant-info', tab: 'applicant-info-screen' },
     { id: 'menu-dbmake', tab: 'dbmake-screen' },
     { id: 'menu-form-customize', tab: 'form-customize-screen' },
-    { id: 'menu-table-creator', tab: 'table-creator-screen' }
+    { id: 'menu-table-creator', tab: 'table-creator-screen' },
+    { id: 'menu-user-manager', tab: 'user-manager-screen' }
   ];
 
   sidebarButtons.forEach(btn => {
@@ -7193,6 +7249,9 @@ function setupEventListeners() {
         } else if (btn.tab === 'table-creator-screen') {
           title = 'テーブル作成';
           type = 'table-creator-screen';
+        } else if (btn.tab === 'user-manager-screen') {
+          title = '👤 ユーザー登録・管理';
+          type = 'user-manager-screen';
         }
         openTab(btn.tab, type, title);
       });
@@ -8170,6 +8229,10 @@ function handleLogin(e) {
     const foundUser = users.find(u => u.id === id && u.password === pass);
 
     if (foundUser) {
+      foundUser.lastLoginAt = new Date().toISOString();
+      const updatedUsers = users.map(u => u.id === foundUser.id ? foundUser : u);
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedUsers));
+
       state.currentUser = { id: foundUser.role, name: foundUser.name, loginId: foundUser.id, password: foundUser.password };
       localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
       
@@ -20989,15 +21052,19 @@ function initSignupEvents() {
         const firstNameInput = document.getElementById('signup-firstname');
         const emailInput = document.getElementById('signup-email');
         const usernameInput = document.getElementById('signup-username');
+        const passwordInput = document.getElementById('signup-password');
+        const passwordConfirmInput = document.getElementById('signup-password-confirm');
 
         if (lastNameInput) lastNameInput.value = '鈴木';
         if (firstNameInput) firstNameInput.value = '一郎';
         if (emailInput) emailInput.value = 'suzuki.ichiro@gmail.com';
         if (usernameInput) usernameInput.value = 'suzuki_ichiro';
+        if (passwordInput) passwordInput.value = 'Suzuki123'; // 大・小・数を含む記号なし6文字以上
+        if (passwordConfirmInput) passwordConfirmInput.value = 'Suzuki123';
 
         googleBtn.disabled = false;
         googleBtn.style.opacity = '1';
-        showToast('Googleアカウントから認証情報をインポートしました。セキュリティ保護のため、パスワードを設定して登録を完了させてください。', 'success');
+        showToast('Googleアカウントから認証情報をインポートしました。自動生成されたパスワードが設定されています。', 'success');
       }, 1000);
     });
   }
@@ -21018,8 +21085,15 @@ function initSignupEvents() {
         return;
       }
 
-      if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-        showToast('ユーザー名は半角英数字、ハイフン、アンダースコアのみ使用できます。', 'error');
+      // ユーザー名バリデーション: 小文字・記号・数字・6文字以上・大文字不可
+      if (!/^[a-z0-9_-]{6,}$/.test(username)) {
+        showToast('ユーザー名は6文字以上の半角小文字英数字、ハイフン、アンダースコアのみ使用できます（大文字不可）。', 'error');
+        return;
+      }
+
+      // パスワードバリデーション: 英大文字・英小文字・数字必須、記号不可、6文字以上
+      if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z0-9]{6,}$/.test(password)) {
+        showToast('パスワードは6文字以上で、英大文字、英小文字、数字をそれぞれ1文字以上組み合わせてください（記号不可）。', 'error');
         return;
       }
 
@@ -21038,13 +21112,17 @@ function initSignupEvents() {
       }
 
       const fullName = `${lastName} ${firstName}`;
+      const nowIso = new Date().toISOString();
 
       users.push({
         id: username,
         name: fullName,
         password: password,
         role: 'sales', // 新規サインアップのデフォルトロールは営業担当
-        email: email
+        email: email,
+        createdAt: nowIso,
+        lastLoginAt: nowIso,
+        pwdChangedAt: nowIso
       });
 
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
@@ -21068,20 +21146,20 @@ function initSignupEvents() {
 // ==========================================
 function initUserManagerEvents() {
   const panelBtn = document.getElementById('admin-panel-user-register-btn');
-  const modal = document.getElementById('user-manager-modal');
-  const closeBtn = document.getElementById('user-manager-modal-close');
-  const form = document.getElementById('user-register-form');
+  const form = document.getElementById('tab-user-register-form');
+  const generateBtn = document.getElementById('tab-reg-password-generate-btn');
+  
+  // アコーディオン制御
+  const accHeader = document.getElementById('admin-tab-user-accordion-header');
+  const accContent = document.getElementById('admin-tab-user-accordion-content');
+  const accArrow = document.getElementById('admin-tab-user-accordion-arrow');
 
-  // アコーディオン開閉
-  const accHeader = document.getElementById('admin-new-user-accordion-header');
-  const accContent = document.getElementById('admin-new-user-accordion-content');
-  const accArrow = document.getElementById('admin-new-user-accordion-arrow');
+  // パスワード変更リマインダー即時実行
+  const reminderRunBtn = document.getElementById('user-pwd-reminder-run-btn');
 
   if (accHeader && accContent && accArrow) {
-    // リスナー重複防止のために一度クローン置換
     const newHeader = accHeader.cloneNode(true);
     accHeader.parentNode.replaceChild(newHeader, accHeader);
-
     newHeader.addEventListener('click', () => {
       const isHidden = accContent.style.display === 'none';
       accContent.style.display = isHidden ? 'flex' : 'none';
@@ -21089,31 +21167,80 @@ function initUserManagerEvents() {
     });
   }
 
-  if (panelBtn && modal) {
+  // 管理者パネルボタンからタブを開く
+  if (panelBtn) {
     panelBtn.addEventListener('click', () => {
-      modal.style.display = 'flex';
-      modal.classList.add('active');
-      
-      // 開いたときはアコーディオンを閉じた状態（初期値）にしておく
+      // 開閉状態をリセットしてタブを開く
       if (accContent && accArrow) {
         accContent.style.display = 'none';
         accArrow.style.transform = 'rotate(0deg)';
       }
+      openTab('user-manager-screen', 'user-manager-screen', '👤 ユーザー登録・管理');
       renderUserManagerList();
     });
   }
 
-  const closeModal = () => {
-    if (modal) {
-      modal.style.display = 'none';
-      modal.classList.remove('active');
-    }
-  };
+  // パスワード自動生成 (6文字以上、大・小・数字それぞれ1字以上、記号なし)
+  if (generateBtn) {
+    generateBtn.addEventListener('click', () => {
+      const uppers = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const lowers = 'abcdefghijklmnopqrstuvwxyz';
+      const numbers = '0123456789';
+      
+      // 最低1文字ずつ含める
+      let pwd = '';
+      pwd += uppers.charAt(Math.floor(Math.random() * uppers.length));
+      pwd += lowers.charAt(Math.floor(Math.random() * lowers.length));
+      pwd += numbers.charAt(Math.floor(Math.random() * numbers.length));
+      
+      // 残りをランダムに埋めて10文字にする
+      const allChars = uppers + lowers + numbers;
+      for (let i = 0; i < 7; i++) {
+        pwd += allChars.charAt(Math.floor(Math.random() * allChars.length));
+      }
+      
+      // シャッフル
+      pwd = pwd.split('').sort(() => 0.5 - Math.random()).join('');
 
-  if (closeBtn) closeBtn.addEventListener('click', closeModal);
-  if (modal) {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeModal();
+      const pwdInput = document.getElementById('tab-reg-user-password');
+      const pwdConfirmInput = document.getElementById('tab-reg-user-password-confirm');
+      if (pwdInput) pwdInput.value = pwd;
+      if (pwdConfirmInput) pwdConfirmInput.value = pwd;
+      
+      showToast('ルール適合パスワードを自動生成しました。', 'success');
+    });
+  }
+
+  // パスワード変更リマインダー即時実行
+  if (reminderRunBtn) {
+    reminderRunBtn.addEventListener('click', () => {
+      const toggle = document.getElementById('user-pwd-reminder-toggle');
+      if (toggle && !toggle.checked) {
+        showToast('リマインダー自動送信設定がOFFのため、実行できません。', 'error');
+        return;
+      }
+
+      ensureInitialUsersExist();
+      const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+      const halfYearMs = 180 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      let sentCount = 0;
+
+      users.forEach(user => {
+        const changedTime = user.pwdChangedAt ? new Date(user.pwdChangedAt).getTime() : new Date(user.createdAt || '2025-01-01').getTime();
+        if (now - changedTime >= halfYearMs) {
+          sentCount++;
+          // モックメール送信演出＆操作ログ記録
+          addAuditLog(`SYSTEM`, `USER_PWD_REMINDER`, `ユーザー「${user.name} (ID: ${user.id})」宛てにパスワード期限リマインダーメールを自動シミュレート送信しました。`);
+          showToast(`📧 ${user.name} 様へパスワード変更促しメールを送信しました。`, 'info');
+        }
+      });
+
+      if (sentCount > 0) {
+        showToast(`パスワード期限切れの ${sentCount} 名にリマインダーメールを送信しました。`, 'success');
+      } else {
+        showToast('現在、パスワード変更期限（半年）を迎えている登録ユーザーはいません。', 'success');
+      }
     });
   }
 
@@ -21123,20 +21250,27 @@ function initUserManagerEvents() {
 
     newForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const regLastName = document.getElementById('reg-user-lastname').value.trim();
-      const regFirstName = document.getElementById('reg-user-firstname').value.trim();
-      const regId = document.getElementById('reg-user-id').value.trim();
-      const regPassword = document.getElementById('reg-user-password').value.trim();
-      const regPasswordConfirm = document.getElementById('reg-user-password-confirm').value.trim();
-      const regRole = document.getElementById('reg-user-role').value;
+      const regLastName = document.getElementById('tab-reg-user-lastname').value.trim();
+      const regFirstName = document.getElementById('tab-reg-user-firstname').value.trim();
+      const regId = document.getElementById('tab-reg-user-id').value.trim();
+      const regPassword = document.getElementById('tab-reg-user-password').value.trim();
+      const regPasswordConfirm = document.getElementById('tab-reg-user-password-confirm').value.trim();
+      const regRole = document.getElementById('tab-reg-user-role').value;
 
       if (!regLastName || !regFirstName) {
         showToast('姓と名を入力してください。', 'error');
         return;
       }
 
-      if (!/^[a-zA-Z0-9_-]+$/.test(regId)) {
-        showToast('ユーザー名は半角英数字、ハイフン、アンダースコアのみ使用できます。', 'error');
+      // ユーザー名バリデーション: 小文字・記号・数字・6文字以上・大文字不可
+      if (!/^[a-z0-9_-]{6,}$/.test(regId)) {
+        showToast('ユーザー名は6文字以上の半角小文字英数字、ハイフン、アンダースコアのみ使用できます。', 'error');
+        return;
+      }
+
+      // パスワードバリデーション: 英大文字・英小文字・数字必須、記号不可、6文字以上
+      if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z0-9]{6,}$/.test(regPassword)) {
+        showToast('パスワードは6文字以上で、英大文字、英小文字、数字をそれぞれ1文字以上組み合わせてください（記号不可）。', 'error');
         return;
       }
 
@@ -21155,12 +21289,16 @@ function initUserManagerEvents() {
       }
 
       const regFullName = `${regLastName} ${regFirstName}`;
+      const nowIso = new Date().toISOString();
 
       users.push({
         id: regId,
         name: regFullName,
         password: regPassword,
-        role: regRole
+        role: regRole,
+        createdAt: nowIso,
+        lastLoginAt: nowIso,
+        pwdChangedAt: nowIso
       });
 
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
@@ -21179,8 +21317,8 @@ function initUserManagerEvents() {
 }
 
 function renderUserManagerList() {
-  const container = document.getElementById('user-list-container');
-  const countBadge = document.getElementById('user-count-badge');
+  const container = document.getElementById('tab-user-list-container');
+  const countBadge = document.getElementById('tab-user-count-badge');
   if (!container) return;
 
   ensureInitialUsersExist();
@@ -21194,9 +21332,12 @@ function renderUserManagerList() {
     return;
   }
 
+  const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
   users.forEach(user => {
     const card = document.createElement('div');
-    card.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); transition: background-color 0.2s;';
+    card.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); transition: background-color 0.2s; flex-wrap: wrap; gap: 0.5rem;';
     
     // ロールごとのバッジ
     let roleBadgeColor = 'var(--text-muted)';
@@ -21212,26 +21353,59 @@ function renderUserManagerList() {
       roleLabel = 'サポート';
     }
 
+    // 最終ログインから3ヶ月(90日)経過しているか検知
+    const lastLoginTime = user.lastLoginAt ? new Date(user.lastLoginAt).getTime() : 0;
+    const isInactive = (now - lastLoginTime) >= ninetyDaysMs;
+
     const info = document.createElement('div');
-    info.style.cssText = 'display: flex; flex-direction: column; gap: 0.15rem;';
+    info.style.cssText = 'display: flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 200px;';
+    
+    let lastLoginStr = '未ログイン';
+    if (user.lastLoginAt) {
+      const d = new Date(user.lastLoginAt);
+      lastLoginStr = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+
     info.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">
+      <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; font-weight: 700; color: var(--text-primary); flex-wrap: wrap;">
         <span>${user.name}</span>
         <span style="font-size: 0.68rem; font-weight: 600; padding: 0.05rem 0.3rem; border-radius: var(--radius-sm); color: #ffffff; background: ${roleBadgeColor};">${roleLabel}</span>
+        ${isInactive ? `<span style="font-size: 0.68rem; font-weight: 700; padding: 0.05rem 0.3rem; border-radius: var(--radius-sm); color: #ffffff; background: #eab308; animation: statusPulse 2s infinite;">⚠️ 長期未ログイン (3ヶ月以上)</span>` : ''}
       </div>
-      <div style="font-size: 0.75rem; color: var(--text-secondary); display: flex; gap: 0.50rem; margin-top: 0.15rem;">
+      <div style="font-size: 0.72rem; color: var(--text-secondary); display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.15rem;">
         <span>ID: <code style="background: var(--bg-surface-elevated); padding: 0.05rem 0.2rem; border-radius: var(--radius-xs); color: var(--text-primary); font-family: monospace;">${user.id}</code></span>
         <span>Pass: <code style="background: var(--bg-surface-elevated); padding: 0.05rem 0.2rem; border-radius: var(--radius-xs); color: var(--text-primary); font-family: monospace;">${user.password}</code></span>
+        <span>最終ログイン: <span style="font-weight: 600;">${lastLoginStr}</span></span>
       </div>
     `;
 
     const action = document.createElement('div');
+    action.style.cssText = 'display: flex; align-items: center; gap: 0.5rem;';
+
+    // 3ヶ月以上未ログインの場合に確認メール送信ボタンを配置
+    if (isInactive) {
+      const emailBtn = document.createElement('button');
+      emailBtn.className = 'btn-secondary';
+      emailBtn.innerHTML = '📧 確認メール';
+      emailBtn.style.cssText = 'font-size: 0.7rem; padding: 0.2rem 0.4rem; font-weight: 600; border-radius: var(--radius-xs); cursor: pointer;';
+      emailBtn.addEventListener('click', () => {
+        emailBtn.disabled = true;
+        emailBtn.innerHTML = '送信中...';
+        setTimeout(() => {
+          showToast(`📧 「${user.name}」様へ長期間ログインのないことに対する状況確認メールをシミュレート送信しました。`, 'success');
+          addAuditLog(`SYSTEM`, `INACTIVE_USER_EMAIL`, `長期未ログインユーザー「${user.name} (ID: ${user.id})」へ確認メールを送信しました。`);
+          emailBtn.disabled = false;
+          emailBtn.innerHTML = '📧 確認メール';
+        }, 1000);
+      });
+      action.appendChild(emailBtn);
+    }
+
     const delBtn = document.createElement('button');
     delBtn.className = 'btn-text';
     delBtn.innerHTML = '🗑️ 削除';
     delBtn.style.cssText = 'color: #ef4444; font-size: 0.75rem; font-weight: 600; cursor: pointer; border: none; background: none; padding: 0.2rem;';
     
-    // adminアカウント、または自分自身のアカウントは削除不可にする
     const isSelf = state.currentUser && state.currentUser.loginId === user.id;
     const isDefaultAdmin = user.id === 'admin';
     if (isSelf || isDefaultAdmin) {
