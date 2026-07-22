@@ -2174,6 +2174,15 @@ function renderCustomTableList() {
 
         // ★ 子フォルダ・子テーブルを再帰アペンド（深さ + 1）
         renderMenuNode(acc.id, contentEl, depth + 1);
+
+        // 親フォルダ内が空の場合は、フォルダのタイトル文字をポップオーバー内の最上部（一番上）に表示する
+        if (contentEl.children.length === 0) {
+          const emptyLabel = document.createElement('div');
+          emptyLabel.className = 'empty-folder-label';
+          emptyLabel.textContent = acc.name || '空のフォルダ';
+          emptyLabel.style.cssText = 'color: var(--text-primary); font-size: 0.8rem; padding: 0.3rem 0.5rem; white-space: nowrap; font-weight: bold; text-align: left;';
+          contentEl.appendChild(emptyLabel);
+        }
       }
     });
 
