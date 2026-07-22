@@ -3789,3 +3789,31 @@ h3 {
   visibility: hidden !important;
 }
 
+/* ============================================================================
+   📝 個人メモ帳 エディタ内リスト & アカウント保管庫スタイル
+   ============================================================================ */
+#memo-input-content ul {
+  padding-left: 1.5rem !important;
+  margin: 0.5rem 0 !important;
+  list-style-type: disc !important;
+}
+
+#memo-input-content ol {
+  padding-left: 1.5rem !important;
+  margin: 0.5rem 0 !important;
+  list-style-type: decimal !important;
+}
+
+#memo-input-content li {
+  margin-bottom: 0.25rem;
+}
+
+/* アカウントカードのアクションボタンホバー */
+.account-card-frame input {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.account-card-frame input:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px var(--primary-glow) !important;
+}
+

@@ -23321,14 +23321,24 @@ function initMypageMemo() {
   const titleInput = document.getElementById('memo-input-title');
   const secureToggleLabel = document.getElementById('memo-secure-toggle-label');
   const isSecureCheckbox = document.getElementById('memo-is-secure-checkbox');
-  const contentInput = document.getElementById('memo-input-content');
+  const statusInfo = document.getElementById('memo-status-info');
   const saveBtn = document.getElementById('memo-save-btn');
   const deleteBtn = document.getElementById('memo-delete-btn');
-  const statusInfo = document.getElementById('memo-status-info');
+
+  // 形式選択トグルとエリア
+  const typeSelectorContainer = document.getElementById('memo-type-selector-container');
+  const formatTypeRadios = document.getElementsByName('memo-format-type');
+  const docEditorArea = document.getElementById('memo-document-editor-area');
+  const contentInput = document.getElementById('memo-input-content');
+  const accountsEditorArea = document.getElementById('memo-accounts-editor-area');
+  const accountListContainer = document.getElementById('memo-account-list');
+  const addAccountBtn = document.getElementById('memo-add-account-btn');
 
   // 書式設定ツールバー
   const formatBtns = document.querySelectorAll('.memo-format-btn');
-  const foreColorInput = document.getElementById('memo-forecolor-input');
+  const paletteBtn = document.getElementById('memo-palette-btn');
+  const colorPalettePopup = document.getElementById('memo-color-palette-popup');
+  const colorPaletteChips = document.querySelectorAll('.color-palette-chip');
 
   // モーダル要素
   const pwdModal = document.getElementById('memo-password-modal');
@@ -23504,7 +23514,189 @@ function initMypageMemo() {
     };
   }
 
-  // 初期画面の同期表示
+  // パレット式文字色選択の表示トグル
+  if (paletteBtn && colorPalettePopup) {
+    paletteBtn.onclick = (e) => {
+      e.stopPropagation();
+      const isOpen = colorPalettePopup.style.display === 'grid';
+      colorPalettePopup.style.display = isOpen ? 'none' : 'grid';
+    };
+  }
+
+  // カラーチップ選択イベント
+  colorPaletteChips.forEach(chip => {
+    chip.onclick = (e) => {
+      e.stopPropagation();
+      const color = chip.dataset.color;
+      if (color) {
+        document.execCommand('foreColor', false, color);
+        if (contentInput) contentInput.focus();
+      }
+      if (colorPalettePopup) colorPalettePopup.style.display = 'none';
+    };
+  });
+
+  // パレットの外をクリックしたときに閉じる
+  document.addEventListener('click', (e) => {
+    if (colorPalettePopup && colorPalettePopup.style.display === 'grid') {
+      if (paletteBtn && !paletteBtn.contains(e.target) && !colorPalettePopup.contains(e.target)) {
+        colorPalettePopup.style.display = 'none';
+      }
+    }
+  });
+
+  // 形式切り替えトグルの変更イベント
+  formatTypeRadios.forEach(radio => {
+    radio.onchange = (e) => {
+      const val = e.target.value;
+      if (val === 'accounts') {
+        if (docEditorArea) docEditorArea.style.display = 'none';
+        if (accountsEditorArea) accountsEditorArea.style.display = 'flex';
+      } else {
+        if (docEditorArea) docEditorArea.style.display = 'flex';
+        if (accountsEditorArea) accountsEditorArea.style.display = 'none';
+      }
+    };
+  });
+
+  // アカウント枠追加イベント
+  if (addAccountBtn) {
+    addAccountBtn.onclick = () => {
+      // 新しい空の枠を追加してUI追加描画
+      const frameHtml = createAccountFrameHtml({ name: '', url: '', user: '', pwd: '' });
+      if (accountListContainer) {
+        accountListContainer.insertAdjacentHTML('beforeend', frameHtml);
+        bindAccountFrameEvents(accountListContainer.lastElementChild);
+      }
+    };
+  }
+
+  // アカウント枠のHTMLを生成
+  function createAccountFrameHtml(acc = { name: '', url: '', user: '', pwd: '' }) {
+    return `
+      <div class="account-card-frame" style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem; background: var(--bg-surface-elevated); display: flex; flex-direction: column; gap: 0.6rem; position: relative;">
+        <!-- 削除ボタン -->
+        <button class="btn-text delete-account-frame-btn" style="position: absolute; top: 0.5rem; right: 0.5rem; color: #ef4444; font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none;" title="このアカウント枠を削除">🗑️</button>
+        
+        <!-- グリッド入力欄 -->
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem; margin-top: 0.5rem;">
+          <!-- 登録名 -->
+          <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
+            <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">登録名（サービス名）</label>
+            <input type="text" class="acc-input-name" placeholder="例: GitHub" value="${acc.name || ''}" style="padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+          </div>
+          <!-- URL -->
+          <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
+            <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">URL</label>
+            <div style="display: flex; gap: 0.25rem;">
+              <input type="text" class="acc-input-url" placeholder="https://..." value="${acc.url || ''}" style="flex: 1; padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+              <button class="btn btn-secondary open-acc-url-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="URLを開く">🔗</button>
+            </div>
+          </div>
+          <!-- ユーザID -->
+          <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
+            <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">ユーザID / メールアドレス</label>
+            <div style="display: flex; gap: 0.25rem;">
+              <input type="text" class="acc-input-user" placeholder="IDを入力" value="${acc.user || ''}" style="flex: 1; padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+              <button class="btn btn-secondary copy-acc-user-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="コピー">📋</button>
+            </div>
+          </div>
+          <!-- パスワード -->
+          <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
+            <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">パスワード</label>
+            <div style="display: flex; gap: 0.25rem; align-items: center; position: relative;">
+              <input type="password" class="acc-input-pwd" placeholder="パスワードを入力" value="${acc.pwd || ''}" style="flex: 1; padding: 0.35rem 2.2rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+              <button class="toggle-acc-pwd-visibility-btn" style="position: absolute; right: 2.1rem; border: none; background: none; cursor: pointer; font-size: 0.85rem; padding: 0.2rem; color: var(--text-secondary);" title="パスワードの表示/非表示">👁️</button>
+              <button class="btn btn-secondary copy-acc-pwd-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="コピー">📋</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // 各アカウントカード内のイベント登録
+  function bindAccountFrameEvents(frameEl) {
+    if (!frameEl) return;
+
+    const delBtn = frameEl.querySelector('.delete-account-frame-btn');
+    const openUrlBtn = frameEl.querySelector('.open-acc-url-btn');
+    const copyUserBtn = frameEl.querySelector('.copy-acc-user-btn');
+    const copyPwdBtn = frameEl.querySelector('.copy-acc-pwd-btn');
+    const togglePwdBtn = frameEl.querySelector('.toggle-acc-pwd-visibility-btn');
+
+    const urlInput = frameEl.querySelector('.acc-input-url');
+    const userInput = frameEl.querySelector('.acc-input-user');
+    const pwdInput = frameEl.querySelector('.acc-input-pwd');
+
+    // 削除
+    if (delBtn) {
+      delBtn.onclick = () => {
+        showAppConfirm('アカウント枠の削除', 'このアカウント保管用の枠を削除しますか？', () => {
+          frameEl.remove();
+        });
+      };
+    }
+
+    // URLを開く
+    if (openUrlBtn && urlInput) {
+      openUrlBtn.onclick = () => {
+        const url = urlInput.value.trim();
+        if (url) {
+          if (!/^https?:\/\//i.test(url)) {
+            window.open('https://' + url, '_blank');
+          } else {
+            window.open(url, '_blank');
+          }
+        } else {
+          showToast('URLが入力されていません。', 'error');
+        }
+      };
+    }
+
+    // ユーザーIDコピー
+    if (copyUserBtn && userInput) {
+      copyUserBtn.onclick = () => {
+        const val = userInput.value;
+        if (val) {
+          navigator.clipboard.writeText(val).then(() => {
+            showToast('ユーザIDをコピーしました。', 'success');
+          });
+        } else {
+          showToast('コピーする項目がありません。', 'error');
+        }
+      };
+    }
+
+    // パスワードコピー
+    if (copyPwdBtn && pwdInput) {
+      copyPwdBtn.onclick = () => {
+        const val = pwdInput.value;
+        if (val) {
+          navigator.clipboard.writeText(val).then(() => {
+            showToast('パスワードをコピーしました。', 'success');
+          });
+        } else {
+          showToast('コピーする項目がありません。', 'error');
+        }
+      };
+    }
+
+    // パスワード可視性切り替え
+    if (togglePwdBtn && pwdInput) {
+      togglePwdBtn.onclick = () => {
+        if (pwdInput.type === 'password') {
+          pwdInput.type = 'text';
+          togglePwdBtn.textContent = '🙈';
+        } else {
+          pwdInput.type = 'password';
+          togglePwdBtn.textContent = '👁️';
+        }
+      };
+    }
+  }
+
+  // 初期表示の処理同期
   if (menuView && menuView.style.display !== 'none') {
     if (memoWrapper) memoWrapper.style.display = 'none';
   } else {
@@ -23569,14 +23761,77 @@ function initMypageMemo() {
       if (editorEmpty) editorEmpty.style.display = 'none';
       if (editorActive) editorActive.style.display = 'flex';
       if (titleInput) titleInput.value = memo.title || '';
-      if (contentInput) contentInput.innerHTML = memo.content || '';
       
-      // ロック解除中なら「シークレット（ロック付き）」チェックボックスと値を同期して表示
+      // ロック解除中なら「シークレット（ロック付き）」チェックボックスを同期して表示
       if (state.memoUnlockedSecure) {
         if (secureToggleLabel) secureToggleLabel.style.display = 'flex';
         if (isSecureCheckbox) isSecureCheckbox.checked = !!memo.isSecure;
+        
+        // シークレットメモ（ロック付き）であれば形式切り替えトグルを表示
+        if (memo.isSecure) {
+          if (typeSelectorContainer) typeSelectorContainer.style.display = 'flex';
+        } else {
+          if (typeSelectorContainer) typeSelectorContainer.style.display = 'none';
+        }
       } else {
         if (secureToggleLabel) secureToggleLabel.style.display = 'none';
+        if (typeSelectorContainer) typeSelectorContainer.style.display = 'none';
+      }
+
+      // 形式とコンテンツ描画の切り替え
+      const isAccount = !!(memo.isSecure && memo.isAccountType);
+      
+      // ラジオボタンの値を同期
+      formatTypeRadios.forEach(radio => {
+        radio.checked = (radio.value === 'accounts') === isAccount;
+      });
+
+      if (isAccount) {
+        if (docEditorArea) docEditorArea.style.display = 'none';
+        if (accountsEditorArea) accountsEditorArea.style.display = 'flex';
+        
+        // アカウントリストのレンダリング
+        if (accountListContainer) {
+          accountListContainer.innerHTML = '';
+          let accountData = [];
+          try {
+            accountData = JSON.parse(memo.content) || [];
+          } catch(e) {
+            accountData = [];
+          }
+          
+          // データがない場合は初期状態として空の枠を1つ置く
+          if (accountData.length === 0) {
+            accountData.push({ name: '', url: '', user: '', pwd: '' });
+          }
+
+          accountData.forEach(acc => {
+            const frameHtml = createAccountFrameHtml(acc);
+            accountListContainer.insertAdjacentHTML('beforeend', frameHtml);
+            bindAccountFrameEvents(accountListContainer.lastElementChild);
+          });
+        }
+      } else {
+        if (docEditorArea) docEditorArea.style.display = 'flex';
+        if (accountsEditorArea) accountsEditorArea.style.display = 'none';
+        if (contentInput) contentInput.innerHTML = memo.content || '';
+      }
+
+      // チェックボックスの変更に伴い形式トグルの表示状態を追従させる
+      if (isSecureCheckbox) {
+        isSecureCheckbox.onchange = (e) => {
+          if (e.target.checked) {
+            if (typeSelectorContainer) typeSelectorContainer.style.display = 'flex';
+          } else {
+            if (typeSelectorContainer) typeSelectorContainer.style.display = 'none';
+            // ドキュメント形式に強制リセット
+            formatTypeRadios.forEach(radio => {
+              radio.checked = radio.value === 'document';
+            });
+            if (docEditorArea) docEditorArea.style.display = 'flex';
+            if (accountsEditorArea) accountsEditorArea.style.display = 'none';
+          }
+        };
       }
 
       const date = new Date(memo.updatedAt);
@@ -23595,6 +23850,7 @@ function initMypageMemo() {
         title: '',
         content: '',
         isSecure: false, // 初期は通常メモ
+        isAccountType: false,
         updatedAt: new Date().toISOString()
       };
       memos.push(newMemo);
@@ -23614,18 +23870,47 @@ function initMypageMemo() {
       const memo = memos.find(m => m.id === activeMemoId);
       if (memo) {
         memo.title = (titleInput ? titleInput.value.trim() : '') || '無題のメモ';
-        memo.content = contentInput ? contentInput.innerHTML : '';
         
-        // ロックトグル設定を読み込んで保存
+        // ロック設定を同期
         if (state.memoUnlockedSecure && isSecureCheckbox) {
           memo.isSecure = isSecureCheckbox.checked;
+        } else {
+          memo.isSecure = false;
+        }
+
+        // アクティブな形式タイプを取得して保存コンテンツを生成
+        let activeFormat = 'document';
+        formatTypeRadios.forEach(radio => {
+          if (radio.checked) activeFormat = radio.value;
+        });
+
+        // シークレットメモかつ「アカウント保管庫」の場合のみアカウント形式で保存
+        if (memo.isSecure && activeFormat === 'accounts') {
+          memo.isAccountType = true;
+          
+          // アカウントカードの全入力枠から収集
+          const accountData = [];
+          if (accountListContainer) {
+            const frames = accountListContainer.querySelectorAll('.account-card-frame');
+            frames.forEach(frame => {
+              const name = frame.querySelector('.acc-input-name').value.trim();
+              const url = frame.querySelector('.acc-input-url').value.trim();
+              const user = frame.querySelector('.acc-input-user').value.trim();
+              const pwd = frame.querySelector('.acc-input-pwd').value;
+              accountData.push({ name, url, user, pwd });
+            });
+          }
+          memo.content = JSON.stringify(accountData);
+        } else {
+          memo.isAccountType = false;
+          memo.content = contentInput ? contentInput.innerHTML : '';
         }
 
         memo.updatedAt = new Date().toISOString();
         localStorage.setItem(storageMemosKey, JSON.stringify(memos));
         showToast('メモを保存しました。', 'success');
 
-        // もし現在ロック設定をして、かつ鍵がロック状態なら、リスト上表示されなくなるので選択クリア
+        // もしロック設定をしていて、かつ現在非表示（鍵がロック）状態なら、リスト上表示されなくなるので選択クリア
         if (memo.isSecure && !state.memoUnlockedSecure) {
           activeMemoId = null;
           showEditor(null);
@@ -23666,14 +23951,5 @@ function initMypageMemo() {
       }
     };
   });
-
-  // 文字色変更
-  if (foreColorInput) {
-    foreColorInput.oninput = (e) => {
-      const color = e.target.value;
-      document.execCommand('foreColor', false, color);
-      if (contentInput) contentInput.focus();
-    };
-  }
 }
 
