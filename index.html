@@ -585,8 +585,8 @@
               <div style="display: flex; gap: 0.5rem; align-items: center; width: 100%;">
                 <input type="text" id="memo-input-title" placeholder="無題のメモ" style="flex: 1; padding: 0.5rem 0.75rem; font-size: 1.1rem; font-weight: 700; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
                 
-                <!-- シークレットトグル設定 -->
-                <label id="memo-secure-toggle-label" style="display: none; align-items: center; gap: 0.25rem; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                <!-- シークレットトグル設定 (初期表示は flex で常に表示) -->
+                <label id="memo-secure-toggle-label" style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none;">
                   <input type="checkbox" id="memo-is-secure-checkbox" style="cursor: pointer;">
                   <span>🔒 ロック対象</span>
                 </label>

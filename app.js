@@ -23851,7 +23851,11 @@ function initMypageMemo() {
       if (isSecureCheckbox) {
         isSecureCheckbox.onchange = (e) => {
           if (e.target.checked) {
-            if (typeSelectorContainer) typeSelectorContainer.style.display = 'flex';
+            if (state.memoUnlockedSecure) {
+              if (typeSelectorContainer) typeSelectorContainer.style.display = 'flex';
+            } else {
+              if (typeSelectorContainer) typeSelectorContainer.style.display = 'none';
+            }
           } else {
             if (typeSelectorContainer) typeSelectorContainer.style.display = 'none';
             // ドキュメント形式に強制リセット
@@ -23903,11 +23907,25 @@ function initMypageMemo() {
       if (memo) {
         memo.title = (titleInput ? titleInput.value.trim() : '') || '無題のメモ';
         
-        // ロック設定を同期
-        if (state.memoUnlockedSecure && isSecureCheckbox) {
-          memo.isSecure = isSecureCheckbox.checked;
-        } else {
-          memo.isSecure = false;
+        // ロック設定を同期 (ロック未解除状態でもチェックされていればロック付きにする)
+        if (isSecureCheckbox) {
+          const targetSecure = isSecureCheckbox.checked;
+          
+          if (targetSecure && !memo.isSecure) {
+            // 新たにロックを有効にする場合
+            const savedPwd = localStorage.getItem(storagePwdKey);
+            if (!savedPwd) {
+              // 暗証番号がまだ未設定なら、保存を一時中断して設定モーダルを開く
+              showToast('ロック付きメモを保存するには、まず暗証番号を設定してください。', 'warning');
+              if (pwdModal) {
+                pwdModal.style.display = 'flex';
+                if (setupForm) setupForm.style.display = 'block';
+                if (unlockForm) unlockForm.style.display = 'none';
+              }
+              return;
+            }
+          }
+          memo.isSecure = targetSecure;
         }
 
         // アクティブな形式タイプを取得して保存コンテンツを生成
