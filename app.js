@@ -23359,17 +23359,13 @@ function initMypageMemo() {
     // 鍵マークボタンの表示更新
     if (state.memoUnlockedSecure) {
       if (lockIconStatus) lockIconStatus.textContent = '🔓';
-      if (lockTextStatus) lockTextStatus.textContent = 'ロック付きメモを隠す';
       if (lockToggleBtn) {
-        lockToggleBtn.style.background = 'rgba(234, 179, 8, 0.15)';
-        lockToggleBtn.style.borderColor = '#eab308';
+        lockToggleBtn.style.color = '#4b5563';
       }
     } else {
       if (lockIconStatus) lockIconStatus.textContent = '🔒';
-      if (lockTextStatus) lockTextStatus.textContent = 'ロック付きメモを表示';
       if (lockToggleBtn) {
-        lockToggleBtn.style.background = 'var(--bg-surface-elevated)';
-        lockToggleBtn.style.borderColor = 'var(--border-color)';
+        lockToggleBtn.style.color = '#9ca3af';
       }
     }
     if (secureToggleLabel) secureToggleLabel.style.display = 'flex';
@@ -23426,7 +23422,7 @@ function initMypageMemo() {
           if (setupForm) setupForm.style.display = 'none';
           if (unlockForm) unlockForm.style.display = 'flex';
         }
-        if (pwdModal) pwdModal.style.display = 'flex';
+        if (pwdModal) pwdModal.classList.add('active');
         
         // 入力値クリア
         if (setupVal) setupVal.value = '';
@@ -23439,7 +23435,7 @@ function initMypageMemo() {
   // モーダルを閉じる
   if (pwdModalClose) {
     pwdModalClose.onclick = () => {
-      if (pwdModal) pwdModal.style.display = 'none';
+      if (pwdModal) pwdModal.classList.remove('active');
     };
   }
 
@@ -23466,7 +23462,7 @@ function initMypageMemo() {
       localStorage.setItem(storagePwdKey, pwd);
       showToast('暗証番号を設定しました。', 'success');
       state.memoUnlockedSecure = true;
-      if (pwdModal) pwdModal.style.display = 'none';
+      if (pwdModal) pwdModal.classList.remove('active');
       updateMemoUI();
     };
   }
@@ -23480,7 +23476,7 @@ function initMypageMemo() {
       if (pwd === savedPwd) {
         state.memoUnlockedSecure = true;
         showToast('ロック付きメモを表示しました。', 'success');
-        if (pwdModal) pwdModal.style.display = 'none';
+        if (pwdModal) pwdModal.classList.remove('active');
         updateMemoUI();
       } else {
         showToast('暗証番号が正しくありません。', 'error');
@@ -23508,7 +23504,7 @@ function initMypageMemo() {
         state.memoUnlockedSecure = false;
         activeMemoId = null;
         showEditor(null);
-        if (pwdModal) pwdModal.style.display = 'none';
+        if (pwdModal) pwdModal.classList.remove('active');
         updateMemoUI();
         showToast('暗証番号とロック付きメモを初期化しました。', 'success');
       });
@@ -23912,7 +23908,7 @@ function initMypageMemo() {
               // 暗証番号がまだ未設定なら、保存を一時中断して設定モーダルを開く
               showToast('ロック付きメモを保存するには、まず暗証番号を設定してください。', 'warning');
               if (pwdModal) {
-                pwdModal.style.display = 'flex';
+                pwdModal.classList.add('active');
                 if (setupForm) setupForm.style.display = 'block';
                 if (unlockForm) unlockForm.style.display = 'none';
               }
