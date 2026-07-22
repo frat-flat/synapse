@@ -587,6 +587,12 @@
               <div style="display: flex; gap: 0.5rem; align-items: center; width: 100%;">
                 <input type="text" id="memo-input-title" placeholder="無題のメモ" style="flex: 1; padding: 0.5rem 0.75rem; font-size: 1.1rem; font-weight: 700; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
                 
+                <!-- ピン留めトグル (通常メモのみ表示、アカウント保管庫では非表示) -->
+                <label id="memo-pin-toggle-label" style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                  <input type="checkbox" id="memo-is-pinned-checkbox" style="cursor: pointer;">
+                  <span>📌 ピン留め</span>
+                </label>
+
                 <!-- シークレットトグル設定 (初期表示は flex で常に表示) -->
                 <label id="memo-secure-toggle-label" style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none;">
                   <input type="checkbox" id="memo-is-secure-checkbox" style="cursor: pointer;">
@@ -712,6 +718,12 @@
               <!-- 🔑 アカウント保管庫エリア (初期非表示) -->
               <div id="memo-accounts-editor-area" style="display: none; flex-direction: column; gap: 0.75rem; flex: 1; overflow-y: auto; min-height: 250px;">
                 <p style="margin: 0; font-size: 0.72rem; color: var(--text-secondary);">サービス名、URL、ユーザID、パスワードをセキュアに一元管理できます。枠も自由に追加可能です。</p>
+                
+                <!-- 登録名での検索バー -->
+                <div id="memo-account-search-container" style="display: flex; align-items: center; width: 100%; margin-top: 0.15rem;">
+                  <input type="text" id="memo-account-search-input" placeholder="🔍 登録名で検索..." style="flex: 1; padding: 0.4rem 0.6rem; font-size: 0.78rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+                </div>
+
                 <div id="memo-account-list" style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.25rem;">
                   <!-- JSでアカウント枠が動的に生成されます -->
                 </div>

@@ -23302,6 +23302,25 @@ function initMypageMemo() {
   const storagePwdKey = `synapse_memo_pwd_${userId}`;
   const storageMemosKey = `synapse_user_memos_${userId}`;
 
+  // アカウント保管庫（一人一つ・固定ID: account_vault）の自動初期化
+  const initAccountVault = () => {
+    const memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+    const hasVault = memos.some(m => m.id === 'account_vault');
+    if (!hasVault) {
+      memos.push({
+        id: 'account_vault',
+        title: 'アカウント保管庫',
+        content: '[]',
+        isSecure: true, // ロック付き固定
+        isAccountType: true, // アカウント形式固定
+        isPinned: false,
+        updatedAt: new Date().toISOString()
+      });
+      localStorage.setItem(storageMemosKey, JSON.stringify(memos));
+    }
+  };
+  initAccountVault();
+
   // DOM要素
   const menuView = document.getElementById('mypage-menu-view');
   const memoWrapper = document.getElementById('mypage-memo-view-wrapper');
@@ -23321,6 +23340,8 @@ function initMypageMemo() {
   const titleInput = document.getElementById('memo-input-title');
   const secureToggleLabel = document.getElementById('memo-secure-toggle-label');
   const isSecureCheckbox = document.getElementById('memo-is-secure-checkbox');
+  const pinToggleLabel = document.getElementById('memo-pin-toggle-label');
+  const isPinnedCheckbox = document.getElementById('memo-is-pinned-checkbox');
   const statusInfo = document.getElementById('memo-status-info');
   const saveBtn = document.getElementById('memo-save-btn');
   const deleteBtn = document.getElementById('memo-delete-btn');
@@ -23333,6 +23354,7 @@ function initMypageMemo() {
   const accountsEditorArea = document.getElementById('memo-accounts-editor-area');
   const accountListContainer = document.getElementById('memo-account-list');
   const addAccountBtn = document.getElementById('memo-add-account-btn');
+  const accountSearchInput = document.getElementById('memo-account-search-input');
 
   // 書式設定ツールバー
   const formatBtns = document.querySelectorAll('.memo-format-btn');
@@ -23733,27 +23755,88 @@ function initMypageMemo() {
       return;
     }
 
-    // 更新日時順で降順（新しい順）ソート
-    visibleMemos.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    // ソート順：
+    // 1. account_vault (固定ID) を最優先
+    // 2. ピン留めされている (isPinned === true) ものを優先
+    // 3. その他を updatedAt の新しい順
+    visibleMemos.sort((a, b) => {
+      if (a.id === 'account_vault') return -1;
+      if (b.id === 'account_vault') return 1;
+      
+      const pinA = !!a.isPinned;
+      const pinB = !!b.isPinned;
+      if (pinA !== pinB) {
+        return pinA ? -1 : 1;
+      }
+      
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
 
     visibleMemos.forEach(memo => {
       const item = document.createElement('div');
       const isSelected = memo.id === activeMemoId;
-      item.style.cssText = `padding: 0.55rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid ${isSelected ? 'var(--primary)' : 'var(--border-color)'}; background: ${isSelected ? 'var(--bg-surface-elevated)' : 'var(--bg-surface)'}; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; gap: 0.2rem; text-align: left;`;
+      item.style.cssText = `padding: 0.55rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid ${isSelected ? 'var(--primary)' : 'var(--border-color)'}; background: ${isSelected ? 'var(--bg-surface-elevated)' : 'var(--bg-surface)'}; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; text-align: left; position: relative;`;
       
       const prefix = memo.isSecure ? '🔒 ' : '';
       const titleStr = prefix + (memo.title.trim() || '無題のメモ');
       const date = new Date(memo.updatedAt);
       const dateStr = `${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
 
+      // ピン留め表示用のHTML (account_vault 以外で表示)
+      let pinHtml = '';
+      if (memo.id !== 'account_vault') {
+        const isPinned = !!memo.isPinned;
+        pinHtml = `
+          <span class="memo-pin-btn" title="${isPinned ? 'ピン留めを解除' : 'ピン留めする'}" style="font-size: 0.85rem; cursor: pointer; transition: opacity 0.2s; opacity: ${isPinned ? '1' : '0'}; padding: 0.2rem;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='${isPinned ? '1' : '0'}'">
+            📌
+          </span>
+        `;
+      }
+
       item.innerHTML = `
-        <div style="font-size: 0.82rem; font-weight: 600; color: ${isSelected ? 'var(--primary)' : 'var(--text-primary)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-          ${titleStr}
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem;">
+          <div style="font-size: 0.82rem; font-weight: 600; color: ${isSelected ? 'var(--primary)' : 'var(--text-primary)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${titleStr}
+          </div>
+          <div style="font-size: 0.65rem; color: var(--text-muted);">
+            ${dateStr}
+          </div>
         </div>
-        <div style="font-size: 0.65rem; color: var(--text-muted);">
-          ${dateStr}
-        </div>
+        ${pinHtml}
       `;
+
+      // アイテム全体のホバー時に未ピン留めピンボタンの不透明度を 0.35 にする設定
+      if (memo.id !== 'account_vault' && !memo.isPinned) {
+        item.onmouseenter = () => {
+          const pinBtn = item.querySelector('.memo-pin-btn');
+          if (pinBtn) pinBtn.style.opacity = '0.35';
+        };
+        item.onmouseleave = () => {
+          const pinBtn = item.querySelector('.memo-pin-btn');
+          if (pinBtn) pinBtn.style.opacity = '0';
+        };
+      }
+
+      // ピン留めボタンのクリックイベント
+      const pinBtn = item.querySelector('.memo-pin-btn');
+      if (pinBtn) {
+        pinBtn.onclick = (e) => {
+          e.stopPropagation(); // リスト選択イベントを防止
+          const allMemos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+          const targetMemo = allMemos.find(m => m.id === memo.id);
+          if (targetMemo) {
+            targetMemo.isPinned = !targetMemo.isPinned;
+            localStorage.setItem(storageMemosKey, JSON.stringify(allMemos));
+            renderMemoList();
+            
+            // エディタ側の上部ピン留め表示も同期
+            if (activeMemoId === memo.id) {
+              const editorPinCheckbox = document.getElementById('memo-editor-pin-checkbox');
+              if (editorPinCheckbox) editorPinCheckbox.checked = targetMemo.isPinned;
+            }
+          }
+        };
+      }
 
       item.onclick = () => {
         activeMemoId = memo.id;
@@ -23774,31 +23857,59 @@ function initMypageMemo() {
     } else {
       if (editorEmpty) editorEmpty.style.display = 'none';
       if (editorActive) editorActive.style.display = 'flex';
-      if (titleInput) titleInput.value = memo.title || '';
+
+      // 検索ワードをリセット
+      if (accountSearchInput) accountSearchInput.value = '';
+
+      if (memo.id === 'account_vault') {
+        // アカウント保管庫の場合：タイトル入力欄、削除ボタン、ロック対象トグル、ピン留めトグル、形式トグルをすべて非表示
+        if (titleInput) {
+          titleInput.value = 'アカウント保管庫';
+          titleInput.style.display = 'none';
+        }
+        if (deleteBtn) deleteBtn.style.display = 'none';
+        if (secureToggleLabel) secureToggleLabel.style.display = 'none';
+        if (pinToggleLabel) pinToggleLabel.style.display = 'none';
+        if (typeSelectorContainer) typeSelectorContainer.style.display = 'none';
+      } else {
+        // 通常のメモの場合：すべて表示
+        if (titleInput) {
+          titleInput.value = memo.title || '';
+          titleInput.style.display = 'block';
+        }
+        if (deleteBtn) deleteBtn.style.display = 'inline-block';
+        
+        // 「ロック対象」チェックボックスを表示
+        if (secureToggleLabel) secureToggleLabel.style.display = 'flex';
+        if (isSecureCheckbox) isSecureCheckbox.checked = !!memo.isSecure;
+
+        // 「ピン留め」チェックボックスを表示
+        if (pinToggleLabel) pinToggleLabel.style.display = 'flex';
+        if (isPinnedCheckbox) {
+          isPinnedCheckbox.checked = !!memo.isPinned;
+          isPinnedCheckbox.onchange = (e) => {
+            memo.isPinned = e.target.checked;
+            const allMemos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+            const targetMemo = allMemos.find(m => m.id === memo.id);
+            if (targetMemo) {
+              targetMemo.isPinned = memo.isPinned;
+              localStorage.setItem(storageMemosKey, JSON.stringify(allMemos));
+              renderMemoList();
+            }
+          };
+        }
+
+        // 通常メモは形式選択トグルを常に非表示にする
+        if (typeSelectorContainer) typeSelectorContainer.style.display = 'none';
+      }
       
       // フォントファミリーの初期値をArialにセット
       if (fontSelect) fontSelect.value = 'Arial';
       // 段落書式スタイルの初期値を標準テキストにセット
       if (paragraphSelect) paragraphSelect.value = 'p';
-      
-      // 「ロック対象」チェックボックスは常に表示
-      if (secureToggleLabel) secureToggleLabel.style.display = 'flex';
-      if (isSecureCheckbox) isSecureCheckbox.checked = !!memo.isSecure;
-      
-      // シークレットメモ（ロック付き）かつロック解除中のときのみ形式切り替えトグルを表示
-      if (memo.isSecure && state.memoUnlockedSecure) {
-        if (typeSelectorContainer) typeSelectorContainer.style.display = 'flex';
-      } else {
-        if (typeSelectorContainer) typeSelectorContainer.style.display = 'none';
-      }
 
       // 形式とコンテンツ描画の切り替え
-      const isAccount = !!(memo.isSecure && memo.isAccountType);
-      
-      // ラジオボタンの値を同期
-      formatTypeRadios.forEach(radio => {
-        radio.checked = (radio.value === 'accounts') === isAccount;
-      });
+      const isAccount = memo.id === 'account_vault';
 
       if (isAccount) {
         if (docEditorArea) docEditorArea.style.display = 'none';
@@ -23825,6 +23936,23 @@ function initMypageMemo() {
             bindAccountFrameEvents(accountListContainer.lastElementChild);
           });
         }
+
+        // 登録名検索のリアルタイムフィルタリングロジックのバインド
+        if (accountSearchInput) {
+          accountSearchInput.oninput = (e) => {
+            const keyword = e.target.value.toLowerCase().trim();
+            const frames = accountListContainer.querySelectorAll('.account-card-frame');
+            frames.forEach(frame => {
+              const nameInput = frame.querySelector('.acc-input-name');
+              const nameVal = nameInput ? nameInput.value.toLowerCase().trim() : '';
+              if (nameVal.includes(keyword)) {
+                frame.style.display = 'block';
+              } else {
+                frame.style.display = 'none';
+              }
+            });
+          };
+        }
       } else {
         if (docEditorArea) docEditorArea.style.display = 'flex';
         if (accountsEditorArea) accountsEditorArea.style.display = 'none';
@@ -23834,21 +23962,8 @@ function initMypageMemo() {
       // チェックボックスの変更に伴い形式トグルの表示状態を追従させる
       if (isSecureCheckbox) {
         isSecureCheckbox.onchange = (e) => {
-          if (e.target.checked) {
-            if (state.memoUnlockedSecure) {
-              if (typeSelectorContainer) typeSelectorContainer.style.display = 'flex';
-            } else {
-              if (typeSelectorContainer) typeSelectorContainer.style.display = 'none';
-            }
-          } else {
-            if (typeSelectorContainer) typeSelectorContainer.style.display = 'none';
-            // ドキュメント形式に強制リセット
-            formatTypeRadios.forEach(radio => {
-              radio.checked = radio.value === 'document';
-            });
-            if (docEditorArea) docEditorArea.style.display = 'flex';
-            if (accountsEditorArea) accountsEditorArea.style.display = 'none';
-          }
+          memo.isSecure = e.target.checked;
+          if (typeSelectorContainer) typeSelectorContainer.style.display = 'none';
         };
       }
 
@@ -23889,38 +24004,10 @@ function initMypageMemo() {
       const memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
       const memo = memos.find(m => m.id === activeMemoId);
       if (memo) {
-        memo.title = (titleInput ? titleInput.value.trim() : '') || '無題のメモ';
-        
-        // ロック設定を同期 (ロック未解除状態でもチェックされていればロック付きにする)
-        if (isSecureCheckbox) {
-          const targetSecure = isSecureCheckbox.checked;
-          
-          if (targetSecure && !memo.isSecure) {
-            // 新たにロックを有効にする場合
-            const savedPwd = localStorage.getItem(storagePwdKey);
-            if (!savedPwd) {
-              // 暗証番号がまだ未設定なら、保存を一時中断して設定モーダルを開く
-              showToast('ロック付きメモを保存するには、まず暗証番号を設定してください。', 'warning');
-              if (pwdModal) {
-                pwdModal.classList.add('active');
-                if (setupForm) setupForm.style.display = 'block';
-                if (unlockForm) unlockForm.style.display = 'none';
-              }
-              return;
-            }
-          }
-          memo.isSecure = targetSecure;
-        }
-
-        // アクティブな形式タイプを取得して保存コンテンツを生成
-        let activeFormat = 'document';
-        formatTypeRadios.forEach(radio => {
-          if (radio.checked) activeFormat = radio.value;
-        });
-
-        // シークレットメモかつ「アカウント保管庫」の場合のみアカウント形式で保存
-        if (memo.isSecure && activeFormat === 'accounts') {
+        // アカウント保管庫の場合
+        if (memo.id === 'account_vault') {
           memo.isAccountType = true;
+          memo.isSecure = true; // セキュア固定
           
           // アカウントカードの全入力枠から収集
           const accountData = [];
@@ -23936,8 +24023,31 @@ function initMypageMemo() {
           }
           memo.content = JSON.stringify(accountData);
         } else {
+          // 通常のメモの場合
+          memo.title = (titleInput ? titleInput.value.trim() : '') || '無題のメモ';
           memo.isAccountType = false;
           memo.content = contentInput ? contentInput.innerHTML : '';
+          
+          // ロック設定を同期 (ロック未解除状態でもチェックされていればロック付きにする)
+          if (isSecureCheckbox) {
+            const targetSecure = isSecureCheckbox.checked;
+            
+            if (targetSecure && !memo.isSecure) {
+              // 新たにロックを有効にする場合
+              const savedPwd = localStorage.getItem(storagePwdKey);
+              if (!savedPwd) {
+                // 暗証番号がまだ未設定なら、保存を一時中断して設定モーダルを開く
+                showToast('ロック付きメモを保存するには、まず暗証番号を設定してください。', 'warning');
+                if (pwdModal) {
+                  pwdModal.classList.add('active');
+                  if (setupForm) setupForm.style.display = 'block';
+                  if (unlockForm) unlockForm.style.display = 'none';
+                }
+                return;
+              }
+            }
+            memo.isSecure = targetSecure;
+          }
         }
 
         memo.updatedAt = new Date().toISOString();
