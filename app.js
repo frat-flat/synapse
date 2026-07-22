@@ -23598,97 +23598,127 @@ function initMypageMemo() {
   // アカウント枠追加イベント
   if (addAccountBtn) {
     addAccountBtn.onclick = () => {
-      // 新しい空の枠を追加してUI追加描画
-      const frameHtml = createAccountFrameHtml({ name: '', url: '', user: '', pwd: '' });
+      // 新しい空の枠を追加してUI追加描画（自動でアコーディオンを展開状態にする）
+      const frameHtml = createAccountFrameHtml({
+        name: '',
+        url: '',
+        note: '',
+        accounts: [{ user: '', pwd: '' }]
+      });
       if (accountListContainer) {
         accountListContainer.insertAdjacentHTML('beforeend', frameHtml);
-        bindAccountFrameEvents(accountListContainer.lastElementChild);
+        const newFrame = accountListContainer.lastElementChild;
+        bindAccountFrameEvents(newFrame);
+        
+        // 追加直後は使いやすくするため自動で開く
+        const newBody = newFrame.querySelector('.acc-card-body');
+        const newArrow = newFrame.querySelector('.acc-toggle-arrow');
+        if (newBody && newArrow) {
+          newBody.style.display = 'flex';
+          newArrow.textContent = '🔼';
+        }
       }
     };
   }
 
-  // アカウント枠のHTMLを生成
-  function createAccountFrameHtml(acc = { name: '', url: '', user: '', pwd: '' }) {
+  // サブアカウント（ログイン情報ペア）のHTML生成
+  function createSubAccountFrameHtml(subAcc = { user: '', pwd: '' }) {
     return `
-      <div class="account-card-frame" style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem; background: var(--bg-surface-elevated); display: flex; flex-direction: column; gap: 0.6rem; position: relative;">
-        <!-- 削除ボタン -->
-        <button class="btn-text delete-account-frame-btn" style="position: absolute; top: 0.5rem; right: 0.5rem; color: #ef4444; font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none;" title="このアカウント枠を削除">🗑️</button>
+      <div class="account-sub-frame" style="display: flex; gap: 0.6rem; align-items: flex-end; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); position: relative;">
+        <!-- ユーザID -->
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1; text-align: left;">
+          <label style="font-size: 0.65rem; font-weight: 700; color: var(--text-secondary);">ユーザID / メールアドレス</label>
+          <div style="display: flex; gap: 0.25rem;">
+            <input type="text" class="acc-input-user" placeholder="IDを入力" value="${subAcc.user || ''}" style="flex: 1; padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+            <button class="btn btn-secondary copy-acc-user-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="コピー">📋</button>
+          </div>
+        </div>
+        <!-- パスワード -->
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1; text-align: left;">
+          <label style="font-size: 0.65rem; font-weight: 700; color: var(--text-secondary);">パスワード</label>
+          <div style="display: flex; gap: 0.25rem; align-items: center; position: relative;">
+            <input type="password" class="acc-input-pwd" placeholder="パスワードを入力" value="${subAcc.pwd || ''}" style="flex: 1; padding: 0.35rem 2.2rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+            <button class="toggle-acc-pwd-visibility-btn" style="position: absolute; right: 2.1rem; border: none; background: none; cursor: pointer; font-size: 0.85rem; padding: 0.2rem; color: var(--text-secondary);" title="パスワードの表示/非表示">👁️</button>
+            <button class="btn btn-secondary copy-acc-pwd-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="コピー">📋</button>
+          </div>
+        </div>
+        <!-- サブ枠削除ボタン -->
+        <button class="btn-text delete-sub-account-btn" style="color: #ef4444; font-size: 0.85rem; cursor: pointer; padding: 0.35rem; border: none; background: none;" title="このログイン情報を削除">🗑️</button>
+      </div>
+    `;
+  }
+
+  // アカウント枠のHTMLを生成 (アコーディオンヘッダー＋詳細ボディ構成)
+  function createAccountFrameHtml(acc = { name: '', url: '', note: '', accounts: [{ user: '', pwd: '' }] }) {
+    // 互換性チェック
+    if (!acc.accounts) {
+      acc.accounts = [{ user: '', pwd: '' }];
+    }
+    
+    // サブ枠HTMLの組み立て
+    let subsHtml = '';
+    acc.accounts.forEach(sub => {
+      subsHtml += createSubAccountFrameHtml(sub);
+    });
+
+    return `
+      <div class="account-card-frame" style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0.5rem;">
+        <!-- ヘッダー（常に表示・トグル用） -->
+        <div class="acc-card-header" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.55rem 0.75rem; background: var(--bg-surface); cursor: pointer; user-select: none;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1;">
+            <span class="acc-toggle-arrow" style="font-size: 0.75rem; color: var(--text-muted); transition: transform 0.2s;">🔽</span>
+            <input type="text" class="acc-input-name" placeholder="登録名（サービス名）を入力" value="${acc.name || ''}" style="flex: 1; max-width: 300px; padding: 0.25rem 0.4rem; font-size: 0.82rem; font-weight: 700; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text-primary); outline: none;" onclick="event.stopPropagation();" onfocus="event.stopPropagation();">
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <button class="btn-text delete-account-frame-btn" style="color: #ef4444; font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none;" title="このアカウント枠を削除" onclick="event.stopPropagation();">🗑️</button>
+          </div>
+        </div>
         
-        <!-- グリッド入力欄 -->
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem; margin-top: 0.5rem;">
-          <!-- 登録名 -->
-          <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
-            <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">登録名（サービス名）</label>
-            <input type="text" class="acc-input-name" placeholder="例: GitHub" value="${acc.name || ''}" style="padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
-          </div>
-          <!-- URL -->
-          <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
-            <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">URL</label>
-            <div style="display: flex; gap: 0.25rem;">
-              <input type="text" class="acc-input-url" placeholder="https://..." value="${acc.url || ''}" style="flex: 1; padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
-              <button class="btn btn-secondary open-acc-url-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="URLを開く">🔗</button>
+        <!-- ボディ（トグル展開部分・初期非表示） -->
+        <div class="acc-card-body" style="display: none; padding: 0.75rem; border-top: 1px solid var(--border-color); flex-direction: column; gap: 0.75rem; background: var(--bg-surface-elevated);">
+          <!-- URL ＆ 備考欄 -->
+          <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 0.75rem;">
+            <!-- URL -->
+            <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
+              <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">URL</label>
+              <div style="display: flex; gap: 0.25rem;">
+                <input type="text" class="acc-input-url" placeholder="https://..." value="${acc.url || ''}" style="flex: 1; padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+                <button class="btn btn-secondary open-acc-url-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="URLを開く">🔗</button>
+              </div>
+            </div>
+            <!-- 備考欄 -->
+            <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
+              <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">備考（メモ）</label>
+              <textarea class="acc-input-note" placeholder="アカウントに関するメモや追加情報を書き込めます..." style="width: 100%; height: 32px; min-height: 32px; padding: 0.3rem 0.5rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; resize: vertical; font-family: sans-serif; line-height: 1.3;">${acc.note || ''}</textarea>
             </div>
           </div>
-          <!-- ユーザID -->
-          <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
-            <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">ユーザID / メールアドレス</label>
-            <div style="display: flex; gap: 0.25rem;">
-              <input type="text" class="acc-input-user" placeholder="IDを入力" value="${acc.user || ''}" style="flex: 1; padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
-              <button class="btn btn-secondary copy-acc-user-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="コピー">📋</button>
+
+          <!-- サブアカウントログイン情報枠のリスト -->
+          <div class="acc-sub-list-container" style="display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px dashed var(--border-color); padding-top: 0.6rem;">
+            <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-secondary); text-align: left; margin-bottom: 0.1rem;">👤 ログイン情報一覧</div>
+            <div class="acc-sub-list" style="display: flex; flex-direction: column; gap: 0.4rem;">
+              ${subsHtml}
             </div>
-          </div>
-          <!-- パスワード -->
-          <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
-            <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">パスワード</label>
-            <div style="display: flex; gap: 0.25rem; align-items: center; position: relative;">
-              <input type="password" class="acc-input-pwd" placeholder="パスワードを入力" value="${acc.pwd || ''}" style="flex: 1; padding: 0.35rem 2.2rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
-              <button class="toggle-acc-pwd-visibility-btn" style="position: absolute; right: 2.1rem; border: none; background: none; cursor: pointer; font-size: 0.85rem; padding: 0.2rem; color: var(--text-secondary);" title="パスワードの表示/非表示">👁️</button>
-              <button class="btn btn-secondary copy-acc-pwd-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="コピー">📋</button>
-            </div>
+            <button class="btn btn-secondary add-sub-account-btn" style="padding: 0.3rem; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.25rem; border-radius: var(--radius-sm); border-style: dashed; width: fit-content; margin-top: 0.2rem;">
+              ➕ ログイン情報を追加
+            </button>
           </div>
         </div>
       </div>
     `;
   }
 
-  // 各アカウントカード内のイベント登録
-  function bindAccountFrameEvents(frameEl) {
-    if (!frameEl) return;
-
-    const delBtn = frameEl.querySelector('.delete-account-frame-btn');
-    const openUrlBtn = frameEl.querySelector('.open-acc-url-btn');
-    const copyUserBtn = frameEl.querySelector('.copy-acc-user-btn');
-    const copyPwdBtn = frameEl.querySelector('.copy-acc-pwd-btn');
-    const togglePwdBtn = frameEl.querySelector('.toggle-acc-pwd-visibility-btn');
-
-    const urlInput = frameEl.querySelector('.acc-input-url');
-    const userInput = frameEl.querySelector('.acc-input-user');
-    const pwdInput = frameEl.querySelector('.acc-input-pwd');
-
-    // 削除
-    if (delBtn) {
-      delBtn.onclick = () => {
-        showAppConfirm('アカウント枠の削除', 'このアカウント保管用の枠を削除しますか？', () => {
-          frameEl.remove();
-        });
-      };
-    }
-
-    // URLを開く
-    if (openUrlBtn && urlInput) {
-      openUrlBtn.onclick = () => {
-        const url = urlInput.value.trim();
-        if (url) {
-          if (!/^https?:\/\//i.test(url)) {
-            window.open('https://' + url, '_blank');
-          } else {
-            window.open(url, '_blank');
-          }
-        } else {
-          showToast('URLが入力されていません。', 'error');
-        }
-      };
-    }
+  // サブアカウント（ID/パスワード）枠のイベント登録
+  function bindSubAccountEvents(subEl) {
+    if (!subEl) return;
+    
+    const copyUserBtn = subEl.querySelector('.copy-acc-user-btn');
+    const copyPwdBtn = subEl.querySelector('.copy-acc-pwd-btn');
+    const togglePwdBtn = subEl.querySelector('.toggle-acc-pwd-visibility-btn');
+    const delSubBtn = subEl.querySelector('.delete-sub-account-btn');
+    
+    const userInput = subEl.querySelector('.acc-input-user');
+    const pwdInput = subEl.querySelector('.acc-input-pwd');
 
     // ユーザーIDコピー
     if (copyUserBtn && userInput) {
@@ -23730,6 +23760,85 @@ function initMypageMemo() {
         }
       };
     }
+
+    // サブ枠削除
+    if (delSubBtn) {
+      delSubBtn.onclick = () => {
+        showAppConfirm('ログイン情報の削除', 'このログイン情報を削除しますか？', () => {
+          subEl.remove();
+        });
+      };
+    }
+  }
+
+  // 各アカウントカード内のイベント登録
+  function bindAccountFrameEvents(frameEl) {
+    if (!frameEl) return;
+
+    const header = frameEl.querySelector('.acc-card-header');
+    const body = frameEl.querySelector('.acc-card-body');
+    const arrow = frameEl.querySelector('.acc-toggle-arrow');
+    const delBtn = frameEl.querySelector('.delete-account-frame-btn');
+    const openUrlBtn = frameEl.querySelector('.open-acc-url-btn');
+    const addSubBtn = frameEl.querySelector('.add-sub-account-btn');
+    
+    const urlInput = frameEl.querySelector('.acc-input-url');
+    const subList = frameEl.querySelector('.acc-sub-list');
+
+    // トグル開閉
+    if (header && body && arrow) {
+      header.onclick = () => {
+        const isOpen = body.style.display === 'flex';
+        if (isOpen) {
+          body.style.display = 'none';
+          arrow.textContent = '🔽';
+          arrow.style.transform = 'rotate(0deg)';
+        } else {
+          body.style.display = 'flex';
+          arrow.textContent = '🔼';
+          arrow.style.transform = 'rotate(0deg)';
+        }
+      };
+    }
+
+    // 削除
+    if (delBtn) {
+      delBtn.onclick = (e) => {
+        e.stopPropagation();
+        showAppConfirm('アカウント枠の削除', 'このアカウント保管用の枠を削除しますか？', () => {
+          frameEl.remove();
+        });
+      };
+    }
+
+    // URLを開く
+    if (openUrlBtn && urlInput) {
+      openUrlBtn.onclick = () => {
+        const url = urlInput.value.trim();
+        if (url) {
+          if (!/^https?:\/\//i.test(url)) {
+            window.open('https://' + url, '_blank');
+          } else {
+            window.open(url, '_blank');
+          }
+        } else {
+          showToast('URLが入力されていません。', 'error');
+        }
+      };
+    }
+
+    // 新規ログインサブ枠追加
+    if (addSubBtn && subList) {
+      addSubBtn.onclick = () => {
+        const subHtml = createSubAccountFrameHtml({ user: '', pwd: '' });
+        subList.insertAdjacentHTML('beforeend', subHtml);
+        bindSubAccountEvents(subList.lastElementChild);
+      };
+    }
+
+    // 既存の全サブ枠にイベント紐付け
+    const subFrames = frameEl.querySelectorAll('.account-sub-frame');
+    subFrames.forEach(sub => bindSubAccountEvents(sub));
   }
 
   // 初期表示の処理同期
@@ -23920,14 +24029,31 @@ function initMypageMemo() {
           accountListContainer.innerHTML = '';
           let accountData = [];
           try {
-            accountData = JSON.parse(memo.content) || [];
+            const raw = JSON.parse(memo.content) || [];
+            accountData = raw.map(item => {
+              // 古いデータ構造（accountsプロパティがない）を検知してマイグレーション
+              if (!item.accounts) {
+                return {
+                  name: item.name || '',
+                  url: item.url || '',
+                  note: '',
+                  accounts: [{ user: item.user || '', pwd: item.pwd || '' }]
+                };
+              }
+              return item;
+            });
           } catch(e) {
             accountData = [];
           }
           
           // データがない場合は初期状態として空の枠を1つ置く
           if (accountData.length === 0) {
-            accountData.push({ name: '', url: '', user: '', pwd: '' });
+            accountData.push({
+              name: '',
+              url: '',
+              note: '',
+              accounts: [{ user: '', pwd: '' }]
+            });
           }
 
           accountData.forEach(acc => {
@@ -24009,16 +24135,29 @@ function initMypageMemo() {
           memo.isAccountType = true;
           memo.isSecure = true; // セキュア固定
           
-          // アカウントカードの全入力枠から収集
+          // アカウントカードの全入力枠から収集（サブ枠もネストして収集）
           const accountData = [];
           if (accountListContainer) {
             const frames = accountListContainer.querySelectorAll('.account-card-frame');
             frames.forEach(frame => {
               const name = frame.querySelector('.acc-input-name').value.trim();
               const url = frame.querySelector('.acc-input-url').value.trim();
-              const user = frame.querySelector('.acc-input-user').value.trim();
-              const pwd = frame.querySelector('.acc-input-pwd').value;
-              accountData.push({ name, url, user, pwd });
+              const note = frame.querySelector('.acc-input-note').value.trim();
+              
+              const subAccounts = [];
+              const subFrames = frame.querySelectorAll('.account-sub-frame');
+              subFrames.forEach(sub => {
+                const user = sub.querySelector('.acc-input-user').value.trim();
+                const pwd = sub.querySelector('.acc-input-pwd').value;
+                subAccounts.push({ user, pwd });
+              });
+              
+              accountData.push({
+                name,
+                url,
+                note,
+                accounts: subAccounts
+              });
             });
           }
           memo.content = JSON.stringify(accountData);

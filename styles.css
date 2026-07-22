@@ -3804,6 +3804,25 @@ h3 {
   list-style-type: decimal !important;
 }
 
+/* アカウント保管庫 アコーディオン ＆ ネストスタイル */
+.acc-card-header:hover {
+  background: var(--bg-surface-elevated) !important;
+}
+
+.acc-input-name:focus {
+  border-color: var(--primary) !important;
+  background: var(--bg-surface-elevated) !important;
+}
+
+.account-sub-frame {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.account-sub-frame:focus-within {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px rgba(107, 70, 193, 0.1);
+}
+
 #memo-input-content li {
   margin-bottom: 0.25rem;
 }
