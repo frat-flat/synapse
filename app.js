@@ -6176,6 +6176,7 @@ function openMyPage() {
   
   state.currentView = 'mypage-screen';
   renderTabBar();
+  initMypageMemo();
 }
 
 // フォームに入力されている現在の状態をアクティブなタブに退避
@@ -23282,5 +23283,276 @@ function setupValidationSidebarEvents() {
       }
     });
   });
+}
+
+// ==========================================
+// 👤 マイページ ＆ 暗号化メモ帳機能
+// ==========================================
+let activeMemoId = null;
+
+function initMypageMemo() {
+  const currentUser = state.currentUser;
+  if (!currentUser) return;
+
+  const userId = currentUser.id;
+  const storagePwdKey = `synapse_memo_pwd_${userId}`;
+  const storageMemosKey = `synapse_memos_${userId}`;
+
+  // DOM要素
+  const lockView = document.getElementById('memo-lock-view');
+  const mainView = document.getElementById('memo-main-view');
+  const setupContainer = document.getElementById('memo-lock-setup-container');
+  const unlockContainer = document.getElementById('memo-lock-unlock-container');
+
+  const setupPwdInput = document.getElementById('memo-setup-pwd');
+  const setupPwdConfirmInput = document.getElementById('memo-setup-pwd-confirm');
+  const setupBtn = document.getElementById('memo-setup-btn');
+
+  const unlockPwdInput = document.getElementById('memo-unlock-pwd');
+  const unlockBtn = document.getElementById('memo-unlock-btn');
+  const resetBtn = document.getElementById('memo-reset-pwd-btn');
+
+  const memoListContainer = document.getElementById('memo-list-container');
+  const newMemoBtn = document.getElementById('memo-new-btn');
+  const lockExitBtn = document.getElementById('memo-lock-exit-btn');
+
+  const editorEmpty = document.getElementById('memo-editor-empty');
+  const editorActive = document.getElementById('memo-editor-active');
+  const titleInput = document.getElementById('memo-input-title');
+  const contentInput = document.getElementById('memo-input-content');
+  const saveBtn = document.getElementById('memo-save-btn');
+  const deleteBtn = document.getElementById('memo-delete-btn');
+  const statusInfo = document.getElementById('memo-status-info');
+
+  // 書式設定ツールバー
+  const formatBtns = document.querySelectorAll('.memo-format-btn');
+  const foreColorInput = document.getElementById('memo-forecolor-input');
+
+  // ロック解除・設定画面の切り替え
+  const updateLockUI = () => {
+    const savedPwd = localStorage.getItem(storagePwdKey);
+    if (!savedPwd) {
+      // 初回設定
+      if (setupContainer) setupContainer.style.display = 'flex';
+      if (unlockContainer) unlockContainer.style.display = 'none';
+    } else {
+      // 解除用
+      if (setupContainer) setupContainer.style.display = 'none';
+      if (unlockContainer) unlockContainer.style.display = 'flex';
+    }
+    if (lockView) lockView.style.display = 'flex';
+    if (mainView) mainView.style.display = 'none';
+    
+    // 入力欄をクリア
+    if (setupPwdInput) setupPwdInput.value = '';
+    if (setupPwdConfirmInput) setupPwdConfirmInput.value = '';
+    if (unlockPwdInput) unlockPwdInput.value = '';
+  };
+
+  // 初期表示
+  updateLockUI();
+
+  // 暗証番号の設定
+  if (setupBtn) {
+    setupBtn.onclick = () => {
+      const pwd = setupPwdInput.value;
+      const pwdConfirm = setupPwdConfirmInput.value;
+      if (!pwd || pwd.length < 4) {
+        showToast('暗証番号は4桁以上で入力してください。', 'error');
+        return;
+      }
+      if (pwd !== pwdConfirm) {
+        showToast('確認用暗証番号が一致しません。', 'error');
+        return;
+      }
+      localStorage.setItem(storagePwdKey, pwd);
+      showToast('暗証番号を設定しました。', 'success');
+      unlockMemoContainer();
+    };
+  }
+
+  // 暗証番号でのロック解除
+  const unlockMemoContainer = () => {
+    if (lockView) lockView.style.display = 'none';
+    if (mainView) mainView.style.display = 'flex';
+    activeMemoId = null;
+    renderMemoList();
+    showEditor(null);
+  };
+
+  if (unlockBtn) {
+    unlockBtn.onclick = () => {
+      const pwd = unlockPwdInput.value;
+      const savedPwd = localStorage.getItem(storagePwdKey);
+      if (pwd === savedPwd) {
+        unlockMemoContainer();
+        showToast('ロックを解除しました。', 'success');
+      } else {
+        showToast('暗証番号が正しくありません。', 'error');
+      }
+    };
+    
+    // Enterキーでも解除できるように
+    if (unlockPwdInput) {
+      unlockPwdInput.onkeydown = (e) => {
+        if (e.key === 'Enter') unlockBtn.click();
+      };
+    }
+  }
+
+  // 暗証番号のリセット（再設定）
+  if (resetBtn) {
+    resetBtn.onclick = () => {
+      showAppConfirm('暗証番号のリセット', '暗証番号をリセットして再設定しますか？\n⚠️ 安全のため、このアカウントでこれまでに保存されたすべてのメモデータは完全に削除されます。この操作は取り消せません。', () => {
+        localStorage.removeItem(storagePwdKey);
+        localStorage.removeItem(storageMemosKey);
+        updateLockUI();
+        showToast('メモ帳データを初期化しました。新しい暗証番号を設定してください。', 'success');
+      });
+    };
+  }
+
+  // ロックして退出
+  if (lockExitBtn) {
+    lockExitBtn.onclick = () => {
+      updateLockUI();
+      showToast('メモ帳をロックしました。', 'info');
+    };
+  }
+
+  // メモリストのレンダリング
+  const renderMemoList = () => {
+    if (!memoListContainer) return;
+    memoListContainer.innerHTML = '';
+    const memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+
+    if (memos.length === 0) {
+      memoListContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.72rem; padding: 1rem 0;">メモはありません</div>`;
+      return;
+    }
+
+    // 更新日時順で降順（新しい順）ソート
+    memos.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+    memos.forEach(memo => {
+      const item = document.createElement('div');
+      const isSelected = memo.id === activeMemoId;
+      item.style.cssText = `padding: 0.55rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid ${isSelected ? 'var(--primary)' : 'var(--border-color)'}; background: ${isSelected ? 'var(--bg-surface-elevated)' : 'var(--bg-surface)'}; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; gap: 0.2rem; text-align: left;`;
+      
+      const titleStr = memo.title.trim() || '無題のメモ';
+      const date = new Date(memo.updatedAt);
+      const dateStr = `${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+
+      item.innerHTML = `
+        <div style="font-size: 0.82rem; font-weight: 600; color: ${isSelected ? 'var(--primary)' : 'var(--text-primary)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          ${titleStr}
+        </div>
+        <div style="font-size: 0.65rem; color: var(--text-muted);">
+          ${dateStr}
+        </div>
+      `;
+
+      item.onclick = () => {
+        activeMemoId = memo.id;
+        renderMemoList();
+        showEditor(memo);
+      };
+
+      memoListContainer.appendChild(item);
+    });
+  };
+
+  // エディタの表示制御
+  const showEditor = (memo) => {
+    if (!memo) {
+      if (editorEmpty) editorEmpty.style.display = 'flex';
+      if (editorActive) editorActive.style.display = 'none';
+      activeMemoId = null;
+    } else {
+      if (editorEmpty) editorEmpty.style.display = 'none';
+      if (editorActive) editorActive.style.display = 'flex';
+      if (titleInput) titleInput.value = memo.title || '';
+      if (contentInput) contentInput.innerHTML = memo.content || '';
+      
+      const date = new Date(memo.updatedAt);
+      if (statusInfo) {
+        statusInfo.textContent = `最終更新: ${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+      }
+    }
+  };
+
+  // 新規メモ作成
+  if (newMemoBtn) {
+    newMemoBtn.onclick = () => {
+      const memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+      const newMemo = {
+        id: 'memo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        title: '',
+        content: '',
+        updatedAt: new Date().toISOString()
+      };
+      memos.push(newMemo);
+      localStorage.setItem(storageMemosKey, JSON.stringify(memos));
+      activeMemoId = newMemo.id;
+      renderMemoList();
+      showEditor(newMemo);
+      if (titleInput) titleInput.focus();
+    };
+  }
+
+  // メモ保存
+  if (saveBtn) {
+    saveBtn.onclick = () => {
+      if (!activeMemoId) return;
+      const memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+      const memo = memos.find(m => m.id === activeMemoId);
+      if (memo) {
+        memo.title = (titleInput ? titleInput.value.trim() : '') || '無題のメモ';
+        memo.content = contentInput ? contentInput.innerHTML : '';
+        memo.updatedAt = new Date().toISOString();
+        localStorage.setItem(storageMemosKey, JSON.stringify(memos));
+        showToast('メモを保存しました。', 'success');
+        renderMemoList();
+        showEditor(memo);
+      }
+    };
+  }
+
+  // メモ削除
+  if (deleteBtn) {
+    deleteBtn.onclick = () => {
+      if (!activeMemoId) return;
+      showAppConfirm('メモの削除', 'このメモを完全に削除しますか？', () => {
+        let memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+        memos = memos.filter(m => m.id !== activeMemoId);
+        localStorage.setItem(storageMemosKey, JSON.stringify(memos));
+        showToast('メモを削除しました。', 'success');
+        renderMemoList();
+        showEditor(null);
+      });
+    };
+  }
+
+  // 書式設定コマンドの実行
+  formatBtns.forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      const command = btn.dataset.command;
+      const arg = btn.dataset.arg || null;
+      if (command) {
+        document.execCommand(command, false, arg);
+        if (contentInput) contentInput.focus();
+      }
+    };
+  });
+
+  // 文字色変更
+  if (foreColorInput) {
+    foreColorInput.oninput = (e) => {
+      const color = e.target.value;
+      document.execCommand('foreColor', false, color);
+      if (contentInput) contentInput.focus();
+    };
+  }
 }
 
