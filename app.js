@@ -2415,93 +2415,10 @@ function renderCustomTableList() {
   // ルート直下から再帰構築
   renderMenuNode('root', sidebarNav);
 
-  // お気に入りアコーディオンの描画
-  const mypageBtn = document.getElementById('menu-mypage');
+  // お気に入りアコーディオンの描画（ご要望によりサイドバーからは表示を除去し、マイページ内のみで機能させます）
   let favAccordion = document.getElementById('favorites-accordion');
   if (favAccordion) {
     favAccordion.remove();
-  }
-
-  if (state.favorites && state.favorites.length > 0) {
-    favAccordion = document.createElement('div');
-    favAccordion.className = 'sidebar-accordion';
-    favAccordion.id = 'favorites-accordion';
-    favAccordion.style.marginTop = '0.5rem';
-
-    const header = document.createElement('button');
-    header.className = 'accordion-header collapsed';
-    header.id = 'menu-favorites-parent';
-    header.setAttribute('data-tooltip', 'お気に入り');
-    header.style.cssText = 'width: calc(100% - 1rem); box-sizing: border-box; text-align: left; display: flex; align-items: center; gap: 0.5rem;';
-    
-    const arrow = document.createElement('span');
-    arrow.className = 'accordion-icon';
-    arrow.textContent = '▼';
-    arrow.style.cssText = 'display: inline-block; transition: transform 0.2s; font-size: 0.7rem;';
-    
-    const textSpan = document.createElement('span');
-    textSpan.innerHTML = `⭐ <span class="nav-item-text">お気に入り</span>`;
-    
-    header.appendChild(arrow);
-    header.appendChild(textSpan);
-
-    const content = document.createElement('div');
-    content.className = 'accordion-content';
-    content.id = 'menu-favorites-content';
-    content.style.cssText = 'display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;';
-
-    state.favorites.forEach(fav => {
-      const favBtn = document.createElement('button');
-      favBtn.className = 'nav-item';
-      favBtn.style.cssText = 'width: 100%; display: flex; align-items: center; padding: 0.4rem 0.75rem; font-size: 0.85rem; background: none; border: none; cursor: pointer; color: var(--text-secondary); border-radius: var(--radius-sm); transition: all 0.2s;';
-      
-      let icon = '📄';
-      if (fav.type === 'folder') {
-        const origAcc = state.customAccordions.find(a => a.id === fav.id) || 
-                        (fav.id === 'appoint' ? { icon: '📂' } : null);
-        icon = (origAcc && origAcc.icon) ? origAcc.icon : '📂';
-      } else if (fav.type === 'table') {
-        icon = getUserItemIconHtml(fav.id, null);
-      }
-      
-      favBtn.innerHTML = `${icon.startsWith('<') ? icon : `<span>${icon}</span>`}<span class="nav-item-text" style="margin-left: 0.5rem;">${fav.name}</span>`;
-      favBtn.setAttribute('data-tooltip', fav.name);
-      
-      favBtn.addEventListener('click', () => {
-        if (fav.type === 'folder') {
-          const origHeader = document.getElementById(`menu-${fav.id}-parent`);
-          if (origHeader) origHeader.click();
-        } else if (fav.type === 'table') {
-          const mappedId = getActualMenuElementId(fav.id);
-          const origBtn = document.getElementById(`menu-custom-table-${fav.id}`) || 
-                            (mappedId ? document.getElementById(mappedId) : null) ||
-                            document.getElementById(`menu-${fav.id}`);
-          if (origBtn) {
-            origBtn.click();
-          } else {
-            openTab(`custom-table-${fav.id}-tab`, `custom-table-${fav.id}-screen`, `📊 ${fav.name}`);
-            renderCustomTable(fav.id);
-          }
-        }
-      });
-
-      content.appendChild(favBtn);
-    });
-
-    favAccordion.appendChild(header);
-    favAccordion.appendChild(content);
-
-    header.addEventListener('click', () => {
-      const isCollapsed = header.classList.toggle('collapsed');
-      content.style.display = isCollapsed ? 'none' : 'flex';
-      arrow.style.transform = isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)';
-    });
-
-    if (mypageBtn && mypageBtn.nextSibling) {
-      sidebarNav.insertBefore(favAccordion, mypageBtn.nextSibling);
-    } else {
-      sidebarNav.appendChild(favAccordion);
-    }
   }
 }
 
