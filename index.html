@@ -620,20 +620,20 @@
 
                   <!-- 字体（フォントファミリー）選択 -->
                   <select id="memo-font-select" title="フォントの変更" style="height: 28px; padding: 0 0.25rem; font-size: 0.72rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; cursor: pointer; width: 95px;">
-                    <option value="Arial" selected>Arial</option>
-                    <option value="sans-serif">Sans-serif</option>
-                    <option value="serif">Serif</option>
-                    <option value="monospace">Monospace</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Arial" selected style="font-family: Arial;">Arial</option>
+                    <option value="sans-serif" style="font-family: sans-serif;">Sans-serif</option>
+                    <option value="serif" style="font-family: serif;">Serif</option>
+                    <option value="monospace" style="font-family: monospace;">Monospace</option>
+                    <option value="Georgia" style="font-family: Georgia;">Georgia</option>
+                    <option value="Times New Roman" style="font-family: 'Times New Roman';">Times New Roman</option>
                   </select>
                   
                   <!-- テキスト書式選択 -->
                   <select id="memo-paragraph-select" title="テキスト書式の変更" style="height: 28px; padding: 0 0.25rem; font-size: 0.72rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; cursor: pointer; width: 105px;">
                     <option value="p" selected>標準テキスト</option>
-                    <option value="blockquote">引用 (枠線付き)</option>
-                    <option value="pre">コード（等幅）</option>
-                    <option value="small">注釈 (極小)</option>
+                    <option value="blockquote" style="font-style: italic;">引用 (枠線付き)</option>
+                    <option value="pre" style="font-family: monospace;">コード（等幅）</option>
+                    <option value="small" style="font-size: 0.65rem;">注釈 (極小)</option>
                   </select>
                   <div style="width: 1px; height: 16px; background: var(--border-color); margin: 0 0.15rem;"></div>
                   
