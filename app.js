@@ -23339,6 +23339,7 @@ function initMypageMemo() {
   const paletteBtn = document.getElementById('memo-palette-btn');
   const colorPalettePopup = document.getElementById('memo-color-palette-popup');
   const colorPaletteChips = document.querySelectorAll('.color-palette-chip');
+  const fontSelect = document.getElementById('memo-font-select');
 
   // モーダル要素
   const pwdModal = document.getElementById('memo-password-modal');
@@ -23511,6 +23512,15 @@ function initMypageMemo() {
         updateMemoUI();
         showToast('暗証番号とロック付きメモを初期化しました。', 'success');
       });
+    };
+  }
+
+  // 字体（フォントファミリー）の変更イベント
+  if (fontSelect) {
+    fontSelect.onchange = (e) => {
+      const fontName = e.target.value;
+      document.execCommand('fontName', false, fontName);
+      if (contentInput) contentInput.focus();
     };
   }
 
@@ -23762,6 +23772,9 @@ function initMypageMemo() {
       if (editorActive) editorActive.style.display = 'flex';
       if (titleInput) titleInput.value = memo.title || '';
       
+      // フォントファミリーの初期値をArialにセット
+      if (fontSelect) fontSelect.value = 'Arial';
+      
       // ロック解除中なら「シークレット（ロック付き）」チェックボックスを同期して表示
       if (state.memoUnlockedSecure) {
         if (secureToggleLabel) secureToggleLabel.style.display = 'flex';
@@ -23858,6 +23871,7 @@ function initMypageMemo() {
       activeMemoId = newMemo.id;
       renderMemoList();
       showEditor(newMemo);
+      if (fontSelect) fontSelect.value = 'Arial';
       if (titleInput) titleInput.focus();
     };
   }

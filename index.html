@@ -610,21 +610,79 @@
 
               <!-- 📄 ドキュメント編集エリア -->
               <div id="memo-document-editor-area" style="display: flex; flex-direction: column; gap: 0.75rem; flex: 1; min-height: 0;">
-                <!-- リッチテキスト ツールバー (太字、斜体、下線、見出しなど) -->
+                <!-- リッチテキスト ツールバー (太字、斜体、下線、見出し、フォントなど) -->
                 <div class="format-toolbar" style="display: flex; align-items: center; gap: 0.25rem; padding: 0.3rem 0.4rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); flex-wrap: wrap;">
                   <button class="toolbar-btn memo-format-btn" data-command="bold" title="太字 (Ctrl+B)" style="font-weight: 700; width: 28px; height: 28px; padding: 0;">B</button>
                   <button class="toolbar-btn memo-format-btn" data-command="italic" title="斜体 (Ctrl+I)" style="font-style: italic; width: 28px; height: 28px; padding: 0;">I</button>
                   <button class="toolbar-btn memo-format-btn" data-command="underline" title="下線 (Ctrl+U)" style="text-decoration: underline; width: 28px; height: 28px; padding: 0;">U</button>
                   <button class="toolbar-btn memo-format-btn" data-command="strikeThrough" title="打ち消し線" style="text-decoration: line-through; width: 28px; height: 28px; padding: 0;">S</button>
                   <div style="width: 1px; height: 16px; background: var(--border-color); margin: 0 0.15rem;"></div>
-                  
-                  <button class="toolbar-btn memo-format-btn" data-command="fontSize" data-arg="5" title="見出し (大)" style="font-size: 0.85rem; font-weight: bold; width: 30px; height: 28px; padding: 0;">H1</button>
-                  <button class="toolbar-btn memo-format-btn" data-command="fontSize" data-arg="3" title="見出し (小)" style="font-size: 0.75rem; font-weight: bold; width: 30px; height: 28px; padding: 0;">H2</button>
-                  <button class="toolbar-btn memo-format-btn" data-command="fontSize" data-arg="2" title="標準テキスト" style="font-size: 0.75rem; width: 30px; height: 28px; padding: 0;">T</button>
+
+                  <!-- 字体（フォントファミリー）選択 -->
+                  <select id="memo-font-select" title="フォントの変更" style="height: 28px; padding: 0 0.25rem; font-size: 0.72rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; cursor: pointer; width: 95px;">
+                    <option value="Arial" selected>Arial</option>
+                    <option value="sans-serif">Sans-serif</option>
+                    <option value="serif">Serif</option>
+                    <option value="monospace">Monospace</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                  </select>
                   <div style="width: 1px; height: 16px; background: var(--border-color); margin: 0 0.15rem;"></div>
                   
-                  <button class="toolbar-btn memo-format-btn" data-command="insertUnorderedList" title="箇条書き" style="font-size: 0.85rem; width: 28px; height: 28px; padding: 0; font-weight: bold;">•</button>
-                  <button class="toolbar-btn memo-format-btn" data-command="insertOrderedList" title="番号付きリスト" style="font-size: 0.8rem; width: 28px; height: 28px; padding: 0; font-weight: bold;">1.</button>
+                  <!-- 見出し (大) ポップアッププレビュー -->
+                  <div class="toolbar-btn-wrapper" style="position: relative; display: inline-block;">
+                    <button class="toolbar-btn memo-format-btn" data-command="fontSize" data-arg="6" title="見出し (大)" style="font-size: 0.85rem; font-weight: bold; width: 30px; height: 28px; padding: 0;">H1</button>
+                    <div class="preview-tooltip" style="font-size: 0.65rem; color: var(--text-muted); pointer-events: none;">
+                      見出し (大)<br>
+                      <span style="font-size: 1.15rem; font-weight: 700; font-family: Arial, sans-serif; color: var(--text-primary); display: block; margin-top: 2px; line-height: 1.2;">大タイトル</span>
+                    </div>
+                  </div>
+
+                  <!-- 見出し (中) ポップアッププレビュー -->
+                  <div class="toolbar-btn-wrapper" style="position: relative; display: inline-block;">
+                    <button class="toolbar-btn memo-format-btn" data-command="fontSize" data-arg="4" title="見出し (中)" style="font-size: 0.8rem; font-weight: bold; width: 30px; height: 28px; padding: 0;">H2</button>
+                    <div class="preview-tooltip" style="font-size: 0.65rem; color: var(--text-muted); pointer-events: none;">
+                      見出し (中)<br>
+                      <span style="font-size: 0.95rem; font-weight: 700; font-family: Arial, sans-serif; color: var(--text-primary); display: block; margin-top: 2px; line-height: 1.2;">中タイトル</span>
+                    </div>
+                  </div>
+
+                  <!-- 見出し (小) ポップアッププレビュー -->
+                  <div class="toolbar-btn-wrapper" style="position: relative; display: inline-block;">
+                    <button class="toolbar-btn memo-format-btn" data-command="fontSize" data-arg="3" title="見出し (小)" style="font-size: 0.72rem; font-weight: bold; width: 30px; height: 28px; padding: 0;">H3</button>
+                    <div class="preview-tooltip" style="font-size: 0.65rem; color: var(--text-muted); pointer-events: none;">
+                      見出し (小)<br>
+                      <span style="font-size: 0.82rem; font-weight: 700; font-family: Arial, sans-serif; color: var(--text-primary); display: block; margin-top: 2px; line-height: 1.2;">小タイトル</span>
+                    </div>
+                  </div>
+
+                  <!-- 標準テキスト ポップアッププレビュー -->
+                  <div class="toolbar-btn-wrapper" style="position: relative; display: inline-block;">
+                    <button class="toolbar-btn memo-format-btn" data-command="fontSize" data-arg="2" title="標準テキスト" style="font-size: 0.75rem; width: 30px; height: 28px; padding: 0;">T</button>
+                    <div class="preview-tooltip" style="font-size: 0.65rem; color: var(--text-muted); pointer-events: none;">
+                      標準テキスト<br>
+                      <span style="font-size: 0.75rem; font-family: Arial, sans-serif; color: var(--text-primary); display: block; margin-top: 2px; line-height: 1.2;">本文の文字</span>
+                    </div>
+                  </div>
+                  <div style="width: 1px; height: 16px; background: var(--border-color); margin: 0 0.15rem;"></div>
+                  
+                  <!-- 箇条書き ポップアッププレビュー -->
+                  <div class="toolbar-btn-wrapper" style="position: relative; display: inline-block;">
+                    <button class="toolbar-btn memo-format-btn" data-command="insertUnorderedList" title="箇条書き" style="font-size: 0.85rem; width: 28px; height: 28px; padding: 0; font-weight: bold;">•</button>
+                    <div class="preview-tooltip" style="font-size: 0.65rem; color: var(--text-muted); width: 120px; pointer-events: none;">
+                      箇条書き<br>
+                      <span style="font-size: 0.72rem; color: var(--text-primary); display: block; margin-top: 2px; line-height: 1.3;">• 項目A<br>• 項目B</span>
+                    </div>
+                  </div>
+
+                  <!-- 番号付きリスト ポップアッププレビュー -->
+                  <div class="toolbar-btn-wrapper" style="position: relative; display: inline-block;">
+                    <button class="toolbar-btn memo-format-btn" data-command="insertOrderedList" title="番号付きリスト" style="font-size: 0.8rem; width: 28px; height: 28px; padding: 0; font-weight: bold;">1.</button>
+                    <div class="preview-tooltip" style="font-size: 0.65rem; color: var(--text-muted); width: 120px; pointer-events: none;">
+                      番号付きリスト<br>
+                      <span style="font-size: 0.72rem; color: var(--text-primary); display: block; margin-top: 2px; line-height: 1.3;">1. 項目A<br>2. 項目B</span>
+                    </div>
+                  </div>
                   <div style="width: 1px; height: 16px; background: var(--border-color); margin: 0 0.15rem;"></div>
                   
                   <!-- パレット式文字色選択 -->
@@ -642,12 +700,10 @@
                       <div class="color-palette-chip" data-color="#ff7f50" style="background: #ff7f50; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 1px solid var(--border-color);" title="オレンジ"></div>
                     </div>
                   </div>
-
-                  <button class="toolbar-btn memo-format-btn" data-command="removeFormat" title="書式のクリア" style="font-size: 0.72rem; padding: 0 0.35rem; height: 28px; line-height: 26px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: none; color: var(--text-primary); cursor: pointer;">クリア</button>
                 </div>
 
                 <!-- エディタコンテンツエリア (contenteditable) -->
-                <div id="memo-input-content" contenteditable="true" style="flex: 1; min-height: 250px; padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none; overflow-y: auto; font-size: 0.9rem; line-height: 1.5; text-align: left;" placeholder="メモの内容を書き込んでください..."></div>
+                <div id="memo-input-content" contenteditable="true" style="flex: 1; min-height: 250px; padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none; overflow-y: auto; font-size: 0.9rem; line-height: 1.5; text-align: left; font-family: Arial, Helvetica, sans-serif;" placeholder="メモの内容を書き込んでください..."></div>
               </div>
 
               <!-- 🔑 アカウント保管庫エリア (初期非表示) -->
