@@ -29,7 +29,8 @@
         <div class="sidebar-accordion" id="appoint-accordion" style="margin-top: 0.5rem;">
           <button class="accordion-header collapsed" id="menu-appoint-parent">
             <span class="accordion-icon">▼</span>
-            <span>📅 アポイント</span>
+            <span class="user-custom-icon">📅</span>
+            <span class="accordion-header-text">アポイント</span>
           </button>
           <div class="accordion-content" id="menu-appoint-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
             <button class="nav-item" id="menu-new-appoint" data-tab="appointment-new">新規アポイント</button>
@@ -43,7 +44,8 @@
         <div class="sidebar-accordion" id="agency-accordion" style="margin-top: 0.5rem;">
           <button class="accordion-header collapsed" id="menu-agency-parent">
             <span class="accordion-icon">▼</span>
-            <span>💼 代理店情報</span>
+            <span class="user-custom-icon">💼</span>
+            <span class="accordion-header-text">代理店情報</span>
           </button>
           <div class="accordion-content" id="menu-agency-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
             <button class="nav-item" id="menu-agency-info" data-tab="agency-info-screen">📊 代理店 基本マスタ</button>
@@ -53,7 +55,8 @@
         <div class="sidebar-accordion" id="jo-accordion" style="margin-top: 0.5rem;">
           <button class="accordion-header collapsed" id="menu-jo-parent">
             <span class="accordion-icon">▼</span>
-            <span>📑 JO情報</span>
+            <span class="user-custom-icon">📑</span>
+            <span class="accordion-header-text">JO情報</span>
           </button>
           <div class="accordion-content" id="menu-jo-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
             <button class="nav-item" id="menu-jo-info" data-tab="jo-info-screen">📊 JO 基本マスタ</button>
@@ -63,7 +66,8 @@
         <div class="sidebar-accordion" id="applicant-accordion" style="margin-top: 0.5rem;">
           <button class="accordion-header collapsed" id="menu-applicant-parent">
             <span class="accordion-icon">▼</span>
-            <span>📋 申込者情報</span>
+            <span class="user-custom-icon">📋</span>
+            <span class="accordion-header-text">申込者情報</span>
           </button>
           <div class="accordion-content" id="menu-applicant-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
             <button class="nav-item" id="menu-applicant-info" data-tab="applicant-info-screen">📊 申込者 基本マスタ</button>
@@ -518,14 +522,14 @@
       <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
         
         <!-- お気に入り -->
-        <div class="admin-app-icon" id="mypage-btn-favorites" title="お気に入り" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; aspect-ratio: 1.1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+        <div class="admin-app-icon" id="mypage-btn-favorites" title="お気に入り" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
           <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">⭐</div>
           <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">お気に入り</span>
           <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">登録されたよく使うフォルダやテーブルを表示します</span>
         </div>
 
         <!-- 個人メモ帳 -->
-        <div class="admin-app-icon" id="mypage-btn-memo" title="個人メモ帳" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; aspect-ratio: 1.1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+        <div class="admin-app-icon" id="mypage-btn-memo" title="個人メモ帳" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
           <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">📝</div>
           <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">個人メモ帳</span>
           <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">通常のメモと暗証番号付きのシークレットメモを使い分けられます</span>
