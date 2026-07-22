@@ -1449,8 +1449,7 @@ textarea {
   width: 60px !important;
   min-width: 60px !important;
   padding: 0.75rem 0.2rem !important;
-  overflow-x: visible !important; /* ツールチップ吹き出しが表示されるよう調整 */
-  overflow-y: auto;
+  overflow: hidden !important; /* スクロールバーによるはみ出し・被りを完全防止 */
   border-right: 1px solid var(--border-color) !important;
   align-items: center;
 }
