@@ -5908,11 +5908,6 @@ function updateUIForCurrentMode() {
   
   if (agencyInfoBtn) agencyInfoBtn.style.display = mode === 'support' ? 'none' : 'block';
   if (joInfoBtn) joInfoBtn.style.display = 'block';
-  
-  const userManagerBtn = document.getElementById('menu-user-manager');
-  if (userManagerBtn) {
-    userManagerBtn.style.display = mode === 'admin' ? 'block' : 'none';
-  }
   if (applicantInfoBtn) applicantInfoBtn.style.display = 'block';
   if (dbmakeBtn) dbmakeBtn.style.display = mode === 'admin' ? 'block' : 'none';
   
@@ -7200,8 +7195,7 @@ function setupEventListeners() {
     { id: 'menu-applicant-info', tab: 'applicant-info-screen' },
     { id: 'menu-dbmake', tab: 'dbmake-screen' },
     { id: 'menu-form-customize', tab: 'form-customize-screen' },
-    { id: 'menu-table-creator', tab: 'table-creator-screen' },
-    { id: 'menu-user-manager', tab: 'user-manager-screen' }
+    { id: 'menu-table-creator', tab: 'table-creator-screen' }
   ];
 
   sidebarButtons.forEach(btn => {
@@ -7249,9 +7243,6 @@ function setupEventListeners() {
         } else if (btn.tab === 'table-creator-screen') {
           title = 'テーブル作成';
           type = 'table-creator-screen';
-        } else if (btn.tab === 'user-manager-screen') {
-          title = '👤 ユーザー登録・管理';
-          type = 'user-manager-screen';
         }
         openTab(btn.tab, type, title);
       });
@@ -21148,33 +21139,12 @@ function initUserManagerEvents() {
   const panelBtn = document.getElementById('admin-panel-user-register-btn');
   const form = document.getElementById('tab-user-register-form');
   const generateBtn = document.getElementById('tab-reg-password-generate-btn');
-  
-  // アコーディオン制御
-  const accHeader = document.getElementById('admin-tab-user-accordion-header');
-  const accContent = document.getElementById('admin-tab-user-accordion-content');
-  const accArrow = document.getElementById('admin-tab-user-accordion-arrow');
-
   // パスワード変更リマインダー即時実行
   const reminderRunBtn = document.getElementById('user-pwd-reminder-run-btn');
-
-  if (accHeader && accContent && accArrow) {
-    const newHeader = accHeader.cloneNode(true);
-    accHeader.parentNode.replaceChild(newHeader, accHeader);
-    newHeader.addEventListener('click', () => {
-      const isHidden = accContent.style.display === 'none';
-      accContent.style.display = isHidden ? 'flex' : 'none';
-      accArrow.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
-    });
-  }
 
   // 管理者パネルボタンからタブを開く
   if (panelBtn) {
     panelBtn.addEventListener('click', () => {
-      // 開閉状態をリセットしてタブを開く
-      if (accContent && accArrow) {
-        accContent.style.display = 'none';
-        accArrow.style.transform = 'rotate(0deg)';
-      }
       openTab('user-manager-screen', 'user-manager-screen', '👤 ユーザー登録・管理');
       renderUserManagerList();
     });
@@ -21304,12 +21274,6 @@ function initUserManagerEvents() {
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
       showToast(`ユーザー「${regFullName}」を正常に登録しました。`, 'success');
       newForm.reset();
-      
-      // 登録完了したらアコーディオンを閉じる
-      if (accContent && accArrow) {
-        accContent.style.display = 'none';
-        accArrow.style.transform = 'rotate(0deg)';
-      }
       
       renderUserManagerList();
     });

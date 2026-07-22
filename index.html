@@ -71,7 +71,7 @@
 
         <button class="nav-item" id="menu-form-customize" data-tab="form-customize-screen" style="margin-top: 0.5rem;">📋 フォーム作成</button>
         <button class="nav-item" id="menu-table-creator" data-tab="table-creator-screen" style="margin-top: 0.5rem;">📊 テーブル作成</button>
-        <button class="nav-item" id="menu-user-manager" data-tab="user-manager-screen" style="margin-top: 0.5rem; display: none;">👤 ユーザー登録・管理</button>
+
 
 </nav>
 <div class="user-profile-section" style="position: relative;">
@@ -1631,6 +1631,107 @@
           <!-- JSで動的描画 -->
         </tbody>
       </table>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 👥 ユーザー登録・管理画面（画面遷移タブ） ================= -->
+<section id="user-manager-screen" class="screen-view" style="display: none; padding: 1.25rem;">
+  <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left;">
+    
+    <!-- 画面ヘッダー ＆ 各種リマインダー設定 -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 0.5rem;">
+      <div>
+        <h1 style="margin: 0; font-size: 1.3rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+          👤 ユーザーアカウント管理
+        </h1>
+        <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">システム利用ユーザーの作成・削除、パスワード変更リマインダーおよび未ログイン検出の制御を行います。</p>
+      </div>
+      
+      <!-- パスワード変更リマインダーコントロール -->
+      <div style="display: flex; align-items: center; gap: 0.75rem; background: var(--bg-surface-elevated); padding: 0.5rem 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.82rem;">
+        <label style="display: flex; align-items: center; gap: 0.4rem; font-weight: 600; cursor: pointer; user-select: none;">
+          <input type="checkbox" id="user-pwd-reminder-toggle" checked style="cursor: pointer; width: 15px; height: 15px;">
+          <span>半年ごとのパスワード変更促しメール自動送信: ON</span>
+        </label>
+        <button id="user-pwd-reminder-run-btn" class="btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.25rem; border-radius: var(--radius-xs);" title="パスワード変更が必要なユーザーを検知し、促しメールを即時シミュレート送信します。">
+          ⚡ リマインダー即時実行
+        </button>
+      </div>
+    </div>
+
+    <!-- コンテンツボディ：2カラムレイアウト -->
+    <div style="display: flex; flex-direction: row; gap: 1.25rem; align-items: flex-start; flex-wrap: wrap;">
+      
+      <!-- 左カラム：新規アカウント登録（最初から展開してフラット表示） -->
+      <div style="flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-surface); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+        <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); border-bottom: 1.5px solid var(--border-color); padding-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+          <span style="display: flex; align-items: center; gap: 0.35rem;">➕ 新規アカウント登録</span>
+        </h3>
+        
+        <div style="display: flex; flex-direction: column; gap: 0.85rem; margin-top: 0.5rem;">
+          <form id="tab-user-register-form" style="display: flex; flex-direction: column; gap: 0.85rem;">
+            
+            <!-- 姓名の分割入力 -->
+            <div style="display: flex; gap: 0.5rem;">
+              <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1;">
+                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">姓:</label>
+                <input type="text" id="tab-reg-user-lastname" required placeholder="例: 営業" style="width: 100%; padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1;">
+                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">名:</label>
+                <input type="text" id="tab-reg-user-firstname" required placeholder="例: 担当C" style="width: 100%; padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+              </div>
+            </div>
+            
+            <!-- ユーザー名 (ログインID) / パスワード生成 -->
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+              <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">ユーザー名 (ログインID。半角小文字・記号・6文字以上):</label>
+              <input type="text" id="tab-reg-user-id" required placeholder="例: sales_03 (大文字・記号なし不可)" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.25rem; position: relative;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">パスワード (大・小・数を含む6文字以上・記号不可):</label>
+                <button type="button" id="tab-reg-password-generate-btn" class="btn-secondary" style="padding: 0.15rem 0.4rem; font-size: 0.68rem; font-weight: 600; border-radius: var(--radius-xs); cursor: pointer;" title="強力なパスワードを自動生成して入力します">🔑 自動生成</button>
+              </div>
+              <input type="password" id="tab-reg-user-password" required placeholder="パスワードを入力" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+              <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">パスワード (確認用):</label>
+              <input type="password" id="tab-reg-user-password-confirm" required placeholder="パスワードを再入力" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+              <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">ロール（所属権限）:</label>
+              <select id="tab-reg-user-role" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+                <option value="sales">営業担当 (sales)</option>
+                <option value="support">開設サポート担当 (support)</option>
+                <option value="admin">システム管理者 (admin)</option>
+              </select>
+            </div>
+            
+            <button type="submit" class="btn-primary" style="margin-top: 0.5rem; padding: 0.6rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm);">
+              💾 アカウントを登録
+            </button>
+          </form>
+        </div>
+      </div>
+      
+      <!-- 右カラム：登録ユーザー一覧（長期未ログイン警告 & メール送信ボタン付き） -->
+      <div style="flex: 1.5; min-width: 350px; display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-surface); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+        <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid var(--border-color); padding-bottom: 0.5rem;">
+          <span>📋 登録アカウント一覧</span>
+          <span id="tab-user-count-badge" style="font-size: 0.75rem; font-weight: 600; background: var(--border-color); padding: 0.15rem 0.5rem; border-radius: var(--radius-md); color: var(--text-primary);">0件</span>
+        </h3>
+        
+        <!-- リストコンテナ -->
+        <div id="tab-user-list-container" style="display: flex; flex-direction: column; gap: 0.6rem; max-height: calc(100vh - 280px); overflow-y: auto; padding-right: 0.25rem;">
+          <!-- JSで動的に構築されます -->
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
