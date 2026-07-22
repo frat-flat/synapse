@@ -2118,9 +2118,9 @@ function attachSidebarItemActions(el, itemId, itemName, itemType, depth = 1) {
   if (!isParentFolder) {
     favBtn = document.createElement('span');
     favBtn.textContent = isFav ? '★' : '☆';
-    favBtn.className = 'custom-icon-fav-btn';
+    favBtn.className = isFav ? 'custom-icon-fav-btn is-favorite' : 'custom-icon-fav-btn';
     favBtn.title = isFav ? 'お気に入りから解除' : 'お気に入りに追加';
-    favBtn.style.cssText = `cursor: pointer; margin-left: auto; font-size: 0.85rem; opacity: ${isFav ? '0.9' : '0'}; transition: opacity 0.2s; padding: 0 0.2rem; color: #eab308; display: inline-flex; align-items: center; justify-content: center;`;
+    favBtn.style.cssText = `cursor: pointer; margin-left: auto; font-size: 0.85rem; opacity: ${isFav ? '0.9' : '0'}; transition: opacity 0.2s, transform 0.2s; padding: 0 0.2rem; color: #eab308; display: inline-flex; align-items: center; justify-content: center;`;
     favBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleFavorite(itemId, itemName, itemType);
@@ -2150,19 +2150,7 @@ function attachSidebarItemActions(el, itemId, itemName, itemType, depth = 1) {
     });
     el.appendChild(editBtn);
   }
-
-  // マウスイベントのバインド
-  const onMouseEnter = () => {
-    if (favBtn) favBtn.style.opacity = '0.9';
-    if (editBtn) editBtn.style.opacity = '0.7';
-  };
-  const onMouseLeave = () => {
-    if (favBtn) favBtn.style.opacity = isFav ? '0.9' : '0';
-    if (editBtn) editBtn.style.opacity = '0';
-  };
-
-  el.addEventListener('mouseenter', onMouseEnter);
-  el.addEventListener('mouseleave', onMouseLeave);
+  // マウスイベントは styles.css のホバー指定でクリーンに制御するため、JSリスナーはバインドしません。
 }
 
 // 標準メニュー要素 of cache
@@ -5704,18 +5692,22 @@ function syncMasterTableNamesWithFolders() {
   const joInfoBtn = document.getElementById('menu-jo-info');
   const applicantInfoBtn = document.getElementById('menu-applicant-info');
 
-  if (joInfoBtn) {
-    const name = getDynamicMasterTableName('jo-info-screen');
-    joInfoBtn.innerHTML = `📊 ${name}`;
-  }
-  if (applicantInfoBtn) {
-    const name = getDynamicMasterTableName('applicant-info-screen');
-    applicantInfoBtn.innerHTML = `📊 ${name}`;
-  }
-  if (agencyInfoBtn) {
-    const name = getDynamicMasterTableName('agency-info-screen');
-    agencyInfoBtn.innerHTML = `📊 ${name}`;
-  }
+  const updateBtnText = (btn, screenId) => {
+    if (!btn) return;
+    const name = getDynamicMasterTableName(screenId);
+    const textSpan = btn.querySelector('.nav-item-text');
+    if (textSpan) {
+      textSpan.textContent = name;
+    } else {
+      btn.innerHTML = `📊 <span class="nav-item-text">${name}</span>`;
+      // innerHTMLが上書きされた場合は、お気に入りボタンなどを再バインド
+      attachSidebarItemActions(btn, screenId, name, 'table');
+    }
+  };
+
+  updateBtnText(joInfoBtn, 'jo-info-screen');
+  updateBtnText(applicantInfoBtn, 'applicant-info-screen');
+  updateBtnText(agencyInfoBtn, 'agency-info-screen');
 }
 window.syncMasterTableNamesWithFolders = syncMasterTableNamesWithFolders;
 
