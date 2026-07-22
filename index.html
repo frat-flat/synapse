@@ -514,18 +514,11 @@
       <!-- コントロールパネル風のアイコンメニュー -->
       <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
         
-        <!-- 通常のメモ帳 -->
-        <div class="admin-app-icon" id="mypage-btn-normal-memo" title="通常のメモ帳" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; aspect-ratio: 1.1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
-          <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">📄</div>
-          <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">通常のメモ帳</span>
-          <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">暗証番号なしで素早く書き留められます</span>
-        </div>
-
-        <!-- シークレットメモ帳 -->
-        <div class="admin-app-icon" id="mypage-btn-secure-memo" title="シークレットメモ帳" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; aspect-ratio: 1.1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
-          <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">🔒</div>
-          <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">シークレットメモ帳</span>
-          <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">暗証番号の認証が必要な安全なメモ帳です</span>
+        <!-- 個人メモ帳 -->
+        <div class="admin-app-icon" id="mypage-btn-memo" title="個人メモ帳" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; aspect-ratio: 1.1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+          <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">📝</div>
+          <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">個人メモ帳</span>
+          <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">通常のメモと暗証番号付きのシークレットメモを使い分けられます</span>
         </div>
 
         <!-- 将来の拡張用プレースホルダー -->
@@ -549,45 +542,20 @@
           </button>
           <div>
             <h1 id="mypage-memo-title-text" style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
-              📄 通常のメモ帳
+              📝 個人メモ帳
             </h1>
-            <p id="mypage-memo-desc-text" style="margin: 0.2rem 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">個人用のメモ帳です。このデータはご自身のみに紐付いて保存されます。</p>
+            <p id="mypage-memo-desc-text" style="margin: 0.2rem 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">個人用のメモ帳です。通常メモと暗証番号付きのシークレットメモを管理できます。</p>
           </div>
         </div>
       </div>
 
-      <!-- コンテンツ表示部（通常のメモ / ロック付きメモ） -->
+      <!-- コンテンツ表示部 -->
       <div style="display: flex; flex: 1; gap: 1.25rem; overflow: hidden; align-items: stretch; position: relative; width: 100%;">
         
-        <!-- 暗証番号ロック画面（ロック付きメモで、かつロック状態の時だけ表示） -->
-        <div id="memo-lock-view" style="display: none; position: absolute; inset: 0; z-index: 10; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 2rem;">
-          <div style="font-size: 3rem; margin-bottom: 1rem;">🔒</div>
-          
-          <!-- 初回設定用 -->
-          <div id="memo-lock-setup-container" style="display: none; flex-direction: column; align-items: center; gap: 0.85rem; max-width: 320px; width: 100%;">
-            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); text-align: center;">ロック用暗証番号を設定してください</h3>
-            <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); text-align: center;">
-              ロック付きメモを保護するための専用パスワードです。<br>ログイン用パスワードとは異なるものを設定できます。
-            </p>
-            <input type="password" id="memo-setup-pwd" placeholder="暗証番号を入力 (4桁以上)" style="width: 100%; padding: 0.55rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); text-align: center; outline: none;">
-            <input type="password" id="memo-setup-pwd-confirm" placeholder="暗証番号を確認用で再入力" style="width: 100%; padding: 0.55rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); text-align: center; outline: none;">
-            <button id="memo-setup-btn" class="btn btn-primary" style="width: 100%; padding: 0.55rem; font-weight: 600; font-size: 0.85rem; cursor: pointer;">💾 暗証番号を設定して解除</button>
-          </div>
-
-          <!-- 解除用 -->
-          <div id="memo-lock-unlock-container" style="display: flex; flex-direction: column; align-items: center; gap: 0.85rem; max-width: 320px; width: 100%;">
-            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); text-align: center;">ロック付きメモのロックを解除</h3>
-            <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); text-align: center;">暗証番号を入力して、ロック付きメモを表示してください。</p>
-            <input type="password" id="memo-unlock-pwd" placeholder="暗証番号を入力" style="width: 100%; padding: 0.55rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); text-align: center; outline: none;">
-            <button id="memo-unlock-btn" class="btn btn-primary" style="width: 100%; padding: 0.55rem; font-weight: 600; font-size: 0.85rem; cursor: pointer;">🔓 ロックを解除</button>
-            <button id="memo-reset-pwd-btn" class="btn-text" style="font-size: 0.72rem; color: var(--text-muted); cursor: pointer; text-decoration: underline; background: none; border: none;">暗証番号を再設定する (※ロック付きメモは全削除されます)</button>
-          </div>
-        </div>
-
-        <!-- メモ帳本体（通常のメモ、または解除後のロック付きメモ） -->
+        <!-- メモ帳本体 -->
         <div id="memo-main-view" style="display: flex; flex: 1; flex-direction: row; gap: 1.25rem; overflow: hidden; align-items: stretch; width: 100%;">
           
-          <!-- メモ帳左カラム：リスト ＆ 新規作成 ＆ ロックアウトボタン -->
+          <!-- メモ帳左カラム：リスト ＆ 新規作成 ＆ 鍵トグルボタン -->
           <div style="width: 260px; display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-surface); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
             <button id="memo-new-btn" class="btn-primary" style="padding: 0.5rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.35rem; border-radius: var(--radius-sm);">
               ➕ 新規メモ作成
@@ -597,9 +565,9 @@
               <!-- メモ一覧が動的に出力されます -->
             </div>
 
-            <!-- ロック付きメモのときのみ表示される「再ロック」ボタン -->
-            <button id="memo-lock-exit-btn" class="btn-secondary" style="display: none; padding: 0.45rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.35rem; border-radius: var(--radius-sm); border-color: #ef4444; color: #ef4444; background: none;">
-              🔒 メモ帳をロック
+            <!-- 鍵マーク（暗証番号ロック切り替え）ボタン -->
+            <button id="memo-lock-toggle-btn" class="btn-secondary" style="padding: 0.45rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.35rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-primary); transition: all 0.2s;">
+              <span id="memo-lock-icon-status">🔒</span> <span id="memo-lock-text-status">ロック付きメモを表示</span>
             </button>
           </div>
 
@@ -614,8 +582,15 @@
             <!-- エディタ本体 -->
             <div id="memo-editor-active" style="display: none; flex-direction: column; gap: 0.75rem; height: 100%;">
               <!-- タイトル入力 -->
-              <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <div style="display: flex; gap: 0.5rem; align-items: center; width: 100%;">
                 <input type="text" id="memo-input-title" placeholder="無題のメモ" style="flex: 1; padding: 0.5rem 0.75rem; font-size: 1.1rem; font-weight: 700; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+                
+                <!-- シークレットトグル設定 -->
+                <label id="memo-secure-toggle-label" style="display: none; align-items: center; gap: 0.25rem; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                  <input type="checkbox" id="memo-is-secure-checkbox" style="cursor: pointer;">
+                  <span>🔒 ロック対象</span>
+                </label>
+
                 <button id="memo-save-btn" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm);">💾 保存</button>
                 <button id="memo-delete-btn" class="btn-text" style="color: #ef4444; font-size: 0.85rem; font-weight: 600; cursor: pointer; padding: 0.5rem; background: none; border: none;">🗑️ 削除</button>
               </div>
@@ -2345,6 +2320,38 @@
     個数: 0 ▼
   </div>
   <div id="stats-dropdown-menu" class="stats-dropdown-menu" style="display: none;"></div>
+</div>
+
+<!-- ================= メモ暗証番号（4桁数字）モーダル ================= -->
+<div class="modal-overlay" id="memo-password-modal" style="display: none; justify-content: center; align-items: center; z-index: 20000; position: fixed; inset: 0; background: rgba(0,0,0,0.5);">
+  <div class="modal-box" style="max-width: 320px; width: 90%; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-lg);">
+    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; text-align: left;">
+      <h3 id="memo-pwd-modal-title" style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+        🔒 暗証番号の確認
+      </h3>
+      <button class="btn-text" id="memo-pwd-modal-close" style="font-size: 1.1rem; font-weight: bold; cursor: pointer; color: var(--text-muted); border: none; background: none;">✕</button>
+    </div>
+    
+    <!-- 初回設定用フォーム -->
+    <div id="memo-pwd-setup-form" style="display: none; flex-direction: column; gap: 0.75rem; text-align: left;">
+      <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); text-align: left;">
+        ロック付きメモを保護するための<strong>4桁の数字</strong>を設定してください。
+      </p>
+      <input type="password" id="memo-pwd-setup-val" maxlength="4" placeholder="4桁の数字を入力" style="width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); text-align: center; font-size: 1.1rem; letter-spacing: 0.25rem; outline: none;">
+      <input type="password" id="memo-pwd-setup-confirm-val" maxlength="4" placeholder="確認のため再入力" style="width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); text-align: center; font-size: 1.1rem; letter-spacing: 0.25rem; outline: none;">
+      <button id="memo-pwd-setup-submit" class="btn-primary" style="width: 100%; padding: 0.55rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); border: none;">💾 暗証番号を設定</button>
+    </div>
+
+    <!-- 解除用フォーム -->
+    <div id="memo-pwd-unlock-form" style="display: flex; flex-direction: column; gap: 0.75rem; text-align: left;">
+      <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); text-align: left;">
+        設定した<strong>4桁의 数字</strong>の暗証番号を入力してください。
+      </p>
+      <input type="password" id="memo-pwd-unlock-val" maxlength="4" placeholder="4桁の数字を入力" style="width: 100%; padding: 0.55rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); text-align: center; font-size: 1.1rem; letter-spacing: 0.25rem; outline: none;">
+      <button id="memo-pwd-unlock-submit" class="btn-primary" style="width: 100%; padding: 0.55rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); border: none;">🔓 解除する</button>
+      <button id="memo-pwd-reset-submit" class="btn-text" style="font-size: 0.7rem; color: var(--text-muted); cursor: pointer; text-decoration: underline; background: none; border: none; padding: 0; margin-top: 0.25rem;">暗証番号を再設定する (※ロック付きメモは全削除されます)</button>
+    </div>
+  </div>
 </div>
 </body>
 </html>
