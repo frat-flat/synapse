@@ -21278,6 +21278,15 @@ function initUserManagerEvents() {
       renderUserManagerList();
     });
   }
+
+  const filterRole = document.getElementById('tab-user-filter-role');
+  const sortDate = document.getElementById('tab-user-sort-date');
+  if (filterRole) {
+    filterRole.addEventListener('change', () => renderUserManagerList());
+  }
+  if (sortDate) {
+    sortDate.addEventListener('change', () => renderUserManagerList());
+  }
 }
 
 function renderUserManagerList() {
@@ -21286,13 +21295,34 @@ function renderUserManagerList() {
   if (!container) return;
 
   ensureInitialUsersExist();
-  const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+  let users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+
+  // ロールフィルター適用
+  const filterRoleEl = document.getElementById('tab-user-filter-role');
+  const selectedRole = filterRoleEl ? filterRoleEl.value : 'all';
+  if (selectedRole !== 'all') {
+    users = users.filter(u => u.role === selectedRole);
+  }
+
+  // 登録日ソート適用
+  const sortDateEl = document.getElementById('tab-user-sort-date');
+  const selectedSort = sortDateEl ? sortDateEl.value : 'desc';
+  users.sort((a, b) => {
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    if (selectedSort === 'asc') {
+      return timeA - timeB; // 古い順 (昇順)
+    } else {
+      return timeB - timeA; // 新しい順 (降順)
+    }
+  });
+
   if (countBadge) countBadge.textContent = `${users.length}件`;
 
   container.innerHTML = '';
 
   if (users.length === 0) {
-    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 1.5rem 0;">登録されているアカウントはありません。</div>`;
+    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 1.5rem 0;">該当する登録アカウントはありません。</div>`;
     return;
   }
 

@@ -1719,15 +1719,41 @@
         </div>
       </div>
       
-      <!-- 右カラム：登録ユーザー一覧（長期未ログイン警告 & メール送信ボタン付き） -->
+      <!-- 右カラム：登録ユーザー一覧（長期未ログイン警告 & メール送信ボタン付き、フィルター・ソート付き） -->
       <div style="flex: 1.5; min-width: 350px; display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-surface); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
-        <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid var(--border-color); padding-bottom: 0.5rem;">
-          <span>📋 登録アカウント一覧</span>
-          <span id="tab-user-count-badge" style="font-size: 0.75rem; font-weight: 600; background: var(--border-color); padding: 0.15rem 0.5rem; border-radius: var(--radius-md); color: var(--text-primary);">0件</span>
-        </h3>
+        <div style="border-bottom: 1.5px solid var(--border-color); padding-bottom: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+              <span>📋 登録アカウント一覧</span>
+              <span id="tab-user-count-badge" style="font-size: 0.75rem; font-weight: 600; background: var(--border-color); padding: 0.15rem 0.5rem; border-radius: var(--radius-md); color: var(--text-primary);">0件</span>
+            </h3>
+          </div>
+          
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem;">
+            <!-- ロールフィルター -->
+            <div style="display: flex; align-items: center; gap: 0.25rem;">
+              <span style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted);">ロール:</span>
+              <select id="tab-user-filter-role" style="padding: 0.2rem 0.4rem; font-size: 0.72rem; border: 1px solid var(--border-color); border-radius: var(--radius-xs); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none; cursor: pointer;">
+                <option value="all">すべて</option>
+                <option value="admin">管理者</option>
+                <option value="sales">営業担当</option>
+                <option value="support">サポート</option>
+              </select>
+            </div>
+            
+            <!-- 登録日ソート -->
+            <div style="display: flex; align-items: center; gap: 0.25rem;">
+              <span style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted);">登録順:</span>
+              <select id="tab-user-sort-date" style="padding: 0.2rem 0.4rem; font-size: 0.72rem; border: 1px solid var(--border-color); border-radius: var(--radius-xs); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none; cursor: pointer;">
+                <option value="desc">新しい順 (降順)</option>
+                <option value="asc">古い順 (昇順)</option>
+              </select>
+            </div>
+          </div>
+        </div>
         
         <!-- リストコンテナ -->
-        <div id="tab-user-list-container" style="display: flex; flex-direction: column; gap: 0.6rem; max-height: calc(100vh - 280px); overflow-y: auto; padding-right: 0.25rem;">
+        <div id="tab-user-list-container" style="display: flex; flex-direction: column; gap: 0.6rem; max-height: calc(100vh - 310px); overflow-y: auto; padding-right: 0.25rem;">
           <!-- JSで動的に構築されます -->
         </div>
       </div>
