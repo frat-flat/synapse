@@ -2089,44 +2089,62 @@ function renderMypageFavorites() {
 }
 
 // ⭐ サイドバー項目にお気に入り＆編集アクションを追加する共通関数
-function attachSidebarItemActions(el, itemId, itemName, itemType) {
+function attachSidebarItemActions(el, itemId, itemName, itemType, depth = 1) {
   // すでに存在している場合は削除して再作成（再描画時のクリーンアップ）
   const oldFav = el.querySelector('.custom-icon-fav-btn');
   if (oldFav) oldFav.remove();
   const oldEdit = el.querySelector('.custom-icon-edit-btn');
   if (oldEdit) oldEdit.remove();
 
-  const isFav = state.favorites && state.favorites.some(fav => fav.id === itemId);
-  const favBtn = document.createElement('span');
-  favBtn.textContent = isFav ? '★' : '☆';
-  favBtn.className = 'custom-icon-fav-btn';
-  favBtn.title = isFav ? 'お気に入りから解除' : 'お気に入りに追加';
-  favBtn.style.cssText = `cursor: pointer; margin-left: auto; font-size: 0.85rem; opacity: ${isFav ? '0.9' : '0'}; transition: opacity 0.2s; padding: 0 0.2rem; color: #eab308; display: inline-flex; align-items: center; justify-content: center;`;
-  favBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleFavorite(itemId, itemName, itemType);
-  });
-  el.appendChild(favBtn);
+  // 親フォルダ（第一階層：depth === 0 かつフォルダタイプ）の場合はお気に入りボタンを表示しない
+  const isParentFolder = (itemType === 'folder' && depth === 0);
 
-  const editBtn = document.createElement('span');
-  editBtn.textContent = '🎨';
-  editBtn.className = 'custom-icon-edit-btn';
-  editBtn.title = 'アイコンを変更';
-  editBtn.style.cssText = 'cursor: pointer; margin-left: 0.25rem; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s; padding: 0 0.2rem; display: inline-flex; align-items: center; justify-content: center;';
-  editBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    openCustomIconModal(itemId, itemName);
-  });
-  el.appendChild(editBtn);
+  const isFav = state.favorites && state.favorites.some(fav => fav.id === itemId);
+  let favBtn = null;
+  
+  if (!isParentFolder) {
+    favBtn = document.createElement('span');
+    favBtn.textContent = isFav ? '★' : '☆';
+    favBtn.className = 'custom-icon-fav-btn';
+    favBtn.title = isFav ? 'お気に入りから解除' : 'お気に入りに追加';
+    favBtn.style.cssText = `cursor: pointer; margin-left: auto; font-size: 0.85rem; opacity: ${isFav ? '0.9' : '0'}; transition: opacity 0.2s; padding: 0 0.2rem; color: #eab308; display: inline-flex; align-items: center; justify-content: center;`;
+    favBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFavorite(itemId, itemName, itemType);
+    });
+    el.appendChild(favBtn);
+  }
+
+  // 編集ボタン（🎨）は、システム項目以外の項目にのみ表示する
+  const stdSystemItems = [
+    'appoint-accordion', 'agency-accordion', 'jo-accordion', 'applicant-accordion',
+    'agency-info-screen', 'jo-info-screen', 'applicant-info-screen',
+    'appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link'
+  ];
+  const isSystemItem = stdSystemItems.includes(itemId);
+  let editBtn = null;
+
+  if (!isSystemItem) {
+    editBtn = document.createElement('span');
+    editBtn.textContent = '🎨';
+    editBtn.className = 'custom-icon-edit-btn';
+    editBtn.title = 'アイコンを変更';
+    editBtn.style.cssText = `cursor: pointer; margin-left: ${isParentFolder ? 'auto' : '0.25rem'}; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s; padding: 0 0.2rem; display: inline-flex; align-items: center; justify-content: center;`;
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCustomIconModal(itemId, itemName);
+    });
+    el.appendChild(editBtn);
+  }
 
   // マウスイベントのバインド
   const onMouseEnter = () => {
-    favBtn.style.opacity = '0.9';
-    editBtn.style.opacity = '0.7';
+    if (favBtn) favBtn.style.opacity = '0.9';
+    if (editBtn) editBtn.style.opacity = '0.7';
   };
   const onMouseLeave = () => {
-    favBtn.style.opacity = isFav ? '0.9' : '0';
-    editBtn.style.opacity = '0';
+    if (favBtn) favBtn.style.opacity = isFav ? '0.9' : '0';
+    if (editBtn) editBtn.style.opacity = '0';
   };
 
   el.addEventListener('mouseenter', onMouseEnter);
@@ -2229,7 +2247,7 @@ function renderCustomTableList() {
           headerEl.setAttribute('data-tooltip', acc.name);
           headerEl.innerHTML = `<span class="accordion-arrow">▼</span>${iconHtml}<span class="accordion-header-text">${acc.name}</span>`;
 
-          attachSidebarItemActions(headerEl, acc.id, acc.name, 'folder');
+          attachSidebarItemActions(headerEl, acc.id, acc.name, 'folder', depth);
         }
       } else {
         // 新規カスタムアコーディオンを動的生成
@@ -2246,7 +2264,7 @@ function renderCustomTableList() {
         const iconHtml = getUserItemIconHtml(acc.id, '📁');
         header.innerHTML = `<span class="accordion-arrow">▼</span>${iconHtml}<span class="accordion-header-text">${acc.name}</span>`;
 
-        attachSidebarItemActions(header, acc.id, acc.name, 'folder');
+        attachSidebarItemActions(header, acc.id, acc.name, 'folder', depth);
 
         // サイドバーからのフォルダ削除は禁止（「フォルダ管理」からのみパスワード認証で削除可能）
 
@@ -2297,7 +2315,7 @@ function renderCustomTableList() {
         contentEl.innerHTML = '';
 
         // アポイントアコーディオンの場合は、標準のサブメニューを最初にアペンドする
-        if (acc.id === 'appoint-accordion') {
+        if (normalizeFolderId(acc.id) === 'appoint-accordion') {
           appointSubMenus.forEach(el => {
             if (el) contentEl.appendChild(el);
           });
