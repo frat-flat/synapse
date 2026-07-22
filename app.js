@@ -23340,6 +23340,7 @@ function initMypageMemo() {
   const colorPalettePopup = document.getElementById('memo-color-palette-popup');
   const colorPaletteChips = document.querySelectorAll('.color-palette-chip');
   const fontSelect = document.getElementById('memo-font-select');
+  const paragraphSelect = document.getElementById('memo-paragraph-select');
 
   // モーダル要素
   const pwdModal = document.getElementById('memo-password-modal');
@@ -23524,23 +23525,37 @@ function initMypageMemo() {
     };
   }
 
-  // パレット式文字色選択の表示トグル
+  // テキスト書式スタイルの変更イベント
+  if (paragraphSelect) {
+    paragraphSelect.onchange = (e) => {
+      const val = e.target.value;
+      if (val === 'small') {
+        document.execCommand('fontSize', false, '1');
+      } else {
+        document.execCommand('formatBlock', false, val);
+      }
+      if (contentInput) contentInput.focus();
+    };
+  }
+
+  // パレット式文字色選択の表示トグル (onmousedown で preventDefault して選択範囲を維持)
   if (paletteBtn && colorPalettePopup) {
-    paletteBtn.onclick = (e) => {
+    paletteBtn.onmousedown = (e) => {
+      e.preventDefault();
       e.stopPropagation();
       const isOpen = colorPalettePopup.style.display === 'grid';
       colorPalettePopup.style.display = isOpen ? 'none' : 'grid';
     };
   }
 
-  // カラーチップ選択イベント
+  // カラーチップ選択イベント (onmousedown で preventDefault して選択範囲を維持したまま色を適用)
   colorPaletteChips.forEach(chip => {
-    chip.onclick = (e) => {
+    chip.onmousedown = (e) => {
+      e.preventDefault();
       e.stopPropagation();
       const color = chip.dataset.color;
       if (color) {
         document.execCommand('foreColor', false, color);
-        if (contentInput) contentInput.focus();
       }
       if (colorPalettePopup) colorPalettePopup.style.display = 'none';
     };
@@ -23774,6 +23789,8 @@ function initMypageMemo() {
       
       // フォントファミリーの初期値をArialにセット
       if (fontSelect) fontSelect.value = 'Arial';
+      // 段落書式スタイルの初期値を標準テキストにセット
+      if (paragraphSelect) paragraphSelect.value = 'p';
       
       // ロック解除中なら「シークレット（ロック付き）」チェックボックスを同期して表示
       if (state.memoUnlockedSecure) {
@@ -23872,6 +23889,7 @@ function initMypageMemo() {
       renderMemoList();
       showEditor(newMemo);
       if (fontSelect) fontSelect.value = 'Arial';
+      if (paragraphSelect) paragraphSelect.value = 'p';
       if (titleInput) titleInput.focus();
     };
   }

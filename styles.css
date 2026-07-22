@@ -3849,3 +3849,31 @@ h3 {
   display: block;
 }
 
+/* ============================================================================
+   📝 エディタ内 blockquote / pre / small の美化スタイル
+   ============================================================================ */
+#memo-input-content blockquote {
+  border-left: 4px solid var(--primary);
+  padding: 0.5rem 1rem;
+  margin: 0.5rem 0;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+#memo-input-content pre {
+  background: #000000;
+  color: #10b981;
+  font-family: monospace;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  margin: 0.5rem 0;
+  overflow-x: auto;
+  font-size: 0.85rem;
+}
+
+#memo-input-content small {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
