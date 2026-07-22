@@ -524,13 +524,16 @@
           <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">通常のメモと暗証番号付きのシークレットメモを使い分けられます</span>
         </div>
 
-        <!-- 将来の拡張用プレースホルダー -->
-        <div style="opacity: 0.55; border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface-elevated); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; aspect-ratio: 1.1 / 1; user-select: none;">
-          <div style="font-size: 2.2rem;">⚙️</div>
-          <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted);">個人設定</span>
-          <span style="font-size: 0.65rem; color: var(--text-muted); line-height: 1.2;">プロフィールや表示設定（近日追加）</span>
-        </div>
+      </div>
 
+      <!-- お気に入りセクション -->
+      <div id="mypage-favorites-section" style="margin-top: 1.5rem; display: none;">
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.4rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+          ⭐ お気に入り
+        </h3>
+        <div id="mypage-favorites-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem;">
+          <!-- JSで動的に追加されます -->
+        </div>
       </div>
     </div>
 

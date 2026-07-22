@@ -82,7 +82,8 @@ const STORAGE_KEYS = {
   JO_ROW_HEIGHTS: 'synapse_jo_row_heights',
   AP_ROW_HEIGHTS: 'synapse_ap_row_heights',
   AG_ROW_HEIGHTS: 'synapse_ag_row_heights',
-  USERS: 'synapse_users_list'
+  USERS: 'synapse_users_list',
+  FAVORITES: 'synapse_favorites'
 };
 
 const INITIAL_JO_COLUMNS = [
@@ -171,6 +172,7 @@ let state = {
   previewMode: 'hide', // プレビュー表示モード ('hide' | 'grayout')
   defaultZoomLevel: 100, // タブ以外の画面（ホーム等）のズームデフォルト値
   tableEditLocks: {}, // 各テーブルごとの直接編集ロック状態 (テーブルID -> boolean)
+  favorites: [], // お気に入り登録されたメニュー項目
   
   // カスタムテーブル用選択情報（グリッド・フォーマット・範囲選択用）
   ctSelectedCell: null,
@@ -676,6 +678,8 @@ function loadStateFromLocalStorage(keys) {
       state.agColumns = JSON.parse(localStorage.getItem(STORAGE_KEYS.AG_COLUMNS));
     } else if (key === `SYNAPSE_DBMAKE_COLUMNS${dbmakeSuffix}`) {
       state.dbmakeColumns = JSON.parse(localStorage.getItem(`SYNAPSE_DBMAKE_COLUMNS${dbmakeSuffix}`));
+    } else if (key === STORAGE_KEYS.FAVORITES) {
+      state.favorites = JSON.parse(localStorage.getItem(STORAGE_KEYS.FAVORITES)) || [];
     }
   });
 
@@ -1116,6 +1120,9 @@ function initDatabase() {
     ap: JSON.parse(localStorage.getItem(`SYNAPSE_CF_AP_${userId}`)) || [],
     ag: JSON.parse(localStorage.getItem(`SYNAPSE_CF_AG_${userId}`)) || []
   };
+
+  // お気に入りのロード
+  state.favorites = JSON.parse(localStorage.getItem(STORAGE_KEYS.FAVORITES)) || [];
 
   // 既存のローカルストレージカラム定義に対するドロップダウンマイグレーション（初期定義補完）
   const migrateColumns = (cols, defaults) => {
@@ -1985,7 +1992,148 @@ function deleteCustomAccordion(accId) {
   });
 }
 
-// 標準メニュー要素のキャッシュ（DOM再構築時のロスト防止）
+// ⭐ お気に入り登録/解除処理
+function toggleFavorite(itemId, itemName, itemType) {
+  if (!state.favorites) state.favorites = [];
+  const index = state.favorites.findIndex(fav => fav.id === itemId);
+  if (index >= 0) {
+    state.favorites.splice(index, 1);
+    showToast(`${itemName}をお気に入りから解除しました。`, 'info');
+  } else {
+    state.favorites.push({ id: itemId, name: itemName, type: itemType });
+    showToast(`${itemName}をお気に入りに追加しました。`, 'success');
+  }
+  localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(state.favorites));
+  
+  // サイドバーとお気に入りリスト（マイページなど）を再レンダリング
+  renderCustomTableList();
+  renderMypageFavorites();
+}
+
+// ⭐ マイページのお気に入りカード描画処理
+function renderMypageFavorites() {
+  const section = document.getElementById('mypage-favorites-section');
+  const grid = document.getElementById('mypage-favorites-grid');
+  if (!section || !grid) return;
+
+  grid.innerHTML = '';
+
+  if (!state.favorites || state.favorites.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+
+  state.favorites.forEach(fav => {
+    const card = document.createElement('div');
+    card.className = 'admin-app-icon'; // ホバーエフェクト等のクラスを流用
+    card.style.cssText = 'position: relative; cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; aspect-ratio: 1.2 / 1; transition: all 0.2s; box-shadow: var(--shadow-sm);';
+    
+    // アイコン取得
+    let icon = '📄';
+    if (fav.type === 'folder') {
+      const origAcc = state.customAccordions.find(a => a.id === fav.id) || 
+                      (fav.id === 'appoint' ? { icon: '📂' } : null);
+      icon = (origAcc && origAcc.icon) ? origAcc.icon : '📂';
+    } else if (fav.type === 'table') {
+      icon = getUserItemIconHtml(fav.id, null);
+    }
+    
+    const iconContainer = document.createElement('div');
+    iconContainer.style.cssText = 'font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); display: flex; align-items: center; justify-content: center;';
+    iconContainer.innerHTML = icon;
+    card.appendChild(iconContainer);
+
+    const nameEl = document.createElement('span');
+    nameEl.style.cssText = 'font-size: 0.82rem; font-weight: 700; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; width: 100%;';
+    nameEl.textContent = fav.name;
+    card.appendChild(nameEl);
+
+    const typeEl = document.createElement('span');
+    typeEl.style.cssText = 'font-size: 0.65rem; color: var(--text-muted);';
+    typeEl.textContent = fav.type === 'folder' ? 'カテゴリフォルダ' : 'システムテーブル';
+    card.appendChild(typeEl);
+
+    // お気に入り解除用星マーク（★）
+    const favStar = document.createElement('span');
+    favStar.textContent = '★';
+    favStar.title = 'お気に入りから解除';
+    favStar.style.cssText = 'position: absolute; top: 0.5rem; right: 0.5rem; cursor: pointer; color: #eab308; font-size: 1rem; transition: transform 0.2s; z-index: 10;';
+    favStar.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFavorite(fav.id, fav.name, fav.type);
+    });
+    favStar.addEventListener('mouseenter', () => { favStar.style.transform = 'scale(1.2)'; });
+    favStar.addEventListener('mouseleave', () => { favStar.style.transform = 'scale(1.0)'; });
+    card.appendChild(favStar);
+
+    card.addEventListener('click', () => {
+      if (fav.type === 'folder') {
+        const origHeader = document.getElementById(`menu-${fav.id}-parent`);
+        if (origHeader) origHeader.click();
+      } else if (fav.type === 'table') {
+        const origBtn = document.getElementById(`menu-custom-table-${fav.id}`) || 
+                          document.getElementById(`menu-${fav.id}`);
+        if (origBtn) {
+          origBtn.click();
+        } else {
+          openTab(`custom-table-${fav.id}-tab`, `custom-table-${fav.id}-screen`, `📊 ${fav.name}`);
+          renderCustomTable(fav.id);
+        }
+      }
+    });
+
+    grid.appendChild(card);
+  });
+}
+
+// ⭐ サイドバー項目にお気に入り＆編集アクションを追加する共通関数
+function attachSidebarItemActions(el, itemId, itemName, itemType) {
+  // すでに存在している場合は削除して再作成（再描画時のクリーンアップ）
+  const oldFav = el.querySelector('.custom-icon-fav-btn');
+  if (oldFav) oldFav.remove();
+  const oldEdit = el.querySelector('.custom-icon-edit-btn');
+  if (oldEdit) oldEdit.remove();
+
+  const isFav = state.favorites && state.favorites.some(fav => fav.id === itemId);
+  const favBtn = document.createElement('span');
+  favBtn.textContent = isFav ? '★' : '☆';
+  favBtn.className = 'custom-icon-fav-btn';
+  favBtn.title = isFav ? 'お気に入りから解除' : 'お気に入りに追加';
+  favBtn.style.cssText = `cursor: pointer; margin-left: auto; font-size: 0.85rem; opacity: ${isFav ? '0.9' : '0'}; transition: opacity 0.2s; padding: 0 0.2rem; color: #eab308; display: inline-flex; align-items: center; justify-content: center;`;
+  favBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleFavorite(itemId, itemName, itemType);
+  });
+  el.appendChild(favBtn);
+
+  const editBtn = document.createElement('span');
+  editBtn.textContent = '🎨';
+  editBtn.className = 'custom-icon-edit-btn';
+  editBtn.title = 'アイコンを変更';
+  editBtn.style.cssText = 'cursor: pointer; margin-left: 0.25rem; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s; padding: 0 0.2rem; display: inline-flex; align-items: center; justify-content: center;';
+  editBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openCustomIconModal(itemId, itemName);
+  });
+  el.appendChild(editBtn);
+
+  // マウスイベントのバインド
+  const onMouseEnter = () => {
+    favBtn.style.opacity = '0.9';
+    editBtn.style.opacity = '0.7';
+  };
+  const onMouseLeave = () => {
+    favBtn.style.opacity = isFav ? '0.9' : '0';
+    editBtn.style.opacity = '0';
+  };
+
+  el.addEventListener('mouseenter', onMouseEnter);
+  el.addEventListener('mouseleave', onMouseLeave);
+}
+
+// 標準メニュー要素 of cache
 let cachedSysAccs = null;
 let cachedSysTables = null;
 let cachedAppointSubMenus = null;
@@ -2081,19 +2229,7 @@ function renderCustomTableList() {
           headerEl.setAttribute('data-tooltip', acc.name);
           headerEl.innerHTML = `<span class="accordion-arrow">▼</span>${iconHtml}<span class="accordion-header-text">${acc.name}</span>`;
 
-          const editBtn = document.createElement('span');
-          editBtn.textContent = '🎨';
-          editBtn.className = 'custom-icon-edit-btn';
-          editBtn.title = 'アイコンを変更';
-          editBtn.style.cssText = 'cursor: pointer; margin-left: auto; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s; padding: 0 0.2rem;';
-          editBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openCustomIconModal(acc.id, acc.name);
-          });
-          headerEl.appendChild(editBtn);
-
-          headerEl.addEventListener('mouseenter', () => { editBtn.style.opacity = '0.7'; });
-          headerEl.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; });
+          attachSidebarItemActions(headerEl, acc.id, acc.name, 'folder');
         }
       } else {
         // 新規カスタムアコーディオンを動的生成
@@ -2110,19 +2246,7 @@ function renderCustomTableList() {
         const iconHtml = getUserItemIconHtml(acc.id, '📁');
         header.innerHTML = `<span class="accordion-arrow">▼</span>${iconHtml}<span class="accordion-header-text">${acc.name}</span>`;
 
-        const editBtn = document.createElement('span');
-        editBtn.textContent = '🎨';
-        editBtn.className = 'custom-icon-edit-btn';
-        editBtn.title = 'アイコンを変更';
-        editBtn.style.cssText = 'cursor: pointer; margin-left: auto; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s; padding: 0 0.2rem;';
-        editBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openCustomIconModal(acc.id, acc.name);
-        });
-        header.appendChild(editBtn);
-
-        header.addEventListener('mouseenter', () => { editBtn.style.opacity = '0.7'; });
-        header.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; });
+        attachSidebarItemActions(header, acc.id, acc.name, 'folder');
 
         // サイドバーからのフォルダ削除は禁止（「フォルダ管理」からのみパスワード認証で削除可能）
 
@@ -2172,6 +2296,13 @@ function renderCustomTableList() {
       if (contentEl) {
         contentEl.innerHTML = '';
 
+        // アポイントアコーディオンの場合は、標準のサブメニューを最初にアペンドする
+        if (acc.id === 'appoint-accordion') {
+          appointSubMenus.forEach(el => {
+            if (el) contentEl.appendChild(el);
+          });
+        }
+
         // ★ 子フォルダ・子テーブルを再帰アペンド（深さ + 1）
         renderMenuNode(acc.id, contentEl, depth + 1);
 
@@ -2200,22 +2331,7 @@ function renderCustomTableList() {
         btn.style.alignItems = 'center';
         btn.innerHTML = `${tableIcon}<span class="nav-item-text">${tbl.name}</span>`;
 
-        let editBtn = btn.querySelector('.custom-icon-edit-btn');
-        if (!editBtn) {
-          editBtn = document.createElement('span');
-          editBtn.textContent = '🎨';
-          editBtn.className = 'custom-icon-edit-btn';
-          editBtn.title = 'アイコンを変更';
-          editBtn.style.cssText = 'cursor: pointer; margin-left: auto; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s; padding: 0 0.2rem;';
-          editBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openCustomIconModal(tbl.id, tbl.name);
-          });
-          btn.appendChild(editBtn);
-
-          btn.addEventListener('mouseenter', () => { editBtn.style.opacity = '0.7'; });
-          btn.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; });
-        }
+        attachSidebarItemActions(btn, tbl.id, tbl.name, 'table');
       } else {
         // 新規カスタムテーブルボタンを動的生成
         btn = document.createElement('button');
@@ -2236,19 +2352,7 @@ function renderCustomTableList() {
         btn.setAttribute('data-tooltip', tbl.name);
         btn.innerHTML = `${tableIcon}<span class="nav-item-text">${tbl.name}</span>`;
 
-        const editBtn = document.createElement('span');
-        editBtn.textContent = '🎨';
-        editBtn.className = 'custom-icon-edit-btn';
-        editBtn.title = 'アイコンを変更';
-        editBtn.style.cssText = 'cursor: pointer; margin-left: auto; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s; padding: 0 0.2rem;';
-        editBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openCustomIconModal(tbl.id, tbl.name);
-        });
-        btn.appendChild(editBtn);
-
-        btn.addEventListener('mouseenter', () => { editBtn.style.opacity = '0.7'; });
-        btn.addEventListener('mouseleave', () => { editBtn.style.opacity = '0'; });
+        attachSidebarItemActions(btn, tbl.id, tbl.name, 'table');
 
         btn.addEventListener('click', () => {
           openTab(`custom-table-${tbl.id}-tab`, `custom-table-${tbl.id}-screen`, `📊 ${tbl.name}`);
@@ -2281,6 +2385,93 @@ function renderCustomTableList() {
 
   // ルート直下から再帰構築
   renderMenuNode('root', sidebarNav);
+
+  // お気に入りアコーディオンの描画
+  const mypageBtn = document.getElementById('menu-mypage');
+  let favAccordion = document.getElementById('favorites-accordion');
+  if (favAccordion) {
+    favAccordion.remove();
+  }
+
+  if (state.favorites && state.favorites.length > 0) {
+    favAccordion = document.createElement('div');
+    favAccordion.className = 'sidebar-accordion';
+    favAccordion.id = 'favorites-accordion';
+    favAccordion.style.marginTop = '0.5rem';
+
+    const header = document.createElement('button');
+    header.className = 'accordion-header collapsed';
+    header.id = 'menu-favorites-parent';
+    header.setAttribute('data-tooltip', 'お気に入り');
+    header.style.cssText = 'width: calc(100% - 1rem); box-sizing: border-box; text-align: left; display: flex; align-items: center; gap: 0.5rem;';
+    
+    const arrow = document.createElement('span');
+    arrow.className = 'accordion-icon';
+    arrow.textContent = '▼';
+    arrow.style.cssText = 'display: inline-block; transition: transform 0.2s; font-size: 0.7rem;';
+    
+    const textSpan = document.createElement('span');
+    textSpan.innerHTML = `⭐ <span class="nav-item-text">お気に入り</span>`;
+    
+    header.appendChild(arrow);
+    header.appendChild(textSpan);
+
+    const content = document.createElement('div');
+    content.className = 'accordion-content';
+    content.id = 'menu-favorites-content';
+    content.style.cssText = 'display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;';
+
+    state.favorites.forEach(fav => {
+      const favBtn = document.createElement('button');
+      favBtn.className = 'nav-item';
+      favBtn.style.cssText = 'width: 100%; display: flex; align-items: center; padding: 0.4rem 0.75rem; font-size: 0.85rem; background: none; border: none; cursor: pointer; color: var(--text-secondary); border-radius: var(--radius-sm); transition: all 0.2s;';
+      
+      let icon = '📄';
+      if (fav.type === 'folder') {
+        const origAcc = state.customAccordions.find(a => a.id === fav.id) || 
+                        (fav.id === 'appoint' ? { icon: '📂' } : null);
+        icon = (origAcc && origAcc.icon) ? origAcc.icon : '📂';
+      } else if (fav.type === 'table') {
+        icon = getUserItemIconHtml(fav.id, null);
+      }
+      
+      favBtn.innerHTML = `${icon.startsWith('<') ? icon : `<span>${icon}</span>`}<span class="nav-item-text" style="margin-left: 0.5rem;">${fav.name}</span>`;
+      favBtn.setAttribute('data-tooltip', fav.name);
+      
+      favBtn.addEventListener('click', () => {
+        if (fav.type === 'folder') {
+          const origHeader = document.getElementById(`menu-${fav.id}-parent`);
+          if (origHeader) origHeader.click();
+        } else if (fav.type === 'table') {
+          const origBtn = document.getElementById(`menu-custom-table-${fav.id}`) || 
+                            document.getElementById(`menu-${fav.id}`);
+          if (origBtn) {
+            origBtn.click();
+          } else {
+            openTab(`custom-table-${fav.id}-tab`, `custom-table-${fav.id}-screen`, `📊 ${fav.name}`);
+            renderCustomTable(fav.id);
+          }
+        }
+      });
+
+      content.appendChild(favBtn);
+    });
+
+    favAccordion.appendChild(header);
+    favAccordion.appendChild(content);
+
+    header.addEventListener('click', () => {
+      const isCollapsed = header.classList.toggle('collapsed');
+      content.style.display = isCollapsed ? 'none' : 'flex';
+      arrow.style.transform = isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)';
+    });
+
+    if (mypageBtn && mypageBtn.nextSibling) {
+      sidebarNav.insertBefore(favAccordion, mypageBtn.nextSibling);
+    } else {
+      sidebarNav.appendChild(favAccordion);
+    }
+  }
 }
 
 // テーブル作成画面の初期セットアップとイベントリスナーの登録
@@ -6185,6 +6376,7 @@ function openMyPage() {
   renderTabBar();
   state.memoUnlockedSecure = false;
   initMypageMemo();
+  renderMypageFavorites();
 }
 
 // フォームに入力されている現在の状態をアクティブなタブに退避
