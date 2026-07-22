@@ -23791,19 +23791,14 @@ function initMypageMemo() {
       // 段落書式スタイルの初期値を標準テキストにセット
       if (paragraphSelect) paragraphSelect.value = 'p';
       
-      // ロック解除中なら「シークレット（ロック付き）」チェックボックスを同期して表示
-      if (state.memoUnlockedSecure) {
-        if (secureToggleLabel) secureToggleLabel.style.display = 'flex';
-        if (isSecureCheckbox) isSecureCheckbox.checked = !!memo.isSecure;
-        
-        // シークレットメモ（ロック付き）であれば形式切り替えトグルを表示
-        if (memo.isSecure) {
-          if (typeSelectorContainer) typeSelectorContainer.style.display = 'flex';
-        } else {
-          if (typeSelectorContainer) typeSelectorContainer.style.display = 'none';
-        }
+      // 「ロック対象」チェックボックスは常に表示
+      if (secureToggleLabel) secureToggleLabel.style.display = 'flex';
+      if (isSecureCheckbox) isSecureCheckbox.checked = !!memo.isSecure;
+      
+      // シークレットメモ（ロック付き）かつロック解除中のときのみ形式切り替えトグルを表示
+      if (memo.isSecure && state.memoUnlockedSecure) {
+        if (typeSelectorContainer) typeSelectorContainer.style.display = 'flex';
       } else {
-        if (secureToggleLabel) secureToggleLabel.style.display = 'none';
         if (typeSelectorContainer) typeSelectorContainer.style.display = 'none';
       }
 
