@@ -1419,16 +1419,14 @@ function ensureStandardAccordionsInState() {
 function ensureStandardTablesInState() {
   if (!state.customTables) state.customTables = [];
 
+  // 過去に残ってしまったアポイント関連のテーブルIDを取り除く
+  const appointTableIds = ['appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link', 'link-official-screen'];
+  state.customTables = state.customTables.filter(t => !appointTableIds.includes(t.id));
+
   const stds = [
     { id: 'agency-info-screen', name: '代理店 基本マスタ', parentMenuId: 'agency-accordion' },
     { id: 'jo-info-screen', name: 'JO 基本マスタ', parentMenuId: 'jo-accordion' },
-    { id: 'applicant-info-screen', name: '申込者 基本マスタ', parentMenuId: 'applicant-accordion' },
-    { id: 'appointment-new', name: '新規アポイント', parentMenuId: 'appoint-accordion' },
-    { id: 'appointment-existing', name: '既存顧客アポイント', parentMenuId: 'appoint-accordion' },
-    { id: 'drafts-view-screen', name: '一時保存一覧', parentMenuId: 'appoint-accordion' },
-    { id: 'history-view-screen', name: 'アポイント履歴', parentMenuId: 'appoint-accordion' },
-    { id: 'official-id-link', name: '本登録ID紐付け', parentMenuId: 'appoint-accordion' },
-    { id: 'link-official-screen', name: '本登録ID紐付け', parentMenuId: 'appoint-accordion' }
+    { id: 'applicant-info-screen', name: '申込者 基本マスタ', parentMenuId: 'applicant-accordion' }
   ];
 
   stds.forEach(std => {
@@ -1992,6 +1990,16 @@ function deleteCustomAccordion(accId) {
   });
 }
 
+// ⭐ アポイント標準サブメニューIDを実際のDOM要素IDにマッピングするユーティリティ
+function getActualMenuElementId(itemId) {
+  if (itemId === 'appointment-new') return 'menu-new-appoint';
+  if (itemId === 'appointment-existing') return 'menu-existing-appoint';
+  if (itemId === 'drafts-view-screen') return 'menu-drafts-list';
+  if (itemId === 'history-view-screen') return 'menu-history-list';
+  if (itemId === 'official-id-link') return 'menu-link-official';
+  return '';
+}
+
 // ⭐ お気に入り登録/解除処理
 function toggleFavorite(itemId, itemName, itemType) {
   if (!state.favorites) state.favorites = [];
@@ -2073,7 +2081,9 @@ function renderMypageFavorites() {
         const origHeader = document.getElementById(`menu-${fav.id}-parent`);
         if (origHeader) origHeader.click();
       } else if (fav.type === 'table') {
+        const mappedId = getActualMenuElementId(fav.id);
         const origBtn = document.getElementById(`menu-custom-table-${fav.id}`) || 
+                          (mappedId ? document.getElementById(mappedId) : null) ||
                           document.getElementById(`menu-${fav.id}`);
         if (origBtn) {
           origBtn.click();
@@ -2182,13 +2192,7 @@ function renderCustomTableList() {
     cachedSysTables = {
       'agency-info-screen': document.getElementById('menu-agency-info'),
       'jo-info-screen': document.getElementById('menu-jo-info'),
-      'applicant-info-screen': document.getElementById('menu-applicant-info'),
-      'appointment-new': document.getElementById('menu-new-appoint'),
-      'appointment-existing': document.getElementById('menu-existing-appoint'),
-      'drafts-view-screen': document.getElementById('menu-drafts-list'),
-      'history-view-screen': document.getElementById('menu-history-list'),
-      'official-id-link': document.getElementById('menu-link-official'),
-      'link-official-screen': document.getElementById('menu-link-official')
+      'applicant-info-screen': document.getElementById('menu-applicant-info')
     };
   }
   if (!cachedAppointSubMenus) {
@@ -2237,16 +2241,8 @@ function renderCustomTableList() {
       let folderDiv = sysAccs[acc.id]; // 標準フォルダの場合
 
       if (folderDiv) {
-        // 標準アコーディオンの名前とカスタムアイコンを動的に反映
         const headerEl = folderDiv.querySelector('.accordion-header');
         if (headerEl) {
-          const defaultIcon = acc.id === 'appoint-accordion' ? '📅' :
-                              acc.id === 'agency-accordion' ? '💼' :
-                              acc.id === 'jo-accordion' ? '📑' : '📋';
-          const iconHtml = getUserItemIconHtml(acc.id, defaultIcon);
-          headerEl.setAttribute('data-tooltip', acc.name);
-          headerEl.innerHTML = `<span class="accordion-arrow">▼</span>${iconHtml}<span class="accordion-header-text">${acc.name}</span>`;
-
           attachSidebarItemActions(headerEl, acc.id, acc.name, 'folder', depth);
         }
       } else {
@@ -2317,7 +2313,29 @@ function renderCustomTableList() {
         // アポイントアコーディオンの場合は、標準のサブメニューを最初にアペンドする
         if (normalizeFolderId(acc.id) === 'appoint-accordion') {
           appointSubMenus.forEach(el => {
-            if (el) contentEl.appendChild(el);
+            if (el) {
+              contentEl.appendChild(el);
+              // お気に入りアクションをバインド（子メニュー項目として機能させるため）
+              let itemId = '';
+              let itemName = '';
+              if (el.id === 'menu-new-appoint') { itemId = 'appointment-new'; itemName = '新規アポイント'; }
+              else if (el.id === 'menu-existing-appoint') { itemId = 'appointment-existing'; itemName = '既存顧客アポイント'; }
+              else if (el.id === 'menu-drafts-list') { itemId = 'drafts-view-screen'; itemName = '一時保存一覧'; }
+              else if (el.id === 'menu-history-list') { itemId = 'history-view-screen'; itemName = 'アポイント履歴'; }
+              else if (el.id === 'menu-link-official') { itemId = 'official-id-link'; itemName = '本登録ID紐付け'; }
+              
+              if (itemId) {
+                el.style.display = 'flex';
+                el.style.alignItems = 'center';
+                el.style.width = '100%';
+                
+                // アイコンの左右の謎のスペース解消のため、元々のテキストだけを表示する
+                // （前回のデグレーションで追加された customIcon 等をクリアし、元の文字だけの innerHTML を保証）
+                el.innerHTML = `<span class="nav-item-text">${itemName}</span>`;
+                
+                attachSidebarItemActions(el, itemId, itemName, 'table');
+              }
+            }
           });
         }
 
@@ -2461,7 +2479,9 @@ function renderCustomTableList() {
           const origHeader = document.getElementById(`menu-${fav.id}-parent`);
           if (origHeader) origHeader.click();
         } else if (fav.type === 'table') {
+          const mappedId = getActualMenuElementId(fav.id);
           const origBtn = document.getElementById(`menu-custom-table-${fav.id}`) || 
+                            (mappedId ? document.getElementById(mappedId) : null) ||
                             document.getElementById(`menu-${fav.id}`);
           if (origBtn) {
             origBtn.click();
