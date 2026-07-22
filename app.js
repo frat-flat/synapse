@@ -23622,34 +23622,35 @@ function initMypageMemo() {
     };
   }
 
-  // サブアカウント（ログイン情報ペア）のHTML生成
+  // サブアカウント（ログイン情報ペア）のHTML生成 (2カラム・目のアイコンは内側右端、コピー＆ゴミ箱は右隣)
   function createSubAccountFrameHtml(subAcc = { user: '', pwd: '' }) {
     return `
-      <div class="account-sub-frame" style="display: flex; gap: 0.6rem; align-items: flex-end; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); position: relative;">
+      <div class="account-sub-frame" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem; align-items: end; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); margin-bottom: 0.25rem;">
         <!-- ユーザID -->
-        <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1; text-align: left;">
-          <label style="font-size: 0.65rem; font-weight: 700; color: var(--text-secondary);">ユーザID / メールアドレス</label>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
+          <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">ユーザID / メールアドレス</label>
           <div style="display: flex; gap: 0.25rem;">
-            <input type="text" class="acc-input-user" placeholder="IDを入力" value="${subAcc.user || ''}" style="flex: 1; padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+            <input type="text" class="acc-input-user" placeholder="IDを入力" value="${subAcc.user || ''}" style="flex: 1; padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
             <button class="btn btn-secondary copy-acc-user-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="コピー">📋</button>
           </div>
         </div>
         <!-- パスワード -->
-        <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1; text-align: left;">
-          <label style="font-size: 0.65rem; font-weight: 700; color: var(--text-secondary);">パスワード</label>
-          <div style="display: flex; gap: 0.25rem; align-items: center; position: relative;">
-            <input type="password" class="acc-input-pwd" placeholder="パスワードを入力" value="${subAcc.pwd || ''}" style="flex: 1; padding: 0.35rem 2.2rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-            <button class="toggle-acc-pwd-visibility-btn" style="position: absolute; right: 2.1rem; border: none; background: none; cursor: pointer; font-size: 0.85rem; padding: 0.2rem; color: var(--text-secondary);" title="パスワードの表示/非表示">👁️</button>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
+          <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">パスワード</label>
+          <div style="display: flex; gap: 0.25rem; align-items: center;">
+            <div style="position: relative; flex: 1; display: flex;">
+              <input type="password" class="acc-input-pwd" placeholder="パスワードを入力" value="${subAcc.pwd || ''}" style="width: 100%; padding: 0.35rem 2.2rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+              <button class="toggle-acc-pwd-visibility-btn" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; font-size: 0.85rem; padding: 0.2rem; color: var(--text-secondary);" title="パスワードの表示/非表示">👁️</button>
+            </div>
             <button class="btn btn-secondary copy-acc-pwd-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="コピー">📋</button>
+            <button class="btn-text delete-sub-account-btn" style="color: #ef4444; font-size: 0.8rem; cursor: pointer; padding: 0.35rem; border: none; background: none;" title="このログイン情報を削除">🗑️</button>
           </div>
         </div>
-        <!-- サブ枠削除ボタン -->
-        <button class="btn-text delete-sub-account-btn" style="color: #ef4444; font-size: 0.85rem; cursor: pointer; padding: 0.35rem; border: none; background: none;" title="このログイン情報を削除">🗑️</button>
       </div>
     `;
   }
 
-  // アカウント枠のHTMLを生成 (アコーディオンヘッダー＋詳細ボディ構成)
+  // アカウント枠のHTMLを生成 (アコーディオンヘッダー＋詳細ボディ構成。並び順：登録名/URL ➔ 追加情報/備考 ➔ ログイン情報一覧)
   function createAccountFrameHtml(acc = { name: '', url: '', note: '', extra: '', accounts: [{ user: '', pwd: '' }] }) {
     // 互換性チェック
     if (!acc.accounts) {
@@ -23696,18 +23697,7 @@ function initMypageMemo() {
             </div>
           </div>
 
-          <!-- 2. サブアカウントログイン情報枠のリスト (中部) -->
-          <div class="acc-sub-list-container" style="display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px dashed var(--border-color); padding-top: 0.6rem;">
-            <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-secondary); text-align: left; margin-bottom: 0.1rem;">👤 ログイン情報一覧</div>
-            <div class="acc-sub-list" style="display: flex; flex-direction: column; gap: 0.4rem;">
-              ${subsHtml}
-            </div>
-            <button class="btn btn-secondary add-sub-account-btn" style="padding: 0.3rem; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.25rem; border-radius: var(--radius-sm); border-style: dashed; width: fit-content; margin-top: 0.2rem;">
-              ➕ ログイン情報を追加
-            </button>
-          </div>
-
-          <!-- 3. タイトルのない入力枠 ＆ 備考欄 の横並び (最下部) -->
+          <!-- 2. タイトルのない入力枠 ＆ 備考欄 の横並び (中部) -->
           <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 0.75rem; border-top: 1px dashed var(--border-color); padding-top: 0.6rem;">
             <!-- タイトルのない自由入力枠 (左) -->
             <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
@@ -23719,6 +23709,17 @@ function initMypageMemo() {
               <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">備考（メモ）</label>
               <textarea class="acc-input-note" placeholder="備考・メモを入力..." style="width: 100%; height: 32px; min-height: 32px; padding: 0.3rem 0.5rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; resize: vertical; font-family: sans-serif; line-height: 1.3;">${acc.note || ''}</textarea>
             </div>
+          </div>
+
+          <!-- 3. サブアカウントログイン情報枠のリスト (最下部) -->
+          <div class="acc-sub-list-container" style="display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px dashed var(--border-color); padding-top: 0.6rem;">
+            <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-secondary); text-align: left; margin-bottom: 0.1rem;">👤 ログイン情報一覧</div>
+            <div class="acc-sub-list" style="display: flex; flex-direction: column; gap: 0.4rem;">
+              ${subsHtml}
+            </div>
+            <button class="btn btn-secondary add-sub-account-btn" style="padding: 0.3rem; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.25rem; border-radius: var(--radius-sm); border-style: dashed; width: fit-content; margin-top: 0.2rem;">
+              ➕ ログイン情報を追加
+            </button>
           </div>
         </div>
       </div>
