@@ -23684,20 +23684,27 @@ function initMypageMemo() {
             <!-- ユーザID -->
             <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
               <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">ユーザID / メールアドレス</label>
-              <div style="display: flex; gap: 0.25rem;">
-                <input type="text" class="acc-input-user" placeholder="IDを入力" value="${acc.user || ''}" style="flex: 1; padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
-                <button class="btn btn-secondary copy-acc-user-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="コピー">📋</button>
+              <div style="position: relative; display: flex; width: 100%;">
+                <input type="text" class="acc-input-user" placeholder="IDを入力" value="${acc.user || ''}" style="width: 100%; padding: 0.35rem 2.0rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+                <button class="btn-text copy-acc-user-btn" style="position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; padding: 0.2rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="コピー">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                </button>
               </div>
             </div>
             <!-- パスワード -->
             <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
               <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">パスワード</label>
-              <div style="display: flex; gap: 0.25rem; align-items: center;">
-                <div style="position: relative; flex: 1; display: flex;">
-                  <input type="password" class="acc-input-pwd" placeholder="パスワードを入力" value="${acc.pwd || ''}" style="width: 100%; padding: 0.35rem 2.2rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
-                  <button class="toggle-acc-pwd-visibility-btn" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; font-size: 0.85rem; padding: 0.2rem; color: var(--text-secondary);" title="パスワードの表示/非表示">👁️</button>
+              <div style="position: relative; display: flex; width: 100%;">
+                <input type="password" class="acc-input-pwd" placeholder="パスワードを入力" value="${acc.pwd || ''}" style="width: 100%; padding: 0.35rem 3.4rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+                <div style="position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 0.3rem;">
+                  <button class="btn-text toggle-acc-pwd-visibility-btn" style="border: none; background: none; cursor: pointer; padding: 0.2rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="パスワードの表示/非表示">
+                    <svg class="eye-open-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                    <svg class="eye-closed-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display: none;"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.82l2.92 2.92c1.51-1.44 2.63-3.21 3.22-5.19-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+                  </button>
+                  <button class="btn-text copy-acc-pwd-btn" style="border: none; background: none; cursor: pointer; padding: 0.2rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="コピー">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                  </button>
                 </div>
-                <button class="btn btn-secondary copy-acc-pwd-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="コピー">📋</button>
               </div>
             </div>
           </div>
@@ -23706,7 +23713,7 @@ function initMypageMemo() {
           <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 0.75rem; border-top: 1px dashed var(--border-color); padding-top: 0.6rem;">
             <!-- 左側：追加情報リストエリア -->
             <div style="display: flex; flex-direction: column; gap: 0.4rem; text-align: left;">
-              <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">追加情報</label>
+              <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); visibility: hidden; height: 14px;">(追加情報)</label>
               <div class="acc-extra-list" style="display: flex; flex-direction: column; gap: 0.25rem;">
                 ${extrasHtml}
               </div>
@@ -23837,12 +23844,16 @@ function initMypageMemo() {
     // パスワード可視性切り替え
     if (togglePwdBtn && pwdInput) {
       togglePwdBtn.onclick = () => {
+        const openIcon = togglePwdBtn.querySelector('.eye-open-icon');
+        const closedIcon = togglePwdBtn.querySelector('.eye-closed-icon');
         if (pwdInput.type === 'password') {
           pwdInput.type = 'text';
-          togglePwdBtn.textContent = '🙈';
+          if (openIcon) openIcon.style.display = 'none';
+          if (closedIcon) closedIcon.style.display = 'block';
         } else {
           pwdInput.type = 'password';
-          togglePwdBtn.textContent = '👁️';
+          if (openIcon) openIcon.style.display = 'block';
+          if (closedIcon) closedIcon.style.display = 'none';
         }
       };
     }
