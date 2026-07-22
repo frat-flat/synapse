@@ -2023,18 +2023,18 @@ function toggleFavorite(itemId, itemName, itemType) {
 
 // ⭐ マイページのお気に入りカード描画処理
 function renderMypageFavorites() {
-  const section = document.getElementById('mypage-favorites-section');
+  const favWrapper = document.getElementById('mypage-fav-view-wrapper');
   const grid = document.getElementById('mypage-favorites-grid');
-  if (!section || !grid) return;
+  if (!grid) return;
 
   grid.innerHTML = '';
 
   if (!state.favorites || state.favorites.length === 0) {
-    section.style.display = 'none';
+    if (favWrapper) favWrapper.style.display = 'none';
+    const menuView = document.getElementById('mypage-menu-view');
+    if (menuView) menuView.style.display = 'flex';
     return;
   }
-
-  section.style.display = 'block';
 
   state.favorites.forEach(fav => {
     const card = document.createElement('div');
@@ -23567,6 +23567,31 @@ function initMypageMemo() {
       state.memoUnlockedSecure = false; // 戻った時に再ロック
       activeMemoId = null;
       showEditor(null);
+    };
+  }
+
+  // お気に入りカードをクリック
+  const btnFavorites = document.getElementById('mypage-btn-favorites');
+  const favWrapper = document.getElementById('mypage-fav-view-wrapper');
+  const favBackBtn = document.getElementById('mypage-fav-back-btn');
+
+  if (btnFavorites) {
+    btnFavorites.onclick = () => {
+      if (!state.favorites || state.favorites.length === 0) {
+        showToast('現在お気に入りに登録されているものはありません。', 'error');
+        return;
+      }
+      if (menuView) menuView.style.display = 'none';
+      if (favWrapper) favWrapper.style.display = 'flex';
+      renderMypageFavorites();
+    };
+  }
+
+  // お気に入り一覧から戻る
+  if (favBackBtn) {
+    favBackBtn.onclick = () => {
+      if (menuView) menuView.style.display = 'flex';
+      if (favWrapper) favWrapper.style.display = 'none';
     };
   }
 

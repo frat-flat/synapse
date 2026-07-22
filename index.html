@@ -517,6 +517,13 @@
       <!-- コントロールパネル風のアイコンメニュー -->
       <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
         
+        <!-- お気に入り -->
+        <div class="admin-app-icon" id="mypage-btn-favorites" title="お気に入り" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; aspect-ratio: 1.1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+          <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">⭐</div>
+          <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">お気に入り</span>
+          <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">登録されたよく使うフォルダやテーブルを表示します</span>
+        </div>
+
         <!-- 個人メモ帳 -->
         <div class="admin-app-icon" id="mypage-btn-memo" title="個人メモ帳" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; aspect-ratio: 1.1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
           <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">📝</div>
@@ -525,15 +532,26 @@
         </div>
 
       </div>
+    </div>
 
-      <!-- お気に入りセクション -->
-      <div id="mypage-favorites-section" style="margin-top: 1.5rem; display: none;">
-        <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.4rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
-          ⭐ お気に入り
-        </h3>
-        <div id="mypage-favorites-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem;">
-          <!-- JSで動的に追加されます -->
+    <!-- マイページ：お気に入り一覧の本体画面（初期非表示） -->
+    <div id="mypage-fav-view-wrapper" style="display: none; flex-direction: column; gap: 1rem; flex: 1; height: 100%;">
+      <!-- お気に入りヘッダー ＆ メニューに戻るボタン -->
+      <div style="border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <button id="mypage-fav-back-btn" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem;">
+            ⬅️ メニューに戻る
+          </button>
+          <div>
+            <h1 style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+              ⭐ お気に入り一覧
+            </h1>
+          </div>
         </div>
+      </div>
+      <!-- お気に入りカードグリッド -->
+      <div id="mypage-favorites-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; margin-top: 0.5rem; text-align: left;">
+        <!-- JSで動的に追加されます -->
       </div>
     </div>
 
