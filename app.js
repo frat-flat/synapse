@@ -6176,6 +6176,7 @@ function openMyPage() {
   
   state.currentView = 'mypage-screen';
   renderTabBar();
+  state.memoUnlockedSecure = false;
   initMypageMemo();
 }
 
@@ -23290,13 +23291,23 @@ function setupValidationSidebarEvents() {
 // ==========================================
 let activeMemoId = null;
 
+// メモ帳のグローバル状態
+if (!state.activeMemoType) state.activeMemoType = 'normal';
+if (state.memoUnlockedSecure === undefined) state.memoUnlockedSecure = false;
+
 function initMypageMemo() {
   const currentUser = state.currentUser;
   if (!currentUser) return;
 
   const userId = currentUser.id;
   const storagePwdKey = `synapse_memo_pwd_${userId}`;
-  const storageMemosKey = `synapse_memos_${userId}`;
+  
+  // 通常/シークレットメモ用のキー
+  const getStorageMemosKey = () => {
+    return state.activeMemoType === 'secure' 
+      ? `synapse_secure_memos_${userId}` 
+      : `synapse_normal_memos_${userId}`;
+  };
 
   // DOM要素
   const lockView = document.getElementById('memo-lock-view');
@@ -23328,29 +23339,82 @@ function initMypageMemo() {
   const formatBtns = document.querySelectorAll('.memo-format-btn');
   const foreColorInput = document.getElementById('memo-forecolor-input');
 
+  // タブボタン
+  const tabBtnNormal = document.getElementById('memo-tab-btn-normal');
+  const tabBtnSecure = document.getElementById('memo-tab-btn-secure');
+
   // ロック解除・設定画面の切り替え
-  const updateLockUI = () => {
-    const savedPwd = localStorage.getItem(storagePwdKey);
-    if (!savedPwd) {
-      // 初回設定
-      if (setupContainer) setupContainer.style.display = 'flex';
-      if (unlockContainer) unlockContainer.style.display = 'none';
-    } else {
-      // 解除用
-      if (setupContainer) setupContainer.style.display = 'none';
-      if (unlockContainer) unlockContainer.style.display = 'flex';
+  const updateMemoUI = () => {
+    // タブのボタンのアクティブクラス切り替え
+    if (tabBtnNormal && tabBtnSecure) {
+      if (state.activeMemoType === 'normal') {
+        tabBtnNormal.classList.add('active');
+        tabBtnSecure.classList.remove('active');
+      } else {
+        tabBtnNormal.classList.remove('active');
+        tabBtnSecure.classList.add('active');
+      }
     }
-    if (lockView) lockView.style.display = 'flex';
-    if (mainView) mainView.style.display = 'none';
-    
-    // 入力欄をクリア
-    if (setupPwdInput) setupPwdInput.value = '';
-    if (setupPwdConfirmInput) setupPwdConfirmInput.value = '';
-    if (unlockPwdInput) unlockPwdInput.value = '';
+
+    if (state.activeMemoType === 'normal') {
+      // 通常メモはロックなしで常に見せる
+      if (lockView) lockView.style.display = 'none';
+      if (mainView) mainView.style.display = 'flex';
+      if (lockExitBtn) lockExitBtn.style.display = 'none';
+      renderMemoList();
+    } else {
+      // ロック付きメモ
+      if (lockExitBtn) lockExitBtn.style.display = 'flex';
+      
+      if (!state.memoUnlockedSecure) {
+        // ロック中
+        const savedPwd = localStorage.getItem(storagePwdKey);
+        if (!savedPwd) {
+          // 初回設定
+          if (setupContainer) setupContainer.style.display = 'flex';
+          if (unlockContainer) unlockContainer.style.display = 'none';
+        } else {
+          // 解除用
+          if (setupContainer) setupContainer.style.display = 'none';
+          if (unlockContainer) unlockContainer.style.display = 'flex';
+        }
+        if (lockView) lockView.style.display = 'flex';
+        if (mainView) mainView.style.display = 'none';
+        
+        // 入力欄をクリア
+        if (setupPwdInput) setupPwdInput.value = '';
+        if (setupPwdConfirmInput) setupPwdConfirmInput.value = '';
+        if (unlockPwdInput) unlockPwdInput.value = '';
+      } else {
+        // 解除済み
+        if (lockView) lockView.style.display = 'none';
+        if (mainView) mainView.style.display = 'flex';
+        renderMemoList();
+      }
+    }
   };
 
+  // タブ切り替えイベント
+  if (tabBtnNormal) {
+    tabBtnNormal.onclick = () => {
+      state.activeMemoType = 'normal';
+      activeMemoId = null;
+      showEditor(null);
+      updateMemoUI();
+    };
+  }
+
+  if (tabBtnSecure) {
+    tabBtnSecure.onclick = () => {
+      state.activeMemoType = 'secure';
+      activeMemoId = null;
+      showEditor(null);
+      updateMemoUI();
+    };
+  }
+
   // 初期表示
-  updateLockUI();
+  updateMemoUI();
 
   // 暗証番号の設定
   if (setupBtn) {
@@ -23367,25 +23431,19 @@ function initMypageMemo() {
       }
       localStorage.setItem(storagePwdKey, pwd);
       showToast('暗証番号を設定しました。', 'success');
-      unlockMemoContainer();
+      state.memoUnlockedSecure = true;
+      updateMemoUI();
     };
   }
 
   // 暗証番号でのロック解除
-  const unlockMemoContainer = () => {
-    if (lockView) lockView.style.display = 'none';
-    if (mainView) mainView.style.display = 'flex';
-    activeMemoId = null;
-    renderMemoList();
-    showEditor(null);
-  };
-
   if (unlockBtn) {
     unlockBtn.onclick = () => {
       const pwd = unlockPwdInput.value;
       const savedPwd = localStorage.getItem(storagePwdKey);
       if (pwd === savedPwd) {
-        unlockMemoContainer();
+        state.memoUnlockedSecure = true;
+        updateMemoUI();
         showToast('ロックを解除しました。', 'success');
       } else {
         showToast('暗証番号が正しくありません。', 'error');
@@ -23403,11 +23461,12 @@ function initMypageMemo() {
   // 暗証番号のリセット（再設定）
   if (resetBtn) {
     resetBtn.onclick = () => {
-      showAppConfirm('暗証番号のリセット', '暗証番号をリセットして再設定しますか？\n⚠️ 安全のため、このアカウントでこれまでに保存されたすべてのメモデータは完全に削除されます。この操作は取り消せません。', () => {
+      showAppConfirm('暗証番号のリセット', '暗証番号をリセットして再設定しますか？\n⚠️ 安全のため、このアカウントでこれまでに保存されたすべてのロック付きメモデータは完全に削除されます。この操作は取り消せません。', () => {
         localStorage.removeItem(storagePwdKey);
-        localStorage.removeItem(storageMemosKey);
-        updateLockUI();
-        showToast('メモ帳データを初期化しました。新しい暗証番号を設定してください。', 'success');
+        localStorage.removeItem(`synapse_secure_memos_${userId}`);
+        state.memoUnlockedSecure = false;
+        updateMemoUI();
+        showToast('ロック付きメモデータを初期化しました。新しい暗証番号を設定してください。', 'success');
       });
     };
   }
@@ -23415,16 +23474,19 @@ function initMypageMemo() {
   // ロックして退出
   if (lockExitBtn) {
     lockExitBtn.onclick = () => {
-      updateLockUI();
+      state.memoUnlockedSecure = false;
+      activeMemoId = null;
+      showEditor(null);
+      updateMemoUI();
       showToast('メモ帳をロックしました。', 'info');
     };
   }
 
   // メモリストのレンダリング
-  const renderMemoList = () => {
+  function renderMemoList() {
     if (!memoListContainer) return;
     memoListContainer.innerHTML = '';
-    const memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+    const memos = JSON.parse(localStorage.getItem(getStorageMemosKey())) || [];
 
     if (memos.length === 0) {
       memoListContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.72rem; padding: 1rem 0;">メモはありません</div>`;
@@ -23460,10 +23522,10 @@ function initMypageMemo() {
 
       memoListContainer.appendChild(item);
     });
-  };
+  }
 
   // エディタの表示制御
-  const showEditor = (memo) => {
+  function showEditor(memo) {
     if (!memo) {
       if (editorEmpty) editorEmpty.style.display = 'flex';
       if (editorActive) editorActive.style.display = 'none';
@@ -23479,12 +23541,13 @@ function initMypageMemo() {
         statusInfo.textContent = `最終更新: ${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
       }
     }
-  };
+  }
 
   // 新規メモ作成
   if (newMemoBtn) {
     newMemoBtn.onclick = () => {
-      const memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+      const memosKey = getStorageMemosKey();
+      const memos = JSON.parse(localStorage.getItem(memosKey)) || [];
       const newMemo = {
         id: 'memo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
         title: '',
@@ -23492,7 +23555,7 @@ function initMypageMemo() {
         updatedAt: new Date().toISOString()
       };
       memos.push(newMemo);
-      localStorage.setItem(storageMemosKey, JSON.stringify(memos));
+      localStorage.setItem(memosKey, JSON.stringify(memos));
       activeMemoId = newMemo.id;
       renderMemoList();
       showEditor(newMemo);
@@ -23504,13 +23567,14 @@ function initMypageMemo() {
   if (saveBtn) {
     saveBtn.onclick = () => {
       if (!activeMemoId) return;
-      const memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+      const memosKey = getStorageMemosKey();
+      const memos = JSON.parse(localStorage.getItem(memosKey)) || [];
       const memo = memos.find(m => m.id === activeMemoId);
       if (memo) {
         memo.title = (titleInput ? titleInput.value.trim() : '') || '無題のメモ';
         memo.content = contentInput ? contentInput.innerHTML : '';
         memo.updatedAt = new Date().toISOString();
-        localStorage.setItem(storageMemosKey, JSON.stringify(memos));
+        localStorage.setItem(memosKey, JSON.stringify(memos));
         showToast('メモを保存しました。', 'success');
         renderMemoList();
         showEditor(memo);
@@ -23523,9 +23587,10 @@ function initMypageMemo() {
     deleteBtn.onclick = () => {
       if (!activeMemoId) return;
       showAppConfirm('メモの削除', 'このメモを完全に削除しますか？', () => {
-        let memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+        const memosKey = getStorageMemosKey();
+        let memos = JSON.parse(localStorage.getItem(memosKey)) || [];
         memos = memos.filter(m => m.id !== activeMemoId);
-        localStorage.setItem(storageMemosKey, JSON.stringify(memos));
+        localStorage.setItem(memosKey, JSON.stringify(memos));
         showToast('メモを削除しました。', 'success');
         renderMemoList();
         showEditor(null);
