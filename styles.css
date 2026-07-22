@@ -1506,12 +1506,90 @@ textarea {
 }
 
 /* 展開コンテンツ内のパディングを詰め、アイコンを一列に並べる */
+/* スリムバー折りたたみ時は、アコーディオンコンテンツ（子要素）を完全に非表示 */
 .sidebar-menu.collapsed .accordion-content {
-  padding-left: 0 !important;
+  display: none !important;
+}
+
+/* スリムバーホバー時に、はみ出し表示が途切れないよう overflow を一時的に visible に変更 */
+.sidebar-menu.collapsed:hover {
+  overflow: visible !important;
+}
+
+/* 親アコーディオン（フォルダ）にホバーしたとき、子要素を右隣にポップオーバー表示 */
+.sidebar-menu.collapsed .sidebar-accordion {
+  position: relative !important;
+}
+
+.sidebar-menu.collapsed .sidebar-accordion:hover .accordion-content {
   display: flex !important;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
+  flex-direction: column !important;
+  position: absolute !important;
+  left: 56px !important; /* サイドバーの外側へ配置 */
+  top: 0 !important;
+  background: var(--bg-surface-elevated) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-md) !important;
+  padding: 0.5rem !important;
+  min-width: 170px !important;
+  max-width: 260px !important;
+  z-index: 999999 !important;
+  animation: popupFadeIn 0.15s ease-out;
+  gap: 0.35rem !important;
+}
+
+@keyframes popupFadeIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ポップオーバー内の子項目はテキストも通常通り表示する */
+.sidebar-menu.collapsed .sidebar-accordion:hover .accordion-content .nav-item,
+.sidebar-menu.collapsed .sidebar-accordion:hover .accordion-content .accordion-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  padding: 0.45rem 0.6rem !important;
+  width: 100% !important;
+  text-align: left !important;
+  background: transparent !important;
+  border-radius: var(--radius-sm) !important;
+  justify-content: flex-start !important;
+  position: relative !important;
+}
+
+.sidebar-menu.collapsed .sidebar-accordion:hover .accordion-content .nav-item:hover,
+.sidebar-menu.collapsed .sidebar-accordion:hover .accordion-content .accordion-header:hover {
+  background: var(--bg-hover) !important;
+}
+
+.sidebar-menu.collapsed .sidebar-accordion:hover .accordion-content .nav-item-text,
+.sidebar-menu.collapsed .sidebar-accordion:hover .accordion-content .accordion-header-text {
+  display: inline-block !important;
+  color: var(--text-primary) !important;
+  font-size: 0.8rem !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* ポップオーバー内では、通常のアイコン（user-custom-icon または絵文字）を表示する */
+.sidebar-menu.collapsed .sidebar-accordion:hover .accordion-content .nav-item .user-custom-icon,
+.sidebar-menu.collapsed .sidebar-accordion:hover .accordion-content .accordion-header .user-custom-icon {
+  margin-right: 0.4rem !important;
+}
+
+/* 代替絵文字の content 表示も、ポップオーバー内では不要（本物のアイコンが表示されるため） */
+.sidebar-menu.collapsed .sidebar-accordion:hover .accordion-content .nav-item::before,
+.sidebar-menu.collapsed .sidebar-accordion:hover .accordion-content .accordion-header::before {
+  display: none !important;
+}
+
+/* ポップオーバー内のアコーディオン矢印は非表示にしてシンプルなフラットリスト表示にする */
+.sidebar-menu.collapsed .sidebar-accordion:hover .accordion-content .accordion-arrow {
+  display: none !important;
 }
 
 .sidebar-menu.collapsed .user-profile-section {
