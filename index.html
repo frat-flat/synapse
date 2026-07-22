@@ -480,6 +480,11 @@
 <span style="font-size: 1.8rem; line-height: 1;">📁</span>
 <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">フォルダ管理</div>
 </div>
+<!-- ユーザー登録 -->
+<div class="admin-app-icon" id="admin-panel-user-register-btn" title="ユーザー登録&#13;新規ユーザーの追加、パスワード設定、ロール（権限グループ）の付与を行います。" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.6rem 0.4rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; aspect-ratio: 1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+<span style="font-size: 1.8rem; line-height: 1;">👤</span>
+<div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">ユーザー登録</div>
+</div>
 </div>
 </div>
 </section>
@@ -1676,6 +1681,69 @@
     <div class="ctx-menu-item" id="ctx-rename" style="padding: 0.45rem 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary);">✏️ 名前を変更</div>
     <div class="ctx-menu-item" id="ctx-move-root" style="padding: 0.45rem 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary); border-top: 1px solid var(--border-color); margin-top: 0.15rem; padding-top: 0.45rem;">🏠 最上位階層に戻す</div>
     <div class="ctx-menu-item" id="ctx-delete" style="padding: 0.45rem 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; color: #ef4444; border-top: 1px solid var(--border-color); margin-top: 0.15rem; padding-top: 0.45rem;">🗑️ 削除</div>
+  </div>
+</div>
+
+<!-- ================= ユーザー登録・管理モーダル ================= -->
+<div class="modal-overlay" id="user-manager-modal" style="display: none;">
+  <div class="modal-box" style="max-width: 720px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; padding: 1.25rem; background: var(--bg-surface); border-radius: var(--radius-md); box-shadow: var(--shadow-lg);">
+    <div class="modal-header" style="padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">
+        👤 ユーザーアカウント管理 (システム管理者専用)
+      </h2>
+      <button class="btn-text" id="user-manager-modal-close" style="font-size: 1.25rem; font-weight: bold; cursor: pointer; color: var(--text-muted); border: none; background: none;">✕</button>
+    </div>
+    
+    <div class="modal-body" style="display: flex; flex-direction: row; gap: 1rem; overflow: hidden; flex: 1; flex-wrap: wrap; text-align: left;">
+      <!-- 左側：新規ユーザー作成フォーム -->
+      <div style="flex: 1; min-width: 250px; display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-surface-elevated); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+        <h3 style="margin: 0; font-size: 0.88rem; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.35rem; display: flex; align-items: center; gap: 0.25rem;">
+          ➕ 新規アカウント登録
+        </h3>
+        
+        <form id="user-register-form" style="display: flex; flex-direction: column; gap: 0.65rem;">
+          <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">ログインID (半角英数字):</label>
+            <input type="text" id="reg-user-id" required placeholder="例: sales_03" style="padding: 0.4rem 0.6rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">表示用氏名:</label>
+            <input type="text" id="reg-user-name" required placeholder="例: 営業担当C" style="padding: 0.4rem 0.6rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">パスワード:</label>
+            <input type="password" id="reg-user-password" required placeholder="初期パスワードを入力" style="padding: 0.4rem 0.6rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">ロール（所属権限）:</label>
+            <select id="reg-user-role" style="padding: 0.4rem 0.6rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+              <option value="sales">営業担当 (sales)</option>
+              <option value="support">開設サポート担当 (support)</option>
+              <option value="admin">システム管理者 (admin)</option>
+            </select>
+          </div>
+          
+          <button type="submit" class="btn-primary" style="margin-top: 0.5rem; padding: 0.45rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm);">
+            💾 登録する
+          </button>
+        </form>
+      </div>
+      
+      <!-- 右側：登録ユーザー一覧リスト -->
+      <div style="flex: 1.5; min-width: 320px; display: flex; flex-direction: column; gap: 0.5rem;">
+        <h3 style="margin: 0; font-size: 0.88rem; font-weight: 700; color: var(--text-primary); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.35rem;">
+          <span>📋 登録アカウント一覧</span>
+          <span id="user-count-badge" style="font-size: 0.75rem; font-weight: 500; background: var(--border-color); padding: 0.1rem 0.4rem; border-radius: var(--radius-md); color: var(--text-primary);">0件</span>
+        </h3>
+        
+        <div id="user-list-container" style="flex: 1; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); padding: 0.5rem; overflow-y: auto; max-height: 380px; display: flex; flex-direction: column; gap: 0.4rem;">
+          <!-- 登録ユーザーが動的に追加されます -->
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 

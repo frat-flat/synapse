@@ -81,7 +81,8 @@ const STORAGE_KEYS = {
   USER_CUSTOM_ICONS: 'synapse_user_custom_icons',
   JO_ROW_HEIGHTS: 'synapse_jo_row_heights',
   AP_ROW_HEIGHTS: 'synapse_ap_row_heights',
-  AG_ROW_HEIGHTS: 'synapse_ag_row_heights'
+  AG_ROW_HEIGHTS: 'synapse_ag_row_heights',
+  USERS: 'synapse_users_list'
 };
 
 const INITIAL_JO_COLUMNS = [
@@ -368,6 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFormatDropdowns();
   initCustomIconModalEvents();
   setupSidebarToggleBtnEvent();
+  initUserManagerEvents();
   checkLoginStatus();
 
   // スクロール時にオーバーフローセルを再調整（バブリングしないためキャプチャフェーズを使用）
@@ -691,8 +693,21 @@ function loadStateFromLocalStorage(keys) {
   }
 }
 
+function ensureInitialUsersExist() {
+  if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
+    const defaultUsers = [
+      { id: 'admin', name: 'システム管理者', password: 'password', role: 'admin' },
+      { id: 'sales_01', name: '営業担当A', password: 'password', role: 'sales' },
+      { id: 'sales_02', name: '営業担当B', password: 'password', role: 'sales' },
+      { id: 'support_01', name: '開設サポート担当', password: 'password', role: 'support' }
+    ];
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(defaultUsers));
+  }
+}
+
 // データベースの初期化（ローカルストレージチェック）
 function initDatabase() {
+  ensureInitialUsersExist();
   // バージョンが変わった場合はバージョン情報のみ更新（ユーザーデータを保護するためクリアは実行しない）
   if (localStorage.getItem(STORAGE_KEYS.VERSION) !== CURRENT_DB_VERSION) {
     localStorage.setItem(STORAGE_KEYS.VERSION, CURRENT_DB_VERSION);
@@ -8149,22 +8164,12 @@ function handleLogin(e) {
     const id = document.getElementById('login-id').value.trim();
     const pass = document.getElementById('login-pass').value.trim();
 
-    if (pass === 'password' && id) {
-      let initialMode = 'sales';
-      let name = '営業担当A';
-      
-      // 入力されたIDがadminっぽければ管理者モードで開始、それ以外なら営業モードで開始
-      if (id.toLowerCase().includes('admin')) {
-        initialMode = 'admin';
-        name = 'システム管理者';
-      } else if (id.toLowerCase().includes('support')) {
-        initialMode = 'support';
-        name = '開設サポート担当';
-      } else if (id === 'sales_02') {
-        name = '営業担当B';
-      }
-      
-      state.currentUser = { id: initialMode, name: name, loginId: id };
+    ensureInitialUsersExist();
+    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+    const foundUser = users.find(u => u.id === id && u.password === pass);
+
+    if (foundUser) {
+      state.currentUser = { id: foundUser.role, name: foundUser.name, loginId: foundUser.id, password: foundUser.password };
       localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
       
       // ログインユーザー用のDB設定を再ロード
@@ -20936,6 +20941,159 @@ function initContextMenuEvents() {
       }
     });
   }
+}
+
+// ==========================================
+// ユーザーアカウント管理（システム管理者専用）
+// ==========================================
+function initUserManagerEvents() {
+  const panelBtn = document.getElementById('admin-panel-user-register-btn');
+  const modal = document.getElementById('user-manager-modal');
+  const closeBtn = document.getElementById('user-manager-modal-close');
+  const form = document.getElementById('user-register-form');
+
+  if (panelBtn && modal) {
+    panelBtn.addEventListener('click', () => {
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+      renderUserManagerList();
+    });
+  }
+
+  const closeModal = () => {
+    if (modal) {
+      modal.style.display = 'none';
+      modal.classList.remove('active');
+    }
+  };
+
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+  }
+
+  if (form) {
+    // 既存のリスナーがあれば重複登録を回避するため一度クローンする
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+
+    newForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const regId = document.getElementById('reg-user-id').value.trim();
+      const regName = document.getElementById('reg-user-name').value.trim();
+      const regPassword = document.getElementById('reg-user-password').value.trim();
+      const regRole = document.getElementById('reg-user-role').value;
+
+      if (!/^[a-zA-Z0-9_-]+$/.test(regId)) {
+        showToast('ログインIDは半角英数字、ハイフン、アンダースコアのみ使用できます。', 'error');
+        return;
+      }
+
+      ensureInitialUsersExist();
+      const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+      
+      const duplicate = users.some(u => u.id.toLowerCase() === regId.toLowerCase());
+      if (duplicate) {
+        showToast(`ログインID「${regId}」は既に登録されています。`, 'error');
+        return;
+      }
+
+      users.push({
+        id: regId,
+        name: regName,
+        password: regPassword,
+        role: regRole
+      });
+
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      showToast(`ユーザー「${regName}」を正常に登録しました。`, 'success');
+      newForm.reset();
+      renderUserManagerList();
+    });
+  }
+}
+
+function renderUserManagerList() {
+  const container = document.getElementById('user-list-container');
+  const countBadge = document.getElementById('user-count-badge');
+  if (!container) return;
+
+  ensureInitialUsersExist();
+  const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+  if (countBadge) countBadge.textContent = `${users.length}件`;
+
+  container.innerHTML = '';
+
+  if (users.length === 0) {
+    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 1.5rem 0;">登録されているアカウントはありません。</div>`;
+    return;
+  }
+
+  users.forEach(user => {
+    const card = document.createElement('div');
+    card.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); transition: background-color 0.2s;';
+    
+    // ロールごとのバッジ
+    let roleBadgeColor = 'var(--text-muted)';
+    let roleLabel = '一般';
+    if (user.role === 'admin') {
+      roleBadgeColor = '#ef4444'; // adminは赤
+      roleLabel = '管理者';
+    } else if (user.role === 'sales') {
+      roleBadgeColor = 'var(--primary)'; // 営業はプライマリブルー
+      roleLabel = '営業担当';
+    } else if (user.role === 'support') {
+      roleBadgeColor = 'var(--secondary)'; // サポートはセカンダリグリーン
+      roleLabel = 'サポート';
+    }
+
+    const info = document.createElement('div');
+    info.style.cssText = 'display: flex; flex-direction: column; gap: 0.15rem;';
+    info.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">
+        <span>${user.name}</span>
+        <span style="font-size: 0.68rem; font-weight: 600; padding: 0.05rem 0.3rem; border-radius: var(--radius-sm); color: #ffffff; background: ${roleBadgeColor};">${roleLabel}</span>
+      </div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); display: flex; gap: 0.50rem; margin-top: 0.15rem;">
+        <span>ID: <code style="background: var(--bg-surface-elevated); padding: 0.05rem 0.2rem; border-radius: var(--radius-xs); color: var(--text-primary); font-family: monospace;">${user.id}</code></span>
+        <span>Pass: <code style="background: var(--bg-surface-elevated); padding: 0.05rem 0.2rem; border-radius: var(--radius-xs); color: var(--text-primary); font-family: monospace;">${user.password}</code></span>
+      </div>
+    `;
+
+    const action = document.createElement('div');
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-text';
+    delBtn.innerHTML = '🗑️ 削除';
+    delBtn.style.cssText = 'color: #ef4444; font-size: 0.75rem; font-weight: 600; cursor: pointer; border: none; background: none; padding: 0.2rem;';
+    
+    // adminアカウント、または自分自身のアカウントは削除不可にする
+    const isSelf = state.currentUser && state.currentUser.loginId === user.id;
+    const isDefaultAdmin = user.id === 'admin';
+    if (isSelf || isDefaultAdmin) {
+      delBtn.disabled = true;
+      delBtn.style.opacity = '0.35';
+      delBtn.style.cursor = 'not-allowed';
+      delBtn.title = isSelf ? 'ログイン中の自分自身のアカウントは削除できません。' : 'デフォルト管理者アカウントは削除できません。';
+    } else {
+      delBtn.addEventListener('click', () => {
+        showAppConfirm('アカウントの削除', `アカウント「${user.name}（ID: ${user.id}）」を削除しますか？`, () => {
+          ensureInitialUsersExist();
+          let currentUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+          currentUsers = currentUsers.filter(u => u.id !== user.id);
+          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(currentUsers));
+          showToast(`ユーザー「${user.name}」を削除しました。`, 'success');
+          renderUserManagerList();
+        });
+      });
+    }
+
+    action.appendChild(delBtn);
+    card.appendChild(info);
+    card.appendChild(action);
+    container.appendChild(card);
+  });
 }
 
 function renderModalFolderTree() {
