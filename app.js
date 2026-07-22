@@ -23364,7 +23364,6 @@ function initMypageMemo() {
         lockToggleBtn.style.background = 'rgba(234, 179, 8, 0.15)';
         lockToggleBtn.style.borderColor = '#eab308';
       }
-      if (secureToggleLabel) secureToggleLabel.style.display = 'flex';
     } else {
       if (lockIconStatus) lockIconStatus.textContent = '🔒';
       if (lockTextStatus) lockTextStatus.textContent = 'ロック付きメモを表示';
@@ -23372,8 +23371,8 @@ function initMypageMemo() {
         lockToggleBtn.style.background = 'var(--bg-surface-elevated)';
         lockToggleBtn.style.borderColor = 'var(--border-color)';
       }
-      if (secureToggleLabel) secureToggleLabel.style.display = 'none';
     }
+    if (secureToggleLabel) secureToggleLabel.style.display = 'flex';
     renderMemoList();
   };
 
