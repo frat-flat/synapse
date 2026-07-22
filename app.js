@@ -1412,6 +1412,8 @@ function ensureStandardAccordionsInState() {
     const existing = state.customAccordions.find(a => a.id === std.id);
     if (!existing) {
       state.customAccordions.unshift(std);
+    } else {
+      existing.name = std.name;
     }
   });
 }
@@ -1434,6 +1436,7 @@ function ensureStandardTablesInState() {
     if (!existing) {
       state.customTables.push(std);
     } else {
+      existing.name = std.name; // 強制的に正しい名前に上書き
       // 親IDが無効または未設定、あるいは標準設定が崩れている場合は本来の親フォルダ（例: appoint-accordion）に確実に復元接続
       const norm = normalizeFolderId(existing.parentMenuId);
       if (!norm || norm === 'root' || norm === 'none') {
@@ -2126,12 +2129,13 @@ function attachSidebarItemActions(el, itemId, itemName, itemType, depth = 1) {
   }
 
   // 編集ボタン（🎨）は、システム項目以外の項目にのみ表示する
+  const normId = normalizeFolderId(itemId);
   const stdSystemItems = [
     'appoint-accordion', 'agency-accordion', 'jo-accordion', 'applicant-accordion',
     'agency-info-screen', 'jo-info-screen', 'applicant-info-screen',
     'appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link'
   ];
-  const isSystemItem = stdSystemItems.includes(itemId);
+  const isSystemItem = stdSystemItems.includes(normId);
   let editBtn = null;
 
   if (!isSystemItem) {
@@ -2362,6 +2366,7 @@ function renderCustomTableList() {
 
       const tableIcon = getUserItemIconHtml(tbl.id, null);
       if (btn) {
+        console.log('[DEBUG] Rendering table:', tbl.id, 'with name:', tbl.name);
         btn.setAttribute('data-tooltip', tbl.name);
         btn.style.display = 'flex';
         btn.style.alignItems = 'center';
@@ -5673,8 +5678,16 @@ function getDynamicMasterTableName(tableId) {
   if (parentHeaderId) {
     const el = document.getElementById(parentHeaderId);
     if (el) {
-      const span = el.querySelector('span');
-      let folderName = span ? span.textContent : el.textContent;
+      const spans = el.querySelectorAll('span');
+      let folderName = '';
+      spans.forEach(s => {
+        if (!s.classList.contains('accordion-icon') && !s.classList.contains('accordion-arrow')) {
+          folderName = s.textContent;
+        }
+      });
+      if (!folderName) {
+        folderName = el.textContent.replace('▼', '').replace('▶', '');
+      }
       folderName = folderName.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').replace(/[📅💼📑📋]/g, '').trim();
       let baseName = folderName.replace(/(情報|フォルダ)$/, '');
       if (!baseName) baseName = folderName;
@@ -7494,7 +7507,8 @@ function setupEventListeners() {
   if (accordionHeader && accordionContent) {
     accordionHeader.addEventListener('click', () => {
       accordionHeader.classList.toggle('collapsed');
-      accordionContent.classList.toggle('collapsed');
+      const isHidden = accordionContent.style.display === 'none' || !accordionContent.style.display;
+      accordionContent.style.display = isHidden ? 'flex' : 'none';
     });
   }
 
