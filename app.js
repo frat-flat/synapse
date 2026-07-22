@@ -23360,12 +23360,18 @@ function initMypageMemo() {
     if (state.memoUnlockedSecure) {
       if (lockIconStatus) lockIconStatus.textContent = '🔓';
       if (lockToggleBtn) {
-        lockToggleBtn.style.color = '#4b5563';
+        lockToggleBtn.style.filter = 'grayscale(100%)';
+        lockToggleBtn.style.opacity = '0.7';
+        lockToggleBtn.onmouseover = () => { lockToggleBtn.style.opacity = '0.9'; };
+        lockToggleBtn.onmouseout = () => { lockToggleBtn.style.opacity = '0.7'; };
       }
     } else {
       if (lockIconStatus) lockIconStatus.textContent = '🔒';
       if (lockToggleBtn) {
-        lockToggleBtn.style.color = '#9ca3af';
+        lockToggleBtn.style.filter = 'grayscale(100%)';
+        lockToggleBtn.style.opacity = '0.45';
+        lockToggleBtn.onmouseover = () => { lockToggleBtn.style.opacity = '0.8'; };
+        lockToggleBtn.onmouseout = () => { lockToggleBtn.style.opacity = '0.45'; };
       }
     }
     if (secureToggleLabel) secureToggleLabel.style.display = 'flex';

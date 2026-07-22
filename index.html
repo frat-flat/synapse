@@ -565,9 +565,9 @@
               <!-- メモ一覧が動的に出力されます -->
             </div>
 
-            <!-- 鍵マーク（暗証番号ロック切り替え）ボタン (枠なし・灰色・一回り大きめのアイコンのみ) -->
-            <div style="display: flex; justify-content: center; padding: 0.5rem 0;">
-              <button id="memo-lock-toggle-btn" title="ロック付きメモを表示/非表示" style="background: none; border: none; padding: 0.25rem; font-size: 1.35rem; cursor: pointer; color: #9ca3af; display: inline-flex; align-items: center; justify-content: center; transition: color 0.2s; outline: none;">
+            <!-- 鍵マーク（暗証番号ロック切り替え）ボタン (右端寄せ・グレーアウト化・一回り大きめのアイコンのみ) -->
+            <div style="display: flex; justify-content: flex-end; padding: 0.3rem 0.5rem;">
+              <button id="memo-lock-toggle-btn" title="ロック付きメモを表示/非表示" style="background: none; border: none; padding: 0.25rem; font-size: 1.35rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; filter: grayscale(100%); opacity: 0.45; transition: opacity 0.2s; outline: none;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='0.45'">
                 <span id="memo-lock-icon-status">🔒</span>
               </button>
             </div>
