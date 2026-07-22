@@ -23310,6 +23310,16 @@ function initMypageMemo() {
   };
 
   // DOM要素
+  const menuView = document.getElementById('mypage-menu-view');
+  const memoWrapper = document.getElementById('mypage-memo-view-wrapper');
+  
+  const btnNormalMemo = document.getElementById('mypage-btn-normal-memo');
+  const btnSecureMemo = document.getElementById('mypage-btn-secure-memo');
+  const backToMenuBtn = document.getElementById('mypage-back-to-menu-btn');
+  
+  const memoTitleText = document.getElementById('mypage-memo-title-text');
+  const memoDescText = document.getElementById('mypage-memo-desc-text');
+
   const lockView = document.getElementById('memo-lock-view');
   const mainView = document.getElementById('memo-main-view');
   const setupContainer = document.getElementById('memo-lock-setup-container');
@@ -23339,23 +23349,8 @@ function initMypageMemo() {
   const formatBtns = document.querySelectorAll('.memo-format-btn');
   const foreColorInput = document.getElementById('memo-forecolor-input');
 
-  // タブボタン
-  const tabBtnNormal = document.getElementById('memo-tab-btn-normal');
-  const tabBtnSecure = document.getElementById('memo-tab-btn-secure');
-
   // ロック解除・設定画面の切り替え
   const updateMemoUI = () => {
-    // タブのボタンのアクティブクラス切り替え
-    if (tabBtnNormal && tabBtnSecure) {
-      if (state.activeMemoType === 'normal') {
-        tabBtnNormal.classList.add('active');
-        tabBtnSecure.classList.remove('active');
-      } else {
-        tabBtnNormal.classList.remove('active');
-        tabBtnSecure.classList.add('active');
-      }
-    }
-
     if (state.activeMemoType === 'normal') {
       // 通常メモはロックなしで常に見せる
       if (lockView) lockView.style.display = 'none';
@@ -23394,27 +23389,51 @@ function initMypageMemo() {
     }
   };
 
-  // タブ切り替えイベント
-  if (tabBtnNormal) {
-    tabBtnNormal.onclick = () => {
+  // メニューダッシュボードから通常のメモ帳を開く
+  if (btnNormalMemo) {
+    btnNormalMemo.onclick = () => {
       state.activeMemoType = 'normal';
+      if (menuView) menuView.style.display = 'none';
+      if (memoWrapper) memoWrapper.style.display = 'flex';
+      if (memoTitleText) memoTitleText.textContent = '📄 通常のメモ帳';
+      if (memoDescText) memoDescText.textContent = '個人用のメモ帳です。このデータはご自身のみに紐付いて保存されます。';
       activeMemoId = null;
       showEditor(null);
       updateMemoUI();
     };
   }
 
-  if (tabBtnSecure) {
-    tabBtnSecure.onclick = () => {
+  // メニューダッシュボードからシークレットメモ帳を開く
+  if (btnSecureMemo) {
+    btnSecureMemo.onclick = () => {
       state.activeMemoType = 'secure';
+      if (menuView) menuView.style.display = 'none';
+      if (memoWrapper) memoWrapper.style.display = 'flex';
+      if (memoTitleText) memoTitleText.textContent = '🔒 シークレットメモ帳';
+      if (memoDescText) memoDescText.textContent = '暗証番号ロック付きの個人用メモ帳です。このメモは他ユーザーや管理者からは一切閲覧できません。';
       activeMemoId = null;
       showEditor(null);
       updateMemoUI();
     };
   }
 
-  // 初期表示
-  updateMemoUI();
+  // メニューに戻る
+  if (backToMenuBtn) {
+    backToMenuBtn.onclick = () => {
+      if (menuView) menuView.style.display = 'flex';
+      if (memoWrapper) memoWrapper.style.display = 'none';
+      state.memoUnlockedSecure = false; // 戻った時に再ロック
+      activeMemoId = null;
+      showEditor(null);
+    };
+  }
+
+  // 初期画面遷移の状態を同期して表示
+  if (menuView && menuView.style.display !== 'none') {
+    if (memoWrapper) memoWrapper.style.display = 'none';
+  } else {
+    updateMemoUI();
+  }
 
   // 暗証番号の設定
   if (setupBtn) {
