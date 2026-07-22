@@ -556,18 +556,18 @@
         <div id="memo-main-view" style="display: flex; flex: 1; flex-direction: row; gap: 1.25rem; overflow: hidden; align-items: stretch; width: 100%;">
           
           <!-- メモ帳左カラム：リスト ＆ 新規作成 ＆ 鍵トグルボタン -->
-          <div style="width: 260px; display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-surface); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+          <div style="width: 260px; display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-surface); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); position: relative;">
             <button id="memo-new-btn" class="btn-primary" style="padding: 0.5rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.35rem; border-radius: var(--radius-sm);">
               ➕ 新規メモ作成
             </button>
             
-            <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem;" id="memo-list-container">
+            <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; padding-bottom: 2.2rem;" id="memo-list-container">
               <!-- メモ一覧が動的に出力されます -->
             </div>
 
-            <!-- 鍵マーク（暗証番号ロック切り替え）ボタン (右端寄せ・グレーアウト化・一回り大きめのアイコンのみ) -->
-            <div style="display: flex; justify-content: flex-end; padding: 0.3rem 0.5rem;">
-              <button id="memo-lock-toggle-btn" title="ロック付きメモを表示/非表示" style="background: none; border: none; padding: 0.25rem; font-size: 1.35rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; filter: grayscale(100%); opacity: 0.45; transition: opacity 0.2s; outline: none;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='0.45'">
+            <!-- 鍵マーク（暗証番号ロック切り替え）ボタン (右下絶対配置・グレーアウト化・一回り大きめのアイコンのみ) -->
+            <div style="position: absolute; right: 6px; bottom: 6px; z-index: 10;">
+              <button id="memo-lock-toggle-btn" title="ロック付きメモを表示/非表示" style="background: none; border: none; padding: 0.2rem; font-size: 1.35rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; filter: grayscale(100%); opacity: 0.45; transition: opacity 0.2s; outline: none;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='0.45'">
                 <span id="memo-lock-icon-status">🔒</span>
               </button>
             </div>
