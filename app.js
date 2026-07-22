@@ -370,6 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCustomIconModalEvents();
   setupSidebarToggleBtnEvent();
   initUserManagerEvents();
+  initSignupEvents();
   checkLoginStatus();
 
   // スクロール時にオーバーフローセルを再調整（バブリングしないためキャプチャフェーズを使用）
@@ -20944,6 +20945,125 @@ function initContextMenuEvents() {
 }
 
 // ==========================================
+// ログイン画面の新規サインアップ処理
+// ==========================================
+function initSignupEvents() {
+  const loginScreen = document.getElementById('login-screen');
+  const signupScreen = document.getElementById('signup-screen');
+  const goToSignup = document.getElementById('go-to-signup');
+  const goToLogin = document.getElementById('go-to-login');
+  
+  const signupForm = document.getElementById('signup-form');
+  const googleBtn = document.getElementById('signup-google-btn');
+
+  if (goToSignup && loginScreen && signupScreen) {
+    goToSignup.addEventListener('click', (e) => {
+      e.preventDefault();
+      loginScreen.style.display = 'none';
+      loginScreen.classList.remove('active');
+      signupScreen.style.display = 'flex';
+      signupScreen.classList.add('active');
+      if (signupForm) signupForm.reset();
+    });
+  }
+
+  if (goToLogin && loginScreen && signupScreen) {
+    goToLogin.addEventListener('click', (e) => {
+      e.preventDefault();
+      signupScreen.style.display = 'none';
+      signupScreen.classList.remove('active');
+      loginScreen.style.display = 'flex';
+      loginScreen.classList.add('active');
+    });
+  }
+
+  // Googleでの登録シミュレーション（プレミアム体験）
+  if (googleBtn) {
+    googleBtn.addEventListener('click', () => {
+      showToast('Google 認証をロード中...', 'info');
+      googleBtn.disabled = true;
+      googleBtn.style.opacity = '0.7';
+
+      setTimeout(() => {
+        const lastNameInput = document.getElementById('signup-lastname');
+        const firstNameInput = document.getElementById('signup-firstname');
+        const emailInput = document.getElementById('signup-email');
+        const usernameInput = document.getElementById('signup-username');
+
+        if (lastNameInput) lastNameInput.value = '鈴木';
+        if (firstNameInput) firstNameInput.value = '一郎';
+        if (emailInput) emailInput.value = 'suzuki.ichiro@gmail.com';
+        if (usernameInput) usernameInput.value = 'suzuki_ichiro';
+
+        googleBtn.disabled = false;
+        googleBtn.style.opacity = '1';
+        showToast('Googleアカウントから認証情報をインポートしました。セキュリティ保護のため、パスワードを設定して登録を完了させてください。', 'success');
+      }, 1000);
+    });
+  }
+
+  if (signupForm) {
+    signupForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      const lastName = document.getElementById('signup-lastname').value.trim();
+      const firstName = document.getElementById('signup-firstname').value.trim();
+      const email = document.getElementById('signup-email').value.trim();
+      const username = document.getElementById('signup-username').value.trim();
+      const password = document.getElementById('signup-password').value.trim();
+      const passwordConfirm = document.getElementById('signup-password-confirm').value.trim();
+
+      if (!lastName || !firstName) {
+        showToast('姓と名を入力してください。', 'error');
+        return;
+      }
+
+      if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+        showToast('ユーザー名は半角英数字、ハイフン、アンダースコアのみ使用できます。', 'error');
+        return;
+      }
+
+      if (password !== passwordConfirm) {
+        showToast('パスワードと確認用パスワードが一致しません。', 'error');
+        return;
+      }
+
+      ensureInitialUsersExist();
+      const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+      
+      const duplicate = users.some(u => u.id.toLowerCase() === username.toLowerCase());
+      if (duplicate) {
+        showToast(`ユーザー名「${username}」は既に登録されています。`, 'error');
+        return;
+      }
+
+      const fullName = `${lastName} ${firstName}`;
+
+      users.push({
+        id: username,
+        name: fullName,
+        password: password,
+        role: 'sales', // 新規サインアップのデフォルトロールは営業担当
+        email: email
+      });
+
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      showToast(`アカウント「${fullName}」が正常に作成されました。ログインしてください。`, 'success');
+      
+      signupForm.reset();
+      
+      // ログイン画面へ切り替え
+      if (signupScreen && loginScreen) {
+        signupScreen.style.display = 'none';
+        signupScreen.classList.remove('active');
+        loginScreen.style.display = 'flex';
+        loginScreen.classList.add('active');
+      }
+    });
+  }
+}
+
+// ==========================================
 // ユーザーアカウント管理（システム管理者専用）
 // ==========================================
 function initUserManagerEvents() {
@@ -20952,10 +21072,33 @@ function initUserManagerEvents() {
   const closeBtn = document.getElementById('user-manager-modal-close');
   const form = document.getElementById('user-register-form');
 
+  // アコーディオン開閉
+  const accHeader = document.getElementById('admin-new-user-accordion-header');
+  const accContent = document.getElementById('admin-new-user-accordion-content');
+  const accArrow = document.getElementById('admin-new-user-accordion-arrow');
+
+  if (accHeader && accContent && accArrow) {
+    // リスナー重複防止のために一度クローン置換
+    const newHeader = accHeader.cloneNode(true);
+    accHeader.parentNode.replaceChild(newHeader, accHeader);
+
+    newHeader.addEventListener('click', () => {
+      const isHidden = accContent.style.display === 'none';
+      accContent.style.display = isHidden ? 'flex' : 'none';
+      accArrow.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+    });
+  }
+
   if (panelBtn && modal) {
     panelBtn.addEventListener('click', () => {
       modal.style.display = 'flex';
       modal.classList.add('active');
+      
+      // 開いたときはアコーディオンを閉じた状態（初期値）にしておく
+      if (accContent && accArrow) {
+        accContent.style.display = 'none';
+        accArrow.style.transform = 'rotate(0deg)';
+      }
       renderUserManagerList();
     });
   }
@@ -20975,19 +21118,30 @@ function initUserManagerEvents() {
   }
 
   if (form) {
-    // 既存のリスナーがあれば重複登録を回避するため一度クローンする
     const newForm = form.cloneNode(true);
     form.parentNode.replaceChild(newForm, form);
 
     newForm.addEventListener('submit', (e) => {
       e.preventDefault();
+      const regLastName = document.getElementById('reg-user-lastname').value.trim();
+      const regFirstName = document.getElementById('reg-user-firstname').value.trim();
       const regId = document.getElementById('reg-user-id').value.trim();
-      const regName = document.getElementById('reg-user-name').value.trim();
       const regPassword = document.getElementById('reg-user-password').value.trim();
+      const regPasswordConfirm = document.getElementById('reg-user-password-confirm').value.trim();
       const regRole = document.getElementById('reg-user-role').value;
 
+      if (!regLastName || !regFirstName) {
+        showToast('姓と名を入力してください。', 'error');
+        return;
+      }
+
       if (!/^[a-zA-Z0-9_-]+$/.test(regId)) {
-        showToast('ログインIDは半角英数字、ハイフン、アンダースコアのみ使用できます。', 'error');
+        showToast('ユーザー名は半角英数字、ハイフン、アンダースコアのみ使用できます。', 'error');
+        return;
+      }
+
+      if (regPassword !== regPasswordConfirm) {
+        showToast('パスワードと確認用パスワードが一致しません。', 'error');
         return;
       }
 
@@ -20996,20 +21150,29 @@ function initUserManagerEvents() {
       
       const duplicate = users.some(u => u.id.toLowerCase() === regId.toLowerCase());
       if (duplicate) {
-        showToast(`ログインID「${regId}」は既に登録されています。`, 'error');
+        showToast(`ユーザー名「${regId}」は既に登録されています。`, 'error');
         return;
       }
 
+      const regFullName = `${regLastName} ${regFirstName}`;
+
       users.push({
         id: regId,
-        name: regName,
+        name: regFullName,
         password: regPassword,
         role: regRole
       });
 
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-      showToast(`ユーザー「${regName}」を正常に登録しました。`, 'success');
+      showToast(`ユーザー「${regFullName}」を正常に登録しました。`, 'success');
       newForm.reset();
+      
+      // 登録完了したらアコーディオンを閉じる
+      if (accContent && accArrow) {
+        accContent.style.display = 'none';
+        accArrow.style.transform = 'rotate(0deg)';
+      }
+      
       renderUserManagerList();
     });
   }
