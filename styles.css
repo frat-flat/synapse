@@ -4011,3 +4011,142 @@ h3 {
   opacity: 1.0 !important;
   transform: scale(1.2);
 }
+
+/* ============================================================================
+   📌 浮遊付箋（Sticky Notes）スタイル
+   ============================================================================ */
+.floating-sticky-note {
+  position: absolute;
+  width: 250px;
+  height: 250px;
+  background: #fef08a; /* デフォルト：パステルイエロー */
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+  display: flex;
+  flex-direction: column;
+  z-index: 15000;
+  transition: box-shadow 0.2s;
+  pointer-events: auto;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.floating-sticky-note:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.sticky-note-header {
+  height: 28px;
+  background: rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.4rem 0 0.5rem;
+  cursor: move;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.5);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+  user-select: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.sticky-note-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 80%;
+}
+
+.sticky-note-pin-indicator {
+  font-size: 0.72rem;
+}
+
+.sticky-note-close {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: rgba(0, 0, 0, 0.35);
+  font-weight: bold;
+  border: none;
+  background: none;
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sticky-note-close:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.sticky-note-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.6rem 0.6rem 0.6rem;
+  gap: 0.35rem;
+}
+
+.sticky-note-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.75);
+  background: transparent;
+  border: none;
+  outline: none;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.12);
+  padding-bottom: 0.15rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sticky-note-textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.7);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 付箋カラーバリエーション */
+.sticky-note-yellow { background: #fef08a !important; border-color: rgba(234, 179, 8, 0.2) !important; }
+.sticky-note-pink   { background: #fbcfe8 !important; border-color: rgba(236, 72, 153, 0.2) !important; }
+.sticky-note-blue   { background: #bfdbfe !important; border-color: rgba(59, 130, 246, 0.2) !important; }
+.sticky-note-green  { background: #bbf7d0 !important; border-color: rgba(16, 185, 129, 0.2) !important; }
+
+/* カラーピッカーミニパレット */
+.sticky-note-color-selector {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem 0.6rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.color-dot-btn {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.color-dot-btn:hover {
+  transform: scale(1.25);
+}
+

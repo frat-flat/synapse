@@ -374,6 +374,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initUserManagerEvents();
   initSignupEvents();
   checkLoginStatus();
+  initFloatingStickyNotes(); // 浮遊付箋の復元
+
 
   // スクロール時にオーバーフローセルを再調整（バブリングしないためキャプチャフェーズを使用）
   document.addEventListener('scroll', (e) => {
@@ -7027,7 +7029,10 @@ function activateTab(id) {
     renderCustomTable(tableId);
   } else if (tab.type === 'table-creator-screen') {
     state.activeCustomTableId = null;
+  } else if (tab.type === 'mypage-memo-screen') {
+    initMypageMemo();
   }
+
 
   // 画面表示切り替え
   const views = document.querySelectorAll('.screen-view');
@@ -23561,16 +23566,15 @@ function initMypageMemo() {
     renderMemoList();
   };
 
+  const stickyBtn = document.getElementById('memo-sticky-btn');
+
   // メニューダッシュボードからメモ帳を開く
   if (btnMemo) {
     btnMemo.onclick = () => {
-      if (menuView) menuView.style.display = 'none';
-      if (memoWrapper) memoWrapper.style.display = 'flex';
-      activeMemoId = null;
-      showEditor(null);
-      updateMemoUI();
+      openTab('mypage-memo-screen', 'mypage-memo-screen', '📝 個人メモ帳');
     };
   }
+
 
   // メニューに戻る
   if (backToMenuBtn) {
@@ -24112,6 +24116,8 @@ function initMypageMemo() {
 
     visibleMemos.forEach(memo => {
       const item = document.createElement('div');
+      item.classList.add('memo-item-wrapper');
+      item.dataset.memoId = memo.id;
       const isSelected = memo.id === activeMemoId;
       item.style.cssText = `padding: 0.55rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid ${isSelected ? 'var(--primary)' : 'var(--border-color)'}; background: ${isSelected ? 'var(--bg-surface-elevated)' : 'var(--bg-surface)'}; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; text-align: left; position: relative;`;
       
@@ -24133,7 +24139,7 @@ function initMypageMemo() {
 
       item.innerHTML = `
         <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem;">
-          <div style="font-size: 0.82rem; font-weight: 600; color: ${isSelected ? 'var(--primary)' : 'var(--text-primary)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          <div class="memo-item-title" style="font-size: 0.82rem; font-weight: 600; color: ${isSelected ? 'var(--primary)' : 'var(--text-primary)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             ${titleStr}
           </div>
           <div style="font-size: 0.65rem; color: var(--text-muted);">
@@ -24485,5 +24491,258 @@ function initMypageMemo() {
       }
     };
   });
+
+  // 📌 付箋にする
+  if (stickyBtn) {
+    stickyBtn.onclick = () => {
+      if (!activeMemoId) return;
+      createFloatingStickyNote(activeMemoId);
+    };
+  }
 }
+
+// ==========================================
+// 📌 浮遊付箋（Sticky Notes）処理
+// ==========================================
+function bringToFront(elm) {
+  const notes = document.querySelectorAll('.floating-sticky-note');
+  let maxZ = 15000;
+  notes.forEach(n => {
+    const z = parseInt(n.style.zIndex) || 15000;
+    if (z > maxZ) maxZ = z;
+  });
+  elm.style.zIndex = maxZ + 1;
+}
+
+function updateStickyNoteState(memoId, data) {
+  const key = 'synapse_floating_sticky_notes';
+  let states = JSON.parse(localStorage.getItem(key)) || [];
+  let index = states.findIndex(s => s.id === memoId);
+  if (index !== -1) {
+    states[index] = { ...states[index], ...data };
+  } else {
+    states.push({ id: memoId, ...data });
+  }
+  localStorage.setItem(key, JSON.stringify(states));
+}
+
+function saveStickyNoteState(memoId, x, y) {
+  updateStickyNoteState(memoId, { x, y });
+}
+
+function removeStickyNoteState(memoId) {
+  const key = 'synapse_floating_sticky_notes';
+  let states = JSON.parse(localStorage.getItem(key)) || [];
+  states = states.filter(s => s.id !== memoId);
+  localStorage.setItem(key, JSON.stringify(states));
+}
+
+function makeElementDraggable(elm, header) {
+  let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+  header.onmousedown = dragMouseDown;
+
+  function dragMouseDown(e) {
+    if (e.target.classList.contains('sticky-note-close')) return;
+    
+    e = e || window.event;
+    e.preventDefault();
+    bringToFront(elm);
+    pos3 = e.clientX;
+    pos4 = e.clientY;
+    document.onmouseup = closeDragElement;
+    document.onmousemove = elementDrag;
+  }
+
+  function elementDrag(e) {
+    e = e || window.event;
+    e.preventDefault();
+    pos1 = pos3 - e.clientX;
+    pos2 = pos4 - e.clientY;
+    pos3 = e.clientX;
+    pos4 = e.clientY;
+
+    let newTop = elm.offsetTop - pos2;
+    let newLeft = elm.offsetLeft - pos1;
+
+    const maxLeft = window.innerWidth - elm.offsetWidth;
+    const maxTop = window.innerHeight - elm.offsetHeight;
+    if (newLeft < 0) newLeft = 0;
+    if (newLeft > maxLeft) newLeft = maxLeft;
+    if (newTop < 0) newTop = 0;
+    if (newTop > maxTop) newTop = maxTop;
+
+    elm.style.top = newTop + "px";
+    elm.style.left = newLeft + "px";
+  }
+
+  function closeDragElement() {
+    document.onmouseup = null;
+    document.onmousemove = null;
+    saveStickyNoteState(elm.dataset.memoId, elm.offsetLeft, elm.offsetTop);
+  }
+}
+
+function getMemosStorageKey() {
+  const userId = (state.currentUser && state.currentUser.id) ? state.currentUser.id : 'unknown';
+  return `synapse_user_memos_${userId}`;
+}
+
+function createFloatingStickyNote(memoId, initialData = null) {
+  const container = document.getElementById('floating-sticky-notes-container');
+  if (!container) return;
+
+  let existing = container.querySelector(`[data-memo-id="${memoId}"]`);
+  if (existing) {
+    bringToFront(existing);
+    return;
+  }
+
+  let title = '';
+  let content = '';
+  let color = 'yellow';
+  let x = 100 + (container.children.length * 20);
+  let y = 100 + (container.children.length * 20);
+
+  if (initialData) {
+    title = initialData.title || '';
+    content = initialData.content || '';
+    color = initialData.color || 'yellow';
+    x = initialData.x;
+    y = initialData.y;
+  } else {
+    const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
+    const memo = memos.find(m => m.id === memoId);
+    if (memo) {
+      title = memo.title || '無題のメモ';
+      content = memo.content ? memo.content.replace(/<[^>]*>/g, '') : '';
+    } else {
+      title = '無題のメモ';
+      content = '';
+    }
+  }
+
+  const note = document.createElement('div');
+  note.className = `floating-sticky-note sticky-note-${color}`;
+  note.dataset.memoId = memoId;
+  note.style.left = `${x}px`;
+  note.style.top = `${y}px`;
+
+  note.innerHTML = `
+    <div class="sticky-note-header">
+      <div class="sticky-note-header-left">
+        <span class="sticky-note-pin-indicator">📌</span>
+        <span class="sticky-note-header-title">${title}</span>
+      </div>
+      <button class="sticky-note-close" title="付箋を閉じる">✕</button>
+    </div>
+    <div class="sticky-note-body">
+      <input type="text" class="sticky-note-title" placeholder="タイトル" value="${title}">
+      <textarea class="sticky-note-textarea" placeholder="メモを入力...">${content}</textarea>
+    </div>
+    <div class="sticky-note-color-selector">
+      <div class="color-dot-btn sticky-note-yellow" data-color="yellow"></div>
+      <div class="color-dot-btn sticky-note-pink" data-color="pink"></div>
+      <div class="color-dot-btn sticky-note-blue" data-color="blue"></div>
+      <div class="color-dot-btn sticky-note-green" data-color="green"></div>
+    </div>
+  `;
+
+  container.appendChild(note);
+  bringToFront(note);
+
+  const header = note.querySelector('.sticky-note-header');
+  const closeBtn = note.querySelector('.sticky-note-close');
+  const titleInput = note.querySelector('.sticky-note-title');
+  const textarea = note.querySelector('.sticky-note-textarea');
+  const colorBtns = note.querySelectorAll('.color-dot-btn');
+
+  makeElementDraggable(note, header);
+
+  closeBtn.onclick = () => {
+    note.remove();
+    removeStickyNoteState(memoId);
+  };
+
+  const syncAndSave = () => {
+    const newTitle = titleInput.value;
+    const newContent = textarea.value;
+    note.querySelector('.sticky-note-header-title').textContent = newTitle || '無題';
+    
+    updateStickyNoteState(memoId, { title: newTitle, content: newContent });
+    updateOriginalMemo(memoId, newTitle, newContent);
+  };
+
+  titleInput.oninput = syncAndSave;
+  textarea.oninput = syncAndSave;
+
+  colorBtns.forEach(btn => {
+    btn.onclick = () => {
+      const newColor = btn.dataset.color;
+      note.className = `floating-sticky-note sticky-note-${newColor}`;
+      updateStickyNoteState(memoId, { color: newColor });
+    };
+  });
+
+  if (!initialData) {
+    updateStickyNoteState(memoId, {
+      id: memoId,
+      x,
+      y,
+      color,
+      title,
+      content
+    });
+  }
+}
+
+function updateOriginalMemo(memoId, title, plainTextContent) {
+  const storageMemosKey = getMemosStorageKey();
+  const memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+  const memoIndex = memos.findIndex(m => m.id === memoId);
+  if (memoIndex !== -1) {
+    memos[memoIndex].title = title;
+    memos[memoIndex].content = plainTextContent.replace(/\n/g, '<br>');
+    memos[memoIndex].updatedAt = new Date().toISOString();
+    localStorage.setItem(storageMemosKey, JSON.stringify(memos));
+
+    const activeElement = document.activeElement;
+    const isEditingInMemoScreen = activeElement && (activeElement.id === 'memo-input-title' || activeElement.id === 'memo-input-content');
+
+    const listItems = document.querySelectorAll('.memo-item-title');
+    listItems.forEach(item => {
+      const memoItemDiv = item.closest('.memo-item-wrapper');
+      if (memoItemDiv && memoItemDiv.dataset.memoId === memoId) {
+        item.textContent = title || '無題のメモ';
+      }
+    });
+
+    if (!isEditingInMemoScreen) {
+      const titleInput = document.getElementById('memo-input-title');
+      const contentInput = document.getElementById('memo-input-content');
+      if (titleInput && titleInput.value !== title) titleInput.value = title;
+      if (contentInput) {
+        const htmlContent = plainTextContent.replace(/\n/g, '<br>');
+        if (contentInput.innerHTML !== htmlContent) {
+          contentInput.innerHTML = htmlContent;
+        }
+      }
+    }
+  }
+}
+
+function initFloatingStickyNotes() {
+  const key = 'synapse_floating_sticky_notes';
+  const states = JSON.parse(localStorage.getItem(key)) || [];
+  states.forEach(state => {
+    const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
+    const memoExists = memos.some(m => m.id === state.id);
+    if (memoExists) {
+      createFloatingStickyNote(state.id, state);
+    } else {
+      removeStickyNoteState(state.id);
+    }
+  });
+}
+
+
 
