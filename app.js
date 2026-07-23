@@ -23566,6 +23566,13 @@ function initMypageMemo() {
     renderMemoList();
   };
 
+  // すでに初期化済みの場合は、描画更新だけ行って終了する
+  if (state.mypageMemoInitialized) {
+    updateMemoUI();
+    return;
+  }
+
+
   const stickyBtn = document.getElementById('memo-sticky-btn');
 
   // メニューダッシュボードからメモ帳を開く
@@ -24085,6 +24092,9 @@ function initMypageMemo() {
   } else {
     updateMemoUI();
   }
+
+  state.mypageMemoInitialized = true;
+
 
   // メモリストのレンダリング
   function renderMemoList() {
