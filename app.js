@@ -24075,7 +24075,12 @@ function initMypageMemo() {
   }
 
   // 初期表示の処理同期
-  if (menuView && menuView.style.display !== 'none') {
+  const mypageMemoScreen = document.getElementById('mypage-memo-screen');
+  const isMemoTabActive = mypageMemoScreen && (mypageMemoScreen.classList.contains('active') || mypageMemoScreen.style.display === 'block');
+
+  if (isMemoTabActive) {
+    updateMemoUI();
+  } else if (menuView && menuView.style.display !== 'none') {
     if (memoWrapper) memoWrapper.style.display = 'none';
   } else {
     updateMemoUI();
