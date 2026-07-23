@@ -6317,18 +6317,31 @@ function openHomePage() {
 // マイページ画面を開く（タブは作成せず、単に画面を切り替えてタブの選択を解除する）
 function openMyPage() {
   if (state.activeTabId) {
-    const currentTab = state.tabs.find(t => t.id === state.activeTabId);
-    saveTabState(currentTab);
+    try {
+      const currentTab = state.tabs.find(t => t.id === state.activeTabId);
+      if (currentTab) {
+        saveTabState(currentTab);
+      }
+    } catch (err) {
+      console.error("Error saving tab state in openMyPage:", err);
+    }
   }
   
   state.activeTabId = null;
 
   const views = document.querySelectorAll('.screen-view');
-  views.forEach(v => v.classList.remove('active'));
+  views.forEach(v => {
+    if (v.id === 'mypage-screen') {
+      v.classList.add('active');
+      v.style.display = 'block';
+    } else {
+      v.classList.remove('active');
+      v.style.display = 'none';
+    }
+  });
   
   const mypage = document.getElementById('mypage-screen');
   if (mypage) {
-    mypage.classList.add('active');
     applyZoom(state.defaultZoomLevel || 100);
   }
   
@@ -6343,9 +6356,9 @@ function openMyPage() {
 function saveTabState(tab) {
   if (!tab || tab.type !== 'appointment-screen') return;
 
-  const dateVal = document.getElementById('appoint-date').value;
-  const nameVal = document.getElementById('customer-name').value.trim();
-  const memoVal = document.getElementById('appoint-memo').value.trim();
+  const dateVal = document.getElementById('appoint-date')?.value || '';
+  const nameVal = document.getElementById('customer-name')?.value.trim() || '';
+  const memoVal = document.getElementById('appoint-memo')?.value.trim() || '';
 
   const customFieldsData = {};
   state.addedCustomFields.forEach(fieldType => {
