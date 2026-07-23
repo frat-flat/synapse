@@ -24202,10 +24202,12 @@ function initMypageMemo() {
       }
 
       item.onclick = () => {
+        console.log('[DEBUG] memo item clicked:', memo.id);
         activeMemoId = memo.id;
         renderMemoList();
         showEditor(memo);
       };
+
 
       memoListContainer.appendChild(item);
     });
@@ -24213,7 +24215,9 @@ function initMypageMemo() {
 
   // エディタの表示制御
   function showEditor(memo) {
+    console.log('[DEBUG] showEditor called:', memo ? memo.id : 'null');
     if (!memo) {
+
       if (editorEmpty) editorEmpty.style.display = 'flex';
       if (editorActive) editorActive.style.display = 'none';
       activeMemoId = null;
