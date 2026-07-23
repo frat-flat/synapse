@@ -374,7 +374,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initUserManagerEvents();
   initSignupEvents();
   checkLoginStatus();
+  initMypageMemo();          // メモ帳の初回初期化
   initFloatingStickyNotes(); // 浮遊付箋の復元
+
 
 
   // スクロール時にオーバーフローセルを再調整（バブリングしないためキャプチャフェーズを使用）
@@ -6350,8 +6352,9 @@ function openMyPage() {
   state.currentView = 'mypage-screen';
   renderTabBar();
   state.memoUnlockedSecure = false;
-  initMypageMemo();
+  if (typeof window.updateMypageMemoUI === 'function') window.updateMypageMemoUI();
   renderMypageFavorites();
+
 }
 
 // フォームに入力されている現在の状態をアクティブなタブに退避
@@ -7030,8 +7033,9 @@ function activateTab(id) {
   } else if (tab.type === 'table-creator-screen') {
     state.activeCustomTableId = null;
   } else if (tab.type === 'mypage-memo-screen') {
-    initMypageMemo();
+    if (typeof window.updateMypageMemoUI === 'function') window.updateMypageMemoUI();
   }
+
 
 
   // 画面表示切り替え
@@ -23473,8 +23477,13 @@ let activeMemoId = null;
 if (state.memoUnlockedSecure === undefined) state.memoUnlockedSecure = false;
 
 function initMypageMemo() {
+  if (state.mypageMemoInitialized) return;
+
   const currentUser = state.currentUser;
   if (!currentUser) return;
+
+  state.mypageMemoInitialized = true;
+
 
   const userId = currentUser.id;
   const storagePwdKey = `synapse_memo_pwd_${userId}`;
@@ -23566,14 +23575,10 @@ function initMypageMemo() {
     renderMemoList();
   };
 
-  // すでに初期化済みの場合は、描画更新だけ行って終了する
-  if (state.mypageMemoInitialized) {
-    updateMemoUI();
-    return;
-  }
-
+  window.updateMypageMemoUI = updateMemoUI;
 
   const stickyBtn = document.getElementById('memo-sticky-btn');
+
 
   // メニューダッシュボードからメモ帳を開く
   if (btnMemo) {
@@ -24093,7 +24098,6 @@ function initMypageMemo() {
     updateMemoUI();
   }
 
-  state.mypageMemoInitialized = true;
 
 
   // メモリストのレンダリング
