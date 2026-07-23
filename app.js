@@ -23572,6 +23572,7 @@ function initMypageMemo() {
       if (lockIconStatus) lockIconStatus.textContent = '🔒';
     }
     if (secureToggleLabel) secureToggleLabel.style.display = 'flex';
+    if (memoWrapper) memoWrapper.style.display = 'flex';
     renderMemoList();
   };
 
