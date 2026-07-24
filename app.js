@@ -7400,7 +7400,6 @@ function setupEventListeners() {
   // 左サイドメニューの各ボタンのクリックイベント登録
   const sidebarButtons = [
     { id: 'menu-mypage', tab: 'mypage-screen' },
-    { id: 'menu-mypage-memo', tab: 'mypage-memo-screen' },
     { id: 'menu-new-appoint', tab: 'appointment-new' },
     { id: 'menu-existing-appoint', tab: 'appointment-existing' },
     { id: 'menu-drafts-list', tab: 'drafts-view-screen' },
@@ -7420,10 +7419,6 @@ function setupEventListeners() {
       el.addEventListener('click', () => {
         if (btn.tab === 'mypage-screen') {
           openMyPage();
-          return;
-        }
-        if (btn.tab === 'mypage-memo-screen') {
-          openTab('mypage-memo-screen', 'mypage-memo-screen', '📝 個人メモ帳');
           return;
         }
         if (btn.tab === 'dbmake-screen') {
@@ -23621,7 +23616,7 @@ function initMypageMemo() {
   // メニューダッシュボードからメモ帳を開く
   if (btnMemo) {
     btnMemo.onclick = () => {
-      openTab('mypage-memo-screen', 'mypage-memo-screen', '📝 個人メモ帳');
+      openTab('mypage-memo-screen', 'mypage-memo-screen', '📝 メモ帳');
     };
   }
 

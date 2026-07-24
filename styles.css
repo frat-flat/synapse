@@ -2115,7 +2115,7 @@ textarea {
 }
 
 .toolbar-input {
-  width: 32px;
+  width: 40px;
   height: 28px;
   text-align: center;
   border: 1px solid var(--border-color);
@@ -2126,6 +2126,17 @@ textarea {
   outline: none;
   font-weight: 600;
   -moz-appearance: textfield;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.dropdown-arrow-icon {
+  font-size: 0.65rem;
+  margin-left: 2px;
+  color: var(--text-secondary);
+  display: inline-block;
+  transform: scale(1, 0.8);
+  vertical-align: middle;
 }
 
 .toolbar-input::-webkit-outer-spin-button,
