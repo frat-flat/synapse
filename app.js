@@ -24638,9 +24638,170 @@ function getMemosStorageKey() {
   return `synapse_user_memos_${userId}`;
 }
 
+// アカウント個別用付箋の生成（30秒自動消滅・コピペ対応）
+function createAccountStickyNote(account, x, y, index) {
+  const container = document.getElementById('floating-sticky-notes-container');
+  if (!container) return;
+
+  const tempId = `temp_account_${Date.now()}_${index}`;
+  const note = document.createElement('div');
+  // セキュアデータ用なので分かりやすいブルーや別カラーにする
+  note.className = 'floating-sticky-note sticky-note-blue';
+  note.dataset.memoId = tempId;
+  note.style.left = `${x}px`;
+  note.style.top = `${y}px`;
+  note.style.width = '240px';
+  note.style.height = 'auto';
+  note.style.pointerEvents = 'auto';
+
+  note.innerHTML = `
+    <div class="sticky-note-header" style="background: rgba(0,0,0,0.12); display: flex; align-items: center; justify-content: space-between; padding: 0.35rem 0.5rem;">
+      <div class="sticky-note-header-left" style="display: flex; align-items: center; gap: 0.25rem; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 140px;">
+        <span>🔑</span>
+        <span class="sticky-note-header-title" style="font-size: 0.78rem;">${account.name || '無題のサービス'}</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
+        <span class="account-sticky-timer" style="font-size: 0.65rem; background: var(--bg-surface-elevated); padding: 0.05rem 0.25rem; border-radius: var(--radius-sm); color: var(--text-secondary); font-weight: bold;">30s</span>
+        <button class="sticky-note-close" title="閉じる" style="background: none; border: none; font-size: 0.85rem; cursor: pointer; color: var(--text-secondary); padding: 0;">✕</button>
+      </div>
+    </div>
+    <div class="sticky-note-body" style="padding: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; height: auto;">
+      <div style="display: flex; flex-direction: column; gap: 0.15rem; text-align: left;">
+        <span style="font-size: 0.62rem; color: var(--text-muted); font-weight: 600;">ユーザーID / メールアドレス</span>
+        <div style="display: flex; gap: 0.25rem;">
+          <input type="text" readonly value="${account.user || ''}" style="flex: 1; font-size: 0.75rem; padding: 0.25rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+          <button class="btn btn-secondary copy-btn" title="IDをコピー" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm);">📋</button>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 0.15rem; text-align: left;">
+        <span style="font-size: 0.62rem; color: var(--text-muted); font-weight: 600;">パスワード</span>
+        <div style="display: flex; gap: 0.25rem;">
+          <input type="password" readonly value="${account.pwd || ''}" style="flex: 1; font-size: 0.75rem; padding: 0.25rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+          <button class="btn btn-secondary toggle-pwd-btn" title="表示/非表示" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm);">👁️</button>
+          <button class="btn btn-secondary copy-btn" title="パスワードをコピー" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm);">📋</button>
+        </div>
+      </div>
+      ${account.url ? `
+      <div style="display: flex; flex-direction: column; gap: 0.15rem; text-align: left;">
+        <span style="font-size: 0.62rem; color: var(--text-muted); font-weight: 600;">URL</span>
+        <a href="${account.url}" target="_blank" style="font-size: 0.7rem; color: var(--color-primary); text-decoration: underline; word-break: break-all;">${account.url}</a>
+      </div>
+      ` : ''}
+      ${account.note ? `
+      <div style="display: flex; flex-direction: column; gap: 0.15rem; text-align: left;">
+        <span style="font-size: 0.62rem; color: var(--text-muted); font-weight: 600;">メモ</span>
+        <div style="font-size: 0.7rem; color: var(--text-secondary); white-space: pre-wrap; background: rgba(0,0,0,0.03); padding: 0.25rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); max-height: 50px; overflow-y: auto;">${account.note}</div>
+      </div>
+      ` : ''}
+    </div>
+  `;
+
+  container.appendChild(note);
+  bringToFront(note);
+
+  const header = note.querySelector('.sticky-note-header');
+  const closeBtn = note.querySelector('.sticky-note-close');
+  makeElementDraggable(note, header);
+
+  closeBtn.onclick = () => {
+    note.remove();
+  };
+
+  // コピペ処理
+  const copyBtns = note.querySelectorAll('.copy-btn');
+  copyBtns.forEach(btn => {
+    btn.onclick = () => {
+      const input = btn.previousElementSibling || btn.previousElementSibling.previousElementSibling;
+      if (input) {
+        const originalType = input.type;
+        if (originalType === 'password') {
+          input.type = 'text';
+        }
+        input.select();
+        document.execCommand('copy');
+        input.type = originalType;
+        window.getSelection().removeAllRanges();
+        showToast('クリップボードにコピーしました', 'success');
+      }
+    };
+  });
+
+  // パスワード表示トグル
+  const togglePwdBtn = note.querySelector('.toggle-pwd-btn');
+  if (togglePwdBtn) {
+    togglePwdBtn.onclick = () => {
+      const pwdInput = togglePwdBtn.previousElementSibling;
+      if (pwdInput) {
+        if (pwdInput.type === 'password') {
+          pwdInput.type = 'text';
+          togglePwdBtn.textContent = '🙈';
+        } else {
+          pwdInput.type = 'password';
+          togglePwdBtn.textContent = '👁️';
+        }
+      }
+    };
+  }
+
+  // 30秒後に消滅するタイマー処理
+  let timeLeft = 30;
+  const timerSpan = note.querySelector('.account-sticky-timer');
+  const intervalId = setInterval(() => {
+    timeLeft--;
+    if (timerSpan) timerSpan.textContent = `${timeLeft}s`;
+
+    if (timeLeft <= 5) {
+      if (timerSpan) {
+        timerSpan.style.color = '#ef4444';
+        timerSpan.style.background = 'rgba(239, 68, 68, 0.15)';
+      }
+      note.style.transition = 'opacity 0.5s';
+      note.style.opacity = (timeLeft % 2 === 0) ? '0.5' : '1.0';
+    }
+
+    if (timeLeft <= 0) {
+      clearInterval(intervalId);
+      note.style.transition = 'opacity 0.6s, transform 0.6s';
+      note.style.opacity = '0';
+      note.style.transform = 'scale(0.85)';
+      setTimeout(() => {
+        note.remove();
+      }, 600);
+    }
+  }, 1000);
+
+  closeBtn.addEventListener('click', () => {
+    clearInterval(intervalId);
+  });
+}
+
 function createFloatingStickyNote(memoId, initialData = null) {
   const container = document.getElementById('floating-sticky-notes-container');
   if (!container) return;
+
+  // アカウント保管庫の場合、個別付箋として出力
+  if (!initialData) {
+    const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
+    const memo = memos.find(m => m.id === memoId);
+    if (memo && memo.isAccountType) {
+      let accounts = [];
+      try {
+        accounts = JSON.parse(memo.content) || [];
+      } catch (e) {
+        accounts = [];
+      }
+      if (accounts.length === 0) {
+        showToast('登録されているアカウント情報がありません。', 'warning');
+        return;
+      }
+      accounts.forEach((acc, idx) => {
+        const accountX = 100 + (container.children.length * 25);
+        const accountY = 100 + (container.children.length * 25);
+        createAccountStickyNote(acc, accountX, accountY, idx);
+      });
+      return;
+    }
+  }
 
   let existing = container.querySelector(`[data-memo-id="${memoId}"]`);
   if (existing) {
