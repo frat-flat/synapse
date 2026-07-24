@@ -23898,6 +23898,7 @@ function initMypageMemo() {
             </span>
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <button class="btn-text pin-account-sticky-btn" style="color: var(--color-primary); font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none;" title="このアカウント情報を付箋として開く" onclick="event.stopPropagation();">📌</button>
             <button class="btn-text delete-account-frame-btn" style="color: #ef4444; font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none;" title="このアカウント枠を削除" onclick="event.stopPropagation();">🗑️</button>
           </div>
         </div>
@@ -23993,6 +23994,7 @@ function initMypageMemo() {
     const body = frameEl.querySelector('.acc-card-body');
     const arrow = frameEl.querySelector('.acc-toggle-arrow');
     const delBtn = frameEl.querySelector('.delete-account-frame-btn');
+    const pinStickyBtn = frameEl.querySelector('.pin-account-sticky-btn');
     const openUrlBtn = frameEl.querySelector('.open-acc-url-btn');
     const addExtraBtn = frameEl.querySelector('.add-extra-field-btn');
     
@@ -24026,6 +24028,45 @@ function initMypageMemo() {
           body.style.display = 'flex';
           arrow.textContent = '🔼';
         }
+      };
+    }
+
+    // 個別アカウント付箋展開
+    if (pinStickyBtn) {
+      pinStickyBtn.onclick = (e) => {
+        e.stopPropagation();
+        
+        const nameVal = frameEl.querySelector('.acc-input-name') ? frameEl.querySelector('.acc-input-name').value.trim() : '';
+        const urlVal = frameEl.querySelector('.acc-input-url') ? frameEl.querySelector('.acc-input-url').value.trim() : '';
+        const userVal = frameEl.querySelector('.acc-input-user') ? frameEl.querySelector('.acc-input-user').value.trim() : '';
+        const pwdVal = frameEl.querySelector('.acc-input-pwd') ? frameEl.querySelector('.acc-input-pwd').value : '';
+        const noteVal = frameEl.querySelector('.acc-input-note') ? frameEl.querySelector('.acc-input-note').value.trim() : '';
+        
+        const extraFields = frameEl.querySelectorAll('.account-extra-field');
+        const extras = [];
+        extraFields.forEach(field => {
+          const title = field.querySelector('.acc-extra-title') ? field.querySelector('.acc-extra-title').value.trim() : '';
+          const value = field.querySelector('.acc-extra-value') ? field.querySelector('.acc-extra-value').value.trim() : '';
+          if (title || value) {
+            extras.push({ title, value });
+          }
+        });
+
+        const accObj = {
+          name: nameVal || '無題のサービス',
+          url: urlVal,
+          user: userVal,
+          pwd: pwdVal,
+          note: noteVal,
+          extras: extras
+        };
+
+        const container = document.getElementById('floating-sticky-notes-container');
+        const accountX = 100 + (container ? container.children.length * 25 : 0);
+        const accountY = 100 + (container ? container.children.length * 25 : 0);
+
+        createAccountStickyNote(accObj, accountX, accountY, Date.now());
+        showToast('個別アカウントの付箋を展開しました。', 'success');
       };
     }
 
@@ -24638,6 +24679,84 @@ function getMemosStorageKey() {
   return `synapse_user_memos_${userId}`;
 }
 
+// アカウント選択用モーダルダイアログ
+function showAccountSelectModal(accounts, onConfirm) {
+  const existing = document.getElementById('account-select-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'account-select-modal';
+  modal.style.position = 'fixed';
+  modal.style.top = '0';
+  modal.style.left = '0';
+  modal.style.width = '100vw';
+  modal.style.height = '100vh';
+  modal.style.background = 'rgba(0,0,0,0.4)';
+  modal.style.display = 'flex';
+  modal.style.alignItems = 'center';
+  modal.style.justifyContent = 'center';
+  modal.style.zIndex = '20000';
+  modal.style.pointerEvents = 'auto';
+
+  let listHtml = '';
+  accounts.forEach((acc, idx) => {
+    listHtml += `
+      <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border-color); cursor: pointer; user-select: none; text-align: left;">
+        <input type="checkbox" class="acc-select-checkbox" data-index="${idx}" checked style="cursor: pointer; width: 14px; height: 14px; flex-shrink: 0; margin: 0;">
+        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${acc.name || '無題のサービス'}</span>
+        ${acc.user ? `<span style="font-size: 0.68rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px;">(${acc.user})</span>` : ''}
+      </label>
+    `;
+  });
+
+  modal.innerHTML = `
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 320px; max-width: 90%; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden;">
+      <div style="padding: 0.75rem 0.9rem; border-bottom: 2px solid var(--border-color); font-weight: bold; font-size: 0.9rem; color: var(--text-primary); display: flex; justify-content: space-between; align-items: center;">
+        <span>📌 アカウントの選択</span>
+        <button class="modal-close-btn" style="background: none; border: none; font-size: 1.1rem; cursor: pointer; color: var(--text-secondary); padding: 0;">✕</button>
+      </div>
+      <div style="padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 0.5rem;">
+        <p style="margin: 0; font-size: 0.72rem; color: var(--text-secondary); text-align: left;">付箋として起動するアカウントにチェックを入れてください。</p>
+        <div style="display: flex; flex-direction: column; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); max-height: 180px; overflow-y: auto;">
+          ${listHtml}
+        </div>
+      </div>
+      <div style="padding: 0.6rem 0.9rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 0.4rem; background: var(--bg-surface-elevated);">
+        <button class="btn btn-secondary cancel-btn" style="padding: 0.35rem 0.7rem; font-size: 0.75rem; border-radius: var(--radius-sm);">キャンセル</button>
+        <button class="btn btn-primary confirm-btn" style="padding: 0.35rem 0.7rem; font-size: 0.75rem; border-radius: var(--radius-sm);">付箋を開く</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const closeBtn = modal.querySelector('.modal-close-btn');
+  const cancelBtn = modal.querySelector('.cancel-btn');
+  const confirmBtn = modal.querySelector('.confirm-btn');
+
+  const closeModal = () => modal.remove();
+  closeBtn.onclick = closeModal;
+  cancelBtn.onclick = closeModal;
+
+  confirmBtn.onclick = () => {
+    const checkboxes = modal.querySelectorAll('.acc-select-checkbox');
+    const selectedIndices = [];
+    checkboxes.forEach(cb => {
+      if (cb.checked) {
+        selectedIndices.push(parseInt(cb.dataset.index));
+      }
+    });
+
+    if (selectedIndices.length === 0) {
+      showToast('アカウントが選択されていません。', 'warning');
+      return;
+    }
+
+    closeModal();
+    onConfirm(selectedIndices);
+  };
+}
+
 // アカウント個別用付箋の生成（30秒自動消滅・コピペ対応）
 function createAccountStickyNote(account, x, y, index) {
   const container = document.getElementById('floating-sticky-notes-container');
@@ -24645,7 +24764,6 @@ function createAccountStickyNote(account, x, y, index) {
 
   const tempId = `temp_account_${Date.now()}_${index}`;
   const note = document.createElement('div');
-  // セキュアデータ用なので分かりやすいブルーや別カラーにする
   note.className = 'floating-sticky-note sticky-note-blue';
   note.dataset.memoId = tempId;
   note.style.left = `${x}px`;
@@ -24670,8 +24788,8 @@ function createAccountStickyNote(account, x, y, index) {
         <span style="font-size: 0.62rem; color: var(--text-muted); font-weight: 600;">ユーザーID / メールアドレス</span>
         <div style="display: flex; gap: 0.25rem;">
           <input type="text" readonly value="${account.user || ''}" style="flex: 1; font-size: 0.75rem; padding: 0.25rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-          <button class="btn btn-secondary copy-btn" title="IDをコピー" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; width: 28px; height: 26px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary);">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          <button class="btn btn-secondary copy-btn" title="IDをコピー" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; width: 28px; height: 26px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); flex-shrink: 0;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
           </button>
         </div>
       </div>
@@ -24679,12 +24797,12 @@ function createAccountStickyNote(account, x, y, index) {
         <span style="font-size: 0.62rem; color: var(--text-muted); font-weight: 600;">パスワード</span>
         <div style="display: flex; gap: 0.25rem;">
           <input type="password" readonly value="${account.pwd || ''}" style="flex: 1; font-size: 0.75rem; padding: 0.25rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-          <button class="btn btn-secondary toggle-pwd-btn" title="表示/非表示" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; width: 28px; height: 26px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary);">
-            <svg class="eye-open-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-            <svg class="eye-closed-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display: none;"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.82l2.92 2.92c1.51-1.44 2.63-3.21 3.22-5.19-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+          <button class="btn btn-secondary toggle-pwd-btn" title="表示/非表示" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; width: 28px; height: 26px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); flex-shrink: 0;">
+            <svg class="eye-open-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            <svg class="eye-closed-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display: none; width: 13px; height: 13px; flex-shrink: 0;"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.82l2.92 2.92c1.51-1.44 2.63-3.21 3.22-5.19-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
           </button>
-          <button class="btn btn-secondary copy-btn" title="パスワードをコピー" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; width: 28px; height: 26px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary);">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          <button class="btn btn-secondary copy-btn" title="パスワードをコピー" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; width: 28px; height: 26px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); flex-shrink: 0;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
           </button>
         </div>
       </div>
@@ -24791,7 +24909,7 @@ function createFloatingStickyNote(memoId, initialData = null) {
   const container = document.getElementById('floating-sticky-notes-container');
   if (!container) return;
 
-  // アカウント保管庫の場合、個別付箋として出力
+  // アカウント保管庫の場合、選択用ポップアップを表示
   if (!initialData) {
     const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
     const memo = memos.find(m => m.id === memoId);
@@ -24806,10 +24924,13 @@ function createFloatingStickyNote(memoId, initialData = null) {
         showToast('登録されているアカウント情報がありません。', 'warning');
         return;
       }
-      accounts.forEach((acc, idx) => {
-        const accountX = 100 + (container.children.length * 25);
-        const accountY = 100 + (container.children.length * 25);
-        createAccountStickyNote(acc, accountX, accountY, idx);
+      showAccountSelectModal(accounts, (selectedIndices) => {
+        selectedIndices.forEach((idx) => {
+          const acc = accounts[idx];
+          const accountX = 100 + (container.children.length * 25);
+          const accountY = 100 + (container.children.length * 25);
+          createAccountStickyNote(acc, accountX, accountY, idx);
+        });
       });
       return;
     }
