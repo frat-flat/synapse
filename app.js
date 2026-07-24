@@ -23898,7 +23898,7 @@ function initMypageMemo() {
             </span>
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <button class="btn-text pin-account-sticky-btn" style="color: var(--color-primary); font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none;" title="このアカウント情報を付箋として開く" onclick="event.stopPropagation();">📌</button>
+            <button class="btn-text pin-account-sticky-btn" style="color: var(--color-primary); font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none;" title="このアカウント情報を付箋として開く" onclick="event.stopPropagation();">🗒️</button>
             <button class="btn-text delete-account-frame-btn" style="color: #ef4444; font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none;" title="このアカウント枠を削除" onclick="event.stopPropagation();">🗑️</button>
           </div>
         </div>
@@ -24712,7 +24712,7 @@ function showAccountSelectModal(accounts, onConfirm) {
   modal.innerHTML = `
     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 320px; max-width: 90%; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden;">
       <div style="padding: 0.75rem 0.9rem; border-bottom: 2px solid var(--border-color); font-weight: bold; font-size: 0.9rem; color: var(--text-primary); display: flex; justify-content: space-between; align-items: center;">
-        <span>📌 アカウントの選択</span>
+        <span>🗒️ アカウントの選択</span>
         <button class="modal-close-btn" style="background: none; border: none; font-size: 1.1rem; cursor: pointer; color: var(--text-secondary); padding: 0;">✕</button>
       </div>
       <div style="padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 0.5rem;">
