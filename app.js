@@ -24670,15 +24670,22 @@ function createAccountStickyNote(account, x, y, index) {
         <span style="font-size: 0.62rem; color: var(--text-muted); font-weight: 600;">ユーザーID / メールアドレス</span>
         <div style="display: flex; gap: 0.25rem;">
           <input type="text" readonly value="${account.user || ''}" style="flex: 1; font-size: 0.75rem; padding: 0.25rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-          <button class="btn btn-secondary copy-btn" title="IDをコピー" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm);">📋</button>
+          <button class="btn btn-secondary copy-btn" title="IDをコピー" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; width: 28px; height: 26px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary);">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          </button>
         </div>
       </div>
       <div style="display: flex; flex-direction: column; gap: 0.15rem; text-align: left;">
         <span style="font-size: 0.62rem; color: var(--text-muted); font-weight: 600;">パスワード</span>
         <div style="display: flex; gap: 0.25rem;">
           <input type="password" readonly value="${account.pwd || ''}" style="flex: 1; font-size: 0.75rem; padding: 0.25rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-          <button class="btn btn-secondary toggle-pwd-btn" title="表示/非表示" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm);">👁️</button>
-          <button class="btn btn-secondary copy-btn" title="パスワードをコピー" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm);">📋</button>
+          <button class="btn btn-secondary toggle-pwd-btn" title="表示/非表示" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; width: 28px; height: 26px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary);">
+            <svg class="eye-open-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            <svg class="eye-closed-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display: none;"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.82l2.92 2.92c1.51-1.44 2.63-3.21 3.22-5.19-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+          </button>
+          <button class="btn btn-secondary copy-btn" title="パスワードをコピー" style="padding: 0.2rem 0.35rem; font-size: 0.7rem; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; width: 28px; height: 26px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary);">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          </button>
         </div>
       </div>
       ${account.url ? `
@@ -24729,15 +24736,20 @@ function createAccountStickyNote(account, x, y, index) {
   // パスワード表示トグル
   const togglePwdBtn = note.querySelector('.toggle-pwd-btn');
   if (togglePwdBtn) {
+    const eyeOpen = togglePwdBtn.querySelector('.eye-open-icon');
+    const eyeClosed = togglePwdBtn.querySelector('.eye-closed-icon');
+    
     togglePwdBtn.onclick = () => {
       const pwdInput = togglePwdBtn.previousElementSibling;
       if (pwdInput) {
         if (pwdInput.type === 'password') {
           pwdInput.type = 'text';
-          togglePwdBtn.textContent = '🙈';
+          if (eyeOpen) eyeOpen.style.display = 'none';
+          if (eyeClosed) eyeClosed.style.display = 'block';
         } else {
           pwdInput.type = 'password';
-          togglePwdBtn.textContent = '👁️';
+          if (eyeOpen) eyeOpen.style.display = 'block';
+          if (eyeClosed) eyeClosed.style.display = 'none';
         }
       }
     };
