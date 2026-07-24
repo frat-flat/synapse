@@ -23753,23 +23753,18 @@ function initMypageMemo() {
     }
   }
 
-  // 暗証番号リセット（シークレット全削除）
+  // 暗証番号リセット（メモは削除しない）
   if (resetSubmit) {
     resetSubmit.onclick = () => {
-      showAppConfirm('暗証番号のリセット', '暗証番号をリセットしますか？\n⚠️ 安全のため、これまで保存された【すべてのロック付きメモ】データは完全に削除されます。通常のメモには影響しません。', () => {
+      showAppConfirm('暗証番号のリセット', '暗証番号をリセットして再設定しますか？', () => {
         localStorage.removeItem(storagePwdKey);
-        
-        // ロック付きメモのみフィルタリングして削除
-        const memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
-        const normalMemos = memos.filter(m => !m.isSecure);
-        localStorage.setItem(storageMemosKey, JSON.stringify(normalMemos));
 
         state.memoUnlockedSecure = false;
         activeMemoId = null;
         showEditor(null);
         if (pwdModal) pwdModal.classList.remove('active');
         updateMemoUI();
-        showToast('暗証番号とロック付きメモを初期化しました。', 'success');
+        showToast('暗証番号をリセットしました。再度ロック付きメモを開く際に新しい番号を設定してください。', 'success');
       });
     };
   }
