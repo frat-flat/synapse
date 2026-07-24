@@ -377,6 +377,38 @@ document.addEventListener('DOMContentLoaded', () => {
   initMypageMemo();          // メモ帳の初回初期化
   initFloatingStickyNotes(); // 浮遊付箋の復元
 
+  // トップバーの「📌 付箋を追加」ボタンイベント
+  const addStickyBtn = document.getElementById('header-add-sticky-btn');
+  if (addStickyBtn) {
+    addStickyBtn.onclick = () => {
+      const currentUser = state.currentUser;
+      if (!currentUser) {
+        showToast('ログイン後にご利用いただけます。', 'error');
+        return;
+      }
+      const userId = currentUser.id;
+      const storageMemosKey = `synapse_user_memos_${userId}`;
+      const allMemos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+      
+      const newMemo = {
+        id: 'memo_' + Date.now(),
+        title: '新規付箋',
+        content: '',
+        updatedAt: new Date().toISOString()
+      };
+      
+      allMemos.push(newMemo);
+      localStorage.setItem(storageMemosKey, JSON.stringify(allMemos));
+      
+      if (typeof window.updateMypageMemoUI === 'function') {
+        window.updateMypageMemoUI();
+      }
+      
+      createFloatingStickyNote(newMemo.id);
+      showToast('新しい付箋を追加しました。');
+    };
+  }
+
 
 
   // スクロール時にオーバーフローセルを再調整（バブリングしないためキャプチャフェーズを使用）
@@ -7368,6 +7400,7 @@ function setupEventListeners() {
   // 左サイドメニューの各ボタンのクリックイベント登録
   const sidebarButtons = [
     { id: 'menu-mypage', tab: 'mypage-screen' },
+    { id: 'menu-mypage-memo', tab: 'mypage-memo-screen' },
     { id: 'menu-new-appoint', tab: 'appointment-new' },
     { id: 'menu-existing-appoint', tab: 'appointment-existing' },
     { id: 'menu-drafts-list', tab: 'drafts-view-screen' },
@@ -7387,6 +7420,10 @@ function setupEventListeners() {
       el.addEventListener('click', () => {
         if (btn.tab === 'mypage-screen') {
           openMyPage();
+          return;
+        }
+        if (btn.tab === 'mypage-memo-screen') {
+          openTab('mypage-memo-screen', 'mypage-memo-screen', '📝 個人メモ帳');
           return;
         }
         if (btn.tab === 'dbmake-screen') {

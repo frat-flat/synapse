@@ -26,7 +26,8 @@
 
 </div>
 <nav class="sidebar-nav">
-        <button class="nav-item" id="menu-mypage" data-tab="mypage-screen" style="margin-top: 0.5rem; margin-bottom: 0.5rem; font-weight: bold; width: calc(100% - 1rem); box-sizing: border-box; text-align: left; display: flex; align-items: center; gap: 0.5rem;">👤 <span class="nav-item-text">マイページ</span></button>
+        <button class="nav-item" id="menu-mypage" data-tab="mypage-screen" style="margin-top: 0.5rem; margin-bottom: 0.25rem; font-weight: bold; width: calc(100% - 1rem); box-sizing: border-box; text-align: left; display: flex; align-items: center; gap: 0.5rem;">👤 <span class="nav-item-text">マイページ</span></button>
+        <button class="nav-item" id="menu-mypage-memo" data-tab="mypage-memo-screen" style="margin-top: 0.25rem; margin-bottom: 0.5rem; font-weight: bold; width: calc(100% - 1rem); box-sizing: border-box; text-align: left; display: flex; align-items: center; gap: 0.5rem;">📝 <span class="nav-item-text">個人メモ帳</span></button>
         <div class="sidebar-accordion" id="appoint-accordion" style="margin-top: 0.5rem;">
           <button class="accordion-header collapsed" id="menu-appoint-parent">
             <span class="accordion-icon">▼</span>
@@ -172,6 +173,7 @@
 
         <!-- 一番右端グループ: 👤 アカウントプロファイルボタン ＆ ⚙ 設定 -->
         <div style="display: flex; align-items: center; gap: 0.65rem; margin-left: auto;">
+          <button id="header-add-sticky-btn" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem; margin-right: 0.25rem;">📌 付箋を追加</button>
           <!-- 👤 アカウントプロファイルボタン (クリックでGoogle風カード表示) -->
           <div id="header-user-profile-btn" class="topbar-user-profile" style="display: flex; align-items: center; gap: 0.45rem; padding: 0.25rem 0.65rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 600; color: var(--text-primary); cursor: pointer; user-select: none; transition: all 0.2s;" title="アカウント情報を表示">
             <div class="user-avatar" id="logged-in-user-avatar" style="width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold;">👤</div>
@@ -632,7 +634,7 @@
                 </label>
 
                 <button id="memo-save-btn" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm);">💾 保存</button>
-                <button id="memo-sticky-btn" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem;">📌 付箋にする</button>
+                <button id="memo-sticky-btn" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem;">📌 付箋として開く</button>
                 <button id="memo-delete-btn" class="btn-text" style="color: #ef4444; font-size: 0.85rem; font-weight: 600; cursor: pointer; padding: 0.5rem; background: none; border: none;">🗑️ 削除</button>
               </div>
 
