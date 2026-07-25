@@ -741,6 +741,7 @@ function ensureInitialUsersExist() {
       name: 'システム管理者', 
       password: 'password', 
       role: 'admin',
+      code: '4X9N3K75',
       createdAt: '2025-01-01T10:00:00Z',
       lastLoginAt: new Date().toISOString(),
       pwdChangedAt: '2025-01-01T10:00:00Z' // 半年以上前
@@ -750,6 +751,7 @@ function ensureInitialUsersExist() {
       name: '営業担当A', 
       password: 'password', 
       role: 'sales',
+      code: '4THPH5YA',
       createdAt: '2025-01-01T10:00:00Z',
       lastLoginAt: new Date().toISOString(),
       pwdChangedAt: new Date().toISOString()
@@ -759,6 +761,7 @@ function ensureInitialUsersExist() {
       name: '営業担当B', 
       password: 'password', 
       role: 'sales',
+      code: 'GCMYGGX5',
       createdAt: '2025-01-01T10:00:00Z',
       lastLoginAt: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString(), // 100日前（3ヶ月以上前）
       pwdChangedAt: new Date().toISOString()
@@ -768,6 +771,7 @@ function ensureInitialUsersExist() {
       name: '開設サポート担当', 
       password: 'password', 
       role: 'support',
+      code: '64E5TCAE',
       createdAt: '2025-01-01T10:00:00Z',
       lastLoginAt: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(), // 120日前（3ヶ月以上前）
       pwdChangedAt: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString() // 200日前（半年以上前）
@@ -777,7 +781,7 @@ function ensureInitialUsersExist() {
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(defaultUsers));
   } else {
-    // 既存のユーザーリストがある場合、欠けているフィールド（createdAt, lastLoginAt, pwdChangedAt）を自動補完する
+    // 既存のユーザーリストがある場合、欠けているフィールド（createdAt, lastLoginAt, pwdChangedAt, code）を自動補完する
     try {
       let users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
       let updated = false;
@@ -785,6 +789,7 @@ function ensureInitialUsersExist() {
         if (!u.createdAt) { u.createdAt = '2025-01-01T10:00:00Z'; updated = true; }
         if (!u.lastLoginAt) { u.lastLoginAt = new Date().toISOString(); updated = true; }
         if (!u.pwdChangedAt) { u.pwdChangedAt = u.createdAt; updated = true; }
+        if (!u.code) { u.code = generate8DigitId(); updated = true; }
         return u;
       });
       if (updated) {
@@ -6146,6 +6151,16 @@ function checkLoginStatus() {
   const loggedUser = localStorage.getItem(STORAGE_KEYS.LOGGED_USER);
   if (loggedUser) {
     state.currentUser = JSON.parse(loggedUser);
+    // 既存ログインデータに対する code 補完
+    if (state.currentUser && !state.currentUser.code) {
+      ensureInitialUsersExist();
+      const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+      const foundUser = users.find(u => u.id === state.currentUser.loginId);
+      if (foundUser) {
+        state.currentUser.code = foundUser.code;
+        localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
+      }
+    }
     initDatabase();
     
     const nameEl = document.getElementById('logged-in-user-name');
@@ -6401,6 +6416,15 @@ function openMyPage() {
   if (typeof window.updateMypageMemoUI === 'function') window.updateMypageMemoUI();
   renderMypageFavorites();
 
+  // マイページヘッダーにログインユーザーの姓名・コードを反映
+  const mypageFullnameEl = document.getElementById('mypage-user-fullname');
+  const mypageCodeEl = document.getElementById('mypage-user-code');
+  if (mypageFullnameEl && state.currentUser) {
+    mypageFullnameEl.textContent = state.currentUser.name || 'ゲスト';
+  }
+  if (mypageCodeEl && state.currentUser) {
+    mypageCodeEl.textContent = 'Code: ' + (state.currentUser.code || 'N/A');
+  }
 }
 
 // フォームに入力されている現在の状態をアクティブなタブに退避
@@ -7137,9 +7161,15 @@ function closeTab(id, event) {
 
     // すべてのタブが閉じられたらホーム画面を表示
     const views = document.querySelectorAll('.screen-view');
-    views.forEach(v => v.classList.remove('active'));
+    views.forEach(v => {
+      v.classList.remove('active');
+      v.style.display = 'none';
+    });
     const homeScreen = document.getElementById('home-screen');
-    if (homeScreen) homeScreen.classList.add('active');
+    if (homeScreen) {
+      homeScreen.classList.add('active');
+      homeScreen.style.display = 'block';
+    }
     
     state.currentView = 'home-screen';
   } else if (nextActiveTabId) {
@@ -8454,7 +8484,7 @@ function handleLogin(e) {
       const updatedUsers = users.map(u => u.id === foundUser.id ? foundUser : u);
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedUsers));
 
-      state.currentUser = { id: foundUser.role, name: foundUser.name, loginId: foundUser.id, password: foundUser.password };
+      state.currentUser = { id: foundUser.role, name: foundUser.name, loginId: foundUser.id, password: foundUser.password, code: foundUser.code };
       localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
       
       // ログインユーザー用のDB設定を再ロード
@@ -21238,7 +21268,6 @@ function initSignupEvents() {
   const goToLogin = document.getElementById('go-to-login');
   
   const signupForm = document.getElementById('signup-form');
-  const googleBtn = document.getElementById('signup-google-btn');
 
   if (goToSignup && loginScreen && signupScreen) {
     goToSignup.addEventListener('click', (e) => {
@@ -21261,35 +21290,6 @@ function initSignupEvents() {
     });
   }
 
-  // Googleでの登録シミュレーション（プレミアム体験）
-  if (googleBtn) {
-    googleBtn.addEventListener('click', () => {
-      showToast('Google 認証をロード中...', 'info');
-      googleBtn.disabled = true;
-      googleBtn.style.opacity = '0.7';
-
-      setTimeout(() => {
-        const lastNameInput = document.getElementById('signup-lastname');
-        const firstNameInput = document.getElementById('signup-firstname');
-        const emailInput = document.getElementById('signup-email');
-        const usernameInput = document.getElementById('signup-username');
-        const passwordInput = document.getElementById('signup-password');
-        const passwordConfirmInput = document.getElementById('signup-password-confirm');
-
-        if (lastNameInput) lastNameInput.value = '鈴木';
-        if (firstNameInput) firstNameInput.value = '一郎';
-        if (emailInput) emailInput.value = 'suzuki.ichiro@gmail.com';
-        if (usernameInput) usernameInput.value = 'suzuki_ichiro';
-        if (passwordInput) passwordInput.value = 'Suzuki123'; // 大・小・数を含む記号なし6文字以上
-        if (passwordConfirmInput) passwordConfirmInput.value = 'Suzuki123';
-
-        googleBtn.disabled = false;
-        googleBtn.style.opacity = '1';
-        showToast('Googleアカウントから認証情報をインポートしました。自動生成されたパスワードが設定されています。', 'success');
-      }, 1000);
-    });
-  }
-
   if (signupForm) {
     signupForm.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -21297,7 +21297,7 @@ function initSignupEvents() {
       const lastName = document.getElementById('signup-lastname').value.trim();
       const firstName = document.getElementById('signup-firstname').value.trim();
       const email = document.getElementById('signup-email').value.trim();
-      const username = document.getElementById('signup-username').value.trim();
+      const username = email; // ユーザー名は不要で、メールアドレスをそのままログインID（username）とする
       const password = document.getElementById('signup-password').value.trim();
       const passwordConfirm = document.getElementById('signup-password-confirm').value.trim();
 
@@ -21306,9 +21306,8 @@ function initSignupEvents() {
         return;
       }
 
-      // ユーザー名バリデーション: 小文字・記号・数字・6文字以上・大文字不可
-      if (!/^[a-z0-9_-]{6,}$/.test(username)) {
-        showToast('ユーザー名は6文字以上の半角小文字英数字、ハイフン、アンダースコアのみ使用できます（大文字不可）。', 'error');
+      if (!email) {
+        showToast('メールアドレスを入力してください。', 'error');
         return;
       }
 
@@ -21328,12 +21327,13 @@ function initSignupEvents() {
       
       const duplicate = users.some(u => u.id.toLowerCase() === username.toLowerCase());
       if (duplicate) {
-        showToast(`ユーザー名「${username}」は既に登録されています。`, 'error');
+        showToast(`メールアドレス「${username}」は既に登録されています。`, 'error');
         return;
       }
 
       const fullName = `${lastName} ${firstName}`;
       const nowIso = new Date().toISOString();
+      const userCode = generate8DigitId(); // ユーザー用の8桁一意コードを生成
 
       users.push({
         id: username,
@@ -21341,6 +21341,7 @@ function initSignupEvents() {
         password: password,
         role: 'sales', // 新規サインアップのデフォルトロールは営業担当
         email: email,
+        code: userCode, // 生成したコードを追加
         createdAt: nowIso,
         lastLoginAt: nowIso,
         pwdChangedAt: nowIso
@@ -21452,7 +21453,8 @@ function initUserManagerEvents() {
       e.preventDefault();
       const regLastName = document.getElementById('tab-reg-user-lastname').value.trim();
       const regFirstName = document.getElementById('tab-reg-user-firstname').value.trim();
-      const regId = document.getElementById('tab-reg-user-id').value.trim();
+      const regEmail = document.getElementById('tab-reg-user-email').value.trim();
+      const regId = regEmail; // ユーザー名は不要で、メールアドレスをそのままログインID（id）とする
       const regPassword = document.getElementById('tab-reg-user-password').value.trim();
       const regPasswordConfirm = document.getElementById('tab-reg-user-password-confirm').value.trim();
       const regRole = document.getElementById('tab-reg-user-role').value;
@@ -21462,9 +21464,8 @@ function initUserManagerEvents() {
         return;
       }
 
-      // ユーザー名バリデーション: 小文字・記号・数字・6文字以上・大文字不可
-      if (!/^[a-z0-9_-]{6,}$/.test(regId)) {
-        showToast('ユーザー名は6文字以上の半角小文字英数字、ハイフン、アンダースコアのみ使用できます。', 'error');
+      if (!regEmail) {
+        showToast('メールアドレスを入力してください。', 'error');
         return;
       }
 
@@ -21484,18 +21485,21 @@ function initUserManagerEvents() {
       
       const duplicate = users.some(u => u.id.toLowerCase() === regId.toLowerCase());
       if (duplicate) {
-        showToast(`ユーザー名「${regId}」は既に登録されています。`, 'error');
+        showToast(`メールアドレス「${regId}」は既に登録されています。`, 'error');
         return;
       }
 
       const regFullName = `${regLastName} ${regFirstName}`;
       const nowIso = new Date().toISOString();
+      const userCode = generate8DigitId(); // 一意のユーザーコードを生成
 
       users.push({
         id: regId,
         name: regFullName,
         password: regPassword,
         role: regRole,
+        email: regEmail,
+        code: userCode, // 生成したコードを追加
         createdAt: nowIso,
         lastLoginAt: nowIso,
         pwdChangedAt: nowIso
@@ -21597,6 +21601,7 @@ function renderUserManagerList() {
         ${isInactive ? `<span style="font-size: 0.68rem; font-weight: 700; padding: 0.05rem 0.3rem; border-radius: var(--radius-sm); color: #ffffff; background: #eab308; animation: statusPulse 2s infinite;">⚠️ 長期未ログイン (3ヶ月以上)</span>` : ''}
       </div>
       <div style="font-size: 0.72rem; color: var(--text-secondary); display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.15rem;">
+        <span>コード: <code style="background: var(--bg-surface-elevated); padding: 0.05rem 0.2rem; border-radius: var(--radius-xs); color: var(--text-primary); font-family: monospace;">${user.code || 'N/A'}</code></span>
         <span>ID: <code style="background: var(--bg-surface-elevated); padding: 0.05rem 0.2rem; border-radius: var(--radius-xs); color: var(--text-primary); font-family: monospace;">${user.id}</code></span>
         <span>Pass: <code style="background: var(--bg-surface-elevated); padding: 0.05rem 0.2rem; border-radius: var(--radius-xs); color: var(--text-primary); font-family: monospace;">${user.password}</code></span>
         <span>最終ログイン: <span style="font-weight: 600;">${lastLoginStr}</span></span>
