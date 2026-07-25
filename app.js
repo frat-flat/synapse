@@ -21298,8 +21298,6 @@ function initSignupEvents() {
       const firstName = document.getElementById('signup-firstname').value.trim();
       const email = document.getElementById('signup-email').value.trim();
       const username = email; // ユーザー名は不要で、メールアドレスをそのままログインID（username）とする
-      const password = document.getElementById('signup-password').value.trim();
-      const passwordConfirm = document.getElementById('signup-password-confirm').value.trim();
 
       if (!lastName || !firstName) {
         showToast('姓と名を入力してください。', 'error');
@@ -21308,17 +21306,6 @@ function initSignupEvents() {
 
       if (!email) {
         showToast('メールアドレスを入力してください。', 'error');
-        return;
-      }
-
-      // パスワードバリデーション: 英大文字・英小文字・数字必須、記号不可、6文字以上
-      if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z0-9]{6,}$/.test(password)) {
-        showToast('パスワードは6文字以上で、英大文字、英小文字、数字をそれぞれ1文字以上組み合わせてください（記号不可）。', 'error');
-        return;
-      }
-
-      if (password !== passwordConfirm) {
-        showToast('パスワードと確認用パスワードが一致しません。', 'error');
         return;
       }
 
@@ -21334,11 +21321,12 @@ function initSignupEvents() {
       const fullName = `${lastName} ${firstName}`;
       const nowIso = new Date().toISOString();
       const userCode = generate8DigitId(); // ユーザー用の8桁一意コードを生成
+      const tempPassword = "Temp" + generate8DigitId(); // 仮パスワード
 
       users.push({
         id: username,
         name: fullName,
-        password: password,
+        password: tempPassword,
         role: 'sales', // 新規サインアップのデフォルトロールは営業担当
         email: email,
         code: userCode, // 生成したコードを追加
@@ -21349,17 +21337,97 @@ function initSignupEvents() {
 
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
       
-      // 新規登録後に自動ログイン処理を実行
+      showToast(`アカウント「${fullName}」を仮登録しました。`, 'success');
+      signupForm.reset();
+
+      // パスワード設定メール送信のモックダイアログを表示
+      showAppConfirm(
+        '📧 パスワード設定メール（シミュレーション）',
+        `「${email}」宛てにパスワード設定リンク付きメールを送信しました。受信トレイを開いてパスワード設定画面に進みますか？`,
+        () => {
+          // 「はい」を押した場合、パスワード設定モーダルを表示
+          const modal = document.getElementById('set-password-modal');
+          const emailHidden = document.getElementById('set-pwd-email');
+          if (modal && emailHidden) {
+            emailHidden.value = email;
+            document.getElementById('set-pwd-input').value = '';
+            document.getElementById('set-pwd-confirm-input').value = '';
+            modal.style.display = 'flex';
+          }
+        }
+      );
+    });
+  }
+
+  // 🔐 パスワード設定モーダルの制御
+  const setPwdModal = document.getElementById('set-password-modal');
+  const setPwdCancelBtn = document.getElementById('set-pwd-cancel-btn');
+  const setPwdSubmit = document.getElementById('set-pwd-submit-btn');
+
+  if (setPwdCancelBtn && setPwdModal) {
+    setPwdCancelBtn.addEventListener('click', () => {
+      setPwdModal.style.display = 'none';
+      // ログイン画面へ切り替え
+      if (signupScreen && loginScreen) {
+        signupScreen.style.display = 'none';
+        signupScreen.classList.remove('active');
+        loginScreen.style.display = 'flex';
+        loginScreen.classList.add('active');
+      }
+      showToast('パスワード設定がキャンセルされました。', 'info');
+    });
+  }
+
+  if (setPwdSubmit && setPwdModal) {
+    setPwdSubmit.addEventListener('click', () => {
+      const email = document.getElementById('set-pwd-email').value;
+      const pwd = document.getElementById('set-pwd-input').value.trim();
+      const pwdConfirm = document.getElementById('set-pwd-confirm-input').value.trim();
+
+      if (!pwd) {
+        showToast('新しいパスワードを入力してください。', 'error');
+        return;
+      }
+
+      // パスワードバリデーション: 英大文字・英小文字・数字必須、記号不可、6文字以上
+      if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z0-9]{6,}$/.test(pwd)) {
+        showToast('パスワードは6文字以上で、英大文字、英小文字、数字をそれぞれ1文字以上組み合わせてください（記号不可）。', 'error');
+        return;
+      }
+
+      if (pwd !== pwdConfirm) {
+        showToast('パスワードと確認用パスワードが一致しません。', 'error');
+        return;
+      }
+
+      ensureInitialUsersExist();
+      let users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+      const userIndex = users.findIndex(u => u.id.toLowerCase() === email.toLowerCase());
+      
+      if (userIndex === -1) {
+        showToast('対象のアカウントが見つかりません。', 'error');
+        return;
+      }
+
+      // パスワードの更新
+      users[userIndex].password = pwd;
+      users[userIndex].pwdChangedAt = new Date().toISOString();
+      users[userIndex].lastLoginAt = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+
+      const updatedUser = users[userIndex];
+
+      // 自動ログイン処理を実行してマイページに遷移
       state.currentUser = {
-        id: 'sales', // ロール（営業）
-        name: fullName,
-        loginId: username,
-        password: password,
-        code: userCode
+        id: updatedUser.role || 'sales',
+        name: updatedUser.name,
+        loginId: updatedUser.id,
+        password: pwd,
+        code: updatedUser.code
       };
       localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
 
-      // ログイン後のシステム状態初期化
+      // システム状態の初期化
       initDatabase();
       renderJoInfo();
       renderJoColumnSelector();
@@ -21383,10 +21451,7 @@ function initSignupEvents() {
       updateUIForCurrentMode();
       removeRestrictedTabsForRole(state.currentUser.id);
 
-      showToast(`アカウント「${fullName}」が作成され、ログインしました。`, 'success');
-      signupForm.reset();
-
-      // 新規登録画面を閉じ、ログイン画面を非表示にしてマイページを表示
+      setPwdModal.style.display = 'none';
       if (signupScreen) {
         signupScreen.style.display = 'none';
         signupScreen.classList.remove('active');
@@ -21394,6 +21459,8 @@ function initSignupEvents() {
       showLoginScreen(false);
       switchView('mypage-screen');
       openMyPage();
+
+      showToast('パスワード設定が完了し、ログインしました。', 'success');
     });
   }
 }

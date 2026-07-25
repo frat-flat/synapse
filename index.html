@@ -478,14 +478,14 @@
           <input type="text" id="signup-username" placeholder="yamada_taro" style="width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
         </div>
         
-        <div class="form-group" style="margin: 0;">
+        <div class="form-group" style="margin: 0; display: none;">
           <label for="signup-password" style="font-size: 0.75rem; font-weight: 700; margin-bottom: 0.25rem;">パスワード</label>
-          <input type="password" id="signup-password" required placeholder="パスワードを入力" style="width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+          <input type="password" id="signup-password" placeholder="パスワードを入力" style="width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
         </div>
         
-        <div class="form-group" style="margin: 0;">
+        <div class="form-group" style="margin: 0; display: none;">
           <label for="signup-password-confirm" style="font-size: 0.75rem; font-weight: 700; margin-bottom: 0.25rem;">パスワード (確認用)</label>
-          <input type="password" id="signup-password-confirm" required placeholder="パスワードを再入力" style="width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+          <input type="password" id="signup-password-confirm" placeholder="パスワードを再入力" style="width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
         </div>
         
         <button type="submit" class="btn-primary" style="width: 100%; padding: 0.75rem; font-size: 0.95rem; font-weight: 600; margin-top: 0.5rem; border-radius: var(--radius-sm);">アカウントを新規登録</button>
@@ -2507,6 +2507,35 @@
     </div>
   </div>
 </div>
+<!-- ================= 🔐 パスワード設定モーダル (新規登録時のメールリンクシミュレーション用) ================= -->
+<div id="set-password-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; justify-content: center; align-items: center;">
+  <div style="background: var(--bg-surface); padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); width: 90%; max-width: 400px; box-shadow: var(--shadow-lg); text-align: left;">
+    <h3 style="margin-top: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+      🔑 パスワードの設定
+    </h3>
+    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.5rem 0 1rem 0;">
+      アカウントのパスワードを設定してください。このパスワードはログイン時に使用します。
+    </p>
+    <input type="hidden" id="set-pwd-email">
+    
+    <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">新しいパスワード (大・小・数を含む6文字以上・記号不可):</label>
+        <input type="password" id="set-pwd-input" required placeholder="新しいパスワード" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">新しいパスワード (確認):</label>
+        <input type="password" id="set-pwd-confirm-input" required placeholder="もう一度入力" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+      </div>
+    </div>
+    
+    <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem;">
+      <button type="button" id="set-pwd-cancel-btn" class="btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; cursor: pointer;">キャンセル</button>
+      <button type="button" id="set-pwd-submit-btn" class="btn-primary" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; cursor: pointer;">パスワードを決定</button>
+    </div>
+  </div>
+</div>
+
 <!-- ================= 📌 浮遊付箋（Sticky Notes）コンテナ ================= -->
 <div id="floating-sticky-notes-container" style="position: fixed; top: 0; left: 0; width: 0; height: 0; z-index: 15000; pointer-events: none;"></div>
 
