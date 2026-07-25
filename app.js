@@ -21375,7 +21375,7 @@ function initUserManagerEvents() {
   // 管理者パネルボタンからタブを開く
   if (panelBtn) {
     panelBtn.addEventListener('click', () => {
-      openTab('user-manager-screen', 'user-manager-screen', '👤 ユーザー登録・管理');
+      openTab('user-manager-screen', 'user-manager-screen', '👥 ユーザー登録・管理');
       renderUserManagerList();
     });
   }
