@@ -6094,27 +6094,44 @@ function updateUIForCurrentMode() {
   if (!state.currentUser) return;
   const mode = state.currentUser.id;
 
-  // 一般ユーザー向けホーム画面内マイページ（お気に入り・メモ帳）の動的移動＆表示制御
+  // 一般ユーザー向けホーム画面内マイページ（メニュー・アイコン）の動的移動＆表示制御
   const isSystemAdmin = (state.currentUser.id === 'admin');
   const menuMypage = document.getElementById('menu-mypage');
   const userMypageContainer = document.getElementById('user-mypage-container');
-  const homeFavContainer = document.getElementById('home-favorites-container');
-  const homeMemoContainer = document.getElementById('home-memo-container');
+  const menuView = document.getElementById('mypage-menu-view');
+  const origMenuParent = document.getElementById('mypage-screen');
 
   const mypageFavWrapper = document.getElementById('mypage-fav-view-wrapper');
   const mypageMemoWrapper = document.getElementById('mypage-memo-view-wrapper');
-
   const origFavParent = document.getElementById('mypage-screen');
   const origMemoParent = document.getElementById('mypage-memo-screen');
-
-  const favBackBtn = document.getElementById('mypage-fav-back-btn');
-  const memoBackBtn = document.getElementById('mypage-back-to-menu-btn');
 
   if (isSystemAdmin) {
     if (menuMypage) menuMypage.style.display = 'flex';
     if (userMypageContainer) userMypageContainer.style.display = 'none';
 
-    // 元の位置に戻す
+    // システム管理者の場合は元の位置に戻す
+    if (menuView && origMenuParent && menuView.parentNode !== origMenuParent) {
+      origMenuParent.insertBefore(menuView, origMenuParent.firstChild);
+    }
+    if (mypageFavWrapper && origFavParent && mypageFavWrapper.parentNode !== origFavParent) {
+      origFavParent.appendChild(mypageFavWrapper);
+    }
+    if (mypageMemoWrapper && origMemoParent && mypageMemoWrapper.parentNode !== origMemoParent) {
+      origMemoParent.appendChild(mypageMemoWrapper);
+    }
+  } else {
+    if (menuMypage) menuMypage.style.display = 'none';
+    if (userMypageContainer) userMypageContainer.style.display = 'flex';
+
+    // 一般ユーザーの場合はホーム画面のメニューコンテナへ移動
+    if (menuView && userMypageContainer && menuView.parentNode !== userMypageContainer) {
+      userMypageContainer.appendChild(menuView);
+    }
+    // メニュービューは常にホーム上で表示されるようにする
+    if (menuView) menuView.style.display = 'flex';
+
+    // お気に入り一覧とメモ帳本体は本来の親に戻しておく（遷移時に mypage-screen などに切り替えて使うため）
     if (mypageFavWrapper && origFavParent && mypageFavWrapper.parentNode !== origFavParent) {
       origFavParent.appendChild(mypageFavWrapper);
     }
@@ -6122,37 +6139,11 @@ function updateUIForCurrentMode() {
       origMemoParent.appendChild(mypageMemoWrapper);
     }
 
-    if (favBackBtn) favBackBtn.style.display = 'flex';
-    if (memoBackBtn) memoBackBtn.style.display = 'flex';
-  } else {
-    if (menuMypage) menuMypage.style.display = 'none';
-    if (userMypageContainer) userMypageContainer.style.display = 'flex';
-
-    // ホーム画面の統合コンテナへ移動
-    if (mypageFavWrapper && homeFavContainer && mypageFavWrapper.parentNode !== homeFavContainer) {
-      homeFavContainer.appendChild(mypageFavWrapper);
-    }
-    if (mypageMemoWrapper && homeMemoContainer && mypageMemoWrapper.parentNode !== homeMemoContainer) {
-      homeMemoContainer.appendChild(mypageMemoWrapper);
-    }
-
-    // 強制的に表示させる
-    if (mypageFavWrapper) mypageFavWrapper.style.display = 'flex';
-    if (mypageMemoWrapper) mypageMemoWrapper.style.display = 'flex';
-
-    // 戻るボタンを非表示にする
-    if (favBackBtn) favBackBtn.style.display = 'none';
-    if (memoBackBtn) memoBackBtn.style.display = 'none';
-
-    // プロフィール情報をバインド
-    const homeFullnameEl = document.getElementById('home-user-fullname');
-    const homeCodeEl = document.getElementById('home-user-code');
-    if (homeFullnameEl) homeFullnameEl.textContent = state.currentUser.name || 'ゲスト';
-    if (homeCodeEl) homeCodeEl.textContent = 'Code: ' + (state.currentUser.code || 'N/A');
-
-    // データを最新状態に再描画
-    renderMypageFavorites();
-    if (typeof window.updateMypageMemoUI === 'function') window.updateMypageMemoUI();
+    // 一般ユーザー用のプロフィール情報（マイページ側と同じバインド）
+    const mypageFullnameEl = document.getElementById('mypage-user-fullname');
+    const mypageCodeEl = document.getElementById('mypage-user-code');
+    if (mypageFullnameEl) mypageFullnameEl.textContent = state.currentUser.name || 'ゲスト';
+    if (mypageCodeEl) mypageCodeEl.textContent = 'Code: ' + (state.currentUser.code || 'N/A');
   }
 
   const switchContainer = document.getElementById('global-mode-switch-container');
@@ -23818,8 +23809,13 @@ function initMypageMemo() {
   // メニューに戻る
   if (backToMenuBtn) {
     backToMenuBtn.onclick = () => {
-      if (menuView) menuView.style.display = 'flex';
-      if (memoWrapper) memoWrapper.style.display = 'none';
+      const isSystemAdmin = (state.currentUser && state.currentUser.id === 'admin');
+      if (!isSystemAdmin) {
+        switchView('home-screen');
+      } else {
+        if (menuView) menuView.style.display = 'flex';
+        if (memoWrapper) memoWrapper.style.display = 'none';
+      }
       state.memoUnlockedSecure = false; // 戻った時に再ロック
       activeMemoId = null;
       showEditor(null);
@@ -23837,7 +23833,13 @@ function initMypageMemo() {
         showToast('現在お気に入りに登録されているものはありません。', 'error');
         return;
       }
-      if (menuView) menuView.style.display = 'none';
+      const isSystemAdmin = (state.currentUser && state.currentUser.id === 'admin');
+      if (!isSystemAdmin) {
+        switchView('mypage-screen');
+        if (menuView) menuView.style.display = 'none';
+      } else {
+        if (menuView) menuView.style.display = 'none';
+      }
       if (favWrapper) favWrapper.style.display = 'flex';
       renderMypageFavorites();
     };
@@ -23846,8 +23848,13 @@ function initMypageMemo() {
   // お気に入り一覧から戻る
   if (favBackBtn) {
     favBackBtn.onclick = () => {
-      if (menuView) menuView.style.display = 'flex';
-      if (favWrapper) favWrapper.style.display = 'none';
+      const isSystemAdmin = (state.currentUser && state.currentUser.id === 'admin');
+      if (!isSystemAdmin) {
+        switchView('home-screen');
+      } else {
+        if (menuView) menuView.style.display = 'flex';
+        if (favWrapper) favWrapper.style.display = 'none';
+      }
     };
   }
 
