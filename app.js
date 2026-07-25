@@ -386,8 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('ログイン後にご利用いただけます。', 'error');
         return;
       }
-      const userId = currentUser.id;
-      const storageMemosKey = `synapse_user_memos_${userId}`;
+      const storageMemosKey = getMemosStorageKey();
       const allMemos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
       
       const newMemo = {
@@ -23718,7 +23717,7 @@ function initMypageMemo() {
 
   const userId = currentUser.id;
   const storagePwdKey = `synapse_memo_pwd_${userId}`;
-  const storageMemosKey = `synapse_user_memos_${userId}`;
+  const storageMemosKey = getMemosStorageKey();
 
   // アカウント保管庫（一人一つ・固定ID: account_vault）の自動初期化
   const initAccountVault = () => {
@@ -25297,7 +25296,23 @@ function getMemosStorageKey() {
     const legacyKey = `synapse_user_memos_${role}`;
     const legacyData = localStorage.getItem(legacyKey);
     const newData = localStorage.getItem(newKey);
-    if (!newData && legacyData) {
+    
+    // 新キーにデータが存在しない、または、存在しても「実質的に初期化されたばかりの空データ」である場合
+    let isNewDataEmpty = !newData;
+    if (newData) {
+      try {
+        const parsed = JSON.parse(newData);
+        if (parsed.length === 0) {
+          isNewDataEmpty = true;
+        } else if (parsed.length === 1 && parsed[0].id === 'account_vault' && parsed[0].content === '[]') {
+          isNewDataEmpty = true;
+        }
+      } catch (e) {
+        isNewDataEmpty = true;
+      }
+    }
+
+    if (isNewDataEmpty && legacyData) {
       localStorage.setItem(newKey, legacyData);
     }
   }
