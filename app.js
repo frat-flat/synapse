@@ -24206,7 +24206,7 @@ function initMypageMemo() {
             ${checkboxes || '<span style="font-size: 0.65rem; color: var(--text-muted);">共有可能なユーザーがいません</span>'}
           </div>
           ${checkboxes ? `
-            <button class="btn btn-primary apply-share-btn" style="font-size: 0.72rem; padding: 0.25rem 0.5rem; margin-top: 0.4rem; cursor: pointer; border-radius: var(--radius-xs); width: fit-content; align-self: flex-end;" onclick="event.stopPropagation();">👥 チェックして共有</button>
+            <button class="btn btn-primary apply-share-btn" style="font-size: 0.72rem; padding: 0.25rem 0.5rem; margin-top: 0.4rem; cursor: pointer; border-radius: var(--radius-xs); width: fit-content; align-self: flex-end;" onclick="event.stopPropagation();">👥 チェックしたリストに共有</button>
           ` : ''}
         </div>
       `;
