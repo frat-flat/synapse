@@ -24042,7 +24042,9 @@ function initMypageMemo() {
   if (addAccountBtn) {
     addAccountBtn.onclick = () => {
       // 新しい空の枠を追加してUI追加描画（自動でアコーディオンを展開状態にする）
+      const uniqueId = 'acc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
       const frameHtml = createAccountFrameHtml({
+        id: uniqueId,
         name: '',
         url: '',
         user: '',
@@ -24156,6 +24158,9 @@ function initMypageMemo() {
 
   // アカウント枠のHTMLを生成 (アコーディオンヘッダー＋詳細ボディ構成。並び順：登録名/URL ➔ ID/PW ➔ 追加情報/備考)
   function createAccountFrameHtml(acc = { name: '', url: '', user: '', pwd: '', note: '', extras: [] }) {
+    // IDの自動付与（古いデータや新規作成枠には自動生成IDを割り当てて一意にする）
+    const accId = acc.id || 'acc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+
     // 互換性チェック
     const extrasList = acc.extras || [];
     const isShared = acc.sharedFromAdmin;
@@ -24168,7 +24173,7 @@ function initMypageMemo() {
 
     const deleteBtnStyle = isShared ? 'display: none;' : '';
     const readonlyAttr = isShared ? 'readonly style="background: var(--bg-surface-elevated); color: var(--text-secondary); opacity: 0.85; pointer-events: none;"' : '';
-    const sharedAttr = isShared ? 'data-shared-from-admin="true" class="account-card-frame shared-admin-frame"' : 'class="account-card-frame"';
+    const sharedAttr = isShared ? `data-account-id="${accId}" data-shared-from-admin="true" class="account-card-frame shared-admin-frame"` : `data-account-id="${accId}" class="account-card-frame"`;
     const addExtraBtnStyle = isShared ? 'display: none !important;' : '';
 
     // 共有・同期ユーザー設定（管理者のみ表示、デフォルト非表示で縦並び）
@@ -24506,9 +24511,7 @@ function initMypageMemo() {
           newCheckedIds.push(chk.dataset.userId);
         });
 
-        // 登録名とユーザIDをもとに、localStorage 上の対象アカウントを書き換える
-        const nameVal = frameEl.querySelector('.acc-input-name') ? frameEl.querySelector('.acc-input-name').value.trim() : '';
-        const userVal = frameEl.querySelector('.acc-input-user') ? frameEl.querySelector('.acc-input-user').value.trim() : '';
+        const accountId = frameEl.dataset.accountId;
 
         const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
         const memo = memos.find(m => m.id === activeMemoId);
@@ -24520,16 +24523,16 @@ function initMypageMemo() {
             accounts = [];
           }
 
-          let targetAcc = accounts.find(a => a.name === nameVal && a.user === userVal);
+          let targetAcc = accounts.find(a => a.id === accountId);
           if (!targetAcc) {
-            targetAcc = { name: nameVal, user: userVal, pwd: '', url: '', note: '', extras: [], sharedUsers: [] };
+            targetAcc = { id: accountId, name: '', user: '', pwd: '', url: '', note: '', extras: [], sharedUsers: [] };
             accounts.push(targetAcc);
           }
 
           // 現在入力されている最新情報も同期して書き込む
-          targetAcc.name = nameVal;
+          targetAcc.name = frameEl.querySelector('.acc-input-name') ? frameEl.querySelector('.acc-input-name').value.trim() : '';
           targetAcc.url = frameEl.querySelector('.acc-input-url') ? frameEl.querySelector('.acc-input-url').value.trim() : '';
-          targetAcc.user = userVal;
+          targetAcc.user = frameEl.querySelector('.acc-input-user') ? frameEl.querySelector('.acc-input-user').value.trim() : '';
           targetAcc.pwd = frameEl.querySelector('.acc-input-pwd') ? frameEl.querySelector('.acc-input-pwd').value : '';
           targetAcc.note = frameEl.querySelector('.acc-input-note') ? frameEl.querySelector('.acc-input-note').value.trim() : '';
           
@@ -24555,11 +24558,7 @@ function initMypageMemo() {
           setTimeout(() => {
             const listFrames = accountListContainer.querySelectorAll('.account-card-frame');
             listFrames.forEach(f => {
-              const fNameInput = f.querySelector('.acc-input-name');
-              const fUserInput = f.querySelector('.acc-input-user');
-              const fName = fNameInput ? fNameInput.value.trim() : '';
-              const fUser = fUserInput ? fUserInput.value.trim() : '';
-              if (fName === nameVal && fUser === userVal) {
+              if (f.dataset.accountId === accountId) {
                 const fBody = f.querySelector('.acc-card-body');
                 const fArrow = f.querySelector('.acc-toggle-arrow');
                 const fArea = f.querySelector('.acc-share-setting-area');
@@ -24584,8 +24583,7 @@ function initMypageMemo() {
         const userName = targetUser ? targetUser.name : userId;
 
         showAppConfirm('共有の解除', `「${userName}」へのアカウント情報の共有を解除しますか？`, () => {
-          const nameVal = frameEl.querySelector('.acc-input-name') ? frameEl.querySelector('.acc-input-name').value.trim() : '';
-          const userVal = frameEl.querySelector('.acc-input-user') ? frameEl.querySelector('.acc-input-user').value.trim() : '';
+          const accountId = frameEl.dataset.accountId;
 
           const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
           const memo = memos.find(m => m.id === activeMemoId);
@@ -24597,14 +24595,14 @@ function initMypageMemo() {
               accounts = [];
             }
 
-            const targetAcc = accounts.find(a => a.name === nameVal && a.user === userVal);
+            const targetAcc = accounts.find(a => a.id === accountId);
             if (targetAcc && targetAcc.sharedUsers) {
               targetAcc.sharedUsers = targetAcc.sharedUsers.filter(id => id !== userId);
               
               // 現在入力されている最新情報も同期して書き込む
-              targetAcc.name = nameVal;
+              targetAcc.name = frameEl.querySelector('.acc-input-name') ? frameEl.querySelector('.acc-input-name').value.trim() : '';
               targetAcc.url = frameEl.querySelector('.acc-input-url') ? frameEl.querySelector('.acc-input-url').value.trim() : '';
-              targetAcc.user = userVal;
+              targetAcc.user = frameEl.querySelector('.acc-input-user') ? frameEl.querySelector('.acc-input-user').value.trim() : '';
               targetAcc.pwd = frameEl.querySelector('.acc-input-pwd') ? frameEl.querySelector('.acc-input-pwd').value : '';
               targetAcc.note = frameEl.querySelector('.acc-input-note') ? frameEl.querySelector('.acc-input-note').value.trim() : '';
               
@@ -24626,11 +24624,7 @@ function initMypageMemo() {
               setTimeout(() => {
                 const listFrames = accountListContainer.querySelectorAll('.account-card-frame');
                 listFrames.forEach(f => {
-                  const fNameInput = f.querySelector('.acc-input-name');
-                  const fUserInput = f.querySelector('.acc-input-user');
-                  const fName = fNameInput ? fNameInput.value.trim() : '';
-                  const fUser = fUserInput ? fUserInput.value.trim() : '';
-                  if (fName === nameVal && fUser === userVal) {
+                  if (f.dataset.accountId === accountId) {
                     const fBody = f.querySelector('.acc-card-body');
                     const fArrow = f.querySelector('.acc-toggle-arrow');
                     const fArea = f.querySelector('.acc-share-setting-area');
@@ -24937,7 +24931,9 @@ function initMypageMemo() {
           
           // データがない場合は初期状態として空の枠を1つ置く
           if (accountData.length === 0) {
+            const uniqueId = 'acc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
             accountData.push({
+              id: uniqueId,
               name: '',
               url: '',
               user: '',
@@ -25048,6 +25044,7 @@ function initMypageMemo() {
                 return;
               }
 
+              const accountId = frame.dataset.accountId;
               const name = frame.querySelector('.acc-input-name').value.trim();
               const url = frame.querySelector('.acc-input-url').value.trim();
               const user = frame.querySelector('.acc-input-user').value.trim();
@@ -25063,11 +25060,12 @@ function initMypageMemo() {
               });
 
               // 右上の「保存」ボタンでは、既存の共有先ユーザーリストを引き継ぐ（新規収集はしない）
-              // 登録名とユーザIDが一致する既存アカウントの共有リストを取得
-              const match = existingAccounts.find(ea => ea.name === name && ea.user === user);
+              // 識別IDが一致する既存アカウントの共有リストを取得
+              const match = existingAccounts.find(ea => ea.id === accountId);
               const sharedUsers = match ? (match.sharedUsers || []) : [];
               
               accountData.push({
+                id: accountId,
                 name,
                 url,
                 user,
