@@ -1923,8 +1923,8 @@
 </section>
 
 <!-- ================= 👥 ユーザー登録・管理画面（画面遷移タブ） ================= -->
-<section id="user-manager-screen" class="screen-view" style="display: none; padding: 1.25rem;">
-  <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left;">
+<section id="user-manager-screen" class="screen-view" style="display: none; padding: 1.25rem; height: calc(100vh - var(--header-height, 60px) - 2.5rem); box-sizing: border-box;">
+  <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left; height: 100%;">
     
     <!-- 画面ヘッダー ＆ 各種リマインダー設定 -->
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 0.5rem;">
@@ -1948,10 +1948,10 @@
     </div>
 
     <!-- コンテンツボディ：2カラムレイアウト -->
-    <div style="display: flex; flex-direction: row; gap: 1.25rem; align-items: flex-start; flex-wrap: wrap;">
+    <div style="display: flex; flex-direction: row; gap: 1.25rem; align-items: stretch; flex-wrap: nowrap; flex: 1; min-height: 0;">
       
       <!-- 左カラム：新規アカウント登録（最初から展開してフラット表示） -->
-      <div style="flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-surface); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+      <div style="flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-surface); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); overflow-y: auto; height: 100%; box-sizing: border-box;">
         <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); border-bottom: 1.5px solid var(--border-color); padding-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
           <span style="display: flex; align-items: center; gap: 0.35rem;">➕ 新規アカウント登録</span>
         </h3>
@@ -2013,7 +2013,7 @@
       </div>
       
       <!-- 右カラム：登録ユーザー一覧（長期未ログイン警告 & メール送信ボタン付き、フィルター・ソート付き） -->
-      <div style="flex: 1.5; min-width: 350px; display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-surface); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+      <div style="flex: 1.5; min-width: 350px; display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-surface); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); height: 100%; box-sizing: border-box;">
         <div style="border-bottom: 1.5px solid var(--border-color); padding-bottom: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
             <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
@@ -2046,7 +2046,7 @@
         </div>
         
         <!-- リストコンテナ -->
-        <div id="tab-user-list-container" style="display: flex; flex-direction: column; gap: 0.35rem; max-height: calc(100vh - 310px); overflow-y: auto; padding-right: 0.25rem;">
+        <div id="tab-user-list-container" style="display: flex; flex-direction: column; gap: 0.35rem; flex: 1; min-height: 0; overflow-y: auto; padding-right: 0.25rem;">
           <!-- JSで動的に構築されます -->
         </div>
       </div>
