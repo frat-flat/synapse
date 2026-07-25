@@ -24181,7 +24181,7 @@ function initMypageMemo() {
         checkboxes += `
           <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; cursor: pointer; user-select: none; color: var(--text-primary); margin-bottom: 0.15rem;">
             <input type="checkbox" class="acc-share-user-chk" data-user-id="${u.id}" ${isChecked} style="cursor: pointer;">
-            <span>${u.name}</span>
+            <span>${u.name} <span style="color: var(--text-muted); font-size: 0.68rem; margin-left: 0.25rem;">(${u.id})</span></span>
           </label>
         `;
       });
