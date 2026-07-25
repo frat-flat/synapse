@@ -24169,9 +24169,12 @@ function initMypageMemo() {
     const deleteBtnStyle = isShared ? 'display: none;' : '';
     const readonlyAttr = isShared ? 'readonly style="background: var(--bg-surface-elevated); color: var(--text-secondary); opacity: 0.85; pointer-events: none;"' : '';
     const sharedAttr = isShared ? 'data-shared-from-admin="true" class="account-card-frame shared-admin-frame"' : 'class="account-card-frame"';
+    const addExtraBtnStyle = isShared ? 'display: none !important;' : '';
 
     // 共有・同期ユーザー設定（管理者のみ表示、デフォルト非表示で縦並び）
     const isCurrentAdmin = (state.currentUser && state.currentUser.id === 'admin');
+    const showMenuBtn = !isShared; // 共有アカウントでなければメニューを表示する
+    const showShareOption = isCurrentAdmin && !isShared; // 管理者かつ未共有アカウントの場合のみ共有メニューを表示
     let shareMarkup = '';
     if (isCurrentAdmin && !isShared) {
       const shareableUsers = getShareableUsers();
@@ -24226,22 +24229,26 @@ function initMypageMemo() {
           <div style="display: flex; align-items: center; gap: 0.5rem; position: relative;">
             <button class="btn-text pin-account-sticky-btn" style="color: var(--color-primary); font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; vertical-align: middle;" title="このアカウント情報を付箋として開く" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="#eab308" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h9l6-6V5c0-1.1-.9-2-2-2zm-5 16V15h5l-5 5z"/></svg></button>
             
-            <!-- ⚙️ 縦三点設定ボタンメニュー -->
-            <button class="btn-text acc-menu-trigger-btn" style="color: var(--text-secondary); font-size: 1rem; cursor: pointer; padding: 0.25rem; border: none; background: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; font-weight: bold; line-height: 1;" title="メニューを表示" onclick="event.stopPropagation();">⋮</button>
-            
-            <!-- ポップオーバーメニュー（初期非表示） -->
-            <div class="acc-dropdown-menu" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 0.35rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); z-index: 100; min-width: 115px; flex-direction: column; overflow: hidden; padding: 0.2rem 0;">
-              <!-- 共有するボタン（iOSスタイルの箱から上に矢印が飛び出す共有マーク） -->
-              <button class="acc-menu-item-share" style="display: flex; align-items: center; gap: 0.45rem; width: 100%; border: none; background: none; padding: 0.35rem 0.65rem; font-size: 0.75rem; text-align: left; cursor: pointer; color: var(--text-primary); outline: none; transition: background 0.15s;" onclick="event.stopPropagation();">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-                <span>共有する</span>
-              </button>
-              <!-- 削除するボタン -->
-              <button class="acc-menu-item-delete" style="display: flex; align-items: center; gap: 0.45rem; width: 100%; border: none; background: none; padding: 0.35rem 0.65rem; font-size: 0.75rem; text-align: left; cursor: pointer; color: #ef4444; outline: none; transition: background 0.15s; ${deleteBtnStyle}" onclick="event.stopPropagation();">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                <span>削除する</span>
-              </button>
-            </div>
+            ${showMenuBtn ? `
+              <!-- ⚙️ 縦三点設定ボタンメニュー -->
+              <button class="btn-text acc-menu-trigger-btn" style="color: var(--text-secondary); font-size: 1rem; cursor: pointer; padding: 0.25rem; border: none; background: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; font-weight: bold; line-height: 1;" title="メニューを表示" onclick="event.stopPropagation();">⋮</button>
+              
+              <!-- ポップオーバーメニュー（初期非表示） -->
+              <div class="acc-dropdown-menu" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 0.35rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); z-index: 100; min-width: 115px; flex-direction: column; overflow: hidden; padding: 0.2rem 0;">
+                ${showShareOption ? `
+                  <!-- 共有するボタン（iOSスタイルの箱から上に矢印が飛び出す共有マーク） -->
+                  <button class="acc-menu-item-share" style="display: flex; align-items: center; gap: 0.45rem; width: 100%; border: none; background: none; padding: 0.35rem 0.65rem; font-size: 0.75rem; text-align: left; cursor: pointer; color: var(--text-primary); outline: none; transition: background 0.15s;" onclick="event.stopPropagation();">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                    <span>共有する</span>
+                  </button>
+                ` : ''}
+                <!-- 削除するボタン -->
+                <button class="acc-menu-item-delete" style="display: flex; align-items: center; gap: 0.45rem; width: 100%; border: none; background: none; padding: 0.35rem 0.65rem; font-size: 0.75rem; text-align: left; cursor: pointer; color: #ef4444; outline: none; transition: background 0.15s; ${deleteBtnStyle}" onclick="event.stopPropagation();">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                  <span>削除する</span>
+                </button>
+              </div>
+            ` : ''}
           </div>
         </div>
         
@@ -24302,7 +24309,7 @@ function initMypageMemo() {
               <div class="acc-extra-list" style="display: flex; flex-direction: column; gap: 0.25rem;">
                 ${extrasHtml}
               </div>
-              <button class="btn btn-secondary add-extra-field-btn" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.25rem; border-radius: var(--radius-sm); border-style: dashed; width: fit-content; margin-top: 0.2rem;">
+              <button class="btn btn-secondary add-extra-field-btn" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.25rem; border-radius: var(--radius-sm); border-style: dashed; width: fit-content; margin-top: 0.2rem; ${addExtraBtnStyle}">
                 ➕ 追加項目を追加
               </button>
             </div>
@@ -24930,17 +24937,14 @@ function initMypageMemo() {
           
           // データがない場合は初期状態として空の枠を1つ置く
           if (accountData.length === 0) {
-            const isCurrentAdmin = (state.currentUser && state.currentUser.id === 'admin');
-            if (isCurrentAdmin) {
-              accountData.push({
-                name: '',
-                url: '',
-                user: '',
-                pwd: '',
-                note: '',
-                extras: [{ title: '', value: '' }]
-              });
-            }
+            accountData.push({
+              name: '',
+              url: '',
+              user: '',
+              pwd: '',
+              note: '',
+              extras: [{ title: '', value: '' }]
+            });
           }
 
           accountData.forEach(acc => {
