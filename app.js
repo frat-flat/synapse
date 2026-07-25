@@ -6215,6 +6215,14 @@ function checkLoginStatus() {
   const loggedUser = localStorage.getItem(STORAGE_KEYS.LOGGED_USER);
   if (loggedUser) {
     state.currentUser = JSON.parse(loggedUser);
+    
+    // 既存ログインデータ（古い形式）に対する id/role 構成の自動マイグレーション
+    if (state.currentUser && !state.currentUser.role && state.currentUser.loginId) {
+      state.currentUser.role = state.currentUser.id; // 旧id（ロール）をroleに代入
+      state.currentUser.id = state.currentUser.loginId; // loginIdを本IDに昇格
+      localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
+    }
+
     // 既存ログインデータに対する code 補完
     if (state.currentUser && !state.currentUser.code) {
       ensureInitialUsersExist();
@@ -6247,7 +6255,7 @@ function checkLoginStatus() {
 
     // UI表示の更新
     updateUIForCurrentMode();
-    removeRestrictedTabsForRole(state.currentUser.id);
+    removeRestrictedTabsForRole(state.currentUser.role);
 
     showLoginScreen(false);
     
@@ -8548,7 +8556,7 @@ function handleLogin(e) {
       const updatedUsers = users.map(u => u.id === foundUser.id ? foundUser : u);
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedUsers));
 
-      state.currentUser = { id: foundUser.role, name: foundUser.name, loginId: foundUser.id, password: foundUser.password, code: foundUser.code };
+      state.currentUser = { id: foundUser.id, role: foundUser.role, name: foundUser.name, loginId: foundUser.id, password: foundUser.password, code: foundUser.code };
       localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
       
       // ログインユーザー用のDB設定を再ロード
@@ -8576,7 +8584,7 @@ function handleLogin(e) {
 
       // UI表示の更新
       updateUIForCurrentMode();
-      removeRestrictedTabsForRole(state.currentUser.id);
+      removeRestrictedTabsForRole(state.currentUser.role);
 
       // マイページメモ帳機能の初期化
       initMypageMemo();
@@ -21488,7 +21496,8 @@ function initSignupEvents() {
 
       // 自動ログイン処理を実行してマイページに遷移
       state.currentUser = {
-        id: updatedUser.role || 'sales',
+        id: updatedUser.id,
+        role: updatedUser.role || 'sales',
         name: updatedUser.name,
         loginId: updatedUser.id,
         password: pwd,
@@ -21518,7 +21527,7 @@ function initSignupEvents() {
       }
 
       updateUIForCurrentMode();
-      removeRestrictedTabsForRole(state.currentUser.id);
+      removeRestrictedTabsForRole(state.currentUser.role);
 
       setPwdModal.style.display = 'none';
       if (signupScreen) {
@@ -24123,7 +24132,7 @@ function initMypageMemo() {
       });
 
       // 自動マイグレーション書き戻し
-      if (needsMigration && currentUser && currentUser.id === 'admin') {
+      if (needsMigration && currentUser && currentUser.role === 'admin') {
         const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
         const targetMemo = memos.find(m => m.id === memo.id);
         if (targetMemo) {
@@ -24136,7 +24145,7 @@ function initMypageMemo() {
     }
 
     // 管理者からの共有データを合流させる
-    const isCurrentAdmin = (currentUser && currentUser.id === 'admin');
+    const isCurrentAdmin = (currentUser && currentUser.role === 'admin');
     if (!isCurrentAdmin && currentUser) {
       const adminMemos = JSON.parse(localStorage.getItem('synapse_user_memos_admin')) || [];
       const adminVault = adminMemos.find(m => m.id === 'account_vault');
@@ -24202,7 +24211,7 @@ function initMypageMemo() {
     const addExtraBtnStyle = isShared ? 'display: none !important;' : '';
 
     // 共有・同期ユーザー設定（管理者のみ表示、デフォルト非表示で縦並び）
-    const isCurrentAdmin = (state.currentUser && state.currentUser.id === 'admin');
+    const isCurrentAdmin = (state.currentUser && state.currentUser.role === 'admin');
     const showMenuBtn = !isShared; // 共有アカウントでなければメニューを表示する
     const showShareOption = isCurrentAdmin && !isShared; // 管理者かつ未共有アカウントの場合のみ共有メニューを表示
     let shareMarkup = '';
