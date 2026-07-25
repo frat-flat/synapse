@@ -2071,6 +2071,18 @@ function renderMypageFavorites() {
   grid.innerHTML = '';
 
   if (!state.favorites || state.favorites.length === 0) {
+    const isSystemAdmin = (state.currentUser && state.currentUser.id === 'admin');
+    if (!isSystemAdmin) {
+      if (favWrapper) favWrapper.style.display = 'flex';
+      grid.innerHTML = `
+        <div style="grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.8rem; gap: 0.5rem; text-align: center; height: 100%; min-height: 200px; border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; box-sizing: border-box;">
+          <span style="font-size: 1.8rem;">⭐</span>
+          <div style="font-weight: 700; color: var(--text-primary);">お気に入りは登録されていません。</div>
+          <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.2rem;">各マスタフォルダやテーブルの右上にある「★」を押すと、ここにショートカットが表示されます。</div>
+        </div>
+      `;
+      return;
+    }
     if (favWrapper) favWrapper.style.display = 'none';
     const menuView = document.getElementById('mypage-menu-view');
     if (menuView) menuView.style.display = 'flex';
