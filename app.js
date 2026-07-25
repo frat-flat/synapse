@@ -2451,6 +2451,19 @@ function renderCustomTableList() {
   // ルート直下から再帰構築
   renderMenuNode('root', sidebarNav);
 
+  // 全アコーディオンの空フォルダ判定を一括更新（標準・カスタムを問わず、最終的な子要素数で正しく同期する）
+  sidebarNav.querySelectorAll('.sidebar-accordion').forEach(folder => {
+    const contentEl = folder.querySelector('.accordion-content');
+    if (contentEl) {
+      const hasVisibleChildren = Array.from(contentEl.children).some(child => child.style.display !== 'none');
+      if (hasVisibleChildren) {
+        folder.classList.remove('is-empty-folder');
+      } else {
+        folder.classList.add('is-empty-folder');
+      }
+    }
+  });
+
   // お気に入りアコーディオンの描画（ご要望によりサイドバーからは表示を除去し、マイページ内のみで機能させます）
   let favAccordion = document.getElementById('favorites-accordion');
   if (favAccordion) {
