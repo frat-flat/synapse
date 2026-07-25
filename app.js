@@ -21731,7 +21731,7 @@ function renderUserManagerList() {
 
   users.forEach(user => {
     const card = document.createElement('div');
-    card.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); transition: background-color 0.2s; flex-wrap: wrap; gap: 0.5rem;';
+    card.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); transition: background-color 0.2s; flex-wrap: wrap; gap: 0.35rem;';
     
     // ロールごとのバッジ
     let roleBadgeColor = 'var(--text-muted)';
@@ -21752,7 +21752,7 @@ function renderUserManagerList() {
     const isInactive = (now - lastLoginTime) >= ninetyDaysMs;
 
     const info = document.createElement('div');
-    info.style.cssText = 'display: flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 200px;';
+    info.style.cssText = 'display: flex; flex-direction: column; gap: 0.1rem; flex: 1; min-width: 200px;';
     
     let lastLoginStr = '未ログイン';
     if (user.lastLoginAt) {
@@ -21761,28 +21761,28 @@ function renderUserManagerList() {
     }
 
     info.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; font-weight: 700; color: var(--text-primary); flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 700; color: var(--text-primary); flex-wrap: wrap;">
         <span>${user.name}</span>
-        <span style="font-size: 0.68rem; font-weight: 600; padding: 0.05rem 0.3rem; border-radius: var(--radius-sm); color: #ffffff; background: ${roleBadgeColor};">${roleLabel}</span>
-        ${isInactive ? `<span style="font-size: 0.68rem; font-weight: 700; padding: 0.05rem 0.3rem; border-radius: var(--radius-sm); color: #ffffff; background: #eab308; animation: statusPulse 2s infinite;">⚠️ 長期未ログイン (3ヶ月以上)</span>` : ''}
+        <span style="font-size: 0.62rem; font-weight: 600; padding: 0.02rem 0.25rem; border-radius: var(--radius-sm); color: #ffffff; background: ${roleBadgeColor};">${roleLabel}</span>
+        ${isInactive ? `<span style="font-size: 0.62rem; font-weight: 700; padding: 0.02rem 0.25rem; border-radius: var(--radius-sm); color: #ffffff; background: #eab308; animation: statusPulse 2s infinite;">⚠️ 長期未ログイン (3ヶ月以上)</span>` : ''}
       </div>
-      <div style="font-size: 0.72rem; color: var(--text-secondary); display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.15rem;">
-        <span>コード: <code style="background: var(--bg-surface-elevated); padding: 0.05rem 0.2rem; border-radius: var(--radius-xs); color: var(--text-primary); font-family: monospace;">${user.code || 'N/A'}</code></span>
-        <span>ID: <code style="background: var(--bg-surface-elevated); padding: 0.05rem 0.2rem; border-radius: var(--radius-xs); color: var(--text-primary); font-family: monospace;">${user.id}</code></span>
-        <span>Pass: <code style="background: var(--bg-surface-elevated); padding: 0.05rem 0.2rem; border-radius: var(--radius-xs); color: var(--text-primary); font-family: monospace;">${user.password}</code></span>
+      <div style="font-size: 0.68rem; color: var(--text-secondary); display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.05rem;">
+        <span>コード: <code style="background: var(--bg-surface-elevated); padding: 0.02rem 0.15rem; border-radius: var(--radius-xs); color: var(--text-primary); font-family: monospace;">${user.code || 'N/A'}</code></span>
+        <span>ID: <code style="background: var(--bg-surface-elevated); padding: 0.02rem 0.15rem; border-radius: var(--radius-xs); color: var(--text-primary); font-family: monospace;">${user.id}</code></span>
+        <span>Pass: <code style="background: var(--bg-surface-elevated); padding: 0.02rem 0.15rem; border-radius: var(--radius-xs); color: var(--text-primary); font-family: monospace;">${user.password}</code></span>
         <span>最終ログイン: <span style="font-weight: 600;">${lastLoginStr}</span></span>
       </div>
     `;
 
     const action = document.createElement('div');
-    action.style.cssText = 'display: flex; align-items: center; gap: 0.5rem;';
+    action.style.cssText = 'display: flex; align-items: center; gap: 0.4rem;';
 
     // 3ヶ月以上未ログインの場合に確認メール送信ボタンを配置
     if (isInactive) {
       const emailBtn = document.createElement('button');
       emailBtn.className = 'btn-secondary';
       emailBtn.innerHTML = '📧 確認メール';
-      emailBtn.style.cssText = 'font-size: 0.7rem; padding: 0.2rem 0.4rem; font-weight: 600; border-radius: var(--radius-xs); cursor: pointer;';
+      emailBtn.style.cssText = 'font-size: 0.65rem; padding: 0.1rem 0.3rem; font-weight: 600; border-radius: var(--radius-xs); cursor: pointer;';
       emailBtn.addEventListener('click', () => {
         emailBtn.disabled = true;
         emailBtn.innerHTML = '送信中...';
@@ -21799,7 +21799,7 @@ function renderUserManagerList() {
     const delBtn = document.createElement('button');
     delBtn.className = 'btn-text';
     delBtn.innerHTML = '🗑️ 削除';
-    delBtn.style.cssText = 'color: #ef4444; font-size: 0.75rem; font-weight: 600; cursor: pointer; border: none; background: none; padding: 0.2rem;';
+    delBtn.style.cssText = 'color: #ef4444; font-size: 0.68rem; font-weight: 600; cursor: pointer; border: none; background: none; padding: 0.1rem 0.2rem;';
     
     const isSelf = state.currentUser && state.currentUser.loginId === user.id;
     const isDefaultAdmin = user.id === 'admin';
