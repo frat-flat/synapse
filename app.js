@@ -24143,10 +24143,22 @@ function initMypageMemo() {
         };
       });
 
-      // 一般ユーザーの場合、管理者アカウントIDと一致する「残骸データ」を排除する
+      // 一般ユーザーの場合、管理者アカウントIDと一致する「残骸データ」を排除し、ストレージからもパージ（書き戻し）する
       const isCurrentAdmin = (currentUser && currentUser.role === 'admin');
-      if (!isCurrentAdmin) {
-        accountData = parsed.filter(item => !adminAccIds.includes(item.id));
+      if (!isCurrentAdmin && adminAccIds.length > 0) {
+        const cleanData = parsed.filter(item => !adminAccIds.includes(item.id));
+        if (cleanData.length !== parsed.length) {
+          // 残骸が存在したため、一般ユーザー側のローカルストレージをゴミ抜き状態に上書き・更新する
+          accountData = cleanData;
+          const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
+          const targetMemo = memos.find(m => m.id === memo.id);
+          if (targetMemo) {
+            targetMemo.content = JSON.stringify(cleanData);
+            localStorage.setItem(getMemosStorageKey(), JSON.stringify(memos));
+          }
+        } else {
+          accountData = parsed;
+        }
       } else {
         accountData = parsed;
       }
@@ -24252,45 +24264,51 @@ function initMypageMemo() {
     const sharedAttr = isShared ? `data-account-id="${accId}" data-shared-from-admin="true" class="account-card-frame shared-admin-frame"` : `data-account-id="${accId}" class="account-card-frame"`;
     const addExtraBtnStyle = isShared ? 'display: none !important;' : '';
 
-    // 共有・同期ユーザー設定（管理者のみ表示、デフォルト非表示で縦並び）
+    // 共有・同期ユーザー設定（管理者のみ表示、デフォルトでアコーディオン下部に設置、検索窓付き）
     const isCurrentAdmin = (state.currentUser && state.currentUser.role === 'admin');
     const showMenuBtn = true; // 常にメニューを表示する
-    const showShareOption = isCurrentAdmin && !isShared; // 管理者かつ未共有アカウントの場合のみ共有メニューを表示
+    const showShareOption = false; // 三点リーダーメニューからの共有オプションは廃止（下部に直接置くため）
     let shareMarkup = '';
     if (isCurrentAdmin && !isShared) {
       const shareableUsers = getShareableUsers();
       let checkboxes = '';
       shareableUsers.forEach(u => {
         const isSharedUser = (acc.sharedUsers && acc.sharedUsers.includes(u.id));
-        if (isSharedUser) {
-          checkboxes += `
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.15rem; width: 100%;">
-              <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; cursor: not-allowed; user-select: none; color: var(--text-secondary); opacity: 0.6;">
-                <input type="checkbox" class="acc-share-user-chk" data-user-id="${u.id}" checked disabled style="cursor: not-allowed;">
+        const labelStyle = isSharedUser 
+          ? 'display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; font-size: 0.72rem; cursor: not-allowed; user-select: none; color: var(--text-secondary); opacity: 0.6;'
+          : 'display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; font-size: 0.72rem; cursor: pointer; user-select: none; color: var(--text-primary);';
+
+        checkboxes += `
+          <div class="share-user-row" data-user-name="${u.name.toLowerCase()}" data-user-id="${u.id.toLowerCase()}" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.15rem; width: 100%;">
+            <label style="${labelStyle}">
+              <span style="display: flex; align-items: center; gap: 0.25rem;">
+                <input type="checkbox" class="acc-share-user-chk" data-user-id="${u.id}" ${isSharedUser ? 'checked disabled' : ''}>
                 <span>${u.name} <span style="color: var(--text-muted); font-size: 0.68rem; margin-left: 0.25rem;">(${u.id})</span></span>
-              </label>
-              <button class="btn-text revoke-share-btn" data-user-id="${u.id}" style="color: #ef4444; font-size: 0.65rem; cursor: pointer; border: none; background: none; padding: 0 0.25rem; font-weight: 600; text-decoration: underline;" onclick="event.stopPropagation();">共有を解除する</button>
-            </div>
-          `;
-        } else {
-          checkboxes += `
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.15rem; width: 100%;">
-              <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; cursor: pointer; user-select: none; color: var(--text-primary);">
-                <input type="checkbox" class="acc-share-user-chk" data-user-id="${u.id}" style="cursor: pointer;">
-                <span>${u.name} <span style="color: var(--text-muted); font-size: 0.68rem; margin-left: 0.25rem;">(${u.id})</span></span>
-              </label>
-            </div>
-          `;
-        }
+              </span>
+              ${isSharedUser ? `
+                <button class="btn-text revoke-share-btn" data-user-id="${u.id}" style="color: #ef4444; font-size: 0.65rem; cursor: pointer; border: none; background: none; padding: 0 0.25rem; font-weight: 600; text-decoration: underline;" onclick="event.stopPropagation();">共有を解除する</button>
+              ` : ''}
+            </label>
+          </div>
+        `;
       });
+
       shareMarkup = `
-        <div class="acc-share-setting-area" style="display: none; border-top: 1px dashed var(--border-color); padding-top: 0.6rem; text-align: left; flex-direction: column; gap: 0.35rem; margin-top: 0.4rem;">
-          <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">👥 ユーザーへの共有・同期設定</label>
-          <div style="display: flex; flex-direction: column; gap: 0.45rem; background: var(--bg-surface); padding: 0.5rem 0.75rem; border-radius: var(--radius-xs); border: 1px solid var(--border-color); max-height: 150px; overflow-y: auto;">
-            ${checkboxes || '<span style="font-size: 0.65rem; color: var(--text-muted);">共有可能なユーザーがいません</span>'}
+        <div class="acc-share-toggle-header" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; font-weight: 700; color: var(--color-primary); cursor: pointer; margin-top: 0.6rem; border-top: 1px dashed var(--border-color); padding-top: 0.6rem; user-select: none;">
+          <span>ユーザーへの共有同期設定</span> <span class="share-toggle-arrow">🔽</span>
+        </div>
+        <div class="acc-share-setting-area" style="display: none; flex-direction: column; gap: 0.5rem; margin-top: 0.4rem; padding: 0.5rem; background: var(--bg-surface-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <!-- 🔍 ユーザー検索窓 -->
+          <div style="position: relative; display: flex; width: 100%;">
+            <input type="text" class="acc-share-user-search" placeholder="ユーザー名やIDで検索..." style="width: 100%; padding: 0.25rem 1.5rem 0.25rem 0.4rem; font-size: 0.7rem; border: 1px solid var(--border-color); border-radius: var(--radius-xs); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+            <span style="position: absolute; right: 0.35rem; top: 50%; transform: translateY(-50%); font-size: 0.65rem; color: var(--text-muted); pointer-events: none;">🔍</span>
+          </div>
+          <!-- ユーザー一覧チェックボックス -->
+          <div class="share-user-list-container" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 150px; overflow-y: auto; padding-right: 0.2rem;">
+            ${checkboxes || '<span style="font-size: 0.65rem; color: var(--text-muted); padding: 0.2rem 0;">共有可能なユーザーがいません</span>'}
           </div>
           ${checkboxes ? `
-            <button class="btn btn-primary apply-share-btn" style="font-size: 0.72rem; padding: 0.25rem 0.5rem; margin-top: 0.4rem; cursor: pointer; border-radius: var(--radius-xs); width: fit-content; align-self: flex-end;" onclick="event.stopPropagation();">チェックしたリストに共有</button>
+            <button class="btn btn-primary apply-share-btn" style="font-size: 0.72rem; padding: 0.25rem 0.5rem; margin-top: 0.2rem; cursor: pointer; border-radius: var(--radius-xs); width: fit-content; align-self: flex-end;" onclick="event.stopPropagation();">チェックしたリストに共有</button>
           ` : ''}
         </div>
       `;
@@ -24307,21 +24325,14 @@ function initMypageMemo() {
             </span>
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem; position: relative;">
-            <button class="btn-text pin-account-sticky-btn" style="color: var(--color-primary); font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; vertical-align: middle;" title="このアカウント情報を付箋として開く" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="#eab308" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h9l6-6V5c0-1.1-.9-2-2-2zm-5 16V15h5l-5 5z"/></svg></button>
+            <button class="btn-text pin-account-sticky-btn" style="display: none; color: var(--color-primary); font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none; align-items: center; justify-content: center; width: 18px; height: 18px; vertical-align: middle;" title="このアカウント情報を付箋として開く" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="#eab308" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h9l6-6V5c0-1.1-.9-2-2-2zm-5 16V15h5l-5 5z"/></svg></button>
             
             ${showMenuBtn ? `
               <!-- ⚙️ 縦三点設定ボタンメニュー -->
-              <button class="btn-text acc-menu-trigger-btn" style="color: var(--text-secondary); font-size: 1rem; cursor: pointer; padding: 0.25rem; border: none; background: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; font-weight: bold; line-height: 1;" title="メニューを表示" onclick="event.stopPropagation();">⋮</button>
+              <button class="btn-text acc-menu-trigger-btn" style="display: none; color: var(--text-secondary); font-size: 1rem; cursor: pointer; padding: 0.25rem; border: none; background: none; align-items: center; justify-content: center; width: 18px; height: 18px; font-weight: bold; line-height: 1;" title="メニューを表示" onclick="event.stopPropagation();">⋮</button>
               
               <!-- ポップオーバーメニュー（初期非表示） -->
               <div class="acc-dropdown-menu" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 0.35rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); z-index: 100; min-width: 115px; flex-direction: column; overflow: hidden; padding: 0.2rem 0;">
-                ${showShareOption ? `
-                  <!-- 共有するボタン（iOSスタイルの箱から上に矢印が飛び出す共有マーク） -->
-                  <button class="acc-menu-item-share" style="display: flex; align-items: center; gap: 0.45rem; width: 100%; border: none; background: none; padding: 0.35rem 0.65rem; font-size: 0.75rem; text-align: left; cursor: pointer; color: var(--text-primary); outline: none; transition: background 0.15s;" onclick="event.stopPropagation();">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-                    <span>共有する</span>
-                  </button>
-                ` : ''}
                 <!-- 削除するボタン -->
                 <button class="acc-menu-item-delete" style="display: flex; align-items: center; gap: 0.45rem; width: 100%; border: none; background: none; padding: 0.35rem 0.65rem; font-size: 0.75rem; text-align: left; cursor: pointer; color: #ef4444; outline: none; transition: background 0.15s; ${deleteBtnStyle}" onclick="event.stopPropagation();">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
@@ -24454,16 +24465,29 @@ function initMypageMemo() {
       };
     }
 
-    // トグル開閉
+    // トグル開閉時にヘッダー右端のボタンの表示・非表示を連動
     if (header && body && arrow) {
+      // 初期状態がオープン（再描画直後でbodyが最初から表示されている等）の場合の初期表示同期
+      const initialOpen = body.style.display === 'flex';
+      if (initialOpen) {
+        if (pinStickyBtn) pinStickyBtn.style.display = 'inline-flex';
+        if (menuTrigger) menuTrigger.style.display = 'inline-flex';
+      }
+
       header.onclick = () => {
         const isOpen = body.style.display === 'flex';
         if (isOpen) {
           body.style.display = 'none';
           arrow.textContent = '🔽';
+          if (pinStickyBtn) pinStickyBtn.style.display = 'none';
+          if (menuTrigger) menuTrigger.style.display = 'none';
+          // メニューが開いていた場合は閉じる
+          if (dropdownMenu) dropdownMenu.style.display = 'none';
         } else {
           body.style.display = 'flex';
           arrow.textContent = '🔼';
+          if (pinStickyBtn) pinStickyBtn.style.display = 'inline-flex';
+          if (menuTrigger) menuTrigger.style.display = 'inline-flex';
         }
       };
     }
@@ -24532,33 +24556,34 @@ function initMypageMemo() {
       });
     }
 
-    // メニュー内「共有する」アクション
-    if (shareMenuItem && shareSettingArea) {
-      shareMenuItem.onclick = (e) => {
+    // ユーザーへの共有同期設定（トグル開閉イベント）
+    const shareToggleHeader = frameEl.querySelector('.acc-share-toggle-header');
+    const shareToggleArrow = frameEl.querySelector('.share-toggle-arrow');
+    if (shareToggleHeader && shareSettingArea && shareToggleArrow) {
+      shareToggleHeader.onclick = (e) => {
         e.stopPropagation();
-        if (dropdownMenu) dropdownMenu.style.display = 'none'; // メニューを閉じる
-        
-        // 共有エリアの表示・非表示トグル
-        const isAreaOpen = shareSettingArea.style.display === 'flex';
-        if (!isAreaOpen) {
-          // アコーディオンボディが閉じている場合は開く
-          if (body && body.style.display !== 'flex') {
-            body.style.display = 'flex';
-            if (arrow) arrow.textContent = '🔼';
-          }
-          shareSettingArea.style.display = 'flex';
-          shareSettingArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          showToast('共有設定を表示しました。', 'info');
-        } else {
-          shareSettingArea.style.display = 'none';
-        }
+        const isOpen = shareSettingArea.style.display === 'flex';
+        shareSettingArea.style.display = isOpen ? 'none' : 'flex';
+        shareToggleArrow.textContent = isOpen ? '🔽' : '🔼';
       };
-    } else if (shareMenuItem) {
-      // 非管理者（一般ユーザー）向けフォールバック
-      shareMenuItem.onclick = (e) => {
-        e.stopPropagation();
-        if (dropdownMenu) dropdownMenu.style.display = 'none';
-        showToast('アカウント情報の共有は管理者にのみ許可されています。', 'error');
+    }
+
+    // 共有ターゲットユーザーのインクリメンタル検索
+    const shareUserSearch = frameEl.querySelector('.acc-share-user-search');
+    const shareUserRows = frameEl.querySelectorAll('.share-user-row');
+    if (shareUserSearch) {
+      shareUserSearch.onclick = (e) => e.stopPropagation(); // 検索窓のクリックで親へ伝播するのを防ぐ
+      shareUserSearch.oninput = () => {
+        const query = shareUserSearch.value.trim().toLowerCase();
+        shareUserRows.forEach(row => {
+          const userName = row.dataset.userName || '';
+          const userId = row.dataset.userId || '';
+          if (userName.includes(query) || userId.includes(query)) {
+            row.style.display = 'flex';
+          } else {
+            row.style.display = 'none';
+          }
+        });
       };
     }
 
