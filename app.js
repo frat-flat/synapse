@@ -24066,13 +24066,90 @@ function initMypageMemo() {
     };
   }
 
+  // 共有可能なシステム管理者以外の全一般ユーザーを取得
+  function getShareableUsers() {
+    ensureInitialUsersExist();
+    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+    return users.filter(u => u.id !== 'admin');
+  }
+
+  // アカウント保管庫のアカウント情報を読み込む（一般ユーザー向けに管理者の共有データをマージする）
+  function getVaultAccounts(memo, currentUser) {
+    if (!memo) return [];
+    let accountData = [];
+    try {
+      const raw = JSON.parse(memo.content) || [];
+      accountData = raw.map(item => {
+        let user = '';
+        let pwd = '';
+        if (item.accounts && item.accounts.length > 0) {
+          user = item.accounts[0].user || '';
+          pwd = item.accounts[0].pwd || '';
+        } else {
+          user = item.user || '';
+          pwd = item.pwd || '';
+        }
+        let extras = [];
+        if (item.extras) {
+          extras = item.extras;
+        } else if (item.extra) {
+          extras = [{ title: '追加情報', value: item.extra }];
+        }
+        return {
+          name: item.name || '',
+          url: item.url || '',
+          user: user,
+          pwd: pwd,
+          note: item.note || '',
+          extras: extras,
+          sharedUsers: item.sharedUsers || []
+        };
+      });
+    } catch(e) {
+      accountData = [];
+    }
+
+    // 管理者からの共有データを合流させる
+    const isCurrentAdmin = (currentUser && currentUser.id === 'admin');
+    if (!isCurrentAdmin && currentUser) {
+      const adminMemos = JSON.parse(localStorage.getItem('synapse_user_memos_admin')) || [];
+      const adminVault = adminMemos.find(m => m.id === 'account_vault');
+      if (adminVault) {
+        try {
+          const adminAccounts = JSON.parse(adminVault.content) || [];
+          const sharedWithMe = adminAccounts
+            .filter(acc => acc.sharedUsers && acc.sharedUsers.includes(currentUser.id))
+            .map(acc => {
+              return {
+                name: acc.name || '',
+                url: acc.url || '',
+                user: acc.user || '',
+                pwd: acc.pwd || '',
+                note: acc.note || '',
+                extras: acc.extras || [],
+                sharedFromAdmin: true // 同期フラグ
+              };
+            });
+          accountData = [...accountData, ...sharedWithMe];
+        } catch (e) {
+          console.error('Failed to parse admin shared accounts:', e);
+        }
+      }
+    }
+
+    return accountData;
+  }
+  window.getVaultAccountsHelper = getVaultAccounts; // グローバル公開
+
   // 追加項目（タイトルと値の動的ペア）のHTML生成
-  function createExtraFieldHtml(extraItem = { title: '', value: '' }) {
+  function createExtraFieldHtml(extraItem = { title: '', value: '' }, isShared = false) {
+    const readonlyAttr = isShared ? 'readonly style="background: var(--bg-surface-elevated); color: var(--text-secondary); opacity: 0.85; pointer-events: none;"' : '';
+    const deleteBtnStyle = isShared ? 'display: none;' : '';
     return `
       <div class="account-extra-field" style="display: flex; gap: 0.25rem; align-items: center; margin-bottom: 0.25rem;">
-        <input type="text" class="acc-extra-title" placeholder="項目名 (例: 質問)" value="${extraItem.title || ''}" style="width: 38%; padding: 0.3rem 0.4rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
-        <input type="text" class="acc-extra-value" placeholder="値" value="${extraItem.value || ''}" style="flex: 1; padding: 0.3rem 0.4rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
-        <button class="btn-text delete-extra-field-btn" style="color: #ef4444; font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none;" title="この項目を削除">🗑️</button>
+        <input type="text" class="acc-extra-title" placeholder="項目名 (例: 質問)" value="${extraItem.title || ''}" ${readonlyAttr} style="width: 38%; padding: 0.3rem 0.4rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+        <input type="text" class="acc-extra-value" placeholder="値" value="${extraItem.value || ''}" ${readonlyAttr} style="flex: 1; padding: 0.3rem 0.4rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+        <button class="btn-text delete-extra-field-btn" style="color: #ef4444; font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none; ${deleteBtnStyle}" title="この項目を削除">🗑️</button>
       </div>
     `;
   }
@@ -24081,15 +24158,45 @@ function initMypageMemo() {
   function createAccountFrameHtml(acc = { name: '', url: '', user: '', pwd: '', note: '', extras: [] }) {
     // 互換性チェック
     const extrasList = acc.extras || [];
+    const isShared = acc.sharedFromAdmin;
     
     // 追加情報HTMLの組み立て
     let extrasHtml = '';
     extrasList.forEach(item => {
-      extrasHtml += createExtraFieldHtml(item);
+      extrasHtml += createExtraFieldHtml(item, isShared);
     });
 
+    const deleteBtnStyle = isShared ? 'display: none;' : '';
+    const readonlyAttr = isShared ? 'readonly style="background: var(--bg-surface-elevated); color: var(--text-secondary); opacity: 0.85; pointer-events: none;"' : '';
+    const sharedAttr = isShared ? 'data-shared-from-admin="true" class="account-card-frame shared-admin-frame"' : 'class="account-card-frame"';
+
+    // 共有・同期ユーザー設定（管理者のみ表示）
+    const isCurrentAdmin = (state.currentUser && state.currentUser.id === 'admin');
+    let shareMarkup = '';
+    if (isCurrentAdmin && !isShared) {
+      const shareableUsers = getShareableUsers();
+      let checkboxes = '';
+      shareableUsers.forEach(u => {
+        const isChecked = (acc.sharedUsers && acc.sharedUsers.includes(u.id)) ? 'checked' : '';
+        checkboxes += `
+          <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; cursor: pointer; user-select: none; color: var(--text-primary);">
+            <input type="checkbox" class="acc-share-user-chk" data-user-id="${u.id}" ${isChecked} style="cursor: pointer;">
+            <span>${u.name}</span>
+          </label>
+        `;
+      });
+      shareMarkup = `
+        <div class="acc-share-setting-area" style="border-top: 1px dashed var(--border-color); padding-top: 0.6rem; text-align: left; display: flex; flex-direction: column; gap: 0.3rem;">
+          <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">👥 ユーザーへの共有・同期設定</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.6rem; background: var(--bg-surface); padding: 0.4rem 0.6rem; border-radius: var(--radius-xs); border: 1px solid var(--border-color);">
+            ${checkboxes || '<span style="font-size: 0.65rem; color: var(--text-muted);">共有可能なユーザーがいません</span>'}
+          </div>
+        </div>
+      `;
+    }
+
     return `
-      <div class="account-card-frame" style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0.5rem;">
+      <div ${sharedAttr} style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0.5rem;">
         <!-- ヘッダー（閉じたときは登録名テキストのみを表示） -->
         <div class="acc-card-header" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.55rem 0.75rem; background: var(--bg-surface); cursor: pointer; user-select: none;">
           <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;">
@@ -24097,10 +24204,11 @@ function initMypageMemo() {
             <span class="acc-header-name-label" style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
               ${(acc.name || '').trim() || '無題のサービス'}
             </span>
+            ${isShared ? '<span style="font-size: 0.65rem; color: var(--primary); background: var(--bg-surface-elevated); border: 1px solid var(--primary); padding: 0.05rem 0.25rem; border-radius: var(--radius-xs); margin-left: 0.4rem; font-weight: 600;">同期済</span>' : ''}
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem;">
             <button class="btn-text pin-account-sticky-btn" style="color: var(--color-primary); font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; vertical-align: middle;" title="このアカウント情報を付箋として開く" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="#eab308" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h9l6-6V5c0-1.1-.9-2-2-2zm-5 16V15h5l-5 5z"/></svg></button>
-            <button class="btn-text delete-account-frame-btn" style="color: #ef4444; font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none;" title="このアカウント枠を削除" onclick="event.stopPropagation();">🗑️</button>
+            <button class="btn-text delete-account-frame-btn" style="color: #ef4444; font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none; ${deleteBtnStyle}" title="このアカウント枠を削除" onclick="event.stopPropagation();">🗑️</button>
           </div>
         </div>
         
@@ -24111,25 +24219,25 @@ function initMypageMemo() {
             <!-- 登録名 -->
             <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
               <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">登録名（サービス名）</label>
-              <input type="text" class="acc-input-name" placeholder="例: GitHub" value="${acc.name || ''}" style="padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+              <input type="text" class="acc-input-name" placeholder="例: GitHub" value="${acc.name || ''}" ${readonlyAttr} style="padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
             </div>
             <!-- URL -->
             <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
               <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">URL</label>
               <div style="display: flex; gap: 0.25rem;">
-                <input type="text" class="acc-input-url" placeholder="https://..." value="${acc.url || ''}" style="flex: 1; padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+                <input type="text" class="acc-input-url" placeholder="https://..." value="${acc.url || ''}" ${readonlyAttr} style="flex: 1; padding: 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
                 <button class="btn btn-secondary open-acc-url-btn" style="padding: 0.35rem; font-size: 0.75rem; border-color: var(--border-color);" title="URLを開く">🔗</button>
               </div>
             </div>
           </div>
-
+ 
           <!-- 2. ユーザID ＆ パスワード (1組固定) -->
           <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 0.75rem; border-top: 1px dashed var(--border-color); padding-top: 0.6rem;">
             <!-- ユーザID -->
             <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
               <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">ユーザID / メールアドレス</label>
               <div style="position: relative; display: flex; width: 100%;">
-                <input type="text" class="acc-input-user" placeholder="IDを入力" value="${acc.user || ''}" style="width: 100%; padding: 0.35rem 2.0rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+                <input type="text" class="acc-input-user" placeholder="IDを入力" value="${acc.user || ''}" ${readonlyAttr} style="width: 100%; padding: 0.35rem 2.0rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
                 <button class="btn-text copy-acc-user-btn" style="position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; padding: 0.2rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="コピー">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
                 </button>
@@ -24139,7 +24247,7 @@ function initMypageMemo() {
             <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
               <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">パスワード</label>
               <div style="position: relative; display: flex; width: 100%;">
-                <input type="password" class="acc-input-pwd" placeholder="パスワードを入力" value="${acc.pwd || ''}" style="width: 100%; padding: 0.35rem 3.4rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+                <input type="password" class="acc-input-pwd" placeholder="パスワードを入力" value="${acc.pwd || ''}" ${readonlyAttr} style="width: 100%; padding: 0.35rem 3.4rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
                 <div style="position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 0.3rem;">
                   <button class="btn-text toggle-acc-pwd-visibility-btn" style="border: none; background: none; cursor: pointer; padding: 0.2rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="パスワードの表示/非表示">
                     <svg class="eye-open-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
@@ -24152,7 +24260,7 @@ function initMypageMemo() {
               </div>
             </div>
           </div>
-
+ 
           <!-- 3. 追加項目動的リスト ＆ 備考欄 (最下部) -->
           <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 0.75rem; border-top: 1px dashed var(--border-color); padding-top: 0.6rem;">
             <!-- 左側：追加情報リストエリア -->
@@ -24168,9 +24276,12 @@ function initMypageMemo() {
             <!-- 右側：備考欄 -->
             <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
               <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">備考（メモ）</label>
-              <textarea class="acc-input-note" placeholder="備考・メモを入力..." style="width: 100%; height: 80px; min-height: 80px; padding: 0.3rem 0.5rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; resize: vertical; font-family: sans-serif; line-height: 1.3;">${acc.note || ''}</textarea>
+              <textarea class="acc-input-note" placeholder="備考・メモを入力..." ${readonlyAttr} style="width: 100%; height: 80px; min-height: 80px; padding: 0.3rem 0.5rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; resize: vertical; font-family: sans-serif; line-height: 1.3;">${acc.note || ''}</textarea>
             </div>
           </div>
+          
+          <!-- 👥 共有設定のマークアップ -->
+          ${shareMarkup}
         </div>
       </div>
     `;
@@ -24190,6 +24301,7 @@ function initMypageMemo() {
   // 各アカウントカード内のイベント登録
   function bindAccountFrameEvents(frameEl) {
     if (!frameEl) return;
+    const isShared = frameEl.dataset.sharedFromAdmin === 'true';
 
     const header = frameEl.querySelector('.acc-card-header');
     const body = frameEl.querySelector('.acc-card-body');
@@ -24344,8 +24456,11 @@ function initMypageMemo() {
 
     // 新規追加項目枠追加
     if (addExtraBtn && extraList) {
+      if (isShared) {
+        addExtraBtn.style.display = 'none';
+      }
       addExtraBtn.onclick = () => {
-        const extraHtml = createExtraFieldHtml({ title: '', value: '' });
+        const extraHtml = createExtraFieldHtml({ title: '', value: '' }, isShared);
         extraList.insertAdjacentHTML('beforeend', extraHtml);
         bindExtraFieldEvents(extraList.lastElementChild);
       };
@@ -24555,51 +24670,21 @@ function initMypageMemo() {
         // アカウントリストのレンダリング
         if (accountListContainer) {
           accountListContainer.innerHTML = '';
-          let accountData = [];
-          try {
-            const raw = JSON.parse(memo.content) || [];
-            accountData = raw.map(item => {
-              // 古いデータ構造（複数ログイン情報 accounts / 単一ID・PW / 旧extra）からのマイグレーション
-              let user = '';
-              let pwd = '';
-              if (item.accounts && item.accounts.length > 0) {
-                user = item.accounts[0].user || '';
-                pwd = item.accounts[0].pwd || '';
-              } else {
-                user = item.user || '';
-                pwd = item.pwd || '';
-              }
-
-              let extras = [];
-              if (item.extras) {
-                extras = item.extras;
-              } else if (item.extra) {
-                extras = [{ title: '追加情報', value: item.extra }];
-              }
-
-              return {
-                name: item.name || '',
-                url: item.url || '',
-                user: user,
-                pwd: pwd,
-                note: item.note || '',
-                extras: extras
-              };
-            });
-          } catch(e) {
-            accountData = [];
-          }
+          let accountData = getVaultAccounts(memo, state.currentUser);
           
           // データがない場合は初期状態として空の枠を1つ置く
           if (accountData.length === 0) {
-            accountData.push({
-              name: '',
-              url: '',
-              user: '',
-              pwd: '',
-              note: '',
-              extras: [{ title: '', value: '' }]
-            });
+            const isCurrentAdmin = (state.currentUser && state.currentUser.id === 'admin');
+            if (isCurrentAdmin) {
+              accountData.push({
+                name: '',
+                url: '',
+                user: '',
+                pwd: '',
+                note: '',
+                extras: [{ title: '', value: '' }]
+              });
+            }
           }
 
           accountData.forEach(acc => {
@@ -24686,6 +24771,11 @@ function initMypageMemo() {
           if (accountListContainer) {
             const frames = accountListContainer.querySelectorAll('.account-card-frame');
             frames.forEach(frame => {
+              // 管理者から共有された同期データは一般ユーザー自身の保存対象外とする
+              if (frame.dataset.sharedFromAdmin === 'true') {
+                return;
+              }
+
               const name = frame.querySelector('.acc-input-name').value.trim();
               const url = frame.querySelector('.acc-input-url').value.trim();
               const user = frame.querySelector('.acc-input-user').value.trim();
@@ -24699,6 +24789,16 @@ function initMypageMemo() {
                 const value = field.querySelector('.acc-extra-value').value.trim();
                 extras.push({ title, value });
               });
+
+              // 管理者の場合は共有先ユーザー情報をチェックボックスから収集
+              const isCurrentAdmin = (state.currentUser && state.currentUser.id === 'admin');
+              const sharedUsers = [];
+              if (isCurrentAdmin) {
+                const checkedChks = frame.querySelectorAll('.acc-share-user-chk:checked');
+                checkedChks.forEach(chk => {
+                  sharedUsers.push(chk.dataset.userId);
+                });
+              }
               
               accountData.push({
                 name,
@@ -24706,7 +24806,8 @@ function initMypageMemo() {
                 user,
                 pwd,
                 note,
-                extras
+                extras,
+                sharedUsers
               });
             });
           }
@@ -25118,12 +25219,7 @@ function createFloatingStickyNote(memoId, initialData = null) {
     const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
     const memo = memos.find(m => m.id === memoId);
     if (memo && memo.isAccountType) {
-      let accounts = [];
-      try {
-        accounts = JSON.parse(memo.content) || [];
-      } catch (e) {
-        accounts = [];
-      }
+      const accounts = getVaultAccounts(memo, state.currentUser);
       if (accounts.length === 0) {
         showToast('登録されているアカウント情報がありません。', 'warning');
         return;
