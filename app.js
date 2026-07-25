@@ -24143,10 +24143,23 @@ function initMypageMemo() {
         };
       });
 
-      // 一般ユーザーの場合、管理者アカウントIDと一致する「残骸データ」を排除し、ストレージからもパージ（書き戻し）する
+      // 一般ユーザーの場合、管理者アカウントIDと一致する、またはサービス名&ユーザーIDが一致する「残骸データ」を排除し、ストレージからもパージ（書き戻し）する
       const isCurrentAdmin = (currentUser && currentUser.role === 'admin');
-      if (!isCurrentAdmin && adminAccIds.length > 0) {
-        const cleanData = parsed.filter(item => !adminAccIds.includes(item.id));
+      if (!isCurrentAdmin && adminAccounts.length > 0) {
+        const cleanData = parsed.filter(item => {
+          // 1. IDが管理者データと重複しているか
+          if (adminAccIds.includes(item.id)) return false;
+          
+          // 2. サービス名(name)とユーザID(user)の両方が、管理者データのいずれかと重複しているか（ID違いのコピー残骸）
+          const isDuplicateOfAdmin = adminAccounts.some(adminAcc => {
+            return (item.name && item.name.trim() !== '' && item.name.trim() === (adminAcc.name || '').trim()) &&
+                   (item.user && item.user.trim() !== '' && item.user.trim() === (adminAcc.user || '').trim());
+          });
+          if (isDuplicateOfAdmin) return false;
+          
+          return true;
+        });
+
         if (cleanData.length !== parsed.length) {
           // 残骸が存在したため、一般ユーザー側のローカルストレージをゴミ抜き状態に上書き・更新する
           accountData = cleanData;
@@ -24294,7 +24307,7 @@ function initMypageMemo() {
       });
 
       shareMarkup = `
-        <div class="acc-share-toggle-header" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; font-weight: 700; color: var(--color-primary); cursor: pointer; margin-top: 0.6rem; border-top: 1px dashed var(--border-color); padding-top: 0.6rem; user-select: none;">
+        <div class="acc-share-toggle-header" style="display: flex; align-items: center; justify-content: flex-start; gap: 0.35rem; font-size: 0.72rem; font-weight: 700; color: var(--color-primary); cursor: pointer; margin-top: 0.6rem; border-top: 1px dashed var(--border-color); padding-top: 0.6rem; user-select: none;">
           <span>ユーザーへの共有同期設定</span> <span class="share-toggle-arrow">🔽</span>
         </div>
         <div class="acc-share-setting-area" style="display: none; flex-direction: column; gap: 0.5rem; margin-top: 0.4rem; padding: 0.5rem; background: var(--bg-surface-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
@@ -24378,7 +24391,7 @@ function initMypageMemo() {
             <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
               <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">パスワード</label>
               <div style="position: relative; display: flex; width: 100%;">
-                <input type="password" class="acc-input-pwd" placeholder="パスワードを入力" value="${acc.pwd || ''}" ${readonlyAttr} autocomplete="new-password" style="width: 100%; padding: 0.35rem 3.4rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+                <input type="${isShared ? 'text' : 'password'}" class="acc-input-pwd" placeholder="パスワードを入力" value="${acc.pwd || ''}" ${readonlyAttr} autocomplete="off" style="width: 100%; padding: 0.35rem 3.4rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; ${isShared ? '-webkit-text-security: disk; text-security: disk;' : ''}">
                 <div style="position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 0.3rem;">
                   <button class="btn-text toggle-acc-pwd-visibility-btn" style="border: none; background: none; cursor: pointer; padding: 0.2rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="パスワードの表示/非表示">
                     <svg class="eye-open-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
@@ -24842,14 +24855,30 @@ function initMypageMemo() {
       togglePwdBtn.onclick = () => {
         const openIcon = togglePwdBtn.querySelector('.eye-open-icon');
         const closedIcon = togglePwdBtn.querySelector('.eye-closed-icon');
-        if (pwdInput.type === 'password') {
-          pwdInput.type = 'text';
-          if (openIcon) openIcon.style.display = 'none';
-          if (closedIcon) closedIcon.style.display = 'block';
+        
+        if (isShared) {
+          const isHidden = pwdInput.style.webkitTextSecurity === 'disk' || pwdInput.style.textSecurity === 'disk';
+          if (isHidden) {
+            pwdInput.style.webkitTextSecurity = 'none';
+            pwdInput.style.textSecurity = 'none';
+            if (openIcon) openIcon.style.display = 'none';
+            if (closedIcon) closedIcon.style.display = 'block';
+          } else {
+            pwdInput.style.webkitTextSecurity = 'disk';
+            pwdInput.style.textSecurity = 'disk';
+            if (openIcon) openIcon.style.display = 'block';
+            if (closedIcon) closedIcon.style.display = 'none';
+          }
         } else {
-          pwdInput.type = 'password';
-          if (openIcon) openIcon.style.display = 'block';
-          if (closedIcon) closedIcon.style.display = 'none';
+          if (pwdInput.type === 'password') {
+            pwdInput.type = 'text';
+            if (openIcon) openIcon.style.display = 'none';
+            if (closedIcon) closedIcon.style.display = 'block';
+          } else {
+            pwdInput.type = 'password';
+            if (openIcon) openIcon.style.display = 'block';
+            if (closedIcon) closedIcon.style.display = 'none';
+          }
         }
       };
     }
