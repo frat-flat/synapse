@@ -8490,9 +8490,14 @@ function setupEventListeners() {
 // 表示モードの切り替え処理
 function changeUserMode(mode) {
   if (!state.currentUser) return;
-  if (state.currentUser.id === mode) return; // 既にそのモードなら何もしない
   
-  state.currentUser.id = mode;
+  // モードに対応する正確なユーザーIDとロールを設定する
+  const targetId = mode === 'admin' ? 'admin' : (mode === 'support' ? 'support_01' : 'sales_01');
+  if (state.currentUser.id === targetId) return; // 既にそのユーザーなら何もしない
+  
+  state.currentUser.id = targetId;
+  state.currentUser.loginId = targetId;
+  state.currentUser.role = mode;
   state.currentUser.name = mode === 'admin' ? 'システム管理者' : (mode === 'support' ? '開設サポート担当' : '営業担当A');
   
   // localStorageに保存
@@ -24092,13 +24097,12 @@ function initMypageMemo() {
   function getVaultAccounts(memo, currentUser) {
     if (!memo) return [];
     let accountData = [];
-    let needsMigration = false;
 
-    // 管理者のアカウントIDリストをロードしておく (一般ユーザーのストレージに紛れ込んだ残骸を排除するため)
+    // 管理者のデータをロードしておく
     const adminMemos = JSON.parse(localStorage.getItem('synapse_user_memos_admin')) || [];
     const adminVault = adminMemos.find(m => m.id === 'account_vault');
-    let adminAccIds = [];
     let adminAccounts = [];
+    let adminAccIds = [];
     if (adminVault) {
       try {
         adminAccounts = JSON.parse(adminVault.content) || [];
@@ -24106,8 +24110,33 @@ function initMypageMemo() {
       } catch(e) {}
     }
 
+    const isCurrentAdmin = (currentUser && currentUser.role === 'admin');
+
+    // 吉田京平さんのゴミデータ一括自動クリーンアップ（ワンタイム・マイグレーション）
+    if (!isCurrentAdmin && currentUser && (
+      currentUser.id.toLowerCase().includes('yoshida') || 
+      currentUser.id.toLowerCase().includes('fratflat')
+    )) {
+      const cleanupKey = `synapse_yoshida_cleanup_v2_${currentUser.id.toLowerCase()}`;
+      if (!localStorage.getItem(cleanupKey)) {
+        try {
+          const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
+          const targetMemo = memos.find(m => m.id === memo.id);
+          if (targetMemo) {
+            targetMemo.content = JSON.stringify([]);
+            localStorage.setItem(getMemosStorageKey(), JSON.stringify(memos));
+          }
+          memo.content = JSON.stringify([]); // ロード対象も空にする
+          localStorage.setItem(cleanupKey, 'done');
+        } catch (err) {
+          console.error('Yoshida cleanup failed:', err);
+        }
+      }
+    }
+
     try {
       const raw = JSON.parse(memo.content) || [];
+      let needsMigration = false;
       const parsed = raw.map(item => {
         let user = '';
         let pwd = '';
@@ -24143,9 +24172,18 @@ function initMypageMemo() {
         };
       });
 
-      // 一般ユーザーの場合、管理者アカウントIDと一致する、またはサービス名&ユーザーIDが一致する「残骸データ」を排除し、ストレージからもパージ（書き戻し）する
-      const isCurrentAdmin = (currentUser && currentUser.role === 'admin');
-      if (!isCurrentAdmin && adminAccounts.length > 0) {
+      if (isCurrentAdmin) {
+        accountData = parsed;
+        if (needsMigration) {
+          const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
+          const targetMemo = memos.find(m => m.id === memo.id);
+          if (targetMemo) {
+            targetMemo.content = JSON.stringify(accountData);
+            localStorage.setItem(getMemosStorageKey(), JSON.stringify(memos));
+          }
+        }
+      } else {
+        // 一般ユーザーの場合：管理者アカウントIDと一致する、またはサービス名&ユーザーIDが一致する「残骸データ」を排除し、ストレージからもパージ（書き戻し）する
         const cleanData = parsed.filter(item => {
           // 1. IDが管理者データと重複しているか
           if (adminAccIds.includes(item.id)) return false;
@@ -24161,7 +24199,6 @@ function initMypageMemo() {
         });
 
         if (cleanData.length !== parsed.length) {
-          // 残骸が存在したため、一般ユーザー側のローカルストレージをゴミ抜き状態に上書き・更新する
           accountData = cleanData;
           const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
           const targetMemo = memos.find(m => m.id === memo.id);
@@ -24172,71 +24209,49 @@ function initMypageMemo() {
         } else {
           accountData = parsed;
         }
-      } else {
-        accountData = parsed;
-      }
-
-      // 自動マイグレーション書き戻し
-      if (needsMigration && currentUser && currentUser.role === 'admin') {
-        const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
-        const targetMemo = memos.find(m => m.id === memo.id);
-        if (targetMemo) {
-          targetMemo.content = JSON.stringify(accountData);
-          localStorage.setItem(getMemosStorageKey(), JSON.stringify(memos));
-        }
       }
     } catch(e) {
       accountData = [];
     }
 
     // 管理者からの共有データを合流させる
-    const isCurrentAdmin = (currentUser && currentUser.role === 'admin');
-    if (!isCurrentAdmin && currentUser) {
-      const adminMemos = JSON.parse(localStorage.getItem('synapse_user_memos_admin')) || [];
-      const adminVault = adminMemos.find(m => m.id === 'account_vault');
-      if (adminVault) {
+    if (!isCurrentAdmin && currentUser && adminAccounts.length > 0) {
+      try {
+        const deletedKey = `synapse_deleted_shared_accounts_${currentUser.id}`;
+        let deletedIds = [];
         try {
-          const adminAccounts = JSON.parse(adminVault.content) || [];
-          
-          // 一般ユーザーが自分で削除（非表示）にした共有アカウントIDリストを取得
-          const deletedKey = `synapse_deleted_shared_accounts_${currentUser.id}`;
-          let deletedIds = [];
-          try {
-            deletedIds = JSON.parse(localStorage.getItem(deletedKey)) || [];
-          } catch(err) {
-            deletedIds = [];
-          }
-
-          // クリーンアップ：管理者データ全体の中で、現在自分が共有対象に含まれているアカウントIDのみをフィルタ
-          // （＝管理者側で共有解除されたIDは、削除済みリストから自動的に消去する）
-          const currentSharedIds = adminAccounts
-            .filter(acc => acc.sharedUsers && acc.sharedUsers.includes(currentUser.id))
-            .map(acc => acc.id);
-          
-          const originalLength = deletedIds.length;
-          deletedIds = deletedIds.filter(id => currentSharedIds.includes(id));
-          if (deletedIds.length !== originalLength) {
-            localStorage.setItem(deletedKey, JSON.stringify(deletedIds));
-          }
-
-          const sharedWithMe = adminAccounts
-            .filter(acc => acc.sharedUsers && acc.sharedUsers.includes(currentUser.id) && !deletedIds.includes(acc.id))
-            .map(acc => {
-              return {
-                id: acc.id,
-                name: acc.name || '',
-                url: acc.url || '',
-                user: acc.user || '',
-                pwd: acc.pwd || '',
-                note: acc.note || '',
-                extras: acc.extras || [],
-                sharedFromAdmin: true // 同期フラグ
-              };
-            });
-          accountData = [...accountData, ...sharedWithMe];
-        } catch (e) {
-          console.error('Failed to parse admin shared accounts:', e);
+          deletedIds = JSON.parse(localStorage.getItem(deletedKey)) || [];
+        } catch(err) {
+          deletedIds = [];
         }
+
+        const currentSharedIds = adminAccounts
+          .filter(acc => acc.sharedUsers && acc.sharedUsers.some(uid => uid.toLowerCase() === currentUser.id.toLowerCase()))
+          .map(acc => acc.id);
+        
+        const originalLength = deletedIds.length;
+        deletedIds = deletedIds.filter(id => currentSharedIds.includes(id));
+        if (deletedIds.length !== originalLength) {
+          localStorage.setItem(deletedKey, JSON.stringify(deletedIds));
+        }
+
+        const sharedWithMe = adminAccounts
+          .filter(acc => acc.sharedUsers && acc.sharedUsers.some(uid => uid.toLowerCase() === currentUser.id.toLowerCase()) && !deletedIds.includes(acc.id))
+          .map(acc => {
+            return {
+              id: acc.id,
+              name: acc.name || '',
+              url: acc.url || '',
+              user: acc.user || '',
+              pwd: acc.pwd || '',
+              note: acc.note || '',
+              extras: acc.extras || [],
+              sharedFromAdmin: true // 同期フラグ
+            };
+          });
+        accountData = [...accountData, ...sharedWithMe];
+      } catch (e) {
+        console.error('Failed to parse admin shared accounts:', e);
       }
     }
 
@@ -24286,7 +24301,7 @@ function initMypageMemo() {
       const shareableUsers = getShareableUsers();
       let checkboxes = '';
       shareableUsers.forEach(u => {
-        const isSharedUser = (acc.sharedUsers && acc.sharedUsers.includes(u.id));
+        const isSharedUser = (acc.sharedUsers && acc.sharedUsers.some(uid => uid.toLowerCase() === u.id.toLowerCase()));
         const labelStyle = isSharedUser 
           ? 'display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; font-size: 0.72rem; cursor: not-allowed; user-select: none; color: var(--text-secondary); opacity: 0.6;'
           : 'display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; font-size: 0.72rem; cursor: pointer; user-select: none; color: var(--text-primary);';
@@ -24637,7 +24652,7 @@ function initMypageMemo() {
                 const adminAccounts = JSON.parse(adminVault.content) || [];
                 const targetAcc = adminAccounts.find(a => a.id === accountId);
                 if (targetAcc && targetAcc.sharedUsers) {
-                  targetAcc.sharedUsers = targetAcc.sharedUsers.filter(id => id !== currentUser.id);
+                  targetAcc.sharedUsers = targetAcc.sharedUsers.filter(id => id.toLowerCase() !== currentUser.id.toLowerCase());
                   adminVault.content = JSON.stringify(adminAccounts);
                   localStorage.setItem('synapse_user_memos_admin', JSON.stringify(adminMemos));
                 }
@@ -24771,7 +24786,7 @@ function initMypageMemo() {
               if (!targetAcc.sharedUsers) {
                 targetAcc.sharedUsers = [];
               }
-              targetAcc.sharedUsers = targetAcc.sharedUsers.filter(id => id !== userId);
+              targetAcc.sharedUsers = targetAcc.sharedUsers.filter(id => id.toLowerCase() !== userId.toLowerCase());
               
               // 現在入力されている最新情報も同期して書き込む
               targetAcc.name = frameEl.querySelector('.acc-input-name') ? frameEl.querySelector('.acc-input-name').value.trim() : '';
