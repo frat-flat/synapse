@@ -8578,6 +8578,9 @@ function handleLogin(e) {
       updateUIForCurrentMode();
       removeRestrictedTabsForRole(state.currentUser.id);
 
+      // マイページメモ帳機能の初期化
+      initMypageMemo();
+
       showToast('ログインしました。', 'success');
       showLoginScreen(false);
 
@@ -8597,6 +8600,8 @@ function handleLogin(e) {
 
 function handleLogout() {
   state.currentUser = null;
+  state.mypageMemoInitialized = false;
+  activeMemoId = null;
   localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
   
   // ポップアップを閉じる
@@ -24079,6 +24084,7 @@ function initMypageMemo() {
   function getVaultAccounts(memo, currentUser) {
     if (!memo) return [];
     let accountData = [];
+    let needsMigration = false;
     try {
       const raw = JSON.parse(memo.content) || [];
       accountData = raw.map(item => {
@@ -24097,7 +24103,15 @@ function initMypageMemo() {
         } else if (item.extra) {
           extras = [{ title: '追加情報', value: item.extra }];
         }
+
+        let id = item.id;
+        if (!id) {
+          id = 'acc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+          needsMigration = true;
+        }
+
         return {
+          id: id,
           name: item.name || '',
           url: item.url || '',
           user: user,
@@ -24107,6 +24121,16 @@ function initMypageMemo() {
           sharedUsers: item.sharedUsers || []
         };
       });
+
+      // 自動マイグレーション書き戻し
+      if (needsMigration && currentUser && currentUser.id === 'admin') {
+        const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
+        const targetMemo = memos.find(m => m.id === memo.id);
+        if (targetMemo) {
+          targetMemo.content = JSON.stringify(accountData);
+          localStorage.setItem(getMemosStorageKey(), JSON.stringify(memos));
+        }
+      }
     } catch(e) {
       accountData = [];
     }
@@ -24123,6 +24147,7 @@ function initMypageMemo() {
             .filter(acc => acc.sharedUsers && acc.sharedUsers.includes(currentUser.id))
             .map(acc => {
               return {
+                id: acc.id,
                 name: acc.name || '',
                 url: acc.url || '',
                 user: acc.user || '',
@@ -24595,8 +24620,20 @@ function initMypageMemo() {
               accounts = [];
             }
 
-            const targetAcc = accounts.find(a => a.id === accountId);
-            if (targetAcc && targetAcc.sharedUsers) {
+            let targetAcc = accounts.find(a => a.id === accountId);
+            if (!targetAcc) {
+              // 古いIDなしデータ対策：ID以外の情報（登録名とユーザー名）で最も合致するものを検索
+              const frameName = frameEl.querySelector('.acc-input-name') ? frameEl.querySelector('.acc-input-name').value.trim() : '';
+              const frameUser = frameEl.querySelector('.acc-input-user') ? frameEl.querySelector('.acc-input-user').value.trim() : '';
+              targetAcc = accounts.find(a => a.name === frameName && a.user === frameUser);
+              if (targetAcc) {
+                targetAcc.id = accountId; // IDを補完・更新
+              }
+            }
+            if (targetAcc) {
+              if (!targetAcc.sharedUsers) {
+                targetAcc.sharedUsers = [];
+              }
               targetAcc.sharedUsers = targetAcc.sharedUsers.filter(id => id !== userId);
               
               // 現在入力されている最新情報も同期して書き込む
