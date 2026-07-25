@@ -21348,17 +21348,52 @@ function initSignupEvents() {
       });
 
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-      showToast(`アカウント「${fullName}」が正常に作成されました。ログインしてください。`, 'success');
       
+      // 新規登録後に自動ログイン処理を実行
+      state.currentUser = {
+        id: 'sales', // ロール（営業）
+        name: fullName,
+        loginId: username,
+        password: password,
+        code: userCode
+      };
+      localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
+
+      // ログイン後のシステム状態初期化
+      initDatabase();
+      renderJoInfo();
+      renderJoColumnSelector();
+
+      const nameEl = document.getElementById('logged-in-user-name');
+      const avatarEl = document.getElementById('logged-in-user-avatar');
+      if (nameEl) nameEl.textContent = state.currentUser.name;
+      if (avatarEl) avatarEl.textContent = state.currentUser.name.charAt(0);
+
+      state.tabs = [];
+      state.activeTabId = null;
+
+      const sidebarEl = document.getElementById('app-sidebar');
+      const toggleBtn = document.getElementById('sidebar-toggle-btn');
+      if (sidebarEl) sidebarEl.classList.remove('collapsed');
+      if (toggleBtn) {
+        toggleBtn.textContent = '‹';
+        toggleBtn.style.left = '215px';
+      }
+
+      updateUIForCurrentMode();
+      removeRestrictedTabsForRole(state.currentUser.id);
+
+      showToast(`アカウント「${fullName}」が作成され、ログインしました。`, 'success');
       signupForm.reset();
-      
-      // ログイン画面へ切り替え
-      if (signupScreen && loginScreen) {
+
+      // 新規登録画面を閉じ、ログイン画面を非表示にしてマイページを表示
+      if (signupScreen) {
         signupScreen.style.display = 'none';
         signupScreen.classList.remove('active');
-        loginScreen.style.display = 'flex';
-        loginScreen.classList.add('active');
       }
+      showLoginScreen(false);
+      switchView('mypage-screen');
+      openMyPage();
     });
   }
 }
