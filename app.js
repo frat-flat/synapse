@@ -24616,6 +24616,7 @@ function initMypageMemo() {
           const accountId = frameEl.dataset.accountId;
           
           if (isShared && currentUser) {
+            // (a) 一般ユーザー側の非表示リストに登録
             const deletedKey = `synapse_deleted_shared_accounts_${currentUser.id}`;
             let deletedIds = [];
             try {
@@ -24626,6 +24627,23 @@ function initMypageMemo() {
             if (!deletedIds.includes(accountId)) {
               deletedIds.push(accountId);
               localStorage.setItem(deletedKey, JSON.stringify(deletedIds));
+            }
+
+            // (b) 管理者側の共有設定 (sharedUsers) から自身のIDを削除して、管理者ストレージを更新
+            const adminMemos = JSON.parse(localStorage.getItem('synapse_user_memos_admin')) || [];
+            const adminVault = adminMemos.find(m => m.id === 'account_vault');
+            if (adminVault && adminVault.content) {
+              try {
+                const adminAccounts = JSON.parse(adminVault.content) || [];
+                const targetAcc = adminAccounts.find(a => a.id === accountId);
+                if (targetAcc && targetAcc.sharedUsers) {
+                  targetAcc.sharedUsers = targetAcc.sharedUsers.filter(id => id !== currentUser.id);
+                  adminVault.content = JSON.stringify(adminAccounts);
+                  localStorage.setItem('synapse_user_memos_admin', JSON.stringify(adminMemos));
+                }
+              } catch(e) {
+                console.error('Failed to update admin sharedUsers on user delete:', e);
+              }
             }
           }
           
