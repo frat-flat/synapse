@@ -25289,7 +25289,20 @@ function makeElementDraggable(elm, header) {
 
 function getMemosStorageKey() {
   const userId = (state.currentUser && state.currentUser.id) ? state.currentUser.id : 'unknown';
-  return `synapse_user_memos_${userId}`;
+  const role = (state.currentUser && state.currentUser.role) ? state.currentUser.role : '';
+  const newKey = `synapse_user_memos_${userId}`;
+
+  // 一般ユーザーの古いロール別共有ストレージから個人別ストレージへの移行処理
+  if (role && role !== 'admin' && userId !== 'unknown') {
+    const legacyKey = `synapse_user_memos_${role}`;
+    const legacyData = localStorage.getItem(legacyKey);
+    const newData = localStorage.getItem(newKey);
+    if (!newData && legacyData) {
+      localStorage.setItem(newKey, legacyData);
+    }
+  }
+
+  return newKey;
 }
 
 // アカウント選択用モーダルダイアログ
