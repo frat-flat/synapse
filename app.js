@@ -6082,6 +6082,67 @@ function updateUIForCurrentMode() {
   if (!state.currentUser) return;
   const mode = state.currentUser.id;
 
+  // 一般ユーザー向けホーム画面内マイページ（お気に入り・メモ帳）の動的移動＆表示制御
+  const isSystemAdmin = (state.currentUser.id === 'admin');
+  const menuMypage = document.getElementById('menu-mypage');
+  const userMypageContainer = document.getElementById('user-mypage-container');
+  const homeFavContainer = document.getElementById('home-favorites-container');
+  const homeMemoContainer = document.getElementById('home-memo-container');
+
+  const mypageFavWrapper = document.getElementById('mypage-fav-view-wrapper');
+  const mypageMemoWrapper = document.getElementById('mypage-memo-view-wrapper');
+
+  const origFavParent = document.getElementById('mypage-screen');
+  const origMemoParent = document.getElementById('mypage-memo-screen');
+
+  const favBackBtn = document.getElementById('mypage-fav-back-btn');
+  const memoBackBtn = document.getElementById('mypage-back-to-menu-btn');
+
+  if (isSystemAdmin) {
+    if (menuMypage) menuMypage.style.display = 'flex';
+    if (userMypageContainer) userMypageContainer.style.display = 'none';
+
+    // 元の位置に戻す
+    if (mypageFavWrapper && origFavParent && mypageFavWrapper.parentNode !== origFavParent) {
+      origFavParent.appendChild(mypageFavWrapper);
+    }
+    if (mypageMemoWrapper && origMemoParent && mypageMemoWrapper.parentNode !== origMemoParent) {
+      origMemoParent.appendChild(mypageMemoWrapper);
+    }
+
+    if (favBackBtn) favBackBtn.style.display = 'flex';
+    if (memoBackBtn) memoBackBtn.style.display = 'flex';
+  } else {
+    if (menuMypage) menuMypage.style.display = 'none';
+    if (userMypageContainer) userMypageContainer.style.display = 'flex';
+
+    // ホーム画面の統合コンテナへ移動
+    if (mypageFavWrapper && homeFavContainer && mypageFavWrapper.parentNode !== homeFavContainer) {
+      homeFavContainer.appendChild(mypageFavWrapper);
+    }
+    if (mypageMemoWrapper && homeMemoContainer && mypageMemoWrapper.parentNode !== homeMemoContainer) {
+      homeMemoContainer.appendChild(mypageMemoWrapper);
+    }
+
+    // 強制的に表示させる
+    if (mypageFavWrapper) mypageFavWrapper.style.display = 'flex';
+    if (mypageMemoWrapper) mypageMemoWrapper.style.display = 'flex';
+
+    // 戻るボタンを非表示にする
+    if (favBackBtn) favBackBtn.style.display = 'none';
+    if (memoBackBtn) memoBackBtn.style.display = 'none';
+
+    // プロフィール情報をバインド
+    const homeFullnameEl = document.getElementById('home-user-fullname');
+    const homeCodeEl = document.getElementById('home-user-code');
+    if (homeFullnameEl) homeFullnameEl.textContent = state.currentUser.name || 'ゲスト';
+    if (homeCodeEl) homeCodeEl.textContent = 'Code: ' + (state.currentUser.code || 'N/A');
+
+    // データを最新状態に再描画
+    renderMypageFavorites();
+    if (typeof window.updateMypageMemoUI === 'function') window.updateMypageMemoUI();
+  }
+
   const switchContainer = document.getElementById('global-mode-switch-container');
   if (switchContainer) {
     const isLoginAdmin = (state.currentUser.loginId && state.currentUser.loginId.toLowerCase().includes('admin')) ||
