@@ -24151,8 +24151,30 @@ function initMypageMemo() {
       if (adminVault) {
         try {
           const adminAccounts = JSON.parse(adminVault.content) || [];
-          const sharedWithMe = adminAccounts
+          
+          // 一般ユーザーが自分で削除（非表示）にした共有アカウントIDリストを取得
+          const deletedKey = `synapse_deleted_shared_accounts_${currentUser.id}`;
+          let deletedIds = [];
+          try {
+            deletedIds = JSON.parse(localStorage.getItem(deletedKey)) || [];
+          } catch(err) {
+            deletedIds = [];
+          }
+
+          // クリーンアップ：管理者データ全体の中で、現在自分が共有対象に含まれているアカウントIDのみをフィルタ
+          // （＝管理者側で共有解除されたIDは、削除済みリストから自動的に消去する）
+          const currentSharedIds = adminAccounts
             .filter(acc => acc.sharedUsers && acc.sharedUsers.includes(currentUser.id))
+            .map(acc => acc.id);
+          
+          const originalLength = deletedIds.length;
+          deletedIds = deletedIds.filter(id => currentSharedIds.includes(id));
+          if (deletedIds.length !== originalLength) {
+            localStorage.setItem(deletedKey, JSON.stringify(deletedIds));
+          }
+
+          const sharedWithMe = adminAccounts
+            .filter(acc => acc.sharedUsers && acc.sharedUsers.includes(currentUser.id) && !deletedIds.includes(acc.id))
             .map(acc => {
               return {
                 id: acc.id,
@@ -24204,14 +24226,14 @@ function initMypageMemo() {
       extrasHtml += createExtraFieldHtml(item, isShared);
     });
 
-    const deleteBtnStyle = isShared ? 'display: none;' : '';
+    const deleteBtnStyle = '';
     const readonlyAttr = isShared ? 'readonly style="background: var(--bg-surface-elevated); color: var(--text-secondary); opacity: 0.85; pointer-events: none;"' : '';
     const sharedAttr = isShared ? `data-account-id="${accId}" data-shared-from-admin="true" class="account-card-frame shared-admin-frame"` : `data-account-id="${accId}" class="account-card-frame"`;
     const addExtraBtnStyle = isShared ? 'display: none !important;' : '';
 
     // 共有・同期ユーザー設定（管理者のみ表示、デフォルト非表示で縦並び）
     const isCurrentAdmin = (state.currentUser && state.currentUser.role === 'admin');
-    const showMenuBtn = !isShared; // 共有アカウントでなければメニューを表示する
+    const showMenuBtn = true; // 常にメニューを表示する
     const showShareOption = isCurrentAdmin && !isShared; // 管理者かつ未共有アカウントの場合のみ共有メニューを表示
     let shareMarkup = '';
     if (isCurrentAdmin && !isShared) {
@@ -24262,7 +24284,6 @@ function initMypageMemo() {
             <span class="acc-header-name-label" style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
               ${(acc.name || '').trim() || '無題のサービス'}
             </span>
-            ${isShared ? '<span style="font-size: 0.65rem; color: var(--primary); background: var(--bg-surface-elevated); border: 1px solid var(--primary); padding: 0.05rem 0.25rem; border-radius: var(--radius-xs); margin-left: 0.4rem; font-weight: 600;">同期済</span>' : ''}
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem; position: relative;">
             <button class="btn-text pin-account-sticky-btn" style="color: var(--color-primary); font-size: 0.8rem; cursor: pointer; padding: 0.25rem; border: none; background: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; vertical-align: middle;" title="このアカウント情報を付箋として開く" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="#eab308" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h9l6-6V5c0-1.1-.9-2-2-2zm-5 16V15h5l-5 5z"/></svg></button>
@@ -24525,8 +24546,39 @@ function initMypageMemo() {
       deleteMenuItem.onclick = (e) => {
         e.stopPropagation();
         if (dropdownMenu) dropdownMenu.style.display = 'none';
-        showAppConfirm('アカウント枠の削除', 'このアカウント保管用の枠を削除しますか？', () => {
+        
+        const title = isShared ? '共有アカウントの非表示' : 'アカウント情報の削除';
+        const message = isShared 
+          ? 'この共有アカウント情報を非表示（削除）にしますか？\n（非表示にしても、管理者が再度共有すれば表示されます）'
+          : 'このアカウント保管用の枠を削除しますか？';
+          
+        showAppConfirm(title, message, () => {
+          const currentUser = state.currentUser;
+          const accountId = frameEl.dataset.accountId;
+          
+          if (isShared && currentUser) {
+            const deletedKey = `synapse_deleted_shared_accounts_${currentUser.id}`;
+            let deletedIds = [];
+            try {
+              deletedIds = JSON.parse(localStorage.getItem(deletedKey)) || [];
+            } catch(err) {
+              deletedIds = [];
+            }
+            if (!deletedIds.includes(accountId)) {
+              deletedIds.push(accountId);
+              localStorage.setItem(deletedKey, JSON.stringify(deletedIds));
+            }
+          }
+          
           frameEl.remove();
+          
+          // 個人用アカウント削除時の変更保存をトリガーする
+          const saveBtn = document.getElementById('memo-save-btn');
+          if (saveBtn) {
+            saveBtn.click();
+          }
+          
+          showToast(isShared ? '共有アカウントを非表示にしました。' : 'アカウント情報を削除しました。', 'success');
         });
       };
     }
