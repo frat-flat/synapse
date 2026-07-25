@@ -24361,6 +24361,12 @@ function initMypageMemo() {
               
               <!-- ポップオーバーメニュー（初期非表示） -->
               <div class="acc-dropdown-menu" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 0.35rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); z-index: 100; min-width: 115px; flex-direction: column; overflow: hidden; padding: 0.2rem 0;">
+                <!-- 名前を編集ボタン (一般ユーザーに共有されているアカウントの場合は非表示) -->
+                <button class="acc-menu-item-rename" style="display: ${isShared ? 'none' : 'flex'}; align-items: center; gap: 0.45rem; width: 100%; border: none; background: none; padding: 0.35rem 0.65rem; font-size: 0.75rem; text-align: left; cursor: pointer; color: var(--text-primary); outline: none; transition: background 0.15s;" onclick="event.stopPropagation();">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4z"/></svg>
+                  <span>名前を編集</span>
+                </button>
+                
                 <!-- 削除するボタン -->
                 <button class="acc-menu-item-delete" style="display: flex; align-items: center; gap: 0.45rem; width: 100%; border: none; background: none; padding: 0.35rem 0.65rem; font-size: 0.75rem; text-align: left; cursor: pointer; color: #ef4444; outline: none; transition: background 0.15s; ${deleteBtnStyle}" onclick="event.stopPropagation();">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
@@ -24468,6 +24474,7 @@ function initMypageMemo() {
     const menuTrigger = frameEl.querySelector('.acc-menu-trigger-btn');
     const dropdownMenu = frameEl.querySelector('.acc-dropdown-menu');
     const shareMenuItem = frameEl.querySelector('.acc-menu-item-share');
+    const renameMenuItem = frameEl.querySelector('.acc-menu-item-rename');
     const deleteMenuItem = frameEl.querySelector('.acc-menu-item-delete');
     const shareSettingArea = frameEl.querySelector('.acc-share-setting-area');
     const pinStickyBtn = frameEl.querySelector('.pin-account-sticky-btn');
@@ -24610,6 +24617,35 @@ function initMypageMemo() {
             row.style.display = 'flex';
           } else {
             row.style.display = 'none';
+          }
+        });
+      };
+    }
+
+    // メニュー内「名前を編集」アクション
+    if (renameMenuItem) {
+      renameMenuItem.onclick = (e) => {
+        e.stopPropagation();
+        if (dropdownMenu) dropdownMenu.style.display = 'none';
+
+        if (isShared) {
+          showToast('共有されたアカウント名は変更できません。', 'error');
+          return;
+        }
+
+        const currentName = nameInput ? nameInput.value.trim() : '';
+        showAppPrompt('名前を編集', '新しい登録名（サービス名）を入力してください：', currentName, (newName) => {
+          const cleanName = newName.trim();
+          if (nameInput) {
+            nameInput.value = cleanName;
+            if (headerLabel) {
+              headerLabel.textContent = cleanName || '無題のサービス';
+            }
+            const saveBtn = document.getElementById('memo-save-btn');
+            if (saveBtn) {
+              saveBtn.click();
+            }
+            showToast('登録名を更新しました。', 'success');
           }
         });
       };
