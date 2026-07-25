@@ -24093,9 +24093,22 @@ function initMypageMemo() {
     if (!memo) return [];
     let accountData = [];
     let needsMigration = false;
+
+    // 管理者のアカウントIDリストをロードしておく (一般ユーザーのストレージに紛れ込んだ残骸を排除するため)
+    const adminMemos = JSON.parse(localStorage.getItem('synapse_user_memos_admin')) || [];
+    const adminVault = adminMemos.find(m => m.id === 'account_vault');
+    let adminAccIds = [];
+    let adminAccounts = [];
+    if (adminVault) {
+      try {
+        adminAccounts = JSON.parse(adminVault.content) || [];
+        adminAccIds = adminAccounts.map(a => a.id);
+      } catch(e) {}
+    }
+
     try {
       const raw = JSON.parse(memo.content) || [];
-      accountData = raw.map(item => {
+      const parsed = raw.map(item => {
         let user = '';
         let pwd = '';
         if (item.accounts && item.accounts.length > 0) {
@@ -24129,6 +24142,14 @@ function initMypageMemo() {
           sharedUsers: item.sharedUsers || []
         };
       });
+
+      // 一般ユーザーの場合、管理者アカウントIDと一致する「残骸データ」を排除する
+      const isCurrentAdmin = (currentUser && currentUser.role === 'admin');
+      if (!isCurrentAdmin) {
+        accountData = parsed.filter(item => !adminAccIds.includes(item.id));
+      } else {
+        accountData = parsed;
+      }
 
       // 自動マイグレーション書き戻し
       if (needsMigration && currentUser && currentUser.role === 'admin') {
