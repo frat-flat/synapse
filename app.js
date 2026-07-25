@@ -24177,13 +24177,27 @@ function initMypageMemo() {
       const shareableUsers = getShareableUsers();
       let checkboxes = '';
       shareableUsers.forEach(u => {
-        const isChecked = (acc.sharedUsers && acc.sharedUsers.includes(u.id)) ? 'checked' : '';
-        checkboxes += `
-          <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; cursor: pointer; user-select: none; color: var(--text-primary); margin-bottom: 0.15rem;">
-            <input type="checkbox" class="acc-share-user-chk" data-user-id="${u.id}" ${isChecked} style="cursor: pointer;">
-            <span>${u.name} <span style="color: var(--text-muted); font-size: 0.68rem; margin-left: 0.25rem;">(${u.id})</span></span>
-          </label>
-        `;
+        const isSharedUser = (acc.sharedUsers && acc.sharedUsers.includes(u.id));
+        if (isSharedUser) {
+          checkboxes += `
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.15rem; width: 100%;">
+              <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; cursor: not-allowed; user-select: none; color: var(--text-secondary); opacity: 0.6;">
+                <input type="checkbox" class="acc-share-user-chk" data-user-id="${u.id}" checked disabled style="cursor: not-allowed;">
+                <span>${u.name} <span style="color: var(--text-muted); font-size: 0.68rem; margin-left: 0.25rem;">(${u.id})</span></span>
+              </label>
+              <button class="btn-text revoke-share-btn" data-user-id="${u.id}" style="color: #ef4444; font-size: 0.65rem; cursor: pointer; border: none; background: none; padding: 0 0.25rem; font-weight: 600; text-decoration: underline;" onclick="event.stopPropagation();">共有を解除する</button>
+            </div>
+          `;
+        } else {
+          checkboxes += `
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.15rem; width: 100%;">
+              <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; cursor: pointer; user-select: none; color: var(--text-primary);">
+                <input type="checkbox" class="acc-share-user-chk" data-user-id="${u.id}" style="cursor: pointer;">
+                <span>${u.name} <span style="color: var(--text-muted); font-size: 0.68rem; margin-left: 0.25rem;">(${u.id})</span></span>
+              </label>
+            </div>
+          `;
+        }
       });
       shareMarkup = `
         <div class="acc-share-setting-area" style="display: none; border-top: 1px dashed var(--border-color); padding-top: 0.6rem; text-align: left; flex-direction: column; gap: 0.35rem; margin-top: 0.4rem;">
@@ -24191,6 +24205,9 @@ function initMypageMemo() {
           <div style="display: flex; flex-direction: column; gap: 0.45rem; background: var(--bg-surface); padding: 0.5rem 0.75rem; border-radius: var(--radius-xs); border: 1px solid var(--border-color); max-height: 150px; overflow-y: auto;">
             ${checkboxes || '<span style="font-size: 0.65rem; color: var(--text-muted);">共有可能なユーザーがいません</span>'}
           </div>
+          ${checkboxes ? `
+            <button class="btn btn-primary apply-share-btn" style="font-size: 0.72rem; padding: 0.25rem 0.5rem; margin-top: 0.4rem; cursor: pointer; border-radius: var(--radius-xs); width: fit-content; align-self: flex-end;" onclick="event.stopPropagation();">👥 チェックして共有</button>
+          ` : ''}
         </div>
       `;
     }
@@ -24468,6 +24485,159 @@ function initMypageMemo() {
         });
       };
     }
+
+    // 「チェックして共有」アクション
+    const applyShareBtn = frameEl.querySelector('.apply-share-btn');
+    if (applyShareBtn) {
+      applyShareBtn.onclick = (e) => {
+        e.stopPropagation();
+        
+        // 新規にチェックされたユーザーIDを収集
+        // 注意：共有済みで disabled になっているチェックボックスも、共有状態を維持するために含めます
+        const newCheckedIds = [];
+        frameEl.querySelectorAll('.acc-share-user-chk:checked, .acc-share-user-chk[disabled]').forEach(chk => {
+          newCheckedIds.push(chk.dataset.userId);
+        });
+
+        // 登録名とユーザIDをもとに、localStorage 上の対象アカウントを書き換える
+        const nameVal = frameEl.querySelector('.acc-input-name') ? frameEl.querySelector('.acc-input-name').value.trim() : '';
+        const userVal = frameEl.querySelector('.acc-input-user') ? frameEl.querySelector('.acc-input-user').value.trim() : '';
+
+        const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
+        const memo = memos.find(m => m.id === activeMemoId);
+        if (memo) {
+          let accounts = [];
+          try {
+            accounts = JSON.parse(memo.content) || [];
+          } catch(err) {
+            accounts = [];
+          }
+
+          let targetAcc = accounts.find(a => a.name === nameVal && a.user === userVal);
+          if (!targetAcc) {
+            targetAcc = { name: nameVal, user: userVal, pwd: '', url: '', note: '', extras: [], sharedUsers: [] };
+            accounts.push(targetAcc);
+          }
+
+          // 現在入力されている最新情報も同期して書き込む
+          targetAcc.name = nameVal;
+          targetAcc.url = frameEl.querySelector('.acc-input-url') ? frameEl.querySelector('.acc-input-url').value.trim() : '';
+          targetAcc.user = userVal;
+          targetAcc.pwd = frameEl.querySelector('.acc-input-pwd') ? frameEl.querySelector('.acc-input-pwd').value : '';
+          targetAcc.note = frameEl.querySelector('.acc-input-note') ? frameEl.querySelector('.acc-input-note').value.trim() : '';
+          
+          const extras = [];
+          frameEl.querySelectorAll('.account-extra-field').forEach(field => {
+            const title = field.querySelector('.acc-extra-title').value.trim();
+            const value = field.querySelector('.acc-extra-value').value.trim();
+            extras.push({ title, value });
+          });
+          targetAcc.extras = extras;
+
+          // 共有ターゲットを更新
+          targetAcc.sharedUsers = newCheckedIds;
+
+          memo.content = JSON.stringify(accounts);
+          localStorage.setItem(getMemosStorageKey(), JSON.stringify(memos));
+
+          showToast('共有設定を適用しました。', 'success');
+          
+          // 再描画し、開いていたカードを維持するために展開処理を実行
+          showEditor(memo);
+          
+          setTimeout(() => {
+            const listFrames = accountListContainer.querySelectorAll('.account-card-frame');
+            listFrames.forEach(f => {
+              const fNameInput = f.querySelector('.acc-input-name');
+              const fUserInput = f.querySelector('.acc-input-user');
+              const fName = fNameInput ? fNameInput.value.trim() : '';
+              const fUser = fUserInput ? fUserInput.value.trim() : '';
+              if (fName === nameVal && fUser === userVal) {
+                const fBody = f.querySelector('.acc-card-body');
+                const fArrow = f.querySelector('.acc-toggle-arrow');
+                const fArea = f.querySelector('.acc-share-setting-area');
+                if (fBody) fBody.style.display = 'flex';
+                if (fArrow) fArrow.textContent = '🔼';
+                if (fArea) fArea.style.display = 'flex';
+              }
+            });
+          }, 50);
+        }
+      };
+    }
+
+    // 「共有を解除する」アクション
+    const revokeBtns = frameEl.querySelectorAll('.revoke-share-btn');
+    revokeBtns.forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const userId = btn.dataset.userId;
+        const uList = getShareableUsers();
+        const targetUser = uList.find(u => u.id === userId);
+        const userName = targetUser ? targetUser.name : userId;
+
+        showAppConfirm('共有の解除', `「${userName}」へのアカウント情報の共有を解除しますか？`, () => {
+          const nameVal = frameEl.querySelector('.acc-input-name') ? frameEl.querySelector('.acc-input-name').value.trim() : '';
+          const userVal = frameEl.querySelector('.acc-input-user') ? frameEl.querySelector('.acc-input-user').value.trim() : '';
+
+          const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
+          const memo = memos.find(m => m.id === activeMemoId);
+          if (memo) {
+            let accounts = [];
+            try {
+              accounts = JSON.parse(memo.content) || [];
+            } catch(err) {
+              accounts = [];
+            }
+
+            const targetAcc = accounts.find(a => a.name === nameVal && a.user === userVal);
+            if (targetAcc && targetAcc.sharedUsers) {
+              targetAcc.sharedUsers = targetAcc.sharedUsers.filter(id => id !== userId);
+              
+              // 現在入力されている最新情報も同期して書き込む
+              targetAcc.name = nameVal;
+              targetAcc.url = frameEl.querySelector('.acc-input-url') ? frameEl.querySelector('.acc-input-url').value.trim() : '';
+              targetAcc.user = userVal;
+              targetAcc.pwd = frameEl.querySelector('.acc-input-pwd') ? frameEl.querySelector('.acc-input-pwd').value : '';
+              targetAcc.note = frameEl.querySelector('.acc-input-note') ? frameEl.querySelector('.acc-input-note').value.trim() : '';
+              
+              const extras = [];
+              frameEl.querySelectorAll('.account-extra-field').forEach(field => {
+                const title = field.querySelector('.acc-extra-title').value.trim();
+                const value = field.querySelector('.acc-extra-value').value.trim();
+                extras.push({ title, value });
+              });
+              targetAcc.extras = extras;
+
+              memo.content = JSON.stringify(accounts);
+              localStorage.setItem(getMemosStorageKey(), JSON.stringify(memos));
+
+              showToast('共有を解除しました。', 'success');
+              showEditor(memo);
+              
+              // 展開状態を維持
+              setTimeout(() => {
+                const listFrames = accountListContainer.querySelectorAll('.account-card-frame');
+                listFrames.forEach(f => {
+                  const fNameInput = f.querySelector('.acc-input-name');
+                  const fUserInput = f.querySelector('.acc-input-user');
+                  const fName = fNameInput ? fNameInput.value.trim() : '';
+                  const fUser = fUserInput ? fUserInput.value.trim() : '';
+                  if (fName === nameVal && fUser === userVal) {
+                    const fBody = f.querySelector('.acc-card-body');
+                    const fArrow = f.querySelector('.acc-toggle-arrow');
+                    const fArea = f.querySelector('.acc-share-setting-area');
+                    if (fBody) fBody.style.display = 'flex';
+                    if (fArrow) fArrow.textContent = '🔼';
+                    if (fArea) fArea.style.display = 'flex';
+                  }
+                });
+              }, 50);
+            }
+          }
+        });
+      };
+    });
 
     // 画面外クリックでドロップダウンを閉じるグローバルリスナー（未登録の場合のみ一括登録）
     if (!window.accDropdownGlobalBound) {
@@ -24855,6 +25025,18 @@ function initMypageMemo() {
           // アカウントカードの全入力枠から収集（サブ項目とID/PWも収集）
           const accountData = [];
           if (accountListContainer) {
+            // 現在の最新の既存共有先ユーザー情報をメモリ上にマージ用マップとして読み込む
+            const currentMemos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+            const currentMemo = currentMemos.find(m => m.id === activeMemoId);
+            let existingAccounts = [];
+            if (currentMemo && currentMemo.content) {
+              try {
+                existingAccounts = JSON.parse(currentMemo.content) || [];
+              } catch(e) {
+                existingAccounts = [];
+              }
+            }
+
             const frames = accountListContainer.querySelectorAll('.account-card-frame');
             frames.forEach(frame => {
               // 管理者から共有された同期データは一般ユーザー自身の保存対象外とする
@@ -24876,15 +25058,10 @@ function initMypageMemo() {
                 extras.push({ title, value });
               });
 
-              // 管理者の場合は共有先ユーザー情報をチェックボックスから収集
-              const isCurrentAdmin = (state.currentUser && state.currentUser.id === 'admin');
-              const sharedUsers = [];
-              if (isCurrentAdmin) {
-                const checkedChks = frame.querySelectorAll('.acc-share-user-chk:checked');
-                checkedChks.forEach(chk => {
-                  sharedUsers.push(chk.dataset.userId);
-                });
-              }
+              // 右上の「保存」ボタンでは、既存の共有先ユーザーリストを引き継ぐ（新規収集はしない）
+              // 登録名とユーザIDが一致する既存アカウントの共有リストを取得
+              const match = existingAccounts.find(ea => ea.name === name && ea.user === user);
+              const sharedUsers = match ? (match.sharedUsers || []) : [];
               
               accountData.push({
                 name,
