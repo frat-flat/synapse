@@ -1549,9 +1549,27 @@ textarea {
   animation: popupFadeIn 0.15s ease-out;
   gap: 0.35rem !important;
 }
+/* 中身があるフォルダの場合は、ツールチップ（文字のみ）を非表示にする（右側にポップオーバーが出るため） */
+.sidebar-menu.collapsed .sidebar-accordion:not(.is-empty-folder) .accordion-header[data-tooltip]:hover::after,
+.sidebar-menu.collapsed .sidebar-accordion:not(.is-empty-folder) .accordion-header[data-tooltip]:hover::before {
+  display: none !important;
+}
 
-
-
+/* ポップオーバー最上部のフォルダ名（ファイル一覧の見出し） */
+.accordion-content-header {
+  display: none;
+}
+.sidebar-menu.collapsed .sidebar-accordion:not(.is-empty-folder):hover .accordion-content .accordion-content-header {
+  display: block !important;
+  font-weight: bold !important;
+  font-size: 0.72rem !important;
+  color: var(--text-muted) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  padding: 0.15rem 0.6rem 0.45rem 0.6rem !important;
+  margin-bottom: 0.25rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
 @keyframes popupFadeIn {
   from { opacity: 0; transform: translateX(-4px); }
   to { opacity: 1; transform: translateX(0); }
@@ -1632,44 +1650,44 @@ textarea {
 .sidebar-menu.collapsed [data-tooltip]:hover::after {
   content: attr(data-tooltip);
   position: absolute;
-  left: 50%;
-  bottom: 100%;
-  transform: translateX(-50%);
-  margin-bottom: 8px; /* アイコンの上側に浮かせる */
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 12px;
   background: #ffffff;
   color: #0f172a;
-  padding: 0.4rem 0.7rem;
+  padding: 0.45rem 0.8rem;
   border-radius: 6px;
   border: 1px solid #cbd5e1;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08);
-  z-index: 999999;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08);
+  z-index: 99999;
   pointer-events: none;
-  animation: tooltipFadeInTop 0.12s ease-out;
+  animation: tooltipFadeIn 0.15s ease-out;
 }
 
-/* ツールチップ下側の三角矢印 */
+/* ツールチップ左側の三角矢印 */
 .sidebar-menu.collapsed [data-tooltip]:hover::before {
   content: '';
   position: absolute;
-  left: 50%;
-  bottom: 100%;
-  transform: translateX(-50%);
-  margin-bottom: 3px;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 4px;
   border-width: 5px;
   border-style: solid;
-  border-color: #ffffff transparent transparent transparent;
-  z-index: 999999;
+  border-color: transparent #ffffff transparent transparent;
+  z-index: 99999;
   pointer-events: none;
-  animation: tooltipFadeInTop 0.12s ease-out;
+  animation: tooltipFadeIn 0.15s ease-out;
 }
 
-@keyframes tooltipFadeInTop {
-  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+@keyframes tooltipFadeIn {
+  from { opacity: 0; transform: translateY(-50%) translateX(-4px); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0); }
 }
 
 /* カスタムアイコン用CSS */

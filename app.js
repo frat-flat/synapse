@@ -2299,6 +2299,7 @@ function renderCustomTableList() {
         content.style.flexDirection = 'column';
         content.style.gap = '0.2rem';
         content.style.marginTop = '0.15rem';
+        content.innerHTML = `<div class="accordion-content-header">${acc.name}</div>`;
 
         header.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -2336,7 +2337,7 @@ function renderCustomTableList() {
       // フォルダの子要素を再帰アペンド
       const contentEl = folderDiv.querySelector('.accordion-content');
       if (contentEl) {
-        contentEl.innerHTML = '';
+        contentEl.innerHTML = `<div class="accordion-content-header">${acc.name}</div>`;
 
         // アポイントアコーディオンの場合は、標準のサブメニューを最初にアペンドする
         if (normalizeFolderId(acc.id) === 'appoint-accordion') {
