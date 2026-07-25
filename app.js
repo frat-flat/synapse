@@ -24357,7 +24357,7 @@ function initMypageMemo() {
             <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
               <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">ユーザID / メールアドレス</label>
               <div style="position: relative; display: flex; width: 100%;">
-                <input type="text" class="acc-input-user" placeholder="IDを入力" value="${acc.user || ''}" ${readonlyAttr} style="width: 100%; padding: 0.35rem 2.0rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+                <input type="text" class="acc-input-user" placeholder="IDを入力" value="${acc.user || ''}" ${readonlyAttr} autocomplete="off" style="width: 100%; padding: 0.35rem 2.0rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
                 <button class="btn-text copy-acc-user-btn" style="position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; padding: 0.2rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="コピー">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
                 </button>
@@ -24367,7 +24367,7 @@ function initMypageMemo() {
             <div style="display: flex; flex-direction: column; gap: 0.25rem; text-align: left;">
               <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary);">パスワード</label>
               <div style="position: relative; display: flex; width: 100%;">
-                <input type="password" class="acc-input-pwd" placeholder="パスワードを入力" value="${acc.pwd || ''}" ${readonlyAttr} style="width: 100%; padding: 0.35rem 3.4rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+                <input type="password" class="acc-input-pwd" placeholder="パスワードを入力" value="${acc.pwd || ''}" ${readonlyAttr} autocomplete="new-password" style="width: 100%; padding: 0.35rem 3.4rem 0.35rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
                 <div style="position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 0.3rem;">
                   <button class="btn-text toggle-acc-pwd-visibility-btn" style="border: none; background: none; cursor: pointer; padding: 0.2rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: center;" title="パスワードの表示/非表示">
                     <svg class="eye-open-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
