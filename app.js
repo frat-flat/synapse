@@ -18480,22 +18480,57 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function hasUserFolderAccess(userId, folderId) {
-    if (userId === 'admin') return true;
+    if (userId === 'admin') return { read: true, write: true };
     const allowed = state.permissions.folders[folderId] || [];
     const isSetup = Object.keys(state.permissions.folders).includes(folderId);
-    if (!isSetup) return true;
-    return allowed.includes(userId);
+    const hasAccess = !isSetup || allowed.includes(userId);
+    return { read: hasAccess, write: hasAccess };
   }
 
   function hasUserTableAccess(userId, tableId) {
-    if (userId === 'admin') return true;
+    if (userId === 'admin') return { read: true, write: true };
     if (userId.startsWith('support') && tableId === 'agency-info-screen') {
-      return false;
+      return { read: false, write: false };
     }
     const allowed = state.permissions.tables[tableId] || [];
     const isSetup = Object.keys(state.permissions.tables).includes(tableId);
-    if (!isSetup) return true;
-    return allowed.includes(userId);
+    const hasAccess = !isSetup || allowed.includes(userId);
+    return { read: hasAccess, write: hasAccess };
+  }
+
+  function hasUserColumnAccess(userId, tableId, col, isTableAllowed) {
+    if (!isTableAllowed) {
+      return { read: false, write: false, reason: 'テーブル閲覧制限' };
+    }
+    const isReadOnlyCol = col.readOnly === true || col.id === 'id';
+    
+    if (userId === 'admin') {
+      return { 
+        read: true, 
+        write: !isReadOnlyCol, 
+        reason: isReadOnlyCol ? 'システム読取専用' : '管理者特権' 
+      };
+    }
+
+    const tableCols = state.permissions.columns[tableId] || {};
+    const allowed = tableCols[col.id] || [];
+    const colKeys = Object.keys(tableCols);
+    const isSetup = colKeys.includes(col.id);
+    const hasReadAccess = !isSetup || allowed.includes(userId);
+
+    if (hasReadAccess) {
+      return {
+        read: true,
+        write: !isReadOnlyCol,
+        reason: isReadOnlyCol ? 'システム読取専用' : '一般編集許可'
+      };
+    }
+
+    return {
+      read: false,
+      write: false,
+      reason: '閲覧制限のため編集不可'
+    };
   }
 
   window.renderUserPermissionViewer = function(userId) {
@@ -18511,10 +18546,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const user = users.find(u => u.id === userId) || { id: userId, name: userId, role: userId };
     const userRole = user.role || user.id;
 
-    const getBadge = (allowed) => {
-      return allowed 
-        ? '<span style="color: #10b981; font-weight: 700; font-size: 0.75rem; background: rgba(16,185,129,0.1); padding: 0.15rem 0.4rem; border-radius: 4px;">🟢 閲覧可能</span>'
-        : '<span style="color: #ef4444; font-weight: 700; font-size: 0.75rem; background: rgba(239,68,68,0.1); padding: 0.15rem 0.4rem; border-radius: 4px;">🔴 閲覧制限</span>';
+    const getBadgePair = (read, write) => {
+      const readBadge = read
+        ? '<span style="color: #10b981; font-weight: 700; font-size: 0.72rem; background: rgba(16,185,129,0.08); padding: 0.15rem 0.35rem; border-radius: 3px; border: 1px solid rgba(16,185,129,0.2); margin-right: 0.35rem; display: inline-block;">閲覧: 🟢 許可</span>'
+        : '<span style="color: #ef4444; font-weight: 700; font-size: 0.72rem; background: rgba(239,68,68,0.08); padding: 0.15rem 0.35rem; border-radius: 3px; border: 1px solid rgba(239,68,68,0.2); margin-right: 0.35rem; display: inline-block;">閲覧: 🔴 制限</span>';
+      
+      const writeBadge = write
+        ? '<span style="color: #3b82f6; font-weight: 700; font-size: 0.72rem; background: rgba(59,130,246,0.08); padding: 0.15rem 0.35rem; border-radius: 3px; border: 1px solid rgba(59,130,246,0.2); display: inline-block;">編集: 🔵 許可</span>'
+        : '<span style="color: #f59e0b; font-weight: 700; font-size: 0.72rem; background: rgba(245,158,11,0.08); padding: 0.15rem 0.35rem; border-radius: 3px; border: 1px solid rgba(245,158,11,0.2); display: inline-block;">編集: 🔒 不可</span>';
+      
+      return `${readBadge}${writeBadge}`;
     };
 
     let html = `
@@ -18531,13 +18572,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // システム標準画面
     const systemPages = [
-      { id: 'home-screen', name: '🏠 ホーム・コントロールパネル', desc: 'メイン画面および管理者用ツール' },
-      { id: 'mypage-screen', name: '👤 マイページ', desc: '個人のプロフィール・アポイント確認' },
-      { id: 'dashboard-screen', name: '📊 アポイントダッシュボード', desc: '予約・アポイント状況グラフ' },
-      { id: 'appointment-screen', name: '📄 新規アポイント作成', desc: 'アポイント入力画面' },
-      { id: 'audit-log-screen', name: '📊 操作ログ履歴', desc: 'セル編集履歴の閲覧 (管理者のみ)' },
-      { id: 'user-manager-screen', name: '👥 ユーザー管理', desc: 'ユーザーの追加・編集・削除 (管理者のみ)' },
-      { id: 'permission-settings-screen', name: '🔑 権限設定', desc: 'フォルダ・テーブル・カラムの権限管理 (管理者のみ)' }
+      { id: 'home-screen', name: '🏠 ホーム・コントロールパネル', desc: 'メイン画面および管理者用ツール', editRoleNeeded: 'admin' },
+      { id: 'mypage-screen', name: '👤 マイページ', desc: '個人のプロフィール・アポイント確認', editRoleNeeded: 'any' },
+      { id: 'dashboard-screen', name: '📊 アポイントダッシュボード', desc: '予約・アポイント状況グラフ', editRoleNeeded: 'any' },
+      { id: 'appointment-screen', name: '📄 新規アポイント作成', desc: 'アポイント入力画面', editRoleNeeded: 'any' },
+      { id: 'audit-log-screen', name: '📊 操作ログ履歴', desc: 'セル編集履歴の閲覧 (管理者のみ)', editRoleNeeded: 'admin' },
+      { id: 'user-manager-screen', name: '👥 ユーザー管理', desc: 'ユーザーの追加・編集・削除 (管理者のみ)', editRoleNeeded: 'admin' },
+      { id: 'permission-settings-screen', name: '🔑 権限設定', desc: 'フォルダ・テーブル・カラムの権限管理 (管理者のみ)', editRoleNeeded: 'admin' }
     ];
 
     html += `
@@ -18549,17 +18590,19 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     systemPages.forEach(p => {
-      let allowed = true;
+      let allowedRead = true;
       if (p.id === 'audit-log-screen' || p.id === 'user-manager-screen' || p.id === 'permission-settings-screen') {
-        allowed = (userRole === 'admin');
+        allowedRead = (userRole === 'admin');
       }
+      const allowedWrite = p.editRoleNeeded === 'admin' ? (userRole === 'admin') : allowedRead;
+
       html += `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface);">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); flex-wrap: wrap; gap: 0.5rem;">
           <div>
             <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">${p.name}</span>
             <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.5rem;">- ${p.desc}</span>
           </div>
-          <div>${getBadge(allowed)}</div>
+          <div style="display: flex; align-items: center;">${getBadgePair(allowedRead, allowedWrite)}</div>
         </div>
       `;
     });
@@ -18585,29 +18628,24 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     masterTables.forEach(t => {
-      let tableAllowed = true;
-      if (userRole === 'support' && t.id === 'agency-info-screen') {
-        tableAllowed = false;
-      }
-      const allowedUsers = state.permissions.tables[t.id];
-      if (allowedUsers) {
-        tableAllowed = allowedUsers.includes(user.id);
-      }
+      const tableAccess = hasUserTableAccess(user.id, t.id);
 
       const columns = getTableColumns(t.id);
       let columnsHtml = '';
-      if (tableAllowed && columns.length > 0) {
+      if (tableAccess.read && columns.length > 0) {
         columnsHtml = `
           <div style="margin-top: 0.5rem; padding: 0.5rem 0.75rem; border-top: 1px dashed var(--border-color); background: var(--bg-surface-elevated); border-radius: var(--radius-sm);">
             <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.35rem;">📄 列（カラム）ごとのアクセス権:</div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.35rem 0.75rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.5rem;">
               ${columns.map(col => {
-                const colAccess = hasUserColumnAccess(user.id, t.id, col.id);
-                const statusDot = colAccess.visible ? '<span style="color:#10b981;">●</span>' : '<span style="color:#ef4444;">●</span>';
-                const grayoutText = colAccess.reason === '閲覧制限' ? ' (制限あり)' : '';
+                const colAccess = hasUserColumnAccess(user.id, t.id, col, tableAccess.read);
+                const dotColor = colAccess.read ? '#10b981' : '#ef4444';
                 return `
-                  <div style="font-size: 0.8rem; display: flex; align-items: center; gap: 0.35rem; color: ${colAccess.visible ? 'var(--text-primary)' : 'var(--text-secondary)'};">
-                    ${statusDot} ${col.label || col.name} <span style="font-size: 0.7rem; color: var(--text-secondary);">${grayoutText}</span>
+                  <div style="font-size: 0.8rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.25rem 0.4rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 3px;">
+                    <span style="font-weight: 600; color: ${colAccess.read ? 'var(--text-primary)' : 'var(--text-secondary)'};">
+                      <span style="color: ${dotColor}; margin-right: 0.25rem;">●</span>${col.label || col.name}
+                    </span>
+                    <div style="display: flex; align-items: center;">${getBadgePair(colAccess.read, colAccess.write)}</div>
                   </div>
                 `;
               }).join('')}
@@ -18618,9 +18656,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       html += `
         <div style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); padding: 0.65rem 0.75rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
             <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">${t.name}</span>
-            <div>${getBadge(tableAllowed)}</div>
+            <div style="display: flex; align-items: center;">${getBadgePair(tableAccess.read, tableAccess.write)}</div>
           </div>
           ${columnsHtml}
         </div>
@@ -18660,15 +18698,15 @@ document.addEventListener('DOMContentLoaded', () => {
       let nodeHtml = '';
 
       childFolders.forEach(folder => {
-        const allowed = hasUserFolderAccess(user.id, folder.id);
+        const folderAccess = hasUserFolderAccess(user.id, folder.id);
         const paddingLeft = `${depth * 1.25 + 0.5}rem`;
         nodeHtml += `
           <div style="margin: 0.25rem 0;">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; padding-left: ${paddingLeft}; background: rgba(255,255,255,0.01); border-bottom: 1px solid rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; padding-left: ${paddingLeft}; background: rgba(255,255,255,0.01); border-bottom: 1px solid rgba(0,0,0,0.05); flex-wrap: wrap; gap: 0.5rem;">
               <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
                 📁 ${folder.name}
               </span>
-              <div>${getBadge(allowed)}</div>
+              <div style="display: flex; align-items: center;">${getBadgePair(folderAccess.read, folderAccess.write)}</div>
             </div>
             ${renderTreeNode(folder.id, depth + 1)}
           </div>
@@ -18677,24 +18715,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
       childTables.forEach(tbl => {
         const tableId = `custom-table-${tbl.id}`;
-        const allowed = hasUserTableAccess(user.id, tableId);
+        const tableAccess = hasUserTableAccess(user.id, tableId);
         const paddingLeft = `${depth * 1.25 + 0.5}rem`;
         
         const columns = getTableColumns(tableId);
         let columnsHtml = '';
-        if (allowed && columns.length > 0) {
+        if (tableAccess.read && columns.length > 0) {
           const innerPaddingLeft = `${depth * 1.25 + 1.75}rem`;
           columnsHtml = `
-            <div style="padding: 0.4rem 0.75rem; padding-left: ${innerPaddingLeft}; background: var(--bg-surface-elevated); font-size: 0.78rem;">
-              <div style="font-weight: 700; color: var(--text-secondary); margin-bottom: 0.25rem;">📄 列（カラム）:</div>
-              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.25rem;">
+            <div style="padding: 0.4rem 0.75rem; padding-left: ${innerPaddingLeft}; background: var(--bg-surface-elevated); font-size: 0.78rem; border-top: 1px dashed var(--border-color);">
+              <div style="font-weight: 700; color: var(--text-secondary); margin-bottom: 0.35rem;">📄 列（カラム）:</div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.35rem;">
                 ${columns.map(col => {
-                  const colAccess = hasUserColumnAccess(user.id, tableId, col.id);
-                  const dotColor = colAccess.visible ? '#10b981' : '#ef4444';
+                  const colAccess = hasUserColumnAccess(user.id, tableId, col, tableAccess.read);
+                  const dotColor = colAccess.read ? '#10b981' : '#ef4444';
                   const label = col.name || col.label || col.id;
                   return `
-                    <div style="display: flex; align-items: center; gap: 0.3rem; color: ${colAccess.visible ? 'var(--text-primary)' : 'var(--text-secondary)'};">
-                      <span style="color: ${dotColor};">●</span> ${label}
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.2rem 0.35rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 3px;">
+                      <span style="font-weight: 600; color: ${colAccess.read ? 'var(--text-primary)' : 'var(--text-secondary)'};">
+                        <span style="color: ${dotColor}; margin-right: 0.25rem;">●</span>${label}
+                      </span>
+                      <div style="display: flex; align-items: center;">${getBadgePair(colAccess.read, colAccess.write)}</div>
                     </div>
                   `;
                 }).join('')}
@@ -18704,12 +18745,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         nodeHtml += `
-          <div style="margin: 0.25rem 0; border: 1px solid rgba(0,0,0,0.03); border-radius: var(--radius-sm);">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; padding-left: ${paddingLeft}; background: rgba(0,0,0,0.02);">
+          <div style="margin: 0.25rem 0; border: 1px solid rgba(0,0,0,0.03); border-radius: var(--radius-sm); background: var(--bg-surface);">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; padding-left: ${paddingLeft}; background: rgba(0,0,0,0.02); flex-wrap: wrap; gap: 0.5rem;">
               <span style="font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
                 📋 ${tbl.name}
               </span>
-              <div>${getBadge(allowed)}</div>
+              <div style="display: flex; align-items: center;">${getBadgePair(tableAccess.read, tableAccess.write)}</div>
             </div>
             ${columnsHtml}
           </div>
