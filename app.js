@@ -1976,6 +1976,47 @@ function checkColumnAccess(tableId, colId) {
   return { visible: false, grayout: false };
 }
 
+// カラム（列）の編集可否判定（3ステート対応）
+function checkColumnEditAccess(tableId, colId) {
+  const userId = getCurrentUserId();
+  const isAdminReal = state.currentUser && state.currentUser.id === 'admin';
+  if (isAdminReal && !state.previewUserId) {
+    return true;
+  }
+
+  // 閲覧権限自体がない場合は編集も不可
+  const access = checkColumnAccess(tableId, colId);
+  if (!access.visible) {
+    return false;
+  }
+
+  // システム読取専用チェック
+  if (colId === 'id') {
+    return false;
+  }
+
+  // テーブルごとのカラム設定の readOnly をチェック
+  if (tableId.startsWith('custom-table-')) {
+    const tblId = tableId.replace('custom-table-', '');
+    const tbl = state.customTables.find(t => t.id === tblId);
+    if (tbl && tbl.columns) {
+      const col = tbl.columns.find(c => c.id === colId);
+      if (col && col.readOnly) return false;
+    }
+  }
+
+  // 編集権限リストのチェック
+  if (state.permissions.writeColumns && state.permissions.writeColumns[tableId]) {
+    const allowed = state.permissions.writeColumns[tableId][colId];
+    if (allowed) {
+      return allowed.includes(userId);
+    }
+  }
+
+  // 設定がなければ、閲覧できれば編集も可能
+  return true;
+}
+
 // 行（データ行）の閲覧可否判定
 function checkRowAccess(tableId, row) {
   const userId = getCurrentUserId();
@@ -3917,6 +3958,10 @@ function renderCustomTable(tableId) {
         if (col.type === 'select') {
           e.stopPropagation();
           if (isTableLocked(tableId)) return;
+          if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess(`custom-table-${tbl.id}`, col.id)) {
+            showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+            return;
+          }
           if (td.querySelector('select')) return;
           td.dispatchEvent(new Event('dblclick'));
         }
@@ -3924,6 +3969,10 @@ function renderCustomTable(tableId) {
 
       td.addEventListener('dblclick', () => {
         if (isTableLocked(tableId)) return;
+        if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess(`custom-table-${tbl.id}`, col.id)) {
+          showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+          return;
+        }
         if (td.querySelector('input') || td.querySelector('select')) return;
 
         let input;
@@ -13574,12 +13623,20 @@ function renderAgencyInfo() {
           const isSelect = col.type === 'select' || (col.choices && col.choices.length > 0);
           if (isSelect) {
             if (isTableLocked('ag')) return;
+            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('agency-info-screen', col.id)) {
+              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+              return;
+            }
             startMasterDropdownEdit(td, val, col, contract, index, 'ag');
           }
         });
 
         td.addEventListener('dblclick', (e) => {
           if (!isTableLocked('ag')) {
+            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('agency-info-screen', col.id)) {
+              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+              return;
+            }
             startMasterCellEdit(td, val, col, contract, index, 'ag');
           } else {
             td.classList.toggle('cell-expanded');
@@ -15343,6 +15400,10 @@ function renderJoInfo() {
           const isSelect = col.type === 'select' || (col.choices && col.choices.length > 0);
           if (isSelect) {
             if (isTableLocked('jo')) return;
+            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('jo-info-screen', col.id)) {
+              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+              return;
+            }
             startMasterDropdownEdit(td, val, col, contract, index, 'jo');
           }
         });
@@ -15350,6 +15411,10 @@ function renderJoInfo() {
         td.addEventListener('dblclick', (e) => {
           if (e.target.tagName === 'A') return;
           if (!isTableLocked('jo')) {
+            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('jo-info-screen', col.id)) {
+              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+              return;
+            }
             startMasterCellEdit(td, val, col, contract, index, 'jo');
           } else {
             td.classList.toggle('cell-expanded');
@@ -16036,12 +16101,20 @@ function renderApplicantInfo() {
           const isSelect = col.type === 'select' || (col.choices && col.choices.length > 0);
           if (isSelect) {
             if (isTableLocked('ap')) return;
+            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('applicant-info-screen', col.id)) {
+              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+              return;
+            }
             startMasterDropdownEdit(td, val, col, contract, index, 'ap');
           }
         });
 
         td.addEventListener('dblclick', (e) => {
           if (!isTableLocked('ap')) {
+            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('applicant-info-screen', col.id)) {
+              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+              return;
+            }
             startMasterCellEdit(td, val, col, contract, index, 'ap');
           } else {
             td.classList.toggle('cell-expanded');
@@ -18462,76 +18535,193 @@ document.addEventListener('DOMContentLoaded', () => {
     return [];
   }
 
-  function hasUserColumnAccess(userId, tableId, colId) {
-    if (userId === 'admin') {
-      return { visible: true, reason: '管理者特権' };
-    }
-    const tableCols = state.permissions.columns[tableId] || {};
-    const allowed = tableCols[colId] || [];
-    const colKeys = Object.keys(tableCols);
-    const isSetup = colKeys.includes(colId);
-    if (!isSetup) {
-      return { visible: true, reason: '制限なし' };
-    }
-    if (allowed.includes(userId)) {
-      return { visible: true, reason: '閲覧許可' };
-    }
-    return { visible: false, reason: '閲覧制限' };
-  }
-
-  function hasUserFolderAccess(userId, folderId) {
-    if (userId === 'admin') return { read: true, write: true };
+  function getFolderPermissionLevel(userId, folderId) {
+    if (userId === 'admin') return 'write';
     const allowed = state.permissions.folders[folderId] || [];
     const isSetup = Object.keys(state.permissions.folders).includes(folderId);
-    const hasAccess = !isSetup || allowed.includes(userId);
-    return { read: hasAccess, write: hasAccess };
+    const hasRead = !isSetup || allowed.includes(userId);
+    if (!hasRead) return 'hidden';
+
+    const writeAllowed = (state.permissions.writeFolders || {})[folderId] || [];
+    const isWriteSetup = Object.keys(state.permissions.writeFolders || {}).includes(folderId);
+    const hasWrite = !isWriteSetup || writeAllowed.includes(userId);
+    return hasWrite ? 'write' : 'readonly';
   }
 
-  function hasUserTableAccess(userId, tableId) {
-    if (userId === 'admin') return { read: true, write: true };
+  function getTablePermissionLevel(userId, tableId) {
+    if (userId === 'admin') return 'write';
     if (userId.startsWith('support') && tableId === 'agency-info-screen') {
-      return { read: false, write: false };
+      return 'hidden';
     }
     const allowed = state.permissions.tables[tableId] || [];
     const isSetup = Object.keys(state.permissions.tables).includes(tableId);
-    const hasAccess = !isSetup || allowed.includes(userId);
-    return { read: hasAccess, write: hasAccess };
+    const hasRead = !isSetup || allowed.includes(userId);
+    if (!hasRead) return 'hidden';
+
+    const writeAllowed = (state.permissions.writeTables || {})[tableId] || [];
+    const isWriteSetup = Object.keys(state.permissions.writeTables || {}).includes(tableId);
+    const hasWrite = !isWriteSetup || writeAllowed.includes(userId);
+    return hasWrite ? 'write' : 'readonly';
+  }
+
+  function getColumnPermissionLevel(userId, tableId, col, isTableAllowed) {
+    if (!isTableAllowed) return 'hidden';
+    const isReadOnlyCol = col.readOnly === true || col.id === 'id';
+    if (userId === 'admin') return isReadOnlyCol ? 'readonly' : 'write';
+
+    const tableCols = state.permissions.columns[tableId] || {};
+    const allowed = tableCols[col.id] || [];
+    const colKeys = Object.keys(tableCols);
+    const isSetup = colKeys.includes(col.id);
+    const hasRead = !isSetup || allowed.includes(userId);
+    if (!hasRead) return 'hidden';
+
+    if (isReadOnlyCol) return 'readonly';
+
+    const tableWriteCols = (state.permissions.writeColumns || {})[tableId] || {};
+    const writeAllowed = tableWriteCols[col.id] || [];
+    const colWriteKeys = Object.keys(tableWriteCols);
+    const isWriteSetup = colWriteKeys.includes(col.id);
+    const hasWrite = !isWriteSetup || writeAllowed.includes(userId);
+    return hasWrite ? 'write' : 'readonly';
+  }
+
+  // --- ラッパー関数群（既存ロジックとの互換性用） ---
+  function hasUserFolderAccess(userId, folderId) {
+    const level = getFolderPermissionLevel(userId, folderId);
+    return { read: level !== 'hidden', write: level === 'write' };
+  }
+
+  function hasUserTableAccess(userId, tableId) {
+    const level = getTablePermissionLevel(userId, tableId);
+    return { read: level !== 'hidden', write: level === 'write' };
   }
 
   function hasUserColumnAccess(userId, tableId, col, isTableAllowed) {
     if (!isTableAllowed) {
       return { read: false, write: false, reason: 'テーブル閲覧制限' };
     }
-    const isReadOnlyCol = col.readOnly === true || col.id === 'id';
-    
-    if (userId === 'admin') {
-      return { 
-        read: true, 
-        write: !isReadOnlyCol, 
-        reason: isReadOnlyCol ? 'システム読取専用' : '管理者特権' 
-      };
-    }
-
-    const tableCols = state.permissions.columns[tableId] || {};
-    const allowed = tableCols[col.id] || [];
-    const colKeys = Object.keys(tableCols);
-    const isSetup = colKeys.includes(col.id);
-    const hasReadAccess = !isSetup || allowed.includes(userId);
-
-    if (hasReadAccess) {
-      return {
-        read: true,
-        write: !isReadOnlyCol,
-        reason: isReadOnlyCol ? 'システム読取専用' : '一般編集許可'
-      };
-    }
-
+    const level = getColumnPermissionLevel(userId, tableId, col, isTableAllowed);
     return {
-      read: false,
-      write: false,
-      reason: '閲覧制限のため編集不可'
+      read: level !== 'hidden',
+      write: level === 'write',
+      reason: level === 'hidden' ? '閲覧制限' : (level === 'readonly' ? '読取専用' : '編集許可')
     };
   }
+
+  // 3ステート権限更新用グローバル関数定義
+  window.setFolderPermissionLevel = function(userId, folderId, level) {
+    if (!state.permissions.folders) state.permissions.folders = {};
+    if (!state.permissions.writeFolders) state.permissions.writeFolders = {};
+
+    const readAllowed = state.permissions.folders[folderId] || [];
+    const writeAllowed = state.permissions.writeFolders[folderId] || [];
+    const allUserIds = ['sales_01', 'sales_02', 'support_01'];
+    
+    let newRead = [...readAllowed];
+    let newWrite = [...writeAllowed];
+    
+    const isReadSetup = Object.keys(state.permissions.folders).includes(folderId);
+    if (!isReadSetup) newRead = [...allUserIds];
+
+    const isWriteSetup = Object.keys(state.permissions.writeFolders).includes(folderId);
+    if (!isWriteSetup) newWrite = [...allUserIds];
+
+    if (level === 'hidden') {
+      newRead = newRead.filter(id => id !== userId);
+      newWrite = newWrite.filter(id => id !== userId);
+    } else if (level === 'readonly') {
+      if (!newRead.includes(userId)) newRead.push(userId);
+      newWrite = newWrite.filter(id => id !== userId);
+    } else if (level === 'write') {
+      if (!newRead.includes(userId)) newRead.push(userId);
+      if (!newWrite.includes(userId)) newWrite.push(userId);
+    }
+
+    state.permissions.folders[folderId] = newRead;
+    state.permissions.writeFolders[folderId] = newWrite;
+
+    savePermissions();
+    renderUserPermissionViewer(userId);
+    showToast('フォルダの閲覧・編集権限を更新しました。', 'success');
+  };
+
+  window.setTablePermissionLevel = function(userId, tableId, level) {
+    if (!state.permissions.tables) state.permissions.tables = {};
+    if (!state.permissions.writeTables) state.permissions.writeTables = {};
+
+    const readAllowed = state.permissions.tables[tableId] || [];
+    const writeAllowed = state.permissions.writeTables[tableId] || [];
+    const allUserIds = ['sales_01', 'sales_02', 'support_01'];
+    
+    let newRead = [...readAllowed];
+    let newWrite = [...writeAllowed];
+    
+    const isReadSetup = Object.keys(state.permissions.tables).includes(tableId);
+    if (!isReadSetup) newRead = [...allUserIds];
+    
+    const isWriteSetup = Object.keys(state.permissions.writeTables).includes(tableId);
+    if (!isWriteSetup) newWrite = [...allUserIds];
+
+    if (level === 'hidden') {
+      newRead = newRead.filter(id => id !== userId);
+      newWrite = newWrite.filter(id => id !== userId);
+    } else if (level === 'readonly') {
+      if (!newRead.includes(userId)) newRead.push(userId);
+      newWrite = newWrite.filter(id => id !== userId);
+    } else if (level === 'write') {
+      if (!newRead.includes(userId)) newRead.push(userId);
+      if (!newWrite.includes(userId)) newWrite.push(userId);
+    }
+
+    state.permissions.tables[tableId] = newRead;
+    state.permissions.writeTables[tableId] = newWrite;
+
+    savePermissions();
+    renderUserPermissionViewer(userId);
+    showToast('テーブルの閲覧・編集権限を更新しました。', 'success');
+  };
+
+  window.setColumnPermissionLevel = function(userId, tableId, colId, level) {
+    if (!state.permissions.columns) state.permissions.columns = {};
+    if (!state.permissions.columns[tableId]) state.permissions.columns[tableId] = {};
+    
+    if (!state.permissions.writeColumns) state.permissions.writeColumns = {};
+    if (!state.permissions.writeColumns[tableId]) state.permissions.writeColumns[tableId] = {};
+
+    const readAllowed = state.permissions.columns[tableId][colId] || [];
+    const writeAllowed = state.permissions.writeColumns[tableId][colId] || [];
+    const allUserIds = ['sales_01', 'sales_02', 'support_01'];
+
+    let newRead = [...readAllowed];
+    let newWrite = [...writeAllowed];
+
+    const colKeys = Object.keys(state.permissions.columns[tableId]);
+    const isReadSetup = colKeys.includes(colId);
+    if (!isReadSetup) newRead = [...allUserIds];
+
+    const writeKeys = Object.keys(state.permissions.writeColumns[tableId]);
+    const isWriteSetup = writeKeys.includes(colId);
+    if (!isWriteSetup) newWrite = [...allUserIds];
+
+    if (level === 'hidden') {
+      newRead = newRead.filter(id => id !== userId);
+      newWrite = newWrite.filter(id => id !== userId);
+    } else if (level === 'readonly') {
+      if (!newRead.includes(userId)) newRead.push(userId);
+      newWrite = newWrite.filter(id => id !== userId);
+    } else if (level === 'write') {
+      if (!newRead.includes(userId)) newRead.push(userId);
+      if (!newWrite.includes(userId)) newWrite.push(userId);
+    }
+
+    state.permissions.columns[tableId][colId] = newRead;
+    state.permissions.writeColumns[tableId][colId] = newWrite;
+
+    savePermissions();
+    renderUserPermissionViewer(userId);
+    showToast('カラムの閲覧・編集権限を更新しました。', 'success');
+  };
 
   window.renderUserPermissionViewer = function(userId) {
     const container = document.getElementById('presence-permission-tree-container');
@@ -18546,16 +18736,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const user = users.find(u => u.id === userId) || { id: userId, name: userId, role: userId };
     const userRole = user.role || user.id;
 
-    const getBadgePair = (read, write) => {
-      const readBadge = read
-        ? '<span style="color: #10b981; font-weight: 700; font-size: 0.72rem; background: rgba(16,185,129,0.08); padding: 0.15rem 0.35rem; border-radius: 3px; border: 1px solid rgba(16,185,129,0.2); margin-right: 0.35rem; display: inline-block;">閲覧: 🟢 許可</span>'
-        : '<span style="color: #ef4444; font-weight: 700; font-size: 0.72rem; background: rgba(239,68,68,0.08); padding: 0.15rem 0.35rem; border-radius: 3px; border: 1px solid rgba(239,68,68,0.2); margin-right: 0.35rem; display: inline-block;">閲覧: 🔴 制限</span>';
+    // 3ステート用のスイッチグループを描画するヘルパー
+    const getThreeStateToggleHtml = (currentLevel, isReadOnlySystem, onClickCallbackName, tableId, colId) => {
+      const isSystemAdmin = (user.id === 'admin');
+
+      const optHidden = `<button class="btn-perm-toggle ${currentLevel === 'hidden' ? 'active-hidden' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="window.${onClickCallbackName}('${user.id}', '${tableId}', '${colId || ''}', 'hidden')">🚫 非表示</button>`;
+      const optRead = `<button class="btn-perm-toggle ${currentLevel === 'readonly' ? 'active-read' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="window.${onClickCallbackName}('${user.id}', '${tableId}', '${colId || ''}', 'readonly')">👁️ 閲覧のみ</button>`;
       
-      const writeBadge = write
-        ? '<span style="color: #3b82f6; font-weight: 700; font-size: 0.72rem; background: rgba(59,130,246,0.08); padding: 0.15rem 0.35rem; border-radius: 3px; border: 1px solid rgba(59,130,246,0.2); display: inline-block;">編集: 🔵 許可</span>'
-        : '<span style="color: #f59e0b; font-weight: 700; font-size: 0.72rem; background: rgba(245,158,11,0.08); padding: 0.15rem 0.35rem; border-radius: 3px; border: 1px solid rgba(245,158,11,0.2); display: inline-block;">編集: 🔒 不可</span>';
-      
-      return `${readBadge}${writeBadge}`;
+      let optWrite = '';
+      if (isReadOnlySystem) {
+        optWrite = `<button class="btn-perm-toggle locked" title="システム仕様で編集不可" disabled>🔒 編集不可</button>`;
+      } else {
+        optWrite = `<button class="btn-perm-toggle ${currentLevel === 'write' ? 'active-write' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="window.${onClickCallbackName}('${user.id}', '${tableId}', '${colId || ''}', 'write')">✏️ 編集可能</button>`;
+      }
+
+      return `<div class="perm-three-state-group">${optHidden}${optRead}${optWrite}</div>`;
     };
 
     let html = `
@@ -18595,14 +18790,19 @@ document.addEventListener('DOMContentLoaded', () => {
         allowedRead = (userRole === 'admin');
       }
       const allowedWrite = p.editRoleNeeded === 'admin' ? (userRole === 'admin') : allowedRead;
+      
+      const currentLevel = !allowedRead ? 'hidden' : (!allowedWrite ? 'readonly' : 'write');
+      const isGrayedOut = currentLevel === 'hidden';
 
       html += `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); flex-wrap: wrap; gap: 0.5rem;">
+        <div class="${isGrayedOut ? 'perm-row-grayed-out' : ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); flex-wrap: wrap; gap: 0.5rem;">
           <div>
             <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">${p.name}</span>
             <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.5rem;">- ${p.desc}</span>
           </div>
-          <div style="display: flex; align-items: center;">${getBadgePair(allowedRead, allowedWrite)}</div>
+          <div style="display: flex; align-items: center;">
+            ${getThreeStateToggleHtml(currentLevel, p.editRoleNeeded === 'admin' && userRole !== 'admin', 'setTablePermissionLevel', p.id)}
+          </div>
         </div>
       `;
     });
@@ -18628,24 +18828,29 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     masterTables.forEach(t => {
-      const tableAccess = hasUserTableAccess(user.id, t.id);
+      const tableLevel = getTablePermissionLevel(user.id, t.id);
+      const isTableReadAllowed = tableLevel !== 'hidden';
+      const isTableGrayedOut = tableLevel === 'hidden';
 
       const columns = getTableColumns(t.id);
       let columnsHtml = '';
-      if (tableAccess.read && columns.length > 0) {
+      if (isTableReadAllowed && columns.length > 0) {
         columnsHtml = `
           <div style="margin-top: 0.5rem; padding: 0.5rem 0.75rem; border-top: 1px dashed var(--border-color); background: var(--bg-surface-elevated); border-radius: var(--radius-sm);">
             <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.35rem;">📄 列（カラム）ごとのアクセス権:</div>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.5rem;">
               ${columns.map(col => {
-                const colAccess = hasUserColumnAccess(user.id, t.id, col, tableAccess.read);
-                const dotColor = colAccess.read ? '#10b981' : '#ef4444';
+                const colLevel = getColumnPermissionLevel(user.id, t.id, col, isTableReadAllowed);
+                const isReadOnlyCol = col.readOnly === true || col.id === 'id';
+                const isColGrayedOut = colLevel === 'hidden';
                 return `
-                  <div style="font-size: 0.8rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.25rem 0.4rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 3px;">
-                    <span style="font-weight: 600; color: ${colAccess.read ? 'var(--text-primary)' : 'var(--text-secondary)'};">
-                      <span style="color: ${dotColor}; margin-right: 0.25rem;">●</span>${col.label || col.name}
+                  <div class="${isColGrayedOut ? 'perm-row-grayed-out' : ''}" style="font-size: 0.8rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.25rem 0.4rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 3px;">
+                    <span style="font-weight: 600; color: ${colLevel !== 'hidden' ? 'var(--text-primary)' : 'var(--text-secondary)'};">
+                      ${col.label || col.name}
                     </span>
-                    <div style="display: flex; align-items: center;">${getBadgePair(colAccess.read, colAccess.write)}</div>
+                    <div style="display: flex; align-items: center;">
+                      ${getThreeStateToggleHtml(colLevel, isReadOnlyCol, 'setColumnPermissionLevel', t.id, col.id)}
+                    </div>
                   </div>
                 `;
               }).join('')}
@@ -18655,10 +18860,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       html += `
-        <div style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); padding: 0.65rem 0.75rem;">
+        <div class="${isTableGrayedOut ? 'perm-row-grayed-out' : ''}" style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); padding: 0.65rem 0.75rem;">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
             <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">${t.name}</span>
-            <div style="display: flex; align-items: center;">${getBadgePair(tableAccess.read, tableAccess.write)}</div>
+            <div style="display: flex; align-items: center;">
+              ${getThreeStateToggleHtml(tableLevel, t.id === 'agency-info-screen' && user.id.startsWith('support'), 'setTablePermissionLevel', t.id)}
+            </div>
           </div>
           ${columnsHtml}
         </div>
@@ -18698,15 +18905,18 @@ document.addEventListener('DOMContentLoaded', () => {
       let nodeHtml = '';
 
       childFolders.forEach(folder => {
-        const folderAccess = hasUserFolderAccess(user.id, folder.id);
+        const folderLevel = getFolderPermissionLevel(user.id, folder.id);
+        const isFolderGrayedOut = folderLevel === 'hidden';
         const paddingLeft = `${depth * 1.25 + 0.5}rem`;
         nodeHtml += `
           <div style="margin: 0.25rem 0;">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; padding-left: ${paddingLeft}; background: rgba(255,255,255,0.01); border-bottom: 1px solid rgba(0,0,0,0.05); flex-wrap: wrap; gap: 0.5rem;">
+            <div class="${isFolderGrayedOut ? 'perm-row-grayed-out' : ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; padding-left: ${paddingLeft}; background: rgba(255,255,255,0.01); border-bottom: 1px solid rgba(0,0,0,0.05); flex-wrap: wrap; gap: 0.5rem;">
               <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
                 📁 ${folder.name}
               </span>
-              <div style="display: flex; align-items: center;">${getBadgePair(folderAccess.read, folderAccess.write)}</div>
+              <div style="display: flex; align-items: center;">
+                ${getThreeStateToggleHtml(folderLevel, false, 'setFolderPermissionLevel', folder.id)}
+              </div>
             </div>
             ${renderTreeNode(folder.id, depth + 1)}
           </div>
@@ -18715,27 +18925,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
       childTables.forEach(tbl => {
         const tableId = `custom-table-${tbl.id}`;
-        const tableAccess = hasUserTableAccess(user.id, tableId);
+        const tableLevel = getTablePermissionLevel(user.id, tableId);
+        const isTableReadAllowed = tableLevel !== 'hidden';
+        const isTableGrayedOut = tableLevel === 'hidden';
         const paddingLeft = `${depth * 1.25 + 0.5}rem`;
         
         const columns = getTableColumns(tableId);
         let columnsHtml = '';
-        if (tableAccess.read && columns.length > 0) {
+        if (isTableReadAllowed && columns.length > 0) {
           const innerPaddingLeft = `${depth * 1.25 + 1.75}rem`;
           columnsHtml = `
             <div style="padding: 0.4rem 0.75rem; padding-left: ${innerPaddingLeft}; background: var(--bg-surface-elevated); font-size: 0.78rem; border-top: 1px dashed var(--border-color);">
               <div style="font-weight: 700; color: var(--text-secondary); margin-bottom: 0.35rem;">📄 列（カラム）:</div>
               <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.35rem;">
                 ${columns.map(col => {
-                  const colAccess = hasUserColumnAccess(user.id, tableId, col, tableAccess.read);
-                  const dotColor = colAccess.read ? '#10b981' : '#ef4444';
+                  const colLevel = getColumnPermissionLevel(user.id, tableId, col, isTableReadAllowed);
+                  const isReadOnlyCol = col.readOnly === true || col.id === 'id';
+                  const isColGrayedOut = colLevel === 'hidden';
                   const label = col.name || col.label || col.id;
                   return `
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.2rem 0.35rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 3px;">
-                      <span style="font-weight: 600; color: ${colAccess.read ? 'var(--text-primary)' : 'var(--text-secondary)'};">
-                        <span style="color: ${dotColor}; margin-right: 0.25rem;">●</span>${label}
+                    <div class="${isColGrayedOut ? 'perm-row-grayed-out' : ''}" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.2rem 0.35rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 3px;">
+                      <span style="font-weight: 600; color: ${colLevel !== 'hidden' ? 'var(--text-primary)' : 'var(--text-secondary)'};">
+                        ${label}
                       </span>
-                      <div style="display: flex; align-items: center;">${getBadgePair(colAccess.read, colAccess.write)}</div>
+                      <div style="display: flex; align-items: center;">
+                        ${getThreeStateToggleHtml(colLevel, isReadOnlyCol, 'setColumnPermissionLevel', tableId, col.id)}
+                      </div>
                     </div>
                   `;
                 }).join('')}
@@ -18745,12 +18960,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         nodeHtml += `
-          <div style="margin: 0.25rem 0; border: 1px solid rgba(0,0,0,0.03); border-radius: var(--radius-sm); background: var(--bg-surface);">
+          <div class="${isTableGrayedOut ? 'perm-row-grayed-out' : ''}" style="margin: 0.25rem 0; border: 1px solid rgba(0,0,0,0.03); border-radius: var(--radius-sm); background: var(--bg-surface);">
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; padding-left: ${paddingLeft}; background: rgba(0,0,0,0.02); flex-wrap: wrap; gap: 0.5rem;">
               <span style="font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
                 📋 ${tbl.name}
               </span>
-              <div style="display: flex; align-items: center;">${getBadgePair(tableAccess.read, tableAccess.write)}</div>
+              <div style="display: flex; align-items: center;">
+                ${getThreeStateToggleHtml(tableLevel, false, 'setTablePermissionLevel', tableId)}
+              </div>
             </div>
             ${columnsHtml}
           </div>
@@ -18816,11 +19033,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // 閲覧状況画面のボタンおよび更新アクション登録
   const presenceBtn = document.getElementById('admin-panel-presence-btn');
   if (presenceBtn) {
     presenceBtn.addEventListener('click', () => {
       openTab('presence-tab', 'presence-settings-screen', '👁️‍🗨️ ユーザー閲覧状況');
+      initPresenceUserSelector();
+      renderUserPresenceList();
     });
   }
 
@@ -19726,12 +19944,20 @@ function renderDbmakePartners() {
           const isSelect = col.type === 'select' || (col.choices && col.choices.length > 0);
           if (isSelect) {
             if (isTableLocked('dbmake')) return;
+            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('agency-screen', col.id)) {
+              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+              return;
+            }
             startMasterDropdownEdit(td, val, col, p, index, 'dbmake');
           }
         });
 
         td.addEventListener('dblclick', (e) => {
           if (!isTableLocked('dbmake')) {
+            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('agency-screen', col.id)) {
+              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+              return;
+            }
             startMasterCellEdit(td, val, col, p, index, 'dbmake');
           } else {
             td.classList.toggle('cell-expanded');
