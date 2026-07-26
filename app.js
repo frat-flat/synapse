@@ -377,6 +377,29 @@ document.addEventListener('DOMContentLoaded', () => {
   initMypageMemo();          // メモ帳の初回初期化
   initFloatingStickyNotes(); // 浮遊付箋の復元
 
+  // ログイン画面のパスワード表示トグル
+  const togglePassBtn = document.getElementById('toggle-login-pass-btn');
+  const loginPassInput = document.getElementById('login-pass');
+  const eyeIconShow = document.getElementById('eye-icon-show');
+  const eyeIconHide = document.getElementById('eye-icon-hide');
+  
+  if (togglePassBtn && loginPassInput) {
+    togglePassBtn.addEventListener('click', () => {
+      const isPassword = loginPassInput.type === 'password';
+      loginPassInput.type = isPassword ? 'text' : 'password';
+      
+      if (isPassword) {
+        if (eyeIconShow) eyeIconShow.style.display = 'none';
+        if (eyeIconHide) eyeIconHide.style.display = 'block';
+        togglePassBtn.title = 'パスワードを非表示にする';
+      } else {
+        if (eyeIconShow) eyeIconShow.style.display = 'block';
+        if (eyeIconHide) eyeIconHide.style.display = 'none';
+        togglePassBtn.title = 'パスワードを表示する';
+      }
+    });
+  }
+
   // 📧 メールからのパスワード設定・再設定リンク検知
   const urlParams = new URLSearchParams(window.location.search);
   const action = urlParams.get('action');
