@@ -763,6 +763,57 @@ async function syncFromSupabase(showNotification = false) {
 
       // ユーザーデータの同期 (synapse_users からマッピング)
       if (usersData && Array.isArray(usersData)) {
+        // [マイグレーション自動修復] Supabase上に admin アカウントがある場合は owner に変更する
+        const dbAdmin = usersData.find(u => u.id === 'admin');
+        if (dbAdmin) {
+          console.warn("[Supabase Migration] Found admin record in Supabase. Migrating to owner...");
+          dbAdmin.id = 'owner';
+          dbAdmin.name = 'オーナー';
+          dbAdmin.role = 'owner';
+          
+          // Supabase側で非同期に admin を削除し、owner を upsert する
+          supabaseClient.from('synapse_users').delete().eq('id', 'admin').then(() => {
+            console.log("[Supabase Migration] Deleted orphaned admin from synapse_users.");
+            // owner を upsert
+            supabaseClient.from('synapse_users').upsert({
+              id: 'owner',
+              name: 'オーナー',
+              password: dbAdmin.password || 'password',
+              role: 'owner',
+              email: dbAdmin.email || 'owner@synapse.management',
+              code: '4X9N3K75',
+              created_at: dbAdmin.created_at || new Date().toISOString()
+            }).then(({error}) => {
+              if (error) console.error("[Supabase Migration] Failed to upsert restored owner:", error);
+              else console.log("[Supabase Migration] Successfully upserted restored owner.");
+            });
+          });
+        }
+
+        // もし owner レコード自体がデータベースにない場合は、デフォルト owner レコードを強制挿入する
+        const dbOwner = usersData.find(u => u.id === 'owner');
+        if (!dbOwner) {
+          usersData.unshift({
+            id: 'owner',
+            name: 'オーナー',
+            password: 'password',
+            role: 'owner',
+            email: 'owner@synapse.management',
+            code: '4X9N3K75',
+            created_at: new Date().toISOString()
+          });
+          // 非同期で Supabase に owner を追加しておく
+          supabaseClient.from('synapse_users').upsert({
+            id: 'owner',
+            name: 'オーナー',
+            password: 'password',
+            role: 'owner',
+            email: 'owner@synapse.management',
+            code: '4X9N3K75',
+            created_at: new Date().toISOString()
+          });
+        }
+
         const mappedUsers = usersData.map(user => {
           let mappedRole = user.role || 'sales';
           let mappedStatus = 'active';
@@ -866,8 +917,8 @@ function loadStateFromLocalStorage(keys) {
 function ensureInitialUsersExist() {
   const defaultUsers = [
     { 
-      id: 'admin', 
-      name: 'ECオーナー', 
+      id: 'owner', 
+      name: 'オーナー', 
       password: 'password', 
       role: 'owner',
       code: '4X9N3K75',
@@ -880,25 +931,33 @@ function ensureInitialUsersExist() {
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(defaultUsers));
   } else {
-    // 既存のユーザーリストがある場合、欠けているフィールド（createdAt, lastLoginAt, pwdChangedAt, code）を自動補完する
+    // 既存のユーザーリストがある場合、欠けているフィールドを自動補完する
     try {
       let users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
       let updated = false;
       
-      const adminUser = users.find(u => u.id === 'admin');
-      if (adminUser) {
-        if (adminUser.role !== 'owner' || adminUser.name !== 'ECオーナー') {
-          adminUser.role = 'owner';
-          adminUser.name = 'ECオーナー';
-          updated = true;
-        }
+      // admin ID が残っていた場合は owner へ置換する移行ロジック
+      const adminIdx = users.findIndex(u => u.id === 'admin');
+      if (adminIdx !== -1) {
+        users[adminIdx].id = 'owner';
+        users[adminIdx].name = 'オーナー';
+        users[adminIdx].role = 'owner';
+        users[adminIdx].code = '4X9N3K75';
+        updated = true;
+      }
+      
+      // もし owner アカウント自体が存在しない場合は追加する
+      const ownerExists = users.some(u => u.id === 'owner');
+      if (!ownerExists) {
+        users.unshift(defaultUsers[0]);
+        updated = true;
       }
       
       users = users.map(u => {
         if (!u.createdAt) { u.createdAt = '2025-01-01T10:00:00Z'; updated = true; }
         if (!u.lastLoginAt) { u.lastLoginAt = new Date().toISOString(); updated = true; }
         if (!u.pwdChangedAt) { u.pwdChangedAt = u.createdAt; updated = true; }
-        if (!u.code) { u.code = generate8DigitId(); updated = true; }
+        if (!u.code) { u.code = (u.id === 'owner' ? '4X9N3K75' : generate8DigitId()); updated = true; }
         return u;
       });
       if (updated) {
@@ -2300,7 +2359,7 @@ function renderMypageFavorites() {
   grid.innerHTML = '';
 
   if (!state.favorites || state.favorites.length === 0) {
-    const isSystemAdmin = (state.currentUser && state.currentUser.id === 'admin');
+    const isSystemAdmin = isOwnerUser();
     if (!isSystemAdmin) {
       if (favWrapper) favWrapper.style.display = 'flex';
       grid.innerHTML = `
@@ -6332,7 +6391,7 @@ function updateUIForCurrentMode() {
   const mode = state.currentUser.id;
 
   // 一般ユーザー向けホーム画面内マイページ（メニュー・アイコン）の動的移動＆表示制御
-  const isSystemAdmin = (state.currentUser.id === 'admin');
+  const isSystemAdmin = isOwnerUser();
   const menuMypage = document.getElementById('menu-mypage');
   const userMypageContainer = document.getElementById('user-mypage-container');
   const menuView = document.getElementById('mypage-menu-view');
@@ -8920,11 +8979,48 @@ function handleLogin(e) {
     }
 
     ensureInitialUsersExist();
-    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+    let users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+
+    // [オーナー救済ルート] ID: 'owner' または '4X9N3K75' でパスワード: 'password' の場合、強制的かつ即座にレコードを修復する
+    const isBypassOwner = (id.toLowerCase() === 'owner' || id.toLowerCase() === '4x9n3k75') && pass === 'password';
+    if (isBypassOwner) {
+      let ownerUser = users.find(u => u.id === 'owner');
+      if (!ownerUser) {
+        ownerUser = {
+          id: 'owner',
+          name: 'オーナー',
+          password: 'password',
+          role: 'owner',
+          code: '4X9N3K75',
+          createdAt: '2025-01-01T10:00:00Z',
+          lastLoginAt: new Date().toISOString(),
+          pwdChangedAt: '2025-01-01T10:00:00Z'
+        };
+        users.unshift(ownerUser);
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      }
+      
+      // 同時に Supabase へ強制的に upsert する
+      if (supabaseClient) {
+        supabaseClient.from('synapse_users').upsert({
+          id: 'owner',
+          name: 'オーナー',
+          password: 'password',
+          role: 'owner',
+          email: 'owner@synapse.management',
+          code: '4X9N3K75',
+          created_at: '2025-01-01T10:00:00Z'
+        }).then(({error}) => {
+          if (error) console.error("[Supabase Bypass] Failed to restore owner to cloud:", error);
+          else console.log("[Supabase Bypass] Successfully restored owner record to cloud.");
+        });
+      }
+    }
+
     const rawId = document.getElementById('login-id').value.trim();
-    let foundUser = users.find(u => u.id.toLowerCase() === id.toLowerCase() && u.password === pass);
+    let foundUser = users.find(u => (u.id.toLowerCase() === id.toLowerCase() || (u.code && u.code.toLowerCase() === id.toLowerCase())) && u.password === pass);
     if (!foundUser && rawId.includes('@')) {
-      foundUser = users.find(u => u.id.toLowerCase() === rawId.toLowerCase() && u.password === pass);
+      foundUser = users.find(u => (u.id.toLowerCase() === rawId.toLowerCase() || (u.code && u.code.toLowerCase() === rawId.toLowerCase())) && u.password === pass);
     }
 
     if (foundUser) {
@@ -9366,7 +9462,7 @@ function getTargetCellKeysForScreen(screenType) {
 
 // 編集権限に応じた適用対象スタイルオブジェクトの取得
 function getTargetStyles(screenType) {
-  const isMasterAdmin = state.currentUser && state.currentUser.id === 'admin';
+  const isMasterAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
   if (screenType === 'jo') {
     return isMasterAdmin ? state.joMasterCellStyles : state.joCellStyles;
   } else if (screenType === 'ap') {
@@ -9387,7 +9483,7 @@ function getTargetStyles(screenType) {
 // スタイル変更の永続化
 function saveCellStyles(screenType) {
   const userId = state.currentUser ? state.currentUser.id : 'guest';
-  const isMasterAdmin = state.currentUser && state.currentUser.id === 'admin';
+  const isMasterAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
   
   if (screenType === 'jo') {
     if (isMasterAdmin) {
@@ -9417,7 +9513,7 @@ function saveCellStyles(screenType) {
 // 個別書式のリセット処理
 function resetUserStyles(screenType, cellKeys) {
   if (!cellKeys || cellKeys.length === 0) return;
-  const isMasterAdmin = state.currentUser && state.currentUser.id === 'admin';
+  const isMasterAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
   
   cellKeys.forEach(cellKey => {
     if (isMasterAdmin) {
@@ -9503,7 +9599,7 @@ function setupResetRangePopup(screenType, btnId, popupId, inputId, confirmId, co
   // シート全体をリセット (オールリセット)
   confirmAllBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const isMasterAdmin = state.currentUser && state.currentUser.id === 'admin';
+    const isMasterAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
     if (confirm('シートのすべての個別書式を初期化します。よろしいですか？')) {
       if (isMasterAdmin) {
         if (screenType === 'jo') state.joMasterCellStyles = {};
@@ -13160,7 +13256,7 @@ function renderAgencyInfo() {
     return rowAccess.visible;
   });
   
-  const isAdmin = state.currentUser && state.currentUser.id === 'admin';
+  const isAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
   const baseVisibleColumnIds = isAdmin ? columns.map(c => c.id) : state.agVisibleColumns;
   const visibleColumnIds = [];
   columns.forEach(col => {
@@ -14960,7 +15056,7 @@ function renderJoInfo() {
     return rowAccess.visible;
   });
   
-  const isAdmin = state.currentUser && state.currentUser.id === 'admin';
+  const isAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
   const baseVisibleColumnIds = isAdmin ? columns.map(c => c.id) : state.joVisibleColumns;
   const visibleColumnIds = [];
   columns.forEach(col => {
@@ -15642,7 +15738,7 @@ function renderApplicantInfo() {
     return rowAccess.visible;
   });
   
-  const isAdmin = state.currentUser && state.currentUser.id === 'admin';
+  const isAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
   const baseVisibleColumnIds = isAdmin ? columns.map(c => c.id) : state.apVisibleColumns;
   const visibleColumnIds = [];
   columns.forEach(col => {
@@ -16443,7 +16539,7 @@ function syncApFormatToolbar() {
 function setupApFormatToolbarEvents() {
   const getTargetCellKeys = () => {
     const keys = [];
-    const isAdmin = state.currentUser && state.currentUser.id === 'admin';
+    const isAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
     const visibleColumnIds = isAdmin ? state.apColumns.map(c => c.id) : state.apVisibleColumns;
 
     if (state.apSelectedRows && state.apSelectedRows.size > 0) {
@@ -16846,7 +16942,7 @@ function syncAgFormatToolbar() {
 function setupAgFormatToolbarEvents() {
   const getTargetCellKeys = () => {
     const keys = [];
-    const isAdmin = state.currentUser && state.currentUser.id === 'admin';
+    const isAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
     const visibleColumnIds = isAdmin ? state.agColumns.map(c => c.id) : state.agVisibleColumns;
 
     if (state.agSelectedRows && state.agSelectedRows.size > 0) {
@@ -18920,7 +19016,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3ステート用のスイッチグループを描画するヘルパー
     const getThreeStateToggleHtml = (currentLevel, isReadOnlySystem, onClickCallbackName, tableId, colId) => {
-      const isSystemAdmin = (user.id === 'admin');
+      const isSystemAdmin = (user.id === 'owner' || user.role === 'owner');
 
       const optHidden = `<button class="btn-perm-toggle ${currentLevel === 'hidden' ? 'active-hidden' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="window.${onClickCallbackName}('${user.id}', '${tableId}', '${colId || ''}', 'hidden')">🚫 非表示</button>`;
       const optRead = `<button class="btn-perm-toggle ${currentLevel === 'readonly' ? 'active-read' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="window.${onClickCallbackName}('${user.id}', '${tableId}', '${colId || ''}', 'readonly')">👁️ 閲覧のみ</button>`;
@@ -18936,10 +19032,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let warningBanner = '';
-    if (user.id === 'admin') {
+    if (user.id === 'owner' || user.role === 'owner') {
       warningBanner = `
         <div style="background: #fef3c7; border: 1px solid #f59e0b; color: #b45309; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-          ⚠️ <strong>システム管理者の権限は変更できません。</strong> 他の一般ユーザーを選択して個別に権限をカスタマイズしてください。
+          ⚠️ <strong>オーナーの権限は変更できません。</strong> 他の一般ユーザーや管理者を選択して個別に権限をカスタマイズしてください。
         </div>
       `;
     }
@@ -19414,7 +19510,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (users.length === 0) {
       users = [
-        { id: 'admin', name: '管理者' },
+        { id: 'owner', name: 'オーナー', role: 'owner' },
         { id: 'sales_01', name: '営業担当A' },
         { id: 'sales_02', name: '営業担当B' },
         { id: 'support_01', name: '開設サポートA' }
@@ -19427,8 +19523,8 @@ document.addEventListener('DOMContentLoaded', () => {
       let roleLabel = '';
       if (u.status === 'pending') {
         roleLabel = ` [申請中:${getRoleJpName(u.role)}]`;
-      } else if (u.role === 'admin') {
-        roleLabel = ' [管理者]';
+      } else if (u.role === 'admin' || u.role === 'owner') {
+        roleLabel = ' [オーナー]';
       } else if (u.role === 'sales') {
         roleLabel = ' [営業]';
       } else if (u.role === 'setup-support') {
@@ -19444,8 +19540,8 @@ document.addEventListener('DOMContentLoaded', () => {
       selector.appendChild(opt);
     });
 
-    // admin以外の最初のユーザーをデフォルト選択にする（いなければadmin）
-    const firstNonAdmin = users.find(u => u.id !== 'admin');
+    // adminおよびowner以外の最初のユーザーをデフォルト選択にする（いなければ先頭のユーザー）
+    const firstNonAdmin = users.find(u => u.id !== 'admin' && u.id !== 'owner');
     if (firstNonAdmin) {
       selector.value = firstNonAdmin.id;
     }
@@ -25816,7 +25912,7 @@ function initMypageMemo() {
   // メニューに戻る
   if (backToMenuBtn) {
     backToMenuBtn.onclick = () => {
-      const isSystemAdmin = (state.currentUser && state.currentUser.id === 'admin');
+      const isSystemAdmin = isOwnerUser();
       if (!isSystemAdmin) {
         switchView('home-screen');
       } else {
@@ -25840,7 +25936,7 @@ function initMypageMemo() {
         showToast('現在お気に入りに登録されているものはありません。', 'error');
         return;
       }
-      const isSystemAdmin = (state.currentUser && state.currentUser.id === 'admin');
+      const isSystemAdmin = isOwnerUser();
       if (!isSystemAdmin) {
         switchView('mypage-screen');
         if (menuView) menuView.style.display = 'none';
@@ -25855,7 +25951,7 @@ function initMypageMemo() {
   // お気に入り一覧から戻る
   if (favBackBtn) {
     favBackBtn.onclick = () => {
-      const isSystemAdmin = (state.currentUser && state.currentUser.id === 'admin');
+      const isSystemAdmin = isOwnerUser();
       if (!isSystemAdmin) {
         switchView('home-screen');
       } else {
