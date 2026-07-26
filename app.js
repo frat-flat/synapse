@@ -21350,6 +21350,56 @@ function initSignupEvents() {
   
   const signupForm = document.getElementById('signup-form');
 
+  // パスワード再設定リンクのアクション登録
+  const forgotPasswordLink = document.getElementById('forgot-password-link');
+  if (forgotPasswordLink) {
+    forgotPasswordLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      
+      const loginIdInput = document.getElementById('login-id');
+      const initialVal = loginIdInput ? loginIdInput.value.trim() : '';
+
+      showAppPrompt(
+        '🔑 パスワードの再設定',
+        '登録されているメールアドレスを入力してください：',
+        initialVal,
+        (email) => {
+          const targetEmail = email.trim();
+          if (!targetEmail) {
+            showToast('メールアドレスを入力してください。', 'error');
+            return;
+          }
+
+          ensureInitialUsersExist();
+          const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+          const userExists = users.some(u => u.id.toLowerCase() === targetEmail.toLowerCase());
+
+          if (!userExists) {
+            showToast('ご入力いただいたメールアドレスのアカウントが見つかりません。', 'error');
+            return;
+          }
+
+          showAppConfirm(
+            '📧 パスワード再設定メール（シミュレーション）',
+            `「${targetEmail}」宛てにパスワード再設定用の確認メールを送信しました。受信トレイを開いて新しいパスワード設定画面に進みますか？`,
+            () => {
+              const modal = document.getElementById('set-password-modal');
+              const emailHidden = document.getElementById('set-pwd-email');
+              if (modal && emailHidden) {
+                emailHidden.value = targetEmail;
+                const pwdInput = document.getElementById('set-pwd-input');
+                const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
+                if (pwdInput) pwdInput.value = '';
+                if (pwdConfirmInput) pwdConfirmInput.value = '';
+                modal.style.display = 'flex';
+              }
+            }
+          );
+        }
+      );
+    });
+  }
+
   if (goToSignup && loginScreen && signupScreen) {
     goToSignup.addEventListener('click', (e) => {
       e.preventDefault();
