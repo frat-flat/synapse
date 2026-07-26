@@ -6458,6 +6458,14 @@ function switchView(viewId) {
     const tableId = viewId.replace('custom-table-', '');
     if (typeof renderCustomTable === 'function') renderCustomTable(tableId);
   }
+
+  if (viewId === 'presence-settings-screen') {
+    if (typeof renderUserPresenceList === 'function') renderUserPresenceList();
+  }
+
+  if (typeof trackUserActivity === 'function' && typeof getScreenFriendlyName === 'function') {
+    trackUserActivity(viewId, getScreenFriendlyName(viewId));
+  }
 }
 
 // ==========================================
@@ -6488,6 +6496,15 @@ function showLoginScreen(show) {
     if (userPopover) userPopover.style.display = 'none';
     const settingsPopup = document.getElementById('sidebar-settings-popup');
     if (settingsPopup) settingsPopup.style.display = 'none';
+
+    // ログイン画面表示時（ログアウト時）は閲覧状況をクリアしてオフラインにする
+    if (state.currentUser) {
+      const userId = state.currentUser.id;
+      localStorage.removeItem('synapse_user_presence_' + userId);
+      if (typeof syncToSupabase === 'function' && window.supabaseClient) {
+        syncToSupabase('synapse_user_presence_' + userId, null).catch(() => {});
+      }
+    }
 
     if (login) {
       login.classList.add('active');
@@ -7316,6 +7333,14 @@ function activateTab(id) {
   state.currentView = tab.type;
   renderTabBar();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  if (tab.type === 'presence-settings-screen') {
+    if (typeof renderUserPresenceList === 'function') renderUserPresenceList();
+  }
+
+  if (typeof trackUserActivity === 'function') {
+    trackUserActivity(tab.id, tab.title);
+  }
 }
 
 // タブを閉じる
@@ -18214,6 +18239,222 @@ document.addEventListener('DOMContentLoaded', () => {
       updateAvatarUI();
       manageAccountModal.style.display = 'none';
       showToast('プロファイルを更新しました。', 'success');
+    });
+  }
+
+  // 👁️‍🗨️ ユーザー閲覧状況（リアルタイムトラッキングとレンダリング）の処理定義
+  window.getScreenFriendlyName = function(viewId) {
+    if (viewId === 'home-screen') return 'ホーム';
+    if (viewId === 'mypage-screen') return 'マイページ';
+    if (viewId === 'mypage-memo-screen') return 'メモ帳';
+    if (viewId === 'dbmake-screen' || viewId === 'dbmake') {
+      const getTableName = window.getDynamicMasterTableName || getDynamicMasterTableName;
+      return '🛢️ ' + (typeof getTableName === 'function' ? getTableName('dbmake') : 'DB作成');
+    }
+    if (viewId === 'jo-info-screen') {
+      const getTableName = window.getDynamicMasterTableName || getDynamicMasterTableName;
+      return '📊 ' + (typeof getTableName === 'function' ? getTableName('jo-info-screen') : 'JO 基本マスタ');
+    }
+    if (viewId === 'applicant-info-screen') {
+      const getTableName = window.getDynamicMasterTableName || getDynamicMasterTableName;
+      return '📊 ' + (typeof getTableName === 'function' ? getTableName('applicant-info-screen') : '申込者 基本マスタ');
+    }
+    if (viewId === 'agency-info-screen') {
+      const getTableName = window.getDynamicMasterTableName || getDynamicMasterTableName;
+      return '📊 ' + (typeof getTableName === 'function' ? getTableName('agency-info-screen') : '代理店 基本マスタ');
+    }
+    if (viewId === 'audit-log-screen') return '📊 操作ログ履歴';
+    if (viewId === 'user-manager-screen') return '👥 ユーザー管理';
+    if (viewId === 'permission-settings-screen') return '🔑 権限設定';
+    if (viewId === 'dashboard-screen') return ' アポイントダッシュボード';
+    if (viewId === 'appointment-screen') return '📄 新規アポイント';
+    if (viewId === 'presence-settings-screen') return '👁️‍🗨️ ユーザー閲覧状況';
+    if (viewId.startsWith('custom-table-')) {
+      const tableId = viewId.replace('custom-table-', '');
+      const getTableName = window.getDynamicMasterTableName || getDynamicMasterTableName;
+      return '📊 ' + (typeof getTableName === 'function' ? getTableName(tableId) : tableId);
+    }
+    return viewId;
+  };
+
+  window.trackUserActivity = function(screenId, screenName) {
+    if (!state.currentUser) return;
+    const userId = state.currentUser.id;
+    const userName = state.currentUser.name || userId;
+    
+    const presenceData = {
+      userId: userId,
+      userName: userName,
+      activeScreen: screenId,
+      activeScreenName: screenName,
+      lastActiveTime: new Date().toISOString()
+    };
+    
+    localStorage.setItem('synapse_user_presence_' + userId, JSON.stringify(presenceData));
+    
+    if (typeof syncToSupabase === 'function' && window.supabaseClient) {
+      syncToSupabase('synapse_user_presence_' + userId, presenceData).catch(err => {
+        console.error('[Presence] Error syncing presence data:', err);
+      });
+    }
+  };
+
+  window.renderUserPresenceList = async function() {
+    const listBody = document.getElementById('presence-list-body');
+    if (!listBody) return;
+    
+    listBody.innerHTML = '<tr><td colspan="4" style="padding: 2rem; text-align: center; color: var(--text-secondary);">🌐 最新の閲覧状況をクラウドから取得中...</td></tr>';
+    
+    if (typeof syncFromSupabase === 'function' && window.supabaseClient) {
+      try {
+        await syncFromSupabase(false);
+      } catch (e) {
+        console.error('[Presence] Failed to sync remote presence data:', e);
+      }
+    }
+    
+    const usersStr = localStorage.getItem(STORAGE_KEYS.USERS) || '[]';
+    let users = [];
+    try {
+      users = JSON.parse(usersStr);
+    } catch (e) {
+      console.error('[Presence] Failed to parse users:', e);
+    }
+    
+    if (!Array.isArray(users) || users.length === 0) {
+      listBody.innerHTML = '<tr><td colspan="4" style="padding: 2rem; text-align: center; color: var(--text-secondary);">登録されているユーザーが存在しません。</td></tr>';
+      return;
+    }
+    
+    const presenceMap = new Map();
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('synapse_user_presence_')) {
+        try {
+          const data = JSON.parse(localStorage.getItem(key));
+          if (data && data.userId) {
+            presenceMap.set(data.userId, data);
+          }
+        } catch (e) {}
+      }
+    }
+    
+    const now = new Date();
+    const presenceRows = users.map(user => {
+      const presence = presenceMap.get(user.id);
+      let status = 'offline';
+      let activeScreenName = '---';
+      let lastActiveText = 'アクセス履歴なし';
+      let lastActiveTime = null;
+      
+      if (presence && presence.lastActiveTime) {
+        lastActiveTime = new Date(presence.lastActiveTime);
+        const diffMs = now - lastActiveTime;
+        const diffMins = Math.floor(diffMs / 60000);
+        
+        activeScreenName = presence.activeScreenName || presence.activeScreen || '不明な画面';
+        
+        if (diffMins < 5) {
+          status = 'online';
+          lastActiveText = 'オンライン (アクティブ)';
+        } else if (diffMins < 15) {
+          status = 'away';
+          lastActiveText = `${diffMins}分前 (離席中)`;
+        } else {
+          status = 'offline';
+          if (diffMins < 60) {
+            lastActiveText = `${diffMins}分前`;
+          } else if (diffMins < 1440) {
+            lastActiveText = `${Math.floor(diffMins / 60)}時間前`;
+          } else {
+            lastActiveText = `${Math.floor(diffMins / 1440)}日前`;
+          }
+        }
+      }
+      
+      return {
+        userId: user.id,
+        userName: user.name || user.id,
+        status: status,
+        activeScreenName: activeScreenName,
+        lastActiveText: lastActiveText,
+        lastActiveTime: lastActiveTime
+      };
+    });
+    
+    presenceRows.sort((a, b) => {
+      const getPriority = (status) => status === 'online' ? 2 : (status === 'away' ? 1 : 0);
+      const pA = getPriority(a.status);
+      const pB = getPriority(b.status);
+      if (pA !== pB) return pB - pA;
+      
+      if (!a.lastActiveTime) return 1;
+      if (!b.lastActiveTime) return -1;
+      return b.lastActiveTime - a.lastActiveTime;
+    });
+    
+    listBody.innerHTML = '';
+    presenceRows.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid var(--border-color)';
+      tr.style.transition = 'background-color 0.2s';
+      tr.addEventListener('mouseenter', () => { tr.style.backgroundColor = 'var(--bg-surface-elevated)'; });
+      tr.addEventListener('mouseleave', () => { tr.style.backgroundColor = 'transparent'; });
+      
+      const tdStatus = document.createElement('td');
+      tdStatus.style.padding = '0.75rem 1rem';
+      
+      let badgeBg = 'var(--text-secondary)';
+      let badgeText = 'オフライン';
+      if (row.status === 'online') {
+        badgeBg = '#10b981';
+        badgeText = '🟢 オンライン';
+      } else if (row.status === 'away') {
+        badgeBg = '#f59e0b';
+        badgeText = '🟡 離席中';
+      } else {
+        badgeBg = 'gray';
+        badgeText = '🔘 オフライン';
+      }
+      
+      tdStatus.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; font-weight: 700; color: ${badgeBg};">${badgeText}</span>`;
+      tr.appendChild(tdStatus);
+      
+      const tdName = document.createElement('td');
+      tdName.style.padding = '0.75rem 1rem';
+      tdName.style.fontWeight = '600';
+      tdName.textContent = `${row.userName} (${row.userId})`;
+      tr.appendChild(tdName);
+      
+      const tdScreen = document.createElement('td');
+      tdScreen.style.padding = '0.75rem 1rem';
+      tdScreen.style.color = row.status === 'offline' ? 'var(--text-secondary)' : 'var(--text-primary)';
+      tdScreen.textContent = row.activeScreenName;
+      tr.appendChild(tdScreen);
+      
+      const tdTime = document.createElement('td');
+      tdTime.style.padding = '0.75rem 1rem';
+      tdTime.style.fontSize = '0.8rem';
+      tdTime.style.color = 'var(--text-secondary)';
+      tdTime.textContent = row.lastActiveText;
+      tr.appendChild(tdTime);
+      
+      listBody.appendChild(tr);
+    });
+  };
+
+  // 閲覧状況画面のボタンおよび更新アクション登録
+  const presenceBtn = document.getElementById('admin-panel-presence-btn');
+  if (presenceBtn) {
+    presenceBtn.addEventListener('click', () => {
+      openTab('presence-tab', 'presence-settings-screen', '👁️‍🗨️ ユーザー閲覧状況');
+    });
+  }
+
+  const refreshPresenceBtn = document.getElementById('refresh-presence-btn');
+  if (refreshPresenceBtn) {
+    refreshPresenceBtn.addEventListener('click', () => {
+      renderUserPresenceList();
     });
   }
 
