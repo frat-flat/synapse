@@ -6460,7 +6460,7 @@ function switchView(viewId) {
   }
 
   if (viewId === 'presence-settings-screen') {
-    if (typeof renderUserPresenceList === 'function') renderUserPresenceList();
+    if (typeof initPresenceUserSelector === 'function') initPresenceUserSelector();
   }
 
   if (typeof trackUserActivity === 'function' && typeof getScreenFriendlyName === 'function') {
@@ -7335,7 +7335,7 @@ function activateTab(id) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
   if (tab.type === 'presence-settings-screen') {
-    if (typeof renderUserPresenceList === 'function') renderUserPresenceList();
+    if (typeof initPresenceUserSelector === 'function') initPresenceUserSelector();
   }
 
   if (typeof trackUserActivity === 'function') {
@@ -18443,6 +18443,338 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  // 🔑 ユーザー権限ビューアの描画・制御ロジック
+  function getTableColumns(tableId) {
+    if (tableId === 'jo-info-screen') {
+      return state.joColumns || [];
+    }
+    if (tableId === 'applicant-info-screen') {
+      return state.applicantColumns || [];
+    }
+    if (tableId === 'agency-info-screen') {
+      return state.agencyColumns || [];
+    }
+    if (tableId.startsWith('custom-table-')) {
+      const tblId = tableId.replace('custom-table-', '');
+      const tbl = state.customTables.find(t => t.id === tblId);
+      return tbl ? (tbl.columns || []) : [];
+    }
+    return [];
+  }
+
+  function hasUserColumnAccess(userId, tableId, colId) {
+    if (userId === 'admin') {
+      return { visible: true, reason: '管理者特権' };
+    }
+    const tableCols = state.permissions.columns[tableId] || {};
+    const allowed = tableCols[colId] || [];
+    const colKeys = Object.keys(tableCols);
+    const isSetup = colKeys.includes(colId);
+    if (!isSetup) {
+      return { visible: true, reason: '制限なし' };
+    }
+    if (allowed.includes(userId)) {
+      return { visible: true, reason: '閲覧許可' };
+    }
+    return { visible: false, reason: '閲覧制限' };
+  }
+
+  function hasUserFolderAccess(userId, folderId) {
+    if (userId === 'admin') return true;
+    const allowed = state.permissions.folders[folderId] || [];
+    const isSetup = Object.keys(state.permissions.folders).includes(folderId);
+    if (!isSetup) return true;
+    return allowed.includes(userId);
+  }
+
+  function hasUserTableAccess(userId, tableId) {
+    if (userId === 'admin') return true;
+    if (userId.startsWith('support') && tableId === 'agency-info-screen') {
+      return false;
+    }
+    const allowed = state.permissions.tables[tableId] || [];
+    const isSetup = Object.keys(state.permissions.tables).includes(tableId);
+    if (!isSetup) return true;
+    return allowed.includes(userId);
+  }
+
+  window.renderUserPermissionViewer = function(userId) {
+    const container = document.getElementById('presence-permission-tree-container');
+    if (!container) return;
+    
+    if (!userId) {
+      container.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">ユーザーを選択してください。</div>';
+      return;
+    }
+    
+    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+    const user = users.find(u => u.id === userId) || { id: userId, name: userId, role: userId };
+    const userRole = user.role || user.id;
+
+    const getBadge = (allowed) => {
+      return allowed 
+        ? '<span style="color: #10b981; font-weight: 700; font-size: 0.75rem; background: rgba(16,185,129,0.1); padding: 0.15rem 0.4rem; border-radius: 4px;">🟢 閲覧可能</span>'
+        : '<span style="color: #ef4444; font-weight: 700; font-size: 0.75rem; background: rgba(239,68,68,0.1); padding: 0.15rem 0.4rem; border-radius: 4px;">🔴 閲覧制限</span>';
+    };
+
+    let html = `
+      <div style="margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+        <h3 style="margin: 0 0 0.5rem 0; font-size: 1.1rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+          👤 ${user.name || user.id} <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-secondary);">(${user.id})</span>
+        </h3>
+        <div style="font-size: 0.82rem; color: var(--text-secondary); display: flex; gap: 1.5rem; flex-wrap: wrap;">
+          <span><strong>権限ロール:</strong> <span style="color: var(--primary); font-weight: 600;">${userRole}</span></span>
+          <span><strong>メールアドレス:</strong> ${user.email || '---'}</span>
+        </div>
+      </div>
+    `;
+
+    // システム標準画面
+    const systemPages = [
+      { id: 'home-screen', name: '🏠 ホーム・コントロールパネル', desc: 'メイン画面および管理者用ツール' },
+      { id: 'mypage-screen', name: '👤 マイページ', desc: '個人のプロフィール・アポイント確認' },
+      { id: 'dashboard-screen', name: '📊 アポイントダッシュボード', desc: '予約・アポイント状況グラフ' },
+      { id: 'appointment-screen', name: '📄 新規アポイント作成', desc: 'アポイント入力画面' },
+      { id: 'audit-log-screen', name: '📊 操作ログ履歴', desc: 'セル編集履歴の閲覧 (管理者のみ)' },
+      { id: 'user-manager-screen', name: '👥 ユーザー管理', desc: 'ユーザーの追加・編集・削除 (管理者のみ)' },
+      { id: 'permission-settings-screen', name: '🔑 権限設定', desc: 'フォルダ・テーブル・カラムの権限管理 (管理者のみ)' }
+    ];
+
+    html += `
+      <div style="margin-bottom: 1.5rem;">
+        <h4 style="margin: 0 0 0.75rem 0; font-size: 0.92rem; color: var(--text-secondary); font-weight: 700; border-left: 3px solid var(--primary); padding-left: 0.5rem;">
+          🌐 アプリ標準画面・ビュー
+        </h4>
+        <div style="display: grid; grid-template-columns: 1fr; gap: 0.5rem; max-width: 800px;">
+    `;
+
+    systemPages.forEach(p => {
+      let allowed = true;
+      if (p.id === 'audit-log-screen' || p.id === 'user-manager-screen' || p.id === 'permission-settings-screen') {
+        allowed = (userRole === 'admin');
+      }
+      html += `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface);">
+          <div>
+            <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">${p.name}</span>
+            <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.5rem;">- ${p.desc}</span>
+          </div>
+          <div>${getBadge(allowed)}</div>
+        </div>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    // システム標準マスタ
+    const masterTables = [
+      { id: 'applicant-info-screen', name: '📊 申込者 基本マスタ' },
+      { id: 'jo-info-screen', name: '📊 JO 基本マスタ' },
+      { id: 'agency-info-screen', name: '📊 代理店 基本マスタ' }
+    ];
+
+    html += `
+      <div style="margin-bottom: 1.5rem;">
+        <h4 style="margin: 0 0 0.75rem 0; font-size: 0.92rem; color: var(--text-secondary); font-weight: 700; border-left: 3px solid var(--primary); padding-left: 0.5rem;">
+          📊 標準マスタテーブル・カラム
+        </h4>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem; max-width: 800px;">
+    `;
+
+    masterTables.forEach(t => {
+      let tableAllowed = true;
+      if (userRole === 'support' && t.id === 'agency-info-screen') {
+        tableAllowed = false;
+      }
+      const allowedUsers = state.permissions.tables[t.id];
+      if (allowedUsers) {
+        tableAllowed = allowedUsers.includes(user.id);
+      }
+
+      const columns = getTableColumns(t.id);
+      let columnsHtml = '';
+      if (tableAllowed && columns.length > 0) {
+        columnsHtml = `
+          <div style="margin-top: 0.5rem; padding: 0.5rem 0.75rem; border-top: 1px dashed var(--border-color); background: var(--bg-surface-elevated); border-radius: var(--radius-sm);">
+            <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.35rem;">📄 列（カラム）ごとのアクセス権:</div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.35rem 0.75rem;">
+              ${columns.map(col => {
+                const colAccess = hasUserColumnAccess(user.id, t.id, col.id);
+                const statusDot = colAccess.visible ? '<span style="color:#10b981;">●</span>' : '<span style="color:#ef4444;">●</span>';
+                const grayoutText = colAccess.reason === '閲覧制限' ? ' (制限あり)' : '';
+                return `
+                  <div style="font-size: 0.8rem; display: flex; align-items: center; gap: 0.35rem; color: ${colAccess.visible ? 'var(--text-primary)' : 'var(--text-secondary)'};">
+                    ${statusDot} ${col.label || col.name} <span style="font-size: 0.7rem; color: var(--text-secondary);">${grayoutText}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      html += `
+        <div style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); padding: 0.65rem 0.75rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">${t.name}</span>
+            <div>${getBadge(tableAllowed)}</div>
+          </div>
+          ${columnsHtml}
+        </div>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    // カスタムフォルダ・テーブル階層
+    html += `
+      <div>
+        <h4 style="margin: 0 0 0.75rem 0; font-size: 0.92rem; color: var(--text-secondary); font-weight: 700; border-left: 3px solid var(--primary); padding-left: 0.5rem;">
+          📁 カスタムフォルダ & テーブル階層
+        </h4>
+        <div style="max-width: 800px; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface);">
+    `;
+
+    const normalizeId = (id) => (id || '').replace(/^#/, '');
+
+    function renderTreeNode(parentId, depth = 0) {
+      const normParentId = normalizeId(parentId);
+      
+      const childFolders = (state.customAccordions || []).filter(acc => {
+        const parent = normalizeId(acc.parentMenuId || 'root');
+        return parent === normParentId;
+      });
+
+      const childTables = (state.customTables || []).filter(tbl => {
+        const parent = normalizeId(tbl.parentMenuId || 'root');
+        const parentMapped = (parent === 'custom-tables' || parent === 'custom-table') ? 'root' : parent;
+        return parentMapped === normParentId;
+      });
+
+      let nodeHtml = '';
+
+      childFolders.forEach(folder => {
+        const allowed = hasUserFolderAccess(user.id, folder.id);
+        const paddingLeft = `${depth * 1.25 + 0.5}rem`;
+        nodeHtml += `
+          <div style="margin: 0.25rem 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; padding-left: ${paddingLeft}; background: rgba(255,255,255,0.01); border-bottom: 1px solid rgba(0,0,0,0.05);">
+              <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+                📁 ${folder.name}
+              </span>
+              <div>${getBadge(allowed)}</div>
+            </div>
+            ${renderTreeNode(folder.id, depth + 1)}
+          </div>
+        `;
+      });
+
+      childTables.forEach(tbl => {
+        const tableId = `custom-table-${tbl.id}`;
+        const allowed = hasUserTableAccess(user.id, tableId);
+        const paddingLeft = `${depth * 1.25 + 0.5}rem`;
+        
+        const columns = getTableColumns(tableId);
+        let columnsHtml = '';
+        if (allowed && columns.length > 0) {
+          const innerPaddingLeft = `${depth * 1.25 + 1.75}rem`;
+          columnsHtml = `
+            <div style="padding: 0.4rem 0.75rem; padding-left: ${innerPaddingLeft}; background: var(--bg-surface-elevated); font-size: 0.78rem;">
+              <div style="font-weight: 700; color: var(--text-secondary); margin-bottom: 0.25rem;">📄 列（カラム）:</div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.25rem;">
+                ${columns.map(col => {
+                  const colAccess = hasUserColumnAccess(user.id, tableId, col.id);
+                  const dotColor = colAccess.visible ? '#10b981' : '#ef4444';
+                  const label = col.name || col.label || col.id;
+                  return `
+                    <div style="display: flex; align-items: center; gap: 0.3rem; color: ${colAccess.visible ? 'var(--text-primary)' : 'var(--text-secondary)'};">
+                      <span style="color: ${dotColor};">●</span> ${label}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }
+
+        nodeHtml += `
+          <div style="margin: 0.25rem 0; border: 1px solid rgba(0,0,0,0.03); border-radius: var(--radius-sm);">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; padding-left: ${paddingLeft}; background: rgba(0,0,0,0.02);">
+              <span style="font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+                📋 ${tbl.name}
+              </span>
+              <div>${getBadge(allowed)}</div>
+            </div>
+            ${columnsHtml}
+          </div>
+        `;
+      });
+
+      return nodeHtml;
+    }
+
+    const treeHtml = renderTreeNode('root');
+    if (treeHtml) {
+      html += treeHtml;
+    } else {
+      html += '<div style="padding: 1rem; text-align: center; color: var(--text-secondary); font-size: 0.85rem;">作成されたカスタムフォルダまたはテーブルはありません。</div>';
+    }
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = html;
+  };
+
+  // ユーザー選択セレクトボックスの同期構築
+  window.initPresenceUserSelector = function() {
+    const selector = document.getElementById('presence-user-selector');
+    if (!selector) return;
+    
+    selector.innerHTML = '';
+    
+    const usersStr = localStorage.getItem(STORAGE_KEYS.USERS) || '[]';
+    let users = [];
+    try {
+      users = JSON.parse(usersStr);
+    } catch (e) {}
+    
+    if (users.length === 0) {
+      users = [
+        { id: 'admin', name: '管理者' },
+        { id: 'sales_01', name: '営業担当A' },
+        { id: 'sales_02', name: '営業担当B' },
+        { id: 'support_01', name: '開設サポートA' }
+      ];
+    }
+    
+    users.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id;
+      opt.textContent = `${u.name || u.id} (${u.id})`;
+      selector.appendChild(opt);
+    });
+
+    if (selector.value) {
+      renderUserPermissionViewer(selector.value);
+    }
+
+    if (!selector.dataset.listenerAttached) {
+      selector.dataset.listenerAttached = 'true';
+      selector.addEventListener('change', (e) => {
+        renderUserPermissionViewer(e.target.value);
+      });
+    }
+  };
+
   // 閲覧状況画面のボタンおよび更新アクション登録
   const presenceBtn = document.getElementById('admin-panel-presence-btn');
   if (presenceBtn) {
@@ -18454,6 +18786,30 @@ document.addEventListener('DOMContentLoaded', () => {
   const refreshPresenceBtn = document.getElementById('refresh-presence-btn');
   if (refreshPresenceBtn) {
     refreshPresenceBtn.addEventListener('click', () => {
+      renderUserPresenceList();
+    });
+  }
+
+  // タブ切り替え制御
+  const btnPerms = document.getElementById('toggle-presence-view-perms-btn');
+  const btnActive = document.getElementById('toggle-presence-view-active-btn');
+  const panePerms = document.getElementById('presence-pane-permissions');
+  const paneActive = document.getElementById('presence-pane-activity');
+
+  if (btnPerms && btnActive && panePerms && paneActive) {
+    btnPerms.addEventListener('click', () => {
+      panePerms.style.display = 'flex';
+      paneActive.style.display = 'none';
+      btnPerms.className = 'btn-primary';
+      btnActive.className = 'btn-secondary';
+      initPresenceUserSelector();
+    });
+
+    btnActive.addEventListener('click', () => {
+      panePerms.style.display = 'none';
+      paneActive.style.display = 'flex';
+      btnPerms.className = 'btn-secondary';
+      btnActive.className = 'btn-primary';
       renderUserPresenceList();
     });
   }
