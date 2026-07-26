@@ -384,7 +384,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const eyeIconHide = document.getElementById('eye-icon-hide');
   
   if (togglePassBtn && loginPassInput) {
-    togglePassBtn.addEventListener('click', () => {
+    togglePassBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       const isPassword = loginPassInput.type === 'password';
       loginPassInput.type = isPassword ? 'text' : 'password';
       
