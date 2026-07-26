@@ -2579,6 +2579,17 @@
       <input type="text" id="avatar-char-input" maxlength="2" placeholder="例: オ" style="padding: 0.45rem 0.65rem; font-size: 1.1rem; font-weight: bold; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; text-align: center;">
     </div>
     
+    <!-- アバター画像・PDFアップロード -->
+    <div class="form-group" style="margin-bottom: 1rem; text-align: left; display: flex; flex-direction: column; gap: 0.35rem;">
+      <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">アバター画像またはPDFをアップロード:</label>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <input type="file" id="avatar-file-input" accept=".png,.jpg,.jpeg,.pdf" style="display: none;">
+        <button type="button" id="avatar-upload-trigger-btn" class="btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; cursor: pointer; flex-grow: 1;">ファイルを選択</button>
+        <button type="button" id="avatar-clear-file-btn" class="btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; cursor: pointer; color: var(--text-danger); display: none;">クリア</button>
+      </div>
+      <span id="avatar-file-name-label" style="font-size: 0.7rem; color: var(--text-secondary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 280px; display: block; margin-top: 0.25rem;">選択されていません</span>
+    </div>
+    
     <!-- アバター背景色選択 -->
     <div class="form-group" style="margin-bottom: 1.5rem; text-align: left; display: flex; flex-direction: column; gap: 0.35rem;">
       <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">アバター背景色:</label>

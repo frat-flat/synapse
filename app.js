@@ -17817,7 +17817,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   
-  // アバターUI（表示文字・背景色）を最新設定で更新する関数
+  // アバターUI（表示文字・背景色・画像/PDF）を最新設定で更新する関数
   window.updateAvatarUI = function() {
     if (!state.currentUser) return;
     const userId = state.currentUser.id;
@@ -17825,12 +17825,18 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let char = (state.currentUser.name || '👤').charAt(0);
     let bg = 'var(--primary)';
+    let type = 'text';
+    let fileData = '';
+    let fileName = '';
     
     if (avatarConfigStr) {
       try {
         const config = JSON.parse(avatarConfigStr);
         if (config.char) char = config.char;
         if (config.bg) bg = config.bg;
+        if (config.type) type = config.type;
+        if (config.fileData) fileData = config.fileData;
+        if (config.fileName) fileName = config.fileName;
       } catch (e) {
         console.error('[Avatar] Error parsing local avatar config:', e);
       }
@@ -17839,14 +17845,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const headerAvatar = document.getElementById('logged-in-user-avatar');
     const popoverAvatar = document.getElementById('user-popover-avatar');
     
-    if (headerAvatar) {
-      headerAvatar.textContent = char;
-      headerAvatar.style.backgroundColor = bg;
-    }
-    if (popoverAvatar) {
-      popoverAvatar.textContent = char;
-      popoverAvatar.style.backgroundColor = bg;
-    }
+    const updateElement = (el) => {
+      if (!el) return;
+      if (type === 'image' && fileData) {
+        if (fileData.startsWith('data:application/pdf')) {
+          el.textContent = 'PDF';
+          el.style.backgroundImage = 'none';
+          el.style.backgroundColor = '#ef4444'; // PDFの赤
+          el.style.color = '#fff';
+          el.style.fontSize = el.id === 'logged-in-user-avatar' ? '0.65rem' : '0.9rem';
+          el.style.fontWeight = 'bold';
+          el.style.cursor = 'pointer';
+          el.title = `PDFを表示: ${fileName}`;
+          
+          if (!el._hasPdfListener) {
+            el._hasPdfListener = true;
+            el.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const pData = el._pdfData;
+              const pName = el._pdfName;
+              if (!pData) return;
+              const w = window.open();
+              if (w) {
+                w.document.write(`<iframe src="${pData}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                w.document.title = pName || 'Avatar PDF';
+              } else {
+                window.open(pData, '_blank');
+              }
+            });
+          }
+          el._pdfData = fileData;
+          el._pdfName = fileName;
+        } else {
+          el.textContent = '';
+          el.style.backgroundImage = `url("${fileData}")`;
+          el.style.backgroundSize = 'cover';
+          el.style.backgroundPosition = 'center';
+          el.style.backgroundColor = 'transparent';
+          el.style.cursor = 'default';
+          el.title = state.currentUser.name;
+        }
+      } else {
+        el.textContent = char;
+        el.style.backgroundImage = 'none';
+        el.style.backgroundColor = bg;
+        el.style.color = '#fff';
+        el.style.fontSize = '';
+        el.style.fontWeight = '';
+        el.style.cursor = 'default';
+        el.title = state.currentUser.name;
+      }
+    };
+
+    updateElement(headerAvatar);
+    updateElement(popoverAvatar);
   };
 
   // 右上ヘッダー設定ポップアップの制御
@@ -17928,7 +17980,31 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveManageBtn = document.getElementById('account-manage-save-btn');
   const cancelManageBtn = document.getElementById('account-manage-cancel-btn');
   
+  const fileInput = document.getElementById('avatar-file-input');
+  const uploadTriggerBtn = document.getElementById('avatar-upload-trigger-btn');
+  const clearFileBtn = document.getElementById('avatar-clear-file-btn');
+  const fileNameLabel = document.getElementById('avatar-file-name-label');
+
   let selectedAvatarBg = 'var(--primary)';
+  let currentUploadedFileData = null;
+  let currentUploadedFileName = null;
+  let currentUploadedFileType = 'text'; // 'text' or 'image'
+
+  function updatePreviewWithData(fileData, fileName, bg) {
+    if (!avatarPreview) return;
+    if (fileData.startsWith('data:application/pdf')) {
+      avatarPreview.textContent = 'PDF';
+      avatarPreview.style.backgroundImage = 'none';
+      avatarPreview.style.backgroundColor = '#ef4444';
+      avatarPreview.style.fontSize = '1.25rem';
+    } else {
+      avatarPreview.textContent = '';
+      avatarPreview.style.backgroundImage = `url("${fileData}")`;
+      avatarPreview.style.backgroundSize = 'cover';
+      avatarPreview.style.backgroundPosition = 'center';
+      avatarPreview.style.backgroundColor = 'transparent';
+    }
+  }
 
   if (manageAccountBtn && manageAccountModal) {
     manageAccountBtn.addEventListener('click', () => {
@@ -17939,21 +18015,42 @@ document.addEventListener('DOMContentLoaded', () => {
       
       let currentChar = (state.currentUser ? state.currentUser.name : '👤').charAt(0);
       let currentBg = 'var(--primary)';
+      let fileData = '';
+      let fileName = '';
+      let avatarType = 'text';
       
       if (configStr) {
         try {
           const config = JSON.parse(configStr);
           if (config.char) currentChar = config.char;
           if (config.bg) currentBg = config.bg;
+          if (config.type) avatarType = config.type;
+          if (config.fileData) fileData = config.fileData;
+          if (config.fileName) fileName = config.fileName;
         } catch (e) {}
       }
       
       if (avatarCharInput) avatarCharInput.value = currentChar;
-      if (avatarPreview) {
-        avatarPreview.textContent = currentChar;
-        avatarPreview.style.backgroundColor = currentBg;
-      }
       selectedAvatarBg = currentBg;
+      currentUploadedFileData = fileData;
+      currentUploadedFileName = fileName;
+      currentUploadedFileType = avatarType;
+
+      if (avatarType === 'image' && fileData) {
+        if (fileInput) fileInput.value = '';
+        if (fileNameLabel) fileNameLabel.textContent = fileName || 'アップロード済みファイル';
+        if (clearFileBtn) clearFileBtn.style.display = 'block';
+        updatePreviewWithData(fileData, fileName, currentBg);
+      } else {
+        if (fileNameLabel) fileNameLabel.textContent = '選択されていません';
+        if (clearFileBtn) clearFileBtn.style.display = 'none';
+        if (avatarPreview) {
+          avatarPreview.textContent = currentChar;
+          avatarPreview.style.backgroundImage = 'none';
+          avatarPreview.style.backgroundColor = currentBg;
+          avatarPreview.style.fontSize = '1.75rem';
+        }
+      }
       
       // カラーパレット枠線の初期化
       document.querySelectorAll('.avatar-color-opt').forEach(opt => {
@@ -17971,8 +18068,105 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (avatarCharInput && avatarPreview) {
     avatarCharInput.addEventListener('input', () => {
+      // ファイルが設定されている場合は文字入力を無視
+      if (currentUploadedFileType === 'image') return;
       const char = avatarCharInput.value.trim() || (state.currentUser ? state.currentUser.name.charAt(0) : '👤');
       avatarPreview.textContent = char.substring(0, 2);
+    });
+  }
+
+  if (uploadTriggerBtn && fileInput) {
+    uploadTriggerBtn.addEventListener('click', () => {
+      fileInput.click();
+    });
+  }
+
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        if (file.size > 500 * 1024) {
+          showToast('PDFファイルは500KB以下に制限されています。', 'error');
+          fileInput.value = '';
+          return;
+        }
+        
+        reader.onload = (event) => {
+          currentUploadedFileData = event.target.result;
+          currentUploadedFileName = file.name;
+          currentUploadedFileType = 'image';
+          
+          if (fileNameLabel) fileNameLabel.textContent = file.name;
+          if (clearFileBtn) clearFileBtn.style.display = 'block';
+          
+          updatePreviewWithData(currentUploadedFileData, file.name, selectedAvatarBg);
+        };
+        reader.readAsDataURL(file);
+      } else if (file.type.startsWith('image/')) {
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const maxDim = 96;
+            let w = img.width;
+            let h = img.height;
+            if (w > h) {
+              if (w > maxDim) {
+                h = Math.round((h * maxDim) / w);
+                w = maxDim;
+              }
+            } else {
+              if (h > maxDim) {
+                w = Math.round((w * maxDim) / h);
+                h = maxDim;
+              }
+            }
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            
+            const dataUrl = canvas.toDataURL('image/webp', 0.8);
+            
+            currentUploadedFileData = dataUrl;
+            currentUploadedFileName = file.name;
+            currentUploadedFileType = 'image';
+            
+            if (fileNameLabel) fileNameLabel.textContent = file.name;
+            if (clearFileBtn) clearFileBtn.style.display = 'block';
+            
+            updatePreviewWithData(dataUrl, file.name, selectedAvatarBg);
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      } else {
+        showToast('PNG, JPEG, PDFファイルを選択してください。', 'error');
+        fileInput.value = '';
+      }
+    });
+  }
+
+  if (clearFileBtn) {
+    clearFileBtn.addEventListener('click', () => {
+      currentUploadedFileData = '';
+      currentUploadedFileName = '';
+      currentUploadedFileType = 'text';
+      if (fileInput) fileInput.value = '';
+      if (fileNameLabel) fileNameLabel.textContent = '選択されていません';
+      if (clearFileBtn) clearFileBtn.style.display = 'none';
+      
+      const char = (avatarCharInput ? avatarCharInput.value.trim() : '') || (state.currentUser ? state.currentUser.name.charAt(0) : '👤');
+      if (avatarPreview) {
+        avatarPreview.textContent = char.substring(0, 2);
+        avatarPreview.style.backgroundImage = 'none';
+        avatarPreview.style.backgroundColor = selectedAvatarBg;
+        avatarPreview.style.fontSize = '1.75rem';
+      }
     });
   }
 
@@ -17980,7 +18174,9 @@ document.addEventListener('DOMContentLoaded', () => {
     opt.addEventListener('click', () => {
       const color = opt.getAttribute('data-color');
       selectedAvatarBg = color;
-      if (avatarPreview) avatarPreview.style.backgroundColor = color;
+      if (avatarPreview && currentUploadedFileType !== 'image') {
+        avatarPreview.style.backgroundColor = color;
+      }
       
       document.querySelectorAll('.avatar-color-opt').forEach(o => {
         o.style.borderColor = 'transparent';
@@ -18003,7 +18199,10 @@ document.addEventListener('DOMContentLoaded', () => {
       
       const config = {
         char: char.substring(0, 2),
-        bg: selectedAvatarBg
+        bg: selectedAvatarBg,
+        type: currentUploadedFileType,
+        fileData: currentUploadedFileData || '',
+        fileName: currentUploadedFileName || ''
       };
       
       localStorage.setItem('synapse_user_avatar_' + userId, JSON.stringify(config));
