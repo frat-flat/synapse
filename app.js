@@ -673,13 +673,17 @@ async function syncToSupabase(key, value) {
       if (Array.isArray(usersList)) {
         console.log('[Supabase] Syncing user list to relational synapse_users table...');
         for (const user of usersList) {
+          let dbRole = user.role || 'sales';
+          if (user.status === 'pending') {
+            dbRole = 'pending_' + dbRole;
+          }
           const { error: userError } = await supabaseClient
             .from('synapse_users')
             .upsert({
               id: user.id,
               name: user.name,
               password: user.password,
-              role: user.role || 'sales',
+              role: dbRole,
               email: user.email || user.id,
               code: user.code,
               created_at: user.createdAt || new Date().toISOString(),
@@ -759,17 +763,26 @@ async function syncFromSupabase(showNotification = false) {
 
       // ユーザーデータの同期 (synapse_users からマッピング)
       if (usersData && Array.isArray(usersData)) {
-        const mappedUsers = usersData.map(user => ({
-          id: user.id,
-          name: user.name,
-          password: user.password,
-          role: user.role,
-          email: user.email,
-          code: user.code,
-          createdAt: user.created_at,
-          lastLoginAt: user.last_login_at,
-          pwdChangedAt: user.pwd_changed_at
-        }));
+        const mappedUsers = usersData.map(user => {
+          let mappedRole = user.role || 'sales';
+          let mappedStatus = 'active';
+          if (mappedRole.startsWith('pending_')) {
+            mappedRole = mappedRole.replace('pending_', '');
+            mappedStatus = 'pending';
+          }
+          return {
+            id: user.id,
+            name: user.name,
+            password: user.password,
+            role: mappedRole,
+            status: mappedStatus,
+            email: user.email,
+            code: user.code,
+            createdAt: user.created_at,
+            lastLoginAt: user.last_login_at,
+            pwdChangedAt: user.pwd_changed_at
+          };
+        });
 
         const localVal = localStorage.getItem(STORAGE_KEYS.USERS);
         const remoteValStr = JSON.stringify(mappedUsers);
@@ -854,9 +867,9 @@ function ensureInitialUsersExist() {
   const defaultUsers = [
     { 
       id: 'admin', 
-      name: 'システム管理者', 
+      name: 'ECオーナー', 
       password: 'password', 
-      role: 'admin',
+      role: 'owner',
       code: '4X9N3K75',
       createdAt: '2025-01-01T10:00:00Z',
       lastLoginAt: new Date().toISOString(),
@@ -871,6 +884,16 @@ function ensureInitialUsersExist() {
     try {
       let users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
       let updated = false;
+      
+      const adminUser = users.find(u => u.id === 'admin');
+      if (adminUser) {
+        if (adminUser.role !== 'owner' || adminUser.name !== 'ECオーナー') {
+          adminUser.role = 'owner';
+          adminUser.name = 'ECオーナー';
+          updated = true;
+        }
+      }
+      
       users = users.map(u => {
         if (!u.createdAt) { u.createdAt = '2025-01-01T10:00:00Z'; updated = true; }
         if (!u.lastLoginAt) { u.lastLoginAt = new Date().toISOString(); updated = true; }
@@ -1871,13 +1894,23 @@ function logCellEdit(tableId, rowId, colId, oldValue, newValue) {
   saveAuditLogs();
 }
 
+// ログイン中のユーザーがECオーナー（code: 4X9N3K75 または role: owner）かを判定するヘルパー
+function isOwnerUser() {
+  if (!state.currentUser) return false;
+  return state.currentUser.role === 'owner' || state.currentUser.code === '4X9N3K75';
+}
+
 // アクティブなプレビュー対象、または現在のユーザーIDを解決するヘルパー
 function getCurrentUserId() {
   if (state.previewUserId) return state.previewUserId;
   if (state.currentUser) {
-    if (state.currentUser.loginId && state.currentUser.loginId.toLowerCase().includes('admin')) {
+    // プレビュー表示切り替え時のダミーID解決
+    if (state.currentUser.role === 'owner' || state.currentUser.code === '4X9N3K75') {
       if (state.currentUser.id === 'sales') return 'sales_01';
-      if (state.currentUser.id === 'support') return 'support_01';
+      if (state.currentUser.id === 'setup-support') return 'support_01';
+      if (state.currentUser.id === 'store-patrol') return 'patrol_01';
+      if (state.currentUser.id === 'back-office') return 'backoffice_01';
+      if (state.currentUser.id === 'admin') return 'admin_01';
     }
     return state.currentUser.loginId || state.currentUser.id;
   }
@@ -1887,16 +1920,15 @@ function getCurrentUserId() {
 // フォルダ（アコーディオン）の閲覧可否判定
 // 戻り値: { visible: boolean, grayout: boolean }
 function checkFolderAccess(folderId) {
-  // 標準アコーディオンフォルダ群は常に表示する
-  const stdFolders = ['appoint-accordion', 'agency-accordion', 'jo-accordion', 'applicant-accordion'];
-  if (stdFolders.includes(folderId)) {
-    return { visible: true, grayout: false };
+  // 承認待ちユーザーはマイページ関連以外のフォルダをすべて非表示にする
+  if (state.currentUser && state.currentUser.status === 'pending') {
+    return { visible: false, grayout: false };
   }
 
   const userId = getCurrentUserId();
-  const isAdminReal = state.currentUser && state.currentUser.id === 'admin';
+  const isOwner = isOwnerUser();
   
-  if (isAdminReal && !state.previewUserId) {
+  if (isOwner && !state.previewUserId) {
     return { visible: true, grayout: false };
   }
 
@@ -1908,29 +1940,33 @@ function checkFolderAccess(folderId) {
     return { visible: true, grayout: false };
   }
 
-  if (state.previewUserId && state.previewMode === 'grayout' && isAdminReal) {
-    return { visible: true, grayout: true };
+  // プレビュー表示時のシミュレーションモード
+  if (state.previewUserId && isOwner) {
+    if (state.previewMode === 'simulate' || state.previewMode === 'grayout') {
+      return { visible: true, grayout: true };
+    }
+  }
+
+  // 標準アコーディオンフォルダ群は常に表示する
+  const stdFolders = ['appoint-accordion', 'agency-accordion', 'jo-accordion', 'applicant-accordion'];
+  if (stdFolders.includes(folderId)) {
+    return { visible: true, grayout: false };
   }
 
   return { visible: false, grayout: false };
 }
+
 // テーブル（シート）の閲覧可否判定
 function checkTableAccess(tableId) {
-  // アポイント画面群および標準基本マスタ画面は常に表示する
-  const stdSystemTables = [
-    'appoint-screen', 'appointment-new', 'appointment-existing',
-    'drafts-view-screen', 'history-view-screen', 'official-id-link', 'link-official-screen',
-    'agency-info-screen', 'jo-info-screen', 'applicant-info-screen'
-  ];
-
-  if (stdSystemTables.includes(tableId)) {
-    return { visible: true, grayout: false };
+  // 承認待ちユーザーはマイページ関連以外のテーブルをすべて非表示にする
+  if (state.currentUser && state.currentUser.status === 'pending') {
+    return { visible: false, grayout: false };
   }
 
   const userId = getCurrentUserId();
-  const isAdminReal = state.currentUser && state.currentUser.id === 'admin';
+  const isOwner = isOwnerUser();
 
-  if (isAdminReal && !state.previewUserId) {
+  if (isOwner && !state.previewUserId) {
     return { visible: true, grayout: false };
   }
 
@@ -1942,8 +1978,22 @@ function checkTableAccess(tableId) {
     return { visible: true, grayout: false };
   }
 
-  if (state.previewUserId && state.previewMode === 'grayout' && isAdminReal) {
-    return { visible: true, grayout: true };
+  // プレビュー表示時のシミュレーションモード
+  if (state.previewUserId && isOwner) {
+    if (state.previewMode === 'simulate' || state.previewMode === 'grayout') {
+      return { visible: true, grayout: true };
+    }
+  }
+
+  // アポイント画面群および標準基本マスタ画面は常に表示する
+  const stdSystemTables = [
+    'appoint-screen', 'appointment-new', 'appointment-existing',
+    'drafts-view-screen', 'history-view-screen', 'official-id-link', 'link-official-screen',
+    'agency-info-screen', 'jo-info-screen', 'applicant-info-screen'
+  ];
+
+  if (stdSystemTables.includes(tableId)) {
+    return { visible: true, grayout: false };
   }
 
   return { visible: false, grayout: false };
@@ -1951,10 +2001,15 @@ function checkTableAccess(tableId) {
 
 // カラム（列）の閲覧可否判定
 function checkColumnAccess(tableId, colId) {
-  const userId = getCurrentUserId();
-  const isAdminReal = state.currentUser && state.currentUser.id === 'admin';
+  // 承認待ちユーザーはすべての列（マスタ類）を非表示にする
+  if (state.currentUser && state.currentUser.status === 'pending') {
+    return { visible: false, grayout: false };
+  }
 
-  if (isAdminReal && !state.previewUserId) {
+  const userId = getCurrentUserId();
+  const isOwner = isOwnerUser();
+
+  if (isOwner && !state.previewUserId) {
     return { visible: true, grayout: false };
   }
 
@@ -1969,8 +2024,11 @@ function checkColumnAccess(tableId, colId) {
     return { visible: true, grayout: false };
   }
 
-  if (state.previewUserId && state.previewMode === 'grayout' && isAdminReal) {
-    return { visible: true, grayout: true };
+  // プレビュー表示時のシミュレーションモード
+  if (state.previewUserId && isOwner) {
+    if (state.previewMode === 'simulate' || state.previewMode === 'grayout') {
+      return { visible: true, grayout: true };
+    }
   }
 
   return { visible: false, grayout: false };
@@ -1978,9 +2036,14 @@ function checkColumnAccess(tableId, colId) {
 
 // カラム（列）の編集可否判定（3ステート対応）
 function checkColumnEditAccess(tableId, colId) {
+  // 承認待ちユーザーは一切編集できない
+  if (state.currentUser && state.currentUser.status === 'pending') {
+    return false;
+  }
+
   const userId = getCurrentUserId();
-  const isAdminReal = state.currentUser && state.currentUser.id === 'admin';
-  if (isAdminReal && !state.previewUserId) {
+  const isOwner = isOwnerUser();
+  if (isOwner && !state.previewUserId) {
     return true;
   }
 
@@ -2019,10 +2082,15 @@ function checkColumnEditAccess(tableId, colId) {
 
 // 行（データ行）の閲覧可否判定
 function checkRowAccess(tableId, row) {
-  const userId = getCurrentUserId();
-  const isAdminReal = state.currentUser && state.currentUser.id === 'admin';
+  // 承認待ちユーザーは閲覧不可
+  if (state.currentUser && state.currentUser.status === 'pending') {
+    return { visible: false, grayout: false };
+  }
 
-  if (isAdminReal && !state.previewUserId) {
+  const userId = getCurrentUserId();
+  const isOwner = isOwnerUser();
+
+  if (isOwner && !state.previewUserId) {
     return { visible: true, grayout: false };
   }
 
@@ -6275,6 +6343,28 @@ function updateUIForCurrentMode() {
   const origFavParent = document.getElementById('mypage-screen');
   const origMemoParent = document.getElementById('mypage-memo-screen');
 
+  const pendingBanner = document.getElementById('pending-banner');
+  const pendingUser = state.currentUser && state.currentUser.status === 'pending';
+
+  // 申請中バナーの表示制御
+  if (pendingBanner) {
+    if (pendingUser) {
+      const jpRole = getRoleJpName(state.currentUser.role);
+      pendingBanner.innerHTML = `
+        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; color: #b45309; padding: 12px 16px; margin: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 14px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg style="width: 20px; height: 20px; fill: currentColor; flex-shrink: 0;" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+            <span>現在、<strong>${jpRole}</strong> のロール変更申請が承認待ちです。承認されるまでマイページ機能以外は非表示になります。</span>
+          </div>
+          <span style="font-size: 12px; font-weight: bold; background: #fef3c7; padding: 2px 6px; border-radius: 4px; flex-shrink: 0;">オーナー承認待ち</span>
+        </div>
+      `;
+      pendingBanner.style.display = 'block';
+    } else {
+      pendingBanner.style.display = 'none';
+    }
+  }
+
   if (isSystemAdmin) {
     if (menuMypage) menuMypage.style.display = 'flex';
     if (userMypageContainer) userMypageContainer.style.display = 'none';
@@ -6297,18 +6387,30 @@ function updateUIForCurrentMode() {
     if (menuView && userMypageContainer && menuView.parentNode !== userMypageContainer) {
       userMypageContainer.appendChild(menuView);
     }
-    // メニュービューは常にホーム上で表示されるようにする
-    if (menuView) menuView.style.display = 'flex';
+    // メニュービューは常にホーム上で表示されるようにする (承認待ちの場合はマイページ機能自体以外は非表示なのでメニュー一覧自体隠す)
+    if (menuView) menuView.style.display = pendingUser ? 'none' : 'flex';
 
-    // お気に入り一覧とメモ帳本体は本来の親に戻しておく（遷移時に mypage-screen などに切り替えて使うため）
-    if (mypageFavWrapper && origFavParent && mypageFavWrapper.parentNode !== origFavParent) {
-      origFavParent.appendChild(mypageFavWrapper);
-    }
-    if (mypageMemoWrapper && origMemoParent && mypageMemoWrapper.parentNode !== origMemoParent) {
-      origMemoParent.appendChild(mypageMemoWrapper);
+    // お気に入り一覧とメモ帳本体は本来の親に戻しておく
+    // ただし承認待ちユーザーの場合、お気に入り・メモのみが見えるよう、ホーム画面（user-mypage-container）へ移設する
+    if (pendingUser) {
+      if (mypageFavWrapper && userMypageContainer && mypageFavWrapper.parentNode !== userMypageContainer) {
+        userMypageContainer.appendChild(mypageFavWrapper);
+      }
+      if (mypageMemoWrapper && userMypageContainer && mypageMemoWrapper.parentNode !== userMypageContainer) {
+        userMypageContainer.appendChild(mypageMemoWrapper);
+      }
+      if (mypageFavWrapper) mypageFavWrapper.style.display = 'block';
+      if (mypageMemoWrapper) mypageMemoWrapper.style.display = 'block';
+    } else {
+      if (mypageFavWrapper && origFavParent && mypageFavWrapper.parentNode !== origFavParent) {
+        origFavParent.appendChild(mypageFavWrapper);
+      }
+      if (mypageMemoWrapper && origMemoParent && mypageMemoWrapper.parentNode !== origMemoParent) {
+        origMemoParent.appendChild(mypageMemoWrapper);
+      }
     }
 
-    // 一般ユーザー用のプロフィール情報（マイページ側と同じバインド）
+    // 一般ユーザー用のプロフィール情報
     const mypageFullnameEl = document.getElementById('mypage-user-fullname');
     const mypageCodeEl = document.getElementById('mypage-user-code');
     if (mypageFullnameEl) mypageFullnameEl.textContent = state.currentUser.name || 'ゲスト';
@@ -6318,17 +6420,32 @@ function updateUIForCurrentMode() {
   const switchContainer = document.getElementById('global-mode-switch-container');
   if (switchContainer) {
     const isLoginAdmin = (state.currentUser.loginId && state.currentUser.loginId.toLowerCase().includes('admin')) ||
-                         (state.currentUser.id === 'admin');
+                         (state.currentUser.id === 'admin') || isOwnerUser();
     switchContainer.style.display = isLoginAdmin ? 'flex' : 'none';
   }
   
-  // アポイントアコーディオンの表示制御
+  // アポイントアコーディオンおよび他のアコーディオンの表示制御
   const appointAccordion = document.getElementById('appoint-accordion');
-  if (appointAccordion) {
-    appointAccordion.style.display = 'block';
+  const agencyAccordion = document.getElementById('agency-accordion');
+  const joAccordion = document.getElementById('jo-accordion');
+  const applicantAccordion = document.getElementById('applicant-accordion');
+  const customTablesAccordion = document.getElementById('custom-tables-accordion');
+  
+  if (pendingUser) {
+    if (appointAccordion) appointAccordion.style.display = 'none';
+    if (agencyAccordion) agencyAccordion.style.display = 'none';
+    if (joAccordion) joAccordion.style.display = 'none';
+    if (applicantAccordion) applicantAccordion.style.display = 'none';
+    if (customTablesAccordion) customTablesAccordion.style.display = 'none';
+  } else {
+    if (appointAccordion) appointAccordion.style.display = checkFolderAccess('appoint-accordion').visible ? 'block' : 'none';
+    if (agencyAccordion) agencyAccordion.style.display = checkFolderAccess('agency-accordion').visible ? 'block' : 'none';
+    if (joAccordion) joAccordion.style.display = checkFolderAccess('jo-accordion').visible ? 'block' : 'none';
+    if (applicantAccordion) applicantAccordion.style.display = checkFolderAccess('applicant-accordion').visible ? 'block' : 'none';
+    if (customTablesAccordion) customTablesAccordion.style.display = 'block';
   }
   
-  // メニューバー（サイドバー）の管理者用メニューを完全に排除（ホーム画面に集約するため、常に非表示にする）
+  // メニューバー（サイドバー）の管理者用メニューを完全に排除
   const formCustBtn = document.getElementById('menu-form-customize');
   const tableCreatBtn = document.getElementById('menu-table-creator');
   const permSettingsBtn = document.getElementById('menu-permission-settings');
@@ -6342,8 +6459,8 @@ function updateUIForCurrentMode() {
   // ホーム画面の管理者専用コントロールパネルの表示制御
   const adminHomePanel = document.getElementById('admin-home-panel');
   if (adminHomePanel) {
-    const isAdminMode = getCurrentUserId() === 'admin';
-    adminHomePanel.style.display = isAdminMode ? 'flex' : 'none';
+    const isAdminMode = getCurrentUserId() === 'admin' || (state.currentUser && (state.currentUser.role === 'owner' || state.currentUser.code === '4X9N3K75'));
+    adminHomePanel.style.display = (isAdminMode && !pendingUser) ? 'flex' : 'none';
   }
 
   // 管理者メニューボタンの表示制御
@@ -6352,23 +6469,38 @@ function updateUIForCurrentMode() {
   const applicantInfoBtn = document.getElementById('menu-applicant-info');
   const dbmakeBtn = document.getElementById('menu-dbmake');
   
-  if (agencyInfoBtn) agencyInfoBtn.style.display = mode === 'support' ? 'none' : 'block';
-  if (joInfoBtn) joInfoBtn.style.display = 'block';
-  if (applicantInfoBtn) applicantInfoBtn.style.display = 'block';
-  if (dbmakeBtn) dbmakeBtn.style.display = mode === 'admin' ? 'block' : 'none';
+  if (pendingUser) {
+    if (agencyInfoBtn) agencyInfoBtn.style.display = 'none';
+    if (joInfoBtn) joInfoBtn.style.display = 'none';
+    if (applicantInfoBtn) applicantInfoBtn.style.display = 'none';
+    if (dbmakeBtn) dbmakeBtn.style.display = 'none';
+  } else {
+    if (agencyInfoBtn) agencyInfoBtn.style.display = mode === 'support' ? 'none' : 'block';
+    if (joInfoBtn) joInfoBtn.style.display = 'block';
+    if (applicantInfoBtn) applicantInfoBtn.style.display = 'block';
+    if (dbmakeBtn) dbmakeBtn.style.display = mode === 'admin' ? 'block' : 'none';
+  }
   
   // ヘッダーのモード切り替えボタンの更新
   const btnSales = document.getElementById('btn-mode-sales');
   const btnSupport = document.getElementById('btn-mode-support');
+  const btnPatrol = document.getElementById('btn-mode-patrol');
+  const btnBackOffice = document.getElementById('btn-mode-backoffice');
   const btnAdmin = document.getElementById('btn-mode-admin');
-  if (btnSales && btnSupport && btnAdmin) {
+  if (btnSales && btnSupport && btnPatrol && btnBackOffice && btnAdmin) {
     btnSales.classList.remove('active');
     btnSupport.classList.remove('active');
+    btnPatrol.classList.remove('active');
+    btnBackOffice.classList.remove('active');
     btnAdmin.classList.remove('active');
     if (mode === 'sales') {
       btnSales.classList.add('active');
-    } else if (mode === 'support') {
+    } else if (mode === 'support' || mode === 'setup-support') {
       btnSupport.classList.add('active');
+    } else if (mode === 'store-patrol') {
+      btnPatrol.classList.add('active');
+    } else if (mode === 'back-office') {
+      btnBackOffice.classList.add('active');
     } else {
       btnAdmin.classList.add('active');
     }
@@ -7839,17 +7971,30 @@ function setupEventListeners() {
 
 
   // 表示モード切り替えボタンのイベント登録
+  const btnOwner = document.getElementById('btn-mode-owner');
+  const btnAdmin = document.getElementById('btn-mode-admin');
   const btnSales = document.getElementById('btn-mode-sales');
   const btnSupport = document.getElementById('btn-mode-support');
-  const btnAdmin = document.getElementById('btn-mode-admin');
+  const btnPatrol = document.getElementById('btn-mode-patrol');
+  const btnBackOffice = document.getElementById('btn-mode-backoffice');
+
+  if (btnOwner) {
+    btnOwner.addEventListener('click', () => changeUserMode('admin'));
+  }
+  if (btnAdmin) {
+    btnAdmin.addEventListener('click', () => changeUserMode('admin'));
+  }
   if (btnSales) {
     btnSales.addEventListener('click', () => changeUserMode('sales'));
   }
   if (btnSupport) {
     btnSupport.addEventListener('click', () => changeUserMode('support'));
   }
-  if (btnAdmin) {
-    btnAdmin.addEventListener('click', () => changeUserMode('admin'));
+  if (btnPatrol) {
+    btnPatrol.addEventListener('click', () => changeUserMode('store-patrol'));
+  }
+  if (btnBackOffice) {
+    btnBackOffice.addEventListener('click', () => changeUserMode('back-office'));
   }
 
   // ログイン・ログアウト
@@ -8679,13 +8824,30 @@ function changeUserMode(mode) {
   if (!state.currentUser) return;
   
   // モードに対応する正確なユーザーIDとロールを設定する
-  const targetId = mode === 'admin' ? 'admin' : (mode === 'support' ? 'support_01' : 'sales_01');
+  let targetId = 'sales_01';
+  let targetName = '営業担当A';
+  if (mode === 'admin') {
+    targetId = 'admin';
+    targetName = 'システム管理者';
+  } else if (mode === 'support' || mode === 'setup-support') {
+    targetId = 'support_01';
+    targetName = '開設サポート担当';
+    mode = 'setup-support';
+  } else if (mode === 'store-patrol') {
+    targetId = 'patrol_01';
+    targetName = '店舗パトロール担当';
+  } else if (mode === 'back-office') {
+    targetId = 'backoffice_01';
+    targetName = 'バックオフィス担当';
+  }
+  
   if (state.currentUser.id === targetId) return; // 既にそのユーザーなら何もしない
   
   state.currentUser.id = targetId;
   state.currentUser.loginId = targetId;
   state.currentUser.role = mode;
-  state.currentUser.name = mode === 'admin' ? 'システム管理者' : (mode === 'support' ? '開設サポート担当' : '営業担当A');
+  state.currentUser.name = targetName;
+  state.currentUser.status = 'active'; // プレビュー切替時はアクティブ
   
   // localStorageに保存
   localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
@@ -8705,7 +8867,7 @@ function changeUserMode(mode) {
     if (state.activeTabId === 'dbmake-screen') {
       switchView('mypage-screen');
     }
-  } else if (mode === 'support') {
+  } else if (mode === 'setup-support' || mode === 'store-patrol' || mode === 'back-office') {
     removeRestrictedTabsForRole(mode);
     renderTabs();
     if (state.activeTabId === 'dbmake-screen') {
@@ -8725,8 +8887,22 @@ function changeUserMode(mode) {
   
   let modeLabel = '営業';
   if (mode === 'admin') modeLabel = '管理者';
-  else if (mode === 'support') modeLabel = '開設サポート';
+  else if (mode === 'setup-support') modeLabel = '開設サポート';
+  else if (mode === 'store-patrol') modeLabel = '店舗パトロール';
+  else if (mode === 'back-office') modeLabel = 'バックオフィス';
   showToast(`${modeLabel}モードに切り替えました。`, 'success');
+}
+
+// ロール名の日本語表記を取得するグローバルヘルパー
+function getRoleJpName(role) {
+  switch (role) {
+    case 'admin': return 'システム管理者';
+    case 'sales': return '営業担当';
+    case 'setup-support': return '開設サポート';
+    case 'store-patrol': return '店舗パトロール';
+    case 'back-office': return 'バックオフィス';
+    default: return role || '未設定';
+  }
 }
 
 // ==========================================
@@ -8745,7 +8921,11 @@ function handleLogin(e) {
 
     ensureInitialUsersExist();
     const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
-    const foundUser = users.find(u => u.id.toLowerCase() === id.toLowerCase() && u.password === pass);
+    const rawId = document.getElementById('login-id').value.trim();
+    let foundUser = users.find(u => u.id.toLowerCase() === id.toLowerCase() && u.password === pass);
+    if (!foundUser && rawId.includes('@')) {
+      foundUser = users.find(u => u.id.toLowerCase() === rawId.toLowerCase() && u.password === pass);
+    }
 
     if (foundUser) {
       foundUser.lastLoginAt = new Date().toISOString();
@@ -8787,12 +8967,22 @@ function handleLogin(e) {
       initMypageMemo();
 
       showToast('ログインしました。', 'success');
-      showLoginScreen(false);
 
-      if (state.currentUser.id === 'admin') {
-        openTab('agency-info-screen', 'agency-info-screen', '📊 代理店・基本マスタ');
+      if (!foundUser.role) {
+        if (typeof showBusinessRoleSelectionModal === 'function') {
+          showBusinessRoleSelectionModal(foundUser);
+        } else {
+          // フォールバック
+          showLoginScreen(false);
+          switchView('mypage-screen');
+        }
       } else {
-        switchView('mypage-screen');
+        showLoginScreen(false);
+        if (state.currentUser.id === 'admin') {
+          openTab('agency-info-screen', 'agency-info-screen', '📊 代理店・基本マスタ');
+        } else {
+          switchView('mypage-screen');
+        }
       }
     } else {
       showToast('パスワードが正しくありません。 (パスワード: password)', 'error');
@@ -18984,6 +19174,221 @@ document.addEventListener('DOMContentLoaded', () => {
     container.innerHTML = html;
   };
 
+  // ロール名の日本語表記を取得
+  function getRoleJpName(role) {
+    switch (role) {
+      case 'admin': return 'システム管理者';
+      case 'sales': return '営業担当';
+      case 'setup-support': return '開設サポート';
+      case 'store-patrol': return '店舗パトロール';
+      case 'back-office': return 'バックオフィス';
+      default: return role || '未設定';
+    }
+  }
+
+  const escapeHTML = (str) => String(str).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c] || c));
+
+  // ECオーナー画面における承認申請一覧の描画
+  function renderAdminApprovalPane() {
+    const pane = document.getElementById('admin-approval-list');
+    const badge = document.getElementById('approval-badge-count');
+    if (!pane) return;
+
+    const usersStr = localStorage.getItem(STORAGE_KEYS.USERS) || '[]';
+    let users = [];
+    try {
+      users = JSON.parse(usersStr);
+    } catch (e) {}
+
+    const pendingUsers = users.filter(u => u.status === 'pending');
+
+    // バッジ表示の更新
+    if (badge) {
+      if (pendingUsers.length > 0) {
+        badge.textContent = pendingUsers.length;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    if (pendingUsers.length === 0) {
+      pane.innerHTML = '<div style="padding: 12px; color: #64748b; text-align: center; font-size: 14px;">現在、承認待ちのロール変更申請はありません。</div>';
+      return;
+    }
+
+    let html = `
+      <table class="data-table" style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+        <thead>
+          <tr style="background: #f1f5f9; text-align: left;">
+            <th style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: 13px;">ユーザー名 (ID)</th>
+            <th style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: 13px;">希望ロール</th>
+            <th style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: 13px;">ステータス</th>
+            <th style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: center;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    pendingUsers.forEach(u => {
+      html += `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 8px; font-size: 14px;"><strong>${escapeHTML(u.name || u.id)}</strong> (${escapeHTML(u.id)})</td>
+          <td style="padding: 8px; font-size: 14px;"><span class="badge" style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${escapeHTML(getRoleJpName(u.role))}</span></td>
+          <td style="padding: 8px; font-size: 14px;"><span class="badge" style="background: #fef3c7; color: #d97706; padding: 2px 8px; border-radius: 4px; font-size: 12px;">承認待ち</span></td>
+          <td style="padding: 8px; font-size: 14px; text-align: center;">
+            <button class="btn btn-primary approve-btn" data-user-id="${u.id}" style="padding: 4px 8px; font-size: 12px; margin-right: 6px;">承認</button>
+            <button class="btn btn-secondary reject-btn" data-user-id="${u.id}" style="padding: 4px 8px; font-size: 12px; background: #ef4444; border-color: #ef4444; color: white;">却下</button>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `
+        </tbody>
+      </table>
+    `;
+
+    pane.innerHTML = html;
+
+    // イベントバインド (デリゲーションによる確実なバインド)
+    if (!pane.dataset.delegateBound) {
+      pane.dataset.delegateBound = 'true';
+      pane.addEventListener('click', async (e) => {
+        const approveBtn = e.target.closest('.approve-btn');
+        if (approveBtn) {
+          const userId = approveBtn.getAttribute('data-user-id');
+          console.log('[DEBUG] Delegate click detected for approve-btn, userId:', userId);
+          await processUserApproval(userId, true);
+          return;
+        }
+
+        const rejectBtn = e.target.closest('.reject-btn');
+        if (rejectBtn) {
+          const userId = rejectBtn.getAttribute('data-user-id');
+          console.log('[DEBUG] Delegate click detected for reject-btn, userId:', userId);
+          await processUserApproval(userId, false);
+          return;
+        }
+      });
+    }
+  }
+
+  // デフォルトパッケージ（ロール別のテンプレート権限）をユーザーへ適用する
+  function applyDefaultRolePermissions(userId, role) {
+    // テンプレート元となるユーザーIDを解決
+    let templateUserId = 'sales_01';
+    if (role === 'admin') templateUserId = 'admin_01';
+    else if (role === 'support' || role === 'setup-support') templateUserId = 'support_01';
+    else if (role === 'store-patrol') templateUserId = 'patrol_01';
+    else if (role === 'back-office') templateUserId = 'backoffice_01';
+
+    // 1. フォルダ権限のコピー
+    if (state.permissions.folders) {
+      Object.keys(state.permissions.folders).forEach(folderId => {
+        const allowed = state.permissions.folders[folderId] || [];
+        if (allowed.includes(templateUserId)) {
+          if (!allowed.includes(userId)) {
+            allowed.push(userId);
+          }
+        } else {
+          const idx = allowed.indexOf(userId);
+          if (idx !== -1) {
+            allowed.splice(idx, 1);
+          }
+        }
+        state.permissions.folders[folderId] = allowed;
+      });
+    }
+
+    // 2. テーブル権限のコピー
+    if (state.permissions.tables) {
+      Object.keys(state.permissions.tables).forEach(tableId => {
+        const allowed = state.permissions.tables[tableId] || [];
+        if (allowed.includes(templateUserId)) {
+          if (!allowed.includes(userId)) {
+            allowed.push(userId);
+          }
+        } else {
+          const idx = allowed.indexOf(userId);
+          if (idx !== -1) {
+            allowed.splice(idx, 1);
+          }
+        }
+        state.permissions.tables[tableId] = allowed;
+      });
+    }
+
+    // 3. カラム権限のコピー
+    if (state.permissions.columns) {
+      Object.keys(state.permissions.columns).forEach(tableId => {
+        const colPerms = state.permissions.columns[tableId] || {};
+        Object.keys(colPerms).forEach(colId => {
+          const allowed = colPerms[colId] || [];
+          if (allowed.includes(templateUserId)) {
+            if (!allowed.includes(userId)) {
+              allowed.push(userId);
+            }
+          } else {
+            const idx = allowed.indexOf(userId);
+            if (idx !== -1) {
+              allowed.splice(idx, 1);
+            }
+          }
+          colPerms[colId] = allowed;
+        });
+        state.permissions.columns[tableId] = colPerms;
+      });
+    }
+
+    // 4. ローフィルター権限のコピー (もしあれば)
+    if (state.permissions.rowFilters) {
+      Object.keys(state.permissions.rowFilters).forEach(tableId => {
+        const filters = state.permissions.rowFilters[tableId] || {};
+        if (filters[templateUserId] !== undefined) {
+          filters[userId] = filters[templateUserId];
+        } else {
+          delete filters[userId];
+        }
+        state.permissions.rowFilters[tableId] = filters;
+      });
+    }
+
+    savePermissions();
+  }
+
+  // 承認または却下の実行
+  async function processUserApproval(userId, isApprove) {
+    const usersStr = localStorage.getItem(STORAGE_KEYS.USERS) || '[]';
+    let users = [];
+    try {
+      users = JSON.parse(usersStr);
+    } catch (e) {}
+
+    const uIdx = users.findIndex(u => u.id === userId);
+    if (uIdx === -1) return;
+
+    const user = users[uIdx];
+    if (isApprove) {
+      user.status = 'active';
+      // デフォルトパッケージの権限を適用する
+      applyDefaultRolePermissions(user.id, user.role);
+      showToast(`${user.name} さんのロール「${getRoleJpName(user.role)}」申請を承認しました。権限パッケージを適用しました。`);
+    } else {
+      user.status = 'active';
+      user.role = ''; // ロール選択からやり直し
+      showToast(`${user.name} さんのロール変更申請を却下しました。`);
+    }
+
+    // 保存
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+    await syncToSupabase(STORAGE_KEYS.USERS, JSON.stringify(users));
+
+    // リロード
+    initPresenceUserSelector();
+    updateUIForCurrentMode(); // ヘッダーバナーやUI全体の表示更新
+  }
+
   // ユーザー選択セレクトボックスの同期構築
   window.initPresenceUserSelector = function() {
     const selector = document.getElementById('presence-user-selector');
@@ -19009,7 +19414,23 @@ document.addEventListener('DOMContentLoaded', () => {
     users.forEach(u => {
       const opt = document.createElement('option');
       opt.value = u.id;
-      opt.textContent = `${u.name || u.id} (${u.id})`;
+      let roleLabel = '';
+      if (u.status === 'pending') {
+        roleLabel = ` [申請中:${getRoleJpName(u.role)}]`;
+      } else if (u.role === 'admin') {
+        roleLabel = ' [管理者]';
+      } else if (u.role === 'sales') {
+        roleLabel = ' [営業]';
+      } else if (u.role === 'setup-support') {
+        roleLabel = ' [開設サポート]';
+      } else if (u.role === 'store-patrol') {
+        roleLabel = ' [店舗パトロール]';
+      } else if (u.role === 'back-office') {
+        roleLabel = ' [バックオフィス]';
+      } else {
+        roleLabel = ' [未設定]';
+      }
+      opt.textContent = `${u.name || u.id} (${u.id})${roleLabel}`;
       selector.appendChild(opt);
     });
 
@@ -19023,6 +19444,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderUserPermissionViewer(e.target.value);
       });
     }
+
+    // 承認申請一覧の描画
+    renderAdminApprovalPane();
   };
 
   const presenceBtn = document.getElementById('admin-panel-presence-btn');
@@ -21945,7 +22369,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 権限ロールによって閲覧不可なタブを自動で閉じるクリーンアップ関数
 function removeRestrictedTabsForRole(role) {
-  if (role === 'support') {
+  if (role === 'support' || role === 'setup-support') {
     const beforeLen = state.tabs.length;
     state.tabs = state.tabs.filter(t => t.type !== 'agency-info-screen');
     if (state.activeTabId === 'agency-info-screen') {
@@ -22138,6 +22562,48 @@ function setupPermissionFeatures() {
   if (endPreviewBtn) {
     endPreviewBtn.addEventListener('click', () => {
       endImpersonationPreview();
+    });
+  }
+
+  // 🔑 ユーザー権限設定画面内のサブタブ切り替え
+  const tabBtnUserPerms = document.getElementById('tab-btn-user-perms');
+  const tabBtnPkgReg = document.getElementById('tab-btn-pkg-reg');
+  const tabBtnApprovals = document.getElementById('tab-btn-approvals');
+
+  const panePermissions = document.getElementById('presence-pane-permissions');
+  const panePackages = document.getElementById('presence-pane-packages');
+  const paneApprovals = document.getElementById('presence-pane-approvals');
+
+  function switchPresenceSubTab(activeBtn, showPane) {
+    [tabBtnUserPerms, tabBtnPkgReg, tabBtnApprovals].forEach(btn => {
+      if (btn) btn.classList.remove('active');
+    });
+    [panePermissions, panePackages, paneApprovals].forEach(pane => {
+      if (pane) pane.style.display = 'none';
+    });
+    if (activeBtn) activeBtn.classList.add('active');
+    if (showPane) showPane.style.display = 'flex';
+  }
+
+  if (tabBtnUserPerms) {
+    tabBtnUserPerms.addEventListener('click', () => {
+      switchPresenceSubTab(tabBtnUserPerms, panePermissions);
+    });
+  }
+  if (tabBtnPkgReg) {
+    tabBtnPkgReg.addEventListener('click', () => {
+      switchPresenceSubTab(tabBtnPkgReg, panePackages);
+      if (typeof window.initPackagePermissionTree === 'function') {
+        window.initPackagePermissionTree();
+      }
+    });
+  }
+  if (tabBtnApprovals) {
+    tabBtnApprovals.addEventListener('click', () => {
+      switchPresenceSubTab(tabBtnApprovals, paneApprovals);
+      if (typeof window.initPresenceUserSelector === 'function') {
+        window.initPresenceUserSelector();
+      }
     });
   }
 }
@@ -22730,7 +23196,23 @@ function initSignupEvents() {
           })
           .catch(err => {
             console.error('Failed to send reset email:', err);
-            showToast('メール送信中に通信エラーが発生しました。', 'error');
+            showToast('メール送信中に通信エラーが発生したため、シミュレーションモードに移行します。', 'warning');
+            showAppConfirm(
+              '📧 パスワード再設定メール（シミュレーション）',
+              `（通信エラーのためシミュレート送信しました）\n「${targetEmail}」宛てのパスワード再設定画面に進みますか？`,
+              () => {
+                const modal = document.getElementById('set-password-modal');
+                const emailHidden = document.getElementById('set-pwd-email');
+                if (modal && emailHidden) {
+                  emailHidden.value = targetEmail;
+                  const pwdInput = document.getElementById('set-pwd-input');
+                  const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
+                  if (pwdInput) pwdInput.value = '';
+                  if (pwdConfirmInput) pwdConfirmInput.value = '';
+                  modal.style.display = 'flex';
+                }
+              }
+            );
           });
         }
       );
@@ -22795,7 +23277,6 @@ function initSignupEvents() {
         id: username,
         name: fullName,
         password: tempPassword,
-        role: 'sales', // 新規サインアップのデフォルトロールは営業担当
         email: email,
         code: userCode, // 生成したコードを追加
         createdAt: nowIso,
@@ -22871,7 +23352,23 @@ function initSignupEvents() {
       })
       .catch(err => {
         console.error('Failed to send signup email:', err);
-        showToast('メール送信中に通信エラーが発生しました。', 'error');
+        showToast('メール送信中に通信エラーが発生したため、シミュレーションモードに移行します。', 'warning');
+        showAppConfirm(
+          '📧 パスワード設定メール（シミュレーション）',
+          `（通信エラーのためシミュレート送信しました）\n「${email}」宛てのパスワード設定画面に進みますか？`,
+          () => {
+            const modal = document.getElementById('set-password-modal');
+            const emailHidden = document.getElementById('set-pwd-email');
+            if (modal && emailHidden) {
+              emailHidden.value = email;
+              const pwdInput = document.getElementById('set-pwd-input');
+              const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
+              if (pwdInput) pwdInput.value = '';
+              if (pwdConfirmInput) pwdConfirmInput.value = '';
+              modal.style.display = 'flex';
+            }
+          }
+        );
       });
     });
   }
@@ -22937,7 +23434,7 @@ function initSignupEvents() {
       // 自動ログイン処理を実行してマイページに遷移
       state.currentUser = {
         id: updatedUser.id,
-        role: updatedUser.role || 'sales',
+        role: updatedUser.role, // role は undefined/未設定
         name: updatedUser.name,
         loginId: updatedUser.id,
         password: pwd,
@@ -22974,11 +23471,22 @@ function initSignupEvents() {
         signupScreen.style.display = 'none';
         signupScreen.classList.remove('active');
       }
-      showLoginScreen(false);
-      switchView('mypage-screen');
-      openMyPage();
 
-      showToast('パスワード設定が完了し、ログインしました。', 'success');
+      showToast('パスワードを設定し、自動ログインしました。', 'success');
+
+      if (!updatedUser.role) {
+        if (typeof showBusinessRoleSelectionModal === 'function') {
+          showBusinessRoleSelectionModal(updatedUser);
+        } else {
+          showLoginScreen(false);
+          switchView('mypage-screen');
+          openMyPage();
+        }
+      } else {
+        showLoginScreen(false);
+        switchView('mypage-screen');
+        openMyPage();
+      }
     });
   }
 }
@@ -23084,7 +23592,6 @@ function initUserManagerEvents() {
       const regId = regEmail; // ユーザー名は不要で、メールアドレスをそのままログインID（id）とする
       const regPassword = document.getElementById('tab-reg-user-password').value.trim();
       const regPasswordConfirm = document.getElementById('tab-reg-user-password-confirm').value.trim();
-      const regRole = document.getElementById('tab-reg-user-role').value;
 
       if (!regLastName || !regFirstName) {
         showToast('姓と名を入力してください。', 'error');
@@ -23124,7 +23631,6 @@ function initUserManagerEvents() {
         id: regId,
         name: regFullName,
         password: regPassword,
-        role: regRole,
         email: regEmail,
         code: userCode, // 生成したコードを追加
         createdAt: nowIso,
@@ -27389,6 +27895,81 @@ function initFloatingStickyNotes() {
       removeStickyNoteState(state.id);
     }
   });
+}
+
+// 💼 業務ロール選択（オンボーディング）モーダルの制御
+function showBusinessRoleSelectionModal(user) {
+  const modal = document.getElementById('business-role-modal');
+  const salesBtn = document.getElementById('role-select-sales-btn');
+  const supportBtn = document.getElementById('role-select-support-btn');
+  const adminBtn = document.getElementById('role-select-admin-btn');
+  const patrolBtn = document.getElementById('role-select-patrol-btn');
+  const backofficeBtn = document.getElementById('role-select-backoffice-btn');
+
+  if (!modal) return;
+
+  modal.style.display = 'flex';
+
+  const selectRole = (role) => {
+    ensureInitialUsersExist();
+    let users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+    const idx = users.findIndex(u => u.id.toLowerCase() === user.id.toLowerCase());
+    
+    // システム管理者(admin IDやowner)の場合は即座に active、それ以外は承認制のため pending
+    const isOwnerOrAdmin = (user.id.toLowerCase() === 'admin' || role === 'admin');
+    const targetStatus = isOwnerOrAdmin ? 'active' : 'pending';
+
+    if (idx !== -1) {
+      users[idx].role = role;
+      users[idx].status = targetStatus;
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      
+      // ログイン状態も更新
+      if (state.currentUser && state.currentUser.id.toLowerCase() === user.id.toLowerCase()) {
+        state.currentUser.role = role;
+        state.currentUser.status = targetStatus;
+        localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
+      }
+    }
+
+    // 表示切り替えなどのUI同期
+    updateUIForCurrentMode();
+    removeRestrictedTabsForRole(role);
+
+    modal.style.display = 'none';
+    showLoginScreen(false);
+
+    if (targetStatus === 'pending') {
+      showToast('担当業務を申請しました。オーナーの承認をお待ちください。', 'success');
+      switchView('home-screen'); // マイページのみ表示するためにホーム画面へ遷移させる
+    } else {
+      showToast('担当業務を設定しました。', 'success');
+      if (role === 'admin') {
+        openTab('agency-info-screen', 'agency-info-screen', '📊 代理店・基本マスタ');
+      } else {
+        switchView('mypage-screen');
+        if (typeof openMyPage === 'function') {
+          openMyPage();
+        }
+      }
+    }
+  };
+
+  if (salesBtn) {
+    salesBtn.onclick = () => selectRole('sales');
+  }
+  if (supportBtn) {
+    supportBtn.onclick = () => selectRole('support');
+  }
+  if (adminBtn) {
+    adminBtn.onclick = () => selectRole('admin');
+  }
+  if (patrolBtn) {
+    patrolBtn.onclick = () => selectRole('store-patrol');
+  }
+  if (backofficeBtn) {
+    backofficeBtn.onclick = () => selectRole('back-office');
+  }
 }
 
 
