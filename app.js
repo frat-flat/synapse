@@ -6511,10 +6511,6 @@ function switchView(viewId) {
   if (viewId === 'presence-settings-screen') {
     if (typeof initPresenceUserSelector === 'function') initPresenceUserSelector();
   }
-
-  if (typeof trackUserActivity === 'function' && typeof getScreenFriendlyName === 'function') {
-    trackUserActivity(viewId, getScreenFriendlyName(viewId));
-  }
 }
 
 // ==========================================
@@ -7385,10 +7381,6 @@ function activateTab(id) {
 
   if (tab.type === 'presence-settings-screen') {
     if (typeof initPresenceUserSelector === 'function') initPresenceUserSelector();
-  }
-
-  if (typeof trackUserActivity === 'function') {
-    trackUserActivity(tab.id, tab.title);
   }
 }
 
@@ -19036,40 +19028,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const presenceBtn = document.getElementById('admin-panel-presence-btn');
   if (presenceBtn) {
     presenceBtn.addEventListener('click', () => {
-      openTab('presence-tab', 'presence-settings-screen', '👁️‍🗨️ ユーザー閲覧状況');
+      openTab('presence-tab', 'presence-settings-screen', '🔑 ユーザー権限設定');
       initPresenceUserSelector();
-      renderUserPresenceList();
-    });
-  }
-
-  const refreshPresenceBtn = document.getElementById('refresh-presence-btn');
-  if (refreshPresenceBtn) {
-    refreshPresenceBtn.addEventListener('click', () => {
-      renderUserPresenceList();
-    });
-  }
-
-  // タブ切り替え制御
-  const btnPerms = document.getElementById('toggle-presence-view-perms-btn');
-  const btnActive = document.getElementById('toggle-presence-view-active-btn');
-  const panePerms = document.getElementById('presence-pane-permissions');
-  const paneActive = document.getElementById('presence-pane-activity');
-
-  if (btnPerms && btnActive && panePerms && paneActive) {
-    btnPerms.addEventListener('click', () => {
-      panePerms.style.display = 'flex';
-      paneActive.style.display = 'none';
-      btnPerms.className = 'btn-primary';
-      btnActive.className = 'btn-secondary';
-      initPresenceUserSelector();
-    });
-
-    btnActive.addEventListener('click', () => {
-      panePerms.style.display = 'none';
-      paneActive.style.display = 'flex';
-      btnPerms.className = 'btn-secondary';
-      btnActive.className = 'btn-primary';
-      renderUserPresenceList();
     });
   }
 
