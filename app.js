@@ -836,36 +836,6 @@ function ensureInitialUsersExist() {
       createdAt: '2025-01-01T10:00:00Z',
       lastLoginAt: new Date().toISOString(),
       pwdChangedAt: '2025-01-01T10:00:00Z' // 半年以上前
-    },
-    { 
-      id: 'sales_01', 
-      name: '営業担当A', 
-      password: 'password', 
-      role: 'sales',
-      code: '4THPH5YA',
-      createdAt: '2025-01-01T10:00:00Z',
-      lastLoginAt: new Date().toISOString(),
-      pwdChangedAt: new Date().toISOString()
-    },
-    { 
-      id: 'sales_02', 
-      name: '営業担当B', 
-      password: 'password', 
-      role: 'sales',
-      code: 'GCMYGGX5',
-      createdAt: '2025-01-01T10:00:00Z',
-      lastLoginAt: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString(), // 100日前（3ヶ月以上前）
-      pwdChangedAt: new Date().toISOString()
-    },
-    { 
-      id: 'support_01', 
-      name: '開設サポート担当', 
-      password: 'password', 
-      role: 'support',
-      code: '64E5TCAE',
-      createdAt: '2025-01-01T10:00:00Z',
-      lastLoginAt: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(), // 120日前（3ヶ月以上前）
-      pwdChangedAt: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString() // 200日前（半年以上前）
     }
   ];
 
