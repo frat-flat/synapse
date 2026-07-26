@@ -1495,6 +1495,10 @@ function initDatabase() {
     .catch(err => {
       console.warn('[Supabase] Failed to fetch automatic config:', err);
     });
+  
+  if (typeof updateAvatarUI === 'function') {
+    updateAvatarUI();
+  }
 }
 
 function saveCustomTables() {
@@ -8661,9 +8665,10 @@ function handleLogin(e) {
       renderJoColumnSelector();
       
       const nameEl = document.getElementById('logged-in-user-name');
-      const avatarEl = document.getElementById('logged-in-user-avatar');
       if (nameEl) nameEl.textContent = state.currentUser.name;
-      if (avatarEl) avatarEl.textContent = state.currentUser.name.charAt(0);
+      if (typeof updateAvatarUI === 'function') {
+        updateAvatarUI();
+      }
       
       // タブの初期化
       state.tabs = [];
@@ -17802,11 +17807,77 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // アバターUI（表示文字・背景色）を最新設定で更新する関数
+  window.updateAvatarUI = function() {
+    if (!state.currentUser) return;
+    const userId = state.currentUser.id;
+    const avatarConfigStr = localStorage.getItem('synapse_user_avatar_' + userId);
+    
+    let char = (state.currentUser.name || '👤').charAt(0);
+    let bg = 'var(--primary)';
+    
+    if (avatarConfigStr) {
+      try {
+        const config = JSON.parse(avatarConfigStr);
+        if (config.char) char = config.char;
+        if (config.bg) bg = config.bg;
+      } catch (e) {
+        console.error('[Avatar] Error parsing local avatar config:', e);
+      }
+    }
+    
+    const headerAvatar = document.getElementById('logged-in-user-avatar');
+    const popoverAvatar = document.getElementById('user-popover-avatar');
+    
+    if (headerAvatar) {
+      headerAvatar.textContent = char;
+      headerAvatar.style.backgroundColor = bg;
+    }
+    if (popoverAvatar) {
+      popoverAvatar.textContent = char;
+      popoverAvatar.style.backgroundColor = bg;
+    }
+  };
+
+  // 右上ヘッダー設定ポップアップの制御
+  const settingsBtn = document.getElementById('sidebar-settings-btn');
+  const popoverSettingsBtn = document.getElementById('user-popover-settings-btn');
+  const settingsPopup = document.getElementById('sidebar-settings-popup');
+  
+  function toggleSettingsPopup(triggerEl) {
+    if (!triggerEl || !settingsPopup) return;
+    const isHidden = settingsPopup.style.display === 'none' || !settingsPopup.style.display;
+    if (isHidden) {
+      const rect = triggerEl.getBoundingClientRect();
+      settingsPopup.style.position = 'fixed';
+      settingsPopup.style.top = `${rect.bottom + 8}px`;
+      settingsPopup.style.left = `${Math.min(window.innerWidth - 220, rect.right - 210)}px`;
+      settingsPopup.style.display = 'block';
+    } else {
+      settingsPopup.style.display = 'none';
+    }
+  }
+
+  if (settingsBtn && settingsPopup) {
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSettingsPopup(settingsBtn);
+    });
+  }
+
+  if (popoverSettingsBtn && settingsPopup) {
+    popoverSettingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSettingsPopup(popoverSettingsBtn);
+      // アカウントポップオーバーは閉じる
+      if (userProfilePopover) userProfilePopover.style.display = 'none';
+    });
+  }
+
   // 右上 Googleスタイル ユーザープロファイルカードポップアップの制御
   const userProfileBtn = document.getElementById('header-user-profile-btn');
   const userProfilePopover = document.getElementById('user-profile-popover');
   const closeUserPopoverBtn = document.getElementById('close-user-popover-btn');
-  const addAccountBtn = document.getElementById('user-popover-add-account-btn');
   const manageAccountBtn = document.getElementById('user-popover-manage-btn');
 
   if (userProfileBtn && userProfilePopover) {
@@ -17817,11 +17888,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const u = state.currentUser || { name: '営業担当A', id: 'sales_01' };
         const emailEl = document.getElementById('user-popover-email');
         const nameEl = document.getElementById('user-popover-name');
-        const avatarEl = document.getElementById('user-popover-avatar');
-
-        if (emailEl) emailEl.textContent = `${u.id || 'user'}@synapse.management`;
+        
+        if (emailEl) emailEl.textContent = `${u.email || u.id || 'user'}`;
         if (nameEl) nameEl.textContent = `${u.name || 'ユーザー'} 様`;
-        if (avatarEl) avatarEl.textContent = (u.name || 'A').charAt(0);
+        
+        updateAvatarUI();
 
         const rect = userProfileBtn.getBoundingClientRect();
         userProfilePopover.style.position = 'fixed';
@@ -17840,9 +17911,100 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (manageAccountBtn) {
+  // プロファイル編集モーダルの制御
+  const manageAccountModal = document.getElementById('account-manage-modal');
+  const avatarCharInput = document.getElementById('avatar-char-input');
+  const avatarPreview = document.getElementById('avatar-edit-preview');
+  const saveManageBtn = document.getElementById('account-manage-save-btn');
+  const cancelManageBtn = document.getElementById('account-manage-cancel-btn');
+  
+  let selectedAvatarBg = 'var(--primary)';
+
+  if (manageAccountBtn && manageAccountModal) {
     manageAccountBtn.addEventListener('click', () => {
-      showToast('アカウント管理画面は後日実装予定です。', 'info');
+      if (userProfilePopover) userProfilePopover.style.display = 'none';
+      
+      const userId = state.currentUser ? state.currentUser.id : 'guest';
+      const configStr = localStorage.getItem('synapse_user_avatar_' + userId);
+      
+      let currentChar = (state.currentUser ? state.currentUser.name : '👤').charAt(0);
+      let currentBg = 'var(--primary)';
+      
+      if (configStr) {
+        try {
+          const config = JSON.parse(configStr);
+          if (config.char) currentChar = config.char;
+          if (config.bg) currentBg = config.bg;
+        } catch (e) {}
+      }
+      
+      if (avatarCharInput) avatarCharInput.value = currentChar;
+      if (avatarPreview) {
+        avatarPreview.textContent = currentChar;
+        avatarPreview.style.backgroundColor = currentBg;
+      }
+      selectedAvatarBg = currentBg;
+      
+      // カラーパレット枠線の初期化
+      document.querySelectorAll('.avatar-color-opt').forEach(opt => {
+        const c = opt.getAttribute('data-color');
+        if (c === currentBg) {
+          opt.style.borderColor = 'var(--text-primary)';
+        } else {
+          opt.style.borderColor = 'transparent';
+        }
+      });
+      
+      manageAccountModal.style.display = 'flex';
+    });
+  }
+
+  if (avatarCharInput && avatarPreview) {
+    avatarCharInput.addEventListener('input', () => {
+      const char = avatarCharInput.value.trim() || (state.currentUser ? state.currentUser.name.charAt(0) : '👤');
+      avatarPreview.textContent = char.substring(0, 2);
+    });
+  }
+
+  document.querySelectorAll('.avatar-color-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const color = opt.getAttribute('data-color');
+      selectedAvatarBg = color;
+      if (avatarPreview) avatarPreview.style.backgroundColor = color;
+      
+      document.querySelectorAll('.avatar-color-opt').forEach(o => {
+        o.style.borderColor = 'transparent';
+      });
+      opt.style.borderColor = 'var(--text-primary)';
+    });
+  });
+
+  if (cancelManageBtn && manageAccountModal) {
+    cancelManageBtn.addEventListener('click', () => {
+      manageAccountModal.style.display = 'none';
+    });
+  }
+
+  if (saveManageBtn && manageAccountModal) {
+    saveManageBtn.addEventListener('click', async () => {
+      if (!state.currentUser) return;
+      const userId = state.currentUser.id;
+      const char = (avatarCharInput ? avatarCharInput.value.trim() : '') || state.currentUser.name.charAt(0);
+      
+      const config = {
+        char: char.substring(0, 2),
+        bg: selectedAvatarBg
+      };
+      
+      localStorage.setItem('synapse_user_avatar_' + userId, JSON.stringify(config));
+      
+      if (typeof syncToSupabase === 'function') {
+        await syncToSupabase('synapse_user_avatar_' + userId, config);
+      }
+      
+      updateAvatarUI();
+      manageAccountModal.style.display = 'none';
+      showToast('プロファイルを更新しました。', 'success');
     });
   }
 
@@ -17854,7 +18016,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (bgColPicker && !bgColPicker.contains(e.target) && !bgColBtn.contains(e.target)) {
       bgColPicker.style.display = 'none';
     }
-    if (settingsPopup && !settingsPopup.contains(e.target) && !settingsBtn.contains(e.target)) {
+    if (settingsPopup && !settingsPopup.contains(e.target) && !settingsBtn.contains(e.target) && (!popoverSettingsBtn || !popoverSettingsBtn.contains(e.target))) {
       settingsPopup.style.display = 'none';
     }
     if (userProfilePopover && !userProfilePopover.contains(e.target) && !userProfileBtn.contains(e.target)) {
