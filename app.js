@@ -18935,8 +18935,18 @@ document.addEventListener('DOMContentLoaded', () => {
       return `<div class="perm-three-state-group">${optHidden}${optRead}${optWrite}</div>`;
     };
 
+    let warningBanner = '';
+    if (user.id === 'admin') {
+      warningBanner = `
+        <div style="background: #fef3c7; border: 1px solid #f59e0b; color: #b45309; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+          ⚠️ <strong>システム管理者の権限は変更できません。</strong> 他の一般ユーザーを選択して個別に権限をカスタマイズしてください。
+        </div>
+      `;
+    }
+
     let html = `
       <div style="margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+        ${warningBanner}
         <h3 style="margin: 0 0 0.5rem 0; font-size: 1.1rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
           👤 ${user.name || user.id} <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-secondary);">(${user.id})</span>
         </h3>
@@ -19433,6 +19443,12 @@ document.addEventListener('DOMContentLoaded', () => {
       opt.textContent = `${u.name || u.id} (${u.id})${roleLabel}`;
       selector.appendChild(opt);
     });
+
+    // admin以外の最初のユーザーをデフォルト選択にする（いなければadmin）
+    const firstNonAdmin = users.find(u => u.id !== 'admin');
+    if (firstNonAdmin) {
+      selector.value = firstNonAdmin.id;
+    }
 
     if (selector.value) {
       renderUserPermissionViewer(selector.value);
