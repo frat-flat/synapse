@@ -6419,6 +6419,37 @@ function updateUIForCurrentMode() {
         </div>
       `;
       pendingBanner.style.display = 'block';
+    } else if (isOwnerUser()) {
+      // オーナー向け未承認申請通知バナー
+      const allUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+      const pendingUsers = allUsers.filter(u => u.status === 'pending');
+      
+      if (pendingUsers.length > 0) {
+        const listHtml = pendingUsers.map(u => `<li><strong>${u.name || u.id}</strong> (${u.email || u.id}) さん ➔ <strong>${getRoleJpName(u.role)}</strong></li>`).join('');
+        pendingBanner.innerHTML = `
+          <div style="background: #fef2f2; border-left: 4px solid #ef4444; color: #991b1b; padding: 14px 18px; margin: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 14px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px; line-height: 1;">🔔</span>
+                <span style="font-weight: 700;">新規の業務ロール（パッケージ）承認申請が ${pendingUsers.length} 件あります！</span>
+              </div>
+              <button onclick="window.openApprovalSettingsTab()" class="btn btn-primary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); border: none; background: #dc2626; color: #fff; box-shadow: var(--shadow-sm); transition: all 0.2s;">📋 承認画面を開く</button>
+            </div>
+            <ul style="margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.5; color: #7f1d1d;">
+              ${listHtml}
+            </ul>
+          </div>
+        `;
+        pendingBanner.style.display = 'block';
+
+        // ログイン後最初の更新時にトースト通知
+        if (!state.hasNotifiedPendingUsers) {
+          showToast(`新規の業務ロール承認申請が ${pendingUsers.length} 件届いています。`, 'info');
+          state.hasNotifiedPendingUsers = true;
+        }
+      } else {
+        pendingBanner.style.display = 'none';
+      }
     } else {
       pendingBanner.style.display = 'none';
     }
@@ -6476,12 +6507,7 @@ function updateUIForCurrentMode() {
     if (mypageCodeEl) mypageCodeEl.textContent = 'Code: ' + (state.currentUser.code || 'N/A');
   }
 
-  const switchContainer = document.getElementById('global-mode-switch-container');
-  if (switchContainer) {
-    const isLoginAdmin = (state.currentUser.loginId && state.currentUser.loginId.toLowerCase().includes('admin')) ||
-                         (state.currentUser.id === 'admin') || isOwnerUser();
-    switchContainer.style.display = isLoginAdmin ? 'flex' : 'none';
-  }
+
   
   // アポイントアコーディオンおよび他のアコーディオンの表示制御
   const appointAccordion = document.getElementById('appoint-accordion');
@@ -19559,6 +19585,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 承認申請一覧の描画
     renderAdminApprovalPane();
+  };
+
+  window.openApprovalSettingsTab = function() {
+    openTab('presence-tab', 'presence-settings-screen', '🔑 ユーザー権限設定');
+    initPresenceUserSelector();
+    const tabBtn = document.getElementById('tab-btn-approvals');
+    if (tabBtn) {
+      tabBtn.click();
+    }
   };
 
   const presenceBtn = document.getElementById('admin-panel-presence-btn');
