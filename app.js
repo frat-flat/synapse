@@ -21699,11 +21699,15 @@ function initUserManagerEvents() {
 
   const filterRole = document.getElementById('tab-user-filter-role');
   const sortDate = document.getElementById('tab-user-sort-date');
+  const searchInput = document.getElementById('tab-user-search-input');
   if (filterRole) {
     filterRole.addEventListener('change', () => renderUserManagerList());
   }
   if (sortDate) {
     sortDate.addEventListener('change', () => renderUserManagerList());
+  }
+  if (searchInput) {
+    searchInput.addEventListener('input', () => renderUserManagerList());
   }
 }
 
@@ -21720,6 +21724,19 @@ function renderUserManagerList() {
   const selectedRole = filterRoleEl ? filterRoleEl.value : 'all';
   if (selectedRole !== 'all') {
     users = users.filter(u => u.role === selectedRole);
+  }
+
+  // 検索入力フィルター適用（名前、ID、コード、メールアドレスを対象に部分一致）
+  const searchInputEl = document.getElementById('tab-user-search-input');
+  const searchQuery = searchInputEl ? searchInputEl.value.trim().toLowerCase() : '';
+  if (searchQuery !== '') {
+    users = users.filter(u => {
+      const name = (u.name || '').toLowerCase();
+      const id = (u.id || '').toLowerCase();
+      const code = (u.code || '').toLowerCase();
+      const email = (u.email || '').toLowerCase();
+      return name.includes(searchQuery) || id.includes(searchQuery) || code.includes(searchQuery) || email.includes(searchQuery);
+    });
   }
 
   // 登録日ソート適用
