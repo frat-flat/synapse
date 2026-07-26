@@ -1427,6 +1427,29 @@ function initDatabase() {
       syncFromSupabase();
     }, 100);
   }
+
+  // ☁️ サーバーからSupabase接続情報を自動取得して初期化・自動同期する
+  fetch('/api/get-supabase-config')
+    .then(res => res.json())
+    .then(data => {
+      if (data.success && data.url && data.anonKey) {
+        const localUrl = localStorage.getItem(STORAGE_KEYS.SUPABASE_URL);
+        const localKey = localStorage.getItem(STORAGE_KEYS.SUPABASE_ANON_KEY);
+        if (localUrl !== data.url || localKey !== data.anonKey) {
+          localStorage.setItem(STORAGE_KEYS.SUPABASE_URL, data.url);
+          localStorage.setItem(STORAGE_KEYS.SUPABASE_ANON_KEY, data.anonKey);
+          console.log('[Supabase] Automatically configured credentials from environment variables.');
+          if (initSupabase()) {
+            setTimeout(() => {
+              syncFromSupabase(true);
+            }, 100);
+          }
+        }
+      }
+    })
+    .catch(err => {
+      console.warn('[Supabase] Failed to fetch automatic config:', err);
+    });
 }
 
 function saveCustomTables() {
