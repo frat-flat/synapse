@@ -21733,6 +21733,13 @@ function initUserManagerEvents() {
   // 管理者パネルボタンからタブを開く
   if (panelBtn) {
     panelBtn.addEventListener('click', () => {
+      const searchInputEl = document.getElementById('tab-user-search-input');
+      if (searchInputEl) searchInputEl.value = '';
+      const filterRoleEl = document.getElementById('tab-user-filter-role');
+      if (filterRoleEl) filterRoleEl.value = 'all';
+      const sortDateEl = document.getElementById('tab-user-sort-date');
+      if (sortDateEl) sortDateEl.value = 'desc';
+
       openTab('user-manager-screen', 'user-manager-screen', '👥 ユーザー登録・管理');
       renderUserManagerList();
     });
@@ -21866,6 +21873,13 @@ function initUserManagerEvents() {
       showToast(`ユーザー「${regFullName}」を正常に登録しました。`, 'success');
       newForm.reset();
       
+      const searchInputEl = document.getElementById('tab-user-search-input');
+      if (searchInputEl) searchInputEl.value = '';
+      const filterRoleEl = document.getElementById('tab-user-filter-role');
+      if (filterRoleEl) filterRoleEl.value = 'all';
+      const sortDateEl = document.getElementById('tab-user-sort-date');
+      if (sortDateEl) sortDateEl.value = 'desc';
+
       renderUserManagerList();
     });
   }
