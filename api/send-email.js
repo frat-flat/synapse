@@ -53,7 +53,7 @@ module.exports = async (req, res) => {
     });
 
     const mailOptions = {
-      from: `"${process.env.SMTP_FROM_NAME || 'Synapse'}" <${user}>`,
+      from: `"${process.env.SMTP_FROM_NAME || 'Synapse'}" <${process.env.SMTP_FROM || user}>`,
       to: to,
       subject: subject,
       text: text,
