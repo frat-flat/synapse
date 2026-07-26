@@ -229,9 +229,14 @@
 
 <!-- 画面上部のタブバー（ログイン後に表示） -->
 <div id="tabs-outer-wrapper" class="tabs-outer-wrapper" style="display: none;">
-<div id="tabs-container" class="tabs-container">
+<div id="tabs-container" class="tabs-container" style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%;">
 <div id="app-tabs-bar" class="tabs-bar">
 <!-- JSで動的にタブを生成します -->
+</div>
+<div id="presence-subtabs-container" style="display: none; gap: 0.35rem; margin-bottom: 4px; margin-right: 0.75rem; flex-shrink: 0; align-items: center;">
+  <button id="subtab-btn-user-perms" class="mode-switch-btn active" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface-elevated); transition: all 0.2s;">🔑 ユーザー権限</button>
+  <button id="subtab-btn-pkg-reg" class="mode-switch-btn" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface-elevated); transition: all 0.2s;">📦 パッケージの登録</button>
+  <button id="subtab-btn-approvals" class="mode-switch-btn" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface-elevated); transition: all 0.2s; display: flex; align-items: center; gap: 0.25rem;">📋 承認待ち一覧 <span id="subtab-approval-badge-count" style="display: none; background: #ef4444; color: #fff; border-radius: 50%; padding: 0.05rem 0.3rem; font-size: 0.65rem; font-weight: bold;">0</span></button>
 </div>
 </div>
 <button id="tabs-toggle-btn" class="tabs-toggle-arrow" title="タブバーを折りたたむ">▲</button>
@@ -2671,19 +2676,7 @@
 
 <!-- ================= 👁️‍🗨️ ユーザー閲覧状況画面 ================= -->
 <section id="presence-settings-screen" class="screen-view" style="display: none; padding: 1.25rem; box-sizing: border-box;">
-  <!-- ヘッダー -->
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-    <h2 style="margin: 0; font-size: 1.25rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary);">
-      🔑 ユーザー権限設定
-    </h2>
-    
-    <!-- 承認・パッケージ・権限 サブタブ切り替え -->
-    <div style="display: flex; gap: 0.35rem;">
-      <button id="tab-btn-user-perms" class="mode-switch-btn active" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface-elevated); transition: all 0.2s;">🔑 ユーザー権限</button>
-      <button id="tab-btn-pkg-reg" class="mode-switch-btn" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface-elevated); transition: all 0.2s;">📦 パッケージの登録</button>
-      <button id="tab-btn-approvals" class="mode-switch-btn" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface-elevated); transition: all 0.2s; display: flex; align-items: center; gap: 0.25rem;">📋 承認待ち一覧 <span id="approval-badge-count" style="display: none; background: #ef4444; color: #fff; border-radius: 50%; padding: 0.05rem 0.3rem; font-size: 0.65rem; font-weight: bold;">0</span></button>
-    </div>
-  </div>
+
 
   <!-- ペイン: 🔑 ユーザー権限設定 -->
   <div id="presence-pane-permissions" style="background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); padding: 1.25rem; display: block; box-sizing: border-box;">

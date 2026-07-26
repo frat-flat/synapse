@@ -7721,6 +7721,14 @@ function renderTabBar() {
     tabsOuter.style.display = state.tabs.length > 0 ? 'block' : 'none';
   }
 
+  // 🔑 ユーザー権限設定サブタブのヘッダー表示・非表示を制御
+  const presenceSubtabs = document.getElementById('presence-subtabs-container');
+  if (presenceSubtabs) {
+    const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+    const isPresenceActive = activeTab && activeTab.type === 'presence-settings-screen';
+    presenceSubtabs.style.display = isPresenceActive ? 'flex' : 'none';
+  }
+
   // 左メニューのハイライト状態も連動して更新
   const sidebarNavItems = document.querySelectorAll('.sidebar-nav .nav-item');
   sidebarNavItems.forEach(item => {
@@ -19324,6 +19332,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderAdminApprovalPane() {
     const pane = document.getElementById('admin-approval-list');
     const badge = document.getElementById('approval-badge-count');
+    const subtabBadge = document.getElementById('subtab-approval-badge-count');
     if (!pane) return;
 
     const usersStr = localStorage.getItem(STORAGE_KEYS.USERS) || '[]';
@@ -19335,14 +19344,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const pendingUsers = users.filter(u => u.status === 'pending');
 
     // バッジ表示の更新
-    if (badge) {
-      if (pendingUsers.length > 0) {
-        badge.textContent = pendingUsers.length;
-        badge.style.display = 'inline-block';
-      } else {
-        badge.style.display = 'none';
+    [badge, subtabBadge].forEach(b => {
+      if (b) {
+        if (pendingUsers.length > 0) {
+          b.textContent = pendingUsers.length;
+          b.style.display = 'inline-block';
+        } else {
+          b.style.display = 'none';
+        }
       }
-    }
+    });
 
     if (pendingUsers.length === 0) {
       pane.innerHTML = '<div style="padding: 12px; color: #64748b; text-align: center; font-size: 14px;">現在、承認待ちのロール変更申請はありません。</div>';
@@ -19590,7 +19601,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.openApprovalSettingsTab = function() {
     openTab('presence-tab', 'presence-settings-screen', '🔑 ユーザー権限設定');
     initPresenceUserSelector();
-    const tabBtn = document.getElementById('tab-btn-approvals');
+    const tabBtn = document.getElementById('subtab-btn-approvals');
     if (tabBtn) {
       tabBtn.click();
     }
@@ -22713,9 +22724,9 @@ function setupPermissionFeatures() {
   }
 
   // 🔑 ユーザー権限設定画面内のサブタブ切り替え
-  const tabBtnUserPerms = document.getElementById('tab-btn-user-perms');
-  const tabBtnPkgReg = document.getElementById('tab-btn-pkg-reg');
-  const tabBtnApprovals = document.getElementById('tab-btn-approvals');
+  const tabBtnUserPerms = document.getElementById('subtab-btn-user-perms');
+  const tabBtnPkgReg = document.getElementById('subtab-btn-pkg-reg');
+  const tabBtnApprovals = document.getElementById('subtab-btn-approvals');
 
   const panePermissions = document.getElementById('presence-pane-permissions');
   const panePackages = document.getElementById('presence-pane-packages');
