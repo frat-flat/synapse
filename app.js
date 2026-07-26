@@ -642,14 +642,41 @@ async function syncToSupabase(key, value) {
   if (!supabaseClient) return;
   try {
     const valString = typeof value === 'string' ? value : JSON.stringify(value);
-    const { error } = await supabaseClient
-      .from('synapse_storage')
-      .upsert({ key: key, value: JSON.parse(valString), updated_at: new Date().toISOString() });
     
-    if (error) {
-      console.error(`[Supabase] Sync failed for key ${key}:`, error);
+    if (key === STORAGE_KEYS.USERS) {
+      const usersList = JSON.parse(valString);
+      if (Array.isArray(usersList)) {
+        console.log('[Supabase] Syncing user list to relational synapse_users table...');
+        for (const user of usersList) {
+          const { error: userError } = await supabaseClient
+            .from('synapse_users')
+            .upsert({
+              id: user.id,
+              name: user.name,
+              password: user.password,
+              role: user.role || 'sales',
+              email: user.email || user.id,
+              code: user.code,
+              created_at: user.createdAt || new Date().toISOString(),
+              last_login_at: user.lastLoginAt || null,
+              pwd_changed_at: user.pwdChangedAt || null
+            });
+          
+          if (userError) {
+            console.error(`[Supabase] Relational sync failed for user ${user.id}:`, userError);
+          }
+        }
+      }
     } else {
-      console.log(`[Supabase] Sync success for key ${key}`);
+      const { error } = await supabaseClient
+        .from('synapse_storage')
+        .upsert({ key: key, value: JSON.parse(valString), updated_at: new Date().toISOString() });
+      
+      if (error) {
+        console.error(`[Supabase] Sync failed for key ${key}:`, error);
+      } else {
+        console.log(`[Supabase] Sync success for key ${key}`);
+      }
     }
   } catch (e) {
     console.error(`[Supabase] Error during syncToSupabase for key ${key}:`, e);
@@ -661,23 +688,41 @@ async function syncFromSupabase(showNotification = false) {
   if (!supabaseClient) return;
   try {
     console.log("[Supabase] Pulling latest data from cloud...");
-    const { data, error } = await supabaseClient
+    
+    // 1. synapse_storage からKeyValueデータをプル
+    const { data: storageData, error: storageError } = await supabaseClient
       .from('synapse_storage')
       .select('*');
     
-    if (error) {
-      console.error("[Supabase] Pull failed:", error);
+    if (storageError) {
+      console.error("[Supabase] Pull storage failed:", storageError);
       if (showNotification) {
-        showToast(`Supabaseデータ同期エラー: ${error.message || '接続失敗'} (Code: ${error.code || 'N/A'})`, "error");
+        showToast(`Supabaseデータ同期エラー: ${storageError.message || '接続失敗'}`, "error");
       }
       return;
     }
-    
-    if (data && data.length > 0) {
-      let updatedKeys = [];
-      isSyncing = true;
-      try {
-        data.forEach(item => {
+
+    // 2. synapse_users からユーザーデータをプル
+    const { data: usersData, error: usersError } = await supabaseClient
+      .from('synapse_users')
+      .select('*');
+
+    if (usersError) {
+      console.error("[Supabase] Pull users failed:", usersError);
+      if (showNotification) {
+        showToast(`ユーザー同期エラー: ${usersError.message || '接続失敗'}`, "error");
+      }
+      return;
+    }
+
+    let updatedKeys = [];
+    isSyncing = true;
+    try {
+      // KeyValue データの同期 (USERS キーは除外)
+      if (storageData && Array.isArray(storageData)) {
+        storageData.forEach(item => {
+          if (item.key === STORAGE_KEYS.USERS) return; // ユーザーキーはRDB優先のためスキップ
+
           const localVal = localStorage.getItem(item.key);
           const remoteValStr = JSON.stringify(item.value);
           if (localVal !== remoteValStr) {
@@ -685,23 +730,46 @@ async function syncFromSupabase(showNotification = false) {
             updatedKeys.push(item.key);
           }
         });
-      } finally {
-        isSyncing = false;
       }
-      
-      if (updatedKeys.length > 0) {
-        console.log("[Supabase] LocalStorage updated with remote data:", updatedKeys);
-        loadStateFromLocalStorage(updatedKeys);
-        if (showNotification) {
-          showToast("クラウドから最新データを同期しました。", "success");
+
+      // ユーザーデータの同期 (synapse_users からマッピング)
+      if (usersData && Array.isArray(usersData)) {
+        const mappedUsers = usersData.map(user => ({
+          id: user.id,
+          name: user.name,
+          password: user.password,
+          role: user.role,
+          email: user.email,
+          code: user.code,
+          createdAt: user.created_at,
+          lastLoginAt: user.last_login_at,
+          pwdChangedAt: user.pwd_changed_at
+        }));
+
+        const localVal = localStorage.getItem(STORAGE_KEYS.USERS);
+        const remoteValStr = JSON.stringify(mappedUsers);
+        if (localVal !== remoteValStr) {
+          localStorage.setItem(STORAGE_KEYS.USERS, remoteValStr);
+          updatedKeys.push(STORAGE_KEYS.USERS);
         }
-      } else {
-        if (showNotification) {
-          showToast("データは既に最新の状態です。", "info");
-        }
+      }
+    } finally {
+      isSyncing = false;
+    }
+    
+    if (updatedKeys.length > 0) {
+      console.log("[Supabase] LocalStorage updated with remote data:", updatedKeys);
+      loadStateFromLocalStorage(updatedKeys);
+      if (showNotification) {
+        showToast("クラウドから最新データを同期しました。", "success");
+      }
+    } else {
+      if (showNotification) {
+        showToast("データは既に最新の状態です。", "info");
       }
     }
   } catch (e) {
+    isSyncing = false;
     console.error("[Supabase] Error during syncFromSupabase:", e);
     if (showNotification) showToast("同期処理中にエラーが発生しました。", "error");
   }
