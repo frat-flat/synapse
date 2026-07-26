@@ -377,6 +377,30 @@ document.addEventListener('DOMContentLoaded', () => {
   initMypageMemo();          // メモ帳の初回初期化
   initFloatingStickyNotes(); // 浮遊付箋の復元
 
+  // 📧 メールからのパスワード設定・再設定リンク検知
+  const urlParams = new URLSearchParams(window.location.search);
+  const action = urlParams.get('action');
+  const actionEmail = urlParams.get('email');
+
+  if ((action === 'set-password' || action === 'reset-password') && actionEmail) {
+    showLoginScreen(true);
+    const modal = document.getElementById('set-password-modal');
+    const emailHidden = document.getElementById('set-pwd-email');
+    if (modal && emailHidden) {
+      emailHidden.value = actionEmail;
+      const pwdInput = document.getElementById('set-pwd-input');
+      const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
+      if (pwdInput) pwdInput.value = '';
+      if (pwdConfirmInput) pwdConfirmInput.value = '';
+      modal.style.display = 'flex';
+      
+      const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+      window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+
+      showToast(`メールアドレス「${actionEmail}」のパスワード設定画面を開きました。`, 'info');
+    }
+  }
+
   // トップバーの「📌 付箋を追加」ボタンイベント
   const addStickyBtn = document.getElementById('header-add-sticky-btn');
   if (addStickyBtn) {
@@ -21379,22 +21403,72 @@ function initSignupEvents() {
             return;
           }
 
-          showAppConfirm(
-            '📧 パスワード再設定メール（シミュレーション）',
-            `「${targetEmail}」宛てにパスワード再設定用の確認メールを送信しました。受信トレイを開いて新しいパスワード設定画面に進みますか？`,
-            () => {
-              const modal = document.getElementById('set-password-modal');
-              const emailHidden = document.getElementById('set-pwd-email');
-              if (modal && emailHidden) {
-                emailHidden.value = targetEmail;
-                const pwdInput = document.getElementById('set-pwd-input');
-                const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
-                if (pwdInput) pwdInput.value = '';
-                if (pwdConfirmInput) pwdConfirmInput.value = '';
-                modal.style.display = 'flex';
+          showToast('再設定用メールを送信中...', 'info');
+
+          const origin = window.location.origin;
+          const resetUrl = `${origin}/?action=reset-password&email=${encodeURIComponent(targetEmail)}`;
+
+          fetch('/api/send-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              to: targetEmail,
+              subject: '【Synapse】パスワードの再設定手続きのご案内',
+              html: `
+                <div style="font-family: sans-serif; line-height: 1.5; padding: 1.25rem; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 500px; margin: 0 auto; color: #1e293b;">
+                  <h2 style="color: #ef4444; margin-top: 0;">パスワードの再設定</h2>
+                  <p>パスワード再設定のリクエストを受け付けました。</p>
+                  <p>以下のリンクをクリックして、新しいパスワードを設定してください：</p>
+                  <p style="margin: 1.5rem 0;">
+                    <a href="${resetUrl}" style="background: #ef4444; color: #ffffff; padding: 0.6rem 1.2rem; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block;">新しいパスワードを設定する</a>
+                  </p>
+                  <p style="font-size: 0.8rem; color: #64748b;">
+                    ※このメールに心当たりがない場合は、このメールを破棄してください。<br>
+                    ※リンクがクリックできない場合は、以下のURLをブラウザのアドレスバーに直接貼り付けてください：<br>
+                    <a href="${resetUrl}" style="color: #ef4444;">${resetUrl}</a>
+                  </p>
+                </div>
+              `
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              if (data.simulated) {
+                showToast('メール送信をシミュレートしました。', 'success');
+                showAppConfirm(
+                  '📧 パスワード再設定メール（シミュレーション）',
+                  `（SMTP設定未完了のためシミュレート送信しました）\n「${targetEmail}」宛てのパスワード再設定画面に進みますか？`,
+                  () => {
+                    const modal = document.getElementById('set-password-modal');
+                    const emailHidden = document.getElementById('set-pwd-email');
+                    if (modal && emailHidden) {
+                      emailHidden.value = targetEmail;
+                      const pwdInput = document.getElementById('set-pwd-input');
+                      const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
+                      if (pwdInput) pwdInput.value = '';
+                      if (pwdConfirmInput) pwdConfirmInput.value = '';
+                      modal.style.display = 'flex';
+                    }
+                  }
+                );
+              } else {
+                showToast('パスワード再設定用メールを送信しました。', 'success');
+                showAppConfirm(
+                  '📧 メール送信完了',
+                  `「${targetEmail}」宛てにパスワード再設定用メールを送信しました。メール内のリンクから再設定を行ってください。`
+                );
               }
+            } else {
+              showToast('メール送信に失敗しました: ' + data.error, 'error');
             }
-          );
+          })
+          .catch(err => {
+            console.error('Failed to send reset email:', err);
+            showToast('メール送信中に通信エラーが発生しました。', 'error');
+          });
         }
       );
     });
@@ -21471,22 +21545,71 @@ function initSignupEvents() {
       showToast(`アカウント「${fullName}」を仮登録しました。`, 'success');
       signupForm.reset();
 
-      // パスワード設定メール送信のモックダイアログを表示
-      showAppConfirm(
-        '📧 パスワード設定メール（シミュレーション）',
-        `「${email}」宛てにパスワード設定リンク付きメールを送信しました。受信トレイを開いてパスワード設定画面に進みますか？`,
-        () => {
-          // 「はい」を押した場合、パスワード設定モーダルを表示
-          const modal = document.getElementById('set-password-modal');
-          const emailHidden = document.getElementById('set-pwd-email');
-          if (modal && emailHidden) {
-            emailHidden.value = email;
-            document.getElementById('set-pwd-input').value = '';
-            document.getElementById('set-pwd-confirm-input').value = '';
-            modal.style.display = 'flex';
+      const origin = window.location.origin;
+      const setupUrl = `${origin}/?action=set-password&email=${encodeURIComponent(email)}`;
+
+      showToast(`アカウント「${fullName}」を仮登録しました。メール送信中...`, 'info');
+
+      fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          to: email,
+          subject: '【Synapse】アカウント仮登録とパスワード設定のご案内',
+          html: `
+            <div style="font-family: sans-serif; line-height: 1.5; padding: 1.25rem; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 500px; margin: 0 auto; color: #1e293b;">
+              <h2 style="color: #4f46e5; margin-top: 0;">Synapseへようこそ！</h2>
+              <p>「${fullName}」様のアカウントを仮登録いたしました。</p>
+              <p>以下のリンクをクリックして、パスワードの設定を完了させてください：</p>
+              <p style="margin: 1.5rem 0;">
+                <a href="${setupUrl}" style="background: #4f46e5; color: #ffffff; padding: 0.6rem 1.2rem; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block;">パスワードを設定する</a>
+              </p>
+              <p style="font-size: 0.8rem; color: #64748b;">
+                ※リンクがクリックできない場合は、以下のURLをブラウザのアドレスバーに直接貼り付けてください：<br>
+                <a href="${setupUrl}" style="color: #4f46e5;">${setupUrl}</a>
+              </p>
+            </div>
+          `
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          if (data.simulated) {
+            showToast('メール送信をシミュレートしました。', 'success');
+            showAppConfirm(
+              '📧 パスワード設定メール（シミュレーション）',
+              `（SMTP設定未完了のためシミュレート送信しました）\n「${email}」宛てのパスワード設定画面に進みますか？`,
+              () => {
+                const modal = document.getElementById('set-password-modal');
+                const emailHidden = document.getElementById('set-pwd-email');
+                if (modal && emailHidden) {
+                  emailHidden.value = email;
+                  const pwdInput = document.getElementById('set-pwd-input');
+                  const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
+                  if (pwdInput) pwdInput.value = '';
+                  if (pwdConfirmInput) pwdConfirmInput.value = '';
+                  modal.style.display = 'flex';
+                }
+              }
+            );
+          } else {
+            showToast('パスワード設定用のメールを送信しました。受信トレイをご確認ください。', 'success');
+            showAppConfirm(
+              '📧 メール送信完了',
+              `「${email}」宛てにパスワード設定メールを送信しました。メール内のリンクから設定を行ってください。`
+            );
           }
+        } else {
+          showToast('メール送信に失敗しました: ' + data.error, 'error');
         }
-      );
+      })
+      .catch(err => {
+        console.error('Failed to send signup email:', err);
+        showToast('メール送信中に通信エラーが発生しました。', 'error');
+      });
     });
   }
 
