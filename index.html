@@ -2686,7 +2686,7 @@
   </div>
 
   <!-- ペイン: 🔑 ユーザー権限設定 -->
-  <div id="presence-pane-permissions" style="background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); padding: 1.25rem; display: flex; flex-direction: column; box-sizing: border-box;">
+  <div id="presence-pane-permissions" style="background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); padding: 1.25rem; display: block; box-sizing: border-box;">
     <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1.25rem; background: var(--bg-surface-elevated); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); flex-wrap: wrap;">
       <label style="font-size: 0.88rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap;">対象のユーザーを選択:</label>
       <select id="presence-user-selector" style="padding: 0.4rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; font-size: 0.88rem; min-width: 200px; cursor: pointer;">
@@ -2704,7 +2704,7 @@
   </div>
 
   <!-- ペイン: 📦 パッケージの登録 (初期非表示) -->
-  <div id="presence-pane-packages" style="background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); padding: 1.25rem; display: none; flex-direction: column; box-sizing: border-box;">
+  <div id="presence-pane-packages" style="background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); padding: 1.25rem; display: none; box-sizing: border-box;">
     <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1.25rem; background: var(--bg-surface-elevated); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); flex-wrap: wrap;">
       <label style="font-size: 0.88rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap;">対象のパッケージを選択:</label>
       <select id="presence-package-selector" style="padding: 0.4rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; font-size: 0.88rem; min-width: 180px; cursor: pointer;">
@@ -2724,7 +2724,7 @@
   </div>
 
   <!-- ペイン: 📋 承認申請一覧 (初期非表示) -->
-  <div id="presence-pane-approvals" style="background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); padding: 1.25rem; display: none; flex-direction: column; box-sizing: border-box; text-align: left;">
+  <div id="presence-pane-approvals" style="background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); padding: 1.25rem; display: none; box-sizing: border-box; text-align: left;">
     <h3 style="margin-top: 0; font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem;">📋 業務ロール承認申請一覧</h3>
     <div id="admin-approval-list" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 65vh; overflow-y: auto;">
       <!-- 申請中のユーザーが動的にリストアップされます -->

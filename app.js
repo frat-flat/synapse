@@ -22729,7 +22729,7 @@ function setupPermissionFeatures() {
       if (pane) pane.style.display = 'none';
     });
     if (activeBtn) activeBtn.classList.add('active');
-    if (showPane) showPane.style.display = 'flex';
+    if (showPane) showPane.style.display = 'block';
   }
 
   if (tabBtnUserPerms) {
