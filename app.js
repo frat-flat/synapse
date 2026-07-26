@@ -1473,13 +1473,20 @@ function initDatabase() {
       if (data.success && data.url && data.anonKey) {
         const localUrl = localStorage.getItem(STORAGE_KEYS.SUPABASE_URL);
         const localKey = localStorage.getItem(STORAGE_KEYS.SUPABASE_ANON_KEY);
+        
+        let needsInit = false;
         if (localUrl !== data.url || localKey !== data.anonKey) {
           localStorage.setItem(STORAGE_KEYS.SUPABASE_URL, data.url);
           localStorage.setItem(STORAGE_KEYS.SUPABASE_ANON_KEY, data.anonKey);
           console.log('[Supabase] Automatically configured credentials from environment variables.');
+          needsInit = true;
+        }
+        
+        // 接続URLが同じであっても、起動時初期化に失敗していた（Client未生成）場合は再初期化と同期を行う
+        if (needsInit || !supabaseClient) {
           if (initSupabase()) {
             setTimeout(() => {
-              syncFromSupabase(true);
+              syncFromSupabase();
             }, 100);
           }
         }
