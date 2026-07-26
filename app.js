@@ -8644,12 +8644,17 @@ function changeUserMode(mode) {
 function handleLogin(e) {
   e.preventDefault();
   try {
-    const id = document.getElementById('login-id').value.trim();
+    let id = document.getElementById('login-id').value.trim();
     const pass = document.getElementById('login-pass').value.trim();
+
+    // メールアドレス形式（例: admin@synapse.management）で入力された場合、ユーザーID部のみを切り出して比較
+    if (id.includes('@')) {
+      id = id.split('@')[0];
+    }
 
     ensureInitialUsersExist();
     const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
-    const foundUser = users.find(u => u.id === id && u.password === pass);
+    const foundUser = users.find(u => u.id.toLowerCase() === id.toLowerCase() && u.password === pass);
 
     if (foundUser) {
       foundUser.lastLoginAt = new Date().toISOString();
