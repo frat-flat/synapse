@@ -1991,22 +1991,27 @@ function checkFolderAccess(folderId) {
     return { visible: true, grayout: false };
   }
 
+  // 1. 権限設定（folders）に該当のフォルダIDがセットアップされている場合、
+  //    ログイン中ユーザーが許可されていなければ、標準フォルダであっても非表示にする。
   const isSetup = Object.keys(state.permissions.folders).includes(folderId);
   const allowed = state.permissions.folders[folderId] || [];
   const hasAccess = !isSetup || allowed.includes(userId);
+
+  if (isSetup && !hasAccess) {
+    // プレビュー表示時のシミュレーションモード
+    if (state.previewUserId && isOwner) {
+      if (state.previewMode === 'simulate' || state.previewMode === 'grayout') {
+        return { visible: true, grayout: true };
+      }
+    }
+    return { visible: false, grayout: false };
+  }
 
   if (hasAccess) {
     return { visible: true, grayout: false };
   }
 
-  // プレビュー表示時のシミュレーションモード
-  if (state.previewUserId && isOwner) {
-    if (state.previewMode === 'simulate' || state.previewMode === 'grayout') {
-      return { visible: true, grayout: true };
-    }
-  }
-
-  // 標準アコーディオンフォルダ群は常に表示する
+  // 標準アコーディオンフォルダ群は常に表示する（権限がセットアップされていない、または許可されている場合のみ）
   const stdFolders = ['appoint-accordion', 'agency-accordion', 'jo-accordion', 'applicant-accordion'];
   if (stdFolders.includes(folderId)) {
     return { visible: true, grayout: false };
@@ -2029,22 +2034,27 @@ function checkTableAccess(tableId) {
     return { visible: true, grayout: false };
   }
 
+  // 1. 権限設定（tables）に該当のテーブルIDがセットアップされている場合、
+  //    ログイン中ユーザーが許可されていなければ、標準テーブルであっても非表示にする。
   const isSetup = Object.keys(state.permissions.tables).includes(tableId);
   const allowed = state.permissions.tables[tableId] || [];
   const hasAccess = !isSetup || allowed.includes(userId);
+
+  if (isSetup && !hasAccess) {
+    // プレビュー表示時のシミュレーションモード
+    if (state.previewUserId && isOwner) {
+      if (state.previewMode === 'simulate' || state.previewMode === 'grayout') {
+        return { visible: true, grayout: true };
+      }
+    }
+    return { visible: false, grayout: false };
+  }
 
   if (hasAccess) {
     return { visible: true, grayout: false };
   }
 
-  // プレビュー表示時のシミュレーションモード
-  if (state.previewUserId && isOwner) {
-    if (state.previewMode === 'simulate' || state.previewMode === 'grayout') {
-      return { visible: true, grayout: true };
-    }
-  }
-
-  // アポイント画面群および標準基本マスタ画面は常に表示する
+  // アポイント画面群および標準基本マスタ画面は常に表示する（権限がセットアップされていない、または許可されている場合のみ）
   const stdSystemTables = [
     'appoint-screen', 'appointment-new', 'appointment-existing',
     'drafts-view-screen', 'history-view-screen', 'official-id-link', 'link-official-screen',
@@ -6560,10 +6570,18 @@ function updateUIForCurrentMode() {
     if (applicantInfoBtn) applicantInfoBtn.style.display = 'none';
     if (dbmakeBtn) dbmakeBtn.style.display = 'none';
   } else {
-    if (agencyInfoBtn) agencyInfoBtn.style.display = mode === 'support' ? 'none' : 'block';
-    if (joInfoBtn) joInfoBtn.style.display = 'block';
-    if (applicantInfoBtn) applicantInfoBtn.style.display = 'block';
-    if (dbmakeBtn) dbmakeBtn.style.display = mode === 'admin' ? 'block' : 'none';
+    if (agencyInfoBtn) {
+      agencyInfoBtn.style.display = (mode !== 'support' && checkTableAccess('agency-info-screen').visible) ? 'block' : 'none';
+    }
+    if (joInfoBtn) {
+      joInfoBtn.style.display = checkTableAccess('jo-info-screen').visible ? 'block' : 'none';
+    }
+    if (applicantInfoBtn) {
+      applicantInfoBtn.style.display = checkTableAccess('applicant-info-screen').visible ? 'block' : 'none';
+    }
+    if (dbmakeBtn) {
+      dbmakeBtn.style.display = (mode === 'admin' && checkTableAccess('dbmake-screen').visible) ? 'block' : 'none';
+    }
   }
   
   // ヘッダーのモード切り替えボタンの更新
@@ -7453,6 +7471,15 @@ function renderCustomerDetailView(customerId) {
   container.appendChild(layout);
 }
 function openTab(id, type, title, appointData = null) {
+  // 🔑 権限チェックを追加
+  if (type && type !== 'mypage-screen') {
+    const access = checkTableAccess(type);
+    if (!access.visible) {
+      showToast(`「${title}」画面へのアクセス権限がありません。`, 'error');
+      return;
+    }
+  }
+
   // 動的マスタ名との同期
   if (['jo-info-screen', 'applicant-info-screen', 'agency-info-screen', 'dbmake-screen', 'dbmake'].includes(id)) {
     const tableId = id === 'dbmake-screen' ? 'dbmake' : id;
@@ -7541,6 +7568,28 @@ function openTab(id, type, title, appointData = null) {
 function activateTab(id) {
   const tab = state.tabs.find(t => t.id === id);
   if (!tab) return;
+
+  // 🔑 権限チェックを追加
+  if (tab.type && tab.type !== 'mypage-screen') {
+    const access = checkTableAccess(tab.type);
+    if (!access.visible) {
+      showToast(`「${tab.title}」画面へのアクセス権限がありません。`, 'error');
+      // 権限がない場合は、マイページにフォールバックして強制リダイレクト
+      state.activeTabId = 'mypage-tab';
+      renderTabBar();
+      const views = document.querySelectorAll('.screen-view');
+      views.forEach(v => {
+        if (v.id === 'mypage-screen') {
+          v.classList.add('active');
+          v.style.display = 'block';
+        } else {
+          v.classList.remove('active');
+          v.style.display = 'none';
+        }
+      });
+      return;
+    }
+  }
 
   state.activeTabId = id;
 
