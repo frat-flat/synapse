@@ -19317,51 +19317,7 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     // システム標準画面
-    const systemPages = [
-      { id: 'home-screen', name: '🏠 ホーム・コントロールパネル', desc: 'メイン画面および管理者用ツール', editRoleNeeded: 'admin' },
-      { id: 'mypage-screen', name: '👤 マイページ', desc: '個人のプロフィール・アポイント確認', editRoleNeeded: 'any' },
-      { id: 'dashboard-screen', name: '📊 アポイントダッシュボード', desc: '予約・アポイント状況グラフ', editRoleNeeded: 'any' },
-      { id: 'appointment-screen', name: '📄 新規アポイント作成', desc: 'アポイント入力画面', editRoleNeeded: 'any' },
-      { id: 'audit-log-screen', name: '📊 操作ログ履歴', desc: 'セル編集履歴の閲覧 (管理者のみ)', editRoleNeeded: 'admin' },
-      { id: 'user-manager-screen', name: '👥 ユーザー管理', desc: 'ユーザーの追加・編集・削除 (管理者のみ)', editRoleNeeded: 'admin' },
-      { id: 'permission-settings-screen', name: '🔑 権限設定', desc: 'フォルダ・テーブル・カラムの権限管理 (管理者のみ)', editRoleNeeded: 'admin' }
-    ];
 
-    html += `
-      <div style="margin-bottom: 1.5rem;">
-        <h4 style="margin: 0 0 0.75rem 0; font-size: 0.92rem; color: var(--text-secondary); font-weight: 700; border-left: 3px solid var(--primary); padding-left: 0.5rem;">
-          🌐 アプリ標準画面・ビュー
-        </h4>
-        <div style="display: grid; grid-template-columns: 1fr; gap: 0.5rem; max-width: 800px;">
-    `;
-
-    systemPages.forEach(p => {
-      let allowedRead = true;
-      if (p.id === 'audit-log-screen' || p.id === 'user-manager-screen' || p.id === 'permission-settings-screen') {
-        allowedRead = (userRole === 'admin');
-      }
-      const allowedWrite = p.editRoleNeeded === 'admin' ? (userRole === 'admin') : allowedRead;
-      
-      const currentLevel = !allowedRead ? 'hidden' : (!allowedWrite ? 'readonly' : 'write');
-      const isGrayedOut = currentLevel === 'hidden';
-
-      html += `
-        <div class="${isGrayedOut ? 'perm-row-grayed-out' : ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); flex-wrap: wrap; gap: 0.5rem;">
-          <div>
-            <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">${p.name}</span>
-            <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.5rem;">- ${p.desc}</span>
-          </div>
-          <div style="display: flex; align-items: center;">
-            ${getThreeStateToggleHtml(currentLevel, p.editRoleNeeded === 'admin' && userRole !== 'admin', 'setTablePermissionLevel', p.id)}
-          </div>
-        </div>
-      `;
-    });
-
-    html += `
-        </div>
-      </div>
-    `;
 
     // 💡 管理者コントロールパネル個別アイコンの権限制御 UI
     const adminPanelIcons = [
