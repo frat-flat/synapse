@@ -1953,6 +1953,68 @@ function logCellEdit(tableId, rowId, colId, oldValue, newValue) {
   saveAuditLogs();
 }
 
+// 💡 コントロールパネルの各アイコン（ボタン）の権限レベルを解決する
+function getAdminIconPermissionLevel(userId, iconId) {
+  // 実ログインのユーザー情報またはプレビュー中の情報を取得
+  const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+  const user = users.find(u => u.id === userId) || { id: userId, name: userId, role: userId };
+  const userRole = user.role || user.id;
+
+  // owner（ECオーナー）は常にフルアクセス（write）
+  if (userRole === 'owner' || userId === 'owner') return 'write';
+
+  if (!state.permissions.tables) state.permissions.tables = {};
+  if (!state.permissions.writeTables) state.permissions.writeTables = {};
+
+  const isSetup = Object.keys(state.permissions.tables).includes(iconId);
+  if (!isSetup) {
+    // 💡 修正: デフォルトでは owner 以外（admin を含む）すべて非表示 (hidden) とする
+    return 'hidden';
+  }
+
+  const readAllowed = state.permissions.tables[iconId] || [];
+  const writeAllowed = state.permissions.writeTables[iconId] || [];
+
+  const hasRead = readAllowed.includes(userId);
+  const hasWrite = writeAllowed.includes(userId);
+
+  return (hasRead && hasWrite) ? 'write' : 'hidden';
+}
+
+// 💡 コントロールパネルの各アイコン（ボタン）の権限を設定する
+window.setAdminIconPermissionLevel = function(userId, iconId, level) {
+  if (!state.permissions.tables) state.permissions.tables = {};
+  if (!state.permissions.writeTables) state.permissions.writeTables = {};
+
+  let readAllowed = state.permissions.tables[iconId] || [];
+  let writeAllowed = state.permissions.writeTables[iconId] || [];
+
+  if (level === 'hidden') {
+    readAllowed = readAllowed.filter(id => id !== userId);
+    writeAllowed = writeAllowed.filter(id => id !== userId);
+  } else if (level === 'write') {
+    if (!readAllowed.includes(userId)) readAllowed.push(userId);
+    if (!writeAllowed.includes(userId)) writeAllowed.push(userId);
+  }
+
+  state.permissions.tables[iconId] = readAllowed;
+  state.permissions.writeTables[iconId] = writeAllowed;
+
+  savePermissions();
+  renderUserPermissionViewer(userId);
+  showToast('コントロールパネルのアイコン権限を更新しました。', 'success');
+
+  // UIをリアルタイムに更新
+  updateUIForCurrentMode();
+};
+
+// 💡 現在のユーザーがコントロールパネルのアイコンを表示できるかチェックする
+function checkAdminIconAccess(iconId) {
+  const userId = getCurrentUserId();
+  const level = getAdminIconPermissionLevel(userId, iconId);
+  return level === 'write';
+}
+
 // ログイン中のユーザーがECオーナー（role: owner）かを判定するヘルパー
 function isOwnerUser() {
   if (!state.currentUser) return false;
@@ -1962,14 +2024,31 @@ function isOwnerUser() {
 // ホーム画面（コントロールパネル）にアクセス可能かを判定するヘルパー
 function canAccessHomeScreen() {
   if (!state.currentUser) return false;
-  // プレビュー（なりすまし）中の場合
-  if (state.previewUserId) {
-    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
-    const previewUser = users.find(u => u.id === state.previewUserId);
-    return previewUser && (previewUser.role === 'owner' || previewUser.role === 'admin');
-  }
-  // 通常時は実ログインユーザーがオーナーである場合のみ許可
-  return isOwnerUser();
+
+  // 通常判定用のユーザーIDを決定
+  const userId = getCurrentUserId();
+
+  // 1. オーナーであれば常にアクセス可能
+  const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+  const user = users.find(u => u.id === userId);
+  const isOwner = (userId === 'owner' || (user && user.role === 'owner'));
+  if (isOwner) return true;
+
+  // 2. 一般ユーザー（adminロールを含む）であっても、いずれかのコントロールパネルアイコンの権限を持っていればアクセス可能
+  const adminIcons = [
+    'admin-panel-form-btn',
+    'admin-panel-table-btn',
+    'admin-panel-presence-btn',
+    'admin-panel-audit-btn',
+    'admin-panel-partner-btn',
+    'admin-panel-folder-btn',
+    'admin-panel-user-register-btn'
+  ];
+  const hasAnyIconAccess = adminIcons.some(iconId => {
+    return checkAdminIconAccess(iconId);
+  });
+
+  return hasAnyIconAccess;
 }
 
 // アクティブなプレビュー対象、または現在のユーザーIDを解決するヘルパー
@@ -2161,6 +2240,30 @@ function checkColumnEditAccess(tableId, colId) {
   // 設定がなければ、閲覧できれば編集も可能
   return true;
 }
+
+// 💡 プレビュー（ユーザービュー）時のセルの背景色を解決するヘルパー
+function getPreviewCellBgColor(tableId, colId) {
+  if (!state.previewUserId) return null; // プレビュー中でなければ通常背景
+
+  const colAccess = checkColumnAccess(tableId, colId);
+  const isReadOnly = !checkColumnEditAccess(tableId, colId);
+
+  if (state.previewMode === 'simulate') {
+    if (colAccess.grayout || !colAccess.visible) {
+      return '#f1f5f9'; // 非表示: グレー
+    }
+    if (isReadOnly) {
+      return '#fefaf0'; // 閲覧のみ: アイボリー
+    }
+    return '#edf7ed'; // 編集可: 緑
+  } else if (state.previewMode === 'actual') {
+    if (isReadOnly) {
+      return '#fefaf0'; // 閲覧のみ: アイボリー
+    }
+  }
+  return null;
+}
+window.getPreviewCellBgColor = getPreviewCellBgColor;
 
 // 行（データ行）の閲覧可否判定
 function checkRowAccess(tableId, row) {
@@ -3771,6 +3874,11 @@ function renderCustomTable(tableId) {
     th.style.minWidth = `${tbl.columnWidths[col.id] || 120}px`;
     th.dataset.colId = col.id;
 
+    const previewBg = getPreviewCellBgColor(`custom-table-${tbl.id}`, col.id);
+    if (previewBg) {
+      th.style.backgroundColor = previewBg;
+    }
+
     const headerWrapper = document.createElement('div');
     headerWrapper.className = 'th-wrapper';
     headerWrapper.style.display = 'flex';
@@ -4050,6 +4158,11 @@ function renderCustomTable(tableId) {
       const cellKey = `${row.id}:${col.id}`;
       const style = tbl.cellStyles[cellKey] || {};
       applyInlineStylesToCell(td, style);
+
+      const previewBg = getPreviewCellBgColor(`custom-table-${tbl.id}`, col.id);
+      if (previewBg) {
+        td.style.backgroundColor = previewBg;
+      }
 
       if (fixedColIds.includes(col.id)) {
         td.classList.add('fixed-col-data');
@@ -6575,10 +6688,31 @@ function updateUIForCurrentMode() {
   if (auditLogBtn) auditLogBtn.style.display = 'none';
 
   // ホーム画面の管理者専用コントロールパネルの表示制御
+  const adminIcons = [
+    'admin-panel-form-btn',
+    'admin-panel-table-btn',
+    'admin-panel-presence-btn',
+    'admin-panel-audit-btn',
+    'admin-panel-partner-btn',
+    'admin-panel-folder-btn',
+    'admin-panel-user-register-btn'
+  ];
+
+  let hasAnyVisibleIcon = false;
+  adminIcons.forEach(iconId => {
+    const btn = document.getElementById(iconId);
+    if (btn) {
+      const isVisible = checkAdminIconAccess(iconId);
+      btn.style.display = isVisible ? 'flex' : 'none';
+      if (isVisible) hasAnyVisibleIcon = true;
+    }
+  });
+
   const adminHomePanel = document.getElementById('admin-home-panel');
   if (adminHomePanel) {
-    // 💡 canAccessHomeScreen() を参照して、オーナーまたはプレビュー中のオーナー・管理者にのみ表示する
-    adminHomePanel.style.display = (canAccessHomeScreen() && !pendingUser) ? 'flex' : 'none';
+    // canAccessHomeScreen() を参照して、オーナーまたはプレビュー中のオーナー・管理者にのみ表示する (ただし表示可能アイコンが1つもない場合は非表示)
+    const shouldShowPanel = canAccessHomeScreen() && hasAnyVisibleIcon && !pendingUser;
+    adminHomePanel.style.display = shouldShowPanel ? 'flex' : 'none';
   }
 
   // 管理者メニューボタンの表示制御
@@ -13630,6 +13764,11 @@ function renderAgencyInfo() {
         th.style.boxSizing = 'border-box';
         th.style.cursor = 'pointer';
 
+        const previewBg = getPreviewCellBgColor('agency-info-screen', col.id);
+        if (previewBg) {
+          th.style.backgroundColor = previewBg;
+        }
+
         if (fixedColIds.includes(col.id)) {
           th.style.left = `${leftPosMap[col.id]}px`;
           th.style.zIndex = '15';
@@ -13883,7 +14022,10 @@ function renderAgencyInfo() {
 
         applyInlineStylesToCell(td, styleObj);
 
-        if (styleObj['background-color']) {
+        const previewBg = getPreviewCellBgColor('agency-info-screen', col.id);
+        if (previewBg) {
+          td.style.backgroundColor = previewBg;
+        } else if (styleObj['background-color']) {
           td.style.backgroundColor = styleObj['background-color'];
         } else if (isSticky) {
           td.style.backgroundColor = 'var(--bg-surface)';
@@ -18425,7 +18567,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (popoverSettingsBtn && settingsPopup) {
     popoverSettingsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      toggleSettingsPopup(popoverSettingsBtn);
+      toggleSettingsPopup(userProfileBtn); // アカウントのすぐ下に配置するため、ヘッダーのアカウントボタンをトリガーにする
       // アカウントポップオーバーは閉じる
       if (userProfilePopover) userProfilePopover.style.display = 'none';
     });
@@ -18445,9 +18587,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const u = state.currentUser || { name: '営業担当A', id: 'sales_01' };
         const emailEl = document.getElementById('user-popover-email');
         const nameEl = document.getElementById('user-popover-name');
+        const codeEl = document.getElementById('user-popover-code');
         
         if (emailEl) emailEl.textContent = `${u.email || u.id || 'user'}`;
         if (nameEl) nameEl.textContent = `${u.name || 'ユーザー'} 様`;
+        if (codeEl) codeEl.textContent = u.code ? `コード: ${u.code}` : 'コード: なし';
         
         updateAvatarUI();
 
@@ -19219,6 +19363,54 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
 
+    // 💡 管理者コントロールパネル個別アイコンの権限制御 UI
+    const adminPanelIcons = [
+      { id: 'admin-panel-form-btn', name: '📄 フォーム作成', desc: 'カスタム入力フォームの定義・編集' },
+      { id: 'admin-panel-table-btn', name: '📊 テーブル作成', desc: '新テーブルおよび標準マスタ拡張の定義' },
+      { id: 'admin-panel-presence-btn', name: '🔑 権限設定', desc: 'ユーザーごとの表示・編集権限のマトリクス設定' },
+      { id: 'admin-panel-audit-btn', name: '📈 操作ログ履歴', desc: 'ユーザー全員のセル編集・操作履歴ログの閲覧' },
+      { id: 'admin-panel-partner-btn', name: '🛢️ パートナーDB', desc: 'パートナー企業等の統合データベース' },
+      { id: 'admin-panel-folder-btn', name: '📁 フォルダ管理', desc: 'サイドバーおよびテーブルのフォルダ格納管理' },
+      { id: 'admin-panel-user-register-btn', name: '👥 ユーザー登録', desc: '新規ユーザー登録・オンボーディング承認' }
+    ];
+
+    let adminIconsToggleHtml = `
+      <div style="margin-bottom: 1.5rem;">
+        <h4 style="margin: 0 0 0.75rem 0; font-size: 0.92rem; color: var(--text-secondary); font-weight: 700; border-left: 3px solid var(--primary); padding-left: 0.5rem;">
+          🛠️ 管理者コントロールパネル・アイコン権限
+        </h4>
+        <div style="display: grid; grid-template-columns: 1fr; gap: 0.5rem; max-width: 800px;">
+    `;
+
+    adminPanelIcons.forEach(p => {
+      const currentLevel = getAdminIconPermissionLevel(user.id, p.id);
+      const isGrayedOut = currentLevel === 'hidden';
+      const isSystemAdmin = (user.id === 'owner' || user.role === 'owner');
+
+      const optHidden = `<button class="btn-perm-toggle ${currentLevel === 'hidden' ? 'active-hidden' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="window.setAdminIconPermissionLevel('${user.id}', '${p.id}', 'hidden')">🚫 非表示</button>`;
+      const optWrite = `<button class="btn-perm-toggle ${currentLevel === 'write' ? 'active-write' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="window.setAdminIconPermissionLevel('${user.id}', '${p.id}', 'write')">✏️ 編集許可</button>`;
+      const toggleHtml = `<div class="perm-three-state-group" style="grid-template-columns: 1fr 1fr;">${optHidden}${optWrite}</div>`;
+
+      adminIconsToggleHtml += `
+        <div class="${isGrayedOut ? 'perm-row-grayed-out' : ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">${p.name}</span>
+            <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.5rem;">- ${p.desc}</span>
+          </div>
+          <div style="display: flex; align-items: center;">
+            ${toggleHtml}
+          </div>
+        </div>
+      `;
+    });
+
+    adminIconsToggleHtml += `
+        </div>
+      </div>
+    `;
+
+    html += adminIconsToggleHtml;
+
     // システム標準マスタ
     const masterTables = [
       { id: 'applicant-info-screen', name: '📊 申込者 基本マスタ' },
@@ -19697,6 +19889,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const presenceBtn = document.getElementById('admin-panel-presence-btn');
   if (presenceBtn) {
     presenceBtn.addEventListener('click', () => {
+      if (!checkAdminIconAccess('admin-panel-presence-btn')) {
+        showToast('この機能を利用する権限がありません。', 'error');
+        return;
+      }
       openTab('presence-tab', 'presence-settings-screen', '🔑 ユーザー権限設定');
       initPresenceUserSelector();
     });
@@ -22642,6 +22838,10 @@ function setupPermissionFeatures() {
   const panelFormBtn = document.getElementById('admin-panel-form-btn');
   if (panelFormBtn) {
     panelFormBtn.addEventListener('click', () => {
+      if (!checkAdminIconAccess('admin-panel-form-btn')) {
+        showToast('この機能を利用する権限がありません。', 'error');
+        return;
+      }
       openTab('form-customize-tab', 'form-customize-screen', '📋 フォーム作成');
     });
   }
@@ -22649,6 +22849,10 @@ function setupPermissionFeatures() {
   const panelTableBtn = document.getElementById('admin-panel-table-btn');
   if (panelTableBtn) {
     panelTableBtn.addEventListener('click', () => {
+      if (!checkAdminIconAccess('admin-panel-table-btn')) {
+        showToast('この機能を利用する権限がありません。', 'error');
+        return;
+      }
       openTab('table-creator-tab', 'table-creator-screen', '📊 テーブル作成');
     });
   }
@@ -22656,6 +22860,10 @@ function setupPermissionFeatures() {
   const panelPermBtn = document.getElementById('admin-panel-perm-btn');
   if (panelPermBtn) {
     panelPermBtn.addEventListener('click', () => {
+      if (!checkAdminIconAccess('admin-panel-presence-btn')) {
+        showToast('この機能を利用する権限がありません。', 'error');
+        return;
+      }
       openTab('permission-settings-tab', 'permission-settings-screen', '🔑 権限設定');
       initPermissionSettingsScreen();
     });
@@ -22664,6 +22872,10 @@ function setupPermissionFeatures() {
   const panelAuditBtn = document.getElementById('admin-panel-audit-btn');
   if (panelAuditBtn) {
     panelAuditBtn.addEventListener('click', () => {
+      if (!checkAdminIconAccess('admin-panel-audit-btn')) {
+        showToast('この機能を利用する権限がありません。', 'error');
+        return;
+      }
       openTab('audit-log-tab', 'audit-log-screen', '📊 操作ログ履歴');
       initAuditLogScreen();
     });
@@ -22672,6 +22884,10 @@ function setupPermissionFeatures() {
   const panelPartnerBtn = document.getElementById('admin-panel-partner-btn');
   if (panelPartnerBtn) {
     panelPartnerBtn.addEventListener('click', () => {
+      if (!checkAdminIconAccess('admin-panel-partner-btn')) {
+        showToast('この機能を利用する権限がありません。', 'error');
+        return;
+      }
       openDbmakePage();
     });
   }
@@ -22683,6 +22899,10 @@ function setupPermissionFeatures() {
 
   if (panelFolderBtn && folderManagerModal) {
     panelFolderBtn.addEventListener('click', () => {
+      if (!checkAdminIconAccess('admin-panel-folder-btn')) {
+        showToast('この機能を利用する権限がありません。', 'error');
+        return;
+      }
       folderManagerModal.classList.add('active');
       renderModalFolderTree();
     });
@@ -23749,6 +23969,10 @@ function initUserManagerEvents() {
   // 管理者パネルボタンからタブを開く
   if (panelBtn) {
     panelBtn.addEventListener('click', () => {
+      if (!checkAdminIconAccess('admin-panel-user-register-btn')) {
+        showToast('この機能を利用する権限がありません。', 'error');
+        return;
+      }
       const searchInputEl = document.getElementById('tab-user-search-input');
       if (searchInputEl) searchInputEl.value = '';
       const filterRoleEl = document.getElementById('tab-user-filter-role');
@@ -24844,20 +25068,31 @@ function renderPermissionSummary() {
 }
 
 function startImpersonationPreview(targetUserId, mode) {
+  state.prePreviewView = state.currentView;
   state.previewUserId = targetUserId;
   state.previewMode = mode;
   
-  const bar = document.getElementById('preview-warning-bar');
+  const bar = document.getElementById('impersonate-preview-bar');
   if (bar) {
     const userLabel = ALL_ACCOUNTS.find(a => a.id === targetUserId)?.name || targetUserId;
     const modeLabel = mode === 'grayout' ? 'デバッグ（グレー表示）' : '完全再現（非表示）';
     
-    document.getElementById('preview-target-user-label').textContent = `${userLabel} (${modeLabel})`;
+    const userEl = document.getElementById('previewing-user-name');
+    if (userEl) userEl.textContent = userLabel;
+    
+    const modeEl = document.getElementById('previewing-mode-name');
+    if (modeEl) modeEl.textContent = modeLabel;
+    
     bar.style.display = 'flex';
   }
 
   renderCustomTableList();
   
+  // 実際のユーザーが見られるログイン後の画面（マイページ画面）へ遷移
+  switchView('mypage-screen');
+
+  updateUIForCurrentMode();
+
   if (state.currentView === 'jo-info-screen') renderJoInfo();
   else if (state.currentView === 'applicant-info-screen') renderApplicantInfo();
   else if (state.currentView === 'agency-info-screen') renderAgencyInfo();
@@ -24872,12 +25107,20 @@ function endImpersonationPreview() {
   state.previewUserId = null;
   state.previewMode = null;
 
-  const bar = document.getElementById('preview-warning-bar');
+  const bar = document.getElementById('impersonate-preview-bar');
   if (bar) {
     bar.style.display = 'none';
   }
 
   renderCustomTableList();
+  updateUIForCurrentMode();
+
+  // 元の画面に戻る
+  if (state.prePreviewView) {
+    switchView(state.prePreviewView);
+  } else {
+    switchView('mypage-screen');
+  }
 
   if (state.currentView === 'jo-info-screen') renderJoInfo();
   else if (state.currentView === 'applicant-info-screen') renderApplicantInfo();
@@ -24888,6 +25131,27 @@ function endImpersonationPreview() {
 
   showToast('プレビューを終了し、通常の管理者ビューに戻りました。', 'success');
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const quitBtn = document.getElementById('preview-quit-btn');
+  if (quitBtn) {
+    quitBtn.addEventListener('click', () => {
+      endImpersonationPreview();
+    });
+  }
+
+  const modeSelect = document.getElementById('preview-mode-select');
+  if (modeSelect) {
+    modeSelect.addEventListener('change', () => {
+      if (state.currentView === 'jo-info-screen') renderJoInfo();
+      else if (state.currentView === 'applicant-info-screen') renderApplicantInfo();
+      else if (state.currentView === 'agency-info-screen') renderAgencyInfo();
+      else if (state.currentView === 'custom-table-screen' && state.activeCustomTableId) {
+        renderCustomTable(state.activeCustomTableId);
+      }
+    });
+  }
+});
 
 function initPermissionSettingsScreen() {
   const runBtn = document.getElementById('run-impersonation-preview-btn');
