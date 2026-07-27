@@ -2112,6 +2112,44 @@ function checkFolderAccess(folderId) {
   return { visible: false, grayout: false };
 }
 
+function shouldShowFolder(folderId) {
+  if (state.currentUser && state.currentUser.status === 'pending') {
+    return false;
+  }
+
+  if (checkFolderAccess(folderId).visible) {
+    return true;
+  }
+
+  const systemItemsMap = {
+    'appoint-accordion': ['appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link', 'link-official-screen'],
+    'agency-accordion': ['agency-info-screen'],
+    'jo-accordion': ['jo-info-screen'],
+    'applicant-accordion': ['applicant-info-screen']
+  };
+
+  const stdItems = systemItemsMap[folderId];
+  if (stdItems) {
+    for (const itemId of stdItems) {
+      if (checkTableAccess(itemId).visible) {
+        return true;
+      }
+    }
+  }
+
+  const customTables = state.customTables || [];
+  for (const tbl of customTables) {
+    const parentId = normalizeFolderId(tbl.parentMenuId);
+    if (parentId === folderId) {
+      if (checkTableAccess(tbl.id).visible) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 // テーブル（シート）の閲覧可否判定
 function checkTableAccess(tableId) {
   // 承認待ちユーザーはマイページ関連以外のテーブルをすべて非表示にする
@@ -2692,10 +2730,9 @@ function renderCustomTableList() {
 
     // A. 親IDに属するアコーディオン（標準フォルダ ＋ カスタムフォルダ）を抽出
     const childFolders = state.customAccordions.filter(acc => normalizeFolderId(acc.parentMenuId || 'root') === normalizedParentId);
-
     childFolders.forEach(acc => {
+      if (!shouldShowFolder(acc.id)) return;
       const access = checkFolderAccess(acc.id);
-      if (!access.visible) return;
 
       let folderDiv = sysAccs[acc.id]; // 標準フォルダの場合
 
@@ -6669,10 +6706,10 @@ function updateUIForCurrentMode() {
     if (applicantAccordion) applicantAccordion.style.display = 'none';
     if (customTablesAccordion) customTablesAccordion.style.display = 'none';
   } else {
-    if (appointAccordion) appointAccordion.style.display = checkFolderAccess('appoint-accordion').visible ? 'block' : 'none';
-    if (agencyAccordion) agencyAccordion.style.display = checkFolderAccess('agency-accordion').visible ? 'block' : 'none';
-    if (joAccordion) joAccordion.style.display = checkFolderAccess('jo-accordion').visible ? 'block' : 'none';
-    if (applicantAccordion) applicantAccordion.style.display = checkFolderAccess('applicant-accordion').visible ? 'block' : 'none';
+    if (appointAccordion) appointAccordion.style.display = shouldShowFolder('appoint-accordion') ? 'block' : 'none';
+    if (agencyAccordion) agencyAccordion.style.display = shouldShowFolder('agency-accordion') ? 'block' : 'none';
+    if (joAccordion) joAccordion.style.display = shouldShowFolder('jo-accordion') ? 'block' : 'none';
+    if (applicantAccordion) applicantAccordion.style.display = shouldShowFolder('applicant-accordion') ? 'block' : 'none';
     if (customTablesAccordion) customTablesAccordion.style.display = 'block';
   }
   
