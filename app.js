@@ -1953,10 +1953,10 @@ function logCellEdit(tableId, rowId, colId, oldValue, newValue) {
   saveAuditLogs();
 }
 
-// ログイン中のユーザーがECオーナー（code: 4X9N3K75 または role: owner）かを判定するヘルパー
+// ログイン中のユーザーがECオーナー（role: owner）かを判定するヘルパー
 function isOwnerUser() {
   if (!state.currentUser) return false;
-  return state.currentUser.role === 'owner' || state.currentUser.code === '4X9N3K75';
+  return state.currentUser.role === 'owner';
 }
 
 // アクティブなプレビュー対象、または現在のユーザーIDを解決するヘルパー
@@ -1964,7 +1964,7 @@ function getCurrentUserId() {
   if (state.previewUserId) return state.previewUserId;
   if (state.currentUser) {
     // プレビュー表示切り替え時のダミーID解決
-    if (state.currentUser.role === 'owner' || state.currentUser.code === '4X9N3K75') {
+    if (isOwnerUser()) {
       if (state.currentUser.id === 'sales') return 'sales_01';
       if (state.currentUser.id === 'setup-support') return 'support_01';
       if (state.currentUser.id === 'store-patrol') return 'patrol_01';
@@ -6544,7 +6544,7 @@ function updateUIForCurrentMode() {
   // ホーム画面の管理者専用コントロールパネルの表示制御
   const adminHomePanel = document.getElementById('admin-home-panel');
   if (adminHomePanel) {
-    const isAdminMode = getCurrentUserId() === 'admin' || (state.currentUser && (state.currentUser.role === 'owner' || state.currentUser.code === '4X9N3K75'));
+    const isAdminMode = getCurrentUserId() === 'admin' || (state.currentUser && (state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
     adminHomePanel.style.display = (isAdminMode && !pendingUser) ? 'flex' : 'none';
   }
 
@@ -19560,8 +19560,10 @@ document.addEventListener('DOMContentLoaded', () => {
       let roleLabel = '';
       if (u.status === 'pending') {
         roleLabel = ` [申請中:${getRoleJpName(u.role)}]`;
-      } else if (u.role === 'admin' || u.role === 'owner') {
+      } else if (u.role === 'owner') {
         roleLabel = ' [オーナー]';
+      } else if (u.role === 'admin') {
+        roleLabel = ' [管理者]';
       } else if (u.role === 'sales') {
         roleLabel = ' [営業]';
       } else if (u.role === 'setup-support') {
