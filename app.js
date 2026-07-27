@@ -19301,6 +19301,79 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('カラムの閲覧・編集権限を更新しました。', 'success');
   };
 
+  window.togglePermFolderNode = function(folderId) {
+    const content = document.getElementById(`perm-folder-content-${folderId}`);
+    const arrow = document.getElementById(`perm-folder-arrow-${folderId}`);
+    if (!content) return;
+    const isHidden = content.style.display === 'none';
+    content.style.display = isHidden ? 'block' : 'none';
+    if (arrow) arrow.textContent = isHidden ? '▼' : '▶';
+  };
+
+  window.togglePermTableColumns = function(tblId) {
+    const content = document.getElementById(`perm-table-columns-${tblId}`);
+    const arrow = document.getElementById(`perm-table-arrow-${tblId}`);
+    if (!content) return;
+    const isHidden = content.style.display === 'none';
+    content.style.display = isHidden ? 'block' : 'none';
+    if (arrow) arrow.textContent = isHidden ? '▼' : '▶';
+  };
+
+  window.getPermBadgeAndEditBtnHtml = function(currentLevel, isReadOnlySystem, onClickCallbackName, tableId, colId, userId) {
+    const isOwner = (userId === 'owner');
+    const uniqueId = `perm_${tableId}_${colId || ''}`.replace(/[^a-zA-Z0-9_]/g, '_');
+
+    let badgeText = '🚫 非表示';
+    let badgeStyle = 'background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1;';
+
+    if (currentLevel === 'readonly') {
+      badgeText = '👁️ 閲覧のみ';
+      badgeStyle = 'background: #fefaf0; color: #b45309; border: 1px solid #fcd34d;';
+    } else if (currentLevel === 'write') {
+      badgeText = '✏️ 編集可能';
+      badgeStyle = 'background: #edf7ed; color: #15803d; border: 1px solid #86efac;';
+    }
+
+    const editBtn = isOwner ? '' : `
+      <button class="btn-perm-edit-trigger" style="margin-left: 0.5rem; padding: 0.2rem 0.4rem; font-size: 0.72rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 3px; cursor: pointer; color: var(--text-primary);" onclick="event.stopPropagation(); window.togglePermEditMode('${uniqueId}', '${currentLevel}', '${userId}', '${tableId}', '${colId || ''}', '${onClickCallbackName}', ${isReadOnlySystem})">
+        ✏️ 変更
+      </button>
+    `;
+
+    return `
+      <div id="ctrl-container-${uniqueId}" style="display: flex; align-items: center;">
+        <span style="font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.4rem; border-radius: 4px; ${badgeStyle}">
+          ${badgeText}
+        </span>
+        ${editBtn}
+      </div>
+    `;
+  };
+
+  window.togglePermEditMode = function(uniqueId, currentLevel, userId, tableId, colId, onClickCallbackName, isReadOnlySystem) {
+    const container = document.getElementById(`ctrl-container-${uniqueId}`);
+    if (!container) return;
+
+    const isSystemAdmin = (userId === 'owner');
+
+    const optHidden = `<button class="btn-perm-toggle ${currentLevel === 'hidden' ? 'active-hidden' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="event.stopPropagation(); window.${onClickCallbackName}('${userId}', '${tableId}', '${colId || ''}', 'hidden')">🚫 非表示</button>`;
+    const optRead = `<button class="btn-perm-toggle ${currentLevel === 'readonly' ? 'active-read' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="event.stopPropagation(); window.${onClickCallbackName}('${userId}', '${tableId}', '${colId || ''}', 'readonly')">👁️ 閲覧のみ</button>`;
+    
+    let optWrite = '';
+    if (isReadOnlySystem) {
+      optWrite = `<button class="btn-perm-toggle locked" title="システム仕様で編集不可" disabled>🔒 編集不可</button>`;
+    } else {
+      optWrite = `<button class="btn-perm-toggle ${currentLevel === 'write' ? 'active-write' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="event.stopPropagation(); window.${onClickCallbackName}('${userId}', '${tableId}', '${colId || ''}', 'write')">✏️ 編集可能</button>`;
+    }
+
+    container.innerHTML = `
+      <div class="perm-three-state-group" style="margin-right: 0.25rem;">${optHidden}${optRead}${optWrite}</div>
+      <button style="padding: 0.2rem 0.4rem; font-size: 0.72rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 3px; cursor: pointer; color: var(--text-primary);" onclick="event.stopPropagation(); window.renderUserPermissionViewer('${userId}')">
+        キャンセル
+      </button>
+    `;
+  };
+
   window.renderUserPermissionViewer = function(userId) {
     const container = document.getElementById('presence-permission-tree-container');
     if (!container) return;
@@ -19404,71 +19477,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     html += adminIconsToggleHtml;
 
-    // システム標準マスタ
-    const masterTables = [
-      { id: 'applicant-info-screen', name: '📊 申込者 基本マスタ' },
-      { id: 'jo-info-screen', name: '📊 JO 基本マスタ' },
-      { id: 'agency-info-screen', name: '📊 代理店 基本マスタ' }
-    ];
-
-    html += `
-      <div style="margin-bottom: 1.5rem;">
-        <h4 style="margin: 0 0 0.75rem 0; font-size: 0.92rem; color: var(--text-secondary); font-weight: 700; border-left: 3px solid var(--primary); padding-left: 0.5rem;">
-          📊 標準マスタテーブル・カラム
-        </h4>
-        <div style="display: flex; flex-direction: column; gap: 0.75rem; max-width: 800px;">
-    `;
-
-    masterTables.forEach(t => {
-      const tableLevel = getTablePermissionLevel(user.id, t.id);
-      const isTableReadAllowed = tableLevel !== 'hidden';
-      const isTableGrayedOut = tableLevel === 'hidden';
-
-      const columns = getTableColumns(t.id);
-      let columnsHtml = '';
-      if (isTableReadAllowed && columns.length > 0) {
-        columnsHtml = `
-          <div style="margin-top: 0.5rem; padding: 0.5rem 0.75rem; border-top: 1px dashed var(--border-color); background: var(--bg-surface-elevated); border-radius: var(--radius-sm);">
-            <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.35rem;">📄 列（カラム）ごとのアクセス権:</div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.5rem;">
-              ${columns.map(col => {
-                const colLevel = getColumnPermissionLevel(user.id, t.id, col, isTableReadAllowed);
-                const isReadOnlyCol = col.readOnly === true || col.id === 'id';
-                const isColGrayedOut = colLevel === 'hidden';
-                return `
-                  <div class="${isColGrayedOut ? 'perm-row-grayed-out' : ''}" style="font-size: 0.8rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.25rem 0.4rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 3px;">
-                    <span style="font-weight: 600; color: ${colLevel !== 'hidden' ? 'var(--text-primary)' : 'var(--text-secondary)'};">
-                      ${col.label || col.name}
-                    </span>
-                    <div style="display: flex; align-items: center;">
-                      ${getThreeStateToggleHtml(colLevel, isReadOnlyCol, 'setColumnPermissionLevel', t.id, col.id)}
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        `;
-      }
-
-      html += `
-        <div class="${isTableGrayedOut ? 'perm-row-grayed-out' : ''}" style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); padding: 0.65rem 0.75rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-            <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">${t.name}</span>
-            <div style="display: flex; align-items: center;">
-              ${getThreeStateToggleHtml(tableLevel, t.id === 'agency-info-screen' && user.id.startsWith('support'), 'setTablePermissionLevel', t.id)}
-            </div>
-          </div>
-          ${columnsHtml}
-        </div>
-      `;
-    });
-
-    html += `
-        </div>
-      </div>
-    `;
-
     // カスタムフォルダ・テーブル階層
     html += `
       <div>
@@ -19500,17 +19508,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const folderLevel = getFolderPermissionLevel(user.id, folder.id);
         const isFolderGrayedOut = folderLevel === 'hidden';
         const paddingLeft = `${depth * 1.25 + 0.5}rem`;
+        
         nodeHtml += `
-          <div style="margin: 0.25rem 0;">
-            <div class="${isFolderGrayedOut ? 'perm-row-grayed-out' : ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; padding-left: ${paddingLeft}; background: rgba(255,255,255,0.01); border-bottom: 1px solid rgba(0,0,0,0.05); flex-wrap: wrap; gap: 0.5rem;">
+          <div style="margin: 0.25rem 0; border: 1px solid var(--border-color); border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-surface);">
+            <div class="${isFolderGrayedOut ? 'perm-row-grayed-out' : ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; padding-left: ${paddingLeft}; background: var(--bg-surface-elevated); border-bottom: 1px solid var(--border-color); cursor: pointer; flex-wrap: wrap; gap: 0.5rem;" onclick="window.togglePermFolderNode('${folder.id}')">
               <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+                <span id="perm-folder-arrow-${folder.id}" style="color: var(--text-secondary); width: 1rem; display: inline-block;">▶</span>
                 📁 ${folder.name}
               </span>
               <div style="display: flex; align-items: center;">
-                ${getThreeStateToggleHtml(folderLevel, false, 'setFolderPermissionLevel', folder.id)}
+                ${window.getPermBadgeAndEditBtnHtml(folderLevel, false, 'setFolderPermissionLevel', folder.id, '', user.id)}
               </div>
             </div>
-            ${renderTreeNode(folder.id, depth + 1)}
+            <div id="perm-folder-content-${folder.id}" style="display: none; background: rgba(0,0,0,0.01);">
+              ${renderTreeNode(folder.id, depth + 1)}
+            </div>
           </div>
         `;
       });
@@ -19527,8 +19539,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isTableReadAllowed && columns.length > 0) {
           const innerPaddingLeft = `${depth * 1.25 + 1.75}rem`;
           columnsHtml = `
-            <div style="padding: 0.4rem 0.75rem; padding-left: ${innerPaddingLeft}; background: var(--bg-surface-elevated); font-size: 0.78rem; border-top: 1px dashed var(--border-color);">
-              <div style="font-weight: 700; color: var(--text-secondary); margin-bottom: 0.35rem;">📄 列（カラム）:</div>
+            <div id="perm-table-columns-${tbl.id}" style="display: none; padding: 0.5rem 0.75rem; padding-left: ${innerPaddingLeft}; background: var(--bg-surface-elevated); font-size: 0.78rem; border-top: 1px dashed var(--border-color);">
+              <div style="font-weight: 700; color: var(--text-secondary); margin-bottom: 0.35rem;">📄 列（カラム）ごとのアクセス権:</div>
               <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.35rem;">
                 ${columns.map(col => {
                   const colLevel = getColumnPermissionLevel(user.id, tableId, col, isTableReadAllowed);
@@ -19541,7 +19553,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${label}
                       </span>
                       <div style="display: flex; align-items: center;">
-                        ${getThreeStateToggleHtml(colLevel, isReadOnlyCol, 'setColumnPermissionLevel', tableId, col.id)}
+                        ${window.getPermBadgeAndEditBtnHtml(colLevel, isReadOnlyCol, 'setColumnPermissionLevel', tableId, col.id, user.id)}
                       </div>
                     </div>
                   `;
@@ -19551,14 +19563,20 @@ document.addEventListener('DOMContentLoaded', () => {
           `;
         }
 
+        const hasColumns = isTableReadAllowed && columns.length > 0;
+        const clickAction = hasColumns ? `onclick="window.togglePermTableColumns('${tbl.id}')"` : '';
+        const cursorStyle = hasColumns ? 'cursor: pointer;' : '';
+        const arrowEl = hasColumns ? `<span id="perm-table-arrow-${tbl.id}" style="color: var(--text-secondary); width: 1rem; display: inline-block;">▶</span>` : '<span style="width: 1rem; display: inline-block;"></span>';
+
         nodeHtml += `
-          <div class="${isTableGrayedOut ? 'perm-row-grayed-out' : ''}" style="margin: 0.25rem 0; border: 1px solid rgba(0,0,0,0.03); border-radius: var(--radius-sm); background: var(--bg-surface);">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; padding-left: ${paddingLeft}; background: rgba(0,0,0,0.02); flex-wrap: wrap; gap: 0.5rem;">
+          <div class="${isTableGrayedOut ? 'perm-row-grayed-out' : ''}" style="margin: 0.25rem 0; border: 1px solid var(--border-color); border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-surface);">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; padding-left: ${paddingLeft}; background: var(--bg-surface); ${cursorStyle} flex-wrap: wrap; gap: 0.5rem;" ${clickAction}>
               <span style="font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+                ${arrowEl}
                 📋 ${tbl.name}
               </span>
               <div style="display: flex; align-items: center;">
-                ${getThreeStateToggleHtml(tableLevel, false, 'setTablePermissionLevel', tableId)}
+                ${window.getPermBadgeAndEditBtnHtml(tableLevel, false, 'setTablePermissionLevel', tableId, '', user.id)}
               </div>
             </div>
             ${columnsHtml}
