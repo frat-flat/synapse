@@ -1959,6 +1959,19 @@ function isOwnerUser() {
   return state.currentUser.role === 'owner';
 }
 
+// ホーム画面（コントロールパネル）にアクセス可能かを判定するヘルパー
+function canAccessHomeScreen() {
+  if (!state.currentUser) return false;
+  // プレビュー（なりすまし）中の場合
+  if (state.previewUserId) {
+    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+    const previewUser = users.find(u => u.id === state.previewUserId);
+    return previewUser && (previewUser.role === 'owner' || previewUser.role === 'admin');
+  }
+  // 通常時は実ログインユーザーがオーナーである場合のみ許可
+  return isOwnerUser();
+}
+
 // アクティブなプレビュー対象、または現在のユーザーIDを解決するヘルパー
 function getCurrentUserId() {
   if (state.previewUserId) return state.previewUserId;
@@ -6400,6 +6413,16 @@ function updateUIForCurrentMode() {
   if (!state.currentUser) return;
   const mode = state.currentUser.id;
 
+  // 💡 ロゴのホバータイトル(tooltip)を権限に合わせて切り替える
+  const logoBtn = document.getElementById('sidebar-logo-btn');
+  if (logoBtn) {
+    if (canAccessHomeScreen()) {
+      logoBtn.title = 'ホーム画面へ';
+    } else {
+      logoBtn.title = 'マイページへ';
+    }
+  }
+
   // 一般ユーザー向けホーム画面内マイページ（メニュー・アイコン）の動的移動＆表示制御
   const isSystemAdmin = isOwnerUser();
   const menuMypage = document.getElementById('menu-mypage');
@@ -6554,8 +6577,8 @@ function updateUIForCurrentMode() {
   // ホーム画面の管理者専用コントロールパネルの表示制御
   const adminHomePanel = document.getElementById('admin-home-panel');
   if (adminHomePanel) {
-    const isAdminMode = getCurrentUserId() === 'admin' || (state.currentUser && (state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
-    adminHomePanel.style.display = (isAdminMode && !pendingUser) ? 'flex' : 'none';
+    // 💡 canAccessHomeScreen() を参照して、オーナーまたはプレビュー中のオーナー・管理者にのみ表示する
+    adminHomePanel.style.display = (canAccessHomeScreen() && !pendingUser) ? 'flex' : 'none';
   }
 
   // 管理者メニューボタンの表示制御
@@ -6663,8 +6686,12 @@ function checkLoginStatus() {
 
     showLoginScreen(false);
     
-    // リロード時・初期ロード時は一律でマイページ（ホーム画面）を初期表示する
-    switchView('mypage-screen');
+    // 💡 オーナーならホーム画面、それ以外ならマイページを初期表示する
+    if (isOwnerUser()) {
+      switchView('home-screen');
+    } else {
+      switchView('mypage-screen');
+    }
 
     // ズーム比率の復元・マイグレーション処理（画面全体のCSSズームは100%に戻し、レイアウト占有面積を60%にする設計に対応）
     const userId = state.currentUser ? state.currentUser.id : 'guest';
@@ -6695,6 +6722,11 @@ function checkLoginStatus() {
 
 // ビュー（画面）切り替え
 function switchView(viewId) {
+  // 💡 オーナー以外はホーム画面（home-screen）へのアクセスを拒否し、マイページへリダイレクト
+  if (viewId === 'home-screen' && !canAccessHomeScreen()) {
+    viewId = 'mypage-screen';
+  }
+
   state.currentView = viewId;
   state.activeTabId = viewId;
 
@@ -7942,11 +7974,15 @@ function setupEventListeners() {
     state.isSelectingCols = false;
   });
 
-  // ロゴクリックでホーム画面へ
+  // 💡 ロゴクリックでホーム画面（オーナーのみ）またはマイページ（非オーナー）へ
   const logoBtn = document.getElementById('sidebar-logo-btn');
   if (logoBtn) {
     logoBtn.addEventListener('click', (e) => {
-      switchView('home-screen');
+      if (canAccessHomeScreen()) {
+        switchView('home-screen');
+      } else {
+        switchView('mypage-screen');
+      }
     });
   }
 
@@ -9157,8 +9193,8 @@ function handleLogin(e) {
         }
       } else {
         showLoginScreen(false);
-        if (state.currentUser.id === 'admin') {
-          openTab('agency-info-screen', 'agency-info-screen', '📊 代理店・基本マスタ');
+        if (isOwnerUser()) {
+          switchView('home-screen');
         } else {
           switchView('mypage-screen');
         }
