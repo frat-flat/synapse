@@ -12634,6 +12634,27 @@ function handleFormSubmit(e) {
 function handleFormSubmitMessage(event) {
   if (!event.data) return;
 
+  // 接続変更ログの記録
+  if (event.data.type === 'FORM_LOG_CONNECTION_EDIT') {
+    const { formTitle, detail } = event.data;
+    const log = {
+      id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      timestamp: new Date().toISOString(),
+      userId: state.currentUser ? (state.currentUser.loginId || state.currentUser.id) : 'system',
+      userName: state.currentUser ? state.currentUser.name : 'システム',
+      tableId: 'form-customize',
+      tableName: 'フォーム編集(接続変更)',
+      rowId: formTitle,
+      columnId: 'connections',
+      columnName: 'ノード間接続',
+      oldValue: '接続編集前',
+      newValue: detail
+    };
+    state.auditLogs.unshift(log);
+    saveAuditLogs();
+    return;
+  }
+
   // 1. 一時保存データ取得の要求をハンドリング
   if (event.data.type === 'FORM_GET_TEMPORARY_DATA') {
     const { rowId, formTitle } = event.data;

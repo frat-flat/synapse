@@ -2811,124 +2811,7 @@
 
   // フローマップ内ズーム機能の動的インジェクション
   function injectZoomControls() {
-    const flowmapPanel = document.getElementById('panel-flowmap');
-    if (!flowmapPanel || flowmapPanel.querySelector('.flowmap-zoom-controls')) return;
-
-    const container = flowmapPanel.querySelector('.flowmap-container') || flowmapPanel;
-    container.style.position = 'relative';
-
-    const zoomDiv = document.createElement('div');
-    zoomDiv.className = 'flowmap-zoom-controls';
-    zoomDiv.style.cssText = `
-      position: absolute;
-      bottom: 24px;
-      right: 24px;
-      display: flex;
-      gap: 8px;
-      background: rgba(255, 255, 255, 0.9);
-      backdrop-filter: blur(8px);
-      padding: 8px;
-      border-radius: 30px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-      border: 1px solid rgba(0,0,0,0.08);
-      z-index: 10000;
-    `;
-
-    loadFlowmapPanZoom();
-    let zoomVal = flowmapPanZoom.scale;
-    window.currentFlowmapZoom = zoomVal;
-
-    const label = document.createElement('span');
-    label.id = 'zoom-percentage-label';
-    label.textContent = Math.round(zoomVal * 100) + '%';
-    label.style.cssText = 'font-size: 0.8rem; font-weight: 700; min-width: 45px; text-align: center; align-self: center; color: #4a5568;';
-
-    const updateZoom = (val) => {
-      let newScale = Math.max(0.3, Math.min(2.0, val));
-      
-      const containerRect = container.getBoundingClientRect();
-      const centerX = containerRect.width / 2;
-      const centerY = containerRect.height / 2;
-      
-      const svgCenterX = (centerX - flowmapPanZoom.panX) / flowmapPanZoom.scale;
-      const svgCenterY = (centerY - flowmapPanZoom.panY) / flowmapPanZoom.scale;
-      
-      flowmapPanZoom.scale = newScale;
-      flowmapPanZoom.panX = centerX - svgCenterX * newScale;
-      flowmapPanZoom.panY = centerY - svgCenterY * newScale;
-
-      updateZoomPanTransform();
-      saveFlowmapPanZoom();
-      zoomVal = newScale;
-    };
-
-    const btnOut = document.createElement('button');
-    btnOut.innerHTML = '➖';
-    btnOut.className = 'btn btn-sm btn-secondary';
-    btnOut.style.borderRadius = '50%';
-    btnOut.style.width = '32px';
-    btnOut.style.height = '32px';
-    btnOut.style.padding = '0';
-    btnOut.onclick = () => updateZoom(zoomVal - 0.15);
-
-    const btnIn = document.createElement('button');
-    btnIn.innerHTML = '➕';
-    btnIn.className = 'btn btn-sm btn-secondary';
-    btnIn.style.borderRadius = '50%';
-    btnIn.style.width = '32px';
-    btnIn.style.height = '32px';
-    btnIn.style.padding = '0';
-    btnIn.onclick = () => updateZoom(zoomVal + 0.15);
-
-    const btnReset = document.createElement('button');
-    btnReset.innerHTML = '🔄';
-    btnReset.className = 'btn btn-sm btn-secondary';
-    btnReset.style.borderRadius = '50%';
-    btnReset.style.width = '32px';
-    btnReset.style.height = '32px';
-    btnReset.style.padding = '0';
-    btnReset.onclick = () => {
-      flowmapPanZoom.scale = 1.0;
-      flowmapPanZoom.panX = 0;
-      flowmapPanZoom.panY = 0;
-      updateZoomPanTransform();
-      saveFlowmapPanZoom();
-      zoomVal = 1.0;
-    };
-
-    const btnResetData = document.createElement('button');
-    btnResetData.innerHTML = '🧹 データ初期化';
-    btnResetData.className = 'btn btn-sm btn-danger';
-    btnResetData.style.cssText = `
-      border-radius: 20px;
-      padding: 0 10px;
-      font-size: 0.7rem;
-      font-weight: bold;
-      height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #e53e3e;
-      color: white;
-      border: none;
-      cursor: pointer;
-      margin-left: 4px;
-    `;
-    btnResetData.onclick = () => {
-      if (confirm('⚠️ 警告: フォーム編集のローカルストレージデータをすべて初期状態にリセットしますか？\n（自身で作成したフォーム定義がすべて消去され、標準の初期設定に戻ります）')) {
-        localStorage.removeItem('form_customize_all_forms');
-        localStorage.removeItem('form_customize_active_index');
-        alert('データを完全にリセットしました。ページを再読み込みします。');
-        window.location.reload();
-      }
-    };
-
-    zoomDiv.appendChild(btnOut);
-    zoomDiv.appendChild(label);
-    zoomDiv.appendChild(btnIn);
-    zoomDiv.appendChild(btnReset);
-    zoomDiv.appendChild(btnResetData);
-    flowmapPanel.appendChild(zoomDiv);
+    // ユーザー要望により不要となったため無効化（React Flow標準のControlsを優先）
   }
 
   // ================= window.F のオーバーライド（マインドマップ型フォームエディタ） =================
@@ -3069,6 +2952,88 @@
       };
     }
 
+    function extractConnections(formObj) {
+      if (!formObj || !formObj.sections) return [];
+      const connections = [];
+      
+      formObj.sections.forEach(section => {
+        if (section.nextSectionId) {
+          connections.push({
+            fromType: 'section',
+            fromId: section.id,
+            fromName: `セクション「${section.title || section.id}」`,
+            toId: section.nextSectionId,
+            key: `section_${section.id}_to_${section.nextSectionId}`
+          });
+        }
+        
+        if (section.questions) {
+          section.questions.forEach(q => {
+            if (q.options) {
+              q.options.forEach(opt => {
+                if (opt.nextSectionId) {
+                  connections.push({
+                    fromType: 'question_option',
+                    fromId: q.id,
+                    fromName: `セクション「${section.title || section.id}」 > 質問「${q.title || q.id}」 > 選択肢「${opt.label || '無名選択肢'}」`,
+                    toId: opt.nextSectionId,
+                    key: `opt_${q.id}_${opt.label || ''}_to_${opt.nextSectionId}`
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+      
+      return connections;
+    }
+
+    function logConnectionChanges(oldForm, newForm) {
+      if (!oldForm || !newForm) return;
+      const oldConn = extractConnections(oldForm);
+      const newConn = extractConnections(newForm);
+      
+      const changes = [];
+      
+      newConn.forEach(nc => {
+        const sameSourceOld = oldConn.find(oc => oc.fromId === nc.fromId && oc.fromType === nc.fromType);
+        
+        if (sameSourceOld) {
+          if (sameSourceOld.toId !== nc.toId) {
+            const oldSec = newForm.sections.find(s => s.id === sameSourceOld.toId) || oldForm.sections.find(s => s.id === sameSourceOld.toId);
+            const newSec = newForm.sections.find(s => s.id === nc.toId);
+            const oldSecName = oldSec ? (oldSec.title || oldSec.id) : `セクション(${sameSourceOld.toId})`;
+            const newSecName = newSec ? (newSec.title || newSec.id) : `セクション(${nc.toId})`;
+            
+            changes.push(`「${nc.fromName}」の遷移先を「${oldSecName}」から「${newSecName}」へ変更しました。`);
+          }
+        } else {
+          const newSec = newForm.sections.find(s => s.id === nc.toId);
+          const newSecName = newSec ? (newSec.title || newSec.id) : `セクション(${nc.toId})`;
+          changes.push(`「${nc.fromName}」から「${newSecName}」への遷移（接続）を追加しました。`);
+        }
+      });
+      
+      oldConn.forEach(oc => {
+        const hasSourceInNew = newConn.some(nc => nc.fromId === oc.fromId && nc.fromType === oc.fromType);
+        if (!hasSourceInNew) {
+          const oldSec = oldForm.sections.find(s => s.id === oc.toId) || newForm.sections.find(s => s.id === oc.toId);
+          const oldSecName = oldSec ? (oldSec.title || oldSec.id) : `セクション(${oc.toId})`;
+          changes.push(`「${oc.fromName}」から「${oldSecName}」への遷移を削除しました。`);
+        }
+      });
+      
+      if (changes.length > 0) {
+        const detail = changes.join('\n');
+        window.parent.postMessage({
+          type: 'FORM_LOG_CONNECTION_EDIT',
+          formTitle: newForm.title,
+          detail: detail
+        }, '*');
+      }
+    }
+
     function saveAndSyncMindmapData() {
       const activeIndex = localStorage.getItem('form_customize_active_index') || '0';
       let allForms = [];
@@ -3078,9 +3043,19 @@
       
       const idx = parseInt(activeIndex);
       if (allForms[idx]) {
+        // 保存前の状態をディープコピーして比較
+        const oldFormCopy = JSON.parse(JSON.stringify(allForms[idx]));
+        
         allForms[idx].title = window.G.title;
         allForms[idx].sections = window.G.sections;
         localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+        
+        // 接続差分の検出とログ送信
+        try {
+          logConnectionChanges(oldFormCopy, window.G);
+        } catch(e) {
+          console.error('[Connection Log] Failed to log changes:', e);
+        }
       }
 
       if (window.x) {
