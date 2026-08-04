@@ -1276,6 +1276,13 @@
     if (headerImagePos) headerImagePos.value = savedPos;
     if (posValText) posValText.textContent = `${savedPos}%`;
 
+    // ヘッダー画像ズーム倍率のプレフィル
+    const headerImageScale = document.getElementById('editor-pro-header-image-scale');
+    const scaleValText = document.getElementById('header-image-scale-val');
+    const savedScale = g.headerImageScale !== undefined ? g.headerImageScale : 100;
+    if (headerImageScale) headerImageScale.value = savedScale;
+    if (scaleValText) scaleValText.textContent = `${savedScale}%`;
+
     updatePresetChipsState();
     setupProInputListeners();
   }
@@ -1361,6 +1368,20 @@
         const posValText = document.getElementById('header-image-pos-val');
         if (posValText) posValText.textContent = `${v}%`;
         window.G.headerImagePosition = parseInt(v, 10);
+        saveAndSyncMindmapData();
+        applyPreviewTheme();
+        renderLivePreview();
+        if (window.S) window.S();
+      });
+    }
+
+    const headerImageScale = document.getElementById('editor-pro-header-image-scale');
+    if (headerImageScale) {
+      headerImageScale.addEventListener('input', (e) => {
+        const v = e.target.value;
+        const scaleValText = document.getElementById('header-image-scale-val');
+        if (scaleValText) scaleValText.textContent = `${v}%`;
+        window.G.headerImageScale = parseInt(v, 10);
         saveAndSyncMindmapData();
         applyPreviewTheme();
         renderLivePreview();
@@ -1501,7 +1522,10 @@
         previewHeaderImg.src = g.headerImage;
         previewHeaderImgContainer.style.display = 'block';
         const yPos = g.headerImagePosition !== undefined ? g.headerImagePosition : 50;
+        const scale = g.headerImageScale !== undefined ? g.headerImageScale : 100;
         previewHeaderImg.style.objectPosition = `center ${yPos}%`;
+        previewHeaderImg.style.transform = `scale(${scale / 100})`;
+        previewHeaderImg.style.transformOrigin = `center ${yPos}%`;
       } else {
         previewHeaderImgContainer.style.display = 'none';
       }
@@ -2695,7 +2719,10 @@
         liveHeaderImg.src = g.headerImage;
         liveHeaderImgContainer.style.display = 'block';
         const yPos = g.headerImagePosition !== undefined ? g.headerImagePosition : 50;
+        const scale = g.headerImageScale !== undefined ? g.headerImageScale : 100;
         liveHeaderImg.style.objectPosition = `center ${yPos}%`;
+        liveHeaderImg.style.transform = `scale(${scale / 100})`;
+        liveHeaderImg.style.transformOrigin = `center ${yPos}%`;
       } else {
         liveHeaderImgContainer.style.display = 'none';
       }
