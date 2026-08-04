@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v3.js?v=2.2.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
-    <link rel="stylesheet" href="./assets/custom-editor-v39.css?v=3.9.0">
-    <script src="./assets/custom-editor-v39.js?v=3.9.0" defer></script>
+    <link rel="stylesheet" href="./assets/custom-editor-v40.css?v=4.0.0">
+    <script src="./assets/custom-editor-v40.js?v=4.0.0" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -21,34 +21,36 @@
         <h1>フォーム構築基盤</h1>
       </div>
       <nav class="header-nav">
-        <button id="btn-tab-dashboard" class="nav-tab active" data-tab="dashboard">
+        <button id="btn-tab-dashboard" class="nav-tab active" data-tab="dashboard" data-tooltip="ホーム">
           <span class="tab-icon">🏠</span>
-          ホーム
+          <span class="tab-text">ホーム</span>
         </button>
-        <button id="btn-tab-editor" class="nav-tab" data-tab="editor">
+        <button id="btn-tab-editor" class="nav-tab" data-tab="editor" data-tooltip="フォーム編集">
           <span class="tab-icon">✏️</span>
-          フォーム編集
+          <span class="tab-text">フォーム編集</span>
         </button>
-        <button id="btn-tab-flowmap" class="nav-tab" data-tab="flowmap">
+        <button id="btn-tab-flowmap" class="nav-tab" data-tab="flowmap" data-tooltip="フローマップ">
           <span class="tab-icon">🕸️</span>
-          フローマップ
+          <span class="tab-text">フローマップ</span>
         </button>
-        <button id="btn-tab-preview" class="nav-tab" data-tab="preview">
+        <button id="btn-tab-preview" class="nav-tab" data-tab="preview" data-tooltip="回答プレビュー">
           <span class="tab-icon">👁️</span>
-          回答プレビュー
+          <span class="tab-text">回答プレビュー</span>
         </button>
       </nav>
       <div class="header-actions">
         <!-- ユーザープロフィール表示（ログイン状態） -->
-        <div class="user-profile-header" id="gf-user-profile" style="display: none;">
+        <div class="user-profile-header" id="gf-user-profile" style="display: none;" data-tooltip="ユーザー情報">
           <span class="user-avatar">👤</span>
           <div class="user-info">
             <span class="user-name" id="gf-user-name">田中さん</span>
             <span class="user-role" id="gf-user-role">閲覧者</span>
           </div>
-          <button id="btn-logout" class="btn btn-sm btn-secondary">ログアウト</button>
+          <button id="btn-logout" class="btn btn-sm btn-secondary" data-tooltip="ログアウト">ログアウト</button>
         </div>
-        <button id="btn-export-json" class="btn btn-primary">JSON出力</button>
+        <button id="btn-export-json" class="btn btn-primary" data-tooltip="JSON形式でエクスポート">
+          <span class="btn-text">JSON出力</span>
+        </button>
       </div>
     </header>
 
