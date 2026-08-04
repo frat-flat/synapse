@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v3.js?v=2.2.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
-    <link rel="stylesheet" href="./assets/custom-editor-v33.css?v=3.3.0">
-    <script src="./assets/custom-editor-v33.js?v=3.3.0" defer></script>
+    <link rel="stylesheet" href="./assets/custom-editor-v34.css?v=3.4.0">
+    <script src="./assets/custom-editor-v34.js?v=3.4.0" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -230,58 +230,66 @@
                   
                   <!-- ヘッダー情報 -->
                   <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
-                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">🏢 会社ロゴ・ヘッダー編集</span>
+                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">🏢 ヘッダー編集</span>
                     
                     <!-- 内部的な値同期およびJSエラー防止用の非表示インプット -->
                     <input type="text" id="editor-pro-title" style="display: none;" />
                     <input type="text" id="editor-pro-disclaimer" style="display: none;" />
-                    <div class="form-group" style="margin-top: 8px;">
-                      <label style="font-size: 0.75rem; color: var(--color-text-muted);">ヘッダー画像 (アップロードまたはURL)</label>
-                      <div style="display: flex; gap: 8px; align-items: center;">
-                        <input type="text" id="editor-pro-header-image-url" class="form-control form-control-sm" style="flex: 2; height: 30px; font-size: 0.75rem;" placeholder="https://example.com/image.jpg またはローカルパス" />
-                        <input type="file" id="editor-pro-header-image-file" style="display: none;" accept="image/*" />
-                        <button type="button" class="btn btn-sm btn-secondary" id="btn-pro-header-image-upload" style="flex: 1; font-size: 0.7rem; height: 30px; padding: 2px 8px; white-space: nowrap;">画像を選択...</button>
-                      </div>
-                    </div>
-                    <!-- 画像の拡大・縮小 (ズーム) -->
-                    <div class="form-group" style="margin-top: 6px; margin-bottom: 2px;">
-                      <label style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; display: block;">🔍 画像の拡大・縮小 (ズーム)</label>
-                      <div style="display: flex; align-items: center; gap: 8px;">
-                        <input type="range" id="editor-pro-header-image-scale" min="30" max="300" value="100" style="flex: 1; height: 18px; cursor: pointer;" />
-                        <div style="display: flex; align-items: center; gap: 2px; flex-shrink: 0;">
-                          <input type="number" id="editor-pro-header-image-scale-num" min="30" max="300" value="100" class="form-control form-control-sm" style="width: 48px; height: 22px; font-size: 0.7rem; text-align: center; padding: 0 2px;" />
-                          <span style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600;">%</span>
-                        </div>
-                      </div>
+
+                    <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                      <input type="checkbox" id="editor-pro-use-header-image" style="width: 16px; height: 16px; cursor: pointer;" />
+                      <label for="editor-pro-use-header-image" style="margin: 0; cursor: pointer; font-weight: 600; font-size: 0.8rem; color: var(--color-text);">ヘッダー画像を挿入する</label>
                     </div>
 
-                    <!-- 縦横位置調整 (コンパクト2カラムフレックス配置) -->
-                    <div style="display: flex; gap: 12px; margin-top: 4px; margin-bottom: 4px;">
-                      <!-- 縦方向 -->
-                      <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <label style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; display: block;">↕️ 表示位置 (縦方向)</label>
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                          <input type="range" id="editor-pro-header-image-position" min="0" max="100" value="50" style="flex: 1; height: 18px; cursor: pointer;" />
+                    <div id="pro-header-image-edit-group" style="display: none; flex-direction: column; gap: 10px;">
+                      <div class="form-group" style="margin-top: 2px;">
+                        <label style="font-size: 0.75rem; color: var(--color-text-muted);">ヘッダー画像 (アップロードまたはURL)</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                          <input type="text" id="editor-pro-header-image-url" class="form-control form-control-sm" style="flex: 2; height: 30px; font-size: 0.75rem;" placeholder="https://example.com/image.jpg またはローカルパス" />
+                          <input type="file" id="editor-pro-header-image-file" style="display: none;" accept="image/*" />
+                          <button type="button" class="btn btn-sm btn-secondary" id="btn-pro-header-image-upload" style="flex: 1; font-size: 0.7rem; height: 30px; padding: 2px 8px; white-space: nowrap;">画像を選択...</button>
+                        </div>
+                      </div>
+                      <!-- 画像の拡大・縮小 (ズーム) -->
+                      <div class="form-group" style="margin-top: 2px; margin-bottom: 2px;">
+                        <label style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; display: block;">🔍 画像の拡大・縮小 (ズーム)</label>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <input type="range" id="editor-pro-header-image-scale" min="30" max="300" value="100" style="flex: 1; height: 18px; cursor: pointer;" />
                           <div style="display: flex; align-items: center; gap: 2px; flex-shrink: 0;">
-                            <input type="number" id="editor-pro-header-image-position-num" min="0" max="100" value="50" class="form-control form-control-sm" style="width: 40px; height: 22px; font-size: 0.7rem; text-align: center; padding: 0 2px;" />
+                            <input type="number" id="editor-pro-header-image-scale-num" min="30" max="300" value="100" class="form-control form-control-sm" style="width: 48px; height: 22px; font-size: 0.7rem; text-align: center; padding: 0 2px;" />
                             <span style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600;">%</span>
                           </div>
                         </div>
                       </div>
-                      
-                      <!-- 横方向 -->
-                      <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <label style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; display: block;">↔️ 表示位置 (横方向)</label>
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                          <input type="range" id="editor-pro-header-image-position-x" min="0" max="100" value="50" style="flex: 1; height: 18px; cursor: pointer;" />
-                          <div style="display: flex; align-items: center; gap: 2px; flex-shrink: 0;">
-                            <input type="number" id="editor-pro-header-image-position-x-num" min="0" max="100" value="50" class="form-control form-control-sm" style="width: 40px; height: 22px; font-size: 0.7rem; text-align: center; padding: 0 2px;" />
-                            <span style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600;">%</span>
+
+                      <!-- 縦横位置調整 (コンパクト2カラムフレックス配置) -->
+                      <div style="display: flex; gap: 12px; margin-top: 2px; margin-bottom: 2px;">
+                        <!-- 縦方向 -->
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                          <label style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; display: block;">↕️ 表示位置 (縦方向)</label>
+                          <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="range" id="editor-pro-header-image-position" min="0" max="100" value="50" style="flex: 1; height: 18px; cursor: pointer;" />
+                            <div style="display: flex; align-items: center; gap: 2px; flex-shrink: 0;">
+                              <input type="number" id="editor-pro-header-image-position-num" min="0" max="100" value="50" class="form-control form-control-sm" style="width: 40px; height: 22px; font-size: 0.7rem; text-align: center; padding: 0 2px;" />
+                              <span style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600;">%</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <!-- 横方向 -->
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                          <label style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; display: block;">↔️ 表示位置 (横方向)</label>
+                          <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="range" id="editor-pro-header-image-position-x" min="0" max="100" value="50" style="flex: 1; height: 18px; cursor: pointer;" />
+                            <div style="display: flex; align-items: center; gap: 2px; flex-shrink: 0;">
+                              <input type="number" id="editor-pro-header-image-position-x-num" min="0" max="100" value="50" class="form-control form-control-sm" style="width: 40px; height: 22px; font-size: 0.7rem; text-align: center; padding: 0 2px;" />
+                              <span style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600;">%</span>
+                            </div>
                           </div>
                         </div>
                       </div>
+                      <span style="font-size: 0.6rem; color: var(--color-text-muted); display: block; margin-top: 2px;">※ 数値の直接入力またはスライダー操作で、画像の位置や拡大率を微調整できます。</span>
                     </div>
-                    <span style="font-size: 0.6rem; color: var(--color-text-muted); display: block; margin-top: 2px;">※ 数値の直接入力またはスライダー操作で、画像の位置や拡大率を微調整できます。</span>
                   </div>
 
                   <!-- レイアウト・進捗表示 -->
@@ -360,6 +368,31 @@
                           <option value="large">L (大)</option>
                         </select>
                       </div>
+                    </div>
+                  </div>
+
+                  <!-- 背景画像の着せ替えデコレーション -->
+                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
+                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">🖼️ 背景画像（着せ替え）デコレーション設定</span>
+                    
+                    <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 2px;">
+                      <input type="checkbox" id="editor-pro-use-bg-image" style="width: 16px; height: 16px; cursor: pointer;" />
+                      <label for="editor-pro-use-bg-image" style="margin: 0; cursor: pointer; font-weight: 600; font-size: 0.8rem; color: var(--color-text);">背景画像を挿入する</label>
+                    </div>
+                    
+                    <div class="form-group" id="pro-bg-theme-select-group" style="display: none; flex-direction: column; gap: 4px;">
+                      <label for="editor-pro-bg-theme-select" style="font-size: 0.75rem; color: var(--color-text-muted);">着せ替えテーマ背景</label>
+                      <select id="editor-pro-bg-theme-select" class="form-control form-control-sm">
+                        <option value="spring">🌸 春 (桜の舞うピンク)</option>
+                        <option value="summer">🌻 夏 (ひまわりと爽やかな青)</option>
+                        <option value="autumn">🍁 秋 (もみじ深まるオレンジ)</option>
+                        <option value="winter">❄️ 冬 (雪のきらめくブルー)</option>
+                        <option value="sunset">🌇 日没 (エモーショナルな夕焼け)</option>
+                        <option value="sunrise">🌅 朝日 (清々しい朝の光)</option>
+                        <option value="space">🌌 宇宙 (神秘の星屑ダーク)</option>
+                        <option value="green">🍃 緑地帯 (安らぐ新緑グリーン)</option>
+                        <option value="it">💻 IT (サイバーネオングリッド)</option>
+                      </select>
                     </div>
                   </div>
 
