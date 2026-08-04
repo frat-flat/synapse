@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v3.js?v=2.2.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
-    <link rel="stylesheet" href="./assets/custom-editor-v40.css?v=4.0.0">
-    <script src="./assets/custom-editor-v40.js?v=4.0.0" defer></script>
+    <link rel="stylesheet" href="./assets/custom-editor-v41.css?v=4.1.0">
+    <script src="./assets/custom-editor-v41.js?v=4.1.0" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -137,8 +137,14 @@
             <div id="form-overview-editor" class="overview-editor-container">
               <!-- 全体の概要画面内のサブタブ -->
               <div class="overview-subtabs" style="display: flex; gap: 8px; border-bottom: 2px solid var(--color-border); margin-bottom: 1.25rem; padding-bottom: 1px;">
-                <button type="button" id="btn-subtab-global-settings" class="subtab-btn active" style="background: none; border: none; border-bottom: 3px solid var(--color-primary); padding: 8px 16px; font-weight: bold; font-size: 0.9rem; color: var(--color-text); cursor: pointer; transition: all 0.2s;">⚙️ フォーム全体設定</button>
-                <button type="button" id="btn-subtab-section-design" class="subtab-btn" style="background: none; border: none; border-bottom: 3px solid transparent; padding: 8px 16px; font-weight: bold; font-size: 0.9rem; color: var(--color-text-muted); cursor: pointer; transition: all 0.2s;">📋 セクション構成一覧</button>
+                <button type="button" id="btn-subtab-global-settings" class="subtab-btn active" data-tooltip="フォーム全体設定" style="background: none; border: none; border-bottom: 3px solid var(--color-primary); padding: 8px 16px; font-weight: bold; font-size: 0.9rem; color: var(--color-text); cursor: pointer; transition: all 0.2s;">
+                  <span class="subtab-icon">⚙️</span>
+                  <span class="subtab-text">フォーム全体設定</span>
+                </button>
+                <button type="button" id="btn-subtab-section-design" class="subtab-btn" data-tooltip="セクション構成一覧" style="background: none; border: none; border-bottom: 3px solid transparent; padding: 8px 16px; font-weight: bold; font-size: 0.9rem; color: var(--color-text-muted); cursor: pointer; transition: all 0.2s;">
+                  <span class="subtab-icon">📋</span>
+                  <span class="subtab-text">セクション構成一覧</span>
+                </button>
               </div>
 
               <div class="form-title-desc-card">
