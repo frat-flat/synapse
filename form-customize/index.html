@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v3.js?v=2.2.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
-    <link rel="stylesheet" href="./assets/custom-editor-v44.css?v=4.4.0">
-    <script src="./assets/custom-editor-v44.js?v=4.4.0" defer></script>
+    <link rel="stylesheet" href="./assets/custom-editor-v45.css?v=4.5.0">
+    <script src="./assets/custom-editor-v45.js?v=4.5.0" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -117,9 +117,10 @@
         <div class="editor-layout">
           <!-- 左サイドバー: 構成ナビゲーション -->
           <aside class="editor-sidebar">
-            <div class="sidebar-header">
-              <h2>フォーム全体の構成</h2>
-            </div>
+             <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+               <h2>フォーム全体の構成</h2>
+               <button type="button" id="btn-sidebar-collapse" style="background: none; border: none; font-size: 0.9rem; font-weight: bold; cursor: pointer; color: #718096; padding: 2px 6px; transition: color 0.15s; margin: 0;" title="構成ナビゲーションを隠す">◀</button>
+             </div>
             <!-- 全体の概要へのジャンプ -->
             <div class="sidebar-overview-btn-area">
               <button id="sidebar-item-overview" class="sidebar-overview-btn active">
@@ -136,9 +137,14 @@
             </ul>
           </aside>
 
-          <!-- メイン編集エリア -->
-          <div class="editor-main">
-            <!-- A. 【全体概要画面】フォームに入ったら最初に見えるセクション一覧 -->
+           <!-- メイン編集エリア -->
+           <div class="editor-main" style="position: relative;">
+             <!-- 📁 構成ナビゲーションを表示するトグルボタン (最小化時に浮き上がる) -->
+             <button type="button" id="btn-sidebar-expand" style="display: none; position: absolute; left: 10px; top: 10px; z-index: 100; background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: 4px; font-size: 0.8rem; padding: 6px 12px; font-weight: bold; cursor: pointer; color: var(--color-text); box-shadow: 0 2px 6px rgba(0,0,0,0.08); transition: all 0.15s; align-items: center; gap: 6px;" title="構成ナビゲーションを展開する">
+               <span>▶</span>
+               <span>構成ナビゲーション</span>
+             </button>
+             <!-- A. 【全体概要画面】フォームに入ったら最初に見えるセクション一覧 -->
             <div id="form-overview-editor" class="overview-editor-container">
               <!-- 全体の概要画面内のサブタブ -->
               <div class="overview-subtabs" style="display: flex; gap: 8px; border-bottom: 2px solid var(--color-border); margin-bottom: 1.25rem; padding-bottom: 1px;">
