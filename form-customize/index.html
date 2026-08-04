@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v3.js?v=2.2.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
-    <link rel="stylesheet" href="./assets/custom-editor-v35.css?v=3.5.0">
-    <script src="./assets/custom-editor-v35.js?v=3.5.0" defer></script>
+    <link rel="stylesheet" href="./assets/custom-editor-v36.css?v=3.6.0">
+    <script src="./assets/custom-editor-v36.js?v=3.6.0" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -236,9 +236,12 @@
                     <input type="text" id="editor-pro-title" style="display: none;" />
                     <input type="text" id="editor-pro-disclaimer" style="display: none;" />
 
-                    <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-                      <input type="checkbox" id="editor-pro-use-header-image" style="width: 16px; height: 16px; cursor: pointer;" />
-                      <label for="editor-pro-use-header-image" style="margin: 0; cursor: pointer; font-weight: 600; font-size: 0.8rem; color: var(--color-text);">ヘッダー画像を挿入する</label>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 2px;">
+                      <label class="editor-toggle-switch">
+                        <input type="checkbox" id="editor-pro-use-header-image" />
+                        <span class="editor-toggle-slider"></span>
+                      </label>
+                      <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text); cursor: pointer;" onclick="document.getElementById('editor-pro-use-header-image').click();">🖼️ ヘッダー画像を挿入する</span>
                     </div>
 
                     <div id="pro-header-image-edit-group" style="display: none; flex-direction: column; gap: 10px;">
@@ -372,23 +375,23 @@
                   </div>
 
                   <!-- 背景画像の着せ替えデコレーション -->
-                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
-                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">🖼️ 背景画像（着せ替え）デコレーション設定</span>
-                    
-                    <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 2px;">
-                      <input type="checkbox" id="editor-pro-use-bg-image" style="width: 16px; height: 16px; cursor: pointer;" />
-                      <label for="editor-pro-use-bg-image" style="margin: 0; cursor: pointer; font-weight: 600; font-size: 0.8rem; color: var(--color-text);">背景画像を挿入する</label>
+                  <div class="settings-card-pro" style="display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 10px 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border); flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <label class="editor-toggle-switch" style="margin: 0;">
+                        <input type="checkbox" id="editor-pro-use-bg-image" />
+                        <span class="editor-toggle-slider"></span>
+                      </label>
+                      <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text); cursor: pointer;" onclick="document.getElementById('editor-pro-use-bg-image').click();">🖼️ 背景画像を挿入する</span>
                     </div>
                     
-                    <div class="form-group" id="pro-bg-theme-select-group" style="display: none; flex-direction: column; gap: 4px;">
-                      <label for="editor-pro-bg-theme-select" style="font-size: 0.75rem; color: var(--color-text-muted);">着せ替えテーマ背景</label>
-                      <select id="editor-pro-bg-theme-select" class="form-control form-control-sm">
+                    <div id="pro-bg-theme-select-group" style="display: none; align-items: center; gap: 6px; flex: 1; min-width: 160px; margin: 0;">
+                      <select id="editor-pro-bg-theme-select" class="form-control form-control-sm" style="margin: 0; height: 30px; font-size: 0.75rem;">
                         <option value="spring">🌸 春 (桜の舞うピンク)</option>
                         <option value="summer">🌻 夏 (ひまわりと爽やかな青)</option>
                         <option value="autumn">🍁 秋 (もみじ深まるオレンジ)</option>
                         <option value="winter">❄️ 冬 (雪のきらめくブルー)</option>
                         <option value="sunset">🌇 日没 (エモーショナルな夕焼け)</option>
-                        <option value="sunrise">🌅 朝日 (清々しい朝の光)</option>
+                        <option value="sunrise">🌅 朝日 (清々しい朝 of 光)</option>
                         <option value="space">🌌 宇宙 (神秘の星屑ダーク)</option>
                         <option value="green">🍃 緑地帯 (安らぐ新緑グリーン)</option>
                         <option value="it">💻 IT (サイバーネオングリッド)</option>
@@ -397,21 +400,33 @@
                   </div>
 
                   <!-- アラート ＆ 所要時間設定 -->
-                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
-                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">🕒 所要時間 ＆ ⚠️ 注意事項アラートボックス</span>
-                    <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-                      <input type="checkbox" id="editor-pro-show-duration" style="width: 16px; height: 16px; cursor: pointer;" />
-                      <label for="editor-pro-show-duration" style="font-size: 0.8rem; margin: 0; cursor: pointer;">所要時間目安を表示する</label>
+                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
+                    <!-- 所要時間設定 -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <label class="editor-toggle-switch" style="margin: 0;">
+                          <input type="checkbox" id="editor-pro-show-duration" />
+                          <span class="editor-toggle-slider"></span>
+                        </label>
+                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text); cursor: pointer;" onclick="document.getElementById('editor-pro-show-duration').click();">🕒 所要時間目安を表示</span>
+                      </div>
+                      <div id="pro-duration-input-group" style="display: none; flex: 1; min-width: 160px; margin: 0;">
+                        <input type="text" id="editor-pro-duration-text" class="form-control form-control-sm" style="margin: 0; height: 30px; font-size: 0.75rem;" placeholder="例: 所要時間 目安5~10分" />
+                      </div>
                     </div>
-                    <div class="form-group" id="pro-duration-input-group" style="display: none;">
-                      <input type="text" id="editor-pro-duration-text" class="form-control form-control-sm" placeholder="例: 所要時間 目安5~10分" />
-                    </div>
-                    <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
-                      <input type="checkbox" id="editor-pro-show-alert" style="width: 16px; height: 16px; cursor: pointer;" />
-                      <label for="editor-pro-show-alert" style="font-size: 0.8rem; margin: 0; cursor: pointer;">注意事項アラートボックスを表示する</label>
-                    </div>
-                    <div class="form-group" id="pro-alert-input-group" style="display: none;">
-                      <textarea id="editor-pro-alert-text" class="form-control form-control-sm" rows="2" placeholder="例: 全項目を半角・全角の指定に沿ってご入力ください..."></textarea>
+                    
+                    <!-- 注意事項アラートボックス設定 -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; border-top: 1px dashed rgba(0,0,0,0.08); padding-top: 8px;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <label class="editor-toggle-switch" style="margin: 0;">
+                          <input type="checkbox" id="editor-pro-show-alert" />
+                          <span class="editor-toggle-slider"></span>
+                        </label>
+                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text); cursor: pointer;" onclick="document.getElementById('editor-pro-show-alert').click();">⚠️ 注意事項アラートを表示</span>
+                      </div>
+                      <div id="pro-alert-input-group" style="display: none; flex: 1; min-width: 160px; margin: 0;">
+                        <textarea id="editor-pro-alert-text" class="form-control form-control-sm" rows="1" style="margin: 0; padding: 4px 8px; font-size: 0.75rem;" placeholder="例: 全項目をご入力ください..."></textarea>
+                      </div>
                     </div>
                   </div>
 
