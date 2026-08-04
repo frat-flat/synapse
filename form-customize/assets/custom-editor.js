@@ -1269,6 +1269,13 @@
     const headerImageUrl = document.getElementById('editor-pro-header-image-url');
     if (headerImageUrl) headerImageUrl.value = g.headerImage || "";
 
+    // ヘッダー画像表示位置のプレフィル
+    const headerImagePos = document.getElementById('editor-pro-header-image-position');
+    const posValText = document.getElementById('header-image-pos-val');
+    const savedPos = g.headerImagePosition !== undefined ? g.headerImagePosition : 50;
+    if (headerImagePos) headerImagePos.value = savedPos;
+    if (posValText) posValText.textContent = `${savedPos}%`;
+
     updatePresetChipsState();
     setupProInputListeners();
   }
@@ -1346,6 +1353,20 @@
       window.G.headerImage = v;
       saveAndSyncMindmapData();
     });
+
+    const headerImagePos = document.getElementById('editor-pro-header-image-position');
+    if (headerImagePos) {
+      headerImagePos.addEventListener('input', (e) => {
+        const v = e.target.value;
+        const posValText = document.getElementById('header-image-pos-val');
+        if (posValText) posValText.textContent = `${v}%`;
+        window.G.headerImagePosition = parseInt(v, 10);
+        saveAndSyncMindmapData();
+        applyPreviewTheme();
+        renderLivePreview();
+        if (window.S) window.S();
+      });
+    }
 
     bindInput('editor-pro-logo', v => window.G.header.logoText = v);
     bindInput('editor-pro-title', v => {
@@ -1479,6 +1500,8 @@
       if (isPro && g.headerImage) {
         previewHeaderImg.src = g.headerImage;
         previewHeaderImgContainer.style.display = 'block';
+        const yPos = g.headerImagePosition !== undefined ? g.headerImagePosition : 50;
+        previewHeaderImg.style.objectPosition = `center ${yPos}%`;
       } else {
         previewHeaderImgContainer.style.display = 'none';
       }
@@ -2671,6 +2694,8 @@
       if (isPro && g.headerImage) {
         liveHeaderImg.src = g.headerImage;
         liveHeaderImgContainer.style.display = 'block';
+        const yPos = g.headerImagePosition !== undefined ? g.headerImagePosition : 50;
+        liveHeaderImg.style.objectPosition = `center ${yPos}%`;
       } else {
         liveHeaderImgContainer.style.display = 'none';
       }
