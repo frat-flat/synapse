@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v3.js?v=2.2.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
-    <link rel="stylesheet" href="./assets/custom-editor-v45.css?v=4.5.0">
-    <script src="./assets/custom-editor-v45.js?v=4.5.0" defer></script>
+    <link rel="stylesheet" href="./assets/custom-editor-v46.css?v=4.6.0">
+    <script src="./assets/custom-editor-v46.js?v=4.6.0" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -351,6 +351,65 @@
                           <option value="none">非表示</option>
                         </select>
                       </div>
+                    </div>
+                  </div>
+
+                  <!-- 文字サイズ調整 -->
+                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
+                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">📐 各要素の文字サイズ調整</span>
+                    <div class="form-group-column" style="display: flex; flex-direction: column; gap: 12px;">
+
+                      <!-- 大タイトルサイズ -->
+                      <div class="form-group" style="display: flex; flex-direction: column; gap: 4px; margin: 0;">
+                        <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">大タイトルサイズ</label>
+                        <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+                          <select id="editor-pro-size-title" class="form-control form-control-sm" style="flex: 1; max-width: 150px; cursor: pointer;">
+                            <option value="small">S (小)</option>
+                            <option value="medium">M (中)</option>
+                            <option value="large" selected>L (大)</option>
+                            <option value="custom">カスタム</option>
+                          </select>
+                          <div id="editor-pro-size-title-custom-container" style="display: none; align-items: center; gap: 4px; flex: 1;">
+                            <input type="number" id="editor-pro-size-title-custom-val" class="form-control form-control-sm" style="width: 80px; height: 32px;" min="10" max="100" value="28" />
+                            <span style="font-size: 0.75rem; color: var(--color-text-muted);">px</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- セクション見出し -->
+                      <div class="form-group" style="display: flex; flex-direction: column; gap: 4px; margin: 0;">
+                        <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">セクション見出し</label>
+                        <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+                          <select id="editor-pro-size-section" class="form-control form-control-sm" style="flex: 1; max-width: 150px; cursor: pointer;">
+                            <option value="small">S (小)</option>
+                            <option value="medium" selected>M (中)</option>
+                            <option value="large">L (大)</option>
+                            <option value="custom">カスタム</option>
+                          </select>
+                          <div id="editor-pro-size-section-custom-container" style="display: none; align-items: center; gap: 4px; flex: 1;">
+                            <input type="number" id="editor-pro-size-section-custom-val" class="form-control form-control-sm" style="width: 80px; height: 32px;" min="10" max="100" value="20" />
+                            <span style="font-size: 0.75rem; color: var(--color-text-muted);">px</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- 質問項目ラベル -->
+                      <div class="form-group" style="display: flex; flex-direction: column; gap: 4px; margin: 0;">
+                        <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">質問項目ラベル</label>
+                        <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+                          <select id="editor-pro-size-label" class="form-control form-control-sm" style="flex: 1; max-width: 150px; cursor: pointer;">
+                            <option value="small">S (小)</option>
+                            <option value="medium" selected>M (中)</option>
+                            <option value="large">L (大)</option>
+                            <option value="custom">カスタム</option>
+                          </select>
+                          <div id="editor-pro-size-label-custom-container" style="display: none; align-items: center; gap: 4px; flex: 1;">
+                            <input type="number" id="editor-pro-size-label-custom-val" class="form-control form-control-sm" style="width: 80px; height: 32px;" min="10" max="100" value="16" />
+                            <span style="font-size: 0.75rem; color: var(--color-text-muted);">px</span>
+                          </div>
+                        </div>
+                      </div>
+
                     </div>
                   </div>
 
