@@ -134,6 +134,7 @@
         setupValidationInterceptors();
         setupFormTitleSync();
         setupOverviewSubtabs(); // 概要画面のサブタブイベント登録
+        setupHeaderObserver(); // ヘッダーの白背景・高コントラスト常時強制固定
         setupFlowmapDragBindings(); // フローマップドラッグイベント登録
         setupFlowmapOverrideF(); // window.Fのオーバーライドを確実に行う
         
@@ -213,6 +214,74 @@
 
     // 初期状態は「全体設定」を表示
     showGlobal();
+  }
+
+  function enforceLightHeader() {
+    const header = document.querySelector('.app-header');
+    if (header) {
+      header.style.setProperty('background', '#ffffff', 'important');
+      header.style.setProperty('background-color', '#ffffff', 'important');
+      header.style.setProperty('border-bottom', '1px solid var(--color-border)', 'important');
+      header.style.setProperty('box-shadow', '0 1px 3px rgba(0,0,0,0.05)', 'important');
+    }
+
+    // ロゴタイトル
+    const logoTitle = document.querySelector('.header-logo h1');
+    if (logoTitle) {
+      logoTitle.style.setProperty('background', 'linear-gradient(135deg, var(--color-primary) 0%, #0f172a 100%)', 'important');
+      logoTitle.style.setProperty('-webkit-background-clip', 'text', 'important');
+      logoTitle.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
+    }
+
+    // ナビゲーションバーの背景
+    const headerNav = document.querySelector('.header-nav');
+    if (headerNav) {
+      headerNav.style.setProperty('background-color', '#f1f5f9', 'important');
+      headerNav.style.setProperty('border-color', '#e2e8f0', 'important');
+    }
+
+    // 非アクティブタブの文字色
+    const tabs = document.querySelectorAll('.nav-tab:not(.active)');
+    tabs.forEach(tab => {
+      tab.style.setProperty('color', '#475569', 'important');
+    });
+
+    // ユーザー情報
+    const userName = document.querySelector('.user-profile-header .user-name');
+    if (userName) userName.style.setProperty('color', '#0f172a', 'important');
+
+    const userRole = document.querySelector('.user-profile-header .user-role');
+    if (userRole) {
+      userRole.style.setProperty('color', 'var(--color-primary)', 'important');
+      userRole.style.setProperty('font-weight', '600', 'important');
+    }
+
+    // 新規フォーム作成ボタンとJSON出力ボタン（青背景の btn-primary）の文字を白にする
+    const primaryBtns = document.querySelectorAll('.btn-primary');
+    primaryBtns.forEach(btn => {
+      btn.style.setProperty('color', '#ffffff', 'important');
+      btn.style.setProperty('background-color', 'var(--color-primary)', 'important');
+      btn.style.setProperty('border-color', 'var(--color-primary)', 'important');
+    });
+  }
+
+  function setupHeaderObserver() {
+    enforceLightHeader();
+    setInterval(enforceLightHeader, 200);
+
+    const target = document.body;
+    if (!target) return;
+
+    const observer = new MutationObserver(() => {
+      enforceLightHeader();
+    });
+
+    observer.observe(target, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      attributeFilter: ['style', 'class']
+    });
   }
 
   function setupFormTitleSync() {
