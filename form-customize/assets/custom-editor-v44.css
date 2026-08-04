@@ -1239,17 +1239,21 @@ input:-webkit-autofill:active {
   margin-bottom: -130px; /* 縮小で空いた下のスペースを相殺 */
 }
 
-/* 画面幅が1180pxを下回る場合、初期状態でプレビューを隠す（必要に応じて表示可能） */
+/* 画面幅が1180pxを下回る場合、初期状態でプレビューを隠す */
 @media (max-width: 1180px) {
   .editor-live-preview-pane {
-    display: none; /* !importantを解除し、JSによる表示上書きを可能にする */
+    display: none;
   }
   .editor-live-preview-pane.preview-scaled {
     width: 320px !important;
     min-width: 320px !important;
   }
-  #btn-preview-restore {
-    display: flex !important; /* 幅狭時は復活ボタンを初期表示 */
-  }
+}
+
+/* ヘッダーのプレビュー表示切り替えボタンのスタイル */
+#btn-header-preview-toggle.active {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: #ffffff !important;
 }
 

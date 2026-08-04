@@ -332,19 +332,26 @@
           targetPanel.classList.add('active');
         }
 
-        // プレビュー表示復活ボタンのトグル
-        const btnRestore = document.getElementById("btn-preview-restore");
-        if (btnRestore) {
+        // プレビュー表示切り替えボタンのトグル
+        const btnHeaderPreview = document.getElementById("btn-header-preview-toggle");
+        if (btnHeaderPreview) {
           if (tabName === 'editor') {
+            btnHeaderPreview.style.setProperty("display", "flex", "important");
+
+            // プレビューペインの開閉状態に応じてactiveクラスを同期
             const pane = document.querySelector(".editor-live-preview-pane");
-            const isCollapsed = pane && (pane.classList.contains("pane-collapsed") || pane.style.display === "none" || window.getComputedStyle(pane).display === "none");
-            if (isCollapsed) {
-              btnRestore.style.setProperty("display", "flex", "important");
-            } else {
-              btnRestore.style.setProperty("display", "none", "important");
+            if (pane) {
+              const isCollapsed = pane.classList.contains("pane-collapsed") || pane.style.display === "none" || window.getComputedStyle(pane).display === "none";
+              if (isCollapsed) {
+                btnHeaderPreview.classList.remove("active");
+                btnHeaderPreview.setAttribute("data-tooltip", "プレビューを表示する");
+              } else {
+                btnHeaderPreview.classList.add("active");
+                btnHeaderPreview.setAttribute("data-tooltip", "プレビューを非表示にする");
+              }
             }
           } else {
-            btnRestore.style.setProperty("display", "none", "important");
+            btnHeaderPreview.style.setProperty("display", "none", "important");
           }
         }
 
@@ -4228,7 +4235,7 @@
       const pane = document.querySelector(".editor-live-preview-pane");
       const btnMinimize = document.getElementById("btn-preview-minimize");
       const btnToggleSize = document.getElementById("btn-preview-toggle-size");
-      const btnRestore = document.getElementById("btn-preview-restore");
+      const btnHeaderPreview = document.getElementById("btn-header-preview-toggle");
 
       if (btnToggleSize && pane) {
         btnToggleSize.addEventListener("click", () => {
@@ -4238,33 +4245,67 @@
         });
       }
 
-      if (btnMinimize && btnRestore && pane) {
+      // 最小化（─）ボタンクリック時
+      if (btnMinimize && pane && btnHeaderPreview) {
         btnMinimize.addEventListener("click", () => {
           pane.classList.add("pane-collapsed");
           pane.style.setProperty("display", "none", "important");
-          btnRestore.style.setProperty("display", "flex", "important");
-        });
-        btnRestore.addEventListener("click", () => {
-          pane.classList.remove("pane-collapsed");
-          pane.style.setProperty("display", "flex", "important");
-          btnRestore.style.setProperty("display", "none", "important");
 
-          // 画面幅が1180px以下の場合は、自動的に縮小モードで開く
-          if (window.innerWidth <= 1180) {
-            pane.classList.add("preview-scaled");
-            if (btnToggleSize) {
-              btnToggleSize.title = "等倍表示に戻す";
-              btnToggleSize.textContent = "🗗";
+          btnHeaderPreview.classList.remove("active");
+          btnHeaderPreview.setAttribute("data-tooltip", "プレビューを表示する");
+        });
+      }
+
+      // ヘッダーの「📱 プレビュー」トグルボタンクリック時
+      if (btnHeaderPreview && pane) {
+        btnHeaderPreview.addEventListener("click", () => {
+          const isCollapsed = pane.classList.contains("pane-collapsed") || pane.style.display === "none" || window.getComputedStyle(pane).display === "none";
+          if (isCollapsed) {
+            // 展開
+            pane.classList.remove("pane-collapsed");
+            pane.style.setProperty("display", "flex", "important");
+
+            btnHeaderPreview.classList.add("active");
+            btnHeaderPreview.setAttribute("data-tooltip", "プレビューを非表示にする");
+
+            // 画面幅が1180px以下の場合は、自動的に縮小モードで開く
+            if (window.innerWidth <= 1180) {
+              pane.classList.add("preview-scaled");
+              if (btnToggleSize) {
+                btnToggleSize.title = "等倍表示に戻す";
+                btnToggleSize.textContent = "🗗";
+              }
             }
+          } else {
+            // 最小化
+            pane.classList.add("pane-collapsed");
+            pane.style.setProperty("display", "none", "important");
+
+            btnHeaderPreview.classList.remove("active");
+            btnHeaderPreview.setAttribute("data-tooltip", "プレビューを表示する");
           }
         });
       }
 
-      // ロード時の初期復活ボタンのトグル (幅狭対応)
+      // 初期ロード時の状態同期
       setTimeout(() => {
         const activeTab = localStorage.getItem('form_customize_active_tab') || 'dashboard';
-        if (activeTab === 'editor' && window.innerWidth <= 1180) {
-          if (btnRestore) btnRestore.style.setProperty("display", "flex", "important");
+        if (activeTab === 'editor') {
+          if (btnHeaderPreview) {
+            btnHeaderPreview.style.setProperty("display", "flex", "important");
+            if (window.innerWidth <= 1180) {
+              // 幅狭時は初期最小化状態
+              pane.classList.add("pane-collapsed");
+              pane.style.setProperty("display", "none", "important");
+              btnHeaderPreview.classList.remove("active");
+              btnHeaderPreview.setAttribute("data-tooltip", "プレビューを表示する");
+            } else {
+              pane.classList.remove("pane-collapsed");
+              pane.style.setProperty("display", "flex", "important");
+              btnHeaderPreview.classList.add("active");
+              btnHeaderPreview.setAttribute("data-tooltip", "プレビューを非表示にする");
+            }
+          }
         }
       }, 600);
     } catch (err) {
