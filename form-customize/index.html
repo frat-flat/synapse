@@ -755,45 +755,62 @@
         color: var(--color-text-muted) !important;
       }
 
-      /* ヘッダー全体の背景をホワイトに強制し、コントラストを高める */
-      .app-header {
+      /* ヘッダー全体の背景をホワイトに強制し、コントラストを高める（ダークテーマが動的に当たっても白固定） */
+      .app-header,
+      .theme-dark .app-header,
+      body.theme-dark .app-header {
         background-color: #ffffff !important;
+        background: #ffffff !important;
         border-bottom: 1px solid var(--color-border) !important;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
       }
       
       /* ヘッダー内ナビゲーション（タブバーのコンテナ）の背景 */
-      .header-nav {
+      .header-nav,
+      .theme-dark .header-nav,
+      body.theme-dark .header-nav {
         background-color: #f1f5f9 !important;
         border-color: #e2e8f0 !important;
       }
       
       /* タブの文字色とホバー色 */
-      .nav-tab {
+      .nav-tab,
+      .theme-dark .nav-tab,
+      body.theme-dark .nav-tab {
         color: #475569 !important;
       }
 
-      .nav-tab:hover {
+      .nav-tab:hover,
+      .theme-dark .nav-tab:hover,
+      body.theme-dark .nav-tab:hover {
         color: #0f172a !important;
         background-color: #e2e8f0 !important;
       }
 
-      .nav-tab.active {
+      .nav-tab.active,
+      .theme-dark .nav-tab.active,
+      body.theme-dark .nav-tab.active {
         color: #ffffff !important;
         background-color: var(--color-primary) !important;
         box-shadow: 0 4px 10px var(--color-primary-glow) !important;
       }
       
       /* ユーザープロフィールの表示部分 */
-      .user-profile-header {
+      .user-profile-header,
+      .theme-dark .user-profile-header,
+      body.theme-dark .user-profile-header {
         border-right-color: #e2e8f0 !important;
       }
 
-      .user-profile-header .user-name {
+      .user-profile-header .user-name,
+      .theme-dark .user-profile-header .user-name,
+      body.theme-dark .user-profile-header .user-name {
         color: #0f172a !important;
       }
 
-      .user-profile-header .user-role {
+      .user-profile-header .user-role,
+      .theme-dark .user-profile-header .user-role,
+      body.theme-dark .user-profile-header .user-role {
         color: var(--color-primary) !important;
         font-weight: 600 !important;
       }
@@ -822,8 +839,10 @@
         color: #ffffff !important;
       }
 
-      /* ロゴタイトルを白背景の上で非常に明瞭なグラデーションに設定 */
-      .header-logo h1 {
+      /* ロゴタイトルを白背景の上で非常に明瞭なグラデーションに設定（ダークテーマが動的に当たっても白背景用を維持） */
+      .header-logo h1,
+      .theme-dark .header-logo h1,
+      body.theme-dark .header-logo h1 {
         background: linear-gradient(135deg, var(--color-primary) 0%, #0f172a 100%) !important;
         -webkit-background-clip: text !important;
         -webkit-text-fill-color: transparent !important;
