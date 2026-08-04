@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v3.js?v=2.2.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
-    <link rel="stylesheet" href="./assets/custom-editor-v27.css?v=2.7.0">
-    <script src="./assets/custom-editor-v27.js?v=2.7.0" defer></script>
+    <link rel="stylesheet" href="./assets/custom-editor-v28.css?v=2.8.0">
+    <script src="./assets/custom-editor-v28.js?v=2.8.0" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -152,13 +152,46 @@
                   </div>
                 </div>
 
-                <!-- 1. 会社ロゴテキスト (プロ版限定, プレビュー1段目) -->
-                <div class="form-group pro-only-field" id="pro-logo-container" style="display: none; margin-bottom: 12px;">
-                  <label for="editor-pro-logo" style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--color-text-muted);">
-                    <span>🏢 会社ロゴテキスト</span>
+                <!-- 1. 会社ロゴ設定 (プロ版限定, プレビュー1段目) -->
+                <div class="form-group pro-only-field" id="pro-logo-container" style="display: none; margin-bottom: 12px; border: 1px solid var(--color-border); padding: 12px; border-radius: 6px; background: rgba(0,0,0,0.02);">
+                  <label style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 700; color: var(--color-text-muted); margin-bottom: 8px;">
+                    <span>🏢 会社ロゴ設定</span>
                     <span style="font-size: 0.65rem; background: rgba(0, 86, 179, 0.1); color: #0056b3; padding: 1px 4px; border-radius: 3px; font-weight: 700;">プロ版 💎</span>
                   </label>
-                  <input type="text" id="editor-pro-logo" class="form-control form-control-sm" placeholder="例: 株式会社wayway" />
+                  
+                  <!-- ロゴタイプ選択 (テキスト / 画像) -->
+                  <div style="display: flex; gap: 15px; margin-bottom: 8px; font-size: 0.75rem;">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; margin: 0;">
+                      <input type="radio" name="editor-logo-type" id="logo-type-text" value="text" checked style="width: 14px; height: 14px; cursor: pointer;" /> テキストロゴ
+                    </label>
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; margin: 0;">
+                      <input type="radio" name="editor-logo-type" id="logo-type-image" value="image" style="width: 14px; height: 14px; cursor: pointer;" /> 画像ロゴ
+                    </label>
+                  </div>
+
+                  <!-- ロゴ表示位置選択 (最上部 / 最下部) -->
+                  <div style="display: flex; gap: 15px; margin-bottom: 10px; font-size: 0.75rem;">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; margin: 0;">
+                      <input type="radio" name="editor-logo-position" id="logo-pos-top" value="top" checked style="width: 14px; height: 14px; cursor: pointer;" /> 最上部に表示
+                    </label>
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; margin: 0;">
+                      <input type="radio" name="editor-logo-position" id="logo-pos-bottom" value="bottom" style="width: 14px; height: 14px; cursor: pointer;" /> 最下部に表示
+                    </label>
+                  </div>
+
+                  <!-- ロゴ入力：テキスト用 -->
+                  <div id="logo-input-text-group" class="form-group" style="margin-bottom: 0;">
+                    <input type="text" id="editor-pro-logo" class="form-control form-control-sm" placeholder="例: 株式会社wayway" />
+                  </div>
+
+                  <!-- ロゴ入力：画像用 (アップロード/URL) -->
+                  <div id="logo-input-image-group" class="form-group" style="display: none; margin-bottom: 0;">
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                      <input type="text" id="editor-pro-logo-image-url" class="form-control form-control-sm" style="flex: 2; height: 30px; font-size: 0.75rem;" placeholder="https://example.com/logo.png" />
+                      <input type="file" id="editor-pro-logo-image-file" style="display: none;" accept="image/*" />
+                      <button type="button" class="btn btn-sm btn-secondary" id="btn-pro-logo-image-upload" style="flex: 1; font-size: 0.7rem; height: 30px; padding: 0 6px; white-space: nowrap;">選択...</button>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- 2. フォームのタイトル (常時, プレビュー2段目) -->
@@ -166,6 +199,17 @@
                   <label for="editor-form-title">フォームのタイトル</label>
                   <input type="text" id="editor-form-title" class="form-control title-input" placeholder="フォームのタイトルを入力..." />
                 </div>
+
+                <!-- 3. サブタイトル (プロ版限定, プレビュー3段目) -->
+                <div class="form-group pro-only-field" id="pro-subtitle-container" style="display: none; margin-top: 12px; margin-bottom: 12px;">
+                  <label for="editor-pro-subtitle" style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--color-text-muted);">
+                    <span>✏️ サブタイトル</span>
+                    <span style="font-size: 0.65rem; background: rgba(0, 86, 179, 0.1); color: #0056b3; padding: 1px 4px; border-radius: 3px; font-weight: 700;">プロ版 💎</span>
+                  </label>
+                  <input type="text" id="editor-pro-subtitle" class="form-control form-control-sm" placeholder="例: 運営代行 お申し込みフォーム" />
+                </div>
+
+                <!-- 4. フォームの説明 (常時, プレビュー4段目) -->
                 <div class="form-group" style="margin-top: 12px;">
                   <label for="editor-form-desc">フォームの説明</label>
                   <input type="text" id="editor-form-desc" class="form-control desc-input" placeholder="フォームの説明を入力..." />
@@ -427,6 +471,7 @@
                     </div>
                     <div id="live-preview-logo-area" class="preview-logo-container" style="display: none; text-align: center; margin-bottom: 0.5rem; font-size: 0.75rem; font-weight: 500; color: var(--color-text-muted);">
                       <span id="live-preview-logo-text">wayway</span>
+                      <img id="live-preview-logo-image" src="" style="display: none; max-height: 24px; max-width: 120px; object-fit: contain; margin: 0 auto;" />
                     </div>
                     <div id="live-preview-form-header" class="preview-form-header" style="text-align: center; margin-bottom: 1.2rem;">
                       <h1 id="live-preview-form-title" style="font-size: 1.2rem; margin-bottom: 4px; font-weight: 700;">フォームのタイトル</h1>
@@ -455,6 +500,7 @@
                   <div id="live-preview-footer-logo-container" class="preview-footer-logo-container" style="display: none; text-align: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px dashed var(--color-border); justify-content: center; align-items: center; gap: 6px;">
                     <span style="font-size: 0.65rem; color: var(--color-text-muted);">Powered by</span>
                     <img id="live-preview-footer-logo" src="../logo.png" style="max-height: 24px; object-fit: contain;" />
+                    <span id="live-preview-footer-logo-text" style="display: none; font-size: 0.7rem; font-weight: 700; color: var(--color-text-muted);"></span>
                   </div>
                 </div>
               </div>
@@ -505,6 +551,7 @@
             <!-- プロ版用会社ロゴ表示エリア -->
             <div id="preview-logo-area" class="preview-logo-container" style="display: none; text-align: center; margin-bottom: 0.5rem; font-size: 0.8rem; font-weight: 500; color: var(--color-text-muted);">
               <span id="preview-logo-text">wayway</span>
+              <img id="preview-logo-image" src="" style="display: none; max-height: 32px; max-width: 160px; object-fit: contain; margin: 0 auto;" />
             </div>
 
             <div id="preview-form-header" class="preview-form-header">
@@ -540,6 +587,7 @@
             <div id="preview-footer-logo-container" class="preview-footer-logo-container" style="display: none; text-align: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px dashed var(--color-border); justify-content: center; align-items: center; gap: 8px;">
               <span style="font-size: 0.75rem; color: var(--color-text-muted);">Powered by</span>
               <img id="preview-footer-logo" src="../logo.png" style="max-height: 32px; object-fit: contain;" />
+              <span id="preview-footer-logo-text" style="display: none; font-size: 0.85rem; font-weight: 700; color: var(--color-text-muted);"></span>
             </div>
           </div>
 
