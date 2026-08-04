@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v3.js?v=2.2.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
-    <link rel="stylesheet" href="./assets/custom-editor-v38.css?v=3.8.0">
-    <script src="./assets/custom-editor-v38.js?v=3.8.0" defer></script>
+    <link rel="stylesheet" href="./assets/custom-editor-v39.css?v=3.9.0">
+    <script src="./assets/custom-editor-v39.js?v=3.9.0" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -258,6 +258,16 @@
                           <input type="file" id="editor-pro-header-image-file" style="display: none;" accept="image/*" />
                           <button type="button" class="btn btn-sm btn-secondary" id="btn-pro-header-image-upload" style="flex: 1; font-size: 0.7rem; height: 30px; padding: 2px 8px; white-space: nowrap;">画像を選択...</button>
                         </div>
+                        
+                        <!-- ヘッダー用ドラッグ＆ドロップおよびレパートリー履歴 -->
+                        <div id="header-image-dropzone" class="editor-dropzone">
+                          📂 ここにヘッダー用画像をドラッグ＆ドロップ
+                        </div>
+                        
+                        <div id="header-library-container" class="image-library-container" style="display: none;">
+                          <span class="image-library-title">📁 保存されたヘッダー画像レパートリー</span>
+                          <div id="header-library-gallery" class="image-library-gallery"></div>
+                        </div>
                       </div>
                       <!-- 画像の拡大・縮小 (ズーム) -->
                       <div class="form-group" style="margin-top: 2px; margin-bottom: 2px;">
@@ -381,27 +391,43 @@
                   </div>
 
                   <!-- 背景画像の着せ替えデコレーション -->
-                  <div class="settings-card-pro" style="display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 10px 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border); flex-wrap: wrap;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                      <label class="editor-toggle-switch" style="margin: 0;">
-                        <input type="checkbox" id="editor-pro-use-bg-image" />
-                        <span class="editor-toggle-slider"></span>
-                      </label>
-                      <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text); cursor: pointer;" onclick="document.getElementById('editor-pro-use-bg-image').click();">🖼️ 背景画像を挿入する</span>
+                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; width: 100%;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <label class="editor-toggle-switch" style="margin: 0;">
+                          <input type="checkbox" id="editor-pro-use-bg-image" />
+                          <span class="editor-toggle-slider"></span>
+                        </label>
+                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text); cursor: pointer;" onclick="document.getElementById('editor-pro-use-bg-image').click();">🖼️ 背景画像を挿入する</span>
+                      </div>
+                      
+                      <div id="pro-bg-theme-select-group" style="display: none; align-items: center; gap: 6px; flex: 1; min-width: 160px; margin: 0;">
+                        <select id="editor-pro-bg-theme-select" class="form-control form-control-sm" style="margin: 0; height: 34px !important; padding: 4px 8px !important; line-height: 1.5 !important; font-size: 0.8rem !important; cursor: pointer;">
+                          <option value="spring">🌸 春 (桜の舞うピンク)</option>
+                          <option value="summer">🌻 夏 (ひまわりと爽やかな青)</option>
+                          <option value="autumn">🍁 秋 (もみじ深まるオレンジ)</option>
+                          <option value="winter">❄️ 冬 (雪のきらめくブルー)</option>
+                          <option value="sunset">🌇 日没 (エモーショナルな夕焼け)</option>
+                          <option value="sunrise">🌅 朝日 (清々しい朝 of 光)</option>
+                          <option value="space">🌌 宇宙 (神秘の星屑ダーク)</option>
+                          <option value="green">🍃 緑地帯 (安らぐ新緑グリーン)</option>
+                          <option value="it">💻 IT (サイバーネオングリッド)</option>
+                        </select>
+                      </div>
                     </div>
-                    
-                    <div id="pro-bg-theme-select-group" style="display: none; align-items: center; gap: 6px; flex: 1; min-width: 160px; margin: 0;">
-                      <select id="editor-pro-bg-theme-select" class="form-control form-control-sm" style="margin: 0; height: 34px !important; padding: 4px 8px !important; line-height: 1.5 !important; font-size: 0.8rem !important; cursor: pointer;">
-                        <option value="spring">🌸 春 (桜の舞うピンク)</option>
-                        <option value="summer">🌻 夏 (ひまわりと爽やかな青)</option>
-                        <option value="autumn">🍁 秋 (もみじ深まるオレンジ)</option>
-                        <option value="winter">❄️ 冬 (雪のきらめくブルー)</option>
-                        <option value="sunset">🌇 日没 (エモーショナルな夕焼け)</option>
-                        <option value="sunrise">🌅 朝日 (清々しい朝 of 光)</option>
-                        <option value="space">🌌 宇宙 (神秘の星屑ダーク)</option>
-                        <option value="green">🍃 緑地帯 (安らぐ新緑グリーン)</option>
-                        <option value="it">💻 IT (サイバーネオングリッド)</option>
-                      </select>
+
+                    <!-- 背景用ドラッグ＆ドロップおよびレパートリー履歴（ONの時のみ展開） -->
+                    <div id="pro-bg-custom-group" style="display: none; flex-direction: column; gap: 6px; width: 100%; border-top: 1px dashed rgba(0,0,0,0.08); padding-top: 8px; margin-top: 4px;">
+                      <!-- 非表示ファイル選択要素 -->
+                      <input type="file" id="editor-pro-bg-image-file" style="display: none;" accept="image/*" />
+                      <div id="bg-image-dropzone" class="editor-dropzone">
+                        📂 ここにカスタム背景画像をドラッグ＆ドロップ（またはクリック）
+                      </div>
+                      
+                      <div id="bg-library-container" class="image-library-container" style="display: none;">
+                        <span class="image-library-title">📁 保存された背景画像レパートリー</span>
+                        <div id="bg-library-gallery" class="image-library-gallery"></div>
+                      </div>
                     </div>
                   </div>
 
