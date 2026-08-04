@@ -267,21 +267,8 @@
 
   function setupHeaderObserver() {
     enforceLightHeader();
+    // 0.2秒ごとに定期適用。setIntervalは自分自身のスタイル書き換えによる無限ループを起こさないため100%安全です。
     setInterval(enforceLightHeader, 200);
-
-    const target = document.body;
-    if (!target) return;
-
-    const observer = new MutationObserver(() => {
-      enforceLightHeader();
-    });
-
-    observer.observe(target, {
-      attributes: true,
-      childList: true,
-      subtree: true,
-      attributeFilter: ['style', 'class']
-    });
   }
 
   function setupFormTitleSync() {
