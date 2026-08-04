@@ -133,6 +133,7 @@
         loadProSettingsToInputs();
         setupValidationInterceptors();
         setupFormTitleSync();
+        setupOverviewSubtabs(); // 概要画面のサブタブイベント登録
         setupFlowmapDragBindings(); // フローマップドラッグイベント登録
         setupFlowmapOverrideF(); // window.Fのオーバーライドを確実に行う
         
@@ -167,20 +168,64 @@
     initializeAll();
   }
 
+  function setupOverviewSubtabs() {
+    const btnGlobal = document.getElementById('btn-subtab-global-settings');
+    const btnSection = document.getElementById('btn-subtab-section-design');
+    const globalCard = document.querySelector('#form-overview-editor > .form-title-desc-card');
+    const secHeader = document.querySelector('#form-overview-editor > .overview-sections-header');
+    const secList = document.querySelector('#form-overview-editor > #overview-sections-list');
+    const secFooter = document.querySelector('#form-overview-editor > .overview-add-section-footer');
+
+    if (!btnGlobal || !btnSection || !globalCard || !secHeader || !secList || !secFooter) return;
+
+    const showGlobal = () => {
+      btnGlobal.classList.add('active');
+      btnGlobal.style.borderBottom = '3px solid var(--color-primary)';
+      btnGlobal.style.color = 'var(--color-text)';
+      
+      btnSection.classList.remove('active');
+      btnSection.style.borderBottom = '3px solid transparent';
+      btnSection.style.color = 'var(--color-text-muted)';
+
+      globalCard.style.display = 'block';
+      secHeader.style.display = 'none';
+      secList.style.display = 'none';
+      secFooter.style.display = 'none';
+    };
+
+    const showSection = () => {
+      btnSection.classList.add('active');
+      btnSection.style.borderBottom = '3px solid var(--color-primary)';
+      btnSection.style.color = 'var(--color-text)';
+      
+      btnGlobal.classList.remove('active');
+      btnGlobal.style.borderBottom = '3px solid transparent';
+      btnGlobal.style.color = 'var(--color-text-muted)';
+
+      globalCard.style.display = 'none';
+      secHeader.style.display = 'flex';
+      secList.style.display = 'grid';
+      secFooter.style.display = 'block';
+    };
+
+    btnGlobal.addEventListener('click', showGlobal);
+    btnSection.addEventListener('click', showSection);
+
+    // 初期状態は「全体設定」を表示
+    showGlobal();
+  }
+
   function setupFormTitleSync() {
     const simpleTitleInput = document.getElementById('editor-form-title');
-    const proTitleInput = document.getElementById('editor-pro-title');
     const simpleDescInput = document.getElementById('editor-form-desc');
+    const showLogoCheck = document.getElementById('editor-form-show-logo');
 
     if (simpleTitleInput) {
       simpleTitleInput.addEventListener('input', (e) => {
         const v = e.target.value;
         if (window.G) {
-          window.G.title = v;
-          window.G.header = window.G.header || {};
-          window.G.header.title = v;
+          window.G.title = v; // 管理用タイトルのみ更新
         }
-        if (proTitleInput) proTitleInput.value = v;
       });
     }
 
@@ -188,9 +233,19 @@
       simpleDescInput.addEventListener('input', (e) => {
         const v = e.target.value;
         if (window.G) {
-          window.G.description = v;
-          window.G.header = window.G.header || {};
-          window.G.header.disclaimer = v;
+          window.G.description = v; // 管理用説明のみ更新
+        }
+      });
+    }
+
+    if (showLogoCheck) {
+      showLogoCheck.addEventListener('change', (e) => {
+        if (window.G) {
+          window.G.showLogo = e.target.checked;
+          saveAndSyncMindmapData();
+          applyPreviewTheme();
+          renderLivePreview();
+          if (window.S) window.S();
         }
       });
     }
@@ -1108,10 +1163,12 @@
       showDuration: true,
       durationText: "所要時間 目安5~10分",
       showAlertBox: true,
-      alertBoxText: "全項目を半角・全角の指定に沿ってご入力ください..."
+      alertBoxText: "全項目を半角・全角 of 指定に沿ってご入力ください..."
     };
     window.G.displayMode = window.G.displayMode || "scroll";
     window.G.progressIndicator = window.G.progressIndicator || "both";
+    if (window.G.showLogo === undefined) window.G.showLogo = false;
+    if (window.G.headerImage === undefined) window.G.headerImage = "";
 
     const g = window.G;
 
@@ -1138,6 +1195,14 @@
 
     document.getElementById('pro-duration-input-group').style.display = g.announcement.showDuration ? 'block' : 'none';
     document.getElementById('pro-alert-input-group').style.display = g.announcement.showAlertBox ? 'block' : 'none';
+
+    // ロゴ表示チェックボックスのプレフィル
+    const showLogoCheck = document.getElementById('editor-form-show-logo');
+    if (showLogoCheck) showLogoCheck.checked = !!g.showLogo;
+
+    // ヘッダー画像URLのプレフィル
+    const headerImageUrl = document.getElementById('editor-pro-header-image-url');
+    if (headerImageUrl) headerImageUrl.value = g.headerImage || "";
 
     updatePresetChipsState();
     setupProInputListeners();
@@ -1184,19 +1249,46 @@
       }
     };
 
+    // ヘッダー画像ファイル選択ボタンのトリガーとBase64変換処理
+    const headerFileIn = document.getElementById('editor-pro-header-image-file');
+    const btnUpload = document.getElementById('btn-pro-header-image-upload');
+    if (btnUpload && headerFileIn) {
+      btnUpload.addEventListener('click', () => headerFileIn.click());
+    }
+    if (headerFileIn) {
+      headerFileIn.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64Data = event.target.result;
+            if (window.G) {
+              window.G.headerImage = base64Data;
+              const urlInput = document.getElementById('editor-pro-header-image-url');
+              if (urlInput) urlInput.value = base64Data;
+              saveAndSyncMindmapData();
+              applyPreviewTheme();
+              renderLivePreview();
+              if (window.S) window.S();
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    bindInput('editor-pro-header-image-url', v => {
+      window.G.headerImage = v;
+      saveAndSyncMindmapData();
+    });
+
     bindInput('editor-pro-logo', v => window.G.header.logoText = v);
     bindInput('editor-pro-title', v => {
       window.G.header.title = v;
-      window.G.title = v;
-      const simpleTitleInput = document.getElementById('editor-form-title');
-      if (simpleTitleInput) simpleTitleInput.value = v;
     });
     bindInput('editor-pro-subtitle', v => window.G.header.subtitle = v);
     bindInput('editor-pro-disclaimer', v => {
       window.G.header.disclaimer = v;
-      window.G.description = v;
-      const simpleDescInput = document.getElementById('editor-form-desc');
-      if (simpleDescInput) simpleDescInput.value = v;
     });
 
     bindChange('editor-pro-display-mode', v => window.G.displayMode = v);
@@ -1304,6 +1396,38 @@
     const durationBox = document.getElementById('preview-duration-box');
     const alertBox = document.getElementById('preview-alert-box');
     const announceArea = document.getElementById('preview-announcement-area');
+
+    // タイトルと説明文（免責事項）の強制反映（同期解除対応）
+    const previewTitle = document.getElementById('preview-form-title');
+    const previewDesc = document.getElementById('preview-form-desc');
+    if (previewTitle) {
+      previewTitle.textContent = isPro ? (g.header.title || g.title || "セクション") : (g.title || "セクション");
+    }
+    if (previewDesc) {
+      previewDesc.textContent = isPro ? (g.header.disclaimer || g.description || "") : (g.description || "");
+    }
+
+    // 全体プレビューのヘッダー画像表示制御
+    const previewHeaderImgContainer = document.getElementById('preview-header-image-container');
+    const previewHeaderImg = document.getElementById('preview-header-image');
+    if (previewHeaderImgContainer && previewHeaderImg) {
+      if (isPro && g.headerImage) {
+        previewHeaderImg.src = g.headerImage;
+        previewHeaderImgContainer.style.display = 'block';
+      } else {
+        previewHeaderImgContainer.style.display = 'none';
+      }
+    }
+
+    // 全体プレビューのフッターロゴ表示制御
+    const previewFooterLogoContainer = document.getElementById('preview-footer-logo-container');
+    if (previewFooterLogoContainer) {
+      if (g.showLogo) {
+        previewFooterLogoContainer.style.display = 'flex';
+      } else {
+        previewFooterLogoContainer.style.display = 'none';
+      }
+    }
 
     if (isPro) {
       if (g.header && g.header.logoText) {
@@ -2466,10 +2590,36 @@
     const liveDurationBox = document.getElementById('live-preview-duration-box');
     const liveAlertBox = document.getElementById('live-preview-alert-box');
 
+    // タイトルと説明文の反映（同期解除対応）
     const currentFormTitle = document.getElementById('editor-form-title') ? document.getElementById('editor-form-title').value : (g.title || "");
     const currentFormDesc = document.getElementById('editor-form-desc') ? document.getElementById('editor-form-desc').value : (g.description || "");
-    liveTitleH.textContent = currentFormTitle || "セクション";
-    liveDescP.textContent = currentFormDesc || "";
+    const proTitleVal = (g.header && g.header.title) ? g.header.title : currentFormTitle;
+    const proDescVal = (g.header && g.header.disclaimer) ? g.header.disclaimer : currentFormDesc;
+
+    liveTitleH.textContent = isPro ? (proTitleVal || "セクション") : (currentFormTitle || "セクション");
+    liveDescP.textContent = isPro ? proDescVal : currentFormDesc;
+
+    // ライブプレビューのヘッダー画像表示制御
+    const liveHeaderImgContainer = document.getElementById('live-preview-header-image-container');
+    const liveHeaderImg = document.getElementById('live-preview-header-image');
+    if (liveHeaderImgContainer && liveHeaderImg) {
+      if (isPro && g.headerImage) {
+        liveHeaderImg.src = g.headerImage;
+        liveHeaderImgContainer.style.display = 'block';
+      } else {
+        liveHeaderImgContainer.style.display = 'none';
+      }
+    }
+
+    // ライブプレビューのフッターロゴ表示制御
+    const liveFooterLogoContainer = document.getElementById('live-preview-footer-logo-container');
+    if (liveFooterLogoContainer) {
+      if (g.showLogo) {
+        liveFooterLogoContainer.style.display = 'flex';
+      } else {
+        liveFooterLogoContainer.style.display = 'none';
+      }
+    }
 
     if (isPro && g.header && g.appearance) {
       if (g.header.logoText) {

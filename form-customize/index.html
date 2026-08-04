@@ -133,6 +133,12 @@
           <div class="editor-main">
             <!-- A. 【全体概要画面】フォームに入ったら最初に見えるセクション一覧 -->
             <div id="form-overview-editor" class="overview-editor-container">
+              <!-- 全体の概要画面内のサブタブ -->
+              <div class="overview-subtabs" style="display: flex; gap: 8px; border-bottom: 2px solid var(--color-border); margin-bottom: 1.25rem; padding-bottom: 1px;">
+                <button type="button" id="btn-subtab-global-settings" class="subtab-btn active" style="background: none; border: none; border-bottom: 3px solid var(--color-primary); padding: 8px 16px; font-weight: bold; font-size: 0.9rem; color: var(--color-text); cursor: pointer; transition: all 0.2s;">⚙️ フォーム全体設定</button>
+                <button type="button" id="btn-subtab-section-design" class="subtab-btn" style="background: none; border: none; border-bottom: 3px solid transparent; padding: 8px 16px; font-weight: bold; font-size: 0.9rem; color: var(--color-text-muted); cursor: pointer; transition: all 0.2s;">📋 セクション構成一覧</button>
+              </div>
+
               <div class="form-title-desc-card">
                 <!-- 簡易版 / プロ版 モード切り替えスイッチ -->
                 <div class="mode-toggle-container" style="margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border);">
@@ -161,6 +167,13 @@
                   </label>
                 </div>
 
+                <div class="form-group" style="margin-top: 12px; display: flex; align-items: center; gap: 8px;">
+                  <input type="checkbox" id="editor-form-show-logo" style="width: 16px; height: 16px; cursor: pointer;" />
+                  <label for="editor-form-show-logo" style="margin: 0; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; color: var(--color-text);">
+                    <span>🖼️ ページの最後にロゴを表示する (標準ロゴ: logo.png)</span>
+                  </label>
+                </div>
+
                 <!-- プロ版専用：高度なカスタマイズパネル（初期状態は非表示） -->
                 <div id="pro-settings-panel" class="pro-features-container" style="display: none; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--color-border); flex-direction: column; gap: 1.25rem;">
                   <h4 style="font-size: 0.9rem; font-weight: 700; color: var(--color-primary); margin-bottom: 0.25rem; display: flex; align-items: center; gap: 6px;">💎 プロ版限定カスタマイズ設定</h4>
@@ -185,6 +198,14 @@
                     <div class="form-group">
                       <label style="font-size: 0.75rem; color: var(--color-text-muted);">免責事項テキスト</label>
                       <input type="text" id="editor-pro-disclaimer" class="form-control form-control-sm" placeholder="例: ※ 公式フォームではありません。" />
+                    </div>
+                    <div class="form-group" style="margin-top: 8px;">
+                      <label style="font-size: 0.75rem; color: var(--color-text-muted);">ヘッダー画像 (アップロードまたはURL)</label>
+                      <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="editor-pro-header-image-url" class="form-control form-control-sm" style="flex: 2; height: 30px; font-size: 0.75rem;" placeholder="https://example.com/image.jpg またはローカルパス" />
+                        <input type="file" id="editor-pro-header-image-file" style="display: none;" accept="image/*" />
+                        <button type="button" class="btn btn-sm btn-secondary" id="btn-pro-header-image-upload" style="flex: 1; font-size: 0.7rem; height: 30px; padding: 2px 8px; white-space: nowrap;">画像を選択...</button>
+                      </div>
                     </div>
                   </div>
 
@@ -298,7 +319,7 @@
                 <!-- JSでセクション全体図がカードリストでレンダリングされます -->
               </div>
 
-              <div class="overview-add-section-footer">
+              <div class="overview-add-section-footer" style="margin-top: 1.5rem; text-align: center;">
                 <button id="btn-overview-add-section" class="btn btn-secondary">＋ 新しいセクションを追加</button>
               </div>
             </div>
@@ -366,14 +387,19 @@
                   <span style="letter-spacing: 1px;">📶 🛜 🔋</span>
                 </div>
                 <div class="device-screen-content">
-                  <div id="live-preview-logo-area" class="preview-logo-container" style="display: none; text-align: center; margin-bottom: 0.5rem; font-size: 0.75rem; font-weight: 500; color: var(--color-text-muted);">
-                    <span id="live-preview-logo-text">株式会社wayway</span>
-                  </div>
-                  <div id="live-preview-form-header" class="preview-form-header" style="text-align: center; margin-bottom: 1.2rem;">
-                    <h1 id="live-preview-form-title" style="font-size: 1.2rem; margin-bottom: 4px; font-weight: 700;">フォームのタイトル</h1>
-                    <p id="live-preview-form-subtitle" class="preview-form-subtitle-pro" style="display: none; text-align: center; font-size: 0.85rem; font-weight: 600; margin-top: 0.25rem; color: var(--color-primary);"></p>
-                    <p id="live-preview-form-desc" style="font-size: 0.7rem; color: var(--color-text-muted); line-height: 1.4;">フォームの説明</p>
-                    <p id="live-preview-form-disclaimer" class="preview-form-disclaimer-pro" style="display: none; text-align: center; font-size: 0.6rem; color: var(--color-text-muted); margin-top: 0.5rem; line-height: 1.4;"></p>
+                  <div class="preview-header-pro" style="display: flex; flex-direction: column; width: 100%;">
+                    <div id="live-preview-header-image-container" class="preview-header-image-container" style="display: none; width: 100%; max-height: 120px; overflow: hidden; border-radius: 6px 6px 0 0; margin-bottom: 0.75rem; border-bottom: 1px solid var(--color-border);">
+                      <img id="live-preview-header-image" src="" style="width: 100%; height: 100%; object-fit: cover;" />
+                    </div>
+                    <div id="live-preview-logo-area" class="preview-logo-container" style="display: none; text-align: center; margin-bottom: 0.5rem; font-size: 0.75rem; font-weight: 500; color: var(--color-text-muted);">
+                      <span id="live-preview-logo-text">wayway</span>
+                    </div>
+                    <div id="live-preview-form-header" class="preview-form-header" style="text-align: center; margin-bottom: 1.2rem;">
+                      <h1 id="live-preview-form-title" style="font-size: 1.2rem; margin-bottom: 4px; font-weight: 700;">フォームのタイトル</h1>
+                      <p id="live-preview-form-subtitle" class="preview-form-subtitle-pro" style="display: none; text-align: center; font-size: 0.85rem; font-weight: 600; margin-top: 0.25rem; color: var(--color-primary);"></p>
+                      <p id="live-preview-form-desc" style="font-size: 0.7rem; color: var(--color-text-muted); line-height: 1.4;">フォームの説明</p>
+                      <p id="live-preview-form-disclaimer" class="preview-form-disclaimer-pro" style="display: none; text-align: center; font-size: 0.6rem; color: var(--color-text-muted); margin-top: 0.5rem; line-height: 1.4;"></p>
+                    </div>
                   </div>
                   
                   <div id="live-preview-announcement-area" class="preview-announcement-container" style="display: none; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; width: 100%;">
@@ -392,6 +418,10 @@
 
                   <div id="live-preview-section-container">
                     <!-- ここに編集中の質問項目が即時レンダリングされます -->
+                  </div>
+                  <div id="live-preview-footer-logo-container" class="preview-footer-logo-container" style="display: none; text-align: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px dashed var(--color-border); justify-content: center; align-items: center; gap: 6px;">
+                    <span style="font-size: 0.65rem; color: var(--color-text-muted);">Powered by</span>
+                    <img id="live-preview-footer-logo" src="../logo.png" style="max-height: 24px; object-fit: contain;" />
                   </div>
                 </div>
               </div>
@@ -434,9 +464,13 @@
           <div class="preview-card">
             <div class="preview-badge">プレビューモード</div>
             
-            <!-- プロ版用：会社ロゴ表示エリア -->
+            <div id="preview-header-image-container" class="preview-header-image-container" style="display: none; width: 100%; max-height: 180px; overflow: hidden; border-radius: var(--border-radius) var(--border-radius) 0 0; margin-bottom: 1rem; border-bottom: 1px solid var(--color-border);">
+              <img id="preview-header-image" src="" style="width: 100%; height: 100%; object-fit: cover;" />
+            </div>
+            
+            <!-- プロ版用会社ロゴ表示エリア -->
             <div id="preview-logo-area" class="preview-logo-container" style="display: none; text-align: center; margin-bottom: 0.5rem; font-size: 0.8rem; font-weight: 500; color: var(--color-text-muted);">
-              <span id="preview-logo-text">株式会社wayway</span>
+              <span id="preview-logo-text">wayway</span>
             </div>
 
             <div id="preview-form-header" class="preview-form-header">
@@ -466,9 +500,13 @@
             </div>
 
             <div class="preview-actions">
-              <button id="btn-preview-back" class="btn btn-secondary">戻る</button>
-              <button id="btn-preview-next" class="btn btn-primary">次へ</button>
+              <button id="btn-preview-back" class="btn btn-secondary" style="display: none; margin-right: 10px;">前へ</button>
+              <button id="btn-preview-next" class="btn btn-primary" style="margin-right: 10px;">次へ</button>
               <button id="btn-preview-submit" class="btn btn-success" style="display: none;">送信</button>
+            </div>
+            <div id="preview-footer-logo-container" class="preview-footer-logo-container" style="display: none; text-align: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px dashed var(--color-border); justify-content: center; align-items: center; gap: 8px;">
+              <span style="font-size: 0.75rem; color: var(--color-text-muted);">Powered by</span>
+              <img id="preview-footer-logo" src="../logo.png" style="max-height: 32px; object-fit: contain;" />
             </div>
           </div>
 
