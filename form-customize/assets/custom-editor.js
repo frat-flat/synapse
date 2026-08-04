@@ -240,10 +240,19 @@
       headerNav.style.setProperty('border-color', '#e2e8f0', 'important');
     }
 
-    // 非アクティブタブの文字色
-    const tabs = document.querySelectorAll('.nav-tab:not(.active)');
-    tabs.forEach(tab => {
+    // アクティブなタブ（選択箇所）の文字色を「白(#ffffff)」に、背景を「青」に強制固定する
+    const activeTabs = document.querySelectorAll('.nav-tab.active');
+    activeTabs.forEach(tab => {
+      tab.style.setProperty('color', '#ffffff', 'important');
+      tab.style.setProperty('background-color', 'var(--color-primary)', 'important');
+    });
+
+    // 非アクティブなタブの文字色を「グレー」に、背景を「透明」にして選択状態と明確に分離する
+    const inactiveTabs = document.querySelectorAll('.nav-tab:not(.active)');
+    inactiveTabs.forEach(tab => {
       tab.style.setProperty('color', '#475569', 'important');
+      tab.style.setProperty('background-color', 'transparent', 'important');
+      tab.style.setProperty('box-shadow', 'none', 'important');
     });
 
     // ユーザー情報
