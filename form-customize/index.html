@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v3.js?v=2.2.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
-    <link rel="stylesheet" href="./assets/custom-editor-v26.css?v=2.6.0">
-    <script src="./assets/custom-editor-v26.js?v=2.6.0" defer></script>
+    <link rel="stylesheet" href="./assets/custom-editor-v27.css?v=2.7.0">
+    <script src="./assets/custom-editor-v27.js?v=2.7.0" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -152,6 +152,16 @@
                   </div>
                 </div>
 
+                <!-- 1. 会社ロゴテキスト (プロ版限定, プレビュー1段目) -->
+                <div class="form-group pro-only-field" id="pro-logo-container" style="display: none; margin-bottom: 12px;">
+                  <label for="editor-pro-logo" style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--color-text-muted);">
+                    <span>🏢 会社ロゴテキスト</span>
+                    <span style="font-size: 0.65rem; background: rgba(0, 86, 179, 0.1); color: #0056b3; padding: 1px 4px; border-radius: 3px; font-weight: 700;">プロ版 💎</span>
+                  </label>
+                  <input type="text" id="editor-pro-logo" class="form-control form-control-sm" placeholder="例: 株式会社wayway" />
+                </div>
+
+                <!-- 2. フォームのタイトル (常時, プレビュー2段目) -->
                 <div class="form-group">
                   <label for="editor-form-title">フォームのタイトル</label>
                   <input type="text" id="editor-form-title" class="form-control title-input" placeholder="フォームのタイトルを入力..." />
@@ -182,29 +192,9 @@
                   <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
                     <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">🏢 会社ロゴ・ヘッダー編集</span>
                     
-                    <!-- 1. 会社ロゴテキスト -->
-                    <div class="form-group">
-                      <label style="font-size: 0.75rem; color: var(--color-text-muted);">会社ロゴテキスト</label>
-                      <input type="text" id="editor-pro-logo" class="form-control form-control-sm" placeholder="例: 株式会社wayway" />
-                    </div>
-
-                    <!-- 2. 大タイトル (フォームのタイトルと完全同期) -->
-                    <div class="form-group">
-                      <label style="font-size: 0.75rem; color: var(--color-text-muted);">大タイトル (フォームのタイトル)</label>
-                      <input type="text" id="editor-pro-title" class="form-control form-control-sm" placeholder="例: Yahoo!ショッピング" />
-                    </div>
-
-                    <!-- 3. サブタイトル -->
-                    <div class="form-group">
-                      <label style="font-size: 0.75rem; color: var(--color-text-muted);">サブタイトル</label>
-                      <input type="text" id="editor-pro-subtitle" class="form-control form-control-sm" placeholder="例: 運営代行 お申し込みフォーム" />
-                    </div>
-
-                    <!-- 4. 説明文 (フォームの説明と完全同期) -->
-                    <div class="form-group">
-                      <label style="font-size: 0.75rem; color: var(--color-text-muted);">説明文 (フォームの説明)</label>
-                      <input type="text" id="editor-pro-disclaimer" class="form-control form-control-sm" placeholder="例: フォームの説明をご入力ください。" />
-                    </div>
+                    <!-- 内部的な値同期およびJSエラー防止用の非表示インプット -->
+                    <input type="text" id="editor-pro-title" style="display: none;" />
+                    <input type="text" id="editor-pro-disclaimer" style="display: none;" />
                     <div class="form-group" style="margin-top: 8px;">
                       <label style="font-size: 0.75rem; color: var(--color-text-muted);">ヘッダー画像 (アップロードまたはURL)</label>
                       <div style="display: flex; gap: 8px; align-items: center;">
