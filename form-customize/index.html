@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v3.js?v=2.2.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
-    <link rel="stylesheet" href="./assets/custom-editor-v37.css?v=3.7.0">
-    <script src="./assets/custom-editor-v37.js?v=3.7.0" defer></script>
+    <link rel="stylesheet" href="./assets/custom-editor-v38.css?v=3.8.0">
+    <script src="./assets/custom-editor-v38.js?v=3.8.0" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -194,25 +194,30 @@
                   </div>
                 </div>
 
-                <!-- 2. フォームのタイトル (常時, プレビュー2段目) -->
-                <div class="form-group">
-                  <label for="editor-form-title">フォームのタイトル</label>
-                  <input type="text" id="editor-form-title" class="form-control title-input" placeholder="フォームのタイトルを入力..." />
-                </div>
+                <!-- フォーム基本情報設定（タイトル・サブタイトル・説明文） -->
+                <div class="settings-card-basic" style="display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 6px; border: 1px solid var(--color-border); background: rgba(0,0,0,0.05); margin-bottom: 12px;">
+                  <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">📝 フォーム基本情報</span>
+                  
+                  <!-- 2. フォームのタイトル -->
+                  <div class="form-group" style="margin: 0;">
+                    <label for="editor-form-title" style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 4px;">フォームのタイトル</label>
+                    <input type="text" id="editor-form-title" class="form-control title-input" placeholder="フォームのタイトルを入力..." />
+                  </div>
 
-                <!-- 3. サブタイトル (プロ版限定, プレビュー3段目) -->
-                <div class="form-group pro-only-field" id="pro-subtitle-container" style="display: none; margin-top: 12px; margin-bottom: 12px;">
-                  <label for="editor-pro-subtitle" style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--color-text-muted);">
-                    <span>✏️ サブタイトル</span>
-                    <span style="font-size: 0.65rem; background: rgba(0, 86, 179, 0.1); color: #0056b3; padding: 1px 4px; border-radius: 3px; font-weight: 700;">プロ版 💎</span>
-                  </label>
-                  <input type="text" id="editor-pro-subtitle" class="form-control form-control-sm" placeholder="例: 運営代行 お申し込みフォーム" />
-                </div>
+                  <!-- 3. サブタイトル (プロ版限定) -->
+                  <div class="form-group pro-only-field" id="pro-subtitle-container" style="display: none; margin: 0;">
+                    <label for="editor-pro-subtitle" style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 4px; margin-top: 6px;">
+                      <span>✏️ サブタイトル</span>
+                      <span style="font-size: 0.65rem; background: rgba(0, 86, 179, 0.1); color: #0056b3; padding: 1px 4px; border-radius: 3px; font-weight: 700;">プロ版 💎</span>
+                    </label>
+                    <input type="text" id="editor-pro-subtitle" class="form-control form-control-sm" placeholder="例: 運営代行 お申し込みフォーム" />
+                  </div>
 
-                <!-- 4. フォームの説明 (常時, プレビュー4段目) -->
-                <div class="form-group" style="margin-top: 12px;">
-                  <label for="editor-form-desc">フォームの説明</label>
-                  <input type="text" id="editor-form-desc" class="form-control desc-input" placeholder="フォームの説明を入力..." />
+                  <!-- 4. フォームの説明 -->
+                  <div class="form-group" style="margin: 0;">
+                    <label for="editor-form-desc" style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 4px; margin-top: 6px;">フォームの説明</label>
+                    <input type="text" id="editor-form-desc" class="form-control desc-input" placeholder="フォームの説明を入力..." />
+                  </div>
                 </div>
                 <div class="form-group" id="editor-lock-container" style="margin-top: 12px; display: none; align-items: center; gap: 8px;">
                   <input type="checkbox" id="editor-form-lock" style="width: 16px; height: 16px; cursor: pointer;" />
