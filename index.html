@@ -8,6 +8,31 @@
 
 <link rel="stylesheet" href="styles.css?v=2.1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script id="session-safety-patch">
+  (function() {
+    try {
+      const cosUserStr = localStorage.getItem('cos_logged_user');
+      const gfUserStr = localStorage.getItem('gf_current_user');
+      let needsReset = false;
+      
+      if (cosUserStr && cosUserStr.includes('user_admin')) {
+        needsReset = true;
+      }
+      if (gfUserStr && gfUserStr.includes('user_admin')) {
+        needsReset = true;
+      }
+      
+      if (needsReset) {
+        localStorage.removeItem('cos_logged_user');
+        localStorage.removeItem('gf_current_user');
+        console.log('[Session Safety Patch] Detected broken user_admin session. Cleared localStorage.');
+        location.reload();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  })();
+</script>
 </head>
 <body>
 
