@@ -1269,19 +1269,25 @@
     const headerImageUrl = document.getElementById('editor-pro-header-image-url');
     if (headerImageUrl) headerImageUrl.value = g.headerImage || "";
 
-    // ヘッダー画像表示位置のプレフィル
-    const headerImagePos = document.getElementById('editor-pro-header-image-position');
-    const posValText = document.getElementById('header-image-pos-val');
-    const savedPos = g.headerImagePosition !== undefined ? g.headerImagePosition : 50;
-    if (headerImagePos) headerImagePos.value = savedPos;
-    if (posValText) posValText.textContent = `${savedPos}%`;
-
-    // ヘッダー画像ズーム倍率のプレフィル
-    const headerImageScale = document.getElementById('editor-pro-header-image-scale');
-    const scaleValText = document.getElementById('header-image-scale-val');
+    // ズーム・縦位置・横位置のプレフィル
     const savedScale = g.headerImageScale !== undefined ? g.headerImageScale : 100;
-    if (headerImageScale) headerImageScale.value = savedScale;
-    if (scaleValText) scaleValText.textContent = `${savedScale}%`;
+    const savedPosY = g.headerImagePosition !== undefined ? g.headerImagePosition : 50;
+    const savedPosX = g.headerImagePositionX !== undefined ? g.headerImagePositionX : 50;
+
+    const sliderScale = document.getElementById('editor-pro-header-image-scale');
+    const numScale = document.getElementById('editor-pro-header-image-scale-num');
+    if (sliderScale) sliderScale.value = savedScale;
+    if (numScale) numScale.value = savedScale;
+
+    const sliderY = document.getElementById('editor-pro-header-image-position');
+    const numY = document.getElementById('editor-pro-header-image-position-num');
+    if (sliderY) sliderY.value = savedPosY;
+    if (numY) numY.value = savedPosY;
+
+    const sliderX = document.getElementById('editor-pro-header-image-position-x');
+    const numX = document.getElementById('editor-pro-header-image-position-x-num');
+    if (sliderX) sliderX.value = savedPosX;
+    if (numX) numX.value = savedPosX;
 
     updatePresetChipsState();
     setupProInputListeners();
@@ -1361,33 +1367,36 @@
       saveAndSyncMindmapData();
     });
 
-    const headerImagePos = document.getElementById('editor-pro-header-image-position');
-    if (headerImagePos) {
-      headerImagePos.addEventListener('input', (e) => {
-        const v = e.target.value;
-        const posValText = document.getElementById('header-image-pos-val');
-        if (posValText) posValText.textContent = `${v}%`;
-        window.G.headerImagePosition = parseInt(v, 10);
+    // 双方向連動コントロールバインド関数
+    function bindDoubleControl(sliderId, numId, valueKey, minVal, maxVal, defaultVal) {
+      const slider = document.getElementById(sliderId);
+      const num = document.getElementById(numId);
+      if (!slider || !num) return;
+
+      const updateVal = (v) => {
+        let parsed = parseInt(v, 10);
+        if (isNaN(parsed)) parsed = defaultVal;
+        if (parsed < minVal) parsed = minVal;
+        if (parsed > maxVal) parsed = maxVal;
+        
+        slider.value = parsed;
+        num.value = parsed;
+        
+        window.G[valueKey] = parsed;
         saveAndSyncMindmapData();
         applyPreviewTheme();
         renderLivePreview();
         if (window.S) window.S();
-      });
+      };
+
+      slider.addEventListener('input', (e) => updateVal(e.target.value));
+      num.addEventListener('input', (e) => updateVal(e.target.value));
+      num.addEventListener('change', (e) => updateVal(e.target.value));
     }
 
-    const headerImageScale = document.getElementById('editor-pro-header-image-scale');
-    if (headerImageScale) {
-      headerImageScale.addEventListener('input', (e) => {
-        const v = e.target.value;
-        const scaleValText = document.getElementById('header-image-scale-val');
-        if (scaleValText) scaleValText.textContent = `${v}%`;
-        window.G.headerImageScale = parseInt(v, 10);
-        saveAndSyncMindmapData();
-        applyPreviewTheme();
-        renderLivePreview();
-        if (window.S) window.S();
-      });
-    }
+    bindDoubleControl('editor-pro-header-image-scale', 'editor-pro-header-image-scale-num', 'headerImageScale', 30, 300, 100);
+    bindDoubleControl('editor-pro-header-image-position', 'editor-pro-header-image-position-num', 'headerImagePosition', 0, 100, 50);
+    bindDoubleControl('editor-pro-header-image-position-x', 'editor-pro-header-image-position-x-num', 'headerImagePositionX', 0, 100, 50);
 
     bindInput('editor-pro-logo', v => window.G.header.logoText = v);
     bindInput('editor-pro-title', v => {
@@ -1522,10 +1531,11 @@
         previewHeaderImg.src = g.headerImage;
         previewHeaderImgContainer.style.display = 'block';
         const yPos = g.headerImagePosition !== undefined ? g.headerImagePosition : 50;
+        const xPos = g.headerImagePositionX !== undefined ? g.headerImagePositionX : 50;
         const scale = g.headerImageScale !== undefined ? g.headerImageScale : 100;
-        previewHeaderImg.style.objectPosition = `center ${yPos}%`;
+        previewHeaderImg.style.objectPosition = `${xPos}% ${yPos}%`;
         previewHeaderImg.style.transform = `scale(${scale / 100})`;
-        previewHeaderImg.style.transformOrigin = `center ${yPos}%`;
+        previewHeaderImg.style.transformOrigin = `${xPos}% ${yPos}%`;
       } else {
         previewHeaderImgContainer.style.display = 'none';
       }
@@ -2719,10 +2729,11 @@
         liveHeaderImg.src = g.headerImage;
         liveHeaderImgContainer.style.display = 'block';
         const yPos = g.headerImagePosition !== undefined ? g.headerImagePosition : 50;
+        const xPos = g.headerImagePositionX !== undefined ? g.headerImagePositionX : 50;
         const scale = g.headerImageScale !== undefined ? g.headerImageScale : 100;
-        liveHeaderImg.style.objectPosition = `center ${yPos}%`;
+        liveHeaderImg.style.objectPosition = `${xPos}% ${yPos}%`;
         liveHeaderImg.style.transform = `scale(${scale / 100})`;
-        liveHeaderImg.style.transformOrigin = `center ${yPos}%`;
+        liveHeaderImg.style.transformOrigin = `${xPos}% ${yPos}%`;
       } else {
         liveHeaderImgContainer.style.display = 'none';
       }

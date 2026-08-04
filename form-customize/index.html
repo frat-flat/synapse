@@ -207,21 +207,41 @@
                         <button type="button" class="btn btn-sm btn-secondary" id="btn-pro-header-image-upload" style="flex: 1; font-size: 0.7rem; height: 30px; padding: 2px 8px; white-space: nowrap;">画像を選択...</button>
                       </div>
                     </div>
+                    <!-- 画像の拡大・縮小 -->
                     <div class="form-group" style="margin-top: 8px;">
-                      <label style="font-size: 0.75rem; color: var(--color-text-muted); display: flex; justify-content: space-between; align-items: center;">
-                        <span>🔍 画像の拡大縮小 (ズーム)</span>
-                        <span id="header-image-scale-val" style="font-size: 0.75rem; color: var(--color-primary); font-weight: 700;">100%</span>
-                      </label>
-                      <input type="range" id="editor-pro-header-image-scale" min="30" max="300" value="100" style="width: 100%; margin-top: 4px; cursor: pointer;" />
-                      <span style="font-size: 0.65rem; color: var(--color-text-muted); display: block; margin-top: 2px;">※ 画像を縮小・拡大して（30%〜300%）、見せたい範囲を調整できます。</span>
+                      <label style="font-size: 0.75rem; color: var(--color-text-muted);">🔍 画像の拡大・縮小 (ズーム)</label>
+                      <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                        <input type="range" id="editor-pro-header-image-scale" min="30" max="300" value="100" style="flex: 1; height: 26px; cursor: pointer;" />
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                          <input type="number" id="editor-pro-header-image-scale-num" min="30" max="300" value="100" class="form-control form-control-sm" style="width: 55px; height: 26px; font-size: 0.75rem; text-align: center; padding: 2px;" />
+                          <span style="font-size: 0.75rem; font-weight: 700; color: var(--color-text-muted);">%</span>
+                        </div>
+                      </div>
                     </div>
+
+                    <!-- 画像の表示位置調整 (縦方向) -->
                     <div class="form-group" style="margin-top: 8px;">
-                      <label style="font-size: 0.75rem; color: var(--color-text-muted); display: flex; justify-content: space-between; align-items: center;">
-                        <span>↕️ 画像の表示位置調整 (縦方向)</span>
-                        <span id="header-image-pos-val" style="font-size: 0.75rem; color: var(--color-primary); font-weight: 700;">50%</span>
-                      </label>
-                      <input type="range" id="editor-pro-header-image-position" min="0" max="100" value="50" style="width: 100%; margin-top: 4px; cursor: pointer;" />
-                      <span style="font-size: 0.65rem; color: var(--color-text-muted); display: block; margin-top: 2px;">※ 画像のどの高さ部分（上端 0% 〜 下端 100%）を表示させるか微調整できます。</span>
+                      <label style="font-size: 0.75rem; color: var(--color-text-muted);">↕️ 画像の表示位置調整 (縦方向)</label>
+                      <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                        <input type="range" id="editor-pro-header-image-position" min="0" max="100" value="50" style="flex: 1; height: 26px; cursor: pointer;" />
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                          <input type="number" id="editor-pro-header-image-position-num" min="0" max="100" value="50" class="form-control form-control-sm" style="width: 55px; height: 26px; font-size: 0.75rem; text-align: center; padding: 2px;" />
+                          <span style="font-size: 0.75rem; font-weight: 700; color: var(--color-text-muted);">%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 画像の表示位置調整 (横方向) -->
+                    <div class="form-group" style="margin-top: 8px;">
+                      <label style="font-size: 0.75rem; color: var(--color-text-muted);">↔️ 画像の表示位置調整 (横方向)</label>
+                      <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                        <input type="range" id="editor-pro-header-image-position-x" min="0" max="100" value="50" style="flex: 1; height: 26px; cursor: pointer;" />
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                          <input type="number" id="editor-pro-header-image-position-x-num" min="0" max="100" value="50" class="form-control form-control-sm" style="width: 55px; height: 26px; font-size: 0.75rem; text-align: center; padding: 2px;" />
+                          <span style="font-size: 0.75rem; font-weight: 700; color: var(--color-text-muted);">%</span>
+                        </div>
+                      </div>
+                      <span style="font-size: 0.65rem; color: var(--color-text-muted); display: block; margin-top: 4px;">※ 数値の直接入力またはスライダー操作で、画像の位置や拡大率を微調整できます。</span>
                     </div>
                   </div>
 
