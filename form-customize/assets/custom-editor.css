@@ -44,7 +44,7 @@
   border-radius: 8px !important;
   padding: 15px !important;
   box-sizing: border-box !important;
-  position: sticky !important;
+  position: relative !important;
   top: 0px !important;
   align-self: start !important;
   max-height: calc(100vh - 120px) !important;

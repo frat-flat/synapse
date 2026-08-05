@@ -1291,6 +1291,64 @@
 
     updatePresetChipsState();
     setupProInputListeners();
+    setupStickyPreviewTracker();
+  }
+
+  function setupStickyPreviewTracker() {
+    const previewPane = document.querySelector('.editor-live-preview-pane');
+    if (!previewPane) return;
+
+    let lastScrollTop = -1;
+    const updatePosition = () => {
+      // 1. 親ウィンドウのスクロール (CORSポリシーに配慮)
+      let parentScrollY = 0;
+      try {
+        if (window.parent && window.parent.pageYOffset !== undefined) {
+          parentScrollY = window.parent.pageYOffset;
+        } else if (window.parent && window.parent.document.documentElement.scrollTop !== undefined) {
+          parentScrollY = window.parent.document.documentElement.scrollTop;
+        }
+      } catch (e) {
+        // CORSブロック時は無視
+      }
+
+      // 2. iframe自身のスクロール
+      const iframeScrollY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop;
+      
+      // 3. エディタメイン領域のスクロール
+      const mainElement = document.querySelector('.editor-main');
+      const mainScrollY = mainElement ? mainElement.scrollTop : 0;
+
+      const activeScrollY = Math.max(parentScrollY, iframeScrollY, mainScrollY);
+
+      if (activeScrollY !== lastScrollTop) {
+        lastScrollTop = activeScrollY;
+        let targetY = activeScrollY;
+
+        // iframe自体が親ウィンドウ上で上にスクロールアウトしている場合
+        try {
+          if (parentScrollY > 0 && window.frameElement) {
+            const iframeRect = window.frameElement.getBoundingClientRect();
+            targetY = Math.max(0, -iframeRect.top + 20);
+          }
+        } catch (e) {
+          // 同一オリジンでない場合はフォールバック
+        }
+
+        // transform で位置を動的にスライド配置
+        previewPane.style.transform = `translateY(${targetY}px)`;
+        previewPane.style.transition = 'transform 0.1s ease-out';
+      }
+    };
+
+    window.addEventListener('scroll', updatePosition, { passive: true });
+    const mainElement = document.querySelector('.editor-main');
+    if (mainElement) {
+      mainElement.addEventListener('scroll', updatePosition, { passive: true });
+    }
+    
+    // 100ms間隔で同期位置を自動監視・強制補正
+    setInterval(updatePosition, 100);
   }
 
   function showProFeaturePopup(text) {
