@@ -2472,6 +2472,20 @@
         // キャプチャフェーズ (第3引数 true) でクリックをインターセプトし、
         // 同一要素にバインドされた元のリスナー (サンプル追加) の実行を完全に防ぐ
         sampleBtn.addEventListener('click', (e) => {
+          console.log('[Dashboard Hook] sampleBtn clicked directly.');
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          openTemplateGallery();
+        }, true);
+      }
+
+      // フォルダボタンへの直接イベントバインドも追加
+      const folderBtn = document.getElementById('btn-folder-gf');
+      if (folderBtn && !folderBtn.dataset.hooked) {
+        folderBtn.dataset.hooked = "true";
+        folderBtn.addEventListener('click', (e) => {
+          console.log('[Dashboard Hook] folderBtn clicked directly.');
           e.preventDefault();
           e.stopPropagation();
           e.stopImmediatePropagation();
