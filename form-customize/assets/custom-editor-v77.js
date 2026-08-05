@@ -2,6 +2,50 @@
 (function() {
   console.log('custom-editor.js loading...');
 
+  // 🚀 スコープ不整合ReferenceErrorを解消するプロキシ定義
+  window.saveAndSyncMindmapData = null;
+  function saveAndSyncMindmapData(...args) {
+    if (typeof window.saveAndSyncMindmapData === 'function') {
+      return window.saveAndSyncMindmapData(...args);
+    }
+    console.warn('[Proxy] window.saveAndSyncMindmapData is not registered yet.');
+  }
+
+  // ☁️ 自動保存ステータス更新インジケーター (Google Forms風のUX向上)
+  function updateSaveStatus(status) {
+    try {
+      let indicator = document.getElementById('antigravity-save-indicator');
+      if (!indicator) {
+        // タイトル・説明入力欄カード（またはメイン編集パネル）の上部にインジケーターをマウント
+        const headerArea = document.querySelector('.editor-title-desc-card') || document.querySelector('.editor-main-panel');
+        if (!headerArea) return;
+        
+        indicator = document.createElement('div');
+        indicator.id = 'antigravity-save-indicator';
+        indicator.style.fontSize = '0.78rem';
+        indicator.style.color = '#5f6368';
+        indicator.style.marginBottom = '12px';
+        indicator.style.display = 'flex';
+        indicator.style.alignItems = 'center';
+        indicator.style.gap = '6px';
+        indicator.style.fontFamily = 'Inter, "Noto Sans JP", sans-serif';
+        indicator.style.transition = 'opacity 0.2s ease';
+        
+        headerArea.insertBefore(indicator, headerArea.firstChild);
+      }
+      
+      if (status === 'saving') {
+        indicator.innerHTML = '🔄 <span style="color: #7248b9; font-weight: 500;">変更を保存中...</span>';
+        indicator.style.opacity = '1';
+      } else if (status === 'saved') {
+        indicator.innerHTML = '☁️ <span style="color: #5f6368;">すべての変更を保存しました</span>';
+        indicator.style.opacity = '0.85';
+      }
+    } catch(e) {
+      console.error('[Save Indicator] Failed to update status:', e);
+    }
+  }
+
   // 起動時セーフガード: フラグのリセットおよび破損データの自動修復
   (function initSanitize() {
     try {
@@ -1369,6 +1413,11 @@
         setTimeout(() => {
           renderLivePreview();
           applyPreviewTheme();
+
+          // 保存ステータスインジケーターの初期表示
+          if (typeof updateSaveStatus === 'function') {
+            updateSaveStatus('saved');
+          }
 
           // 保存されたタブ表示状態があれば復元
           const savedTab = localStorage.getItem('form_customize_active_tab');
@@ -5339,6 +5388,10 @@
     }
 
     function saveAndSyncMindmapData() {
+      if (typeof updateSaveStatus === 'function') {
+        updateSaveStatus('saving');
+      }
+
       const activeIndex = localStorage.getItem('form_customize_active_index') || '0';
       const isTemplateMode = localStorage.getItem('form_customize_is_template_mode') === 'true';
       const storageKey = isTemplateMode ? 'form_customize_templates' : 'form_customize_all_forms';
@@ -5393,7 +5446,14 @@
       if (window.F) {
         window.F(window.G);
       }
+
+      setTimeout(() => {
+        if (typeof updateSaveStatus === 'function') {
+          updateSaveStatus('saved');
+        }
+      }, 300);
     }
+    window.saveAndSyncMindmapData = saveAndSyncMindmapData; // 🚀 グローバルプロキシへの登録
 
     function addMindmapNode(node) {
       if (!window.G) return;
