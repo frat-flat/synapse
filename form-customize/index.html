@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v3.js?v=2.2.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
-    <link rel="stylesheet" href="./assets/custom-editor-v77.css?v=8.0.0">
-    <script src="./assets/custom-editor-v77.js?v=8.0.0" defer></script>
+    <link rel="stylesheet" href="./assets/custom-editor-v77.css?v=8.1.0">
+    <script src="./assets/custom-editor-v77.js?v=8.1.0" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -62,29 +62,15 @@
 
     <main class="app-content">
       <section id="panel-dashboard" class="tab-panel active">
-        <!-- 📁 Google Forms 風テンプレート選択バー -->
-        <div id="dashboard-template-bar" class="dashboard-template-bar-container">
-          <div class="dashboard-template-bar-content">
-            <div class="template-bar-header">
-              <span class="template-bar-title">新しいフォームを作成</span>
-              <button type="button" id="btn-open-full-gallery" class="btn-gallery-toggle">
-                テンプレート ギャラリー <span style="font-size: 0.85rem; margin-left: 2px;">↕</span>
-              </button>
-            </div>
-            <div class="template-cards-grid" id="template-bar-cards-grid">
-              <!-- JSで動的にカードが描画されます -->
-            </div>
-          </div>
-        </div>
-
         <div class="dashboard-container">
           <div class="dashboard-header-row">
             <div class="dashboard-title-area">
               <h2>フォーム一覧</h2>
               <p>作成済みのフォームを管理・編集します。</p>
             </div>
-            <div class="dashboard-header-buttons">
+            <div class="dashboard-header-buttons" style="display: flex; align-items: center; gap: 8px;">
               <button id="btn-dashboard-sample" style="display: none !important;"></button>
+              <button type="button" id="btn-dashboard-gallery" class="btn btn-secondary" style="border-radius: 4px; display: inline-flex; align-items: center; gap: 6px;">📋 テンプレート ギャラリー</button>
               <button id="btn-dashboard-create" class="btn btn-primary">＋ 新規フォーム作成</button>
             </div>
           </div>
@@ -139,27 +125,27 @@
         </div>
         
         <div class="gallery-body-content">
-          <!-- 最近使用したテンプレート -->
-          <div class="gallery-section">
-            <h4 class="gallery-section-title">最近使用したテンプレート</h4>
-            <div class="template-cards-grid" id="gallery-recent-grid">
-              <!-- JSで描画 -->
+          <!-- 🎛️ ギャラリー内切り替えタブ (最近使ったテンプレート vs お気に入り) -->
+          <div class="gallery-tabs-container">
+            <div class="gallery-tabs">
+              <button type="button" class="gallery-tab-item active" data-gallery-tab="recent">🕒 最近使ったテンプレート</button>
+              <button type="button" class="gallery-tab-item" data-gallery-tab="favorites">⭐ お気に入り・登録済み</button>
             </div>
           </div>
 
-          <!-- 個人用 -->
-          <div class="gallery-section">
-            <h4 class="gallery-section-title">個人用</h4>
-            <div class="template-cards-grid" id="gallery-personal-grid">
-              <!-- JSで描画 -->
+          <!-- 動的切り替えセクション (上部に並べるエリア) -->
+          <div class="gallery-section dynamic-section">
+            <h4 class="gallery-section-title" id="gallery-dynamic-section-title">最近使ったテンプレート</h4>
+            <div class="template-cards-grid" id="gallery-dynamic-grid">
+              <!-- JSで最近使ったもの、またはお気に入りが動的に描画されます -->
             </div>
           </div>
 
-          <!-- 仕事用 -->
+          <!-- デフォルトテンプレート一覧 (下部に並べるエリア) -->
           <div class="gallery-section">
-            <h4 class="gallery-section-title">仕事用</h4>
-            <div class="template-cards-grid" id="gallery-work-grid">
-              <!-- JSで描画 -->
+            <h4 class="gallery-section-title">すべてのテンプレート</h4>
+            <div class="template-cards-grid" id="gallery-all-grid">
+              <!-- デフォルトプリセットをブラウザサイズに合わせて綺麗に並べます -->
             </div>
           </div>
         </div>

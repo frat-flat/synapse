@@ -1615,3 +1615,85 @@ input:-webkit-autofill:active {
   color: #ffd700 !important;
 }
 
+/* 6. お気に入り・タブ切り替え用のCSS追加 */
+.gallery-tabs-container {
+  display: flex !important;
+  justify-content: center !important;
+  margin-bottom: 30px !important;
+  border-bottom: 1px solid #374151 !important;
+  padding-bottom: 15px !important;
+}
+
+.gallery-tabs {
+  display: flex !important;
+  gap: 12px !important;
+  background-color: #1f2937 !important;
+  padding: 4px !important;
+  border-radius: 8px !important;
+  border: 1px solid #374151 !important;
+}
+
+.gallery-tab-item {
+  background: transparent !important;
+  border: none !important;
+  color: #9ca3af !important;
+  padding: 8px 18px !important;
+  border-radius: 6px !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.gallery-tab-item:hover {
+  color: #ffffff !important;
+  background-color: rgba(255,255,255,0.05) !important;
+}
+
+.gallery-tab-item.active {
+  background-color: #374151 !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+}
+
+/* カード上のお気に入りスターボタン */
+.btn-template-fav {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid #dadce0 !important;
+  border-radius: 50% !important;
+  width: 26px !important;
+  height: 26px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  z-index: 10 !important;
+  font-size: 0.85rem !important;
+  color: #9ca3af !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+  padding: 0 !important;
+}
+
+.btn-template-fav:hover {
+  background: #ffffff !important;
+  transform: scale(1.1) !important;
+}
+
+.btn-template-fav.active {
+  color: #f39c12 !important; /* 金星 */
+  border-color: #f39c12 !important;
+  background: #fff8e7 !important;
+}
+
+/* 画面サイズに合わせて列数を自動調整するレスポンシブグリッド */
+.template-cards-grid {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+}
+
