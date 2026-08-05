@@ -1376,7 +1376,7 @@ input:-webkit-autofill:active {
   border-bottom: 1px solid #dadce0 !important;
   width: 100% !important;
   box-sizing: border-box !important;
-  padding: 18px 0 25px 0 !important;
+  padding: 2px 0 12px 0 !important; /* 上部パディングをさらに縮小 */
   margin-bottom: 20px !important;
 }
 
@@ -1384,7 +1384,7 @@ input:-webkit-autofill:active {
   width: 100% !important;
   max-width: none !important;
   margin: 0 !important;
-  padding: 0 16px !important;
+  padding: 0 !important; /* パディングを完全ゼロにしてギリギリまで左端に寄せる */
   box-sizing: border-box !important;
 }
 
@@ -1392,7 +1392,7 @@ input:-webkit-autofill:active {
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
-  margin-bottom: 15px !important;
+  margin-bottom: 8px !important; /* カードとの間の余白も縮小 */
 }
 
 .template-bar-title {
