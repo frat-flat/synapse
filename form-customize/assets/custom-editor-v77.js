@@ -5985,4 +5985,29 @@
       console.error("ImageLibrary init failed:", err);
     }
   });
+
+  // 🔍 デバッグ用グローバルエラーキャッチャー
+  window.addEventListener('error', (event) => {
+    console.error('[Global Debug Error]', event.error);
+    const debugDiv = document.getElementById('antigravity-debug-log') || (() => {
+      const div = document.createElement('div');
+      div.id = 'antigravity-debug-log';
+      div.style.position = 'fixed';
+      div.style.bottom = '10px';
+      div.style.left = '10px';
+      div.style.background = 'rgba(0,0,0,0.85)';
+      div.style.color = '#ff6b6b';
+      div.style.padding = '10px';
+      div.style.borderRadius = '4px';
+      div.style.fontSize = '0.75rem';
+      div.style.zIndex = '999999';
+      div.style.maxWidth = '400px';
+      div.style.maxHeight = '200px';
+      div.style.overflowY = 'auto';
+      div.style.fontFamily = 'monospace';
+      document.body.appendChild(div);
+      return div;
+    })();
+    debugDiv.innerHTML += `<div>⚠️ ${event.message} (${event.filename ? event.filename.split('/').pop() : 'unknown'}:${event.lineno})</div>`;
+  });
 })();
