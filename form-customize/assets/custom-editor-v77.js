@@ -78,6 +78,46 @@
       }
       return;
     }
+
+    // 3. ギャラリーから戻るボタンのフック
+    if (target && (target.id === 'btn-back-from-gallery' || target.closest('#btn-back-from-gallery'))) {
+      console.log('[Extension] Captured click on btn-back-from-gallery. Returning to dashboard...');
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      
+      const galleryPanel = document.getElementById('panel-template-gallery');
+      const dashboardPanel = document.getElementById('panel-dashboard');
+      if (galleryPanel && dashboardPanel) {
+        galleryPanel.classList.remove('active');
+        dashboardPanel.classList.add('active');
+        const homeTab = document.querySelector('.nav-tab[data-tab="dashboard"]');
+        if (homeTab) homeTab.classList.add('active');
+      }
+      return;
+    }
+
+    // 4. テンプレートバーからのギャラリー遷移ボタンのフック
+    if (target && (target.id === 'btn-open-full-gallery' || target.closest('#btn-open-full-gallery'))) {
+      console.log('[Extension] Captured click on btn-open-full-gallery. Opening gallery...');
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      
+      const galleryPanel = document.getElementById('panel-template-gallery');
+      if (galleryPanel) {
+        document.querySelectorAll('.tab-panel').forEach(panel => {
+          panel.classList.remove('active');
+        });
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+          tab.classList.remove('active');
+        });
+        
+        galleryPanel.classList.add('active');
+        renderFullTemplateGallery();
+      }
+      return;
+    }
   }, true); // キャプチャフェーズでフック！
 
   // ==========================================================================
@@ -573,7 +613,7 @@
     return card;
   }
 
-  // ダッシュボード上部のテンプレートバーの描画（復旧＆折りたたみ）
+  // ダッシュボード上部のテンプレートバーの描画（復旧＆折りたたみ＆トグル切り替え）
   function renderTemplateBar() {
     try {
       const container = document.getElementById('template-bar-cards-grid');
@@ -584,30 +624,42 @@
       // 先頭に「空白のフォーム」を追加
       container.appendChild(createTemplateCardElement(null, true));
       
-      // デフォルトおよび自作のテンプレートを取得してお気に入りのもの、または最近使ったものを優先して最大5件並べる
+      // お気に入りか最近かのモード判定
+      const mode = localStorage.getItem('form_customize_template_bar_mode') || 'recent';
+      
+      // フィルタボタンのアクティブ表示切替
+      const btnRecent = document.getElementById('tpl-bar-mode-recent');
+      const btnFav = document.getElementById('tpl-bar-mode-fav');
+      if (btnRecent && btnFav) {
+        if (mode === 'fav') {
+          btnRecent.classList.remove('active');
+          btnFav.classList.add('active');
+        } else {
+          btnRecent.classList.add('active');
+          btnFav.classList.remove('active');
+        }
+      }
+
       const templates = getTemplates();
-      
-      // お気に入りに指定されているテンプレートを優先的に抽出
-      const favTemplates = templates.filter(t => isFavorite(t.title));
-      
-      // 最近使ったテンプレートを取得
-      let recents = [];
-      try {
-        recents = JSON.parse(localStorage.getItem('form_customize_recent_templates') || '[]');
-      } catch(e) {}
-      
-      // 並べる対象を決定（お気に入りを優先、足りなければ最近使ったもの、さらに足りなければデフォルトを追加）
-      let displayTemplates = [...favTemplates];
-      recents.forEach(r => {
-        if (!displayTemplates.some(d => d.title === r.title)) {
-          displayTemplates.push(r);
-        }
-      });
-      templates.forEach(t => {
-        if (!displayTemplates.some(d => d.title === t.title)) {
-          displayTemplates.push(t);
-        }
-      });
+      let displayTemplates = [];
+
+      if (mode === 'fav') {
+        // お気に入り登録されているテンプレートのみ
+        displayTemplates = templates.filter(t => isFavorite(t.title));
+      } else {
+        // 最近使ったテンプレート優先
+        let recents = [];
+        try {
+          recents = JSON.parse(localStorage.getItem('form_customize_recent_templates') || '[]');
+        } catch(e) {}
+        
+        displayTemplates = [...recents];
+        templates.forEach(t => {
+          if (!displayTemplates.some(d => d.title === t.title)) {
+            displayTemplates.push(t);
+          }
+        });
+      }
       
       const showCount = Math.min(displayTemplates.length, 5);
       for (let i = 0; i < showCount; i++) {
@@ -634,7 +686,7 @@
         }
       }
       
-      console.log('[Templates] Rendered template bar. Count:', showCount + 1, 'Collapsed:', isCollapsed);
+      console.log('[Templates] Rendered template bar. Mode:', mode, 'Count:', showCount + 1, 'Collapsed:', isCollapsed);
     } catch(err) {
       console.error('[Templates] renderTemplateBar error:', err);
     }
@@ -646,6 +698,22 @@
       // イベントデリゲーションで縦三点と折りたたみアクションを強固に制御
       document.addEventListener('click', (e) => {
         const target = e.target;
+        
+        // フィルタトグル「最近使った」のクリック
+        if (target && (target.id === 'tpl-bar-mode-recent' || target.closest('#tpl-bar-mode-recent'))) {
+          e.stopPropagation();
+          localStorage.setItem('form_customize_template_bar_mode', 'recent');
+          renderTemplateBar();
+          return;
+        }
+        
+        // フィルタトグル「お気に入り」のクリック
+        if (target && (target.id === 'tpl-bar-mode-fav' || target.closest('#tpl-bar-mode-fav'))) {
+          e.stopPropagation();
+          localStorage.setItem('form_customize_template_bar_mode', 'fav');
+          renderTemplateBar();
+          return;
+        }
         
         // 縦三点オプションボタンのクリック
         if (target && (target.id === 'btn-template-bar-options' || target.closest('#btn-template-bar-options'))) {
@@ -690,23 +758,73 @@
       
       allGrid.innerHTML = '';
       
-      const templates = getTemplates();
+      // A. リスト/グリッド表示形式の同期
+      const viewMode = localStorage.getItem('form_customize_gallery_view_mode') || 'grid';
+      const viewIcon = document.getElementById('gallery-view-icon');
+      if (viewIcon) {
+        viewIcon.textContent = viewMode === 'list' ? '田' : '▤';
+        viewIcon.parentElement.title = viewMode === 'list' ? 'グリッド表示に切り替え' : 'リスト表示に切り替え';
+      }
       
-      // 過去に作ったテンプレート（またはお気に入り）をすべて描画
-      if (templates.length === 0) {
+      if (viewMode === 'list') {
+        allGrid.classList.add('list-view');
+      } else {
+        allGrid.classList.remove('list-view');
+      }
+
+      // B. 最近使った/お気に入りのタブ同期
+      const tabMode = localStorage.getItem('form_customize_gallery_tab_mode') || 'recent';
+      const tabs = document.querySelectorAll('.gallery-tab-item');
+      tabs.forEach(tab => {
+        if (tab.dataset.galleryTab === tabMode) {
+          tab.classList.add('active');
+          // インラインアクティブスタイル
+          tab.style.backgroundColor = '#ffffff';
+          tab.style.color = '#7248b9';
+          tab.style.boxShadow = '0 1px 3px rgba(0,0,0,0.12)';
+        } else {
+          tab.classList.remove('active');
+          tab.style.backgroundColor = 'transparent';
+          tab.style.color = '#5f6368';
+          tab.style.boxShadow = 'none';
+        }
+      });
+
+      const templates = getTemplates();
+      let displayTemplates = [];
+      
+      if (tabMode === 'favorites') {
+        displayTemplates = templates.filter(t => isFavorite(t.title));
+      } else {
+        // 最近使った順
+        let recents = [];
+        try {
+          recents = JSON.parse(localStorage.getItem('form_customize_recent_templates') || '[]');
+        } catch(e) {}
+        
+        displayTemplates = [...recents];
+        templates.forEach(t => {
+          if (!displayTemplates.some(d => d.title === t.title)) {
+            displayTemplates.push(t);
+          }
+        });
+      }
+      
+      // 描画処理
+      if (displayTemplates.length === 0) {
         allGrid.innerHTML = `
-          <div style="grid-column: 1 / -1; padding: 30px; text-align: center; color: #5f6368; font-size: 0.88rem; line-height: 1.6;">
-            過去に作成・登録されたテンプレートはありません。<br>
-            ダッシュボードのフォーム一覧の各行にある「⭐ テンプレート登録」をクリックして追加できます。
+          <div style="grid-column: 1 / -1; padding: 40px 20px; text-align: center; color: #5f6368; font-size: 0.88rem; line-height: 1.6; width: 100%;">
+            ${tabMode === 'favorites' ? 'お気に入り登録されているテンプレートはありません。' : 'テンプレートはありません。'}<br>
+            フォーム一覧の行にある「⭐ テンプレート登録」をクリックして作成したオリジナルテンプレートがここに表示されます。
           </div>
         `;
       } else {
-        templates.forEach(t => {
+        displayTemplates.forEach(t => {
           allGrid.appendChild(createTemplateCardElement(t));
         });
       }
       
-      console.log(`[Templates] Rendered full template gallery. Mode: unified, Total templates: ${templates.length}`);
+      console.log(`[Templates] Rendered full template gallery. TabMode: ${tabMode}, ViewMode: ${viewMode}, Count: ${displayTemplates.length}`);
     } catch(err) {
       console.error('[Templates] renderFullTemplateGallery error:', err);
     }
@@ -728,10 +846,35 @@
         });
       }
 
+      // 表示切り替えボタン（リスト/グリッド）のハンドリング
+      const toggleViewBtn = document.getElementById('btn-toggle-gallery-view');
+      if (toggleViewBtn) {
+        const newToggleBtn = toggleViewBtn.cloneNode(true);
+        toggleViewBtn.parentNode.replaceChild(newToggleBtn, toggleViewBtn);
+        newToggleBtn.addEventListener('click', () => {
+          const currentMode = localStorage.getItem('form_customize_gallery_view_mode') || 'grid';
+          const nextMode = currentMode === 'grid' ? 'list' : 'grid';
+          localStorage.setItem('form_customize_gallery_view_mode', nextMode);
+          renderFullTemplateGallery();
+        });
+      }
+
+      // お気に入り/最近切り替えタブのハンドリング
+      const tabs = document.querySelectorAll('.gallery-tab-item');
+      tabs.forEach(tab => {
+        const newTab = tab.cloneNode(true);
+        tab.parentNode.replaceChild(newTab, tab);
+        newTab.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const targetTabMode = newTab.dataset.galleryTab;
+          localStorage.setItem('form_customize_gallery_tab_mode', targetTabMode);
+          renderFullTemplateGallery();
+        });
+      });
+
       // 「空白のテンプレートを追加」プラスカードのイベントハンドラ
       const createTplCard = document.getElementById('btn-create-new-template-card');
       if (createTplCard) {
-        // 重複防止のため一度クリアして再登録
         const newCard = createTplCard.cloneNode(true);
         createTplCard.parentNode.replaceChild(newCard, createTplCard);
         

@@ -1421,9 +1421,94 @@ input:-webkit-autofill:active {
 /* 2. テンプレートカードグリッド */
 .template-cards-grid {
   display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
   gap: 20px !important;
   margin-top: 10px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* テンプレートのリスト表示 (1行ずつ並ぶスタイル) */
+.template-cards-grid.list-view {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+.template-cards-grid.list-view .template-card {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  background-color: #ffffff !important;
+  border: 1px solid #dadce0 !important;
+  border-radius: 6px !important;
+  padding: 10px 16px !important;
+  box-shadow: 0 1px 2px 0 rgba(60,64,67,0.05) !important;
+}
+.template-cards-grid.list-view .template-card:hover {
+  transform: none !important;
+  border-color: #7248b9 !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+}
+.template-cards-grid.list-view .template-card-preview {
+  width: 50px !important;
+  height: 36px !important;
+  aspect-ratio: auto !important;
+  padding: 2px !important;
+  flex-shrink: 0 !important;
+  box-shadow: none !important;
+}
+/* リストビュー内の非表示調整 */
+.template-cards-grid.list-view .template-card-preview .template-card-dummy-field,
+.template-cards-grid.list-view .template-card-preview .template-card-dummy-line {
+  display: none !important;
+}
+.template-cards-grid.list-view .template-card-preview .template-card-dummy-title {
+  width: 80% !important;
+  margin: 2px auto !important;
+}
+.template-cards-grid.list-view .template-card-title {
+  margin-top: 0 !important;
+  margin-left: 12px !important;
+  font-size: 0.88rem !important;
+  font-weight: 500 !important;
+  flex-grow: 1 !important;
+  text-align: left !important;
+}
+.template-cards-grid.list-view .template-card-category {
+  margin-top: 0 !important;
+  margin-left: 12px !important;
+  font-size: 0.78rem !important;
+  color: #5f6368 !important;
+  flex-shrink: 0 !important;
+}
+.template-cards-grid.list-view .btn-template-fav {
+  position: static !important;
+  margin-left: 12px !important;
+  flex-shrink: 0 !important;
+}
+
+/* 常設テンプレートバーのフィルタトグルボタン */
+.tpl-bar-filter-btn {
+  color: #5f6368 !important;
+  font-size: 0.78rem !important;
+  padding: 2px 8px !important;
+  border-radius: 3px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  user-select: none !important;
+}
+.tpl-bar-filter-btn:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+  color: #202124 !important;
+}
+.tpl-bar-filter-btn.active {
+  background-color: #ffffff !important;
+  color: #7248b9 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
 }
 
 /* 3. テンプレートカード本体 */
