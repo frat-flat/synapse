@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v3.js?v=2.2.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
-    <link rel="stylesheet" href="./assets/custom-editor-v77.css?v=8.2.0">
-    <script src="./assets/custom-editor-v77.js?v=8.2.0" defer></script>
+    <link rel="stylesheet" href="./assets/custom-editor-v77.css?v=8.3.0">
+    <script src="./assets/custom-editor-v77.js?v=8.3.0" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -62,6 +62,36 @@
 
     <main class="app-content">
       <section id="panel-dashboard" class="tab-panel active">
+        <!-- 📁 常設テンプレート選択バー (折りたたみ対応) -->
+        <div id="dashboard-template-bar" class="dashboard-template-bar-container">
+          <!-- A. 通常展開時のコンテンツ -->
+          <div class="dashboard-template-bar-content" id="template-bar-expanded">
+            <div class="template-bar-header">
+              <span class="template-bar-title">新しいフォームを作成</span>
+              <div class="template-bar-header-right" style="display: flex; align-items: center; gap: 12px;">
+                <button type="button" id="btn-open-full-gallery" class="btn-gallery-toggle">
+                  テンプレート ギャラリー <span style="font-size: 0.85rem; margin-left: 2px;">↕</span>
+                </button>
+                <div class="template-bar-option-menu" style="position: relative;">
+                  <button type="button" id="btn-template-bar-options" class="btn-template-options" title="オプション">⋮</button>
+                  <div class="template-options-dropdown" id="template-options-dropdown">
+                    <div class="template-options-item" id="opt-hide-templates">📋 テンプレートを非表示にする</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="template-cards-grid" id="template-bar-cards-grid">
+              <!-- JSで動的にカードが描画されます -->
+            </div>
+          </div>
+
+          <!-- B. 折りたたみ（片付けられた）状態時のコンテンツ -->
+          <div class="dashboard-template-bar-content-collapsed" id="template-bar-collapsed" style="display: none;">
+            <span>テンプレートは非表示になっています</span>
+            <button type="button" id="btn-show-templates" class="btn-show-templates-link">テンプレートを表示する</button>
+          </div>
+        </div>
+
         <div class="dashboard-container">
           <div class="dashboard-header-row">
             <div class="dashboard-title-area">
@@ -114,38 +144,38 @@
       </section>
 
       <!-- 📁 フルスクリーンテンプレートギャラリー画面 (Google Forms風) -->
-      <section id="panel-template-gallery" class="tab-panel" style="background: var(--color-bg, #0b111e); min-height: 100vh;">
-        <div class="gallery-header-bar">
+      <section id="panel-template-gallery" class="tab-panel" style="background: #ffffff; min-height: 100vh; color: #202124;">
+        <div class="gallery-header-bar" style="background: #ffffff; border-bottom: 1px solid #dadce0;">
           <div class="gallery-header-left">
-            <button type="button" id="btn-back-from-gallery" class="btn-gallery-back" title="戻る">
+            <button type="button" id="btn-back-from-gallery" class="btn-gallery-back" title="戻る" style="color: #5f6368;">
               <span style="font-size: 1.25rem;">←</span>
             </button>
-            <span class="gallery-header-title">テンプレート ギャラリー</span>
+            <span class="gallery-header-title" style="color: #202124;">テンプレート ギャラリー</span>
           </div>
         </div>
         
-        <div class="gallery-body-content">
-          <!-- 🎛️ ギャラリー内切り替えタブ (最近使ったテンプレート vs お気に入り) -->
-          <div class="gallery-tabs-container">
-            <div class="gallery-tabs">
-              <button type="button" class="gallery-tab-item active" data-gallery-tab="recent">🕒 最近使ったテンプレート</button>
-              <button type="button" class="gallery-tab-item" data-gallery-tab="favorites">⭐ お気に入り・登録済み</button>
-            </div>
-          </div>
-
-          <!-- 動的切り替えセクション (上部に並べるエリア) -->
-          <div class="gallery-section dynamic-section">
-            <h4 class="gallery-section-title" id="gallery-dynamic-section-title">最近使ったテンプレート</h4>
-            <div class="template-cards-grid" id="gallery-dynamic-grid">
-              <!-- JSで最近使ったもの、またはお気に入りが動的に描画されます -->
-            </div>
-          </div>
-
-          <!-- デフォルトテンプレート一覧 (下部に並べるエリア) -->
+        <div class="gallery-body-content" style="max-width: 960px; margin: 0 auto; padding: 30px 24px;">
+          <!-- 1. 新しくテンプレートを新規作成するセクション -->
           <div class="gallery-section">
-            <h4 class="gallery-section-title">すべてのテンプレート</h4>
+            <h4 class="gallery-section-title" style="color: #5f6368; border-bottom: 1px solid #dadce0;">新しいテンプレートの作成</h4>
+            <div class="template-cards-grid">
+              <!-- 大きなプラスボタンカード -->
+              <div class="template-card" id="btn-create-new-template-card" style="cursor: pointer;">
+                <div class="template-card-preview" style="border: 1px dashed #7248b9; background: #f8fafc; height: 120px; display: flex; align-items: center; justify-content: center; border-radius: 4px;">
+                  <div class="template-card-blank-inner" style="display: flex; align-items: center; justify-content: center;">
+                    <span class="template-card-plus-icon" style="color: #7248b9; font-size: 2.5rem; font-weight: 300;">+</span>
+                  </div>
+                </div>
+                <span class="template-card-title" style="font-weight: 600; color: #202124; text-align: center; display: block; margin-top: 8px; font-size: 0.85rem;">空白のテンプレートを追加</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. 過去に作ったテンプレート（およびデフォルト一覧） -->
+          <div class="gallery-section" style="margin-top: 40px;">
+            <h4 class="gallery-section-title" style="color: #5f6368; border-bottom: 1px solid #dadce0;">過去に作ったテンプレート・一覧</h4>
             <div class="template-cards-grid" id="gallery-all-grid">
-              <!-- デフォルトプリセットをブラウザサイズに合わせて綺麗に並べます -->
+              <!-- JSで動的にすべてのテンプレートをグリッド描画 -->
             </div>
           </div>
         </div>

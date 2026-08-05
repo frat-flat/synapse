@@ -573,111 +573,203 @@
     return card;
   }
 
-  // 常設テンプレートバーは不要になったため空関数化してエラーを防止
+  // ダッシュボード上部のテンプレートバーの描画（復旧＆折りたたみ）
   function renderTemplateBar() {
-    // No-op
-  }
-
-  // フルスクリーンテンプレートギャラリー画面の描画 (タブ切り替え & お気に入り対応)
-  function renderFullTemplateGallery() {
     try {
-      const dynamicGrid = document.getElementById('gallery-dynamic-grid');
-      const dynamicTitle = document.getElementById('gallery-dynamic-section-title');
-      const allGrid = document.getElementById('gallery-all-grid');
+      const container = document.getElementById('template-bar-cards-grid');
+      if (!container) return;
       
+      container.innerHTML = '';
+      
+      // 先頭に「空白のフォーム」を追加
+      container.appendChild(createTemplateCardElement(null, true));
+      
+      // デフォルトおよび自作のテンプレートを取得してお気に入りのもの、または最近使ったものを優先して最大5件並べる
       const templates = getTemplates();
       
-      // 1. アクティブなタブの判定
-      const activeTab = document.querySelector('.gallery-tab-item.active');
-      const mode = activeTab ? activeTab.dataset.galleryTab : 'recent';
+      // お気に入りに指定されているテンプレートを優先的に抽出
+      const favTemplates = templates.filter(t => isFavorite(t.title));
       
-      if (dynamicGrid && dynamicTitle) {
-        dynamicGrid.innerHTML = '';
-        
-        if (mode === 'recent') {
-          dynamicTitle.textContent = '🕒 最近使ったテンプレート';
-          
-          let recents = [];
-          try {
-            recents = JSON.parse(localStorage.getItem('form_customize_recent_templates') || '[]');
-          } catch(e) {}
-          
-          if (recents.length === 0) {
-            dynamicGrid.appendChild(createTemplateCardElement(null, true));
-            if (templates[0]) dynamicGrid.appendChild(createTemplateCardElement(templates[0]));
-          } else {
-            recents.forEach(t => {
-              dynamicGrid.appendChild(createTemplateCardElement(t));
-            });
-          }
-        } else if (mode === 'favorites') {
-          dynamicTitle.textContent = '⭐ お気に入り・登録済み';
-          
-          const favorites = templates.filter(t => isFavorite(t.title));
-          if (favorites.length === 0) {
-            dynamicGrid.innerHTML = `
-              <div style="grid-column: 1 / -1; padding: 20px; text-align: center; color: #9ca3af; font-size: 0.85rem;">
-                お気に入り登録されているテンプレートはまだありません。<br>
-                各テンプレートカードの右上にある星マーク（☆）をクリックしてお気に入りに追加するか、作成済みのフォーム行からテンプレート登録してください。
-              </div>
-            `;
-          } else {
-            favorites.forEach(t => {
-              dynamicGrid.appendChild(createTemplateCardElement(t));
-            });
-          }
+      // 最近使ったテンプレートを取得
+      let recents = [];
+      try {
+        recents = JSON.parse(localStorage.getItem('form_customize_recent_templates') || '[]');
+      } catch(e) {}
+      
+      // 並べる対象を決定（お気に入りを優先、足りなければ最近使ったもの、さらに足りなければデフォルトを追加）
+      let displayTemplates = [...favTemplates];
+      recents.forEach(r => {
+        if (!displayTemplates.some(d => d.title === r.title)) {
+          displayTemplates.push(r);
+        }
+      });
+      templates.forEach(t => {
+        if (!displayTemplates.some(d => d.title === t.title)) {
+          displayTemplates.push(t);
+        }
+      });
+      
+      const showCount = Math.min(displayTemplates.length, 5);
+      for (let i = 0; i < showCount; i++) {
+        container.appendChild(createTemplateCardElement(displayTemplates[i]));
+      }
+      
+      // 折りたたみトグル状態の初期化
+      const isCollapsed = localStorage.getItem('form_customize_template_bar_collapsed') === 'true';
+      const expandedView = document.getElementById('template-bar-expanded');
+      const collapsedView = document.getElementById('template-bar-collapsed');
+      const barContainer = document.getElementById('dashboard-template-bar');
+      
+      if (barContainer && expandedView && collapsedView) {
+        if (isCollapsed) {
+          expandedView.style.display = 'none';
+          collapsedView.style.display = 'flex';
+          barContainer.style.padding = '8px 0';
+          barContainer.style.marginBottom = '10px';
+        } else {
+          expandedView.style.display = 'block';
+          collapsedView.style.display = 'none';
+          barContainer.style.padding = '18px 0 25px 0';
+          barContainer.style.marginBottom = '20px';
         }
       }
       
-      // 2. 下部の「すべてのテンプレート」をグリッド描画
-      if (allGrid) {
-        allGrid.innerHTML = '';
+      console.log('[Templates] Rendered template bar. Count:', showCount + 1, 'Collapsed:', isCollapsed);
+    } catch(err) {
+      console.error('[Templates] renderTemplateBar error:', err);
+    }
+  }
+
+  // テンプレートバーの折りたたみトグル制御
+  function setupTemplateBarToggleListeners() {
+    try {
+      // イベントデリゲーションで縦三点と折りたたみアクションを強固に制御
+      document.addEventListener('click', (e) => {
+        const target = e.target;
         
-        // まず「空白のフォーム」を追加
-        allGrid.appendChild(createTemplateCardElement(null, true));
+        // 縦三点オプションボタンのクリック
+        if (target && (target.id === 'btn-template-bar-options' || target.closest('#btn-template-bar-options'))) {
+          e.stopPropagation();
+          const dropdown = document.getElementById('template-options-dropdown');
+          if (dropdown) dropdown.classList.toggle('active');
+          return;
+        }
         
-        // デフォルトと追加済みのテンプレートをすべて描画
+        // 「非表示にする」オプションのクリック
+        if (target && (target.id === 'opt-hide-templates' || target.closest('#opt-hide-templates'))) {
+          e.stopPropagation();
+          localStorage.setItem('form_customize_template_bar_collapsed', 'true');
+          renderTemplateBar();
+          const dropdown = document.getElementById('template-options-dropdown');
+          if (dropdown) dropdown.classList.remove('active');
+          return;
+        }
+        
+        // 「テンプレートを表示する」リンクのクリック
+        if (target && (target.id === 'btn-show-templates' || target.closest('#btn-show-templates'))) {
+          e.stopPropagation();
+          localStorage.setItem('form_customize_template_bar_collapsed', 'false');
+          renderTemplateBar();
+          return;
+        }
+        
+        // メメニュー外クリック時にドロップダウンを閉じる
+        const dropdown = document.getElementById('template-options-dropdown');
+        if (dropdown) dropdown.classList.remove('active');
+      });
+    } catch(err) {
+      console.error('[Templates] setupTemplateBarToggleListeners error:', err);
+    }
+  }
+
+  // フルスクリーンテンプレートギャラリー画面の描画
+  function renderFullTemplateGallery() {
+    try {
+      const allGrid = document.getElementById('gallery-all-grid');
+      if (!allGrid) return;
+      
+      allGrid.innerHTML = '';
+      
+      const templates = getTemplates();
+      
+      // 過去に作ったテンプレート（またはお気に入り）をすべて描画
+      if (templates.length === 0) {
+        allGrid.innerHTML = `
+          <div style="grid-column: 1 / -1; padding: 30px; text-align: center; color: #5f6368; font-size: 0.88rem; line-height: 1.6;">
+            過去に作成・登録されたテンプレートはありません。<br>
+            ダッシュボードのフォーム一覧の各行にある「⭐ テンプレート登録」をクリックして追加できます。
+          </div>
+        `;
+      } else {
         templates.forEach(t => {
           allGrid.appendChild(createTemplateCardElement(t));
         });
       }
       
-      console.log(`[Templates] Rendered full template gallery. Mode: ${mode}, Total templates: ${templates.length}`);
+      console.log(`[Templates] Rendered full template gallery. Mode: unified, Total templates: ${templates.length}`);
     } catch(err) {
       console.error('[Templates] renderFullTemplateGallery error:', err);
     }
   }
 
-  // ギャラリーとダッシュボードの画面遷移イベントリスナー (新設ボタン対応)
+  // ギャラリーとダッシュボードの画面遷移イベントリスナー
   function setupTemplateGalleryListeners() {
     try {
-      const openBtn = document.getElementById('btn-dashboard-gallery'); // 新設したボタン
       const backBtn = document.getElementById('btn-back-from-gallery');
       const dashboardPanel = document.getElementById('panel-dashboard');
       const galleryPanel = document.getElementById('panel-template-gallery');
       
-      // (開く処理はグローバルデリゲーションで処理されるため、ここでは戻るボタンとタブのバインドのみ行います)
       if (backBtn && dashboardPanel && galleryPanel) {
         backBtn.addEventListener('click', () => {
           galleryPanel.classList.remove('active');
-          
           dashboardPanel.classList.add('active');
           const homeTab = document.querySelector('.nav-tab[data-tab="dashboard"]');
           if (homeTab) homeTab.classList.add('active');
-          
-          console.log('[Templates] Navigation: gallery -> dashboard');
         });
       }
 
-      // タブ切り替えリスナーのバインド
-      const tabs = document.querySelectorAll('.gallery-tab-item');
-      tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          tabs.forEach(t => t.classList.remove('active'));
-          tab.classList.add('active');
-          renderFullTemplateGallery();
+      // 「空白のテンプレートを追加」プラスカードのイベントハンドラ
+      const createTplCard = document.getElementById('btn-create-new-template-card');
+      if (createTplCard) {
+        // 重複防止のため一度クリアして再登録
+        const newCard = createTplCard.cloneNode(true);
+        createTplCard.parentNode.replaceChild(newCard, createTplCard);
+        
+        newCard.addEventListener('click', () => {
+          console.log('[Templates] Plus card clicked. Creating new custom template...');
+          try {
+            const templates = getTemplates();
+            const newTpl = {
+              title: `新規テンプレート (${templates.length + 1})`,
+              description: 'テンプレートの説明を入力してください。',
+              category: 'personal',
+              stripeColor: '#7248b9',
+              sections: [
+                {
+                  id: 'section_1',
+                  title: '無題のセクション',
+                  description: 'セクションの説明をご入力ください。',
+                  questions: []
+                }
+              ]
+            };
+            templates.push(newTpl);
+            saveTemplates(templates);
+            
+            // 自動的にお気に入り登録（スター付き）
+            let favs = getFavorites();
+            if (!favs.includes(newTpl.title)) {
+              favs.push(newTpl.title);
+              saveFavorites(favs);
+            }
+            
+            // そのテンプレート構成で新規フォームを作成しエディタへ遷移
+            createFormFromTemplate(newTpl);
+          } catch(e) {
+            console.error('[Templates] Failed to create custom template:', e);
+          }
         });
-      });
+      }
     } catch(err) {
       console.error('[Templates] setupTemplateGalleryListeners error:', err);
     }

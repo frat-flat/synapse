@@ -1535,8 +1535,8 @@ input:-webkit-autofill:active {
   justify-content: space-between !important;
   align-items: center !important;
   padding: 16px 24px !important;
-  border-bottom: 1px solid #374151 !important; /* ダークテーマ用境界 */
-  background-color: #111827 !important;
+  border-bottom: 1px solid #dadce0 !important; /* ライトテーマ用境界 */
+  background-color: #ffffff !important;
   position: sticky !important;
   top: 0 !important;
   z-index: 100 !important;
@@ -1551,7 +1551,7 @@ input:-webkit-autofill:active {
 .btn-gallery-back {
   background: transparent !important;
   border: none !important;
-  color: #e5e7eb !important;
+  color: #5f6368 !important;
   cursor: pointer !important;
   padding: 8px !important;
   border-radius: 50% !important;
@@ -1562,13 +1562,13 @@ input:-webkit-autofill:active {
 }
 
 .btn-gallery-back:hover {
-  background-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: rgba(0, 0, 0, 0.05) !important;
 }
 
 .gallery-header-title {
   font-size: 1.1rem !important;
   font-weight: 600 !important;
-  color: #f3f4f6 !important;
+  color: #202124 !important;
   font-family: 'Inter', 'Noto Sans JP', sans-serif !important;
 }
 
@@ -1585,8 +1585,8 @@ input:-webkit-autofill:active {
 .gallery-section-title {
   font-size: 0.92rem !important;
   font-weight: 600 !important;
-  color: #9ca3af !important;
-  border-bottom: 1px solid #374151 !important;
+  color: #5f6368 !important;
+  border-bottom: 1px solid #dadce0 !important;
   padding-bottom: 8px !important;
   margin-bottom: 15px !important;
   text-transform: uppercase !important;
@@ -1620,23 +1620,23 @@ input:-webkit-autofill:active {
   display: flex !important;
   justify-content: center !important;
   margin-bottom: 30px !important;
-  border-bottom: 1px solid #374151 !important;
+  border-bottom: 1px solid #dadce0 !important;
   padding-bottom: 15px !important;
 }
 
 .gallery-tabs {
   display: flex !important;
   gap: 12px !important;
-  background-color: #1f2937 !important;
+  background-color: #f1f3f4 !important;
   padding: 4px !important;
   border-radius: 8px !important;
-  border: 1px solid #374151 !important;
+  border: 1px solid #dadce0 !important;
 }
 
 .gallery-tab-item {
   background: transparent !important;
   border: none !important;
-  color: #9ca3af !important;
+  color: #5f6368 !important;
   padding: 8px 18px !important;
   border-radius: 6px !important;
   font-size: 0.85rem !important;
@@ -1649,14 +1649,14 @@ input:-webkit-autofill:active {
 }
 
 .gallery-tab-item:hover {
-  color: #ffffff !important;
-  background-color: rgba(255,255,255,0.05) !important;
+  color: #202124 !important;
+  background-color: rgba(0, 0, 0, 0.03) !important;
 }
 
 .gallery-tab-item.active {
-  background-color: #374151 !important;
-  color: #ffffff !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+  background-color: #ffffff !important;
+  color: #7248b9 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
 }
 
 /* カード上のお気に入りスターボタン */
