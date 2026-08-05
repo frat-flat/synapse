@@ -1056,6 +1056,43 @@
     });
   }
 
+  // カスタムトースト表示関数 (未定義エラー解消 & UX向上)
+  function showCustomToast(message, type = 'success') {
+    console.log('[Toast]', message, type);
+    const toast = document.createElement('div');
+    toast.className = `custom-toast toast-${type}`;
+    toast.style.position = 'fixed';
+    toast.style.bottom = '20px';
+    toast.style.right = '20px';
+    toast.style.background = type === 'success' ? '#1e8e3e' : '#d93025';
+    toast.style.color = '#ffffff';
+    toast.style.padding = '12px 24px';
+    toast.style.borderRadius = '4px';
+    toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+    toast.style.zIndex = '999999';
+    toast.style.fontFamily = 'sans-serif';
+    toast.style.fontSize = '0.9rem';
+    toast.style.fontWeight = '500';
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s ease';
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    // フェードイン
+    setTimeout(() => {
+      toast.style.opacity = '1';
+    }, 50);
+    
+    // フェードアウトと削除
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => {
+        toast.remove();
+      }, 300);
+    }, 3000);
+  }
+
   // フォーム自前削除ロジック
   function deleteFormSelf(titleText) {
     let allForms = [];
