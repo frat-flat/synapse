@@ -1846,6 +1846,8 @@
 
   // ページ起動時ロード処理の末尾でフックを起動
   setTimeout(() => {
+    // テンプレートモードフラグを強制解除し、通常フォーム一覧が正常に表示されるようにする
+    localStorage.setItem('form_customize_is_template_mode', 'false');
     setupDashboardGlobalListeners();
     startDashboardHookLoop();
   }, 100);
