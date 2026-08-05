@@ -1,5 +1,6 @@
 
 (function() {
+  alert('[Debug] custom-editor-v77.js has loaded successfully. Version: 7.7.3');
   console.log('custom-editor.js loading...');
 
   // localStorage の読み書きをインターセプト（テンプレート編集モード対応）
@@ -2370,19 +2371,61 @@
   function openTemplateGallery() {
     console.log('[Dashboard Hook] openTemplateGallery called.');
     try {
-      const modal = document.getElementById('template-gallery-modal');
-      if (modal) {
-        renderTemplateGallery();
-        modal.style.display = 'flex';
-        console.log('[Dashboard Hook] Modal displayed successfully.');
-      } else {
-        console.error('[Dashboard Hook] template-gallery-modal element not found.');
-        alert('エラー: テンプレートギャラリーのモーダル要素が見つかりません。');
+      let modal = document.getElementById('template-gallery-modal');
+      if (!modal) {
+        console.warn('[Dashboard Hook] template-gallery-modal not found. Creating dynamically...');
+        modal = createDynamicTemplateGalleryModal();
       }
+      
+      renderTemplateGallery();
+      modal.style.display = 'flex';
+      console.log('[Dashboard Hook] Modal displayed successfully.');
     } catch (e) {
       console.error('[Dashboard Hook] Error opening template gallery:', e);
       alert('テンプレートギャラリーを開く際にエラーが発生しました:\n' + e.message + '\n' + e.stack);
     }
+  }
+  window.openTemplateGallery = openTemplateGallery;
+
+  // モーダルがDOMに存在しない場合に動的に生成する関数
+  function createDynamicTemplateGalleryModal() {
+    const modal = document.createElement('div');
+    modal.id = 'template-gallery-modal';
+    modal.className = 'custom-modal-backdrop';
+    modal.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 20000; align-items: center; justify-content: center;';
+    
+    modal.innerHTML = `
+      <div class="custom-modal-content" style="background: var(--color-bg-card, #151d30); border: 1px solid var(--color-border, #223049); border-radius: 12px; width: 90%; max-width: 800px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); overflow: hidden;">
+        <div class="custom-modal-header" style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--color-border, #223049); display: flex; justify-content: space-between; align-items: center; background: var(--color-bg-sidebar, #0f1626);">
+          <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--color-text, #fff); display: flex; align-items: center; gap: 0.5rem;">📁 テンプレートギャラリー</h3>
+          <button id="btn-close-template-gallery" style="background: transparent; border: none; color: var(--color-text-muted, #94a3b8); font-size: 1.5rem; cursor: pointer; line-height: 1;">&times;</button>
+        </div>
+        <div class="custom-modal-body" style="padding: 1.5rem; overflow-y: auto; flex: 1;">
+          <p style="margin: 0 0 1.25rem 0; font-size: 0.85rem; color: var(--color-text-muted, #94a3b8);">使用したいテンプレートを選択して「＋ フォーム作成」をクリックしてください。マスタ自体を編集することも可能です。</p>
+          <div id="template-gallery-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
+            <!-- 動的ロード -->
+          </div>
+        </div>
+        <div class="custom-modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid var(--color-border, #223049); display: flex; justify-content: flex-end; background: var(--color-bg-sidebar, #0f1626);">
+          <button class="btn btn-secondary btn-close-template-gallery-footer" style="font-size: 0.85rem; padding: 6px 16px;">閉じる</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // 閉じるイベントのバインド
+    const closeBtn = modal.querySelector('#btn-close-template-gallery');
+    const footerCloseBtn = modal.querySelector('.btn-close-template-gallery-footer');
+    
+    const close = () => { modal.style.display = 'none'; };
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    if (footerCloseBtn) footerCloseBtn.addEventListener('click', close);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) close();
+    });
+    
+    return modal;
   }
   window.openTemplateGallery = openTemplateGallery;
 
