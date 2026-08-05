@@ -1849,7 +1849,20 @@
           badge.appendChild(titleSpan);
           console.log(`[Extension] Title display mounted successfully (dropdown removed).`);
         } else {
+          // 非表示の場合であっても、元のシステムJSによる TypeError（querySelector('span') や querySelector('.lock-badge') が null になることによるクラッシュ）を完全に防ぐため、
+          // 必要な子要素をあらかじめ生成してアペンドしておく
           badge.style.display = 'none';
+          badge.innerHTML = '';
+          
+          const titleSpan = document.createElement('span');
+          titleSpan.textContent = title;
+          badge.appendChild(titleSpan);
+          
+          const lockSpan = document.createElement('span');
+          lockSpan.className = 'lock-badge';
+          lockSpan.textContent = '🔒';
+          lockSpan.style.display = 'none';
+          badge.appendChild(lockSpan);
         }
       }
     } catch (err) {
