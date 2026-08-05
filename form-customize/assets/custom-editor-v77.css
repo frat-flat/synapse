@@ -1381,9 +1381,10 @@ input:-webkit-autofill:active {
 }
 
 .dashboard-template-bar-content {
-  max-width: 1200px !important;
-  margin: 0 auto !important;
-  padding: 0 24px !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 16px !important;
   box-sizing: border-box !important;
 }
 

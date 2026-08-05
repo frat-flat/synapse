@@ -118,6 +118,103 @@
       }
       return;
     }
+
+    // 5. 常設バーの「最近使った」トグルのフック
+    if (target && (target.id === 'tpl-bar-mode-recent' || target.closest('#tpl-bar-mode-recent'))) {
+      console.log('[Extension] Captured click on tpl-bar-mode-recent.');
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      localStorage.setItem('form_customize_template_bar_mode', 'recent');
+      renderTemplateBar();
+      return;
+    }
+
+    // 6. 常設バーの「お気に入り」トグルのフック
+    if (target && (target.id === 'tpl-bar-mode-fav' || target.closest('#tpl-bar-mode-fav'))) {
+      console.log('[Extension] Captured click on tpl-bar-mode-fav.');
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      localStorage.setItem('form_customize_template_bar_mode', 'fav');
+      renderTemplateBar();
+      return;
+    }
+
+    // 7. ギャラリー画面内の「最近使った」トグルのフック
+    if (target && (target.id === 'gallery-tab-mode-recent' || target.closest('#gallery-tab-mode-recent'))) {
+      console.log('[Extension] Captured click on gallery-tab-mode-recent.');
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      localStorage.setItem('form_customize_gallery_tab_mode', 'recent');
+      renderFullTemplateGallery();
+      return;
+    }
+
+    // 8. ギャラリー画面内の「お気に入り」トグルのフック
+    if (target && (target.id === 'gallery-tab-mode-fav' || target.closest('#gallery-tab-mode-fav'))) {
+      console.log('[Extension] Captured click on gallery-tab-mode-fav.');
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      localStorage.setItem('form_customize_gallery_tab_mode', 'favorites');
+      renderFullTemplateGallery();
+      return;
+    }
+
+    // 9. ギャラリー画面内の表示形式（リスト/グリッド）切り替えボタンのフック
+    if (target && (target.id === 'btn-toggle-gallery-view' || target.closest('#btn-toggle-gallery-view'))) {
+      console.log('[Extension] Captured click on btn-toggle-gallery-view.');
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      const currentMode = localStorage.getItem('form_customize_gallery_view_mode') || 'grid';
+      const nextMode = currentMode === 'grid' ? 'list' : 'grid';
+      localStorage.setItem('form_customize_gallery_view_mode', nextMode);
+      renderFullTemplateGallery();
+      return;
+    }
+
+    // 10. ギャラリー画面内の「空白のテンプレートを追加」プラスカードのフック (起動不具合解消)
+    if (target && (target.id === 'btn-create-new-template-card' || target.closest('#btn-create-new-template-card'))) {
+      console.log('[Extension] Captured click on btn-create-new-template-card. Creating new custom template...');
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      try {
+        const templates = getTemplates();
+        const newTpl = {
+          title: `新規テンプレート (${templates.length + 1})`,
+          description: 'テンプレートの説明を入力してください。',
+          category: 'personal',
+          stripeColor: '#7248b9',
+          sections: [
+            {
+              id: 'section_1',
+              title: '無題のセクション',
+              description: 'セクションの説明をご入力ください。',
+              questions: []
+            }
+          ]
+        };
+        templates.push(newTpl);
+        saveTemplates(templates);
+        
+        // 自動的にお気に入り登録（スター付き）
+        let favs = getFavorites();
+        if (!favs.includes(newTpl.title)) {
+          favs.push(newTpl.title);
+          saveFavorites(favs);
+        }
+        
+        // そのテンプレート構成で新規フォームを作成しエディタへ遷移
+        createFormFromTemplate(newTpl);
+      } catch(err) {
+        console.error('[Templates] Failed to create custom template:', err);
+      }
+      return;
+    }
   }, true); // キャプチャフェーズでフック！
 
   // ==========================================================================
@@ -713,7 +810,9 @@
       const viewIcon = document.getElementById('gallery-view-icon');
       if (viewIcon) {
         viewIcon.textContent = viewMode === 'list' ? '田' : '▤';
-        viewIcon.parentElement.title = viewMode === 'list' ? 'グリッド表示に切り替え' : 'リスト表示に切り替え';
+        if (viewIcon.parentElement) {
+          viewIcon.parentElement.title = viewMode === 'list' ? 'グリッド表示に切り替え' : 'リスト表示に切り替え';
+        }
       }
       
       if (viewMode === 'list') {
@@ -722,23 +821,33 @@
         allGrid.classList.remove('list-view');
       }
 
-      // B. 最近使った/お気に入りのタブ同期
+      // B. 最近使った/お気に入りのタブ同期 (ヘッダー右上配置)
       const tabMode = localStorage.getItem('form_customize_gallery_tab_mode') || 'recent';
-      const tabs = document.querySelectorAll('.gallery-tab-item');
-      tabs.forEach(tab => {
-        if (tab.dataset.galleryTab === tabMode) {
-          tab.classList.add('active');
-          // インラインアクティブスタイル
-          tab.style.backgroundColor = '#ffffff';
-          tab.style.color = '#7248b9';
-          tab.style.boxShadow = '0 1px 3px rgba(0,0,0,0.12)';
+      const btnRecent = document.getElementById('gallery-tab-mode-recent');
+      const btnFav = document.getElementById('gallery-tab-mode-fav');
+      if (btnRecent && btnFav) {
+        if (tabMode === 'favorites') {
+          btnRecent.classList.remove('active');
+          btnRecent.style.backgroundColor = 'transparent';
+          btnRecent.style.color = '#5f6368';
+          btnRecent.style.boxShadow = 'none';
+
+          btnFav.classList.add('active');
+          btnFav.style.backgroundColor = '#ffffff';
+          btnFav.style.color = '#7248b9';
+          btnFav.style.boxShadow = '0 1px 3px rgba(0,0,0,0.12)';
         } else {
-          tab.classList.remove('active');
-          tab.style.backgroundColor = 'transparent';
-          tab.style.color = '#5f6368';
-          tab.style.boxShadow = 'none';
+          btnRecent.classList.add('active');
+          btnRecent.style.backgroundColor = '#ffffff';
+          btnRecent.style.color = '#7248b9';
+          btnRecent.style.boxShadow = '0 1px 3px rgba(0,0,0,0.12)';
+
+          btnFav.classList.remove('active');
+          btnFav.style.backgroundColor = 'transparent';
+          btnFav.style.color = '#5f6368';
+          btnFav.style.boxShadow = 'none';
         }
-      });
+      }
 
       const templates = getTemplates();
       let displayTemplates = [];
@@ -780,7 +889,7 @@
     }
   }
 
-  // ギャラリーとダッシュボードの画面遷移イベントリスナー
+  // ギャラリーとダッシュボードの画面遷移イベントリスナー (デリゲーション補助用)
   function setupTemplateGalleryListeners() {
     try {
       const backBtn = document.getElementById('btn-back-from-gallery');
@@ -788,79 +897,12 @@
       const galleryPanel = document.getElementById('panel-template-gallery');
       
       if (backBtn && dashboardPanel && galleryPanel) {
+        // グローバルデリゲーションでもフックしていますが、念のため直接イベントも維持します
         backBtn.addEventListener('click', () => {
           galleryPanel.classList.remove('active');
           dashboardPanel.classList.add('active');
           const homeTab = document.querySelector('.nav-tab[data-tab="dashboard"]');
           if (homeTab) homeTab.classList.add('active');
-        });
-      }
-
-      // 表示切り替えボタン（リスト/グリッド）のハンドリング
-      const toggleViewBtn = document.getElementById('btn-toggle-gallery-view');
-      if (toggleViewBtn) {
-        const newToggleBtn = toggleViewBtn.cloneNode(true);
-        toggleViewBtn.parentNode.replaceChild(newToggleBtn, toggleViewBtn);
-        newToggleBtn.addEventListener('click', () => {
-          const currentMode = localStorage.getItem('form_customize_gallery_view_mode') || 'grid';
-          const nextMode = currentMode === 'grid' ? 'list' : 'grid';
-          localStorage.setItem('form_customize_gallery_view_mode', nextMode);
-          renderFullTemplateGallery();
-        });
-      }
-
-      // お気に入り/最近切り替えタブのハンドリング
-      const tabs = document.querySelectorAll('.gallery-tab-item');
-      tabs.forEach(tab => {
-        const newTab = tab.cloneNode(true);
-        tab.parentNode.replaceChild(newTab, tab);
-        newTab.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const targetTabMode = newTab.dataset.galleryTab;
-          localStorage.setItem('form_customize_gallery_tab_mode', targetTabMode);
-          renderFullTemplateGallery();
-        });
-      });
-
-      // 「空白のテンプレートを追加」プラスカードのイベントハンドラ
-      const createTplCard = document.getElementById('btn-create-new-template-card');
-      if (createTplCard) {
-        const newCard = createTplCard.cloneNode(true);
-        createTplCard.parentNode.replaceChild(newCard, createTplCard);
-        
-        newCard.addEventListener('click', () => {
-          console.log('[Templates] Plus card clicked. Creating new custom template...');
-          try {
-            const templates = getTemplates();
-            const newTpl = {
-              title: `新規テンプレート (${templates.length + 1})`,
-              description: 'テンプレートの説明を入力してください。',
-              category: 'personal',
-              stripeColor: '#7248b9',
-              sections: [
-                {
-                  id: 'section_1',
-                  title: '無題のセクション',
-                  description: 'セクションの説明をご入力ください。',
-                  questions: []
-                }
-              ]
-            };
-            templates.push(newTpl);
-            saveTemplates(templates);
-            
-            // 自動的にお気に入り登録（スター付き）
-            let favs = getFavorites();
-            if (!favs.includes(newTpl.title)) {
-              favs.push(newTpl.title);
-              saveFavorites(favs);
-            }
-            
-            // そのテンプレート構成で新規フォームを作成しエディタへ遷移
-            createFormFromTemplate(newTpl);
-          } catch(e) {
-            console.error('[Templates] Failed to create custom template:', e);
-          }
         });
       }
     } catch(err) {
