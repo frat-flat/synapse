@@ -1353,3 +1353,16 @@ input:-webkit-autofill:active {
   padding: 0.25rem 0.75rem !important;
   border-radius: 9999px !important;
 }
+
+/* ダッシュボード全体の幅を画面サイズに合わせて広げ、表示列数が変動するようにする */
+.dashboard-container {
+  max-width: 1600px !important;
+  width: 95% !important;
+}
+
+@media (min-width: 1800px) {
+  .dashboard-container {
+    max-width: 90% !important;
+  }
+}
+

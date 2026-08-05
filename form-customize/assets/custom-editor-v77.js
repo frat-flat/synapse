@@ -2096,58 +2096,75 @@
   }
 
   function renderTemplateGallery() {
-    const listContainer = document.getElementById('template-gallery-list');
-    if (!listContainer) return;
+    console.log('[Dashboard Hook] renderTemplateGallery start.');
+    try {
+      const listContainer = document.getElementById('template-gallery-list');
+      if (!listContainer) {
+        console.error('[Dashboard Hook] template-gallery-list element not found.');
+        return;
+      }
 
-    listContainer.innerHTML = '';
-    const templates = getTemplates();
+      listContainer.innerHTML = '';
+      const templates = getTemplates();
+      console.log('[Dashboard Hook] Retrieved templates:', templates.length);
 
-    templates.forEach((tpl, idx) => {
-      const card = document.createElement('div');
-      card.style.background = 'var(--color-bg-card-hover, #1e2942)';
-      card.style.border = '1px solid var(--color-border, #2d3748)';
-      card.style.borderRadius = '8px';
-      card.style.padding = '1.25rem';
-      card.style.display = 'flex';
-      card.style.flexDirection = 'column';
-      card.style.justifyContent = 'space-between';
-      card.style.gap = '0.75rem';
-      card.style.boxShadow = '0 2px 6px rgba(0,0,0,0.1)';
+      templates.forEach((tpl, idx) => {
+        const card = document.createElement('div');
+        card.style.background = 'var(--color-bg-card-hover, #1e2942)';
+        card.style.border = '1px solid var(--color-border, #2d3748)';
+        card.style.borderRadius = '8px';
+        card.style.padding = '1.25rem';
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        card.style.justifyContent = 'space-between';
+        card.style.gap = '0.75rem';
+        card.style.boxShadow = '0 2px 6px rgba(0,0,0,0.1)';
 
-      card.innerHTML = `
-        <div>
-          <h4 style="margin: 0 0 0.5rem 0; font-size: 0.95rem; color: var(--color-text, #fff); font-weight: 700;">📂 ${tpl.title}</h4>
-          <p style="margin: 0; font-size: 0.78rem; color: var(--color-text-muted, #a0aec0); line-height: 1.4;">
-            ${tpl.description || '事前定義された入力フロー構成のテンプレートです。'}
-          </p>
-        </div>
-        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; justify-content: flex-end;">
-          <button class="btn btn-sm btn-primary btn-use-template" data-index="${idx}" style="font-size: 0.72rem; padding: 4px 10px;">＋ フォーム作成</button>
-          <button class="btn btn-sm btn-secondary btn-edit-template-direct" data-index="${idx}" style="font-size: 0.72rem; padding: 4px 10px; color: var(--color-primary) !important;">✏️ 編集</button>
-          <button class="btn btn-sm btn-secondary btn-delete-template" data-index="${idx}" style="font-size: 0.72rem; padding: 4px 10px; color: #ef4444 !important; border-color: rgba(239,68,68,0.2) !important;">🗑️ 削除</button>
-        </div>
-      `;
-      listContainer.appendChild(card);
-    });
-
-    listContainer.querySelectorAll('.btn-use-template').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const idx = parseInt(btn.dataset.index);
-        createFormFromTemplate(templates[idx]);
+        card.innerHTML = `
+          <div>
+            <h4 style="margin: 0 0 0.5rem 0; font-size: 0.95rem; color: var(--color-text, #fff); font-weight: 700;">📂 ${tpl.title}</h4>
+            <p style="margin: 0; font-size: 0.78rem; color: var(--color-text-muted, #a0aec0); line-height: 1.4;">
+              ${tpl.description || '事前定義された入力フロー構成のテンプレートです。'}
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; justify-content: flex-end;">
+            <button class="btn btn-sm btn-primary btn-use-template" data-index="${idx}" style="font-size: 0.72rem; padding: 4px 10px;">＋ フォーム作成</button>
+            <button class="btn btn-sm btn-secondary btn-edit-template-direct" data-index="${idx}" style="font-size: 0.72rem; padding: 4px 10px; color: var(--color-primary) !important;">✏️ 編集</button>
+            <button class="btn btn-sm btn-secondary btn-delete-template" data-index="${idx}" style="font-size: 0.72rem; padding: 4px 10px; color: #ef4444 !important; border-color: rgba(239,68,68,0.2) !important;">🗑️ 削除</button>
+          </div>
+        `;
+        listContainer.appendChild(card);
       });
-    });
-    listContainer.querySelectorAll('.btn-edit-template-direct').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const idx = parseInt(btn.dataset.index);
-        editTemplateDirectly(idx);
+
+      listContainer.querySelectorAll('.btn-use-template').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.dataset.index);
+          createFormFromTemplate(templates[idx]);
+          closeTemplateGallery();
+        });
       });
-    });
-    listContainer.querySelectorAll('.btn-delete-template').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const idx = parseInt(btn.dataset.index);
-        deleteTemplate(idx);
+      listContainer.querySelectorAll('.btn-edit-template-direct').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.dataset.index);
+          editTemplateDirectly(idx);
+          closeTemplateGallery();
+        });
       });
-    });
+      listContainer.querySelectorAll('.btn-delete-template').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.dataset.index);
+          deleteTemplate(idx);
+          closeTemplateGallery();
+        });
+      });
+      console.log('[Dashboard Hook] renderTemplateGallery finished successfully.');
+    } catch (e) {
+      console.error('[Dashboard Hook] Error rendering template gallery:', e);
+      alert('テンプレートギャラリーの描画中にエラーが発生しました:\n' + e.message + '\n' + e.stack);
+    }
   }
 
   function setupTemplateGalleryModal() {
@@ -2351,10 +2368,20 @@
   }
 
   function openTemplateGallery() {
-    const modal = document.getElementById('template-gallery-modal');
-    if (modal) {
-      renderTemplateGallery();
-      modal.style.display = 'flex';
+    console.log('[Dashboard Hook] openTemplateGallery called.');
+    try {
+      const modal = document.getElementById('template-gallery-modal');
+      if (modal) {
+        renderTemplateGallery();
+        modal.style.display = 'flex';
+        console.log('[Dashboard Hook] Modal displayed successfully.');
+      } else {
+        console.error('[Dashboard Hook] template-gallery-modal element not found.');
+        alert('エラー: テンプレートギャラリーのモーダル要素が見つかりません。');
+      }
+    } catch (e) {
+      console.error('[Dashboard Hook] Error opening template gallery:', e);
+      alert('テンプレートギャラリーを開く際にエラーが発生しました:\n' + e.message + '\n' + e.stack);
     }
   }
 
