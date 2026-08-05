@@ -88,12 +88,15 @@
                   <div class="owner-dropdown-item" data-filter="others">自分以外がオーナー</div>
                 </div>
               </div>
-              <span id="sort-label-text" class="sort-label-text">最終閲覧 (自分)</span>
+              <select id="sort-select-gf" class="sort-select-gf" style="background: transparent; border: none; color: var(--color-text-dark, #4a5568); font-size: 0.85rem; font-family: inherit; font-weight: 500; cursor: pointer; outline: none; margin-right: 8px; padding: 4px; border-radius: 4px;">
+                <option value="date">最終閲覧 (自分)</option>
+                <option value="title_asc">タイトル順 (昇順)</option>
+                <option value="title_desc">タイトル順 (降順)</option>
+                <option value="lastModified_desc">最終更新順 (新しい順)</option>
+                <option value="lastModified_asc">最終更新順 (古い順)</option>
+              </select>
               <button id="btn-toggle-view-gf" class="control-icon-btn" title="表示形式切り替え">
                 <span class="control-icon" id="toggle-view-icon">田</span>
-              </button>
-              <button id="btn-sort-gf" class="control-icon-btn" title="並び替え順">
-                <span class="control-icon">A↕</span>
               </button>
               <button id="btn-folder-gf" class="control-icon-btn" title="フォルダ">
                 <span class="control-icon">📁</span>

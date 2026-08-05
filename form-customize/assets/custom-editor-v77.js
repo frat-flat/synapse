@@ -2285,60 +2285,14 @@
 
   function updateSortUI() {
     const mode = window.currentSortMode;
-    const label = document.getElementById('sort-label-text');
-    const sortBtn = document.getElementById('btn-sort-gf');
-    const sortIcon = sortBtn ? sortBtn.querySelector('.control-icon') : null;
-
-    // ラベルの更新
-    if (label) {
-      if (mode === 'title_asc') {
-        label.textContent = 'タイトル順 (昇順)';
-      } else if (mode === 'title_desc') {
-        label.textContent = 'タイトル順 (降順)';
-      } else if (mode === 'lastModified_desc') {
-        label.textContent = '最終更新順 (新しい順)';
-      } else if (mode === 'lastModified_asc') {
-        label.textContent = '最終更新順 (古い順)';
-      } else {
-        label.textContent = '最終閲覧 (自分)';
-      }
+    const sortSelect = document.getElementById('sort-select-gf');
+    if (sortSelect) {
+      sortSelect.value = mode;
     }
-
-    // ボタンアイコンの更新
-    if (sortIcon) {
-      if (mode === 'title_asc') {
-        sortIcon.textContent = 'A↓';
-      } else if (mode === 'title_desc') {
-        sortIcon.textContent = 'Z↓';
-      } else if (mode === 'lastModified_desc') {
-        sortIcon.textContent = '🕒↓';
-      } else if (mode === 'lastModified_asc') {
-        sortIcon.textContent = '🕒↑';
-      } else {
-        sortIcon.textContent = 'A↕';
-      }
-    }
-  }
-
-  function toggleSortMode() {
-    if (window.currentSortMode === 'date') {
-      window.currentSortMode = 'title_asc';
-    } else if (window.currentSortMode === 'title_asc') {
-      window.currentSortMode = 'title_desc';
-    } else if (window.currentSortMode === 'title_desc') {
-      window.currentSortMode = 'lastModified_desc';
-    } else if (window.currentSortMode === 'lastModified_desc') {
-      window.currentSortMode = 'lastModified_asc';
-    } else {
-      window.currentSortMode = 'date';
-    }
-    
-    updateSortUI();
-    applyDashboardSort();
   }
 
   function setupDashboardGlobalListeners() {
-    // テンプレート追加ボタン、フォルダボタン、並べ替えボタンのフック
+    // テンプレート追加ボタン、フォルダボタンのフック
     document.addEventListener('click', (e) => {
       // 1. テンプレートを追加ボタン (#btn-dashboard-sample)
       const sampleBtn = e.target.closest('#btn-dashboard-sample');
@@ -2359,19 +2313,18 @@
         openTemplateGallery();
         return;
       }
-
-      // 3. 並び替え順ボタン (#btn-sort-gf) またはソートラベル (#sort-label-text)
-      const sortBtn = e.target.closest('#btn-sort-gf');
-      const sortLabel = e.target.closest('#sort-label-text');
-      if ((sortBtn || sortLabel) && !e.target.closest('#btn-folder-gf') && !e.target.closest('#btn-toggle-view-gf')) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        toggleSortMode();
-        return;
-      }
     }, true); // キャプチャフェーズで登録！
     
+    // プルダウン変更時のソート適用イベントリスナー
+    const sortSelect = document.getElementById('sort-select-gf');
+    if (sortSelect) {
+      sortSelect.value = window.currentSortMode;
+      sortSelect.addEventListener('change', (e) => {
+        window.currentSortMode = e.target.value;
+        applyDashboardSort();
+      });
+    }
+
     // MutationObserver による自動ソート適用
     const observer = new MutationObserver(() => {
       const listContainer = document.querySelector('.gf-list-container');
