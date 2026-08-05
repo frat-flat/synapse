@@ -2167,7 +2167,7 @@
   }
 
   // --- ダッシュボードソート＆グローバルリスナー実装 ---
-  window.currentSortMode = 'date'; // 'date' | 'title' | 'lastModified'
+  window.currentSortMode = 'date'; // 'date' | 'title_asc' | 'title_desc' | 'lastModified_desc' | 'lastModified_asc'
 
   function applyDashboardSort() {
     const mode = window.currentSortMode;
@@ -2185,14 +2185,22 @@
         
         const sortedRows = [...rows];
         sortedRows.sort((a, b) => {
-          if (mode === 'title') {
+          if (mode === 'title_asc') {
             const titleA = (a.querySelector('.gf-list-title-text')?.textContent || '').trim();
             const titleB = (b.querySelector('.gf-list-title-text')?.textContent || '').trim();
             return titleA.localeCompare(titleB, 'ja');
-          } else if (mode === 'lastModified') {
+          } else if (mode === 'title_desc') {
+            const titleA = (a.querySelector('.gf-list-title-text')?.textContent || '').trim();
+            const titleB = (b.querySelector('.gf-list-title-text')?.textContent || '').trim();
+            return titleB.localeCompare(titleA, 'ja');
+          } else if (mode === 'lastModified_desc') {
             const timeA = (a.querySelector('.gf-list-time-area')?.textContent || '').trim();
             const timeB = (b.querySelector('.gf-list-time-area')?.textContent || '').trim();
             return timeB.localeCompare(timeA); // 降順 (最新順)
+          } else if (mode === 'lastModified_asc') {
+            const timeA = (a.querySelector('.gf-list-time-area')?.textContent || '').trim();
+            const timeB = (b.querySelector('.gf-list-time-area')?.textContent || '').trim();
+            return timeA.localeCompare(timeB); // 昇順 (古い順)
           } else {
             const idxA = parseInt(a.getAttribute('data-original-index') || '0', 10);
             const idxB = parseInt(b.getAttribute('data-original-index') || '0', 10);
@@ -2229,11 +2237,15 @@
         
         const sortedCards = [...cards];
         sortedCards.sort((a, b) => {
-          if (mode === 'title') {
+          if (mode === 'title_asc') {
             const titleA = (a.querySelector('.card-preview-title-gf span')?.textContent || '').trim();
             const titleB = (b.querySelector('.card-preview-title-gf span')?.textContent || '').trim();
             return titleA.localeCompare(titleB, 'ja');
-          } else if (mode === 'lastModified') {
+          } else if (mode === 'title_desc') {
+            const titleA = (a.querySelector('.card-preview-title-gf span')?.textContent || '').trim();
+            const titleB = (b.querySelector('.card-preview-title-gf span')?.textContent || '').trim();
+            return titleB.localeCompare(titleA, 'ja');
+          } else if (mode === 'lastModified_desc') {
             const textA = (a.querySelector('.card-preview-meta-gf')?.textContent || '');
             const textB = (b.querySelector('.card-preview-meta-gf')?.textContent || '');
             const matchA = textA.match(/\d{2}:\d{2}/);
@@ -2241,6 +2253,14 @@
             const timeA = matchA ? matchA[0] : '00:00';
             const timeB = matchB ? matchB[0] : '00:00';
             return timeB.localeCompare(timeA); // 降順 (最新順)
+          } else if (mode === 'lastModified_asc') {
+            const textA = (a.querySelector('.card-preview-meta-gf')?.textContent || '');
+            const textB = (b.querySelector('.card-preview-meta-gf')?.textContent || '');
+            const matchA = textA.match(/\d{2}:\d{2}/);
+            const matchB = textB.match(/\d{2}:\d{2}/);
+            const timeA = matchA ? matchA[0] : '00:00';
+            const timeB = matchB ? matchB[0] : '00:00';
+            return timeA.localeCompare(timeB); // 昇順 (古い順)
           } else {
             const idxA = parseInt(a.getAttribute('data-original-index') || '0', 10);
             const idxB = parseInt(b.getAttribute('data-original-index') || '0', 10);
@@ -2263,26 +2283,57 @@
     }
   }
 
-  function toggleSortMode() {
-    if (window.currentSortMode === 'date') {
-      window.currentSortMode = 'title';
-    } else if (window.currentSortMode === 'title') {
-      window.currentSortMode = 'lastModified';
-    } else {
-      window.currentSortMode = 'date';
-    }
-    
+  function updateSortUI() {
+    const mode = window.currentSortMode;
     const label = document.getElementById('sort-label-text');
+    const sortBtn = document.getElementById('btn-sort-gf');
+    const sortIcon = sortBtn ? sortBtn.querySelector('.control-icon') : null;
+
+    // ラベルの更新
     if (label) {
-      if (window.currentSortMode === 'title') {
-        label.textContent = 'タイトル順';
-      } else if (window.currentSortMode === 'lastModified') {
-        label.textContent = '最終更新順';
+      if (mode === 'title_asc') {
+        label.textContent = 'タイトル順 (昇順)';
+      } else if (mode === 'title_desc') {
+        label.textContent = 'タイトル順 (降順)';
+      } else if (mode === 'lastModified_desc') {
+        label.textContent = '最終更新順 (新しい順)';
+      } else if (mode === 'lastModified_asc') {
+        label.textContent = '最終更新順 (古い順)';
       } else {
         label.textContent = '最終閲覧 (自分)';
       }
     }
+
+    // ボタンアイコンの更新
+    if (sortIcon) {
+      if (mode === 'title_asc') {
+        sortIcon.textContent = 'A↓';
+      } else if (mode === 'title_desc') {
+        sortIcon.textContent = 'Z↓';
+      } else if (mode === 'lastModified_desc') {
+        sortIcon.textContent = '🕒↓';
+      } else if (mode === 'lastModified_asc') {
+        sortIcon.textContent = '🕒↑';
+      } else {
+        sortIcon.textContent = 'A↕';
+      }
+    }
+  }
+
+  function toggleSortMode() {
+    if (window.currentSortMode === 'date') {
+      window.currentSortMode = 'title_asc';
+    } else if (window.currentSortMode === 'title_asc') {
+      window.currentSortMode = 'title_desc';
+    } else if (window.currentSortMode === 'title_desc') {
+      window.currentSortMode = 'lastModified_desc';
+    } else if (window.currentSortMode === 'lastModified_desc') {
+      window.currentSortMode = 'lastModified_asc';
+    } else {
+      window.currentSortMode = 'date';
+    }
     
+    updateSortUI();
     applyDashboardSort();
   }
 
