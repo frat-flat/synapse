@@ -1,6 +1,6 @@
 
 (function() {
-  alert('[Debug] custom-editor-v77.js has loaded successfully. Version: 7.7.5');
+  alert('[Debug] custom-editor-v77.js has loaded successfully. Version: 7.7.6');
   console.log('custom-editor.js loading...');
 
   // localStorage の読み書きをインターセプト（テンプレート編集モード対応）
@@ -2515,94 +2515,100 @@
 
   function startDashboardHookLoop() {
     setInterval(() => {
-      // 1. テンプレートを追加ボタン (#btn-dashboard-sample) のフック
-      const sampleBtn = document.getElementById('btn-dashboard-sample');
-      if (sampleBtn && !sampleBtn.dataset.templated) {
-        sampleBtn.dataset.templated = "true";
-        sampleBtn.innerHTML = '<span class="btn-text">📁 テンプレートを追加</span>';
-        
-        // インライン onclick 属性を動的に再付与
-        sampleBtn.setAttribute('onclick', "if(window.openTemplateGallery){window.openTemplateGallery();}else{alert('システム初期化中です。少々お待ちください。');}");
-        
-        // 直接プロパティでのイベント登録（二重化）
-        sampleBtn.onclick = function(e) {
-          console.log('[Dashboard Hook] sampleBtn clicked.');
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-          if (window.openTemplateGallery) {
-            window.openTemplateGallery();
-          }
-        };
-      }
-
-      // 2. フォルダボタン (#btn-folder-gf) のフック
-      const folderBtn = document.getElementById('btn-folder-gf');
-      if (folderBtn && !folderBtn.dataset.hooked) {
-        folderBtn.dataset.hooked = "true";
-        
-        // インライン onclick 属性を動的に再付与
-        folderBtn.setAttribute('onclick', "if(window.openTemplateGallery){window.openTemplateGallery();}else{alert('システム初期化中です。少々お待ちください。');}");
-        
-        // 直接プロパティでのイベント登録（二重化）
-        folderBtn.onclick = function(e) {
-          console.log('[Dashboard Hook] folderBtn clicked.');
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-          if (window.openTemplateGallery) {
-            window.openTemplateGallery();
-          }
-        };
-      }
-
-      const createBtn = document.getElementById('btn-dashboard-create');
-      if (createBtn && !createBtn.dataset.hooked) {
-        createBtn.dataset.hooked = "true";
-        createBtn.addEventListener('click', () => {
-          localStorage.setItem('form_customize_is_template_mode', 'false');
-        });
-      }
-
-      const rows = document.querySelectorAll('.gf-list-row');
-      rows.forEach(row => {
-        if (row.closest('#dashboard-templates-section')) return;
-        
-        const actionArea = row.querySelector('.gf-list-action-area');
-        if (actionArea && !actionArea.querySelector('.btn-register-template')) {
-          const titleTextEl = row.querySelector('.gf-list-title-text');
-          if (!titleTextEl) return;
-          const titleText = titleTextEl.textContent.trim();
+      try {
+        // 1. テンプレートを追加ボタン (#btn-dashboard-sample) のフック
+        const sampleBtn = document.getElementById('btn-dashboard-sample');
+        if (sampleBtn && !sampleBtn.dataset.templated) {
+          sampleBtn.dataset.templated = "true";
+          sampleBtn.innerHTML = '<span class="btn-text">📁 テンプレートを追加</span>';
           
-          let allForms = [];
-          try {
-            allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]');
-          } catch(e) {}
-          const formIdx = allForms.findIndex(f => f.title === titleText);
-          if (formIdx === -1) return;
-
-          const regBtn = document.createElement('button');
-          regBtn.className = 'btn btn-sm btn-secondary btn-register-template';
-          regBtn.style.marginRight = '8px';
-          regBtn.style.fontSize = '0.72rem';
-          regBtn.style.padding = '4px 8px';
-          regBtn.style.color = '#d69e2e !important';
-          regBtn.style.borderColor = 'rgba(214,158,46,0.2) !important';
-          regBtn.innerHTML = '★ テンプレート登録';
+          // インライン onclick 属性を動的に再付与
+          sampleBtn.setAttribute('onclick', "if(window.openTemplateGallery){window.openTemplateGallery();}else{alert('システム初期化中です。少々お待ちください。');}");
           
-          regBtn.addEventListener('click', (e) => {
+          // 直接プロパティでのイベント登録（二重化）
+          sampleBtn.onclick = function(e) {
+            console.log('[Dashboard Hook] sampleBtn clicked.');
+            e.preventDefault();
             e.stopPropagation();
-            registerFormAsTemplate(formIdx);
-          });
-          actionArea.insertBefore(regBtn, actionArea.firstChild);
+            e.stopImmediatePropagation();
+            if (window.openTemplateGallery) {
+              window.openTemplateGallery();
+            }
+          };
         }
-      });
 
-      const activeTab = localStorage.getItem('form_customize_active_tab') || 'dashboard';
-      if (activeTab === 'dashboard' && document.getElementById('dashboard-view-list') && document.getElementById('dashboard-view-list').classList.contains('active')) {
-        if (!document.getElementById('dashboard-templates-section')) {
-          renderTemplatesListOnDashboard();
+        // 2. フォルダボタン (#btn-folder-gf) のフック
+        const folderBtn = document.getElementById('btn-folder-gf');
+        if (folderBtn && !folderBtn.dataset.hooked) {
+          folderBtn.dataset.hooked = "true";
+          
+          // インライン onclick 属性を動的に再付与
+          folderBtn.setAttribute('onclick', "if(window.openTemplateGallery){window.openTemplateGallery();}else{alert('システム初期化中です。少々お待ちください。');}");
+          
+          // 直接プロパティでのイベント登録（二重化）
+          folderBtn.onclick = function(e) {
+            console.log('[Dashboard Hook] folderBtn clicked.');
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            if (window.openTemplateGallery) {
+              window.openTemplateGallery();
+            }
+          };
         }
+
+        const createBtn = document.getElementById('btn-dashboard-create');
+        if (createBtn && !createBtn.dataset.hooked) {
+          createBtn.dataset.hooked = "true";
+          createBtn.addEventListener('click', () => {
+            localStorage.setItem('form_customize_is_template_mode', 'false');
+          });
+        }
+
+        const rows = document.querySelectorAll('.gf-list-row');
+        rows.forEach(row => {
+          if (row.closest('#dashboard-templates-section')) return;
+          
+          const actionArea = row.querySelector('.gf-list-action-area');
+          if (actionArea && !actionArea.querySelector('.btn-register-template')) {
+            const titleTextEl = row.querySelector('.gf-list-title-text');
+            if (!titleTextEl) return;
+            const titleText = titleTextEl.textContent.trim();
+            
+            let allForms = [];
+            try {
+              allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]');
+            } catch(e) {}
+            const formIdx = allForms.findIndex(f => f.title === titleText);
+            if (formIdx === -1) return;
+
+            const regBtn = document.createElement('button');
+            regBtn.className = 'btn btn-sm btn-secondary btn-register-template';
+            regBtn.style.marginRight = '8px';
+            regBtn.style.fontSize = '0.72rem';
+            regBtn.style.padding = '4px 8px';
+            regBtn.style.color = '#d69e2e !important';
+            regBtn.style.borderColor = 'rgba(214,158,46,0.2) !important';
+            regBtn.innerHTML = '★ テンプレート登録';
+            
+            regBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              registerFormAsTemplate(formIdx);
+            });
+            actionArea.insertBefore(regBtn, actionArea.firstChild);
+          }
+        });
+
+        // 4. 表示切り替え時のテンプレートマスタ一覧再描画トリガー (安全な存在チェック)
+        const dashboardList = document.getElementById('dashboard-view-list');
+        const activeTab = localStorage.getItem('form_customize_active_tab') || 'dashboard';
+        if (activeTab === 'dashboard' && dashboardList && dashboardList.classList.contains('active')) {
+          if (!document.getElementById('dashboard-templates-section')) {
+            renderTemplatesListOnDashboard();
+          }
+        }
+      } catch (loopError) {
+        console.error('[Dashboard Hook Loop Error] Exception inside setInterval:', loopError);
       }
     }, 100);
   }
