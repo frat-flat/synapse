@@ -668,7 +668,7 @@
   }
 
   // テンプレートカード単体のHTML要素を生成するヘルパー
-  function createTemplateCardElement(template, isBlank = false) {
+  function createTemplateCardElement(template, isBlank = false, showDelete = false) {
     try {
       const card = document.createElement('div');
       card.className = 'template-card';
@@ -736,6 +736,36 @@
           toggleFavorite(template.title);
         });
         card.appendChild(favBtn);
+        
+        // 🗑️ 直接削除可能な削除ボタン (ギャラリーのみ)
+        if (showDelete) {
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.className = 'btn-delete-template-direct';
+          delBtn.innerHTML = '🗑️';
+          delBtn.title = 'テンプレートを削除';
+          
+          delBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            showSystemConfirmModal(`テンプレート「${template.title}」を完全に削除しますか？`, (ok) => {
+              if (ok) {
+                const templates = getTemplates();
+                const idx = templates.findIndex(temp => temp.title === template.title);
+                if (idx !== -1) {
+                  templates.splice(idx, 1);
+                  saveTemplates(templates);
+                  showCustomToast('テンプレートを削除しました。', 'success');
+                  if (typeof renderTemplateGallery === 'function') renderTemplateGallery();
+                  if (typeof renderTemplateBar === 'function') renderTemplateBar();
+                  if (typeof renderFullTemplateGallery === 'function') renderFullTemplateGallery();
+                }
+              }
+            });
+          });
+          card.appendChild(delBtn);
+        }
         
         const title = document.createElement('span');
         title.className = 'template-card-title';
@@ -946,7 +976,7 @@
         `;
       } else {
         displayTemplates.forEach(t => {
-          allGrid.appendChild(createTemplateCardElement(t));
+          allGrid.appendChild(createTemplateCardElement(t, false, true));
         });
       }
       

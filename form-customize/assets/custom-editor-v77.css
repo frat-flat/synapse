@@ -1434,9 +1434,13 @@ input:-webkit-autofill:active {
   display: flex !important;
   flex-direction: column !important;
   gap: 10px !important;
+  width: 100% !important;
+  max-width: none !important;
 }
 
 .template-cards-grid.list-view .template-card {
+  width: 100% !important;
+  max-width: none !important;
   flex-direction: row !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -1445,6 +1449,7 @@ input:-webkit-autofill:active {
   border-radius: 6px !important;
   padding: 10px 16px !important;
   box-shadow: 0 1px 2px 0 rgba(60,64,67,0.05) !important;
+  box-sizing: border-box !important;
 }
 .template-cards-grid.list-view .template-card:hover {
   transform: none !important;
@@ -1659,13 +1664,18 @@ input:-webkit-autofill:active {
 }
 
 .gallery-body-content {
-  max-width: 1000px !important;
+  width: 100% !important;
+  max-width: 1200px !important;
   margin: 0 auto !important;
-  padding: 40px 24px 80px 24px !important;
+  padding: 30px 24px 80px 24px !important;
+  box-sizing: border-box !important;
 }
 
 .gallery-section {
+  width: 100% !important;
+  max-width: none !important;
   margin-bottom: 45px !important;
+  box-sizing: border-box !important;
 }
 
 .gallery-section-title {
@@ -1781,5 +1791,40 @@ input:-webkit-autofill:active {
 /* 画面サイズに合わせて列数を自動調整するレスポンシブグリッド */
 .template-cards-grid {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+}
+
+/* 🗑️ テンプレート削除ボタン (インライン/絶対配置の両対応) */
+.btn-delete-template-direct {
+  position: absolute !important;
+  top: 10px !important;
+  right: 40px !important; /* スターボタンの左隣 */
+  z-index: 10 !important;
+  background: rgba(255,255,255,0.9) !important;
+  border: 1px solid #dadce0 !important;
+  border-radius: 50% !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  font-size: 0.8rem !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+  transition: transform 0.1s ease !important;
+  padding: 0 !important;
+  outline: none !important;
+}
+
+.btn-delete-template-direct:hover {
+  background: #fdf2f2 !important;
+  border-color: #f8b4b4 !important;
+  transform: scale(1.1) !important;
+}
+
+/* リスト表示（リストビュー）の時は横並びのフローに組み込む */
+.template-cards-grid.list-view .btn-delete-template-direct {
+  position: static !important;
+  margin-left: 12px !important;
+  flex-shrink: 0 !important;
 }
 
