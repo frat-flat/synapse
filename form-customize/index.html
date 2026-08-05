@@ -11,8 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v3.js?v=2.2.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
-    <link rel="stylesheet" href="./assets/custom-editor-v77.css?v=7.7.1">
-    <script src="./assets/custom-editor-v77.js?v=7.7.1" defer></script>
+    <link rel="stylesheet" href="./assets/custom-editor-v77.css?v=7.7.2">
+    <script src="./assets/custom-editor-v77.js?v=7.7.2" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -70,7 +70,7 @@
               <p>作成済みのフォームを管理・編集します。</p>
             </div>
             <div class="dashboard-header-buttons">
-              <button id="btn-dashboard-sample" class="btn btn-secondary">サンプルを追加</button>
+              <button id="btn-dashboard-sample" class="btn btn-secondary" onclick="if(window.openTemplateGallery){window.openTemplateGallery();}else{alert('システム初期化中です。少々お待ちください。');}">サンプルを追加</button>
               <button id="btn-dashboard-create" class="btn btn-primary">＋ 新規フォーム作成</button>
             </div>
           </div>
@@ -98,7 +98,7 @@
               <button id="btn-toggle-view-gf" class="control-icon-btn" title="表示形式切り替え">
                 <span class="control-icon" id="toggle-view-icon">田</span>
               </button>
-              <button id="btn-folder-gf" class="control-icon-btn" title="フォルダ">
+              <button id="btn-folder-gf" class="control-icon-btn" title="フォルダ" onclick="if(window.openTemplateGallery){window.openTemplateGallery();}else{alert('システム初期化中です。少々お待ちください。');}">
                 <span class="control-icon">📁</span>
               </button>
             </div>

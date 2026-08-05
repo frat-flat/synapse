@@ -2384,6 +2384,7 @@
       alert('テンプレートギャラリーを開く際にエラーが発生しました:\n' + e.message + '\n' + e.stack);
     }
   }
+  window.openTemplateGallery = openTemplateGallery;
 
   function renderTemplatesListOnDashboard() {
     const dashboardList = document.getElementById('dashboard-view-list');
