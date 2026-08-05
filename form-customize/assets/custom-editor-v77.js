@@ -2183,7 +2183,8 @@
           }
         });
         
-        rows.sort((a, b) => {
+        const sortedRows = [...rows];
+        sortedRows.sort((a, b) => {
           if (mode === 'title') {
             const titleA = (a.querySelector('.gf-list-title-text')?.textContent || '').trim();
             const titleB = (b.querySelector('.gf-list-title-text')?.textContent || '').trim();
@@ -2199,7 +2200,19 @@
           }
         });
         
-        rows.forEach(row => listContainer.appendChild(row));
+        // 実際の順序が変更されるかチェック
+        let orderChanged = false;
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i] !== sortedRows[i]) {
+            orderChanged = true;
+            break;
+          }
+        }
+        
+        // 順序に変更がある場合のみDOMを更新
+        if (orderChanged) {
+          sortedRows.forEach(row => listContainer.appendChild(row));
+        }
       }
     }
     
@@ -2214,7 +2227,8 @@
           }
         });
         
-        cards.sort((a, b) => {
+        const sortedCards = [...cards];
+        sortedCards.sort((a, b) => {
           if (mode === 'title') {
             const titleA = (a.querySelector('.card-preview-title-gf span')?.textContent || '').trim();
             const titleB = (b.querySelector('.card-preview-title-gf span')?.textContent || '').trim();
@@ -2234,7 +2248,17 @@
           }
         });
         
-        cards.forEach(card => previewGrid.appendChild(card));
+        let orderChanged = false;
+        for (let i = 0; i < cards.length; i++) {
+          if (cards[i] !== sortedCards[i]) {
+            orderChanged = true;
+            break;
+          }
+        }
+        
+        if (orderChanged) {
+          sortedCards.forEach(card => previewGrid.appendChild(card));
+        }
       }
     }
   }
@@ -2306,11 +2330,13 @@
         observer.disconnect(); // 一時的に監視を停止して無限ループを回避
         applyDashboardSort();
         
-        // 再度監視を開始
-        const dashboardPanel = document.getElementById('panel-dashboard');
-        if (dashboardPanel) {
-          observer.observe(dashboardPanel, { childList: true, subtree: true });
-        }
+        // 再度監視を開始（マクロタスクでの再開により、同一ターン内のDOM変更の評価ループを防ぐ）
+        setTimeout(() => {
+          const dashboardPanel = document.getElementById('panel-dashboard');
+          if (dashboardPanel) {
+            observer.observe(dashboardPanel, { childList: true, subtree: true });
+          }
+        }, 0);
       }
     });
 
