@@ -836,11 +836,19 @@
         return res;
       }
 
+      // 通常フォームの削除確認メッセージからタイトルを抽出する
+      const deleteFormMatch = message.match(/フォーム「(.*?)」を完全に削除しますか？/);
+
       showSystemConfirmModal(message, (ok) => {
         if (ok) {
-          forceConfirmResult = true;
-          if (lastClickedDeleteElement) {
-            lastClickedDeleteElement.click();
+          if (deleteFormMatch && deleteFormMatch[1]) {
+            // DOM消滅バグを回避するため、LocalStorageから直接削除を起動
+            deleteFormSelf(deleteFormMatch[1]);
+          } else {
+            forceConfirmResult = true;
+            if (lastClickedDeleteElement) {
+              lastClickedDeleteElement.click();
+            }
           }
         }
       });
