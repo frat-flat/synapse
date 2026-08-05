@@ -625,96 +625,108 @@
 
   // テンプレートカード単体のHTML要素を生成するヘルパー
   function createTemplateCardElement(template, isBlank = false) {
-    const card = document.createElement('div');
-    card.className = 'template-card';
-    card.style.position = 'relative';
-    
-    const preview = document.createElement('div');
-    preview.className = 'template-card-preview';
-    
-    if (isBlank) {
-      preview.innerHTML = `
-        <div class="template-card-blank-inner">
-          <span class="template-card-plus-icon">+</span>
-        </div>
-      `;
-      card.appendChild(preview);
+    try {
+      const card = document.createElement('div');
+      card.className = 'template-card';
+      card.style.position = 'relative';
       
-      const title = document.createElement('span');
-      title.className = 'template-card-title';
-      title.textContent = '空白のフォーム';
-      card.appendChild(title);
+      const preview = document.createElement('div');
+      preview.className = 'template-card-preview';
       
-      card.addEventListener('click', () => {
-        createFormFromTemplate(null);
-      });
-    } else {
-      const stripe = document.createElement('div');
-      stripe.className = 'template-card-header-stripe';
-      stripe.style.backgroundColor = template.stripeColor || '#7248b9';
-      preview.appendChild(stripe);
-      
-      const dTitle = document.createElement('div');
-      dTitle.className = 'template-card-dummy-title';
-      preview.appendChild(dTitle);
-      
-      const dField1 = document.createElement('div');
-      dField1.className = 'template-card-dummy-field';
-      preview.appendChild(dField1);
-      
-      const dField2 = document.createElement('div');
-      dField2.className = 'template-card-dummy-field';
-      preview.appendChild(dField2);
-      
-      const dLine = document.createElement('div');
-      dLine.className = 'template-card-dummy-line';
-      preview.appendChild(dLine);
-      
-      card.appendChild(preview);
-      
-      // 🌟 右上に絶対配置する「お気に入り」スターボタン
-      const favBtn = document.createElement('button');
-      favBtn.type = 'button';
-      favBtn.className = 'btn-template-fav';
-      if (isFavorite(template.title)) {
-        favBtn.classList.add('active');
-        favBtn.innerHTML = '★';
-        favBtn.title = 'お気に入りから削除';
+      if (isBlank || !template || !template.title) {
+        preview.innerHTML = `
+          <div class="template-card-blank-inner">
+            <span class="template-card-plus-icon">+</span>
+          </div>
+        `;
+        card.appendChild(preview);
+        
+        const title = document.createElement('span');
+        title.className = 'template-card-title';
+        title.textContent = '空白のフォーム';
+        card.appendChild(title);
+        
+        card.addEventListener('click', () => {
+          createFormFromTemplate(null);
+        });
       } else {
-        favBtn.innerHTML = '☆';
-        favBtn.title = 'お気に入りに追加';
-      }
-      
-      favBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleFavorite(template.title);
-      });
-      card.appendChild(favBtn);
-      
-      const title = document.createElement('span');
-      title.className = 'template-card-title';
-      title.textContent = template.title;
-      card.appendChild(title);
+        const stripe = document.createElement('div');
+        stripe.className = 'template-card-header-stripe';
+        stripe.style.backgroundColor = template.stripeColor || '#7248b9';
+        preview.appendChild(stripe);
+        
+        const dTitle = document.createElement('div');
+        dTitle.className = 'template-card-dummy-title';
+        preview.appendChild(dTitle);
+        
+        const dField1 = document.createElement('div');
+        dField1.className = 'template-card-dummy-field';
+        preview.appendChild(dField1);
+        
+        const dField2 = document.createElement('div');
+        dField2.className = 'template-card-dummy-field';
+        preview.appendChild(dField2);
+        
+        const dLine = document.createElement('div');
+        dLine.className = 'template-card-dummy-line';
+        preview.appendChild(dLine);
+        
+        card.appendChild(preview);
+        
+        // 🌟 右上に絶対配置する「お気に入り」スターボタン
+        const favBtn = document.createElement('button');
+        favBtn.type = 'button';
+        favBtn.className = 'btn-template-fav';
+        if (isFavorite(template.title)) {
+          favBtn.classList.add('active');
+          favBtn.innerHTML = '★';
+          favBtn.title = 'お気に入りから削除';
+        } else {
+          favBtn.innerHTML = '☆';
+          favBtn.title = 'お気に入りに追加';
+        }
+        
+        favBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleFavorite(template.title);
+        });
+        card.appendChild(favBtn);
+        
+        const title = document.createElement('span');
+        title.className = 'template-card-title';
+        title.textContent = template.title;
+        card.appendChild(title);
 
-      const categoryLabel = document.createElement('span');
-      categoryLabel.className = 'template-card-category';
-      categoryLabel.textContent = template.category === 'work' ? '仕事用' : '個人用';
-      card.appendChild(categoryLabel);
-      
-      card.addEventListener('click', () => {
-        createFormFromTemplate(template);
-      });
+        const categoryLabel = document.createElement('span');
+        categoryLabel.className = 'template-card-category';
+        categoryLabel.textContent = template.category === 'work' ? '仕事用' : '個人用';
+        card.appendChild(categoryLabel);
+        
+        card.addEventListener('click', () => {
+          createFormFromTemplate(template);
+        });
+      }
+      return card;
+    } catch (e) {
+      console.error('[Templates] createTemplateCardElement inner error:', e);
+      // 万が一のフォールバック
+      const fbCard = document.createElement('div');
+      fbCard.className = 'template-card';
+      fbCard.innerHTML = '<div class="template-card-preview">Error</div>';
+      return fbCard;
     }
-    
-    return card;
   }
 
   // ダッシュボード上部のテンプレートバーの描画（復旧＆折りたたみ＆トグル切り替え）
   function renderTemplateBar() {
     try {
+      console.log('[Templates] renderTemplateBar execution started.');
       const container = document.getElementById('template-bar-cards-grid');
-      if (!container) return;
+      if (!container) {
+        console.warn('[Templates] template-bar-cards-grid container not found in DOM!');
+        return;
+      }
       
       container.innerHTML = '';
       
@@ -737,12 +749,12 @@
         }
       }
 
-      const templates = getTemplates();
+      const templates = getTemplates() || [];
       let displayTemplates = [];
 
       if (mode === 'fav') {
         // お気に入り登録されているテンプレートのみ
-        displayTemplates = templates.filter(t => isFavorite(t.title));
+        displayTemplates = templates.filter(t => t && t.title && isFavorite(t.title));
       } else {
         // 最近使ったテンプレート優先
         let recents = [];
@@ -750,22 +762,33 @@
           recents = JSON.parse(localStorage.getItem('form_customize_recent_templates') || '[]');
         } catch(e) {}
         
-        displayTemplates = [...recents];
+        // 有効なもののみ抽出
+        const validRecents = (Array.isArray(recents) ? recents : []).filter(r => r && r.title);
+        displayTemplates = [...validRecents];
+        
         templates.forEach(t => {
-          if (!displayTemplates.some(d => d.title === t.title)) {
+          if (t && t.title && !displayTemplates.some(d => d && d.title === t.title)) {
             displayTemplates.push(t);
           }
         });
       }
       
       const showCount = Math.min(displayTemplates.length, 5);
+      console.log('[Templates] Filtered display templates count:', showCount);
       for (let i = 0; i < showCount; i++) {
-        container.appendChild(createTemplateCardElement(displayTemplates[i]));
+        const item = displayTemplates[i];
+        if (item) {
+          try {
+            container.appendChild(createTemplateCardElement(item));
+          } catch(cardErr) {
+            console.error('[Templates] Error rendering single card:', cardErr);
+          }
+        }
       }
       
-      console.log('[Templates] Rendered template bar. Mode:', mode, 'Count:', showCount + 1);
+      console.log('[Templates] Rendered template bar successfully. Mode:', mode, 'Total Elements:', container.children.length);
     } catch(err) {
-      console.error('[Templates] renderTemplateBar error:', err);
+      console.error('[Templates] renderTemplateBar fatal error:', err);
     }
   }
 
