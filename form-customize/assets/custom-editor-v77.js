@@ -2298,16 +2298,19 @@
     }, true); // キャプチャフェーズで登録！
     
     // MutationObserver による自動ソート適用
-    let isSorting = false;
     const observer = new MutationObserver(() => {
-      if (isSorting) return;
       const listContainer = document.querySelector('.gf-list-container');
       const previewGrid = document.querySelector('.dashboard-grid');
       
       if (listContainer || previewGrid) {
-        isSorting = true;
+        observer.disconnect(); // 一時的に監視を停止して無限ループを回避
         applyDashboardSort();
-        isSorting = false;
+        
+        // 再度監視を開始
+        const dashboardPanel = document.getElementById('panel-dashboard');
+        if (dashboardPanel) {
+          observer.observe(dashboardPanel, { childList: true, subtree: true });
+        }
       }
     });
 
