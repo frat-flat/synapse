@@ -1870,15 +1870,78 @@
     }
   }
 
+  function createNewFormDirectlyWithoutPrompt() {
+    try {
+      const originalGetItem = localStorage.getItem;
+      let allForms = [];
+      try {
+        allForms = JSON.parse(originalGetItem.call(localStorage, 'form_customize_all_forms') || '[]');
+      } catch(e) {}
+
+      let currentUser = { id: 'user_own_editor', name: '編集（自分がオーナーのみ）', role: 'own_editor' };
+      try {
+        const userRaw = originalGetItem.call(localStorage, 'gf_current_user');
+        if (userRaw) {
+          currentUser = JSON.parse(userRaw);
+        }
+      } catch(e) {}
+
+      const defaultSchema = {
+        title: `無題のフォーム (${allForms.length + 1})`,
+        description: 'フォームの説明を入力してください。',
+        isLocked: false,
+        isTemplateMode: false,
+        ownerId: currentUser.id,
+        ownerName: currentUser.name,
+        sections: [
+          {
+            id: 'section_1',
+            title: '無題のセクション',
+            description: 'セクションの説明をご入力ください。',
+            questions: []
+          }
+        ]
+      };
+
+      const today = new Date();
+      defaultSchema.lastModified = `${today.getHours().toString().padStart(2, '0')}:${today.getMinutes().toString().padStart(2, '0')}`;
+
+      allForms.push(defaultSchema);
+      localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+      
+      const activeIdx = allForms.length - 1;
+      localStorage.setItem('form_customize_active_index', activeIdx.toString());
+      localStorage.setItem('form_customize_is_template_mode', 'false');
+      localStorage.setItem('form_customize_active_form_title', defaultSchema.title);
+      localStorage.setItem('form_customize_active_tab', 'editor');
+
+      console.log('[Dashboard Hook] Created new form without prompt. Index:', activeIdx);
+
+      // リロードして編集画面で起動
+      window.location.reload();
+    } catch (err) {
+      console.error('[Dashboard Hook] Failed to create form without prompt:', err);
+      alert('フォームの作成に失敗しました。');
+    }
+  }
+
   function startDashboardHookLoop() {
     setInterval(() => {
       try {
         const createBtn = document.getElementById('btn-dashboard-create');
         if (createBtn && !createBtn.dataset.hooked) {
           createBtn.dataset.hooked = "true";
-          createBtn.addEventListener('click', () => {
-            localStorage.setItem('form_customize_is_template_mode', 'false');
-          });
+          
+          // イベントキャプチャフェーズ (第3引数 true) でクリックをインターセプト
+          createBtn.addEventListener('click', (e) => {
+            console.log('[Dashboard Hook] Intercepted btn-dashboard-create click.');
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            
+            // プロンプトポップを出さずに即座に新規作成を実行
+            createNewFormDirectlyWithoutPrompt();
+          }, true);
         }
       } catch (err) {
         console.error('[Dashboard Hook Error]', err);
