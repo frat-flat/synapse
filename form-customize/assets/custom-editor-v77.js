@@ -97,9 +97,9 @@
       return;
     }
 
-    // 4. テンプレートバーからのギャラリー遷移ボタンのフック
-    if (target && (target.id === 'btn-open-full-gallery' || target.closest('#btn-open-full-gallery'))) {
-      console.log('[Extension] Captured click on btn-open-full-gallery. Opening gallery...');
+    // 4. テンプレートバーからのギャラリー遷移ボタンのフック (左上ボタン)
+    if (target && (target.id === 'btn-open-full-gallery-left' || target.closest('#btn-open-full-gallery-left'))) {
+      console.log('[Extension] Captured click on btn-open-full-gallery-left. Opening gallery...');
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
@@ -666,36 +666,16 @@
         container.appendChild(createTemplateCardElement(displayTemplates[i]));
       }
       
-      // 折りたたみトグル状態の初期化
-      const isCollapsed = localStorage.getItem('form_customize_template_bar_collapsed') === 'true';
-      const expandedView = document.getElementById('template-bar-expanded');
-      const collapsedView = document.getElementById('template-bar-collapsed');
-      const barContainer = document.getElementById('dashboard-template-bar');
-      
-      if (barContainer && expandedView && collapsedView) {
-        if (isCollapsed) {
-          expandedView.style.display = 'none';
-          collapsedView.style.display = 'flex';
-          barContainer.style.padding = '8px 0';
-          barContainer.style.marginBottom = '10px';
-        } else {
-          expandedView.style.display = 'block';
-          collapsedView.style.display = 'none';
-          barContainer.style.padding = '18px 0 25px 0';
-          barContainer.style.marginBottom = '20px';
-        }
-      }
-      
-      console.log('[Templates] Rendered template bar. Mode:', mode, 'Count:', showCount + 1, 'Collapsed:', isCollapsed);
+      console.log('[Templates] Rendered template bar. Mode:', mode, 'Count:', showCount + 1);
     } catch(err) {
       console.error('[Templates] renderTemplateBar error:', err);
     }
   }
 
-  // テンプレートバーの折りたたみトグル制御
+  // テンプレートバーのトグル制御
   function setupTemplateBarToggleListeners() {
     try {
-      // イベントデリゲーションで縦三点と折りたたみアクションを強固に制御
+      // 最近使った / お気に入りのフィルタ切り替えのみ処理
       document.addEventListener('click', (e) => {
         const target = e.target;
         
@@ -714,36 +694,6 @@
           renderTemplateBar();
           return;
         }
-        
-        // 縦三点オプションボタンのクリック
-        if (target && (target.id === 'btn-template-bar-options' || target.closest('#btn-template-bar-options'))) {
-          e.stopPropagation();
-          const dropdown = document.getElementById('template-options-dropdown');
-          if (dropdown) dropdown.classList.toggle('active');
-          return;
-        }
-        
-        // 「非表示にする」オプションのクリック
-        if (target && (target.id === 'opt-hide-templates' || target.closest('#opt-hide-templates'))) {
-          e.stopPropagation();
-          localStorage.setItem('form_customize_template_bar_collapsed', 'true');
-          renderTemplateBar();
-          const dropdown = document.getElementById('template-options-dropdown');
-          if (dropdown) dropdown.classList.remove('active');
-          return;
-        }
-        
-        // 「テンプレートを表示する」リンクのクリック
-        if (target && (target.id === 'btn-show-templates' || target.closest('#btn-show-templates'))) {
-          e.stopPropagation();
-          localStorage.setItem('form_customize_template_bar_collapsed', 'false');
-          renderTemplateBar();
-          return;
-        }
-        
-        // メメニュー外クリック時にドロップダウンを閉じる
-        const dropdown = document.getElementById('template-options-dropdown');
-        if (dropdown) dropdown.classList.remove('active');
       });
     } catch(err) {
       console.error('[Templates] setupTemplateBarToggleListeners error:', err);
