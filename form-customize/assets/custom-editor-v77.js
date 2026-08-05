@@ -1200,8 +1200,15 @@
                 templates.splice(idx, 1);
                 saveTemplates(templates);
                 showCustomToast('テンプレートを削除しました。', 'success');
-                renderTemplateGallery();
-                renderTemplatesListOnDashboard();
+                if (typeof renderTemplateGallery === 'function') {
+                  renderTemplateGallery();
+                }
+                if (typeof renderTemplateBar === 'function') {
+                  renderTemplateBar();
+                }
+                if (typeof renderFullTemplateGallery === 'function') {
+                  renderFullTemplateGallery();
+                }
               }
             });
           }
