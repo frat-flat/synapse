@@ -2166,6 +2166,157 @@
     }
   }
 
+  // --- ダッシュボードソート＆グローバルリスナー実装 ---
+  window.currentSortMode = 'date'; // 'date' | 'title' | 'lastModified'
+
+  function applyDashboardSort() {
+    const mode = window.currentSortMode;
+    
+    // 1. リスト表示のソート
+    const listContainer = document.querySelector('.gf-list-container');
+    if (listContainer) {
+      const rows = Array.from(listContainer.querySelectorAll('.gf-list-row'));
+      if (rows.length > 0) {
+        rows.forEach((row, idx) => {
+          if (!row.hasAttribute('data-original-index')) {
+            row.setAttribute('data-original-index', idx);
+          }
+        });
+        
+        rows.sort((a, b) => {
+          if (mode === 'title') {
+            const titleA = (a.querySelector('.gf-list-title-text')?.textContent || '').trim();
+            const titleB = (b.querySelector('.gf-list-title-text')?.textContent || '').trim();
+            return titleA.localeCompare(titleB, 'ja');
+          } else if (mode === 'lastModified') {
+            const timeA = (a.querySelector('.gf-list-time-area')?.textContent || '').trim();
+            const timeB = (b.querySelector('.gf-list-time-area')?.textContent || '').trim();
+            return timeB.localeCompare(timeA); // 降順 (最新順)
+          } else {
+            const idxA = parseInt(a.getAttribute('data-original-index') || '0', 10);
+            const idxB = parseInt(b.getAttribute('data-original-index') || '0', 10);
+            return idxA - idxB;
+          }
+        });
+        
+        rows.forEach(row => listContainer.appendChild(row));
+      }
+    }
+    
+    // 2. プレビュー表示のソート
+    const previewGrid = document.querySelector('.dashboard-grid');
+    if (previewGrid) {
+      const cards = Array.from(previewGrid.querySelectorAll('.form-preview-card'));
+      if (cards.length > 0) {
+        cards.forEach((card, idx) => {
+          if (!card.hasAttribute('data-original-index')) {
+            card.setAttribute('data-original-index', idx);
+          }
+        });
+        
+        cards.sort((a, b) => {
+          if (mode === 'title') {
+            const titleA = (a.querySelector('.card-preview-title-gf span')?.textContent || '').trim();
+            const titleB = (b.querySelector('.card-preview-title-gf span')?.textContent || '').trim();
+            return titleA.localeCompare(titleB, 'ja');
+          } else if (mode === 'lastModified') {
+            const textA = (a.querySelector('.card-preview-meta-gf')?.textContent || '');
+            const textB = (b.querySelector('.card-preview-meta-gf')?.textContent || '');
+            const matchA = textA.match(/\d{2}:\d{2}/);
+            const matchB = textB.match(/\d{2}:\d{2}/);
+            const timeA = matchA ? matchA[0] : '00:00';
+            const timeB = matchB ? matchB[0] : '00:00';
+            return timeB.localeCompare(timeA); // 降順 (最新順)
+          } else {
+            const idxA = parseInt(a.getAttribute('data-original-index') || '0', 10);
+            const idxB = parseInt(b.getAttribute('data-original-index') || '0', 10);
+            return idxA - idxB;
+          }
+        });
+        
+        cards.forEach(card => previewGrid.appendChild(card));
+      }
+    }
+  }
+
+  function toggleSortMode() {
+    if (window.currentSortMode === 'date') {
+      window.currentSortMode = 'title';
+    } else if (window.currentSortMode === 'title') {
+      window.currentSortMode = 'lastModified';
+    } else {
+      window.currentSortMode = 'date';
+    }
+    
+    const label = document.getElementById('sort-label-text');
+    if (label) {
+      if (window.currentSortMode === 'title') {
+        label.textContent = 'タイトル順';
+      } else if (window.currentSortMode === 'lastModified') {
+        label.textContent = '最終更新順';
+      } else {
+        label.textContent = '最終閲覧 (自分)';
+      }
+    }
+    
+    applyDashboardSort();
+  }
+
+  function setupDashboardGlobalListeners() {
+    // テンプレート追加ボタン、フォルダボタン、並べ替えボタンのフック
+    document.addEventListener('click', (e) => {
+      // 1. テンプレートを追加ボタン (#btn-dashboard-sample)
+      const sampleBtn = e.target.closest('#btn-dashboard-sample');
+      if (sampleBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        openTemplateGallery();
+        return;
+      }
+      
+      // 2. フォルダボタン (#btn-folder-gf)
+      const folderBtn = e.target.closest('#btn-folder-gf');
+      if (folderBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        openTemplateGallery();
+        return;
+      }
+
+      // 3. 並び替え順ボタン (#btn-sort-gf) またはソートラベル (#sort-label-text)
+      const sortBtn = e.target.closest('#btn-sort-gf');
+      const sortLabel = e.target.closest('#sort-label-text');
+      if ((sortBtn || sortLabel) && !e.target.closest('#btn-folder-gf') && !e.target.closest('#btn-toggle-view-gf')) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        toggleSortMode();
+        return;
+      }
+    }, true); // キャプチャフェーズで登録！
+    
+    // MutationObserver による自動ソート適用
+    let isSorting = false;
+    const observer = new MutationObserver(() => {
+      if (isSorting) return;
+      const listContainer = document.querySelector('.gf-list-container');
+      const previewGrid = document.querySelector('.dashboard-grid');
+      
+      if (listContainer || previewGrid) {
+        isSorting = true;
+        applyDashboardSort();
+        isSorting = false;
+      }
+    });
+
+    const dashboardPanel = document.getElementById('panel-dashboard');
+    if (dashboardPanel) {
+      observer.observe(dashboardPanel, { childList: true, subtree: true });
+    }
+  }
+
   function openTemplateGallery() {
     const modal = document.getElementById('template-gallery-modal');
     if (modal) {
@@ -2323,6 +2474,7 @@
   setTimeout(() => {
     initTemplates();
     setupTemplateGalleryModal();
+    setupDashboardGlobalListeners();
     startDashboardHookLoop();
   }, 100);
 
