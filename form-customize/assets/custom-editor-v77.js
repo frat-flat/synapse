@@ -2285,7 +2285,7 @@
 
   function updateSortUI() {
     const mode = window.currentSortMode;
-    const sortSelect = document.getElementById('sort-select-gf');
+    const sortSelect = document.getElementById('sort-label-text');
     if (sortSelect) {
       sortSelect.value = mode;
     }
@@ -2316,7 +2316,7 @@
     }, true); // キャプチャフェーズで登録！
     
     // プルダウン変更時のソート適用イベントリスナー
-    const sortSelect = document.getElementById('sort-select-gf');
+    const sortSelect = document.getElementById('sort-label-text');
     if (sortSelect) {
       sortSelect.value = window.currentSortMode;
       sortSelect.addEventListener('change', (e) => {
