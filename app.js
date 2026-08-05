@@ -4250,7 +4250,56 @@ function renderCustomTable(tableId) {
           `;
         }
       } else {
-        td.textContent = displayVal;
+        const urlRegex = /^(https?:\/\/[^\s]+)$/i;
+        if (typeof displayVal === 'string' && urlRegex.test(displayVal.trim())) {
+          const urlStr = displayVal.trim();
+          td.innerHTML = '';
+          td.style.position = 'relative';
+          
+          const isResumable = urlStr.includes('res_id=') && urlStr.includes('form-customize');
+          const link = document.createElement('a');
+          if (isResumable) {
+            link.href = '#';
+            link.textContent = '再開 ↗';
+            link.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (typeof window.openResumableUrl === 'function') {
+                window.openResumableUrl(urlStr);
+              } else {
+                window.open(urlStr, '_blank');
+              }
+            });
+          } else {
+            link.href = urlStr;
+            link.target = '_blank';
+            link.textContent = '開く ↗';
+          }
+          link.style.color = 'var(--primary, #3182ce)';
+          link.style.textDecoration = 'underline';
+          link.style.marginRight = '8px';
+          link.style.fontSize = '0.8rem';
+          link.style.fontWeight = 'bold';
+          td.appendChild(link);
+
+          const copyBtn = document.createElement('span');
+          copyBtn.innerHTML = '📋';
+          copyBtn.style.cursor = 'pointer';
+          copyBtn.title = 'URLをコピー';
+          copyBtn.style.fontSize = '0.85rem';
+          copyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            navigator.clipboard.writeText(urlStr).then(() => {
+              showToast('URLをクリップボードにコピーしました！', 'success');
+            }).catch(() => {
+              showToast('コピーに失敗しました。', 'warning');
+            });
+          });
+          td.appendChild(copyBtn);
+        } else {
+          td.textContent = displayVal;
+        }
       }
 
       // シングルクリックでドロップダウン編集を開く（ドロップダウンのみ）
@@ -12691,7 +12740,22 @@ function handleFormSubmitMessage(event) {
   const { formTitle, data, isTemporary, rowId: clientRowId } = event.data;
   if (!data) return;
 
-  console.log(`%c[Form Submit]%c Received submission for form "${formTitle}" (isTemporary: ${!!isTemporary}, rowId: ${clientRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
+  // 事前に行IDを決定（新規なら採番、既存なら引き継ぐ）
+  const targetRowId = clientRowId || 'row_' + Date.now();
+
+  // 一時保存・回答完了ステータスおよび再開用URLをデータに自動マージ
+  data["ステータス"] = isTemporary ? "一時保存" : "回答完了";
+  
+  // プレビュー画面で再開させるためのURLを生成
+  // トークンはデモ用に簡易的なタイムスタンプベース
+  const generatedToken = 'token_' + Math.random().toString(36).substr(2, 9);
+  const resumeUrl = isTemporary 
+    ? window.location.origin + "/form-customize/index.html?res_id=" + targetRowId + "&token=" + generatedToken + "&active_tab=preview"
+    : "";
+  
+  data["再開用URL"] = resumeUrl;
+
+  console.log(`%c[Form Submit]%c Received submission for form "${formTitle}" (isTemporary: ${!!isTemporary}, rowId: ${targetRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
 
   // ----------------------------------------------------
   // 1. COS内カスタムマスターテーブルへのデータ蓄積・更新
@@ -12774,17 +12838,11 @@ function handleFormSubmitMessage(event) {
   }
 
   // 既存のレコードを上書き更新するか、新規に作成するか
-  let targetRow = null;
-  let targetRowId = clientRowId;
-
-  if (targetRowId) {
-    targetRow = targetTable.rows.find(r => r.id === targetRowId);
-  }
+  let targetRow = targetTable.rows.find(r => r.id === targetRowId);
 
   if (targetRow) {
     console.log('[Synapse Database] Updating existing row:', targetRowId);
   } else {
-    targetRowId = targetRowId || 'row_' + Date.now();
     targetRow = {
       id: targetRowId
     };
@@ -12806,6 +12864,17 @@ function handleFormSubmitMessage(event) {
   // 編集監査ログへ記録
   logCellEdit(targetTable.id, targetRowId, 'all_columns', 'none', JSON.stringify(data));
   console.log(`%c[Synapse Database]%c Saved row (ID: ${targetRowId}) to Custom Master Table "${formTitle}":`, "color: #3b82f6; font-weight: bold;", "color: inherit;", targetRow);
+
+  // 送信元（iframe）に結果を返却
+  if (event.source && typeof event.source.postMessage === 'function') {
+    event.source.postMessage({
+      type: 'FORM_SUBMIT_RESPONSE',
+      success: true,
+      rowId: targetRowId,
+      isTemporary: !!isTemporary,
+      resumeUrl: resumeUrl
+    }, '*');
+  }
 
   // もしカスタムテーブルが新設された場合は、サイドメニューを再描画する
   if (isNewTable) {
@@ -28512,6 +28581,31 @@ function showBusinessRoleSelectionModal(user) {
     backofficeBtn.onclick = () => selectRole('back-office');
   }
 }
+
+// 再開用URLを Synapse ダッシュボード内でシームレスに開くグローバル関数
+window.openResumableUrl = function(urlStr) {
+  const iframe = document.querySelector('#form-customize-screen iframe');
+  if (iframe) {
+    try {
+      const url = new URL(urlStr);
+      // 相対パスに変換、または現在のオリジンに合わせる
+      iframe.src = 'form-customize/index.html' + url.search;
+      
+      const formCustomizeBtn = document.getElementById('menu-form-customize');
+      if (formCustomizeBtn) {
+        formCustomizeBtn.click();
+      } else if (typeof openTab === 'function') {
+        openTab('form-customize-screen', 'form-customize-screen', 'フォーム作成');
+      }
+      showToast('一時保存データから回答を再開します。', 'info');
+    } catch (e) {
+      console.error('Failed to open resumable url:', e);
+      showToast('再開用URLの解析に失敗しました。', 'error');
+    }
+  } else {
+    showToast('フォーム作成画面が見つかりません。', 'error');
+  }
+};
 
 
 
