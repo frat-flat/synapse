@@ -2,6 +2,35 @@
 (function() {
   console.log('custom-editor.js loading...');
 
+  // 起動時セーフガード: フラグのリセットおよび破損データの自動修復
+  (function initSanitize() {
+    try {
+      localStorage.setItem('form_customize_is_template_mode', 'false');
+      
+      const key = 'form_customize_all_forms';
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        let parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          // nullや無効なオブジェクト、またはタイトル（title）がないゴミデータを除外
+          const sanitized = parsed.filter(f => f && typeof f === 'object' && f.title);
+          
+          // ownerIdが欠損している要素への補完
+          sanitized.forEach(f => {
+            if (!f.ownerId) {
+              f.ownerId = 'user_own_editor';
+            }
+          });
+          
+          localStorage.setItem(key, JSON.stringify(sanitized));
+          console.log('[Sanitize] Data repaired successfully. Total count:', sanitized.length);
+        }
+      }
+    } catch(err) {
+      console.error('[Guard] Sanitize failed:', err);
+    }
+  })();
+
   // CSSのキャッシュ破り用動的インジェクションハック！！！
   (function injectLatestCSS() {
     const link = document.createElement('link');
@@ -1846,8 +1875,6 @@
 
   // ページ起動時ロード処理の末尾でフックを起動
   setTimeout(() => {
-    // テンプレートモードフラグを強制解除し、通常フォーム一覧が正常に表示されるようにする
-    localStorage.setItem('form_customize_is_template_mode', 'false');
     setupDashboardGlobalListeners();
     startDashboardHookLoop();
   }, 100);
