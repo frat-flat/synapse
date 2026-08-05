@@ -2854,6 +2854,13 @@
             footer.appendChild(regBtn);
           }
         });
+
+        // 4. テンプレートバーの自動再描画（他のレンダラによって空にされていたら再描画）
+        const barGrid = document.getElementById('template-bar-cards-grid');
+        if (barGrid && barGrid.children.length === 0) {
+          console.log('[Dashboard Hook] Template bar grid is empty, re-rendering...');
+          renderTemplateBar();
+        }
       } catch (err) {
         console.error('[Dashboard Hook Error]', err);
       }

@@ -1376,7 +1376,7 @@ input:-webkit-autofill:active {
   border-bottom: 1px solid #dadce0 !important;
   width: 100% !important;
   box-sizing: border-box !important;
-  padding: 2px 0 12px 0 !important; /* 上部パディングをさらに縮小 */
+  padding: 6px 8px 24px 8px !important; /* 上と左はギリギリに寄せ、下はカード用に広げる */
   margin-bottom: 20px !important;
 }
 
@@ -1384,7 +1384,7 @@ input:-webkit-autofill:active {
   width: 100% !important;
   max-width: none !important;
   margin: 0 !important;
-  padding: 0 !important; /* パディングを完全ゼロにしてギリギリまで左端に寄せる */
+  padding: 0 !important; /* 親コンテナ側で左端ギリギリに調整 */
   box-sizing: border-box !important;
 }
 
