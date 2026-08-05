@@ -2890,12 +2890,36 @@
     }, 500);
   }
 
+  // 安全のためのダミー定義（クラッシュ防止）
+  function setupDashboardGlobalListeners() {
+    console.log('[Dashboard] setupDashboardGlobalListeners stub executed.');
+  }
+
   // ページ起動時ロード処理の末尾でフックを起動
   setTimeout(() => {
-    setupDashboardGlobalListeners();
-    startDashboardHookLoop();
-    renderTemplateBar(); // テンプレート選択バーを描画
-    setupTemplateGalleryListeners(); // ギャラリー画面遷移リスナーを初期化
+    try {
+      setupDashboardGlobalListeners();
+    } catch(e) {
+      console.error('[Init] setupDashboardGlobalListeners error:', e);
+    }
+    
+    try {
+      startDashboardHookLoop();
+    } catch(e) {
+      console.error('[Init] startDashboardHookLoop error:', e);
+    }
+    
+    try {
+      renderTemplateBar(); // テンプレート選択バーを描画
+    } catch(e) {
+      console.error('[Init] renderTemplateBar error:', e);
+    }
+    
+    try {
+      setupTemplateGalleryListeners(); // ギャラリー画面遷移リスナーを初期化
+    } catch(e) {
+      console.error('[Init] setupTemplateGalleryListeners error:', e);
+    }
   }, 100);
 
   function setupStickyPreviewTracker() {
