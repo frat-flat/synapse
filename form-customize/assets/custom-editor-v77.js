@@ -1,6 +1,6 @@
 
 (function() {
-  alert('[Debug] custom-editor-v77.js has loaded successfully. Version: 7.7.4');
+  alert('[Debug] custom-editor-v77.js has loaded successfully. Version: 7.7.5');
   console.log('custom-editor.js loading...');
 
   // localStorage の読み書きをインターセプト（テンプレート編集モード対応）
@@ -2515,33 +2515,45 @@
 
   function startDashboardHookLoop() {
     setInterval(() => {
+      // 1. テンプレートを追加ボタン (#btn-dashboard-sample) のフック
       const sampleBtn = document.getElementById('btn-dashboard-sample');
       if (sampleBtn && !sampleBtn.dataset.templated) {
         sampleBtn.dataset.templated = "true";
         sampleBtn.innerHTML = '<span class="btn-text">📁 テンプレートを追加</span>';
         
-        // キャプチャフェーズ (第3引数 true) でクリックをインターセプトし、
-        // 同一要素にバインドされた元のリスナー (サンプル追加) の実行を完全に防ぐ
-        sampleBtn.addEventListener('click', (e) => {
-          console.log('[Dashboard Hook] sampleBtn clicked directly.');
+        // インライン onclick 属性を動的に再付与
+        sampleBtn.setAttribute('onclick', "if(window.openTemplateGallery){window.openTemplateGallery();}else{alert('システム初期化中です。少々お待ちください。');}");
+        
+        // 直接プロパティでのイベント登録（二重化）
+        sampleBtn.onclick = function(e) {
+          console.log('[Dashboard Hook] sampleBtn clicked.');
           e.preventDefault();
           e.stopPropagation();
           e.stopImmediatePropagation();
-          openTemplateGallery();
-        }, true);
+          if (window.openTemplateGallery) {
+            window.openTemplateGallery();
+          }
+        };
       }
 
-      // フォルダボタンへの直接イベントバインドも追加
+      // 2. フォルダボタン (#btn-folder-gf) のフック
       const folderBtn = document.getElementById('btn-folder-gf');
       if (folderBtn && !folderBtn.dataset.hooked) {
         folderBtn.dataset.hooked = "true";
-        folderBtn.addEventListener('click', (e) => {
-          console.log('[Dashboard Hook] folderBtn clicked directly.');
+        
+        // インライン onclick 属性を動的に再付与
+        folderBtn.setAttribute('onclick', "if(window.openTemplateGallery){window.openTemplateGallery();}else{alert('システム初期化中です。少々お待ちください。');}");
+        
+        // 直接プロパティでのイベント登録（二重化）
+        folderBtn.onclick = function(e) {
+          console.log('[Dashboard Hook] folderBtn clicked.');
           e.preventDefault();
           e.stopPropagation();
           e.stopImmediatePropagation();
-          openTemplateGallery();
-        }, true);
+          if (window.openTemplateGallery) {
+            window.openTemplateGallery();
+          }
+        };
       }
 
       const createBtn = document.getElementById('btn-dashboard-create');
@@ -2592,7 +2604,7 @@
           renderTemplatesListOnDashboard();
         }
       }
-    }, 500);
+    }, 100);
   }
 
   // ページ起動時ロード処理の末尾でフックを起動
