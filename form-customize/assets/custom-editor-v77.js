@@ -32,7 +32,7 @@
     }
   })();
 
-  // CSSのキャッシュ破り用動的インジェクションハック！！！
+  // CSS의 キャッシュ破り用動的インジェクションハック！！！
   (function injectLatestCSS() {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
@@ -40,6 +40,45 @@
     document.head.appendChild(link);
     console.log('[Custom Flowmap] Injected latest stylesheet:', link.href);
   })();
+
+  // 📁 【強固なイベントデリゲーション】新規作成ボタンとギャラリーボタンのフック (プロンプト回避 & ギャラリー起動)
+  document.addEventListener('click', (e) => {
+    const target = e.target;
+    
+    // 1. 新規フォーム作成ボタンのフック
+    if (target && (target.id === 'btn-dashboard-create' || target.closest('#btn-dashboard-create'))) {
+      console.log('[Extension] Captured click on btn-dashboard-create. Preventing prompt...');
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      
+      // 空白フォームから新規作成を実行
+      createFormFromTemplate(null);
+      return;
+    }
+    
+    // 2. テンプレートギャラリーボタンのフック
+    if (target && (target.id === 'btn-dashboard-gallery' || target.closest('#btn-dashboard-gallery'))) {
+      console.log('[Extension] Captured click on btn-dashboard-gallery. Opening gallery...');
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      
+      const galleryPanel = document.getElementById('panel-template-gallery');
+      if (galleryPanel) {
+        document.querySelectorAll('.tab-panel').forEach(panel => {
+          panel.classList.remove('active');
+        });
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+          tab.classList.remove('active');
+        });
+        
+        galleryPanel.classList.add('active');
+        renderFullTemplateGallery();
+      }
+      return;
+    }
+  }, true); // キャプチャフェーズでフック！
 
   // ==========================================================================
   // Google Forms 風 テンプレートマスタデータ定義と処理ロジック
@@ -617,22 +656,7 @@
       const dashboardPanel = document.getElementById('panel-dashboard');
       const galleryPanel = document.getElementById('panel-template-gallery');
       
-      if (openBtn && dashboardPanel && galleryPanel) {
-        openBtn.addEventListener('click', () => {
-          document.querySelectorAll('.tab-panel').forEach(panel => {
-            panel.classList.remove('active');
-          });
-          document.querySelectorAll('.nav-tab').forEach(tab => {
-            tab.classList.remove('active');
-          });
-          
-          galleryPanel.classList.add('active');
-          renderFullTemplateGallery();
-          
-          console.log('[Templates] Navigation: dashboard -> gallery');
-        });
-      }
-      
+      // (開く処理はグローバルデリゲーションで処理されるため、ここでは戻るボタンとタブのバインドのみ行います)
       if (backBtn && dashboardPanel && galleryPanel) {
         backBtn.addEventListener('click', () => {
           galleryPanel.classList.remove('active');
@@ -2555,21 +2579,7 @@
   function startDashboardHookLoop() {
     setInterval(() => {
       try {
-        // 1. 新規フォーム作成ボタンのフック (空白フォームから作成)
-        const createBtn = document.getElementById('btn-dashboard-create');
-        if (createBtn && !createBtn.dataset.hooked) {
-          createBtn.dataset.hooked = "true";
-          
-          createBtn.addEventListener('click', (e) => {
-            console.log('[Dashboard Hook] Intercepted btn-dashboard-create click. Creating blank form...');
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-            
-            // 空白フォームから新規作成を実行
-            createFormFromTemplate(null);
-          }, true);
-        }
+        // 1. 新規フォーム作成ボタンのフックはグローバルデリゲーションで処理されるため省略します。
 
         // 2. リスト表示（テーブル行）への「⭐ テンプレート登録」ボタン自動アペンド
         const listRows = document.querySelectorAll('#dashboard-view-list tbody tr');
@@ -5675,6 +5685,12 @@
       setTimeout(() => {
         const activeTab = localStorage.getItem('form_customize_active_tab') || 'dashboard';
         if (activeTab === 'editor') {
+          // 確実に全体の概要（セクション一覧）を開くために r = null にして再描画
+          window.r = null;
+          if (typeof window.x === 'function') {
+            window.x();
+          }
+
           if (btnHeaderPreview) {
             btnHeaderPreview.style.setProperty("display", "flex", "important");
             if (window.innerWidth <= 1180) {
