@@ -1,6 +1,6 @@
 
 (function() {
-  alert('[Debug] custom-editor-v77.js has loaded successfully. Version: 7.7.3');
+  alert('[Debug] custom-editor-v77.js has loaded successfully. Version: 7.7.4');
   console.log('custom-editor.js loading...');
 
   // localStorage の読み書きをインターセプト（テンプレート編集モード対応）
@@ -2102,6 +2102,7 @@
       const listContainer = document.getElementById('template-gallery-list');
       if (!listContainer) {
         console.error('[Dashboard Hook] template-gallery-list element not found.');
+        alert('エラー: テンプレートリストのコンテナ要素 (#template-gallery-list) が見つかりません。');
         return;
       }
 
@@ -2372,8 +2373,14 @@
     console.log('[Dashboard Hook] openTemplateGallery called.');
     try {
       let modal = document.getElementById('template-gallery-modal');
-      if (!modal) {
-        console.warn('[Dashboard Hook] template-gallery-modal not found. Creating dynamically...');
+      let listContainer = document.getElementById('template-gallery-list');
+      
+      // モーダルが無い、または中身のリストコンテナが無い場合は「壊れている」と判定して強制再生成
+      if (!modal || !listContainer) {
+        console.warn('[Dashboard Hook] Modal is missing or broken. Re-creating...');
+        if (modal) {
+          modal.remove();
+        }
         modal = createDynamicTemplateGalleryModal();
       }
       
