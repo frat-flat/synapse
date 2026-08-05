@@ -6,6 +6,7 @@
   (function initSanitize() {
     try {
       localStorage.setItem('form_customize_is_template_mode', 'false');
+      initTemplates(); // テンプレートマスタ初期化
       
       const key = 'form_customize_all_forms';
       const raw = localStorage.getItem(key);
@@ -39,6 +40,545 @@
     document.head.appendChild(link);
     console.log('[Custom Flowmap] Injected latest stylesheet:', link.href);
   })();
+
+  // ==========================================================================
+  // Google Forms 風 テンプレートマスタデータ定義と処理ロジック
+  // ==========================================================================
+
+  const DEFAULT_TEMPLATES = [
+    {
+      title: "連絡先情報",
+      description: "連絡先情報を収集するためのフォームです。",
+      category: "personal",
+      stripeColor: "#1e8e3e", // 緑
+      sections: [
+        {
+          id: "sec_contact_1",
+          title: "連絡先情報",
+          description: "連絡先情報をご入力ください。",
+          questions: [
+            { id: "q_c1", type: "text", title: "名前", required: true },
+            { id: "q_c2", type: "text", title: "メールアドレス", required: true },
+            { id: "q_c3", type: "text", title: "電話番号", required: false },
+            { id: "q_c4", type: "textarea", title: "住所", required: false }
+          ]
+        }
+      ]
+    },
+    {
+      title: "イベント出欠確認",
+      description: "イベントの出欠確認フォームです。",
+      category: "personal",
+      stripeColor: "#1a73e8", // 青
+      sections: [
+        {
+          id: "sec_event_1",
+          title: "イベント出欠確認",
+          description: "ご参加の可否をお知らせください。",
+          questions: [
+            { id: "q_e1", type: "radio", title: "ご参加されますか？", options: ["出席", "欠席", "未定"], required: true },
+            { id: "q_e2", type: "checkbox", title: "食事の制限はありますか？", options: ["ベジタリアン", "アレルギーあり", "特になし"], required: false },
+            { id: "q_e3", type: "textarea", title: "ご質問やご要望", required: false }
+          ]
+        }
+      ]
+    },
+    {
+      title: "パーティー招待状",
+      description: "パーティーの招待状フォームです。",
+      category: "personal",
+      stripeColor: "#f4b400", // 黄
+      sections: [
+        {
+          id: "sec_party_1",
+          title: "パーティー招待状",
+          description: "パーティーへご招待いたします！",
+          questions: [
+            { id: "q_p1", type: "text", title: "お名前", required: true },
+            { id: "q_p2", type: "radio", title: "何人でご参加されますか？", options: ["1人", "2人", "3人以上"], required: true },
+            { id: "q_p3", type: "textarea", title: "アレルギーなど配慮が必要な事項", required: false }
+          ]
+        }
+      ]
+    },
+    {
+      title: "Tシャツ申込書",
+      description: "Tシャツの購入申込書フォームです。",
+      category: "personal",
+      stripeColor: "#ab47bc", // 紫
+      sections: [
+        {
+          id: "sec_tshirt_1",
+          title: "Tシャツ申込書",
+          description: "ご希望のTシャツのサイズとカラーをお選びください。",
+          questions: [
+            { id: "q_t1", type: "text", title: "お名前", required: true },
+            { id: "q_t2", type: "radio", title: "サイズ", options: ["S", "M", "L", "XL"], required: true },
+            { id: "q_t3", type: "radio", title: "カラー", options: ["ホワイト", "ブラック", "ブルー"], required: true },
+            { id: "q_t4", type: "textarea", title: "その他ご要望", required: false }
+          ]
+        }
+      ]
+    },
+    {
+      title: "イベント参加申込書",
+      description: "イベントの参加申込フォームです。",
+      category: "personal",
+      stripeColor: "#db4437", // 赤
+      sections: [
+        {
+          id: "sec_join_1",
+          title: "イベント参加申込書",
+          description: "参加申込情報を入力してください。",
+          questions: [
+            { id: "q_j1", type: "text", title: "氏名", required: true },
+            { id: "q_j2", type: "text", title: "会社名 / 学校名", required: false },
+            { id: "q_j3", type: "text", title: "メールアドレス", required: true },
+            { id: "q_j4", type: "radio", title: "参加枠", options: ["一般枠", "学生枠", "登壇者・関係者枠"], required: true }
+          ]
+        }
+      ]
+    },
+    {
+      title: "スケジュール確認",
+      description: "日程調整用のフォームです。",
+      category: "personal",
+      stripeColor: "#4285f4", // 青
+      sections: [
+        {
+          id: "sec_sched_1",
+          title: "スケジュール確認",
+          description: "ご都合の良い日程をお知らせください。",
+          questions: [
+            { id: "q_s1", type: "text", title: "お名前", required: true },
+            { id: "q_s2", type: "checkbox", title: "参加可能日程 (複数選択可)", options: ["8/10 (月) 10:00~", "8/10 (月) 14:00~", "8/11 (火) 10:00~", "8/11 (火) 14:00~"], required: true }
+          ]
+        }
+      ]
+    },
+    {
+      title: "イベント参加者アンケート",
+      description: "イベント終了後のアンケートです。",
+      category: "work",
+      stripeColor: "#0f9d58", // 深い緑
+      sections: [
+        {
+          id: "sec_survey_1",
+          title: "イベント参加者アンケート",
+          description: "本日のイベントに関するご意見をお聞かせください。",
+          questions: [
+            { id: "q_su1", type: "radio", title: "本日の満足度はいかがでしたか？", options: ["大変満足", "満足", "普通", "不満"], required: true },
+            { id: "q_su2", type: "textarea", title: "最も良かったセッションやその理由をご記入ください。", required: false },
+            { id: "q_su3", type: "textarea", title: "今後のイベントへの改善要望", required: false }
+          ]
+        }
+      ]
+    },
+    {
+      title: "注文書",
+      description: "商品の注文書フォームです。",
+      category: "work",
+      stripeColor: "#e67e22", // オレンジ
+      sections: [
+        {
+          id: "sec_order_1",
+          title: "注文書",
+          description: "ご注文内容を入力してください。",
+          questions: [
+            { id: "q_o1", type: "text", title: "お名前 / 企業名", required: true },
+            { id: "q_o2", type: "text", title: "配送先住所", required: true },
+            { id: "q_o3", type: "checkbox", title: "ご注文商品 (複数選択可)", options: ["商品A (¥1,000)", "商品B (¥2,500)", "商品C (¥5,000)"], required: true },
+            { id: "q_o4", type: "textarea", title: "配達に関するご要望", required: false }
+          ]
+        }
+      ]
+    },
+    {
+      title: "就職申込書",
+      description: "採用応募用のエントリーフォームです。",
+      category: "work",
+      stripeColor: "#7f8c8d", // グレー
+      sections: [
+        {
+          id: "sec_entry_1",
+          title: "就職申込書",
+          description: "エントリーシート情報を入力してください。",
+          questions: [
+            { id: "q_en1", type: "text", title: "氏名 (フリガナ)", required: true },
+            { id: "q_en2", type: "radio", title: "希望職種", options: ["総合職", "技術職", "デザイナー職", "企画・営業職"], required: true },
+            { id: "q_en3", type: "textarea", title: "自己PR", required: true },
+            { id: "q_en4", type: "textarea", title: "志望動機", required: true }
+          ]
+        }
+      ]
+    },
+    {
+      title: "欠勤願い",
+      description: "休暇や欠勤の申請フォームです。",
+      category: "work",
+      stripeColor: "#95a5a6", // 薄いグレー
+      sections: [
+        {
+          id: "sec_absent_1",
+          title: "欠勤願い",
+          description: "欠勤の申請をご入力ください。",
+          questions: [
+            { id: "q_ab1", type: "text", title: "社員名", required: true },
+            { id: "q_ab2", type: "radio", title: "休暇・欠勤の区分", options: ["有給休暇", "病欠", "慶弔休暇", "その他欠勤"], required: true },
+            { id: "q_ab3", type: "text", title: "対象日 (例: 2026/08/10)", required: true },
+            { id: "q_ab4", type: "textarea", title: "欠勤理由", required: true }
+          ]
+        }
+      ]
+    },
+    {
+      title: "業務依頼書",
+      description: "社内業務の依頼・起票フォームです。",
+      category: "work",
+      stripeColor: "#2980b9", // 濃い青
+      sections: [
+        {
+          id: "sec_work_1",
+          title: "業務依頼書",
+          description: "業務の依頼内容を起票してください。",
+          questions: [
+            { id: "q_w1", type: "text", title: "依頼件名", required: true },
+            { id: "q_w2", type: "radio", title: "優先度", options: ["高", "中", "低"], required: true },
+            { id: "q_w3", type: "text", title: "希望納期", required: true },
+            { id: "q_w4", type: "textarea", title: "依頼詳細内容", required: true }
+          ]
+        }
+      ]
+    },
+    {
+      title: "お客様アンケート",
+      description: "サービス改善のための顧客満足度調査です。",
+      category: "work",
+      stripeColor: "#27ae60", // 鮮やかな緑
+      sections: [
+        {
+          id: "sec_cust_1",
+          title: "お客様アンケート",
+          description: "弊社のサービス・製品に対するご意見をお寄せください。",
+          questions: [
+            { id: "q_cu1", type: "radio", title: "当サービスをどこで知りましたか？", options: ["WEB検索", "SNS", "知人紹介", "その他"], required: true },
+            { id: "q_cu2", type: "radio", title: "サービスの使いやすさはいかがですか？", options: ["非常に使いやすい", "使いやすい", "普通", "使いにくい"], required: true },
+            { id: "q_cu3", type: "textarea", title: "当サービスについてのご要望やご意見", required: false }
+          ]
+        }
+      ]
+    }
+  ];
+
+  function getTemplates() {
+    try {
+      const raw = localStorage.getItem('form_customize_templates');
+      if (raw) {
+        return JSON.parse(raw);
+      }
+    } catch(e) {}
+    return [];
+  }
+
+  function saveTemplates(templates) {
+    try {
+      localStorage.setItem('form_customize_templates', JSON.stringify(templates));
+    } catch(e) {}
+  }
+
+  function initTemplates() {
+    try {
+      const current = getTemplates();
+      if (current.length === 0) {
+        saveTemplates(DEFAULT_TEMPLATES);
+        console.log('[Templates] Initialized DEFAULT_TEMPLATES in localStorage.');
+      }
+    } catch(e) {
+      console.error('[Templates] Init templates failed:', e);
+    }
+  }
+
+  function createFormFromTemplate(template) {
+    try {
+      const originalGetItem = localStorage.getItem;
+      let allForms = [];
+      try {
+        allForms = JSON.parse(originalGetItem.call(localStorage, 'form_customize_all_forms') || '[]');
+      } catch(e) {}
+
+      let currentUser = { id: 'user_own_editor', name: '編集（自分がオーナーのみ）', role: 'own_editor' };
+      try {
+        const userRaw = originalGetItem.call(localStorage, 'gf_current_user');
+        if (userRaw) {
+          currentUser = JSON.parse(userRaw);
+        }
+      } catch(e) {}
+
+      const defaultSchema = {
+        title: template ? `${template.title} (${allForms.length + 1})` : `無題のフォーム (${allForms.length + 1})`,
+        description: template ? (template.description || '') : 'フォームの説明を入力してください。',
+        isLocked: false,
+        isTemplateMode: false,
+        ownerId: currentUser.id,
+        ownerName: currentUser.name,
+        sections: template ? JSON.parse(JSON.stringify(template.sections)) : [
+          {
+            id: 'section_1',
+            title: '無題のセクション',
+            description: 'セクションの説明をご入力ください。',
+            questions: []
+          }
+        ]
+      };
+
+      const today = new Date();
+      defaultSchema.lastModified = `${today.getHours().toString().padStart(2, '0')}:${today.getMinutes().toString().padStart(2, '0')}`;
+
+      if (template) {
+        saveRecentTemplate(template);
+      }
+
+      allForms.push(defaultSchema);
+      localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+      
+      const activeIdx = allForms.length - 1;
+      localStorage.setItem('form_customize_active_index', activeIdx.toString());
+      localStorage.setItem('form_customize_is_template_mode', 'false');
+      localStorage.setItem('form_customize_active_form_title', defaultSchema.title);
+      localStorage.setItem('form_customize_active_tab', 'editor');
+
+      console.log('[Templates] Created new form from template. Index:', activeIdx);
+
+      // リロードして編集画面で起動
+      window.location.reload();
+    } catch (err) {
+      console.error('[Templates] Failed to create form from template:', err);
+      alert('フォームの作成に失敗しました。');
+    }
+  }
+
+  function saveRecentTemplate(template) {
+    try {
+      let recents = JSON.parse(localStorage.getItem('form_customize_recent_templates') || '[]');
+      recents = recents.filter(r => r.title !== template.title);
+      recents.unshift(template);
+      if (recents.length > 6) {
+        recents = recents.slice(0, 6);
+      }
+      localStorage.setItem('form_customize_recent_templates', JSON.stringify(recents));
+    } catch(e) {}
+  }
+
+  function registerFormAsTemplate(formIndex) {
+    try {
+      const originalGetItem = localStorage.getItem;
+      let allForms = [];
+      try {
+        allForms = JSON.parse(originalGetItem.call(localStorage, 'form_customize_all_forms') || '[]');
+      } catch(e) {}
+
+      const targetForm = allForms[formIndex];
+      if (!targetForm) return;
+
+      let templates = getTemplates();
+      
+      const newTemplate = {
+        title: `${targetForm.title} (テンプレート)`,
+        description: targetForm.description || '',
+        category: 'personal',
+        stripeColor: '#7248b9',
+        sections: JSON.parse(JSON.stringify(targetForm.sections))
+      };
+
+      templates.push(newTemplate);
+      saveTemplates(templates);
+      
+      alert(`「${targetForm.title}」をテンプレート（個人用）として登録しました！`);
+      
+      renderTemplateBar();
+      renderFullTemplateGallery();
+
+    } catch (err) {
+      console.error('[Templates] Failed to register template:', err);
+      alert('テンプレート登録に失敗しました。');
+    }
+  }
+
+  // テンプレートカード単体のHTML要素を生成するヘルパー
+  function createTemplateCardElement(template, isBlank = false) {
+    const card = document.createElement('div');
+    card.className = 'template-card';
+    
+    const preview = document.createElement('div');
+    preview.className = 'template-card-preview';
+    
+    if (isBlank) {
+      preview.innerHTML = `
+        <div class="template-card-blank-inner">
+          <span class="template-card-plus-icon">+</span>
+        </div>
+      `;
+      card.appendChild(preview);
+      
+      const title = document.createElement('span');
+      title.className = 'template-card-title';
+      title.textContent = '空白のフォーム';
+      card.appendChild(title);
+      
+      card.addEventListener('click', () => {
+        createFormFromTemplate(null);
+      });
+    } else {
+      const stripe = document.createElement('div');
+      stripe.className = 'template-card-header-stripe';
+      stripe.style.backgroundColor = template.stripeColor || '#7248b9';
+      preview.appendChild(stripe);
+      
+      const dTitle = document.createElement('div');
+      dTitle.className = 'template-card-dummy-title';
+      preview.appendChild(dTitle);
+      
+      const dField1 = document.createElement('div');
+      dField1.className = 'template-card-dummy-field';
+      preview.appendChild(dField1);
+      
+      const dField2 = document.createElement('div');
+      dField2.className = 'template-card-dummy-field';
+      preview.appendChild(dField2);
+      
+      const dLine = document.createElement('div');
+      dLine.className = 'template-card-dummy-line';
+      preview.appendChild(dLine);
+      
+      card.appendChild(preview);
+      
+      const title = document.createElement('span');
+      title.className = 'template-card-title';
+      title.textContent = template.title;
+      card.appendChild(title);
+
+      const categoryLabel = document.createElement('span');
+      categoryLabel.className = 'template-card-category';
+      categoryLabel.textContent = template.category === 'work' ? '仕事用' : '個人用';
+      card.appendChild(categoryLabel);
+      
+      card.addEventListener('click', () => {
+        createFormFromTemplate(template);
+      });
+    }
+    
+    return card;
+  }
+
+  // ダッシュボード上部のテンプレートバーの描画
+  function renderTemplateBar() {
+    try {
+      const container = document.getElementById('template-bar-cards-grid');
+      if (!container) return;
+      
+      container.innerHTML = '';
+      
+      container.appendChild(createTemplateCardElement(null, true));
+      
+      const templates = getTemplates();
+      const showCount = Math.min(templates.length, 5);
+      for (let i = 0; i < showCount; i++) {
+        container.appendChild(createTemplateCardElement(templates[i]));
+      }
+      
+      console.log('[Templates] Rendered template bar. Count:', showCount + 1);
+    } catch(err) {
+      console.error('[Templates] renderTemplateBar error:', err);
+    }
+  }
+
+  // フルスクリーンテンプレートギャラリー画面の描画
+  function renderFullTemplateGallery() {
+    try {
+      const recentGrid = document.getElementById('gallery-recent-grid');
+      const personalGrid = document.getElementById('gallery-personal-grid');
+      const workGrid = document.getElementById('gallery-work-grid');
+      
+      const templates = getTemplates();
+      
+      if (recentGrid) {
+        recentGrid.innerHTML = '';
+        let recents = [];
+        try {
+          recents = JSON.parse(localStorage.getItem('form_customize_recent_templates') || '[]');
+        } catch(e) {}
+        
+        if (recents.length === 0) {
+          recentGrid.appendChild(createTemplateCardElement(null, true));
+          if (templates[0]) recentGrid.appendChild(createTemplateCardElement(templates[0]));
+        } else {
+          recents.forEach(t => {
+            recentGrid.appendChild(createTemplateCardElement(t));
+          });
+        }
+      }
+      
+      if (personalGrid) {
+        personalGrid.innerHTML = '';
+        const personals = templates.filter(t => t.category === 'personal');
+        personals.forEach(t => {
+          personalGrid.appendChild(createTemplateCardElement(t));
+        });
+      }
+      
+      if (workGrid) {
+        workGrid.innerHTML = '';
+        const works = templates.filter(t => t.category === 'work');
+        works.forEach(t => {
+          workGrid.appendChild(createTemplateCardElement(t));
+        });
+      }
+      
+      console.log('[Templates] Rendered full template gallery.');
+    } catch(err) {
+      console.error('[Templates] renderFullTemplateGallery error:', err);
+    }
+  }
+
+  // ギャラリーとダッシュボードの画面遷移イベントリスナー
+  function setupTemplateGalleryListeners() {
+    try {
+      const openBtn = document.getElementById('btn-open-full-gallery');
+      const backBtn = document.getElementById('btn-back-from-gallery');
+      const dashboardPanel = document.getElementById('panel-dashboard');
+      const galleryPanel = document.getElementById('panel-template-gallery');
+      
+      if (openBtn && dashboardPanel && galleryPanel) {
+        openBtn.addEventListener('click', () => {
+          document.querySelectorAll('.tab-panel').forEach(panel => {
+            panel.classList.remove('active');
+          });
+          document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.classList.remove('active');
+          });
+          
+          galleryPanel.classList.add('active');
+          renderFullTemplateGallery();
+          
+          console.log('[Templates] Navigation: dashboard -> gallery');
+        });
+      }
+      
+      if (backBtn && dashboardPanel && galleryPanel) {
+        backBtn.addEventListener('click', () => {
+          galleryPanel.classList.remove('active');
+          
+          dashboardPanel.classList.add('active');
+          const homeTab = document.querySelector('.nav-tab[data-tab="dashboard"]');
+          if (homeTab) homeTab.classList.add('active');
+          
+          console.log('[Templates] Navigation: gallery -> dashboard');
+        });
+      }
+    } catch(err) {
+      console.error('[Templates] setupTemplateGalleryListeners error:', err);
+    }
+  }
 
   // 1. APIシミュレーター用のマスタデータ (モック)
   const ZIP_DATABASE = {
@@ -1928,21 +2468,68 @@
   function startDashboardHookLoop() {
     setInterval(() => {
       try {
+        // 1. 新規フォーム作成ボタンのフック (空白フォームから作成)
         const createBtn = document.getElementById('btn-dashboard-create');
         if (createBtn && !createBtn.dataset.hooked) {
           createBtn.dataset.hooked = "true";
           
-          // イベントキャプチャフェーズ (第3引数 true) でクリックをインターセプト
           createBtn.addEventListener('click', (e) => {
-            console.log('[Dashboard Hook] Intercepted btn-dashboard-create click.');
+            console.log('[Dashboard Hook] Intercepted btn-dashboard-create click. Creating blank form...');
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
             
-            // プロンプトポップを出さずに即座に新規作成を実行
-            createNewFormDirectlyWithoutPrompt();
+            // 空白フォームから新規作成を実行
+            createFormFromTemplate(null);
           }, true);
         }
+
+        // 2. リスト表示（テーブル行）への「⭐ テンプレート登録」ボタン自動アペンド
+        const listRows = document.querySelectorAll('#dashboard-view-list tbody tr');
+        listRows.forEach((row, idx) => {
+          if (row.dataset.templateHooked) return;
+          row.dataset.templateHooked = "true";
+
+          const actionTd = row.querySelector('td:last-child');
+          if (actionTd) {
+            const regBtn = document.createElement('button');
+            regBtn.type = 'button';
+            regBtn.className = 'btn-register-template';
+            regBtn.innerHTML = '⭐ テンプレート登録';
+            
+            regBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              registerFormAsTemplate(idx);
+            });
+            
+            actionTd.insertBefore(regBtn, actionTd.firstChild);
+          }
+        });
+
+        // 3. プレビューカード（グリッド表示）への「⭐ テンプレート登録」ボタン自動アペンド
+        const previewCards = document.querySelectorAll('#dashboard-view-preview .dashboard-preview-card');
+        previewCards.forEach((card, idx) => {
+          if (card.dataset.templateHooked) return;
+          card.dataset.templateHooked = "true";
+
+          const footer = card.querySelector('.card-footer') || card;
+          if (footer) {
+            const regBtn = document.createElement('button');
+            regBtn.type = 'button';
+            regBtn.className = 'btn-register-template';
+            regBtn.style.marginTop = '6px';
+            regBtn.innerHTML = '⭐ テンプレート登録';
+            
+            regBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              registerFormAsTemplate(idx);
+            });
+            
+            footer.appendChild(regBtn);
+          }
+        });
       } catch (err) {
         console.error('[Dashboard Hook Error]', err);
       }
@@ -1953,6 +2540,8 @@
   setTimeout(() => {
     setupDashboardGlobalListeners();
     startDashboardHookLoop();
+    renderTemplateBar(); // テンプレート選択バーを描画
+    setupTemplateGalleryListeners(); // ギャラリー画面遷移リスナーを初期化
   }, 100);
 
   function setupStickyPreviewTracker() {
