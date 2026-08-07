@@ -665,6 +665,12 @@ function setupSupabaseAuthListener() {
 
   const { data } = supabaseClient.auth.onAuthStateChange(async (event, session) => {
     console.log(`[Supabase Auth] Event: ${event}`);
+
+    // 💡 [管理者バイパス保護] ローカルで owner (既存管理者) としてログインしている場合は、Supabase の状態変化を無視する
+    if (state.currentUser && (state.currentUser.id === 'owner' || state.currentUser.role === 'owner')) {
+      console.log("[Supabase Auth] Owner bypass session active. Ignoring auth state change.");
+      return;
+    }
     
     const signupScreen = document.getElementById('signup-screen');
     const loginScreen = document.getElementById('login-screen');
@@ -9834,8 +9840,23 @@ async function handleLogin(e) {
 
 async function handleLogout() {
   try {
-    if (supabaseClient) {
+    const isBypassOwner = state.currentUser && (state.currentUser.id === 'owner' || state.currentUser.role === 'owner');
+    
+    if (isBypassOwner) {
+      state.currentUser = null;
+      state.mypageMemoInitialized = false;
+      activeMemoId = null;
+      localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
+      showLoginScreen(true);
+    } else if (supabaseClient) {
       await supabaseClient.auth.signOut();
+      
+      // ログアウトが確実に伝播するようにローカル状態もクリア
+      state.currentUser = null;
+      state.mypageMemoInitialized = false;
+      activeMemoId = null;
+      localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
+      showLoginScreen(true);
     } else {
       state.currentUser = null;
       state.mypageMemoInitialized = false;
