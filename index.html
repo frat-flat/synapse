@@ -186,15 +186,17 @@
 <div class="main-content">
 <!-- トップバー（ログイン後に表示） -->
 <div id="main-header" class="main-header" style="display: none; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.85rem; flex-wrap: wrap;">
-<!-- 左側グループ: ワークスペースタイトル & ズーム & 表示モード -->
-<div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
-<div class="header-title-section" style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary);">
-ワークスペース
-</div>
-
-
-
-</div>
+        <!-- 左側グループ: ワークスペースタイトル & ズーム & 表示モード -->
+        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+          <div class="header-title-section" style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary);">
+            ワークスペース
+          </div>
+          <!-- ☁️ 同期ステータスインジケータ -->
+          <div id="sync-status-indicator" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-secondary); transition: all 0.2s; user-select: none;">
+            <span id="sync-status-icon">🟢</span>
+            <span id="sync-status-text">同期済み</span>
+          </div>
+        </div>
 
         <!-- 一番右端グループ: 👤 アカウントプロファイルボタン ＆ ⚙ 設定 -->
         <div style="display: flex; align-items: center; gap: 0.65rem; margin-left: auto;">

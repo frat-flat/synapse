@@ -139,10 +139,11 @@ const originalSetItem = localStorage.setItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   originalSetItem(key, value);
   if (!isSyncing && typeof syncToSupabase === 'function') {
-    const isTargetKey = Object.values(STORAGE_KEYS).includes(key) || 
+    const isTargetKey = (Object.values(STORAGE_KEYS).includes(key) || 
                         key === 'synapse_dbmake_partners' || 
                         key.startsWith('SYNAPSE_') || 
-                        key.startsWith('synapse_');
+                        key.startsWith('synapse_')) &&
+                        key !== 'synapse_sync_queue';
     if (isTargetKey) {
       setTimeout(() => {
         syncToSupabase(key, value);
@@ -161,6 +162,8 @@ let state = {
   patterns: {},
   officialLinks: [],
   connectedLinks: {}, // 現在編集中のアポイントに関連付けられた接続情報
+  syncQueue: [],      // Supabaseへの未送信タスクのキュー
+  isFormDirty: false, // 編集画面での未保存変更フラグ
   
   customTables: [], // 作成されたカスタムテーブルの配列
   activeCustomTableId: null, // 現在表示中のカスタムテーブルID
@@ -376,6 +379,21 @@ document.addEventListener('DOMContentLoaded', () => {
   checkLoginStatus();
   initMypageMemo();          // メモ帳の初回初期化
   initFloatingStickyNotes(); // 浮遊付箋の復元
+
+  // 同期キューのロードと再試行
+  loadSyncQueueFromStorage();
+  processSyncQueue();
+
+  // ページ離脱防止警告のバインド
+  window.addEventListener('beforeunload', (e) => {
+    const hasUnsavedForm = state.isFormDirty;
+    const hasPendingSync = state.syncQueue.length > 0;
+    if (hasUnsavedForm || hasPendingSync) {
+      e.preventDefault();
+      e.returnValue = '作業内容が保存されていない可能性があります。このページを離れますか？';
+      return e.returnValue;
+    }
+  });
 
   // ログイン画面のパスワード表示トグル
   const togglePassBtn = document.getElementById('toggle-login-pass-btn');
@@ -663,8 +681,145 @@ function initSupabase() {
 }
 
 // Supabaseへのデータ送信 (プッシュ)
+// 同期ステータスUIの更新
+function updateSyncStatusUI() {
+  const indicator = document.getElementById('sync-status-indicator');
+  const icon = document.getElementById('sync-status-icon');
+  const text = document.getElementById('sync-status-text');
+  if (!indicator || !icon || !text) return;
+
+  const hasOfflineErrors = state.syncQueue.some(t => t.status === 'error');
+  const isSyncingNow = state.syncQueue.some(t => t.status === 'pending');
+
+  if (state.syncQueue.length === 0) {
+    icon.textContent = '🟢';
+    text.textContent = '同期済み';
+    indicator.style.background = 'var(--bg-surface-elevated)';
+    indicator.style.color = 'var(--text-secondary)';
+    indicator.style.borderColor = 'var(--border-color)';
+  } else if (hasOfflineErrors) {
+    icon.textContent = '☁️';
+    text.textContent = `未同期の変更が ${state.syncQueue.length} 件あります (オフライン)`;
+    indicator.style.background = '#fef08a'; // 薄いイエロー
+    indicator.style.color = '#854d0e';      // ダークイエロー
+    indicator.style.borderColor = '#eab308';
+  } else if (isSyncingNow) {
+    icon.textContent = '🔄';
+    text.textContent = '同期中...';
+    indicator.style.background = 'var(--bg-surface-elevated)';
+    indicator.style.color = 'var(--text-secondary)';
+    indicator.style.borderColor = 'var(--border-color)';
+  }
+}
+
+// 送信待ちキューの永続化保存
+function saveSyncQueueToStorage() {
+  originalSetItem('synapse_sync_queue', JSON.stringify(state.syncQueue));
+}
+
+// 起動時等のキュー復旧
+function loadSyncQueueFromStorage() {
+  const saved = localStorage.getItem('synapse_sync_queue');
+  if (saved) {
+    try {
+      state.syncQueue = JSON.parse(saved);
+      // 再起動時はステータスを待機状態に戻す
+      state.syncQueue.forEach(t => t.status = 'error');
+      updateSyncStatusUI();
+    } catch (e) {
+      console.error("[Supabase] Failed to parse sync queue:", e);
+    }
+  }
+}
+
+// 送信待ちキューのバックグラウンド再送信処理
+async function processSyncQueue() {
+  if (state.syncQueue.length === 0 || !supabaseClient) return;
+
+  const failedTasks = state.syncQueue.filter(t => t.status === 'error');
+  if (failedTasks.length === 0) return;
+
+  console.log(`[Supabase] Retrying ${failedTasks.length} pending sync tasks...`);
+  
+  for (const task of failedTasks) {
+    await syncToSupabase(task.key, task.value);
+  }
+}
+
+// オンライン復帰時の自動イベントリスナー
+window.addEventListener('online', () => {
+  console.log("[Network] Connection recovered. Triggering sync queue retry...");
+  processSyncQueue();
+});
+
+// 定期タイマーによる再試行（30秒おき）
+setInterval(() => {
+  processSyncQueue();
+}, 30000);
+
+// クラウド（Supabase）からユーザー個別設定を取得し、ローカルに適用する
+async function loadUserSettingsFromCloud() {
+  if (!supabaseClient || !state.currentUser) return;
+  
+  const userId = state.currentUser.id;
+  try {
+    const { data, error } = await supabaseClient
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error("[Supabase] Failed to load user profiles:", error);
+      return;
+    }
+
+    if (data) {
+      console.log("[Supabase] Applying user profiles from cloud:", data);
+      
+      state.defaultZoomLevel = data.zoom_level || 100;
+      localStorage.setItem(`SYNAPSE_ZOOM_DEFAULT_${userId}`, state.defaultZoomLevel);
+      applyZoom(state.defaultZoomLevel);
+
+      const theme = data.ui_theme || 'light';
+      localStorage.setItem(`SYNAPSE_THEME_${userId}`, theme);
+      applyTheme(theme);
+
+      if (data.background_settings) {
+        const hue = data.background_settings.hue ?? 0;
+        const sat = data.background_settings.saturation ?? 100;
+        localStorage.setItem(`SYNAPSE_HUE_${userId}`, hue);
+        localStorage.setItem(`SYNAPSE_SATURATION_${userId}`, sat);
+        applyColorTone(hue, sat);
+      }
+    }
+  } catch (e) {
+    console.error("[Supabase] Error loading user profiles:", e);
+  }
+}
+
+// Supabaseへのデータ送信 (プッシュ)
 async function syncToSupabase(key, value) {
-  if (!supabaseClient) return;
+  // 同期がオンフライトでない場合はキューを制御
+  let task = state.syncQueue.find(t => t.key === key);
+  if (!task) {
+    task = { key, value, status: 'pending' };
+    state.syncQueue.push(task);
+  } else {
+    task.value = value;
+    task.status = 'pending';
+  }
+  saveSyncQueueToStorage();
+  updateSyncStatusUI();
+
+  if (!supabaseClient) {
+    console.warn(`[Supabase] Client not initialized. Key ${key} queued.`);
+    task.status = 'error';
+    saveSyncQueueToStorage();
+    updateSyncStatusUI();
+    return;
+  }
+
   try {
     const valString = typeof value === 'string' ? value : JSON.stringify(value);
     
@@ -692,23 +847,49 @@ async function syncToSupabase(key, value) {
             });
           
           if (userError) {
-            console.error(`[Supabase] Relational sync failed for user ${user.id}:`, userError);
+            throw userError;
           }
         }
       }
+    } else if (key.startsWith('SYNAPSE_ZOOM_DEFAULT_') || key.startsWith('SYNAPSE_THEME_') || key.startsWith('SYNAPSE_HUE_') || key.startsWith('SYNAPSE_SATURATION_')) {
+      // ユーザー設定の同期
+      const userId = state.currentUser ? state.currentUser.id : 'guest';
+      const zoom = localStorage.getItem(`SYNAPSE_ZOOM_DEFAULT_${userId}`) || '100';
+      const theme = localStorage.getItem(`SYNAPSE_THEME_${userId}`) || 'light';
+      const hue = localStorage.getItem(`SYNAPSE_HUE_${userId}`) || '0';
+      const sat = localStorage.getItem(`SYNAPSE_SATURATION_${userId}`) || '100';
+
+      const { error } = await supabaseClient
+        .from('user_profiles')
+        .upsert({
+          user_id: userId,
+          zoom_level: parseInt(zoom, 10),
+          ui_theme: theme,
+          background_settings: { hue: parseInt(hue, 10), saturation: parseInt(sat, 10) },
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
     } else {
       const { error } = await supabaseClient
         .from('synapse_storage')
         .upsert({ key: key, value: JSON.parse(valString), updated_at: new Date().toISOString() });
       
       if (error) {
-        console.error(`[Supabase] Sync failed for key ${key}:`, error);
-      } else {
-        console.log(`[Supabase] Sync success for key ${key}`);
+        throw error;
       }
     }
+
+    // 成功時：キューから削除
+    state.syncQueue = state.syncQueue.filter(t => t.key !== key);
+    saveSyncQueueToStorage();
+    updateSyncStatusUI();
+    console.log(`[Supabase] Sync success for key ${key}`);
   } catch (e) {
     console.error(`[Supabase] Error during syncToSupabase for key ${key}:`, e);
+    task.status = 'error';
+    saveSyncQueueToStorage();
+    updateSyncStatusUI();
   }
 }
 
@@ -7053,6 +7234,11 @@ function showLoginScreen(show) {
     }
 
     const userId = state.currentUser ? state.currentUser.id : 'guest';
+    if (state.currentUser) {
+      loadUserSettingsFromCloud().catch(err => {
+        console.error("[Supabase] Failed to auto-load settings on initial boot:", err);
+      });
+    }
     const savedDefaultZoom = localStorage.getItem(`SYNAPSE_ZOOM_DEFAULT_${userId}`);
     state.defaultZoomLevel = savedDefaultZoom ? parseInt(savedDefaultZoom, 10) : 100;
     
@@ -9046,9 +9232,21 @@ function setupEventListeners() {
   document.getElementById('btn-save-draft').addEventListener('click', handleSaveDraft);
   document.getElementById('delete-draft-btn').addEventListener('click', handleDeleteDraft);
 
-  // フォーム内の任意の入力を検知してDirtyフラグを立てる
+  // フォーム内の任意の入力を検知してDirtyフラグを立てる ＆ 3秒無入力で自動一時保存
+  let autoSaveTimeout = null;
   document.getElementById('appointment-form').addEventListener('input', () => {
     state.isFormDirty = true;
+    if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+    autoSaveTimeout = setTimeout(() => {
+      // 必須入力チェック
+      const dateVal = document.getElementById('appoint-date').value;
+      const nameVal = document.getElementById('customer-name').value.trim();
+      const memoVal = document.getElementById('appoint-memo').value.trim();
+      if (dateVal && nameVal && memoVal) {
+        console.log("[AutoSave] Auto-saving appointment draft...");
+        autoSaveAppointmentDraft();
+      }
+    }, 3000);
   });
 
   // 本登録ID紐付けフォームの処理
@@ -9402,6 +9600,11 @@ function handleLogin(e) {
       initMypageMemo();
 
       showToast('ログインしました。', 'success');
+
+      // クラウドからユーザー設定を自動ロードして適用
+      loadUserSettingsFromCloud().catch(err => {
+        console.error("[Supabase] Failed to auto-load settings after login:", err);
+      });
 
       if (!foundUser.role) {
         if (typeof showBusinessRoleSelectionModal === 'function') {
@@ -13130,6 +13333,81 @@ function syncBiDirectionalRelatedAppointmentIds(appointIdA, targetRelatedAppoint
   });
   
   localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+}
+
+// バックグラウンドでアポイントの下書きを自動保存する（タブは閉じない）
+function autoSaveAppointmentDraft() {
+  const dateVal = document.getElementById('appoint-date').value;
+  const nameVal = document.getElementById('customer-name').value.trim();
+  const memoVal = document.getElementById('appoint-memo').value.trim();
+
+  if (!dateVal || !nameVal || !memoVal) return;
+
+  const customFieldsData = {};
+  state.addedCustomFields.forEach(fieldType => {
+    if (fieldType === 'corp_info') {
+      customFieldsData['corp_info'] = {
+        name: document.getElementById('corp-info-name')?.value.trim() || '',
+        code: document.getElementById('corp-info-code')?.value.trim() || '',
+        address: document.getElementById('corp-info-address')?.value.trim() || ''
+      };
+    } else if (fieldType === 'introducer') {
+      customFieldsData['introducer'] = state.selectedIntroducer;
+    } else {
+      const inputEl = document.getElementById(`custom-field-input-${fieldType}`);
+      if (inputEl) {
+        customFieldsData[fieldType] = inputEl.value.trim();
+      }
+    }
+  });
+
+  const appointId = state.editingAppointId;
+  if (!appointId) return;
+
+  let relatedAppointmentIds = '';
+  const currentAppoint = state.appointments.find(a => a.id === appointId);
+  if (currentAppoint) {
+    relatedAppointmentIds = currentAppoint.relatedAppointmentIds || '';
+  }
+
+  const appointData = {
+    id: appointId,
+    date: dateVal,
+    customerType: state.formMode,
+    customerId: state.formMode === 'existing' ? state.selectedExistingCustomer.id : null,
+    relatedAppointmentIds: relatedAppointmentIds,
+    customerName: nameVal,
+    memo: memoVal,
+    customFields: customFieldsData,
+    connectedLinks: state.connectedLinks || {},
+    status: 'draft',
+    registeredAt: new Date().toISOString()
+  };
+
+  const index = state.appointments.findIndex(a => a.id === appointId);
+  if (index >= 0) {
+    state.appointments[index] = appointData;
+  } else {
+    state.appointments.push(appointData);
+  }
+
+  // LocalStorageに保存することで、Supabaseへの自動プッシュが走る
+  localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+  
+  // 双方向バインドも適用
+  syncBiDirectionalRelatedAppointmentIds(appointId, relatedAppointmentIds);
+
+  // 一時保存タブ側の dirty 状態も更新
+  const currentTab = state.tabs.find(t => t.id === state.activeTabId);
+  if (currentTab) {
+    currentTab.appointData = {
+      ...currentTab.appointData,
+      ...appointData,
+      isFormDirty: false
+    };
+  }
+  state.isFormDirty = false;
+  console.log("[AutoSave] Draft auto-saved successfully.");
 }
 
 // アポイントデータ保存ロジック本体
