@@ -2005,58 +2005,28 @@
     <!-- コンテンツボディ：2カラムレイアウト -->
     <div style="display: flex; flex-direction: row; gap: 1.25rem; align-items: stretch; flex-wrap: nowrap; flex: 1; min-height: 0;">
       
-      <!-- 左カラム：新規アカウント登録（最初から展開してフラット表示） -->
-      <div style="flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-surface); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); box-sizing: border-box; align-self: flex-start;">
+      <!-- 左カラム：新規アカウント登録案内 -->
+      <div style="flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-surface); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); box-sizing: border-box; align-self: flex-start;">
         <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); border-bottom: 1.5px solid var(--border-color); padding-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
-          <span style="display: flex; align-items: center; gap: 0.35rem;">➕ 新規アカウント登録</span>
+          <span style="display: flex; align-items: center; gap: 0.35rem;">👤 ユーザーアカウント登録について</span>
         </h3>
         
-        <div style="display: flex; flex-direction: column; gap: 0.85rem; margin-top: 0.5rem;">
-          <form id="tab-user-register-form" style="display: flex; flex-direction: column; gap: 0.85rem;">
-            
-            <!-- 姓名の分割入力 -->
-            <div style="display: flex; gap: 0.5rem;">
-              <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1;">
-                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">姓:</label>
-                <input type="text" id="tab-reg-user-lastname" required placeholder="例: 営業" style="width: 100%; padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-              </div>
-              <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1;">
-                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">名:</label>
-                <input type="text" id="tab-reg-user-firstname" required placeholder="例: 担当C" style="width: 100%; padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-              </div>
-            </div>
-            
-            <!-- メールアドレス (ログインIDになります) -->
-            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-              <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">メールアドレス (ログインIDになります):</label>
-              <input type="email" id="tab-reg-user-email" required placeholder="例: staff@example.com" style="width: 100%; padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-            </div>
-
-            <!-- ユーザー名 (ログインID - 非表示化) -->
-            <div style="display: flex; flex-direction: column; gap: 0.25rem; display: none;">
-              <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">ユーザー名 (ログインID。半角小文字・記号・6文字以上):</label>
-              <input type="text" id="tab-reg-user-id" placeholder="例: sales_03 (大文字・記号なし不可)" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 0.25rem; position: relative;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">パスワード (大・小・数を含む6文字以上・記号不可):</label>
-                <button type="button" id="tab-reg-password-generate-btn" class="btn-secondary" style="padding: 0.15rem 0.4rem; font-size: 0.68rem; font-weight: 600; border-radius: var(--radius-xs); cursor: pointer;" title="強力なパスワードを自動生成して入力します">🔑 自動生成</button>
-              </div>
-              <input type="password" id="tab-reg-user-password" required placeholder="パスワードを入力" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-              <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">パスワード (確認用):</label>
-              <input type="password" id="tab-reg-user-password-confirm" required placeholder="パスワードを再入力" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-            </div>
-            
-
-            
-            <button type="submit" class="btn-primary" style="margin-top: 0.5rem; padding: 0.6rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm);">
-              💾 アカウントを登録
-            </button>
-          </form>
+        <div style="display: flex; flex-direction: column; gap: 1rem; margin-top: 0.75rem; line-height: 1.5; font-size: 0.82rem; color: var(--text-secondary);">
+          <p>
+            セキュリティ強化のため、管理者が本画面から直接アカウントを作成する機能は廃止されました。
+          </p>
+          <p>
+            新規にアカウントを登録する場合は、**ユーザー自身がログイン画面の「新規仮登録」リンクから、登録者名とメールアドレスを入力して申請を行ってください。**
+          </p>
+          <div style="background: var(--bg-surface-elevated); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.78rem;">
+            <strong style="color: var(--text-primary); display: block; margin-bottom: 0.25rem;">📝 登録の流れ:</strong>
+            1. ユーザーがログイン画面から仮登録申請を行う。<br>
+            2. 本人確認用の本登録案内メールが自動送信される。<br>
+            3. メール内のリンクから、生年月日、ログインID、パスワードを設定して本登録が完了。
+          </div>
+          <p style="margin: 0;">
+            ※本画面の右側の一覧から、既存ユーザーアカウントの確認や不要になったアカウントの削除を行うことができます。
+          </p>
         </div>
       </div>
       
@@ -2617,22 +2587,68 @@
     </div>
   </div>
 </div>
-<!-- ================= 🔐 パスワード設定モーダル (新規登録時のメールリンクシミュレーション用) ================= -->
-<div id="set-password-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; justify-content: center; align-items: center;">
+<!-- ================= 🔑 パスワード再設定メール送信モーダル ================= -->
+<div id="reset-password-request-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; justify-content: center; align-items: center;">
   <div style="background: var(--bg-surface); padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); width: 90%; max-width: 400px; box-shadow: var(--shadow-lg); text-align: left;">
     <h3 style="margin-top: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
-      🔑 パスワードの設定
+      🔑 パスワードの再設定
     </h3>
     <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.5rem 0 1rem 0;">
-      アカウントのパスワードを設定してください。このパスワードはログイン時に使用します。
+      ご登録いただいているメールアドレスを入力してください。<br>パスワード再設定用のURLを送付いたします。
+    </p>
+    <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">メールアドレス:</label>
+        <input type="email" id="reset-pwd-req-email" required placeholder="example@synapse.com" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+      </div>
+    </div>
+    
+    <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem;">
+      <button type="button" id="reset-pwd-req-cancel-btn" class="btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; cursor: pointer;">キャンセル</button>
+      <button type="button" id="reset-pwd-req-submit-btn" class="btn-primary" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; cursor: pointer;">再設定メールを送信</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 🔐 パスワード設定モーダル (新規登録時のメールリンクシミュレーション用) ================= -->
+<!-- ================= 🔐 本登録（パスワード・プロフィール設定）モーダル ================= -->
+<div id="set-password-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; justify-content: center; align-items: center;">
+  <div style="background: var(--bg-surface); padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); width: 90%; max-width: 420px; box-shadow: var(--shadow-lg); text-align: left; max-height: 90vh; overflow-y: auto;">
+    <h3 style="margin-top: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+      🔑 アカウントの本登録
+    </h3>
+    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.5rem 0 1rem 0;">
+      以下の情報を入力してアカウントの本登録を完了させてください。
     </p>
     <input type="hidden" id="set-pwd-email">
     
-    <div style="display: flex; flex-direction: column; gap: 0.85rem;">
-      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">新しいパスワード (大・小・数を含む6文字以上・記号不可):</label>
-        <input type="password" id="set-pwd-input" required placeholder="新しいパスワード" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+      <div style="display: flex; gap: 0.5rem;">
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1;">
+          <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">姓:</label>
+          <input type="text" id="set-pwd-lastname" readonly style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-muted); outline: none; cursor: not-allowed;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1;">
+          <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">名:</label>
+          <input type="text" id="set-pwd-firstname" readonly style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-muted); outline: none; cursor: not-allowed;">
+        </div>
       </div>
+      
+      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">生年月日 (西暦表記):</label>
+        <input type="text" id="set-pwd-birthday" required placeholder="例: 1990/01/01" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">ログインID (半角英数字6文字以上、大文字不可、記号は-_ .のみ可、記号のみ不可):</label>
+        <input type="text" id="set-pwd-loginid" required placeholder="例: sales_user01" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">新しいパスワード (半角英数字8文字以上、大文字・小文字・数字必須):</label>
+        <input type="password" id="set-pwd-input" required placeholder="パスワード (大文字小文字数字含む)" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+      </div>
+      
       <div style="display: flex; flex-direction: column; gap: 0.25rem;">
         <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">新しいパスワード (確認):</label>
         <input type="password" id="set-pwd-confirm-input" required placeholder="もう一度入力" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
@@ -2641,7 +2657,7 @@
     
     <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem;">
       <button type="button" id="set-pwd-cancel-btn" class="btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; cursor: pointer;">キャンセル</button>
-      <button type="button" id="set-pwd-submit-btn" class="btn-primary" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; cursor: pointer;">パスワードを決定</button>
+      <button type="button" id="set-pwd-submit-btn" class="btn-primary" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; cursor: pointer;">本登録を完了</button>
     </div>
   </div>
 </div>

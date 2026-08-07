@@ -651,6 +651,143 @@ function generateUniqueCustomerNumber() {
    ============================================================================ */
 
 // Supabaseクライアントの初期化
+// Supabaseクライアントの初期化
+let authListenerSubscription = null;
+
+function setupSupabaseAuthListener() {
+  if (!supabaseClient) return;
+  
+  if (authListenerSubscription) {
+    if (typeof authListenerSubscription.unsubscribe === 'function') {
+      authListenerSubscription.unsubscribe();
+    }
+  }
+
+  const { data } = supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    console.log(`[Supabase Auth] Event: ${event}`);
+    
+    const signupScreen = document.getElementById('signup-screen');
+    const loginScreen = document.getElementById('login-screen');
+
+    if (session && session.user) {
+      const user = session.user;
+      const metadata = user.user_metadata || {};
+      const email = user.email;
+      const name = metadata.name || email;
+      const code = metadata.code || '';
+      
+      let role = metadata.role || 'sales';
+      
+      try {
+        const { data: userData } = await supabaseClient
+          .from('synapse_users')
+          .select('role')
+          .eq('id', email)
+          .single();
+        if (userData && userData.role) {
+          role = userData.role;
+          if (role.startsWith('pending_')) {
+            role = role.replace('pending_', '');
+          }
+        }
+      } catch (e) {
+        console.warn('[Supabase Auth] Failed to fetch exact user role from public DB:', e);
+      }
+
+      state.currentUser = {
+        id: email,
+        role: role,
+        name: name,
+        loginId: email,
+        code: code
+      };
+      localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
+
+      if (event === 'PASSWORD_RECOVERY') {
+        showLoginScreen(true);
+        const modal = document.getElementById('set-password-modal');
+        const emailHidden = document.getElementById('set-pwd-email');
+        if (modal && emailHidden) {
+          emailHidden.value = email;
+          
+          const lastNameInput = document.getElementById('set-pwd-lastname');
+          const firstNameInput = document.getElementById('set-pwd-firstname');
+          const birthdayInput = document.getElementById('set-pwd-birthday');
+          const loginIdInput = document.getElementById('set-pwd-loginid');
+          const pwdInput = document.getElementById('set-pwd-input');
+          const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
+          
+          // 生年月日、ログインID、名前入力を非表示にする
+          if (birthdayInput && birthdayInput.parentElement) birthdayInput.parentElement.style.display = 'none';
+          if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'none';
+          if (lastNameInput && lastNameInput.parentElement && lastNameInput.parentElement.parentElement) {
+            lastNameInput.parentElement.parentElement.style.display = 'none';
+          }
+          
+          const titleEl = modal.querySelector('h3');
+          if (titleEl) titleEl.innerHTML = '🔑 パスワードの再設定';
+          
+          if (pwdInput) pwdInput.value = '';
+          if (pwdConfirmInput) pwdConfirmInput.value = '';
+          
+          modal.style.display = 'flex';
+          showToast('パスワード再設定セッションが有効です。新しいパスワードを設定してください。', 'info');
+        }
+      } else if (metadata.needs_password_setup === true) {
+        showLoginScreen(true);
+        const modal = document.getElementById('set-password-modal');
+        const emailHidden = document.getElementById('set-pwd-email');
+        if (modal && emailHidden) {
+          emailHidden.value = email;
+          
+          const lastNameInput = document.getElementById('set-pwd-lastname');
+          const firstNameInput = document.getElementById('set-pwd-firstname');
+          const birthdayInput = document.getElementById('set-pwd-birthday');
+          const loginIdInput = document.getElementById('set-pwd-loginid');
+          const pwdInput = document.getElementById('set-pwd-input');
+          const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
+          
+          // 本登録時は全入力項目を表示する
+          if (birthdayInput && birthdayInput.parentElement) birthdayInput.parentElement.style.display = 'flex';
+          if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'flex';
+          if (lastNameInput && lastNameInput.parentElement && lastNameInput.parentElement.parentElement) {
+            lastNameInput.parentElement.parentElement.style.display = 'flex';
+          }
+          
+          const titleEl = modal.querySelector('h3');
+          if (titleEl) titleEl.innerHTML = '🔑 アカウントの本登録';
+          
+          if (lastNameInput) lastNameInput.value = metadata.lastName || '';
+          if (firstNameInput) firstNameInput.value = metadata.firstName || '';
+          if (birthdayInput) birthdayInput.value = '';
+          if (loginIdInput) loginIdInput.value = '';
+          if (pwdInput) pwdInput.value = '';
+          if (pwdConfirmInput) pwdConfirmInput.value = '';
+          
+          modal.style.display = 'flex';
+          showToast('メール認証に成功しました。プロフィールとパスワードを設定してください。', 'success');
+        }
+      } else {
+        showLoginScreen(false);
+        
+        const nameEl = document.getElementById('logged-in-user-name');
+        const avatarEl = document.getElementById('logged-in-user-avatar');
+        if (nameEl) nameEl.textContent = name;
+        if (avatarEl) avatarEl.textContent = name.charAt(0);
+        
+        updateUIForCurrentMode();
+        removeRestrictedTabsForRole(role);
+      }
+    } else {
+      state.currentUser = null;
+      localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
+      showLoginScreen(true);
+    }
+  });
+  
+  authListenerSubscription = data.subscription || data;
+}
+
 function initSupabase() {
   const url = localStorage.getItem(STORAGE_KEYS.SUPABASE_URL);
   const key = localStorage.getItem(STORAGE_KEYS.SUPABASE_ANON_KEY);
@@ -670,6 +807,8 @@ function initSupabase() {
       const keyInput = document.getElementById('supabase-anon-key');
       if (urlInput) urlInput.value = url;
       if (keyInput) keyInput.value = key;
+      
+      setupSupabaseAuthListener();
       
       return true;
     } catch (e) {
@@ -894,22 +1033,108 @@ async function syncToSupabase(key, value) {
 }
 
 // Supabaseからのデータ取得 (プル)
+function showLoadingIndicator(show) {
+  let indicator = document.getElementById('global-loading-indicator');
+  if (show) {
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.id = 'global-loading-indicator';
+      indicator.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(2px); z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffffff; font-size: 0.9rem; font-weight: 600; font-family: sans-serif; gap: 0.75rem;';
+      
+      const spinner = document.createElement('div');
+      spinner.style.cssText = 'width: 36px; height: 36px; border: 4px solid rgba(255, 255, 255, 0.1); border-top-color: var(--primary, #3b82f6); border-radius: 50%; animation: spin 1s linear infinite;';
+      
+      if (!document.getElementById('spin-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'spin-keyframes';
+        style.innerHTML = '@keyframes spin { to { transform: rotate(360deg); } }';
+        document.head.appendChild(style);
+      }
+
+      const text = document.createElement('div');
+      text.textContent = 'データをロード中...';
+      text.id = 'global-loading-text';
+
+      indicator.appendChild(spinner);
+      indicator.appendChild(text);
+      document.body.appendChild(indicator);
+    } else {
+      indicator.style.display = 'flex';
+    }
+  } else {
+    if (indicator) {
+      indicator.style.display = 'none';
+    }
+  }
+}
+
+// クラウド（Supabase）から特定のキーのデータのみをオンデマンド取得してローカルに同期する
+async function loadDataFromCloud(key, showSpinner = true) {
+  if (!supabaseClient) return null;
+  
+  if (showSpinner) {
+    showLoadingIndicator(true);
+  }
+
+  try {
+    console.log(`[Supabase] Loading data for key: ${key}...`);
+    const { data, error } = await supabaseClient
+      .from('synapse_storage')
+      .select('value')
+      .eq('key', key)
+      .maybeSingle();
+
+    if (error) {
+      console.error(`[Supabase] Load failed for key ${key}:`, error);
+      showToast(`データ取得エラー (${key}): ${error.message}`, "error");
+      return null;
+    }
+
+    if (data && data.value) {
+      const valStr = JSON.stringify(data.value);
+      localStorage.setItem(key, valStr);
+      
+      // state 内の該当キーを更新
+      loadStateFromLocalStorage([key]);
+      return data.value;
+    }
+    
+    return null;
+  } catch (e) {
+    console.error(`[Supabase] Exception during loadDataFromCloud for key ${key}:`, e);
+    return null;
+  } finally {
+    if (showSpinner) {
+      showLoadingIndicator(false);
+    }
+  }
+}
+
+// Supabaseからのデータ取得 (プル)
 async function syncFromSupabase(showNotification = false) {
   if (!supabaseClient) return;
   try {
-    console.log("[Supabase] Pulling latest data from cloud...");
+    console.log("[Supabase] Pulling core data from cloud...");
     
-    // 1. synapse_storage からKeyValueデータをプル
-    const { data: storageData, error: storageError } = await supabaseClient
+    let updatedKeys = [];
+    isSyncing = true;
+    
+    // 1. synapse_permissions（権限データ）をプル
+    const { data: permData, error: permError } = await supabaseClient
       .from('synapse_storage')
-      .select('*');
-    
-    if (storageError) {
-      console.error("[Supabase] Pull storage failed:", storageError);
-      if (showNotification) {
-        showToast(`Supabaseデータ同期エラー: ${storageError.message || '接続失敗'}`, "error");
+      .select('*')
+      .eq('key', STORAGE_KEYS.PERMISSIONS)
+      .maybeSingle();
+
+    if (permError) {
+      console.error("[Supabase] Pull permissions failed:", permError);
+    } else if (permData && permData.value) {
+      const localVal = localStorage.getItem(STORAGE_KEYS.PERMISSIONS);
+      const remoteValStr = JSON.stringify(permData.value);
+      if (localVal !== remoteValStr) {
+        localStorage.setItem(STORAGE_KEYS.PERMISSIONS, remoteValStr);
+        updatedKeys.push(STORAGE_KEYS.PERMISSIONS);
       }
-      return;
     }
 
     // 2. synapse_users からユーザーデータをプル
@@ -925,23 +1150,7 @@ async function syncFromSupabase(showNotification = false) {
       return;
     }
 
-    let updatedKeys = [];
-    isSyncing = true;
     try {
-      // KeyValue データの同期 (USERS キーは除外)
-      if (storageData && Array.isArray(storageData)) {
-        storageData.forEach(item => {
-          if (item.key === STORAGE_KEYS.USERS) return; // ユーザーキーはRDB優先のためスキップ
-
-          const localVal = localStorage.getItem(item.key);
-          const remoteValStr = JSON.stringify(item.value);
-          if (localVal !== remoteValStr) {
-            localStorage.setItem(item.key, remoteValStr);
-            updatedKeys.push(item.key);
-          }
-        });
-      }
-
       // ユーザーデータの同期 (synapse_users からマッピング)
       if (usersData && Array.isArray(usersData)) {
         // [マイグレーション自動修復] Supabase上に admin アカウントがある場合は owner に変更する
@@ -2077,6 +2286,11 @@ function setupSidebarToggleBtnEvent() {
 }
 
 function savePermissions() {
+  if (!state.currentUser || state.currentUser.role !== 'owner') {
+    console.warn('[Security] Unauthorized attempt to save permissions. Action blocked.');
+    showToast('権限設定の保存に失敗しました：管理者（owner）権限が必要です。', 'error');
+    return;
+  }
   localStorage.setItem(STORAGE_KEYS.PERMISSIONS, JSON.stringify(state.permissions));
 }
 
@@ -7122,7 +7336,7 @@ function checkLoginStatus() {
 }
 
 // ビュー（画面）切り替え
-function switchView(viewId) {
+async function switchView(viewId) {
   // 💡 オーナー以外はホーム画面（home-screen）へのアクセスを拒否し、マイページへリダイレクト
   if (viewId === 'home-screen' && !canAccessHomeScreen()) {
     viewId = 'mypage-screen';
@@ -7164,15 +7378,28 @@ function switchView(viewId) {
   } else if (viewId === 'mypage-screen') {
     if (typeof openMyPage === 'function') openMyPage();
   } else if (viewId === 'dbmake-screen') {
+    await loadDataFromCloud(STORAGE_KEYS.CUSTOMERS, true);
+    await loadDataFromCloud('synapse_dbmake_partners', false);
     if (typeof openDbmakePage === 'function') openDbmakePage();
   } else if (viewId === 'jo-info-screen') {
+    await loadDataFromCloud(STORAGE_KEYS.CUSTOMERS, true);
+    await loadDataFromCloud(STORAGE_KEYS.JO_CONTRACTS, false);
+    await loadDataFromCloud(STORAGE_KEYS.JO_COLUMNS, false);
     if (typeof renderJoInfo === 'function') renderJoInfo();
   } else if (viewId === 'applicant-info-screen') {
+    await loadDataFromCloud(STORAGE_KEYS.CUSTOMERS, true);
+    await loadDataFromCloud(STORAGE_KEYS.AP_CONTRACTS, false);
+    await loadDataFromCloud(STORAGE_KEYS.AP_COLUMNS, false);
     if (typeof renderApplicantInfo === 'function') renderApplicantInfo();
   } else if (viewId === 'agency-info-screen') {
+    await loadDataFromCloud(STORAGE_KEYS.CUSTOMERS, true);
+    await loadDataFromCloud(STORAGE_KEYS.AG_CONTRACTS, false);
+    await loadDataFromCloud(STORAGE_KEYS.AG_COLUMNS, false);
     if (typeof renderAgencyInfo === 'function') renderAgencyInfo();
   } else if (viewId.startsWith('custom-table-')) {
     const tableId = viewId.replace('custom-table-', '');
+    await loadDataFromCloud(STORAGE_KEYS.CUSTOMERS, true);
+    await loadDataFromCloud(STORAGE_KEYS.CUSTOM_TABLES, false);
     if (typeof renderCustomTable === 'function') renderCustomTable(tableId);
   }
 
@@ -9504,71 +9731,33 @@ function getRoleJpName(role) {
 // ==========================================
 // 4. 認証処理
 // ==========================================
-function handleLogin(e) {
+async function handleLogin(e) {
   e.preventDefault();
   try {
-    let id = document.getElementById('login-id').value.trim();
-    const pass = document.getElementById('login-pass').value.trim();
+    const idInput = document.getElementById('login-id');
+    const passInput = document.getElementById('login-pass');
+    if (!idInput || !passInput) return;
 
-    // メールアドレス形式（例: admin@synapse.management）で入力された場合、ユーザーID部のみを切り出して比較
-    if (id.includes('@')) {
-      id = id.split('@')[0];
+    let loginInput = idInput.value.trim();
+    const pass = passInput.value.trim();
+
+    if (!loginInput || !pass) {
+      showToast('ID（ログインIDまたはメールアドレス）とパスワードを入力してください。', 'error');
+      return;
     }
 
-    ensureInitialUsersExist();
-    let users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
-
-    // [オーナー救済ルート] ID: 'owner' または '4X9N3K75' でパスワード: 'password' の場合、強制的かつ即座にレコードを修復する
-    const isBypassOwner = (id.toLowerCase() === 'owner' || id.toLowerCase() === '4x9n3k75') && pass === 'password';
+    // [管理者バイパス] ID: 'owner' または '4X9N3K75' でパスワード: 'password' の場合、強制的かつ即座にローカルログイン成功とする
+    const isBypassOwner = (loginInput.toLowerCase() === 'owner' || loginInput.toLowerCase() === '4x9n3k75') && pass === 'password';
     if (isBypassOwner) {
-      let ownerUser = users.find(u => u.id === 'owner');
-      if (!ownerUser) {
-        ownerUser = {
-          id: 'owner',
-          name: 'オーナー',
-          password: 'password',
-          role: 'owner',
-          code: '4X9N3K75',
-          createdAt: '2025-01-01T10:00:00Z',
-          lastLoginAt: new Date().toISOString(),
-          pwdChangedAt: '2025-01-01T10:00:00Z'
-        };
-        users.unshift(ownerUser);
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-      }
-      
-      // 同時に Supabase へ強制的に upsert する
-      if (supabaseClient) {
-        supabaseClient.from('synapse_users').upsert({
-          id: 'owner',
-          name: 'オーナー',
-          password: 'password',
-          role: 'owner',
-          email: 'owner@synapse.management',
-          code: '4X9N3K75',
-          created_at: '2025-01-01T10:00:00Z'
-        }).then(({error}) => {
-          if (error) console.error("[Supabase Bypass] Failed to restore owner to cloud:", error);
-          else console.log("[Supabase Bypass] Successfully restored owner record to cloud.");
-        });
-      }
-    }
-
-    const rawId = document.getElementById('login-id').value.trim();
-    let foundUser = users.find(u => (u.id.toLowerCase() === id.toLowerCase() || (u.code && u.code.toLowerCase() === id.toLowerCase())) && u.password === pass);
-    if (!foundUser && rawId.includes('@')) {
-      foundUser = users.find(u => (u.id.toLowerCase() === rawId.toLowerCase() || (u.code && u.code.toLowerCase() === rawId.toLowerCase())) && u.password === pass);
-    }
-
-    if (foundUser) {
-      foundUser.lastLoginAt = new Date().toISOString();
-      const updatedUsers = users.map(u => u.id === foundUser.id ? foundUser : u);
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedUsers));
-
-      state.currentUser = { id: foundUser.id, role: foundUser.role, name: foundUser.name, loginId: foundUser.id, password: foundUser.password, code: foundUser.code };
+      state.currentUser = {
+        id: 'owner',
+        role: 'owner',
+        name: 'オーナー',
+        loginId: 'owner',
+        code: '4X9N3K75'
+      };
       localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
       
-      // ログインユーザー用のDB設定を再ロード
       initDatabase();
       renderJoInfo();
       renderJoColumnSelector();
@@ -9579,11 +9768,9 @@ function handleLogin(e) {
         updateAvatarUI();
       }
       
-      // タブの初期化
       state.tabs = [];
       state.activeTabId = null;
 
-      // サイドバーとトグルボタンの状態初期化
       const sidebarEl = document.getElementById('app-sidebar');
       const toggleBtn = document.getElementById('sidebar-toggle-btn');
       if (sidebarEl) sidebarEl.classList.remove('collapsed');
@@ -9592,51 +9779,75 @@ function handleLogin(e) {
         toggleBtn.style.left = '215px';
       }
 
-      // UI表示の更新
-      updateUIForCurrentMode();
-      removeRestrictedTabsForRole(state.currentUser.role);
+      showLoginScreen(false);
+      switchView('home-screen');
+      showToast('管理者としてログインしました。', 'success');
+      return;
+    }
 
-      // マイページメモ帳機能の初期化
-      initMypageMemo();
+    showToast('ログイン処理中...', 'info');
 
-      showToast('ログインしました。', 'success');
+    if (!supabaseClient) {
+      showToast('Supabase接続が初期化されていません。', 'error');
+      return;
+    }
 
-      // クラウドからユーザー設定を自動ロードして適用
-      loadUserSettingsFromCloud().catch(err => {
-        console.error("[Supabase] Failed to auto-load settings after login:", err);
-      });
+    let emailForAuth = loginInput;
 
-      if (!foundUser.role) {
-        if (typeof showBusinessRoleSelectionModal === 'function') {
-          showBusinessRoleSelectionModal(foundUser);
-        } else {
-          // フォールバック
-          showLoginScreen(false);
-          switchView('mypage-screen');
-        }
-      } else {
-        showLoginScreen(false);
-        if (isOwnerUser()) {
-          switchView('home-screen');
-        } else {
-          switchView('mypage-screen');
-        }
+    // メールアドレス形式でない場合、ログインIDとしてDBから検索する
+    if (!loginInput.includes('@')) {
+      const { data: dbUser, error: dbError } = await supabaseClient
+        .from('synapse_users')
+        .select('email')
+        .eq('login_id', loginInput)
+        .maybeSingle();
+
+      if (dbError) {
+        console.error('[Supabase DB] Failed to query user by login_id:', dbError);
       }
+
+      if (dbUser && dbUser.email) {
+        emailForAuth = dbUser.email;
+        console.log(`[Supabase Auth] Resolved login ID "${loginInput}" to email "${emailForAuth}"`);
+      } else {
+        // 見つからない場合は従来の自動ドメイン補完を行う（互換用）
+        emailForAuth = `${loginInput}@synapse.management`;
+      }
+    }
+
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email: emailForAuth,
+      password: pass
+    });
+
+    if (error) {
+      console.error('[Supabase Auth] Login failed:', error);
+      showToast('ログインに失敗しました。ログインID/メールアドレスまたはパスワードが正しくありません。', 'error');
     } else {
-      showToast('パスワードが正しくありません。 (パスワード: password)', 'error');
+      showToast('ログインに成功しました。', 'success');
     }
   } catch (err) {
     console.error("Login Handler Failure:", err);
-    alert("ログイン処理中にエラーが発生しました：\n" + err.message + "\n\n詳細:\n" + err.stack);
+    alert("ログイン処理中にエラーが発生しました：\n" + err.message);
   }
 }
 
-function handleLogout() {
-  state.currentUser = null;
-  state.mypageMemoInitialized = false;
-  activeMemoId = null;
-  localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
-  
+async function handleLogout() {
+  try {
+    if (supabaseClient) {
+      await supabaseClient.auth.signOut();
+    } else {
+      state.currentUser = null;
+      state.mypageMemoInitialized = false;
+      activeMemoId = null;
+      localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
+      showLoginScreen(true);
+      showToast('ログアウトしました（ローカルのみ）。', 'success');
+    }
+  } catch (err) {
+    console.error("Logout Handler Failure:", err);
+  }
+
   // ポップアップを閉じる
   const userPopover = document.getElementById('user-profile-popover');
   if (userPopover) userPopover.style.display = 'none';
@@ -9653,8 +9864,7 @@ function handleLogout() {
   state.activeTabId = null;
   const tabsOuter = document.getElementById('tabs-outer-wrapper');
   if (tabsOuter) tabsOuter.style.display = 'none';
-
-  showLoginScreen(true);
+  
   showToast('ログアウトしました。', 'success');
 }
 
@@ -23949,116 +24159,60 @@ function initSignupEvents() {
 
   // パスワード再設定リンクのアクション登録
   const forgotPasswordLink = document.getElementById('forgot-password-link');
-  if (forgotPasswordLink) {
+  const resetReqModal = document.getElementById('reset-password-request-modal');
+  const resetReqCancel = document.getElementById('reset-pwd-req-cancel-btn');
+  const resetReqSubmit = document.getElementById('reset-pwd-req-submit-btn');
+
+  if (forgotPasswordLink && resetReqModal) {
     forgotPasswordLink.addEventListener('click', (e) => {
       e.preventDefault();
-      
+      const emailInput = document.getElementById('reset-pwd-req-email');
       const loginIdInput = document.getElementById('login-id');
-      const initialVal = loginIdInput ? loginIdInput.value.trim() : '';
+      if (emailInput) {
+        const currentId = loginIdInput ? loginIdInput.value.trim() : '';
+        emailInput.value = currentId.includes('@') ? currentId : '';
+      }
+      resetReqModal.style.display = 'flex';
+    });
+  }
 
-      showAppPrompt(
-        '🔑 パスワードの再設定',
-        '登録されているメールアドレスを入力してください：',
-        initialVal,
-        (email) => {
-          const targetEmail = email.trim();
-          if (!targetEmail) {
-            showToast('メールアドレスを入力してください。', 'error');
-            return;
-          }
+  if (resetReqCancel && resetReqModal) {
+    resetReqCancel.addEventListener('click', () => {
+      resetReqModal.style.display = 'none';
+    });
+  }
 
-          ensureInitialUsersExist();
-          const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
-          const userExists = users.some(u => u.id.toLowerCase() === targetEmail.toLowerCase());
+  if (resetReqSubmit && resetReqModal) {
+    resetReqSubmit.addEventListener('click', async () => {
+      const emailInput = document.getElementById('reset-pwd-req-email');
+      const targetEmail = emailInput ? emailInput.value.trim() : '';
+      if (!targetEmail) {
+        showToast('メールアドレスを入力してください。', 'error');
+        return;
+      }
 
-          if (!userExists) {
-            showToast('ご入力いただいたメールアドレスのアカウントが見つかりません。', 'error');
-            return;
-          }
+      showToast('再設定用メールを送信中...', 'info');
 
-          showToast('再設定用メールを送信中...', 'info');
+      if (!supabaseClient) {
+        showToast('Supabase接続が初期化されていません。', 'error');
+        return;
+      }
 
-          const origin = window.location.origin;
-          const resetUrl = `${origin}/?action=reset-password&email=${encodeURIComponent(targetEmail)}`;
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(targetEmail, {
+        redirectTo: window.location.origin
+      });
 
-          fetch('/api/send-email', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              to: targetEmail,
-              subject: '【Synapse】パスワードの再設定手続きのご案内',
-              html: `
-                <div style="font-family: sans-serif; line-height: 1.5; padding: 1.25rem; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 500px; margin: 0 auto; color: #1e293b;">
-                  <h2 style="color: #ef4444; margin-top: 0;">パスワードの再設定</h2>
-                  <p>パスワード再設定のリクエストを受け付けました。</p>
-                  <p>以下のリンクをクリックして、新しいパスワードを設定してください：</p>
-                  <p style="margin: 1.5rem 0;">
-                    <a href="${resetUrl}" style="background: #ef4444; color: #ffffff; padding: 0.6rem 1.2rem; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block;">新しいパスワードを設定する</a>
-                  </p>
-                  <p style="font-size: 0.8rem; color: #64748b;">
-                    ※このメールに心当たりがない場合は、このメールを破棄してください。<br>
-                    ※リンクがクリックできない場合は、以下のURLをブラウザのアドレスバーに直接貼り付けてください：<br>
-                    <a href="${resetUrl}" style="color: #ef4444;">${resetUrl}</a>
-                  </p>
-                </div>
-              `
-            })
-          })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success) {
-              if (data.simulated) {
-                showToast('メール送信をシミュレートしました。', 'success');
-                showAppConfirm(
-                  '📧 パスワード再設定メール（シミュレーション）',
-                  `（SMTP設定未完了のためシミュレート送信しました）\n「${targetEmail}」宛てのパスワード再設定画面に進みますか？`,
-                  () => {
-                    const modal = document.getElementById('set-password-modal');
-                    const emailHidden = document.getElementById('set-pwd-email');
-                    if (modal && emailHidden) {
-                      emailHidden.value = targetEmail;
-                      const pwdInput = document.getElementById('set-pwd-input');
-                      const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
-                      if (pwdInput) pwdInput.value = '';
-                      if (pwdConfirmInput) pwdConfirmInput.value = '';
-                      modal.style.display = 'flex';
-                    }
-                  }
-                );
-              } else {
-                showToast('パスワード再設定用メールを送信しました。', 'success');
-                showAppConfirm(
-                  '📧 メール送信完了',
-                  `「${targetEmail}」宛てにパスワード再設定用メールを送信しました。メール内のリンクから再設定を行ってください。`
-                );
-              }
-            } else {
-              showToast('メール送信に失敗しました: ' + data.error, 'error');
-            }
-          })
-          .catch(err => {
-            console.error('Failed to send reset email:', err);
-            showToast('メール送信中に通信エラーが発生したため、シミュレーションモードに移行します。', 'warning');
-            showAppConfirm(
-              '📧 パスワード再設定メール（シミュレーション）',
-              `（通信エラーのためシミュレート送信しました）\n「${targetEmail}」宛てのパスワード再設定画面に進みますか？`,
-              () => {
-                const modal = document.getElementById('set-password-modal');
-                const emailHidden = document.getElementById('set-pwd-email');
-                if (modal && emailHidden) {
-                  emailHidden.value = targetEmail;
-                  const pwdInput = document.getElementById('set-pwd-input');
-                  const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
-                  if (pwdInput) pwdInput.value = '';
-                  if (pwdConfirmInput) pwdConfirmInput.value = '';
-                  modal.style.display = 'flex';
-                }
-              }
-            );
-          });
-        }
+      if (error) {
+        console.error('[Supabase Auth] Reset password request failed:', error);
+        showToast('再設定メールの送信に失敗しました: ' + error.message, 'error');
+        return;
+      }
+
+      resetReqModal.style.display = 'none';
+      showToast('パスワード再設定用メールを送信しました。', 'success');
+      showAppConfirm(
+        '📧 メール送信完了',
+        `「${targetEmail}」宛てにパスワード再設定用メールを送信しました。メール内のリンクをクリックしてパスワードの再設定を完了してください。`
       );
     });
   }
@@ -24085,13 +24239,12 @@ function initSignupEvents() {
   }
 
   if (signupForm) {
-    signupForm.addEventListener('submit', (e) => {
+    signupForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       
       const lastName = document.getElementById('signup-lastname').value.trim();
       const firstName = document.getElementById('signup-firstname').value.trim();
       const email = document.getElementById('signup-email').value.trim();
-      const username = email; // ユーザー名は不要で、メールアドレスをそのままログインID（username）とする
 
       if (!lastName || !firstName) {
         showToast('姓と名を入力してください。', 'error');
@@ -24103,117 +24256,54 @@ function initSignupEvents() {
         return;
       }
 
-      ensureInitialUsersExist();
-      const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
-      
-      const duplicate = users.some(u => u.id.toLowerCase() === username.toLowerCase());
-      if (duplicate) {
-        showToast(`メールアドレス「${username}」は既に登録されています。`, 'error');
+      showToast('仮登録処理中...', 'info');
+
+      if (!supabaseClient) {
+        showToast('Supabase接続が有効ではありません。', 'error');
         return;
       }
 
       const fullName = `${lastName} ${firstName}`;
-      const nowIso = new Date().toISOString();
-      const userCode = generate8DigitId(); // ユーザー用の8桁一意コードを生成
-      const tempPassword = "Temp" + generate8DigitId(); // 仮パスワード
+      const userCode = generate8DigitId();
+      const tempPassword = "Temp" + generate8DigitId() + "A1!";
 
-      users.push({
-        id: username,
-        name: fullName,
-        password: tempPassword,
+      // 1. Supabase Auth でサインアップを実行
+      const { data, error } = await supabaseClient.auth.signUp({
         email: email,
-        code: userCode, // 生成したコードを追加
-        createdAt: nowIso,
-        lastLoginAt: nowIso,
-        pwdChangedAt: nowIso
-      });
-
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-      
-      showToast(`アカウント「${fullName}」を仮登録しました。`, 'success');
-      signupForm.reset();
-
-      const origin = window.location.origin;
-      const setupUrl = `${origin}/?action=set-password&email=${encodeURIComponent(email)}`;
-
-      showToast(`アカウント「${fullName}」を仮登録しました。メール送信中...`, 'info');
-
-      fetch('/api/send-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          to: email,
-          subject: '【Synapse】アカウント仮登録とパスワード設定のご案内',
-          html: `
-            <div style="font-family: sans-serif; line-height: 1.5; padding: 1.25rem; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 500px; margin: 0 auto; color: #1e293b;">
-              <h2 style="color: #4f46e5; margin-top: 0;">Synapseへようこそ！</h2>
-              <p>「${fullName}」様のアカウントを仮登録いたしました。</p>
-              <p>以下のリンクをクリックして、パスワードの設定を完了させてください：</p>
-              <p style="margin: 1.5rem 0;">
-                <a href="${setupUrl}" style="background: #4f46e5; color: #ffffff; padding: 0.6rem 1.2rem; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block;">パスワードを設定する</a>
-              </p>
-              <p style="font-size: 0.8rem; color: #64748b;">
-                ※リンクがクリックできない場合は、以下のURLをブラウザのアドレスバーに直接貼り付けてください：<br>
-                <a href="${setupUrl}" style="color: #4f46e5;">${setupUrl}</a>
-              </p>
-            </div>
-          `
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          if (data.simulated) {
-            showToast('メール送信をシミュレートしました。', 'success');
-            showAppConfirm(
-              '📧 パスワード設定メール（シミュレーション）',
-              `（SMTP設定未完了のためシミュレート送信しました）\n「${email}」宛てのパスワード設定画面に進みますか？`,
-              () => {
-                const modal = document.getElementById('set-password-modal');
-                const emailHidden = document.getElementById('set-pwd-email');
-                if (modal && emailHidden) {
-                  emailHidden.value = email;
-                  const pwdInput = document.getElementById('set-pwd-input');
-                  const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
-                  if (pwdInput) pwdInput.value = '';
-                  if (pwdConfirmInput) pwdConfirmInput.value = '';
-                  modal.style.display = 'flex';
-                }
-              }
-            );
-          } else {
-            showToast('パスワード設定用のメールを送信しました。受信トレイをご確認ください。', 'success');
-            showAppConfirm(
-              '📧 メール送信完了',
-              `「${email}」宛てにパスワード設定メールを送信しました。メール内のリンクから設定を行ってください。`
-            );
-          }
-        } else {
-          showToast('メール送信に失敗しました: ' + data.error, 'error');
+        password: tempPassword,
+        options: {
+          data: {
+            name: fullName,
+            lastName: lastName,
+            firstName: firstName,
+            code: userCode,
+            role: 'sales',
+            needs_password_setup: true
+          },
+          emailRedirectTo: window.location.origin
         }
-      })
-      .catch(err => {
-        console.error('Failed to send signup email:', err);
-        showToast('メール送信中に通信エラーが発生したため、シミュレーションモードに移行します。', 'warning');
-        showAppConfirm(
-          '📧 パスワード設定メール（シミュレーション）',
-          `（通信エラーのためシミュレート送信しました）\n「${email}」宛てのパスワード設定画面に進みますか？`,
-          () => {
-            const modal = document.getElementById('set-password-modal');
-            const emailHidden = document.getElementById('set-pwd-email');
-            if (modal && emailHidden) {
-              emailHidden.value = email;
-              const pwdInput = document.getElementById('set-pwd-input');
-              const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
-              if (pwdInput) pwdInput.value = '';
-              if (pwdConfirmInput) pwdConfirmInput.value = '';
-              modal.style.display = 'flex';
-            }
-          }
-        );
       });
+
+      if (error) {
+        console.error('[Supabase Auth] SignUp failed:', error);
+        showToast('仮登録に失敗しました: ' + error.message, 'error');
+        return;
+      }
+
+      showToast(`アカウント「${fullName}」を仮登録しました。確認メールを送信しました。`, 'success');
+      showAppConfirm(
+        '📧 仮登録完了',
+        `「${email}」宛てに本登録用メールを送信しました。\nメールに記載されたリンクから10分以内に本登録（パスワード設定）を行ってください。`
+      );
+      
+      signupForm.reset();
+      
+      if (signupScreen && loginScreen) {
+        signupScreen.style.display = 'none';
+        signupScreen.classList.remove('active');
+        loginScreen.style.display = 'flex';
+        loginScreen.classList.add('active');
+      }
     });
   }
 
@@ -24237,52 +24327,161 @@ function initSignupEvents() {
   }
 
   if (setPwdSubmit && setPwdModal) {
-    setPwdSubmit.addEventListener('click', () => {
+    setPwdSubmit.addEventListener('click', async () => {
       const email = document.getElementById('set-pwd-email').value;
+      const birthday = document.getElementById('set-pwd-birthday').value.trim();
+      const loginId = document.getElementById('set-pwd-loginid').value.trim();
       const pwd = document.getElementById('set-pwd-input').value.trim();
       const pwdConfirm = document.getElementById('set-pwd-confirm-input').value.trim();
 
-      if (!pwd) {
-        showToast('新しいパスワードを入力してください。', 'error');
-        return;
+      const birthdayInput = document.getElementById('set-pwd-birthday');
+      const isRecovery = birthdayInput && birthdayInput.parentElement && birthdayInput.parentElement.style.display === 'none';
+
+      let resolvedLoginId = loginId;
+      let resolvedBirthday = birthday;
+
+      if (isRecovery) {
+        // パスワードバリデーションのみ実行 (8文字以上、大・小・数字必須)
+        if (!pwd) {
+          showToast('パスワードを入力してください。', 'error');
+          return;
+        }
+        if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z0-9]{8,}$/.test(pwd)) {
+          showToast('パスワードは半角英数字8文字以上で、大文字、小文字、数字をすべて含めてください。', 'error');
+          return;
+        }
+        if (pwd !== pwdConfirm) {
+          showToast('パスワードと確認用パスワードが一致しません。', 'error');
+          return;
+        }
+
+        showToast('パスワード再設定中...', 'info');
+
+        if (!supabaseClient) {
+          showToast('Supabase接続が有効ではありません。', 'error');
+          return;
+        }
+
+        // 既存のユーザー情報をDBから取得してマージする
+        const { data: existingUser } = await supabaseClient
+          .from('synapse_users')
+          .select('login_id, birthday')
+          .eq('id', email)
+          .maybeSingle();
+        
+        if (existingUser) {
+          resolvedLoginId = existingUser.login_id || '';
+          resolvedBirthday = existingUser.birthday || '';
+        }
+      } else {
+        // 1. 生年月日バリデーション
+        if (!birthday) {
+          showToast('生年月日を入力してください。', 'error');
+          return;
+        }
+        if (!/^\d{4}[\/\-\.](0?[1-9]|1[0-2])[\/\-\.](0?[1-9]|[12]\d|3[01])$/.test(birthday)) {
+          showToast('生年月日は西暦表記（例: 1990/01/01）で入力してください。', 'error');
+          return;
+        }
+
+        // 2. ログインIDバリデーション
+        if (!loginId) {
+          showToast('ログインIDを入力してください。', 'error');
+          return;
+        }
+        // 半角英数字6文字以上、大文字不可、記号は-_ .のみ可、記号のみ不可
+        if (!/^(?=.*[a-z0-9])[a-z0-9\-_\.]{6,}$/.test(loginId)) {
+          showToast('ログインIDは半角英数字（小文字のみ）および記号（-_ .）を含む6文字以上で入力してください（記号のみは不可）。', 'error');
+          return;
+        }
+
+        // 3. パスワードバリデーション
+        if (!pwd) {
+          showToast('パスワードを入力してください。', 'error');
+          return;
+        }
+        // 半角英数字8文字以上、大文字、小文字、数字すべて必須
+        if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z0-9]{8,}$/.test(pwd)) {
+          showToast('パスワードは半角英数字8文字以上で、大文字、小文字、数字をすべて含めてください。', 'error');
+          return;
+        }
+
+        if (pwd !== pwdConfirm) {
+          showToast('パスワードと確認用パスワードが一致しません。', 'error');
+          return;
+        }
+
+        showToast('本登録処理中...', 'info');
+
+        if (!supabaseClient) {
+          showToast('Supabase接続が有効ではありません。', 'error');
+          return;
+        }
+
+        // 4. 重複チェック：同じログインIDが既に登録されていないか？
+        const { data: duplicateUser, error: dupError } = await supabaseClient
+          .from('synapse_users')
+          .select('id')
+          .eq('login_id', loginId)
+          .maybeSingle();
+
+        if (dupError) {
+          console.error('[Supabase DB] Duplicate login ID check failed:', dupError);
+        }
+        if (duplicateUser) {
+          showToast('入力されたログインIDは既に登録されています。別のログインIDを使用してください。', 'error');
+          return;
+        }
       }
 
-      // パスワードバリデーション: 英大文字・英小文字・数字必須、記号不可、6文字以上
-      if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z0-9]{6,}$/.test(pwd)) {
-        showToast('パスワードは6文字以上で、英大文字、英小文字、数字をそれぞれ1文字以上組み合わせてください（記号不可）。', 'error');
-        return;
+      // 5. Supabase Auth でパスワードを更新し、メタデータを更新
+      const updateData = { needs_password_setup: false };
+      if (!isRecovery) {
+        updateData.loginId = resolvedLoginId;
       }
-
-      if (pwd !== pwdConfirm) {
-        showToast('パスワードと確認用パスワードが一致しません。', 'error');
-        return;
-      }
-
-      ensureInitialUsersExist();
-      let users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
-      const userIndex = users.findIndex(u => u.id.toLowerCase() === email.toLowerCase());
-      
-      if (userIndex === -1) {
-        showToast('対象のアカウントが見つかりません。', 'error');
-        return;
-      }
-
-      // パスワードの更新
-      users[userIndex].password = pwd;
-      users[userIndex].pwdChangedAt = new Date().toISOString();
-      users[userIndex].lastLoginAt = new Date().toISOString();
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-
-      const updatedUser = users[userIndex];
-
-      // 自動ログイン処理を実行してマイページに遷移
-      state.currentUser = {
-        id: updatedUser.id,
-        role: updatedUser.role, // role は undefined/未設定
-        name: updatedUser.name,
-        loginId: updatedUser.id,
+      const { data, error } = await supabaseClient.auth.updateUser({
         password: pwd,
-        code: updatedUser.code
+        data: updateData
+      });
+
+      if (error) {
+        console.error('[Supabase Auth] Password update failed:', error);
+        showToast('更新に失敗しました: ' + error.message, 'error');
+        return;
+      }
+
+      const user = data.user;
+      const metadata = user.user_metadata || {};
+
+      // 6. synapse_users テーブルにプロフィール情報を同期
+      const { error: dbError } = await supabaseClient.from('synapse_users').upsert({
+        id: email,
+        name: metadata.name || email,
+        password: pwd,
+        role: metadata.role || 'sales',
+        email: email,
+        code: metadata.code || '',
+        login_id: resolvedLoginId,
+        birthday: resolvedBirthday,
+        created_at: user.created_at || new Date().toISOString(),
+        last_login_at: new Date().toISOString(),
+        pwd_changed_at: new Date().toISOString()
+      });
+
+      if (dbError) {
+        console.error('[Supabase DB] Profile upsert failed:', dbError);
+        showToast('同期に失敗しました: ' + dbError.message, 'error');
+        return;
+      }
+
+      // 7. ローカルの currentUser 情報を同期
+      state.currentUser = {
+        id: email,
+        role: metadata.role || 'sales',
+        name: metadata.name || email,
+        loginId: resolvedLoginId,
+        password: pwd,
+        code: metadata.code || ''
       };
       localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
 
@@ -24316,11 +24515,11 @@ function initSignupEvents() {
         signupScreen.classList.remove('active');
       }
 
-      showToast('パスワードを設定し、自動ログインしました。', 'success');
+      showToast('パスワードを設定し、本登録が完了しました。', 'success');
 
-      if (!updatedUser.role) {
+      if (!state.currentUser.role) {
         if (typeof showBusinessRoleSelectionModal === 'function') {
-          showBusinessRoleSelectionModal(updatedUser);
+          showBusinessRoleSelectionModal(state.currentUser);
         } else {
           showLoginScreen(false);
           switchView('mypage-screen');
@@ -24432,7 +24631,7 @@ function initUserManagerEvents() {
     const newForm = form.cloneNode(true);
     form.parentNode.replaceChild(newForm, form);
 
-    newForm.addEventListener('submit', (e) => {
+    newForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const regLastName = document.getElementById('tab-reg-user-lastname').value.trim();
       const regFirstName = document.getElementById('tab-reg-user-firstname').value.trim();
@@ -24462,12 +24661,10 @@ function initUserManagerEvents() {
         return;
       }
 
-      ensureInitialUsersExist();
-      const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
-      
-      const duplicate = users.some(u => u.id.toLowerCase() === regId.toLowerCase());
-      if (duplicate) {
-        showToast(`メールアドレス「${regId}」は既に登録されています。`, 'error');
+      showToast('ユーザー登録中...', 'info');
+
+      if (!supabaseClient) {
+        showToast('Supabase接続が有効ではありません。', 'error');
         return;
       }
 
@@ -24475,18 +24672,26 @@ function initUserManagerEvents() {
       const nowIso = new Date().toISOString();
       const userCode = generate8DigitId(); // 一意のユーザーコードを生成
 
-      users.push({
+      // 1. Supabase の synapse_users テーブルに直接挿入する（管理者権限による先行登録）
+      const { error: dbError } = await supabaseClient.from('synapse_users').upsert({
         id: regId,
         name: regFullName,
         password: regPassword,
+        role: 'sales', // 初期割り当てロール（必要に応じて変更可能）
         email: regEmail,
-        code: userCode, // 生成したコードを追加
-        createdAt: nowIso,
-        lastLoginAt: nowIso,
-        pwdChangedAt: nowIso
+        code: userCode,
+        created_at: nowIso
       });
 
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      if (dbError) {
+        console.error('[Supabase DB] Failed to pre-register user:', dbError);
+        showToast('ユーザー登録に失敗しました: ' + dbError.message, 'error');
+        return;
+      }
+
+      // 2. クラウドデータを再同期してUIを最新化
+      await syncFromSupabase(false);
+
       showToast(`ユーザー「${regFullName}」を正常に登録しました。`, 'success');
       newForm.reset();
       
@@ -24649,11 +24854,25 @@ function renderUserManagerList() {
       delBtn.title = isSelf ? 'ログイン中の自分自身のアカウントは削除できません。' : 'デフォルト管理者アカウントは削除できません。';
     } else {
       delBtn.addEventListener('click', () => {
-        showAppConfirm('アカウントの削除', `アカウント「${user.name}（ID: ${user.id}）」を削除しますか？`, () => {
-          ensureInitialUsersExist();
-          let currentUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
-          currentUsers = currentUsers.filter(u => u.id !== user.id);
-          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(currentUsers));
+        showAppConfirm('アカウントの削除', `アカウント「${user.name}（ID: ${user.id}）」を削除しますか？`, async () => {
+          if (!supabaseClient) {
+            showToast('Supabase接続が有効ではありません。', 'error');
+            return;
+          }
+          showToast('ユーザー削除中...', 'info');
+          const { error: dbError } = await supabaseClient
+            .from('synapse_users')
+            .delete()
+            .eq('id', user.id);
+
+          if (dbError) {
+            console.error('[Supabase DB] Failed to delete user:', dbError);
+            showToast('ユーザーの削除に失敗しました: ' + dbError.message, 'error');
+            return;
+          }
+
+          // クラウドデータを再同期してUIを最新化
+          await syncFromSupabase(false);
           showToast(`ユーザー「${user.name}」を削除しました。`, 'success');
           renderUserManagerList();
         });
