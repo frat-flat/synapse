@@ -2364,6 +2364,7 @@ function getAdminIconPermissionLevel(userId, iconId) {
   // owner（ECオーナー）は常にフルアクセス（write）
   if (userRole === 'owner' || userId === 'owner') return 'write';
 
+  if (!state.permissions) state.permissions = {};
   if (!state.permissions.tables) state.permissions.tables = {};
   if (!state.permissions.writeTables) state.permissions.writeTables = {};
 
@@ -2486,6 +2487,8 @@ function checkFolderAccess(folderId) {
 
   // 1. 権限設定（folders）に該当のフォルダIDがセットアップされている場合、
   //    ログイン中ユーザーが許可されていなければ、標準フォルダであっても非表示にする。
+  if (!state.permissions) state.permissions = {};
+  if (!state.permissions.folders) state.permissions.folders = {};
   const isSetup = Object.keys(state.permissions.folders).includes(folderId);
   const allowed = state.permissions.folders[folderId] || [];
   const hasAccess = !isSetup || allowed.includes(userId);
@@ -2567,6 +2570,8 @@ function checkTableAccess(tableId) {
 
   // 1. 権限設定（tables）に該当のテーブルIDがセットアップされている場合、
   //    ログイン中ユーザーが許可されていなければ、標準テーブルであっても非表示にする。
+  if (!state.permissions) state.permissions = {};
+  if (!state.permissions.tables) state.permissions.tables = {};
   const isSetup = Object.keys(state.permissions.tables).includes(tableId);
   const allowed = state.permissions.tables[tableId] || [];
   const hasAccess = !isSetup || allowed.includes(userId);
@@ -2613,6 +2618,8 @@ function checkColumnAccess(tableId, colId) {
     return { visible: true, grayout: false };
   }
 
+  if (!state.permissions) state.permissions = {};
+  if (!state.permissions.columns) state.permissions.columns = {};
   const tableCols = state.permissions.columns[tableId] || {};
   const allowed = tableCols[colId] || [];
   
