@@ -112,6 +112,7 @@
 
         <button class="nav-item" id="menu-form-customize" data-tab="form-customize-screen" style="margin-top: 0.5rem;">📋 フォーム作成</button>
         <button class="nav-item" id="menu-table-creator" data-tab="table-creator-screen" style="margin-top: 0.5rem;">📊 テーブル作成</button>
+        <button class="nav-item" id="menu-party-id-mgmt" data-tab="party-id-mgmt-screen" style="margin-top: 0.5rem;">🔑 Party ID管理</button>
 
 
 </nav>
@@ -292,6 +293,71 @@
 <div id="pending-banner" style="display: none;"></div>
 
 <main>
+<!-- ================= Party ID 管理画面 ================= -->
+<section id="party-id-mgmt-screen" class="screen-view" style="display: none; padding: 1.5rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h1 style="margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.5rem; color: var(--text-primary);">
+        🔑 Party ID 管理
+      </h1>
+      <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-muted);">発行済みパーティーIDのステータス監視および手動リセット（再発行可能化）を行います。</p>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+      <button id="btn-refresh-party-ids" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.25rem;">
+        🔄 更新
+      </button>
+    </div>
+  </div>
+
+  <!-- フィルター条件 -->
+  <div style="display: flex; gap: 1rem; padding: 1rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); margin-bottom: 1.5rem; align-items: center; flex-wrap: wrap;">
+    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+      <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-secondary);">ステータス:</label>
+      <select id="party-id-filter-status" style="padding: 0.35rem 0.5rem; font-size: 0.8rem; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); outline: none; cursor: pointer;">
+        <option value="">すべて</option>
+        <option value="temporary">仮発行 (temporary)</option>
+        <option value="active">本登録 (active)</option>
+        <option value="reusable">再利用待ち (reusable)</option>
+      </select>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+      <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-secondary);">前回発行（リセット）からの期間:</label>
+      <select id="party-id-filter-period" style="padding: 0.35rem 0.5rem; font-size: 0.8rem; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); outline: none; cursor: pointer;">
+        <option value="">指定なし</option>
+        <option value="3years">3年以上経過 (再発行可能)</option>
+        <option value="1year">1年以上経過</option>
+        <option value="30days">30日以上経過</option>
+      </select>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+      <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-secondary);">検索 (ID / 流入経路):</label>
+      <input type="text" id="party-id-filter-search" placeholder="IDまたはsource..." style="padding: 0.35rem 0.5rem; font-size: 0.8rem; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); outline: none; width: 180px;">
+    </div>
+  </div>
+
+  <!-- データテーブル -->
+  <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden; background: var(--bg-surface-elevated); max-height: calc(100vh - 280px); overflow-y: auto;">
+    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.8rem;">
+      <thead>
+        <tr style="background: var(--bg-surface); border-bottom: 2px solid var(--border-color); color: var(--text-secondary); font-weight: 600; position: sticky; top: 0; z-index: 10;">
+          <th style="padding: 0.75rem 1rem;">Party ID</th>
+          <th style="padding: 0.75rem 1rem;">シーケンス</th>
+          <th style="padding: 0.75rem 1rem;">発行元 (source)</th>
+          <th style="padding: 0.75rem 1rem;">ステータス</th>
+          <th style="padding: 0.75rem 1rem;">発行（リセット）日時</th>
+          <th style="padding: 0.75rem 1rem;">本登録完了日時</th>
+          <th style="padding: 0.75rem 1rem; text-align: center;">操作</th>
+        </tr>
+      </thead>
+      <tbody id="party-id-list-table-body">
+        <tr>
+          <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">データを読み込み中...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
 <!-- ================= フォーム作成画面 ================= -->
 <section id="form-customize-screen" class="screen-view" style="padding: 0; height: calc(100vh - 120px); min-height: 600px;">
 <iframe src="form-customize/index.html?v=7.7.0" style="width: 100%; height: 100%; border: none;"></iframe>
