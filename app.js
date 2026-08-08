@@ -2813,6 +2813,26 @@ function initDatabase() {
       state.permissions.tables[tid] = defaultTables[tid];
     }
   });
+  // 管理者コントロールパネルの初期権限（デフォルトでadminに許可）
+  const defaultAdminIcons = [
+    'admin-panel-form-btn',
+    'admin-panel-table-btn',
+    'admin-panel-presence-btn',
+    'admin-panel-audit-btn',
+    'admin-panel-partner-btn',
+    'admin-panel-folder-btn',
+    'admin-panel-user-register-btn',
+    'admin-panel-party-id-btn'
+  ];
+  if (!state.permissions.writeTables) state.permissions.writeTables = {};
+  defaultAdminIcons.forEach(iconId => {
+    if (!state.permissions.tables[iconId]) {
+      state.permissions.tables[iconId] = ['admin'];
+    }
+    if (!state.permissions.writeTables[iconId]) {
+      state.permissions.writeTables[iconId] = ['admin'];
+    }
+  });
 
   // --- 操作監査ログのロード ---
   state.auditLogs = JSON.parse(localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS)) || [];
@@ -3318,7 +3338,8 @@ function canAccessHomeScreen() {
     'admin-panel-audit-btn',
     'admin-panel-partner-btn',
     'admin-panel-folder-btn',
-    'admin-panel-user-register-btn'
+    'admin-panel-user-register-btn',
+    'admin-panel-party-id-btn'
   ];
   const hasAnyIconAccess = adminIcons.some(iconId => {
     return checkAdminIconAccess(iconId);
@@ -8063,7 +8084,8 @@ function updateUIForCurrentMode() {
     'admin-panel-audit-btn',
     'admin-panel-partner-btn',
     'admin-panel-folder-btn',
-    'admin-panel-user-register-btn'
+    'admin-panel-user-register-btn',
+    'admin-panel-party-id-btn'
   ];
 
   let hasAnyVisibleIcon = false;
@@ -9605,8 +9627,7 @@ function setupEventListeners() {
     { id: 'menu-applicant-info', tab: 'applicant-info-screen' },
     { id: 'menu-dbmake', tab: 'dbmake-screen' },
     { id: 'menu-form-customize', tab: 'form-customize-screen' },
-    { id: 'menu-table-creator', tab: 'table-creator-screen' },
-    { id: 'menu-party-id-mgmt', tab: 'party-id-mgmt-screen' }
+    { id: 'menu-table-creator', tab: 'table-creator-screen' }
   ];
 
   sidebarButtons.forEach(btn => {
@@ -9651,12 +9672,6 @@ function setupEventListeners() {
         } else if (btn.tab === 'form-customize-screen') {
           title = 'フォーム作成';
           type = 'form-customize-screen';
-        } else if (btn.tab === 'table-creator-screen') {
-          title = 'テーブル作成';
-          type = 'table-creator-screen';
-        } else if (btn.tab === 'party-id-mgmt-screen') {
-          title = '🔑 Party ID管理';
-          type = 'party-id-mgmt-screen';
         }
         openTab(btn.tab, type, title);
       });
@@ -21062,7 +21077,8 @@ document.addEventListener('DOMContentLoaded', () => {
       { id: 'admin-panel-audit-btn', name: '📈 操作ログ履歴', desc: 'ユーザー全員のセル編集・操作履歴ログの閲覧' },
       { id: 'admin-panel-partner-btn', name: '🛢️ パートナーDB', desc: 'パートナー企業等の統合データベース' },
       { id: 'admin-panel-folder-btn', name: '📁 フォルダ管理', desc: 'サイドバーおよびテーブルのフォルダ格納管理' },
-      { id: 'admin-panel-user-register-btn', name: '👥 ユーザー登録', desc: '新規ユーザー登録・オンボーディング承認' }
+      { id: 'admin-panel-user-register-btn', name: '👥 ユーザー登録', desc: '新規ユーザー登録・オンボーディング承認' },
+      { id: 'admin-panel-party-id-btn', name: '🔑 ID管理', desc: '発行済みパーティーIDのステータス監視・手動再利用' }
     ];
 
     let adminIconsToggleHtml = `
@@ -24525,6 +24541,17 @@ function setupPermissionFeatures() {
         return;
       }
       openDbmakePage();
+    });
+  }
+
+  const panelPartyIdBtn = document.getElementById('admin-panel-party-id-btn');
+  if (panelPartyIdBtn) {
+    panelPartyIdBtn.addEventListener('click', () => {
+      if (!checkAdminIconAccess('admin-panel-party-id-btn')) {
+        showToast('この機能を利用する権限がありません。', 'error');
+        return;
+      }
+      openTab('party-id-mgmt-screen', 'party-id-mgmt-screen', '🔑 Party ID管理');
     });
   }
 
