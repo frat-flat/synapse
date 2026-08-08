@@ -156,6 +156,23 @@
             <button id="zoom-reset-btn" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-xs); cursor: pointer; color: var(--text-secondary); margin-left: 0.25rem;" title="100%に戻す">リセット</button>
           </div>
         </div>
+
+        <!-- ☁️ Supabase 接続設定 -->
+        <div class="supabase-settings-container" style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">Supabase 接続設定</span>
+          
+          <!-- Synapse用 -->
+          <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <label style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600;">Synapse URL:</label>
+            <input type="text" id="supabase-url" placeholder="https://xxx.supabase.co" style="background: var(--bg-surface-elevated); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.25rem 0.4rem; font-size: 0.75rem; width: 100%; box-sizing: border-box; outline: none;">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.5rem;">
+            <label style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600;">Synapse Anon Key:</label>
+            <input type="password" id="supabase-anon-key" placeholder="eyJhbG..." style="background: var(--bg-surface-elevated); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.25rem 0.4rem; font-size: 0.75rem; width: 100%; box-sizing: border-box; outline: none;">
+          </div>
+
+          <button id="btn-save-supabase" class="btn btn-sm btn-primary" style="width: 100%; font-size: 0.75rem; padding: 0.35rem; font-weight: 600;">🔌 接続情報を保存</button>
+        </div>
 </div>
 
 <!-- 管理者用プレビュー切り替えパネル -->
@@ -512,10 +529,14 @@
             <input type="text" id="signup-firstname" required placeholder="太郎" style="width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
           </div>
         </div>
-        
         <div class="form-group" style="margin: 0;">
           <label for="signup-email" style="font-size: 0.75rem; font-weight: 700; margin-bottom: 0.25rem;">メールアドレス</label>
           <input type="email" id="signup-email" required placeholder="example@synapse.com" style="width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+        </div>
+
+        <div class="form-group" style="margin: 0;">
+          <label for="signup-phone" style="font-size: 0.75rem; font-weight: 700; margin-bottom: 0.25rem;">📞 電話番号 (半角数字、ハイフンなし、SMS認証用)</label>
+          <input type="tel" id="signup-phone" required pattern="^0\d{9,10}$" placeholder="09012345678" style="width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
         </div>
         
         <div class="form-group" style="margin: 0; display: none;">
@@ -591,6 +612,45 @@
           <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">通常のメモと暗証番号付きのシークレットメモを使い分けられます</span>
         </div>
 
+      </div>
+
+      <!-- プロファイル ＆ 登録デバイス一覧 -->
+      <div style="margin-top: 1.5rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+        <!-- アカウントセキュリティ情報 -->
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem;">
+          <h3 style="margin: 0 0 1rem 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+            🔒 アカウントセキュリティ情報
+          </h3>
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; text-align: left; font-size: 0.82rem;">
+            <div>
+              <span style="color: var(--text-secondary); display: block; margin-bottom: 0.15rem;">登録メールアドレス</span>
+              <strong id="mypage-info-email" style="color: var(--text-primary);">-</strong>
+            </div>
+            <div>
+              <span style="color: var(--text-secondary); display: block; margin-bottom: 0.15rem;">📞 登録電話番号 (SMS認証用)</span>
+              <strong id="mypage-info-phone" style="color: var(--text-primary);">-</strong>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); background: var(--bg-surface); padding: 0.5rem; border-radius: var(--radius-xs); border: 1px dashed var(--border-color); line-height: 1.4;">
+              ※ 新規登録時に設定された電話番号です。登録電話番号の変更を希望される場合は、管理者に変更を依頼してください。
+            </div>
+          </div>
+        </div>
+
+        <!-- 認証済み端末（信頼されたデバイス）一覧 -->
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem;">
+          <h3 style="margin: 0 0 0.5rem 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+            💻 認証済み端末一覧 (最大3台)
+          </h3>
+          <p style="margin: 0 0 1rem 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+            現在ログインが許可されているデバイスの一覧です。
+          </p>
+          <div id="mypage-device-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 150px; overflow-y: auto;">
+            <div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">デバイス情報を読み込み中...</div>
+          </div>
+          <div style="margin-top: 1rem; font-size: 0.72rem; color: var(--text-secondary); background: var(--bg-surface); padding: 0.5rem; border-radius: var(--radius-xs); border: 1px dashed var(--border-color); line-height: 1.4; text-align: left;">
+            ⚠️ <strong>登録解除について:</strong> 不要になった端末の登録解除（削除）は、不正利用防止のため管理者のみが行えます。管理者に不要な端末の削除を依頼してください。
+          </div>
+        </div>
       </div>
     </div>
 
@@ -2586,6 +2646,59 @@
   </div>
 </div>
 
+<!-- ================= 管理者用ユーザーデバイス管理モーダル ================= -->
+<div id="admin-device-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; justify-content: center; align-items: center;">
+  <div style="background: var(--bg-surface); padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); width: 90%; max-width: 480px; box-shadow: var(--shadow-lg); text-align: left; position: relative;">
+    <span id="admin-device-modal-close" style="position: absolute; right: 1rem; top: 0.75rem; font-size: 1.25rem; font-weight: 700; cursor: pointer; color: var(--text-muted);">&times;</span>
+    <h3 style="margin-top: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+      💻 端末管理: <span id="admin-device-modal-username" style="color: var(--primary); font-weight: bold;">-</span>
+    </h3>
+    <p style="margin: 0.5rem 0 1rem 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+      このユーザーが登録している「信頼されたデバイス」の一覧です。削除すると、次回その端末からログインする際に再度のSMS認証が求められます。
+    </p>
+
+    <!-- デバイスリスト -->
+    <div id="admin-device-modal-list" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; max-height: 200px; overflow-y: auto; background: var(--bg-surface-elevated); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+      <div style="text-align: center; color: var(--text-secondary); padding: 1rem 0; font-size: 0.8rem;">デバイス情報をロード中...</div>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+      <button type="button" id="admin-device-modal-cancel" class="btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; cursor: pointer;">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 💬 SMS 2段階認証 (MFA) モーダル ================= -->
+<div id="sms-mfa-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10010; justify-content: center; align-items: center;">
+  <div style="background: var(--bg-surface); padding: 1.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); width: 90%; max-width: 400px; box-shadow: var(--shadow-lg); text-align: left; position: relative;">
+    <h3 style="margin-top: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+      💬 SMS 2段階認証
+    </h3>
+    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.5rem 0 1rem 0; line-height: 1.4;">
+      登録された電話番号（<span id="sms-mfa-masked-phone" style="font-weight: 700; color: var(--text-primary);">-</span>）宛てに6桁の認証コードを送信しました。コードを入力してください。
+    </p>
+
+    <!-- モックシミュレータ用通知表示部（デザインを邪魔しない枠） -->
+    <div id="sms-mfa-simulated-notification" style="display: none; background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; border-radius: var(--radius-sm); padding: 0.5rem; margin-bottom: 1rem; font-size: 0.75rem; color: #10b981; text-align: center; font-weight: 600; line-height: 1.4;">
+      【テスト用SMS受信シミュレータ】<br>
+      送信先電話番号: <span id="sms-sim-phone-display"></span><br>
+      認証コード: <span id="sms-sim-code-display" style="font-size: 1.05rem; font-family: monospace; color: var(--primary); letter-spacing: 0.1rem;">------</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">6桁の認証コード:</label>
+        <input type="text" id="sms-mfa-code" maxlength="6" required placeholder="123456" style="padding: 0.55rem; font-size: 1.1rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); text-align: center; letter-spacing: 0.25rem; outline: none;">
+      </div>
+    </div>
+    
+    <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem;">
+      <button type="button" id="sms-mfa-cancel-btn" class="btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; cursor: pointer;">キャンセル</button>
+      <button type="button" id="sms-mfa-submit-btn" class="btn-primary" style="padding: 0.4rem 0.75rem; font-size: 0.82rem; cursor: pointer; font-weight: bold;">認証する</button>
+    </div>
+  </div>
+</div>
+
 <!-- ================= 🔐 パスワード設定モーダル (新規登録時のメールリンクシミュレーション用) ================= -->
 <!-- ================= 🔐 本登録（パスワード・プロフィール設定）モーダル ================= -->
 <div id="set-password-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; justify-content: center; align-items: center;">
@@ -2618,6 +2731,11 @@
       <div style="display: flex; flex-direction: column; gap: 0.25rem;">
         <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">ログインID (半角英数字6文字以上、大文字不可、記号は-_ .のみ可、記号のみ不可):</label>
         <input type="text" id="set-pwd-loginid" required placeholder="例: sales_user01" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">📞 電話番号 (半角数字、ハイフンなし、SMS認証用):</label>
+        <input type="tel" id="set-pwd-phone" required pattern="^0\d{9,10}$" placeholder="例: 09012345678" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 0.25rem;">

@@ -7,6 +7,530 @@
 // ==========================================
 window.logToDebugPanel = function() {};
 
+// ============================================================================
+// 🔒 AES-256 クライアントサイド暗号化コア (Web Crypto API)
+// ============================================================================
+
+// パスワードとソルトから AES-GCM の 256bit 鍵を導出する (PBKDF2)
+async function deriveKey(pin, saltBytes) {
+  const enc = new TextEncoder();
+  const baseKey = await window.crypto.subtle.importKey(
+    'raw',
+    enc.encode(pin),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+  return window.crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: saltBytes,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+// 平文テキストを暗号化し、Base64JSON文字列で返す
+async function encryptData(plainText, pin) {
+  try {
+    const enc = new TextEncoder();
+    const salt = window.crypto.getRandomValues(new Uint8Array(16));
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(pin, salt);
+    
+    const cipherBuffer = await window.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      enc.encode(plainText)
+    );
+    
+    // Uint8Array を Base64 表現にエンコード
+    const cipherArray = new Uint8Array(cipherBuffer);
+    const saltBase64 = btoa(String.fromCharCode.apply(null, salt));
+    const ivBase64 = btoa(String.fromCharCode.apply(null, iv));
+    const cipherBase64 = btoa(String.fromCharCode.apply(null, cipherArray));
+    
+    return JSON.stringify({
+      salt: saltBase64,
+      iv: ivBase64,
+      ciphertext: cipherBase64
+    });
+  } catch (err) {
+    console.error('Encryption failed:', err);
+    throw new Error('暗号化に失敗しました。');
+  }
+}
+
+// 暗号化JSON文字列を復号し、平文テキストを返す
+async function decryptData(cipherTextJson, pin) {
+  try {
+    const { salt, iv, ciphertext } = JSON.parse(cipherTextJson);
+    
+    // Base64 から Uint8Array にデコード
+    const saltBytes = new Uint8Array(atob(salt).split('').map(c => c.charCodeAt(0)));
+    const ivBytes = new Uint8Array(atob(iv).split('').map(c => c.charCodeAt(0)));
+    const cipherBytes = new Uint8Array(atob(ciphertext).split('').map(c => c.charCodeAt(0)));
+    
+    const key = await deriveKey(pin, saltBytes);
+    
+    const plainBuffer = await window.crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: ivBytes },
+      key,
+      cipherBytes
+    );
+    
+    const dec = new TextDecoder();
+    return dec.decode(plainBuffer);
+  } catch (err) {
+    console.error('Decryption failed:', err);
+    throw new Error('復号に失敗しました。暗証番号が間違っている可能性があります。');
+  }
+}
+
+// ============================================================================
+// 💻 デバイス識別・登録・検証ロジック (端末認証)
+// ============================================================================
+
+// 📱 管理者の共有メモデータを Supabase からプルしてローカルに同期する関数
+async function loadAdminSharedMemos() {
+  if (!supabaseClient) return;
+  const adminKey = 'synapse_user_memos_admin';
+  try {
+    console.log('[Supabase API] Fetching admin shared memos...');
+    const { data, error } = await supabaseClient
+      .from('synapse_storage')
+      .select('value')
+      .eq('key', adminKey)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[Supabase API] Failed to fetch admin shared memos:', error);
+      return;
+    }
+
+    if (data && data.value) {
+      // isSyncing を true にして、localStorage.setItem の自動同期ループを一時的に無効化する
+      const prevSyncing = isSyncing;
+      isSyncing = true;
+      localStorage.setItem(adminKey, JSON.stringify(data.value));
+      isSyncing = prevSyncing;
+      console.log('[Supabase API] Admin shared memos synchronized successfully.');
+    }
+  } catch (err) {
+    console.error('[Supabase API] loadAdminSharedMemos exception:', err);
+  }
+}
+
+// User-Agent情報からデバイスタイプ ('smartphone' | 'tablet' | 'desktop') を判別する
+function getDeviceType() {
+  const ua = navigator.userAgent;
+  if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
+    return 'tablet';
+  }
+  if (/Mobile|iP(hone|od)|Android|BlackBerry|IEMobile|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/i.test(ua)) {
+    return 'smartphone';
+  }
+  return 'desktop';
+}
+
+// User-Agent情報から分かりやすいデバイス名を作成する
+function getDeviceName() {
+  const ua = navigator.userAgent;
+  let browser = '不明なブラウザ';
+  let os = '不明なOS';
+
+  if (ua.indexOf('Chrome') > -1) browser = 'Chrome';
+  else if (ua.indexOf('Safari') > -1) browser = 'Safari';
+  else if (ua.indexOf('Firefox') > -1) browser = 'Firefox';
+  else if (ua.indexOf('MSIE') > -1 || !!document.documentMode) browser = 'IE';
+  else if (ua.indexOf('Edge') > -1) browser = 'Edge';
+
+  if (ua.indexOf('Windows NT 10.0') > -1) os = 'Windows 10/11';
+  else if (ua.indexOf('Windows NT 6.2') > -1) os = 'Windows 8';
+  else if (ua.indexOf('Windows NT 6.1') > -1) os = 'Windows 7';
+  else if (ua.indexOf('Macintosh') > -1) os = 'macOS';
+  else if (ua.indexOf('iPhone') > -1) os = 'iPhone';
+  else if (ua.indexOf('iPad') > -1) os = 'iPad';
+  else if (ua.indexOf('Android') > -1) os = 'Android';
+  else if (ua.indexOf('Linux') > -1) os = 'Linux';
+
+  const typeName = { smartphone: 'スマホ', tablet: 'タブレット', desktop: 'PC' }[getDeviceType()];
+  return `${os} / ${browser} (${typeName})`;
+}
+
+// ローカルのデバイストークンがDB側で認証されているか確認する
+async function validateDeviceToken(userId) {
+  if (!supabaseClient) return false;
+  const token = localStorage.getItem('synapse_device_token');
+  if (!token) return false;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('synapse_user_devices')
+      .select('id, last_used_at')
+      .eq('user_id', userId)
+      .eq('device_token', token)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[Supabase DB] Device token validation error:', error);
+      return false;
+    }
+
+    if (data) {
+      // 最終利用日時を更新
+      await supabaseClient
+        .from('synapse_user_devices')
+        .update({ last_used_at: new Date().toISOString() })
+        .eq('id', data.id);
+      return true;
+    }
+  } catch (err) {
+    console.error('Device token validation failed:', err);
+  }
+  return false;
+}
+
+// 新規デバイス追加時の構成パターンチェック (A, B, C)
+function isValidDeviceComposition(existingDevices, newType) {
+  const counts = { smartphone: 0, tablet: 0, desktop: 0 };
+  existingDevices.forEach(d => {
+    if (counts[d.device_type] !== undefined) {
+      counts[d.device_type]++;
+    }
+  });
+  counts[newType]++;
+
+  const s = counts.smartphone;
+  const t = counts.tablet;
+  const d = counts.desktop;
+
+  // パターンA: スマホ1、タブレット1、PC1
+  if (s === 1 && t === 1 && d === 1) return true;
+  // パターンB: スマホ2、PC1 (タブレット0)
+  if (s === 2 && t === 0 && d === 1) return true;
+  // パターンC: スマホ1、PC2 (タブレット0)
+  if (s === 1 && t === 0 && d === 2) return true;
+
+  // 1台目や2台目の途中段階 (登録過程) も許可する
+  const total = s + t + d;
+  if (total <= 2) {
+    // 途中段階として適合し得るか？
+    // パターンA, B, C のいずれかの子セットであること
+    if (s <= 2 && t <= 1 && d <= 2) {
+      // s=2のときはt=0, d<=1でなければならない
+      if (s === 2 && (t > 0 || d > 1)) return false;
+      // d=2のときはt=0, s<=1でなければならない
+      if (d === 2 && (t > 0 || s > 1)) return false;
+      // t=1のときはs<=1, d<=1でなければならない
+      if (t === 1 && (s > 1 || d > 1)) return false;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// 💬 SMS 2段階認証 (MFA) モーダルを起動し、完了を待つPromiseを返す
+function triggerSmsMfa(phoneNumber) {
+  return new Promise((resolve, reject) => {
+    const modal = document.getElementById('sms-mfa-modal');
+    const phoneSpan = document.getElementById('sms-mfa-masked-phone');
+    const simDiv = document.getElementById('sms-mfa-simulated-notification');
+    const simPhone = document.getElementById('sms-sim-phone-display');
+    const simCode = document.getElementById('sms-sim-code-display');
+    const codeInput = document.getElementById('sms-mfa-code');
+    const cancelBtn = document.getElementById('sms-mfa-cancel-btn');
+    const submitBtn = document.getElementById('sms-mfa-submit-btn');
+
+    if (!modal || !phoneSpan || !codeInput || !submitBtn) {
+      reject(new Error('SMS認証画面の初期化に失敗しました。'));
+      return;
+    }
+
+    // 6桁のコードをランダム生成
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 電話番号のマスク表示
+    let masked = phoneNumber;
+    if (phoneNumber && phoneNumber.length >= 8) {
+      masked = phoneNumber.substring(0, 3) + '****' + phoneNumber.substring(phoneNumber.length - 4);
+    }
+    phoneSpan.textContent = masked;
+
+    // モックシミュレータの表示
+    if (simDiv && simPhone && simCode) {
+      simPhone.textContent = phoneNumber;
+      simCode.textContent = generatedOtp;
+      simDiv.style.display = 'block';
+    }
+
+    codeInput.value = '';
+    modal.style.display = 'flex';
+    codeInput.focus();
+
+    // イベントリスナーのクリーンアップ用
+    let cleanUp = () => {};
+
+    const onCancel = () => {
+      cleanUp();
+      modal.style.display = 'none';
+      resolve(false);
+    };
+
+    const onSubmit = () => {
+      const enteredCode = codeInput.value.trim();
+      if (!enteredCode) {
+        showToast('認証コードを入力してください。', 'warning');
+        return;
+      }
+      if (enteredCode === generatedOtp) {
+        cleanUp();
+        modal.style.display = 'none';
+        resolve(true);
+      } else {
+        showToast('認証コードが正しくありません。', 'error');
+      }
+    };
+
+    // keydown Enterキーでのサブミット処理
+    const onKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        onSubmit();
+      }
+    };
+
+    cleanUp = () => {
+      cancelBtn.removeEventListener('click', onCancel);
+      submitBtn.removeEventListener('click', onSubmit);
+      codeInput.removeEventListener('keydown', onKeyDown);
+    };
+
+    cancelBtn.addEventListener('click', onCancel);
+    submitBtn.addEventListener('click', onSubmit);
+    codeInput.addEventListener('keydown', onKeyDown);
+  });
+}
+
+// マイページ用セキュリティ情報のレンダリング
+async function renderMypageSecurityInfo() {
+  if (!state.currentUser) return;
+  
+  const emailEl = document.getElementById('mypage-info-email');
+  const phoneEl = document.getElementById('mypage-info-phone');
+  const deviceListEl = document.getElementById('mypage-device-list');
+  
+  if (emailEl) emailEl.textContent = state.currentUser.id;
+  if (phoneEl) phoneEl.textContent = state.currentUser.phone_number || '未設定';
+  
+  if (!deviceListEl) return;
+  if (!supabaseClient) {
+    deviceListEl.innerHTML = '<div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">Supabase接続が無効です。</div>';
+    return;
+  }
+
+  try {
+    const { data: devices, error } = await supabaseClient
+      .from('synapse_user_devices')
+      .select('*')
+      .eq('user_id', state.currentUser.id)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('[Device Auth] Failed to fetch user devices for mypage:', error);
+      deviceListEl.innerHTML = '<div style="text-align: center; color: #ef4444; font-size: 0.8rem; padding: 1rem 0;">端末一覧の取得に失敗しました。</div>';
+      return;
+    }
+
+    if (!devices || devices.length === 0) {
+      deviceListEl.innerHTML = '<div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">登録されている端末はありません。</div>';
+      return;
+    }
+
+    const currentToken = localStorage.getItem('synapse_device_token');
+
+    deviceListEl.innerHTML = devices.map(dev => {
+      const isCurrent = dev.device_token === currentToken;
+      const badge = isCurrent ? '<span style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 0.1rem 0.35rem; border-radius: var(--radius-xs); font-weight: 700; margin-left: 0.5rem;">現在の端末</span>' : '';
+      const lastUsed = new Date(dev.last_used_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+      const typeIcon = { smartphone: '📱', tablet: '📟', desktop: '💻' }[dev.device_type] || '💻';
+      
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; font-size: 0.8rem;">
+          <div style="text-align: left;">
+            <div style="font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+              <span>${typeIcon}</span>
+              <span>${dev.device_name || '名称不明の端末'}</span>
+              ${badge}
+            </div>
+            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.2rem;">
+              最終利用: ${lastUsed}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('[Device Auth] Render user devices error:', err);
+    deviceListEl.innerHTML = '<div style="text-align: center; color: #ef4444; font-size: 0.8rem; padding: 1rem 0;">エラーが発生しました。</div>';
+  }
+}
+
+// ============================================================================
+// ⏱️ 無操作監視タイマー管理
+// ============================================================================
+let globalLogoutTimer = null;
+let vaultLockTimer = null;
+
+function setupInactivityMonitors() {
+  const resetGlobalTimer = () => {
+    if (globalLogoutTimer) clearTimeout(globalLogoutTimer);
+    globalLogoutTimer = setTimeout(() => {
+      if (state.currentUser) {
+        handleLogout();
+        showToast('1時間無操作だったため、自動的にログアウトしました。', 'warning');
+      }
+    }, 60 * 60 * 1000); // 1時間
+  };
+
+  const resetVaultTimer = () => {
+    if (vaultLockTimer) clearTimeout(vaultLockTimer);
+    vaultLockTimer = setTimeout(() => {
+      // 保管庫が解除状態である場合のみロックを実行する
+      if (state.currentUser && state.memoUnlockedSecure) {
+        if (typeof window.lockSecretVault === 'function') {
+          window.lockSecretVault();
+        }
+      }
+    }, 3 * 60 * 1000); // 3分
+  };
+
+  const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+  events.forEach(evt => {
+    window.addEventListener(evt, () => {
+      resetGlobalTimer();
+      resetVaultTimer();
+    });
+  });
+
+  // 初期起動
+  resetGlobalTimer();
+  resetVaultTimer();
+  console.log('[Security Monitor] Inactivity timers initialized.');
+}
+
+// ============================================================================
+// 📱 管理者用デバイス管理モーダル制御
+// ============================================================================
+async function openAdminDeviceModal(userId) {
+  const modal = document.getElementById('admin-device-modal');
+  const targetEmailSpan = document.getElementById('admin-device-target-email');
+  const listEl = document.getElementById('admin-device-list');
+  const closeBtn = document.getElementById('admin-device-close-btn');
+
+  if (!modal || !listEl) return;
+
+  if (targetEmailSpan) {
+    targetEmailSpan.textContent = userId;
+  }
+
+  modal.style.display = 'flex';
+
+  const loadDevices = async () => {
+    if (!supabaseClient) {
+      listEl.innerHTML = '<div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1.5rem 0;">Supabase接続が無効です。</div>';
+      return;
+    }
+
+    try {
+      const { data: devices, error } = await supabaseClient
+        .from('synapse_user_devices')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('[Admin Device] Failed to load user devices:', error);
+        listEl.innerHTML = '<div style="text-align: center; color: #ef4444; font-size: 0.8rem; padding: 1.5rem 0;">端末データの読み込みに失敗しました。</div>';
+        return;
+      }
+
+      if (!devices || devices.length === 0) {
+        listEl.innerHTML = '<div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1.5rem 0;">登録されている信頼された端末はありません。</div>';
+        return;
+      }
+
+      listEl.innerHTML = devices.map(dev => {
+        const typeIcon = { smartphone: '📱 スマホ', tablet: '📟 タブレット', desktop: '💻 PC' }[dev.device_type] || '💻 PC';
+        const registered = new Date(dev.created_at).toLocaleDateString('ja-JP');
+        const lastUsed = new Date(dev.last_used_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+        
+        return `
+          <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem 1rem; font-size: 0.85rem; margin-bottom: 0.5rem; gap: 0.75rem;">
+            <div style="text-align: left; flex: 1;">
+              <div style="font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 0.75rem; background: var(--border-color); padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); color: var(--text-secondary);">${typeIcon}</span>
+                <span>${dev.device_name || '名称不明の端末'}</span>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.35rem; display: flex; flex-direction: column; gap: 0.15rem;">
+                <span>登録日: ${registered}</span>
+                <span>最終利用: ${lastUsed}</span>
+              </div>
+            </div>
+            <button class="btn btn-danger delete-device-btn" data-id="${dev.id}" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; background: #ef4444; color: #fff; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600; transition: all 0.2s;">
+              ❌ 解除
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      // 削除ボタンのイベントハンドラ登録
+      const deleteBtns = listEl.querySelectorAll('.delete-device-btn');
+      deleteBtns.forEach(btn => {
+        btn.onclick = async () => {
+          const deviceId = btn.getAttribute('data-id');
+          showAppConfirm('信頼された端末の解除', 'この端末の信頼を解除しますか？\n解除された端末からは次回ログイン時にSMS認証が必要になります。', async () => {
+            try {
+              const { error: delErr } = await supabaseClient
+                .from('synapse_user_devices')
+                .delete()
+                .eq('id', deviceId);
+
+              if (delErr) {
+                showToast('解除に失敗しました: ' + delErr.message, 'error');
+              } else {
+                showToast('端末の信頼を解除しました。', 'success');
+                loadDevices(); // リスト再読込
+                renderMypageSecurityInfo(); // 自分の端末の場合はマイページも更新
+              }
+            } catch (err) {
+              console.error('[Admin Device] Delete device error:', err);
+              showToast('エラーが発生しました。', 'error');
+            }
+          });
+        };
+      });
+
+    } catch (err) {
+      console.error('[Admin Device] Render devices error:', err);
+      listEl.innerHTML = '<div style="text-align: center; color: #ef4444; font-size: 0.8rem; padding: 1.5rem 0;">エラーが発生しました。</div>';
+    }
+  };
+
+  await loadDevices();
+
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      modal.style.display = 'none';
+    };
+  }
+}
+window.openAdminDeviceModal = openAdminDeviceModal;
 
 // 初期ダミーデータの定義
 const INITIAL_CUSTOMERS = [
@@ -37,6 +561,8 @@ const STORAGE_KEYS = {
   VERSION: 'synapse_db_version',
   SUPABASE_URL: 'synapse_supabase_url',
   SUPABASE_ANON_KEY: 'synapse_supabase_anon_key',
+  PARTNER_SUPABASE_URL: 'synapse_partner_supabase_url',
+  PARTNER_SUPABASE_ANON_KEY: 'synapse_partner_supabase_anon_key',
   CUSTOMERS: 'synapse_customers',
   APPOINTMENTS: 'synapse_appointments',
   PATTERNS: 'synapse_patterns',
@@ -132,6 +658,7 @@ const INITIAL_AG_COLUMNS = [
 const CURRENT_DB_VERSION = 'v16';
 let targetSearchMode = 'main';
 let supabaseClient = null;
+let partnerSupabaseClient = null;
 let isSyncing = false;
 
 // LocalStorageの更新をフックしてSupabaseと自動同期するラッパー
@@ -379,6 +906,7 @@ document.addEventListener('DOMContentLoaded', () => {
   checkLoginStatus();
   initMypageMemo();          // メモ帳の初回初期化
   initFloatingStickyNotes(); // 浮遊付箋の復元
+  setupInactivityMonitors(); // 無操作監視の初期化
 
   // 同期キューのロードと再試行
   loadSyncQueueFromStorage();
@@ -700,6 +1228,111 @@ function setupSupabaseAuthListener() {
         console.warn('[Supabase Auth] Failed to fetch exact user role from public DB:', e);
       }
 
+      // 💻 デバイス識別・検証 (端末認証) の実施
+      const isPendingPasswordSetup = (metadata.needs_password_setup === true);
+      const isRecovery = (event === 'PASSWORD_RECOVERY');
+
+      if (!isPendingPasswordSetup && !isRecovery) {
+        const isDeviceValid = await validateDeviceToken(email);
+        
+        if (!isDeviceValid) {
+          console.log('[Device Auth] Unknown or unregistered device token for:', email);
+          
+          // 既存のデバイス一覧とユーザー情報を取得
+          const { data: dbUser, error: userErr } = await supabaseClient
+            .from('synapse_users')
+            .select('phone_number')
+            .eq('id', email)
+            .maybeSingle();
+
+          const { data: dbDevices, error: devErr } = await supabaseClient
+            .from('synapse_user_devices')
+            .select('device_type')
+            .eq('user_id', email);
+
+          if (userErr || devErr) {
+            console.error('[Device Auth] Error retrieving device settings:', userErr || devErr);
+            showToast('ログインセキュリティ検証中にエラーが発生しました。', 'error');
+            await supabaseClient.auth.signOut();
+            return;
+          }
+
+          const phoneNumber = dbUser ? dbUser.phone_number : '';
+          const existingDevices = dbDevices || [];
+          const currentType = getDeviceType();
+
+          // 1. 最大登録台数制限の検証 (3台まで)
+          if (existingDevices.length >= 3) {
+            showToast('信頼されたデバイスの登録数が上限（3台）に達しています。ログインできません。', 'error');
+            showAppConfirm(
+              '🚫 ログインブロック',
+              '信頼されたデバイスの登録数（最大3台）を超えています。\n新しい端末を登録するには、管理者に不要な端末の削除を依頼してください。'
+            );
+            await supabaseClient.auth.signOut();
+            return;
+          }
+
+          // 2. デバイス構成パターンの適合検証
+          const isCompositionValid = isValidDeviceComposition(existingDevices, currentType);
+          if (!isCompositionValid) {
+            showToast('許可されていないデバイス構成パターンのため、ログインがブロックされました。', 'error');
+            showAppConfirm(
+              '🚫 ログインブロック',
+              `この端末（${getDeviceName()}）を追加すると、許可されているデバイス構成パターンから外れてしまいます。\n\n【許可される組み合わせ】\n・スマホ1台、タブレット1台、PC1台\n・スマホ2台、PC1台\n・スマホ1台、PC2台\n\n管理者に不要な端末の削除を依頼してください。`
+            );
+            await supabaseClient.auth.signOut();
+            return;
+          }
+
+          // 3. SMS 2要素認証を要求
+          if (!phoneNumber) {
+            showToast('ご登録電話番号が見つからないため、SMS認証を実行できません。管理者に連絡してください。', 'error');
+            await supabaseClient.auth.signOut();
+            return;
+          }
+
+          showToast('新しい端末を検知しました。SMS 2要素認証を実行します。', 'info');
+          const isSmsVerified = await triggerSmsMfa(phoneNumber);
+          
+          if (isSmsVerified) {
+            // SMS認証に成功：新規デバイスとしてDBに登録
+            try {
+              const newDeviceToken = crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).substring(2, 15) + '-' + Math.random().toString(36).substring(2, 15));
+              const newDeviceName = getDeviceName();
+
+              const { error: insertErr } = await supabaseClient.from('synapse_user_devices').insert({
+                user_id: email,
+                device_token: newDeviceToken,
+                device_name: newDeviceName,
+                device_type: currentType,
+                last_used_at: new Date().toISOString(),
+                created_at: new Date().toISOString()
+              });
+
+              if (insertErr) {
+                console.error('[Device Auth] Failed to insert new device record:', insertErr);
+                showToast('デバイス登録に失敗しました。', 'error');
+                await supabaseClient.auth.signOut();
+                return;
+              }
+
+              localStorage.setItem('synapse_device_token', newDeviceToken);
+              showToast('この端末が信頼されたデバイスとして登録されました。', 'success');
+            } catch (err) {
+              console.error('[Device Auth] Device registration error:', err);
+              showToast('システムエラーが発生しました。', 'error');
+              await supabaseClient.auth.signOut();
+              return;
+            }
+          } else {
+            // SMS認証をキャンセルまたは失敗
+            showToast('SMS認証が完了しなかったため、ログインを中止しました。', 'warning');
+            await supabaseClient.auth.signOut();
+            return;
+          }
+        }
+      }
+
       state.currentUser = {
         id: email,
         role: role,
@@ -720,12 +1353,14 @@ function setupSupabaseAuthListener() {
           const firstNameInput = document.getElementById('set-pwd-firstname');
           const birthdayInput = document.getElementById('set-pwd-birthday');
           const loginIdInput = document.getElementById('set-pwd-loginid');
+          const phoneInput = document.getElementById('set-pwd-phone');
           const pwdInput = document.getElementById('set-pwd-input');
           const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
           
-          // 生年月日、ログインID、名前入力を非表示にする
+          // 生年月日、ログインID、名前、電話番号入力を非表示にする
           if (birthdayInput && birthdayInput.parentElement) birthdayInput.parentElement.style.display = 'none';
           if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'none';
+          if (phoneInput && phoneInput.parentElement) phoneInput.parentElement.style.display = 'none';
           if (lastNameInput && lastNameInput.parentElement && lastNameInput.parentElement.parentElement) {
             lastNameInput.parentElement.parentElement.style.display = 'none';
           }
@@ -750,12 +1385,14 @@ function setupSupabaseAuthListener() {
           const firstNameInput = document.getElementById('set-pwd-firstname');
           const birthdayInput = document.getElementById('set-pwd-birthday');
           const loginIdInput = document.getElementById('set-pwd-loginid');
+          const phoneInput = document.getElementById('set-pwd-phone');
           const pwdInput = document.getElementById('set-pwd-input');
           const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
           
           // 本登録時は全入力項目を表示する
           if (birthdayInput && birthdayInput.parentElement) birthdayInput.parentElement.style.display = 'flex';
           if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'flex';
+          if (phoneInput && phoneInput.parentElement) phoneInput.parentElement.style.display = 'flex';
           if (lastNameInput && lastNameInput.parentElement && lastNameInput.parentElement.parentElement) {
             lastNameInput.parentElement.parentElement.style.display = 'flex';
           }
@@ -767,6 +1404,7 @@ function setupSupabaseAuthListener() {
           if (firstNameInput) firstNameInput.value = metadata.firstName || '';
           if (birthdayInput) birthdayInput.value = '';
           if (loginIdInput) loginIdInput.value = '';
+          if (phoneInput) phoneInput.value = metadata.phone || metadata.phone_number || '';
           if (pwdInput) pwdInput.value = '';
           if (pwdConfirmInput) pwdConfirmInput.value = '';
           
@@ -783,8 +1421,14 @@ function setupSupabaseAuthListener() {
         
         updateUIForCurrentMode();
         removeRestrictedTabsForRole(role);
+        
+        // ログイン成功時にバックグラウンドで管理者の共有メモをロードする
+        loadAdminSharedMemos().catch(err => console.error('[Supabase API] Shared load error on login:', err));
       }
     } else {
+      state.decryptedVaultContent = null;
+      state.memoUnlockedSecure = false;
+      state.lastVaultAccessTime = 0;
       state.currentUser = null;
       localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
       showLoginScreen(true);
@@ -813,7 +1457,7 @@ function initSupabase() {
       const keyInput = document.getElementById('supabase-anon-key');
       if (urlInput) urlInput.value = url;
       if (keyInput) keyInput.value = key;
-      
+
       setupSupabaseAuthListener();
       
       return true;
@@ -823,6 +1467,52 @@ function initSupabase() {
   }
   supabaseClient = null;
   return false;
+}
+
+function initPartnerSupabase() {
+  const url = localStorage.getItem(STORAGE_KEYS.PARTNER_SUPABASE_URL);
+  const key = localStorage.getItem(STORAGE_KEYS.PARTNER_SUPABASE_ANON_KEY);
+  
+  if (url && key && window.supabase) {
+    try {
+      let cleanUrl = url.replace(/[\s\u200B-\u200D\uFEFF\u3000]/g, '');
+      if (cleanUrl.endsWith('/')) {
+        cleanUrl = cleanUrl.slice(0, -1);
+      }
+      let cleanKey = key.replace(/[\s\u200B-\u200D\uFEFF\u3000]/g, '');
+      partnerSupabaseClient = window.supabase.createClient(cleanUrl, cleanKey);
+      console.log("[Supabase Partner] Client initialized successfully with URL:", cleanUrl);
+      
+      return true;
+    } catch (e) {
+      console.error("[Supabase Partner] Failed to create client:", e);
+    }
+  }
+  partnerSupabaseClient = null;
+  return false;
+}
+
+async function fetchNewPartyId(sourceSystem = 'synapse_appoint', isTemporary = true) {
+  if (partnerSupabaseClient) {
+    try {
+      const { data, error } = await partnerSupabaseClient.rpc('generate_party_id', {
+        source_system: sourceSystem,
+        is_temporary: isTemporary
+      });
+      if (error) throw error;
+      if (data) {
+        console.log(`[Party ID] Generated successfully via partner DB: ${data}`);
+        return data;
+      }
+    } catch (err) {
+      console.error('[Party ID] Failed to fetch from partner DB, falling back to local generation:', err);
+    }
+  } else {
+    console.log('[Party ID] Partner DB Supabase client not initialized. Falling back to local generation.');
+  }
+  
+  // フォールバック：ローカルの8桁ID生成ロジックを使用
+  return generate8DigitId();
 }
 
 // Supabaseへのデータ送信 (プッシュ)
@@ -1240,6 +1930,11 @@ async function syncFromSupabase(showNotification = false) {
       }
     } finally {
       isSyncing = false;
+    }
+
+    // 同時に一般ユーザーの場合は管理者の共有アカウントデータも同期する
+    if (state.currentUser && state.currentUser.role !== 'owner') {
+      loadAdminSharedMemos().catch(err => console.error('[Supabase API] Shared load error on sync:', err));
     }
     
     if (updatedKeys.length > 0) {
@@ -1963,6 +2658,7 @@ function initDatabase() {
   state.auditLogs = JSON.parse(localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS)) || [];
 
   // Supabase初期化とバックグラウンド自動同期
+  initPartnerSupabase();
   if (initSupabase()) {
     setTimeout(() => {
       syncFromSupabase();
@@ -1973,6 +2669,24 @@ function initDatabase() {
   fetch('/api/get-supabase-config')
     .then(res => res.json())
     .then(data => {
+      // パートナーDB接続情報の自動設定
+      if (data.success && data.partnerUrl && data.partnerAnonKey) {
+        const localPUrl = localStorage.getItem(STORAGE_KEYS.PARTNER_SUPABASE_URL);
+        const localPKey = localStorage.getItem(STORAGE_KEYS.PARTNER_SUPABASE_ANON_KEY);
+        
+        let needsPInit = false;
+        if (localPUrl !== data.partnerUrl || localPKey !== data.partnerAnonKey) {
+          localStorage.setItem(STORAGE_KEYS.PARTNER_SUPABASE_URL, data.partnerUrl);
+          localStorage.setItem(STORAGE_KEYS.PARTNER_SUPABASE_ANON_KEY, data.partnerAnonKey);
+          console.log('[Supabase Partner] Automatically configured credentials from environment variables.');
+          needsPInit = true;
+        }
+        
+        if (needsPInit || !partnerSupabaseClient) {
+          initPartnerSupabase();
+        }
+      }
+
       if (data.success && data.url && data.anonKey) {
         const localUrl = localStorage.getItem(STORAGE_KEYS.SUPABASE_URL);
         const localKey = localStorage.getItem(STORAGE_KEYS.SUPABASE_ANON_KEY);
@@ -7263,6 +7977,7 @@ function updateUIForCurrentMode() {
   if (typeof window.syncMasterTableNamesWithFolders === 'function') {
     window.syncMasterTableNamesWithFolders();
   }
+  renderMypageSecurityInfo();
 }
 
 // ログインステータスのチェック
@@ -8181,7 +8896,7 @@ function openTab(id, type, title, appointData = null) {
 
     // デフォルトのアポイントメントデータを作成
     const defaultAppointData = appointData || {
-      id: generate8DigitId(),
+      id: generate8DigitId(), // 仮でローカル生成
       date: (() => {
         const now = new Date();
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -8198,7 +8913,8 @@ function openTab(id, type, title, appointData = null) {
       selectedIntroducer: null,
       status: 'draft',
       viewOnly: false,
-      isFormDirty: false
+      isFormDirty: false,
+      isPartyIdLoading: !appointData // 新規アポイントの時のみ非同期ロード
     };
 
     // 新規の下書きアポイントレコードを登録DBにも登録（既存の下書き機能と互換）
@@ -8240,6 +8956,44 @@ function openTab(id, type, title, appointData = null) {
 
   state.activeTabId = id;
   activateTab(id);
+
+  // 新規アポイント時の非同期Party ID取得と差し替え
+  if (tab.appointData && tab.appointData.isPartyIdLoading) {
+    const tempId = tab.appointData.id;
+    const displayEl = document.getElementById('display-appoint-id');
+    if (displayEl) {
+      displayEl.innerHTML = `<span style="color: var(--text-muted);">🔄 Party ID取得中... (仮: ${tempId})</span>`;
+    }
+
+    fetchNewPartyId('synapse_appoint', true).then(realPartyId => {
+      tab.appointData.isPartyIdLoading = false;
+      tab.appointData.id = realPartyId;
+      
+      // アクティブタブが同じであればUIと編集IDを更新
+      if (state.activeTabId === id) {
+        state.editingAppointId = realPartyId;
+        if (displayEl) displayEl.textContent = realPartyId;
+      }
+
+      // appointmentsの下書きIDを本物のParty IDに差し替えて同期保存
+      const draftIndex = state.appointments.findIndex(a => a.id === tempId);
+      if (draftIndex !== -1) {
+        state.appointments[draftIndex].id = realPartyId;
+        localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+        // 双方向バインドデータや関連リンクがあればここでもIDを変更する
+        if (state.editingAppointId === realPartyId) {
+          syncBiDirectionalRelatedAppointmentIds(tempId, realPartyId);
+        }
+      }
+      console.log(`[Party ID] Successfully swapped temporary ID ${tempId} with official ID ${realPartyId}`);
+    }).catch(err => {
+      tab.appointData.isPartyIdLoading = false;
+      if (displayEl && state.activeTabId === id) {
+        displayEl.textContent = tempId;
+      }
+      console.error('[Party ID] Async generation error, using fallback temporary ID:', err);
+    });
+  }
 }
 
 // タブを活性化して画面を切り替える
@@ -8869,7 +9623,7 @@ function setupEventListeners() {
       const key = keyInput.value.trim();
 
       if (!url || !key) {
-        showToast("URLとAnon Keyの両方を入力してください。", "error");
+        showToast("Synapse URLとAnon Keyの両方を入力してください。", "error");
         return;
       }
 
@@ -8884,7 +9638,7 @@ function setupEventListeners() {
         // クラウドからの同期をトリガー
         await syncFromSupabase(true);
       } else {
-        showToast("Supabaseの初期化に失敗しました。URLまたはキーが不正です。", "error");
+        showToast("Synapse Supabaseの初期化に失敗しました。URLまたはキーが不正です。", "error");
       }
     });
   }
@@ -9762,6 +10516,79 @@ async function handleLogin(e) {
     // [管理者バイパス] ID: 'owner' または '4X9N3K75' でパスワード: 'password' の場合、強制的かつ即座にローカルログイン成功とする
     const isBypassOwner = (loginInput.toLowerCase() === 'owner' || loginInput.toLowerCase() === '4x9n3k75') && pass === 'password';
     if (isBypassOwner) {
+      const ownerEmail = 'owner@synapse.management';
+      if (supabaseClient) {
+        const isDeviceValid = await validateDeviceToken(ownerEmail);
+        
+        if (!isDeviceValid) {
+          console.log('[Device Auth] Unknown device for owner.');
+          
+          const { data: dbUser } = await supabaseClient
+            .from('synapse_users')
+            .select('phone_number')
+            .eq('id', ownerEmail)
+            .maybeSingle();
+
+          const { data: dbDevices } = await supabaseClient
+            .from('synapse_user_devices')
+            .select('device_type')
+            .eq('user_id', ownerEmail);
+
+          const phoneNumber = dbUser && dbUser.phone_number ? dbUser.phone_number : '09000000000';
+          const existingDevices = dbDevices || [];
+          const currentType = getDeviceType();
+
+          // 1. 最大登録台数制限の検証 (3台まで)
+          if (existingDevices.length >= 3) {
+            showToast('オーナーの信頼されたデバイス登録数が上限（3台）に達しています。ログインできません。', 'error');
+            showAppConfirm(
+              '🚫 ログインブロック',
+              '信頼されたデバイスの登録数（最大3台）を超えています。\n新しい端末を登録するには、別の登録端末の削除を管理者に依頼するか、手動でDBをリセットしてください。'
+            );
+            return;
+          }
+
+          // 2. デバイス構成パターンの適合検証
+          const isCompositionValid = isValidDeviceComposition(existingDevices, currentType);
+          if (!isCompositionValid) {
+            showToast('許可されていないデバイス構成パターンのため、ログインがブロックされました。', 'error');
+            showAppConfirm(
+              '🚫 ログインブロック',
+              `この端末（${getDeviceName()}）を追加すると、許可されているデバイス構成パターンから外れてしまいます。\n\n【許可される組み合わせ】\n・スマホ1台、タブレット1台、PC1台\n・スマホ2台、PC1台\n・スマホ1台、PC2台`
+            );
+            return;
+          }
+
+          // 3. SMS 2要素認証を要求
+          showToast('新しい端末を検知しました。SMS 2要素認証を実行します。', 'info');
+          const isSmsVerified = await triggerSmsMfa(phoneNumber);
+          
+          if (isSmsVerified) {
+            try {
+              const newDeviceToken = crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).substring(2, 15) + '-' + Math.random().toString(36).substring(2, 15));
+              const newDeviceName = getDeviceName();
+
+              await supabaseClient.from('synapse_user_devices').insert({
+                user_id: ownerEmail,
+                device_token: newDeviceToken,
+                device_name: newDeviceName,
+                device_type: currentType,
+                last_used_at: new Date().toISOString(),
+                created_at: new Date().toISOString()
+              });
+
+              localStorage.setItem('synapse_device_token', newDeviceToken);
+              showToast('この端末が信頼されたデバイスとして登録されました。', 'success');
+            } catch (err) {
+              console.error('[Device Auth] Owner registration error:', err);
+            }
+          } else {
+            showToast('SMS認証が完了しなかったため、ログインを中止しました。', 'warning');
+            return;
+          }
+        }
+      }
+
       state.currentUser = {
         id: 'owner',
         role: 'owner',
@@ -9847,6 +10674,11 @@ async function handleLogin(e) {
 
 async function handleLogout() {
   try {
+    // ログアウト時にメモリ上の暗号キャッシュと保管庫状態を完全に消去
+    state.decryptedVaultContent = null;
+    state.memoUnlockedSecure = false;
+    state.lastVaultAccessTime = 0;
+
     const isBypassOwner = state.currentUser && (state.currentUser.id === 'owner' || state.currentUser.role === 'owner');
     
     if (isBypassOwner) {
@@ -24273,6 +25105,7 @@ function initSignupEvents() {
       const lastName = document.getElementById('signup-lastname').value.trim();
       const firstName = document.getElementById('signup-firstname').value.trim();
       const email = document.getElementById('signup-email').value.trim();
+      const phone = document.getElementById('signup-phone').value.trim();
 
       if (!lastName || !firstName) {
         showToast('姓と名を入力してください。', 'error');
@@ -24281,6 +25114,11 @@ function initSignupEvents() {
 
       if (!email) {
         showToast('メールアドレスを入力してください。', 'error');
+        return;
+      }
+
+      if (!phone || !/^0\d{9,10}$/.test(phone)) {
+        showToast('有効な電話番号（半角数字、ハイフンなし10〜11桁）を入力してください。', 'error');
         return;
       }
 
@@ -24306,6 +25144,8 @@ function initSignupEvents() {
             firstName: firstName,
             code: userCode,
             role: 'sales',
+            phone: phone,
+            phone_number: phone,
             needs_password_setup: true
           },
           emailRedirectTo: window.location.origin
@@ -24359,6 +25199,7 @@ function initSignupEvents() {
       const email = document.getElementById('set-pwd-email').value;
       const birthday = document.getElementById('set-pwd-birthday').value.trim();
       const loginId = document.getElementById('set-pwd-loginid').value.trim();
+      const phone = document.getElementById('set-pwd-phone').value.trim();
       const pwd = document.getElementById('set-pwd-input').value.trim();
       const pwdConfirm = document.getElementById('set-pwd-confirm-input').value.trim();
 
@@ -24367,6 +25208,7 @@ function initSignupEvents() {
 
       let resolvedLoginId = loginId;
       let resolvedBirthday = birthday;
+      let resolvedPhone = phone;
 
       if (isRecovery) {
         // パスワードバリデーションのみ実行 (8文字以上、大・小・数字必須)
@@ -24393,13 +25235,14 @@ function initSignupEvents() {
         // 既存のユーザー情報をDBから取得してマージする
         const { data: existingUser } = await supabaseClient
           .from('synapse_users')
-          .select('login_id, birthday')
+          .select('login_id, birthday, phone_number')
           .eq('id', email)
           .maybeSingle();
         
         if (existingUser) {
           resolvedLoginId = existingUser.login_id || '';
           resolvedBirthday = existingUser.birthday || '';
+          resolvedPhone = existingUser.phone_number || '';
         }
       } else {
         // 1. 生年月日バリデーション
@@ -24420,6 +25263,16 @@ function initSignupEvents() {
         // 半角英数字6文字以上、大文字不可、記号は-_ .のみ可、記号のみ不可
         if (!/^(?=.*[a-z0-9])[a-z0-9\-_\.]{6,}$/.test(loginId)) {
           showToast('ログインIDは半角英数字（小文字のみ）および記号（-_ .）を含む6文字以上で入力してください（記号のみは不可）。', 'error');
+          return;
+        }
+
+        // 2.5 電話番号バリデーション
+        if (!phone) {
+          showToast('電話番号を入力してください。', 'error');
+          return;
+        }
+        if (!/^0\d{9,10}$/.test(phone)) {
+          showToast('有効な電話番号（半角数字、ハイフンなし10〜11桁）を入力してください。', 'error');
           return;
         }
 
@@ -24466,6 +25319,8 @@ function initSignupEvents() {
       const updateData = { needs_password_setup: false };
       if (!isRecovery) {
         updateData.loginId = resolvedLoginId;
+        updateData.phone = resolvedPhone;
+        updateData.phone_number = resolvedPhone;
       }
       const { data, error } = await supabaseClient.auth.updateUser({
         password: pwd,
@@ -24491,6 +25346,7 @@ function initSignupEvents() {
         code: metadata.code || '',
         login_id: resolvedLoginId,
         birthday: resolvedBirthday,
+        phone_number: resolvedPhone,
         created_at: user.created_at || new Date().toISOString(),
         last_login_at: new Date().toISOString(),
         pwd_changed_at: new Date().toISOString()
@@ -24509,9 +25365,35 @@ function initSignupEvents() {
         name: metadata.name || email,
         loginId: resolvedLoginId,
         password: pwd,
-        code: metadata.code || ''
+        code: metadata.code || '',
+        phone_number: resolvedPhone
       };
       localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
+
+      // 7.5 新規登録された端末（1台目）を自動的に信頼されたデバイスとして登録
+      try {
+        const deviceToken = crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).substring(2, 15) + '-' + Math.random().toString(36).substring(2, 15));
+        const deviceName = getDeviceName();
+        const deviceType = getDeviceType();
+        
+        const { error: devError } = await supabaseClient.from('synapse_user_devices').insert({
+          user_id: email,
+          device_token: deviceToken,
+          device_name: deviceName,
+          device_type: deviceType,
+          last_used_at: new Date().toISOString(),
+          created_at: new Date().toISOString()
+        });
+
+        if (!devError) {
+          localStorage.setItem('synapse_device_token', deviceToken);
+          console.log('[Device Auth] Auto-registered first device:', deviceName);
+        } else {
+          console.error('[Device Auth] Failed to auto-register first device:', devError);
+        }
+      } catch (err) {
+        console.error('[Device Auth] Auto-register error:', err);
+      }
 
       // システム状態の初期化
       initDatabase();
@@ -24906,6 +25788,16 @@ function renderUserManagerList() {
         });
       });
     }
+
+    // 📱 端末管理ボタンの追加
+    const deviceBtn = document.createElement('button');
+    deviceBtn.className = 'btn-secondary';
+    deviceBtn.innerHTML = '📱 端末';
+    deviceBtn.style.cssText = 'font-size: 0.65rem; padding: 0.15rem 0.35rem; font-weight: 600; border-radius: var(--radius-xs); cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); margin-right: 0.2rem;';
+    deviceBtn.addEventListener('click', () => {
+      openAdminDeviceModal(user.id);
+    });
+    action.appendChild(deviceBtn);
 
     action.appendChild(delBtn);
     card.appendChild(info);
@@ -27034,6 +27926,51 @@ function initMypageMemo() {
     return /^\d{4}$/.test(pwd);
   };
 
+  // 🔑 保管庫データを復号化してメモリに展開する関数
+  const decryptVaultContent = async (pin) => {
+    // 復号前に、API を経由して管理者の共有メモデータを最新化する
+    await loadAdminSharedMemos();
+
+    const memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+    const memo = memos.find(m => m.id === 'account_vault');
+    
+    if (!memo) {
+      state.decryptedVaultContent = [];
+      return true;
+    }
+
+    if (!memo.content || memo.content === '[]') {
+      state.decryptedVaultContent = [];
+      return true;
+    }
+
+    try {
+      let contentData;
+      try {
+        contentData = JSON.parse(memo.content);
+      } catch (e) {
+        contentData = memo.content;
+      }
+      
+      const isEncrypted = contentData && typeof contentData === 'object' && contentData.ciphertext && contentData.iv;
+      
+      if (isEncrypted) {
+        const decryptedText = await decryptData(JSON.stringify(contentData), pin);
+        state.decryptedVaultContent = JSON.parse(decryptedText) || [];
+        console.log('[Crypto] Vault content decrypted successfully.');
+      } else {
+        // 暗号化されていない古い平文データの場合
+        state.decryptedVaultContent = Array.isArray(contentData) ? contentData : [];
+        console.log('[Crypto] Old plain vault content loaded.');
+      }
+      return true;
+    } catch (err) {
+      console.error('[Crypto] Decryption failed:', err);
+      state.decryptedVaultContent = null;
+      return false;
+    }
+  };
+
   // 暗証番号設定の送信
   if (setupSubmit) {
     setupSubmit.onclick = () => {
@@ -27051,11 +27988,32 @@ function initMypageMemo() {
 
       localStorage.setItem(storagePwdKey, pwd);
       showToast('暗証番号を設定しました。', 'success');
+      
+      // 新規設定時は、メモリ上に空の配列をキャッシュする
+      state.decryptedVaultContent = [];
       state.memoUnlockedSecure = true;
+      state.lastVaultAccessTime = Date.now();
+
       if (pwdModal) pwdModal.classList.remove('active');
       updateMemoUI();
     };
   }
+
+  // 🔓 保管庫ロック用の共通グローバル関数を定義
+  window.lockSecretVault = () => {
+    state.memoUnlockedSecure = false;
+    state.decryptedVaultContent = null; // メモリ上の平文キャッシュを破棄
+    const memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
+    const currentMemo = memos.find(m => m.id === activeMemoId);
+    if (currentMemo && currentMemo.isSecure) {
+      activeMemoId = null;
+      if (typeof showEditor === 'function') {
+        showEditor(null);
+      }
+    }
+    updateMemoUI();
+    showToast('アカウント保管庫を自動ロックしました。', 'info');
+  };
 
   // 暗証番号入力での解除送信
   if (unlockSubmit) {
@@ -27064,10 +28022,47 @@ function initMypageMemo() {
       const savedPwd = localStorage.getItem(storagePwdKey);
 
       if (pwd === savedPwd) {
-        state.memoUnlockedSecure = true;
-        showToast('ロック付きメモを表示しました。', 'success');
-        if (pwdModal) pwdModal.classList.remove('active');
-        updateMemoUI();
+        const now = Date.now();
+        const oneHour = 60 * 60 * 1000;
+        const timeDiff = now - (state.lastVaultAccessTime || 0);
+
+        const proceedUnlock = async () => {
+          showToast('暗号化データを復号中...', 'info');
+          const decryptSuccess = await decryptVaultContent(pwd);
+          if (!decryptSuccess) {
+            showToast('暗号化データの復号に失敗しました。', 'error');
+            return;
+          }
+
+          state.memoUnlockedSecure = true;
+          state.lastVaultAccessTime = Date.now();
+          showToast('ロック付きメモを表示しました。', 'success');
+          if (pwdModal) pwdModal.classList.remove('active');
+          updateMemoUI();
+        };
+
+        if (!state.lastVaultAccessTime || timeDiff >= oneHour) {
+          // 1時間以上経過、または初回解除 -> SMS 2要素認証を要求
+          if (!state.currentUser || !state.currentUser.phone_number) {
+            showToast('セキュリティ認証エラー：ご登録電話番号が取得できません。', 'error');
+            return;
+          }
+          
+          if (pwdModal) pwdModal.classList.remove('active');
+          showToast('前回のアクセスから1時間以上経過しているため、SMS認証が必要です。', 'info');
+          
+          (async () => {
+            const isSmsVerified = await triggerSmsMfa(state.currentUser.phone_number);
+            if (isSmsVerified) {
+              await proceedUnlock();
+            } else {
+              showToast('SMS認証が完了しなかったため、ロックは解除されませんでした。', 'warning');
+            }
+          })();
+        } else {
+          // 1時間以内の復帰 -> PINのみで解除
+          proceedUnlock();
+        }
       } else {
         showToast('暗証番号が正しくありません。', 'error');
       }
@@ -27204,7 +28199,13 @@ function initMypageMemo() {
   // アカウント保管庫のアカウント情報を読み込む（一般ユーザー向けに管理者の共有データをマージする）
   function getVaultAccounts(memo, currentUser) {
     if (!memo) return [];
-    let accountData = [];
+
+    // ロックされている、またはキャッシュが未展開の場合は空を返す (ゼロ知識の保護)
+    if (!state.memoUnlockedSecure || !state.decryptedVaultContent) {
+      return [];
+    }
+
+    let accountData = state.decryptedVaultContent;
 
     // 管理者のデータをロードしておく
     const adminMemos = JSON.parse(localStorage.getItem('synapse_user_memos_admin')) || [];
@@ -27219,108 +28220,6 @@ function initMypageMemo() {
     }
 
     const isCurrentAdmin = (currentUser && currentUser.role === 'admin');
-
-    // 吉田京平さんのゴミデータ一括自動クリーンアップ（ワンタイム・マイグレーション）
-    if (!isCurrentAdmin && currentUser && (
-      currentUser.id.toLowerCase().includes('yoshida') || 
-      currentUser.id.toLowerCase().includes('fratflat')
-    )) {
-      const cleanupKey = `synapse_yoshida_cleanup_v2_${currentUser.id.toLowerCase()}`;
-      if (!localStorage.getItem(cleanupKey)) {
-        try {
-          const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
-          const targetMemo = memos.find(m => m.id === memo.id);
-          if (targetMemo) {
-            targetMemo.content = JSON.stringify([]);
-            localStorage.setItem(getMemosStorageKey(), JSON.stringify(memos));
-          }
-          memo.content = JSON.stringify([]); // ロード対象も空にする
-          localStorage.setItem(cleanupKey, 'done');
-        } catch (err) {
-          console.error('Yoshida cleanup failed:', err);
-        }
-      }
-    }
-
-    try {
-      const raw = JSON.parse(memo.content) || [];
-      let needsMigration = false;
-      const parsed = raw.map(item => {
-        let user = '';
-        let pwd = '';
-        if (item.accounts && item.accounts.length > 0) {
-          user = item.accounts[0].user || '';
-          pwd = item.accounts[0].pwd || '';
-        } else {
-          user = item.user || '';
-          pwd = item.pwd || '';
-        }
-        let extras = [];
-        if (item.extras) {
-          extras = item.extras;
-        } else if (item.extra) {
-          extras = [{ title: '追加情報', value: item.extra }];
-        }
-
-        let id = item.id;
-        if (!id) {
-          id = 'acc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
-          needsMigration = true;
-        }
-
-        return {
-          id: id,
-          name: item.name || '',
-          url: item.url || '',
-          user: user,
-          pwd: pwd,
-          note: item.note || '',
-          extras: extras,
-          sharedUsers: item.sharedUsers || []
-        };
-      });
-
-      if (isCurrentAdmin) {
-        accountData = parsed;
-        if (needsMigration) {
-          const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
-          const targetMemo = memos.find(m => m.id === memo.id);
-          if (targetMemo) {
-            targetMemo.content = JSON.stringify(accountData);
-            localStorage.setItem(getMemosStorageKey(), JSON.stringify(memos));
-          }
-        }
-      } else {
-        // 一般ユーザーの場合：管理者アカウントIDと一致する、またはサービス名&ユーザーIDが一致する「残骸データ」を排除し、ストレージからもパージ（書き戻し）する
-        const cleanData = parsed.filter(item => {
-          // 1. IDが管理者データと重複しているか
-          if (adminAccIds.includes(item.id)) return false;
-          
-          // 2. サービス名(name)とユーザID(user)の両方が、管理者データのいずれかと重複しているか（ID違いのコピー残骸）
-          const isDuplicateOfAdmin = adminAccounts.some(adminAcc => {
-            return (item.name && item.name.trim() !== '' && item.name.trim() === (adminAcc.name || '').trim()) &&
-                   (item.user && item.user.trim() !== '' && item.user.trim() === (adminAcc.user || '').trim());
-          });
-          if (isDuplicateOfAdmin) return false;
-          
-          return true;
-        });
-
-        if (cleanData.length !== parsed.length) {
-          accountData = cleanData;
-          const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
-          const targetMemo = memos.find(m => m.id === memo.id);
-          if (targetMemo) {
-            targetMemo.content = JSON.stringify(cleanData);
-            localStorage.setItem(getMemosStorageKey(), JSON.stringify(memos));
-          }
-        } else {
-          accountData = parsed;
-        }
-      }
-    } catch(e) {
-      accountData = [];
-    }
 
     // 管理者からの共有データを合流させる
     if (!isCurrentAdmin && currentUser && adminAccounts.length > 0) {
@@ -28361,7 +29260,7 @@ function initMypageMemo() {
 
   // メモ保存
   if (saveBtn) {
-    saveBtn.onclick = () => {
+    saveBtn.onclick = async () => {
       if (!activeMemoId) return;
       const memos = JSON.parse(localStorage.getItem(storageMemosKey)) || [];
       const memo = memos.find(m => m.id === activeMemoId);
@@ -28425,7 +29324,25 @@ function initMypageMemo() {
               });
             });
           }
-          memo.content = JSON.stringify(accountData);
+          
+          // メモリキャッシュを同期
+          state.decryptedVaultContent = accountData;
+
+          // クライアントサイド暗号化 (ゼロナレッジ)
+          const savedPwd = localStorage.getItem(storagePwdKey);
+          if (savedPwd) {
+            try {
+              const cipherJson = await encryptData(JSON.stringify(accountData), savedPwd);
+              memo.content = cipherJson;
+              console.log('[Crypto] Vault content encrypted and saved.');
+            } catch (err) {
+              console.error('[Crypto] Encryption failed:', err);
+              showToast('データの暗号化保存に失敗しました。', 'error');
+              return;
+            }
+          } else {
+            memo.content = JSON.stringify(accountData);
+          }
         } else {
           // 通常のメモの場合
           memo.title = (titleInput ? titleInput.value.trim() : '') || '無題のメモ';

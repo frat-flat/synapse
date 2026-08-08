@@ -19,6 +19,8 @@ module.exports = async (req, res) => {
 
   const url = process.env.SUPABASE_URL;
   const anonKey = process.env.SUPABASE_ANON_KEY;
+  const partnerUrl = process.env.PARTNER_SUPABASE_URL;
+  const partnerAnonKey = process.env.PARTNER_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
     return res.status(200).json({
@@ -30,6 +32,8 @@ module.exports = async (req, res) => {
   return res.status(200).json({
     success: true,
     url: url,
-    anonKey: anonKey
+    anonKey: anonKey,
+    partnerUrl: partnerUrl || null,
+    partnerAnonKey: partnerAnonKey || null
   });
 };
