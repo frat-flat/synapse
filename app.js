@@ -20309,38 +20309,59 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 設定内サブタブ (アカウント情報 / ディスプレイ) 切り替え
-  const settingsTabAccountBtn = document.getElementById('settings-tab-account-btn');
-  const settingsTabDisplayBtn = document.getElementById('settings-tab-display-btn');
-  const settingsContentAccount = document.getElementById('settings-content-account');
-  const settingsContentDisplay = document.getElementById('settings-content-display');
+  // 設定内サブタブ (登録プロフィール情報 / 認証済み端末一覧 / デスクトップ) 切り替え
+  const settingsTabProfileBtn = document.getElementById('settings-tab-profile-btn');
+  const settingsTabDevicesBtn = document.getElementById('settings-tab-devices-btn');
+  const settingsTabDesktopBtn = document.getElementById('settings-tab-desktop-btn');
+  
+  const settingsContentProfile = document.getElementById('settings-content-profile');
+  const settingsContentDevices = document.getElementById('settings-content-devices');
+  const settingsContentDesktop = document.getElementById('settings-content-desktop');
 
-  if (settingsTabAccountBtn && settingsTabDisplayBtn && settingsContentAccount && settingsContentDisplay) {
-    settingsTabAccountBtn.addEventListener('click', () => {
-      settingsTabAccountBtn.classList.add('active');
-      settingsTabAccountBtn.style.color = 'var(--primary)';
-      settingsTabAccountBtn.style.borderBottomColor = 'var(--primary)';
-
-      settingsTabDisplayBtn.classList.remove('active');
-      settingsTabDisplayBtn.style.color = 'var(--text-secondary)';
-      settingsTabDisplayBtn.style.borderBottomColor = 'transparent';
-
-      settingsContentAccount.style.display = 'grid';
-      settingsContentDisplay.style.display = 'none';
+  function deactivateAllSettingsTabs() {
+    [settingsTabProfileBtn, settingsTabDevicesBtn, settingsTabDesktopBtn].forEach(btn => {
+      if (btn) {
+        btn.classList.remove('active');
+        btn.style.color = 'var(--text-secondary)';
+        btn.style.borderBottomColor = 'transparent';
+      }
     });
+    [settingsContentProfile, settingsContentDevices, settingsContentDesktop].forEach(content => {
+      if (content) content.style.display = 'none';
+    });
+  }
 
-    settingsTabDisplayBtn.addEventListener('click', () => {
-      settingsTabDisplayBtn.classList.add('active');
-      settingsTabDisplayBtn.style.color = 'var(--primary)';
-      settingsTabDisplayBtn.style.borderBottomColor = 'var(--primary)';
+  if (settingsTabProfileBtn && settingsContentProfile) {
+    settingsTabProfileBtn.addEventListener('click', () => {
+      deactivateAllSettingsTabs();
+      settingsTabProfileBtn.classList.add('active');
+      settingsTabProfileBtn.style.color = 'var(--primary)';
+      settingsTabProfileBtn.style.borderBottomColor = 'var(--primary)';
+      settingsContentProfile.style.display = 'flex';
+      settingsContentProfile.style.flexDirection = 'column';
+    });
+  }
 
-      settingsTabAccountBtn.classList.remove('active');
-      settingsTabAccountBtn.style.color = 'var(--text-secondary)';
-      settingsTabAccountBtn.style.borderBottomColor = 'transparent';
+  if (settingsTabDevicesBtn && settingsContentDevices) {
+    settingsTabDevicesBtn.addEventListener('click', () => {
+      deactivateAllSettingsTabs();
+      settingsTabDevicesBtn.classList.add('active');
+      settingsTabDevicesBtn.style.color = 'var(--primary)';
+      settingsTabDevicesBtn.style.borderBottomColor = 'var(--primary)';
+      settingsContentDevices.style.display = 'block';
+      // 端末一覧を再ロードして最新化
+      if (typeof renderMypageDeviceList === 'function') renderMypageDeviceList();
+    });
+  }
 
-      settingsContentAccount.style.display = 'none';
-      settingsContentDisplay.style.display = 'flex';
-      settingsContentDisplay.style.flexDirection = 'column';
+  if (settingsTabDesktopBtn && settingsContentDesktop) {
+    settingsTabDesktopBtn.addEventListener('click', () => {
+      deactivateAllSettingsTabs();
+      settingsTabDesktopBtn.classList.add('active');
+      settingsTabDesktopBtn.style.color = 'var(--primary)';
+      settingsTabDesktopBtn.style.borderBottomColor = 'var(--primary)';
+      settingsContentDesktop.style.display = 'flex';
+      settingsContentDesktop.style.flexDirection = 'column';
     });
   }
 
@@ -20402,14 +20423,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 設定アバター（画像）変更ボタントリガーのバインド
   const settingsEditAvatarBtn = document.getElementById('settings-edit-avatar-btn');
-  const avatarEditModal = document.getElementById('set-avatar-modal');
-  if (settingsEditAvatarBtn && avatarEditModal) {
+  if (settingsEditAvatarBtn) {
     settingsEditAvatarBtn.addEventListener('click', () => {
-      avatarEditModal.style.display = 'flex';
-      const charInput = document.getElementById('avatar-char-input');
-      const headerAvatar = document.getElementById('header-user-avatar');
-      if (charInput && headerAvatar) {
-        charInput.value = headerAvatar.textContent.trim();
+      if (typeof window.openAvatarEditModal === 'function') {
+        window.openAvatarEditModal();
       }
     });
   }
@@ -20774,63 +20791,68 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  window.openAvatarEditModal = function() {
+    if (userProfilePopover) userProfilePopover.style.display = 'none';
+    if (!manageAccountModal) return;
+    
+    const userId = state.currentUser ? state.currentUser.id : 'guest';
+    const configStr = localStorage.getItem('synapse_user_avatar_' + userId);
+    
+    let currentChar = (state.currentUser ? state.currentUser.name : '👤').charAt(0);
+    let currentBg = 'var(--primary)';
+    let fileData = '';
+    let fileName = '';
+    let avatarType = 'text';
+    
+    if (configStr) {
+      try {
+        const config = JSON.parse(configStr);
+        if (config.char) currentChar = config.char;
+        if (config.bg) currentBg = config.bg;
+        if (config.type) avatarType = config.type;
+        if (config.fileData) fileData = config.fileData;
+        if (config.fileName) fileName = config.fileName;
+      } catch (e) {}
+    }
+    
+    if (avatarCharInput) avatarCharInput.value = currentChar;
+    selectedAvatarBg = currentBg;
+    currentUploadedFileData = fileData;
+    currentUploadedFileName = fileName;
+    currentUploadedFileType = avatarType;
+
+    if (avatarType === 'image' && fileData) {
+      if (fileInput) fileInput.value = '';
+      if (fileNameLabel) fileNameLabel.textContent = fileName || 'アップロード済みファイル';
+      if (clearFileBtn) clearFileBtn.style.display = 'block';
+      updatePreviewWithData(fileData, fileName, currentBg);
+    } else {
+      if (fileNameLabel) fileNameLabel.textContent = '選択されていません';
+      if (clearFileBtn) clearFileBtn.style.display = 'none';
+      if (avatarPreview) {
+        avatarPreview.textContent = currentChar;
+        avatarPreview.style.backgroundImage = 'none';
+        avatarPreview.style.backgroundColor = currentBg;
+        avatarPreview.style.fontSize = '1.75rem';
+      }
+    }
+    
+    // カラーパレット枠線の初期化
+    document.querySelectorAll('.avatar-color-opt').forEach(opt => {
+      const c = opt.getAttribute('data-color');
+      if (c === currentBg) {
+        opt.style.borderColor = 'var(--text-primary)';
+      } else {
+        opt.style.borderColor = 'transparent';
+      }
+    });
+    
+    manageAccountModal.style.display = 'flex';
+  };
+
   if (manageAccountBtn && manageAccountModal) {
     manageAccountBtn.addEventListener('click', () => {
-      if (userProfilePopover) userProfilePopover.style.display = 'none';
-      
-      const userId = state.currentUser ? state.currentUser.id : 'guest';
-      const configStr = localStorage.getItem('synapse_user_avatar_' + userId);
-      
-      let currentChar = (state.currentUser ? state.currentUser.name : '👤').charAt(0);
-      let currentBg = 'var(--primary)';
-      let fileData = '';
-      let fileName = '';
-      let avatarType = 'text';
-      
-      if (configStr) {
-        try {
-          const config = JSON.parse(configStr);
-          if (config.char) currentChar = config.char;
-          if (config.bg) currentBg = config.bg;
-          if (config.type) avatarType = config.type;
-          if (config.fileData) fileData = config.fileData;
-          if (config.fileName) fileName = config.fileName;
-        } catch (e) {}
-      }
-      
-      if (avatarCharInput) avatarCharInput.value = currentChar;
-      selectedAvatarBg = currentBg;
-      currentUploadedFileData = fileData;
-      currentUploadedFileName = fileName;
-      currentUploadedFileType = avatarType;
-
-      if (avatarType === 'image' && fileData) {
-        if (fileInput) fileInput.value = '';
-        if (fileNameLabel) fileNameLabel.textContent = fileName || 'アップロード済みファイル';
-        if (clearFileBtn) clearFileBtn.style.display = 'block';
-        updatePreviewWithData(fileData, fileName, currentBg);
-      } else {
-        if (fileNameLabel) fileNameLabel.textContent = '選択されていません';
-        if (clearFileBtn) clearFileBtn.style.display = 'none';
-        if (avatarPreview) {
-          avatarPreview.textContent = currentChar;
-          avatarPreview.style.backgroundImage = 'none';
-          avatarPreview.style.backgroundColor = currentBg;
-          avatarPreview.style.fontSize = '1.75rem';
-        }
-      }
-      
-      // カラーパレット枠線の初期化
-      document.querySelectorAll('.avatar-color-opt').forEach(opt => {
-        const c = opt.getAttribute('data-color');
-        if (c === currentBg) {
-          opt.style.borderColor = 'var(--text-primary)';
-        } else {
-          opt.style.borderColor = 'transparent';
-        }
-      });
-      
-      manageAccountModal.style.display = 'flex';
+      window.openAvatarEditModal();
     });
   }
 
