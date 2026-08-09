@@ -9250,10 +9250,9 @@ function activateTab(id) {
     state.activeCustomTableId = null;
   } else if (tab.type === 'mypage-memo-screen') {
     if (typeof window.updateMypageMemoUI === 'function') window.updateMypageMemoUI();
-  } else if (tab.type === 'mypage-account-info-screen') {
+  } else if (tab.type === 'mypage-settings-screen') {
     if (typeof loadCurrentUserProfile === 'function') loadCurrentUserProfile();
     if (typeof renderMypageDeviceList === 'function') renderMypageDeviceList();
-  } else if (tab.type === 'mypage-settings-screen') {
     const currentTheme = state.currentUser ? localStorage.getItem(`SYNAPSE_THEME_${state.currentUser.id}`) || 'light' : 'light';
     const settingsThemeSelector = document.getElementById('settings-theme-selector');
     if (settingsThemeSelector) settingsThemeSelector.value = currentTheme;
@@ -20209,6 +20208,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const headerAvatar = document.getElementById('logged-in-user-avatar');
     const popoverAvatar = document.getElementById('user-popover-avatar');
+    const settingsAvatar = document.getElementById('settings-avatar-preview');
     
     const updateElement = (el) => {
       if (!el) return;
@@ -20218,7 +20218,7 @@ document.addEventListener('DOMContentLoaded', () => {
           el.style.backgroundImage = 'none';
           el.style.backgroundColor = '#ef4444'; // PDFの赤
           el.style.color = '#fff';
-          el.style.fontSize = el.id === 'logged-in-user-avatar' ? '0.65rem' : '0.9rem';
+          el.style.fontSize = (el.id === 'logged-in-user-avatar' || el.id === 'settings-avatar-preview') ? '0.65rem' : '0.9rem';
           el.style.fontWeight = 'bold';
           el.style.cursor = 'pointer';
           el.title = `PDFを表示: ${fileName}`;
@@ -20264,6 +20264,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateElement(headerAvatar);
     updateElement(popoverAvatar);
+    updateElement(settingsAvatar);
   };
 
   // 右上ヘッダー設定ポップアップの制御
@@ -20308,30 +20309,38 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 設定画面からメニューに戻るボタン
-  const mypageSettingsBackBtn = document.getElementById('mypage-settings-back-btn');
-  if (mypageSettingsBackBtn) {
-    mypageSettingsBackBtn.addEventListener('click', () => {
-      // 1. まず「設定」タブを閉じる
-      closeTab('mypage-settings-screen');
+  // 設定内サブタブ (アカウント情報 / ディスプレイ) 切り替え
+  const settingsTabAccountBtn = document.getElementById('settings-tab-account-btn');
+  const settingsTabDisplayBtn = document.getElementById('settings-tab-display-btn');
+  const settingsContentAccount = document.getElementById('settings-content-account');
+  const settingsContentDisplay = document.getElementById('settings-content-display');
 
-      // 2. マイページのメニュービューを表示するように切り替え
-      const isSystemAdmin = isOwnerUser();
-      const menuView = document.getElementById('mypage-menu-view');
-      const screenView = document.getElementById('mypage-settings-screen');
-      const mypageFavWrapper = document.getElementById('mypage-fav-view-wrapper');
-      const mypageMemoWrapper = document.getElementById('mypage-memo-view-wrapper');
+  if (settingsTabAccountBtn && settingsTabDisplayBtn && settingsContentAccount && settingsContentDisplay) {
+    settingsTabAccountBtn.addEventListener('click', () => {
+      settingsTabAccountBtn.classList.add('active');
+      settingsTabAccountBtn.style.color = 'var(--primary)';
+      settingsTabAccountBtn.style.borderBottomColor = 'var(--primary)';
 
-      if (menuView) menuView.style.display = 'flex';
-      if (screenView) screenView.style.display = 'none';
-      if (mypageFavWrapper) mypageFavWrapper.style.display = 'none';
-      if (mypageMemoWrapper) mypageMemoWrapper.style.display = 'none';
+      settingsTabDisplayBtn.classList.remove('active');
+      settingsTabDisplayBtn.style.color = 'var(--text-secondary)';
+      settingsTabDisplayBtn.style.borderBottomColor = 'transparent';
 
-      if (!isSystemAdmin) {
-        switchView('home-screen');
-      } else {
-        switchView('mypage-screen');
-      }
+      settingsContentAccount.style.display = 'grid';
+      settingsContentDisplay.style.display = 'none';
+    });
+
+    settingsTabDisplayBtn.addEventListener('click', () => {
+      settingsTabDisplayBtn.classList.add('active');
+      settingsTabDisplayBtn.style.color = 'var(--primary)';
+      settingsTabDisplayBtn.style.borderBottomColor = 'var(--primary)';
+
+      settingsTabAccountBtn.classList.remove('active');
+      settingsTabAccountBtn.style.color = 'var(--text-secondary)';
+      settingsTabAccountBtn.style.borderBottomColor = 'transparent';
+
+      settingsContentAccount.style.display = 'none';
+      settingsContentDisplay.style.display = 'flex';
+      settingsContentDisplay.style.flexDirection = 'column';
     });
   }
 
@@ -20391,38 +20400,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // アカウント情報画面（タブ遷移）および編集ロジック
-  const mypageAccInfoBtn = document.getElementById('mypage-btn-account-info');
-
-  if (mypageAccInfoBtn) {
-    mypageAccInfoBtn.addEventListener('click', () => {
-      openTab('mypage-account-info-screen', 'mypage-account-info-screen', '👤 アカウント情報');
-    });
-  }
-
-  // アカウント情報画面からメニューに戻るボタン
-  const mypageAccInfoBackBtn = document.getElementById('mypage-account-info-back-btn');
-  if (mypageAccInfoBackBtn) {
-    mypageAccInfoBackBtn.addEventListener('click', () => {
-      // 1. まず「アカウント情報」タブを閉じる
-      closeTab('mypage-account-info-screen');
-
-      // 2. マイページのメニュービューを表示するように切り替え
-      const isSystemAdmin = isOwnerUser();
-      const menuView = document.getElementById('mypage-menu-view');
-      const screenView = document.getElementById('mypage-account-info-screen');
-      const mypageFavWrapper = document.getElementById('mypage-fav-view-wrapper');
-      const mypageMemoWrapper = document.getElementById('mypage-memo-view-wrapper');
-
-      if (menuView) menuView.style.display = 'flex';
-      if (screenView) screenView.style.display = 'none';
-      if (mypageFavWrapper) mypageFavWrapper.style.display = 'none';
-      if (mypageMemoWrapper) mypageMemoWrapper.style.display = 'none';
-
-      if (!isSystemAdmin) {
-        switchView('home-screen');
-      } else {
-        switchView('mypage-screen');
+  // 設定アバター（画像）変更ボタントリガーのバインド
+  const settingsEditAvatarBtn = document.getElementById('settings-edit-avatar-btn');
+  const avatarEditModal = document.getElementById('set-avatar-modal');
+  if (settingsEditAvatarBtn && avatarEditModal) {
+    settingsEditAvatarBtn.addEventListener('click', () => {
+      avatarEditModal.style.display = 'flex';
+      const charInput = document.getElementById('avatar-char-input');
+      const headerAvatar = document.getElementById('header-user-avatar');
+      if (charInput && headerAvatar) {
+        charInput.value = headerAvatar.textContent.trim();
       }
     });
   }
@@ -20463,15 +20450,23 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    // フルネームから「姓」と「名」を分割
+    const nameVal = profile.name || '';
+    const nameParts = nameVal.trim().split(/[\s　]+/);
+    const lastName = nameParts[0] || '';
+    const firstName = nameParts.slice(1).join(' ') || '';
+
     // 画面のテキストフィールドへセット (編集不可の表示用)
-    const nameEl = document.getElementById('info-disp-name');
+    const lastNameEl = document.getElementById('info-disp-last-name');
+    const firstNameEl = document.getElementById('info-disp-first-name');
     const loginidEl = document.getElementById('info-disp-loginid');
     const birthdayEl = document.getElementById('info-disp-birthday');
     const codeEl = document.getElementById('info-disp-code');
     const emailEl = document.getElementById('info-disp-email');
     const phoneEl = document.getElementById('info-disp-phone');
 
-    if (nameEl) nameEl.value = profile.name;
+    if (lastNameEl) lastNameEl.value = lastName;
+    if (firstNameEl) firstNameEl.value = firstName;
     if (loginidEl) loginidEl.value = profile.login_id;
     if (birthdayEl) birthdayEl.value = profile.birthday;
     if (codeEl) codeEl.value = profile.code;
@@ -20483,43 +20478,47 @@ document.addEventListener('DOMContentLoaded', () => {
     const deviceListEl = document.getElementById('screen-info-device-list');
     if (!deviceListEl) return;
 
-    if (!supabaseClient || !state.currentUser || state.currentUser.id === 'owner') {
-      const lastUsed = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
-      deviceListEl.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; font-size: 0.8rem;">
-          <div style="text-align: left;">
-            <div style="font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
-              <span>💻</span>
-              <span>管理者端末 (Demo PC)</span>
-              <span style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 0.1rem 0.35rem; border-radius: var(--radius-xs); font-weight: 700; margin-left: 0.5rem;">現在の端末</span>
-            </div>
-            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.2rem;">
-              最終利用: ${lastUsed} (デモ同期中)
-            </div>
-          </div>
-        </div>
-      `;
+    if (!supabaseClient || !state.currentUser) {
+      deviceListEl.innerHTML = '<div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">デバイス情報の同期は無効です。</div>';
       return;
     }
 
     try {
+      const searchId = state.currentUser.id === 'owner' ? 'owner@synapse.management' : state.currentUser.id;
+
       const { data: devices, error } = await supabaseClient
         .from('synapse_user_devices')
         .select('*')
-        .eq('user_id', state.currentUser.id)
+        .eq('user_id', searchId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
 
+      const currentToken = localStorage.getItem('synapse_device_token');
+
       if (!devices || devices.length === 0) {
-        deviceListEl.innerHTML = '<div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">登録されている端末はありません。</div>';
+        // デバイス未登録の場合は現在の端末を認識して一時表示
+        const devName = getDeviceName ? getDeviceName() : '現在の端末 (PC)';
+        const lastUsed = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+        deviceListEl.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; font-size: 0.8rem;">
+            <div style="text-align: left;">
+              <div style="font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+                <span>💻</span>
+                <span>${devName}</span>
+                <span style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 0.1rem 0.35rem; border-radius: var(--radius-xs); font-weight: 700; margin-left: 0.5rem;">現在の端末</span>
+              </div>
+              <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.2rem;">
+                最終利用: ${lastUsed} (ローカル検知)
+              </div>
+            </div>
+          </div>
+        `;
         return;
       }
 
-      const currentToken = localStorage.getItem('synapse_device_token');
-
       deviceListEl.innerHTML = devices.map(dev => {
-        const isCurrent = dev.device_token === currentToken;
+        const isCurrent = dev.device_token === currentToken || (devices.length === 1 && state.currentUser.id === 'owner');
         const badge = isCurrent ? '<span style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 0.1rem 0.35rem; border-radius: var(--radius-xs); font-weight: 700; margin-left: 0.5rem;">現在の端末</span>' : '';
         const lastUsed = new Date(dev.last_used_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
         const typeIcon = { smartphone: '📱', tablet: '📟', desktop: '💻' }[dev.device_type] || '💻';

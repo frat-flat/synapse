@@ -249,7 +249,7 @@
           </div>
           <div id="user-popover-email" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500; word-break: break-all; margin-bottom: 0.25rem;">sales_01@synapse.management</div>
           <div id="user-popover-code" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500; margin-bottom: 0.8rem; padding: 0.15rem 0.5rem; background: var(--bg-surface-elevated); border-radius: 4px; border: 1px dashed var(--border-color);">コード: 4X9N3K75</div>
-          <div style="display: flex; gap: 0.45rem; justify-content: center; width: 100%;">
+          <div style="display: none; gap: 0.45rem; justify-content: center; width: 100%;">
             <button id="user-popover-manage-btn" style="padding: 0.35rem 0.8rem; font-size: 0.78rem; font-weight: 600; color: var(--primary); background: transparent; border: 1px solid var(--border-color); border-radius: 20px; cursor: pointer; transition: all 0.2s;" title="アカウント設定">
               Synapse アカウントを管理
             </button>
@@ -677,12 +677,6 @@
           <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">通常のメモと暗証番号付きのシークレットメモを使い分けられます</span>
         </div>
 
-        <!-- アカウント情報 -->
-        <div class="admin-app-icon" id="mypage-btn-account-info" title="アカウント情報" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
-          <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">👤</div>
-          <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">アカウント情報</span>
-          <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">プロファイルや連絡先などの登録情報を確認・変更できます</span>
-        </div>
 
         <!-- 設定 -->
         <div class="admin-app-icon" id="mypage-btn-settings" title="設定" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
@@ -778,177 +772,184 @@
   </div>
 </section>
 
-<!-- ================= 👤 アカウント情報画面 ================= -->
-<section id="mypage-account-info-screen" class="screen-view" style="display: none; padding: 1.25rem;">
-  <div style="display: flex; flex-direction: column; gap: 1.25rem; flex: 1; height: 100%;">
-    <!-- ヘッダー & メニューに戻るボタン -->
-    <div style="border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <button id="mypage-account-info-back-btn" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem;">
-          ⬅️ メニューに戻る
-        </button>
-        <div>
-          <h1 style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
-            👤 アカウント情報
-          </h1>
-          <p style="margin: 0.2rem 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">ご登録のプロフィールおよびアカウントセキュリティ情報を確認・変更できます。</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- コンテンツ (2カラムレイアウト) -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
-      
-      <!-- 左カラム: プロフィール / アカウントセキュリティ情報 -->
-      <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
-        <h3 style="margin: 0 0 0.5rem 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem; border-left: 3px solid var(--primary); padding-left: 0.5rem;">
-          🔒 登録プロフィール情報
-        </h3>
-        
-        <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left; font-size: 0.82rem;">
-          <!-- お名前 (編集不可) -->
-          <div>
-            <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">お名前 (氏名)</span>
-            <input type="text" id="info-disp-name" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;" value="-">
-          </div>
-          
-          <!-- ログインID (編集不可) -->
-          <div>
-            <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">ログインID</span>
-            <input type="text" id="info-disp-loginid" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;" value="-">
-          </div>
-
-          <!-- 生年月日 (編集不可) -->
-          <div>
-            <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">生年月日</span>
-            <input type="text" id="info-disp-birthday" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;" value="-">
-          </div>
-
-          <!-- アカウントコード (編集不可) -->
-          <div>
-            <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">アカウントコード</span>
-            <input type="text" id="info-disp-code" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed; font-family: monospace;" value="-">
-          </div>
-
-          <!-- 登録メールアドレス (編集ポップアップ起動ボタン付き) -->
-          <div>
-            <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">
-              登録メールアドレス <span style="font-weight: normal; font-size: 0.72rem; color: var(--primary); margin-left: 0.25rem;">(編集可能)</span>
-            </span>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-              <input type="text" id="info-disp-email" readonly style="flex: 1; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-primary); outline: none; cursor: default; font-weight: 600;" value="-">
-              <button id="info-edit-email-btn" class="btn btn-secondary" style="padding: 0.45rem 0.75rem; font-size: 0.78rem; display: flex; align-items: center; gap: 0.25rem; white-space: nowrap; cursor: pointer; border-radius: var(--radius-sm);" title="メールアドレスを変更する">
-                ✏️ 変更する
-              </button>
-            </div>
-          </div>
-
-          <!-- 登録電話番号 (編集ポップアップ起動ボタン付き) -->
-          <div>
-            <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">
-              📞 登録電話番号 (SMS認証用) <span style="font-weight: normal; font-size: 0.72rem; color: var(--primary); margin-left: 0.25rem;">(編集可能)</span>
-            </span>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-              <input type="text" id="info-disp-phone" readonly style="flex: 1; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-primary); outline: none; cursor: default; font-weight: 600;" value="-">
-              <button id="info-edit-phone-btn" class="btn btn-secondary" style="padding: 0.45rem 0.75rem; font-size: 0.78rem; display: flex; align-items: center; gap: 0.25rem; white-space: nowrap; cursor: pointer; border-radius: var(--radius-sm);" title="電話番号を変更する">
-                ✏️ 変更する
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 右カラム: 認証済み端末一覧 -->
-      <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
-        <h3 style="margin: 0 0 0.5rem 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem; border-left: 3px solid var(--primary); padding-left: 0.5rem;">
-          💻 認証済み端末一覧 (最大3台)
-        </h3>
-        <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
-          現在ログインが許可されているデバイスの一覧です。
-        </p>
-        <div id="screen-info-device-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 250px; overflow-y: auto;">
-          <div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">デバイス情報を読み込み中...</div>
-        </div>
-        <div style="font-size: 0.7rem; color: var(--text-secondary); background: var(--bg-surface); padding: 0.5rem; border-radius: var(--radius-xs); border: 1px dashed var(--border-color); line-height: 1.4; text-align: left;">
-          ⚠️ <strong>登録解除について:</strong> 不要になった端末の登録解除（削除）は、不正利用防止のため管理者のみが行えます。管理者に不要な端末の削除を依頼してください。
-        </div>
-      </div>
-      
-    </div>
-  </div>
-</section>
-
 <!-- ================= ⚙️ 設定画面 ================= -->
 <section id="mypage-settings-screen" class="screen-view" style="display: none; padding: 1.25rem;">
   <div style="display: flex; flex-direction: column; gap: 1.25rem; flex: 1; height: 100%;">
-    <!-- ヘッダー & メニューに戻るボタン -->
+    <!-- ヘッダー -->
     <div style="border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <button id="mypage-settings-back-btn" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem;">
-          ⬅️ メニューに戻る
-        </button>
-        <div>
-          <h1 style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
-            ⚙️ 設定
-          </h1>
-          <p style="margin: 0.2rem 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">アプリの表示テーマ、色合い、鮮やかさ、画面の表示倍率などをカスタマイズできます。</p>
-        </div>
+      <div>
+        <h1 style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+          ⚙️ 設定
+        </h1>
+        <p style="margin: 0.2rem 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">アカウント情報、アバター画像、表示テーマ、倍率などの各種設定を管理・カスタマイズできます。</p>
       </div>
     </div>
 
-    <!-- コンテンツ (設定カード) -->
-    <div style="max-width: 500px; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; text-align: left;">
+    <!-- 設定内サブタブ (アカウント情報 / ディスプレイ) -->
+    <div style="display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">
+      <button id="settings-tab-account-btn" class="settings-sub-tab active" style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 700; border: none; background: none; border-bottom: 3px solid var(--primary); color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.35rem; transition: all 0.2s;">
+        👤 アカウント情報
+      </button>
+      <button id="settings-tab-display-btn" class="settings-sub-tab" style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 700; border: none; background: none; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 0.35rem; transition: all 0.2s;">
+        🖥️ ディスプレイ
+      </button>
+    </div>
+
+    <!-- 設定コンテンツ表示エリア -->
+    <div id="settings-content-wrapper" style="flex: 1;">
       
-      <!-- テーマ選択 -->
-      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-        <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
-          🎨 テーマ選択
-        </span>
-        <select id="settings-theme-selector" style="background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem; font-size: 0.82rem; cursor: pointer; outline: none; width: 100%;">
-          <option value="dark">ダークモード</option>
-          <option value="light">ライトモード</option>
-          <option value="warm">ウォームモード</option>
-        </select>
-      </div>
-
-      <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0;">
-
-      <!-- 色味調整 -->
-      <div style="display: flex; flex-direction: column; gap: 1rem;">
-        <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">🌈 色味の調整</span>
+      <!-- 1. アカウント情報コンテンツ -->
+      <div id="settings-content-account" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
         
-        <!-- 色合い -->
-        <div style="display: flex; flex-direction: column; gap: 0.35rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.78rem; color: var(--text-secondary);">色合い (Hue)</span>
-            <span id="settings-hue-label" style="font-size: 0.78rem; color: var(--primary); font-weight: 700;">0°</span>
+        <!-- 左カラム: プロフィール情報 -->
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-left: 3px solid var(--primary); padding-left: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <div id="settings-avatar-preview" style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,0.15);">
+                👤
+              </div>
+              <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">
+                🔒 登録プロフィール情報
+              </h3>
+            </div>
+            <!-- アバター（プロフィール画像）変更ボタン -->
+            <button id="settings-edit-avatar-btn" class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.72rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.25rem; border-radius: var(--radius-sm);">
+              🖼️ 画像を変更
+            </button>
           </div>
-          <input type="range" id="settings-hue-slider" min="0" max="360" step="1" value="0" style="width: 100%; cursor: pointer;">
+          
+          <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left; font-size: 0.82rem;">
+            <!-- お名前 (姓・名 分割) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+              <div>
+                <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">姓</span>
+                <input type="text" id="info-disp-last-name" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;" value="-">
+              </div>
+              <div>
+                <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">名</span>
+                <input type="text" id="info-disp-first-name" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;" value="-">
+              </div>
+            </div>
+            
+            <!-- ログインID (編集不可) -->
+            <div>
+              <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">ログインID</span>
+              <input type="text" id="info-disp-loginid" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;" value="-">
+            </div>
+
+            <!-- 生年月日 (編集不可) -->
+            <div>
+              <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">生年月日</span>
+              <input type="text" id="info-disp-birthday" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;" value="-">
+            </div>
+
+            <!-- アカウントコード (編集不可) -->
+            <div>
+              <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">アカウントコード</span>
+              <input type="text" id="info-disp-code" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed; font-family: monospace;" value="-">
+            </div>
+
+            <!-- 登録メールアドレス (編集ポップアップ起動ボタン付き) -->
+            <div>
+              <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">
+                登録メールアドレス <span style="font-weight: normal; font-size: 0.72rem; color: var(--primary); margin-left: 0.25rem;">(編集可能)</span>
+              </span>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="text" id="info-disp-email" readonly style="flex: 1; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-primary); outline: none; cursor: default; font-weight: 600;" value="-">
+                <button id="info-edit-email-btn" class="btn btn-secondary" style="padding: 0.45rem 0.75rem; font-size: 0.78rem; display: flex; align-items: center; gap: 0.25rem; white-space: nowrap; cursor: pointer; border-radius: var(--radius-sm);" title="メールアドレスを変更する">
+                  ✏️ 変更する
+                </button>
+              </div>
+            </div>
+
+            <!-- 登録電話番号 (編集ポップアップ起動ボタン付き) -->
+            <div>
+              <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">
+                📞 登録電話番号 (SMS認証用) <span style="font-weight: normal; font-size: 0.72rem; color: var(--primary); margin-left: 0.25rem;">(編集可能)</span>
+              </span>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="text" id="info-disp-phone" readonly style="flex: 1; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-primary); outline: none; cursor: default; font-weight: 600;" value="-">
+                <button id="info-edit-phone-btn" class="btn btn-secondary" style="padding: 0.45rem 0.75rem; font-size: 0.78rem; display: flex; align-items: center; gap: 0.25rem; white-space: nowrap; cursor: pointer; border-radius: var(--radius-sm);" title="電話番号を変更する">
+                  ✏️ 変更する
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- 鮮やかさ -->
-        <div style="display: flex; flex-direction: column; gap: 0.35rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.78rem; color: var(--text-secondary);">鮮やかさ (Saturation)</span>
-            <span id="settings-saturation-label" style="font-size: 0.78rem; color: var(--primary); font-weight: 700;">100%</span>
+        <!-- 右カラム: 認証済み端末一覧 -->
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+          <h3 style="margin: 0 0 0.5rem 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem; border-left: 3px solid var(--primary); padding-left: 0.5rem;">
+            💻 認証済み端末一覧 (最大3台)
+          </h3>
+          <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+            現在ログインが許可されているデバイスの一覧です。
+          </p>
+          <div id="screen-info-device-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 250px; overflow-y: auto;">
+            <div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">デバイス情報を読み込み中...</div>
           </div>
-          <input type="range" id="settings-saturation-slider" min="50" max="150" step="1" value="100" style="width: 100%; cursor: pointer;">
+          <div style="font-size: 0.7rem; color: var(--text-secondary); background: var(--bg-surface); padding: 0.5rem; border-radius: var(--radius-xs); border: 1px dashed var(--border-color); line-height: 1.4; text-align: left;">
+            ⚠️ <strong>登録解除について:</strong> 不要になった端末の登録解除（削除）は、不正利用防止のため管理者のみが行えます。管理者に不要な端末の削除を依頼してください。
+          </div>
         </div>
+
       </div>
 
-      <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0;">
-
-      <!-- 表示倍率 -->
-      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-        <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
-          🔍 表示倍率 (ズーム)
-        </span>
-        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-surface); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.85rem;">
-          <button id="settings-zoom-out-btn" class="btn-icon" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.25rem; font-size: 0.85rem;" title="縮小">➖</button>
-          <span id="settings-zoom-label" style="font-weight: 700; min-width: 48px; text-align: center; color: var(--text-primary);">100%</span>
-          <button id="settings-zoom-in-btn" class="btn-icon" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.25rem; font-size: 0.85rem;" title="拡大">➕</button>
-          <button id="settings-zoom-reset-btn" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-xs); cursor: pointer; color: var(--text-secondary); margin-left: 0.5rem;" title="100%に戻す">リセット</button>
+      <!-- 2. ディスプレイ設定コンテンツ -->
+      <div id="settings-content-display" style="display: none; max-width: 500px; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; text-align: left;">
+        
+        <!-- テーマ選択 -->
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+          <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+            🎨 テーマ選択
+          </span>
+          <select id="settings-theme-selector" style="background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem; font-size: 0.82rem; cursor: pointer; outline: none; width: 100%;">
+            <option value="dark">ダークモード</option>
+            <option value="light">ライトモード</option>
+            <option value="warm">ウォームモード</option>
+          </select>
         </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0;">
+
+        <!-- 色味調整 -->
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">🌈 色味の調整</span>
+          
+          <!-- 色合い -->
+          <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.78rem; color: var(--text-secondary);">色合い (Hue)</span>
+              <span id="settings-hue-label" style="font-size: 0.78rem; color: var(--primary); font-weight: 700;">0°</span>
+            </div>
+            <input type="range" id="settings-hue-slider" min="0" max="360" step="1" value="0" style="width: 100%; cursor: pointer;">
+          </div>
+
+          <!-- 鮮やかさ -->
+          <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.78rem; color: var(--text-secondary);">鮮やかさ (Saturation)</span>
+              <span id="settings-saturation-label" style="font-size: 0.78rem; color: var(--primary); font-weight: 700;">100%</span>
+            </div>
+            <input type="range" id="settings-saturation-slider" min="50" max="150" step="1" value="100" style="width: 100%; cursor: pointer;">
+          </div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0;">
+
+        <!-- 表示倍率 -->
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+          <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+            🔍 表示倍率 (ズーム)
+          </span>
+          <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-surface); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.85rem;">
+            <button id="settings-zoom-out-btn" class="btn-icon" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.25rem; font-size: 0.85rem;" title="縮小">➖</button>
+            <span id="settings-zoom-label" style="font-weight: 700; min-width: 48px; text-align: center; color: var(--text-primary);">100%</span>
+            <button id="settings-zoom-in-btn" class="btn-icon" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.25rem; font-size: 0.85rem;" title="拡大">➕</button>
+            <button id="settings-zoom-reset-btn" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-xs); cursor: pointer; color: var(--text-secondary); margin-left: 0.5rem;" title="100%に戻す">リセット</button>
+          </div>
+        </div>
+
       </div>
 
     </div>
