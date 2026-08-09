@@ -8435,6 +8435,8 @@ function applyZoom(level) {
   // ズームコントロールラベルの更新
   const label = document.getElementById('zoom-level-label');
   if (label) label.textContent = sanitizedLevel + '%';
+  const settingsZoomLabel = document.getElementById('settings-zoom-label');
+  if (settingsZoomLabel) settingsZoomLabel.textContent = sanitizedLevel + '%';
 
   // アプリ全体レイアウト (.app-layout) に対してズームを適用し、サイドバー、ヘッダー、コンテンツがすべて同調するようにする
   const appLayout = document.querySelector('.app-layout');
@@ -9058,7 +9060,7 @@ function renderCustomerDetailView(customerId) {
   container.appendChild(layout);
 }
 function openTab(id, type, title, appointData = null) {
-  if (type && type !== 'mypage-screen' && type !== 'mypage-account-info-screen' && type !== 'mypage-memo-screen') {
+  if (type && type !== 'mypage-screen' && type !== 'mypage-account-info-screen' && type !== 'mypage-settings-screen' && type !== 'mypage-memo-screen') {
     const access = checkTableAccess(type);
     if (!access.visible) {
       showToast(`「${title}」画面へのアクセス権限がありません。`, 'error');
@@ -9194,7 +9196,7 @@ function activateTab(id) {
   const tab = state.tabs.find(t => t.id === id);
   if (!tab) return;
 
-  if (tab.type && tab.type !== 'mypage-screen' && tab.type !== 'mypage-account-info-screen' && tab.type !== 'mypage-memo-screen') {
+  if (tab.type && tab.type !== 'mypage-screen' && tab.type !== 'mypage-account-info-screen' && tab.type !== 'mypage-settings-screen' && tab.type !== 'mypage-memo-screen') {
     const access = checkTableAccess(tab.type);
     if (!access.visible) {
       showToast(`「${tab.title}」画面へのアクセス権限がありません。`, 'error');
@@ -9251,6 +9253,16 @@ function activateTab(id) {
   } else if (tab.type === 'mypage-account-info-screen') {
     if (typeof loadCurrentUserProfile === 'function') loadCurrentUserProfile();
     if (typeof renderMypageDeviceList === 'function') renderMypageDeviceList();
+  } else if (tab.type === 'mypage-settings-screen') {
+    const currentTheme = state.currentUser ? localStorage.getItem(`SYNAPSE_THEME_${state.currentUser.id}`) || 'light' : 'light';
+    const settingsThemeSelector = document.getElementById('settings-theme-selector');
+    if (settingsThemeSelector) settingsThemeSelector.value = currentTheme;
+    const userId = state.currentUser ? state.currentUser.id : 'guest';
+    const curHue = localStorage.getItem(`SYNAPSE_HUE_${userId}`) || '0';
+    const curSat = localStorage.getItem(`SYNAPSE_SATURATION_${userId}`) || '100';
+    applyColorTone(curHue, curSat);
+    const currentZoom = tab.zoomLevel || state.defaultZoomLevel || 100;
+    applyZoom(currentZoom);
   } else if (tab.type === 'party-id-mgmt-screen') {
     loadPartyIds();
   }
@@ -10955,6 +10967,10 @@ function applyTheme(theme) {
   if (selector) {
     selector.value = theme;
   }
+  const settingsSelector = document.getElementById('settings-theme-selector');
+  if (settingsSelector) {
+    settingsSelector.value = theme;
+  }
 }
 
 function applyColorTone(hue, saturation) {
@@ -10978,6 +10994,28 @@ function applyColorTone(hue, saturation) {
     satSlider.value = s;
   }
   const satLabel = document.getElementById('saturation-value-label');
+  if (satLabel) {
+    satLabel.textContent = s + '%';
+  }
+
+  // 設定画面 (mypage-settings-screen) 側も同期
+  const settingsHueSlider = document.getElementById('settings-hue-slider');
+  if (settingsHueSlider) {
+    settingsHueSlider.value = h;
+  }
+  const settingsHueLabel = document.getElementById('settings-hue-label');
+  if (settingsHueLabel) {
+    settingsHueLabel.textContent = h + '°';
+  }
+
+  const settingsSatSlider = document.getElementById('settings-saturation-slider');
+  if (settingsSatSlider) {
+    settingsSatSlider.value = s;
+  }
+  const settingsSatLabel = document.getElementById('settings-saturation-label');
+  if (settingsSatLabel) {
+    settingsSatLabel.textContent = s + '%';
+  }
   if (satLabel) {
     satLabel.textContent = s + '%';
   }
@@ -20254,21 +20292,102 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (popoverSettingsBtn && settingsPopup) {
+  if (popoverSettingsBtn) {
     popoverSettingsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      toggleSettingsPopup(userProfileBtn); // アカウントのすぐ下に配置するため、ヘッダーのアカウントボタンをトリガーにする
-      // アカウントポップオーバーは閉じる
+      openTab('mypage-settings-screen', 'mypage-settings-screen', '⚙️ 設定');
       if (userProfilePopover) userProfilePopover.style.display = 'none';
     });
   }
 
-  // マイページ内の「設定」アイコンクリックによるトグル
+  // マイページ内の「設定」アイコンクリックによるページ遷移（タブ遷移）
   const mypageSettingsBtn = document.getElementById('mypage-btn-settings');
-  if (mypageSettingsBtn && settingsPopup) {
-    mypageSettingsBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleSettingsPopup(mypageSettingsBtn);
+  if (mypageSettingsBtn) {
+    mypageSettingsBtn.addEventListener('click', () => {
+      openTab('mypage-settings-screen', 'mypage-settings-screen', '⚙️ 設定');
+    });
+  }
+
+  // 設定画面からメニューに戻るボタン
+  const mypageSettingsBackBtn = document.getElementById('mypage-settings-back-btn');
+  if (mypageSettingsBackBtn) {
+    mypageSettingsBackBtn.addEventListener('click', () => {
+      // 1. まず「設定」タブを閉じる
+      closeTab('mypage-settings-screen');
+
+      // 2. マイページのメニュービューを表示するように切り替え
+      const isSystemAdmin = isOwnerUser();
+      const menuView = document.getElementById('mypage-menu-view');
+      const screenView = document.getElementById('mypage-settings-screen');
+      const mypageFavWrapper = document.getElementById('mypage-fav-view-wrapper');
+      const mypageMemoWrapper = document.getElementById('mypage-memo-view-wrapper');
+
+      if (menuView) menuView.style.display = 'flex';
+      if (screenView) screenView.style.display = 'none';
+      if (mypageFavWrapper) mypageFavWrapper.style.display = 'none';
+      if (mypageMemoWrapper) mypageMemoWrapper.style.display = 'none';
+
+      if (!isSystemAdmin) {
+        switchView('home-screen');
+      } else {
+        switchView('mypage-screen');
+      }
+    });
+  }
+
+  // 新設定画面内のコントロールバインド
+  const settingsThemeSelector = document.getElementById('settings-theme-selector');
+  if (settingsThemeSelector) {
+    settingsThemeSelector.addEventListener('change', (e) => {
+      const theme = e.target.value;
+      applyTheme(theme);
+      const userId = state.currentUser ? state.currentUser.id : 'guest';
+      localStorage.setItem(`SYNAPSE_THEME_${userId}`, theme);
+    });
+  }
+
+  const settingsHueSlider = document.getElementById('settings-hue-slider');
+  const settingsSatSlider = document.getElementById('settings-saturation-slider');
+  if (settingsHueSlider && settingsSatSlider) {
+    settingsHueSlider.addEventListener('input', (e) => {
+      applyColorTone(e.target.value, settingsSatSlider.value);
+    });
+    settingsHueSlider.addEventListener('change', (e) => {
+      const userId = state.currentUser ? state.currentUser.id : 'guest';
+      localStorage.setItem(`SYNAPSE_HUE_${userId}`, e.target.value);
+    });
+
+    settingsSatSlider.addEventListener('input', (e) => {
+      applyColorTone(settingsHueSlider.value, e.target.value);
+    });
+    settingsSatSlider.addEventListener('change', (e) => {
+      const userId = state.currentUser ? state.currentUser.id : 'guest';
+      localStorage.setItem(`SYNAPSE_SATURATION_${userId}`, e.target.value);
+    });
+  }
+
+  const settingsZoomInBtn = document.getElementById('settings-zoom-in-btn');
+  const settingsZoomOutBtn = document.getElementById('settings-zoom-out-btn');
+  const settingsZoomResetBtn = document.getElementById('settings-zoom-reset-btn');
+
+  const getSettingsActiveZoom = () => {
+    const tab = state.tabs.find(t => t.id === 'mypage-settings-screen');
+    return tab ? (tab.zoomLevel || 100) : (state.defaultZoomLevel || 100);
+  };
+
+  if (settingsZoomInBtn) {
+    settingsZoomInBtn.addEventListener('click', () => {
+      applyZoom(getSettingsActiveZoom() + 10);
+    });
+  }
+  if (settingsZoomOutBtn) {
+    settingsZoomOutBtn.addEventListener('click', () => {
+      applyZoom(getSettingsActiveZoom() - 10);
+    });
+  }
+  if (settingsZoomResetBtn) {
+    settingsZoomResetBtn.addEventListener('click', () => {
+      applyZoom(100);
     });
   }
 
@@ -20285,18 +20404,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const mypageAccInfoBackBtn = document.getElementById('mypage-account-info-back-btn');
   if (mypageAccInfoBackBtn) {
     mypageAccInfoBackBtn.addEventListener('click', () => {
+      // 1. まず「アカウント情報」タブを閉じる
+      closeTab('mypage-account-info-screen');
+
+      // 2. マイページのメニュービューを表示するように切り替え
       const isSystemAdmin = isOwnerUser();
       const menuView = document.getElementById('mypage-menu-view');
       const screenView = document.getElementById('mypage-account-info-screen');
+      const mypageFavWrapper = document.getElementById('mypage-fav-view-wrapper');
+      const mypageMemoWrapper = document.getElementById('mypage-memo-view-wrapper');
+
+      if (menuView) menuView.style.display = 'flex';
+      if (screenView) screenView.style.display = 'none';
+      if (mypageFavWrapper) mypageFavWrapper.style.display = 'none';
+      if (mypageMemoWrapper) mypageMemoWrapper.style.display = 'none';
+
       if (!isSystemAdmin) {
         switchView('home-screen');
       } else {
-        if (menuView) menuView.style.display = 'flex';
-        if (screenView) screenView.style.display = 'none';
+        switchView('mypage-screen');
       }
-      // タブ自体のクリーンアップ（アクティブタブをマイページに）
-      state.activeTabId = 'mypage-tab';
-      renderTabBar();
     });
   }
 
@@ -20355,8 +20482,23 @@ document.addEventListener('DOMContentLoaded', () => {
   async function renderMypageDeviceList() {
     const deviceListEl = document.getElementById('screen-info-device-list');
     if (!deviceListEl) return;
+
     if (!supabaseClient || !state.currentUser || state.currentUser.id === 'owner') {
-      deviceListEl.innerHTML = '<div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">デバイス情報の同期は無効です。</div>';
+      const lastUsed = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+      deviceListEl.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; font-size: 0.8rem;">
+          <div style="text-align: left;">
+            <div style="font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+              <span>💻</span>
+              <span>管理者端末 (Demo PC)</span>
+              <span style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 0.1rem 0.35rem; border-radius: var(--radius-xs); font-weight: 700; margin-left: 0.5rem;">現在の端末</span>
+            </div>
+            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.2rem;">
+              最終利用: ${lastUsed} (デモ同期中)
+            </div>
+          </div>
+        </div>
+      `;
       return;
     }
 
