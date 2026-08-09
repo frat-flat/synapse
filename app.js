@@ -20348,7 +20348,8 @@ document.addEventListener('DOMContentLoaded', () => {
       settingsTabDevicesBtn.classList.add('active');
       settingsTabDevicesBtn.style.color = 'var(--primary)';
       settingsTabDevicesBtn.style.borderBottomColor = 'var(--primary)';
-      settingsContentDevices.style.display = 'block';
+      settingsContentDevices.style.display = 'flex';
+      settingsContentDevices.style.flexDirection = 'column';
       // 端末一覧を再ロードして最新化
       if (typeof renderMypageDeviceList === 'function') renderMypageDeviceList();
     });
