@@ -677,10 +677,46 @@
           <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">通常のメモと暗証番号付きのシークレットメモを使い分けられます</span>
         </div>
 
+        <!-- アカウント情報 -->
+        <div class="admin-app-icon" id="mypage-btn-account-info" title="アカウント情報" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+          <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">👤</div>
+          <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">アカウント情報</span>
+          <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">プロファイルや連絡先などの登録情報を確認・変更できます</span>
+        </div>
+
+        <!-- 設定 -->
+        <div class="admin-app-icon" id="mypage-btn-settings" title="設定" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+          <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">⚙️</div>
+          <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">設定</span>
+          <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">テーマ、フォントサイズ、その他の設定を変更します</span>
+        </div>
+
+        <!-- Zoom連携 (外部連携) -->
+        <div class="admin-app-icon" id="mypage-btn-zoom-connect" title="Zoomと連携" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm); position: relative;">
+          <!-- 🌟 三点リーダーメニューのボタン -->
+          <div id="zoom-card-menu-trigger" style="position: absolute; top: 6px; right: 8px; width: 22px; height: 22px; display: none; align-items: center; justify-content: center; font-size: 1.1rem; color: var(--text-secondary); cursor: pointer; border-radius: 50%; z-index: 15;" onclick="event.stopPropagation();">︙</div>
+          
+          <!-- 🌟 三点リーダーのポップアップメニュー (ドロップダウン) -->
+          <div id="zoom-card-dropdown" style="position: absolute; top: 30px; right: 8px; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 6px; box-shadow: var(--shadow-md); display: none; flex-direction: column; min-width: 100px; z-index: 20; text-align: left;" onclick="event.stopPropagation();">
+            <button id="zoom-card-menu-unlink" style="background: none; border: none; color: #ef4444; padding: 0.45rem 0.65rem; font-size: 0.75rem; cursor: pointer; width: 100%; text-align: left; font-weight: bold; display: flex; align-items: center; gap: 0.25rem;">
+              🚪 連携解除
+            </button>
+          </div>
+
+          <div style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; margin-bottom: 0.2rem; filter: drop-shadow(0 2px 4px rgba(45, 140, 255, 0.2));" id="mypage-zoom-connect-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="42" height="42">
+              <rect x="2" y="6" width="13" height="12" rx="3" fill="#2D8CFF"/>
+              <path d="M16 9.5l5-3.5v12l-5-3.5v-5z" fill="#2D8CFF"/>
+            </svg>
+          </div>
+          <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);" id="mypage-zoom-connect-title">Zoomと連携</span>
+          <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;" id="mypage-zoom-connect-desc">Zoomアカウントと連携し、面談での通話を可能にします</span>
+        </div>
+
       </div>
 
       <!-- プロファイル ＆ 登録デバイス一覧 -->
-      <div style="margin-top: 1.5rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+      <div id="mypage-profile-device-container" style="display: none; margin-top: 1.5rem; display: none; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
         <!-- アカウントセキュリティ情報 -->
         <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem;">
           <h3 style="margin: 0 0 1rem 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
@@ -2938,6 +2974,114 @@
 
 <!-- ================= 📌 浮遊付箋（Sticky Notes）コンテナ ================= -->
 <div id="floating-sticky-notes-container" style="position: fixed; top: 0; left: 0; width: 0; height: 0; z-index: 15000; pointer-events: none;"></div>
+
+<!-- ================= 🌐 Zoom OAuth 認証連携モーダル ================= -->
+<div id="zoom-oauth-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 20000; align-items: center; justify-content: center; backdrop-filter: blur(4px); font-family: 'Inter', 'Noto Sans JP', sans-serif;">
+  <div style="background: white; border-radius: 12px; width: 380px; padding: 2rem; box-shadow: var(--shadow-lg); color: #1e293b; text-align: center; border: 1px solid rgba(0,0,0,0.1);">
+    <!-- Zoom公式風ロゴマーク -->
+    <div style="display: flex; justify-content: center; margin-bottom: 1rem; filter: drop-shadow(0 2px 4px rgba(45, 140, 255, 0.25));">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="60" height="60">
+        <rect x="2" y="6" width="13" height="12" rx="3" fill="#2D8CFF"/>
+        <path d="M16 9.5l5-3.5v12l-5-3.5v-5z" fill="#2D8CFF"/>
+      </svg>
+    </div>
+    <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #0f172a;">Zoomアカウントと連携</h3>
+    <p style="font-size: 0.75rem; color: #64748b; margin-bottom: 1.5rem; line-height: 1.4; padding: 0 0.5rem;">自身のZoomアカウントでサインインし、Synapseからの会議室自動作成・起動を許可します。</p>
+    
+    <!-- 認証フォーム -->
+    <div style="display: flex; flex-direction: column; gap: 0.8rem; text-align: left; margin-bottom: 1.5rem;">
+      <div>
+        <label style="font-size: 0.72rem; font-weight: 700; color: #475569; display: block; margin-bottom: 0.3rem;">Zoom ログインメールアドレス</label>
+        <input type="email" id="zoom-oauth-email" value="sales_01@zoom.us" placeholder="example@zoom.us" style="width: 100%; padding: 0.55rem 0.7rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.82rem; outline: none; box-sizing: border-box; background: #f8fafc; color: #0f172a;">
+      </div>
+      <div>
+        <label style="font-size: 0.72rem; font-weight: 700; color: #475569; display: block; margin-bottom: 0.3rem;">パスワード</label>
+        <input type="password" id="zoom-oauth-password" value="password123" placeholder="パスワードを入力..." style="width: 100%; padding: 0.55rem 0.7rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.82rem; outline: none; box-sizing: border-box; background: #f8fafc; color: #0f172a;">
+      </div>
+    </div>
+    
+    <!-- アクションボタン -->
+    <div style="display: flex; gap: 0.75rem; justify-content: center; margin-top: 1.5rem;">
+      <button id="zoom-oauth-cancel-btn" style="flex: 1; padding: 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #475569; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;">キャンセル</button>
+      <button id="zoom-oauth-submit-btn" style="flex: 1; padding: 0.6rem; border: none; border-radius: 6px; background: #2D8CFF; color: white; font-weight: 700; font-size: 0.8rem; cursor: pointer; box-shadow: 0 4px 10px rgba(45, 140, 255, 0.3); transition: all 0.2s;">サインインして承認</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 👤 アカウント情報モーダル ================= -->
+<div id="mypage-account-info-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 20000; align-items: center; justify-content: center; backdrop-filter: blur(4px); font-family: 'Inter', 'Noto Sans JP', sans-serif;">
+  <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 680px; max-width: 90%; padding: 2rem; box-shadow: var(--shadow-lg); color: var(--text-primary); text-align: left; display: flex; flex-direction: column; gap: 1.5rem;">
+    
+    <!-- ヘッダー -->
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+      <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+        👤 アカウント情報
+      </h3>
+      <button id="mypage-account-info-close" style="background: none; border: none; font-size: 1.25rem; color: var(--text-muted); cursor: pointer; padding: 0;" title="閉じる">✕</button>
+    </div>
+
+    <!-- コンテンツ (2カラム構成) -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; max-height: 60vh; overflow-y: auto; padding-right: 0.5rem;">
+      
+      <!-- 左側: プロフィール設定 -->
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <h4 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); border-left: 3px solid var(--primary); padding-left: 0.5rem;">
+          👤 登録情報
+        </h4>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div>
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">お名前 (氏名)</label>
+            <input type="text" id="acc-info-name" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;">
+          </div>
+          <div>
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">ログインID</label>
+            <input type="text" id="acc-info-loginid" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;">
+          </div>
+          <div>
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">生年月日</label>
+            <input type="text" id="acc-info-birthday" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;">
+          </div>
+          <div>
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">アカウントコード</label>
+            <input type="text" id="acc-info-code" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;">
+          </div>
+          <div>
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">登録メールアドレス <span style="color: var(--primary); font-size: 0.65rem;">(編集可能)</span></label>
+            <input type="email" id="acc-info-email" style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+          </div>
+          <div>
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">登録電話番号 (SMS認証用) <span style="color: var(--primary); font-size: 0.65rem;">(編集可能)</span></label>
+            <input type="tel" id="acc-info-phone" style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+          </div>
+        </div>
+      </div>
+
+      <!-- 右側: 端末情報一覧 -->
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <h4 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); border-left: 3px solid var(--primary); padding-left: 0.5rem;">
+          💻 認証済み端末一覧 (最大3台)
+        </h4>
+        <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+          現在ログインが許可されているデバイスの一覧です。
+        </p>
+        <div id="acc-info-device-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 220px; overflow-y: auto;">
+          <div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">デバイス情報を読み込み中...</div>
+        </div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary); background: var(--bg-surface); padding: 0.5rem; border-radius: var(--radius-xs); border: 1px dashed var(--border-color); line-height: 1.4; text-align: left;">
+          ⚠️ <strong>登録解除について:</strong> 不要になった端末の登録解除（削除）は、不正利用防止のため管理者のみが行えます。管理者に不要な端末の削除を依頼してください。
+        </div>
+      </div>
+
+    </div>
+
+    <!-- フッター / 保存ボタン -->
+    <div style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+      <button id="mypage-account-info-cancel" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm);">キャンセル</button>
+      <button id="mypage-account-info-save" class="btn btn-primary" style="padding: 0.5rem 1.25rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm);">変更を保存</button>
+    </div>
+
+  </div>
+</div>
 
 <script>
   console.log('[DEBUG] HTML inline test script loaded.');

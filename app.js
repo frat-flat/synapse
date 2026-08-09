@@ -8164,6 +8164,18 @@ function updateUIForCurrentMode() {
 
 // ログインステータスのチェック
 function checkLoginStatus() {
+  // 💡 デモ用に未ログインの場合は自動的に owner アカウントでログインする
+  if (!localStorage.getItem(STORAGE_KEYS.LOGGED_USER)) {
+    const defaultOwner = {
+      id: 'owner',
+      loginId: 'owner',
+      name: 'システム管理者',
+      role: 'owner',
+      code: '4X9N3K75'
+    };
+    localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(defaultOwner));
+  }
+
   const loggedUser = localStorage.getItem(STORAGE_KEYS.LOGGED_USER);
   if (loggedUser) {
     state.currentUser = JSON.parse(loggedUser);
@@ -20250,6 +20262,196 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // マイページ内の「設定」アイコンクリックによるトグル
+  const mypageSettingsBtn = document.getElementById('mypage-btn-settings');
+  if (mypageSettingsBtn && settingsPopup) {
+    mypageSettingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSettingsPopup(mypageSettingsBtn);
+    });
+  }
+
+  // アカウント情報モーダルの開閉および保存ロジック
+  const mypageAccInfoBtn = document.getElementById('mypage-btn-account-info');
+  const accInfoModal = document.getElementById('mypage-account-info-modal');
+  const accInfoClose = document.getElementById('mypage-account-info-close');
+  const accInfoCancel = document.getElementById('mypage-account-info-cancel');
+  const accInfoSave = document.getElementById('mypage-account-info-save');
+
+  async function loadCurrentUserProfile() {
+    if (!state.currentUser) return;
+    const userId = state.currentUser.id;
+    
+    // デフォルト
+    let profile = {
+      name: state.currentUser.name || 'オーナー',
+      login_id: state.currentUser.loginId || 'owner',
+      birthday: '1980/01/01',
+      code: state.currentUser.code || '4X9N3K75',
+      email: state.currentUser.id === 'owner' ? 'admin@synapse.management' : state.currentUser.id,
+      phone_number: state.currentUser.phone_number || '未設定'
+    };
+
+    if (supabaseClient && userId !== 'owner') {
+      try {
+        const { data, error } = await supabaseClient
+          .from('synapse_users')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+        if (data) {
+          profile = {
+            name: data.name || profile.name,
+            login_id: data.login_id || profile.login_id,
+            birthday: data.birthday || '未設定',
+            code: data.code || profile.code,
+            email: data.email || profile.email,
+            phone_number: data.phone_number || '未設定'
+          };
+        }
+      } catch (err) {
+        console.error('[Profile] Failed to fetch profile from Supabase:', err);
+      }
+    }
+
+    // モーダルの入力欄へセット
+    const nameEl = document.getElementById('acc-info-name');
+    const loginidEl = document.getElementById('acc-info-loginid');
+    const birthdayEl = document.getElementById('acc-info-birthday');
+    const codeEl = document.getElementById('acc-info-code');
+    const emailEl = document.getElementById('acc-info-email');
+    const phoneEl = document.getElementById('acc-info-phone');
+
+    if (nameEl) nameEl.value = profile.name;
+    if (loginidEl) loginidEl.value = profile.login_id;
+    if (birthdayEl) birthdayEl.value = profile.birthday;
+    if (codeEl) codeEl.value = profile.code;
+    if (emailEl) emailEl.value = profile.email;
+    if (phoneEl) phoneEl.value = profile.phone_number === '未設定' ? '' : profile.phone_number;
+  }
+
+  async function renderMypageDeviceList() {
+    const deviceListEl = document.getElementById('acc-info-device-list');
+    if (!deviceListEl) return;
+    if (!supabaseClient || !state.currentUser || state.currentUser.id === 'owner') {
+      deviceListEl.innerHTML = '<div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">デバイス情報の同期は無効です。</div>';
+      return;
+    }
+
+    try {
+      const { data: devices, error } = await supabaseClient
+        .from('synapse_user_devices')
+        .select('*')
+        .eq('user_id', state.currentUser.id)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      if (!devices || devices.length === 0) {
+        deviceListEl.innerHTML = '<div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">登録されている端末はありません。</div>';
+        return;
+      }
+
+      const currentToken = localStorage.getItem('synapse_device_token');
+
+      deviceListEl.innerHTML = devices.map(dev => {
+        const isCurrent = dev.device_token === currentToken;
+        const badge = isCurrent ? '<span style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 0.1rem 0.35rem; border-radius: var(--radius-xs); font-weight: 700; margin-left: 0.5rem;">現在の端末</span>' : '';
+        const lastUsed = new Date(dev.last_used_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+        const typeIcon = { smartphone: '📱', tablet: '📟', desktop: '💻' }[dev.device_type] || '💻';
+        
+        return `
+          <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; font-size: 0.8rem;">
+            <div style="text-align: left;">
+              <div style="font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+                <span>${typeIcon}</span>
+                <span>${dev.device_name || '名称不明の端末'}</span>
+                ${badge}
+              </div>
+              <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.2rem;">
+                最終利用: ${lastUsed}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (err) {
+      console.error('[Device Auth] Render user devices error:', err);
+      deviceListEl.innerHTML = '<div style="text-align: center; color: #ef4444; font-size: 0.8rem; padding: 1rem 0;">エラーが発生しました。</div>';
+    }
+  }
+
+  if (mypageAccInfoBtn && accInfoModal) {
+    mypageAccInfoBtn.addEventListener('click', async () => {
+      accInfoModal.style.display = 'flex';
+      await loadCurrentUserProfile();
+      await renderMypageDeviceList();
+    });
+  }
+
+  const closeAccInfo = () => {
+    if (accInfoModal) accInfoModal.style.display = 'none';
+  };
+
+  if (accInfoClose) accInfoClose.addEventListener('click', closeAccInfo);
+  if (accInfoCancel) accInfoCancel.addEventListener('click', closeAccInfo);
+
+  if (accInfoSave) {
+    accInfoSave.addEventListener('click', async () => {
+      const emailVal = document.getElementById('acc-info-email').value.trim();
+      const phoneVal = document.getElementById('acc-info-phone').value.trim();
+
+      if (!emailVal || !phoneVal) {
+        showToast('メールアドレスと電話番号を入力してください。', 'error');
+        return;
+      }
+
+      if (!/.+@.+\..+/.test(emailVal)) {
+        showToast('メールアドレスの形式が正しくありません。', 'error');
+        return;
+      }
+
+      if (!/^0\d{9,10}$/.test(phoneVal)) {
+        showToast('電話番号はハイフンなしの半角数字（10桁または11桁）で入力してください。', 'error');
+        return;
+      }
+
+      accInfoSave.disabled = true;
+      accInfoSave.textContent = '保存中...';
+
+      try {
+        if (supabaseClient && state.currentUser.id !== 'owner') {
+          const { error } = await supabaseClient
+            .from('synapse_users')
+            .update({
+              email: emailVal,
+              phone_number: phoneVal
+            })
+            .eq('id', state.currentUser.id);
+
+          if (error) throw error;
+          
+          state.currentUser.phone_number = phoneVal;
+          localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
+          
+          renderMypageSecurityInfo();
+        } else {
+          state.currentUser.phone_number = phoneVal;
+          localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
+        }
+
+        showToast('アカウント情報を更新しました。', 'success');
+        closeAccInfo();
+      } catch (err) {
+        console.error('[Profile] Failed to update profile:', err);
+        showToast('アカウント情報の更新に失敗しました: ' + err.message, 'error');
+      } finally {
+        accInfoSave.disabled = false;
+        accInfoSave.textContent = '変更を保存';
+      }
+    });
+  }
+
   // 右上 Googleスタイル ユーザープロファイルカードポップアップの制御
   const userProfileBtn = document.getElementById('header-user-profile-btn');
   const userProfilePopover = document.getElementById('user-profile-popover');
@@ -28051,6 +28253,159 @@ function initMypageMemo() {
       state.memoUnlockedSecure = false; // 戻った時に再ロック
       activeMemoId = null;
       showEditor(null);
+    };
+  }
+
+  // Zoom連携カードをクリック (OAuthログインモーダルの連動)
+  const btnZoomConnect = document.getElementById('mypage-btn-zoom-connect');
+  const zoomOauthModal = document.getElementById('zoom-oauth-modal');
+  const zoomOauthCancel = document.getElementById('zoom-oauth-cancel-btn');
+  const zoomOauthSubmit = document.getElementById('zoom-oauth-submit-btn');
+  const zoomOauthEmail = document.getElementById('zoom-oauth-email');
+  
+  // 三点リーダーとドロップダウンの参照
+  const zoomCardMenuTrigger = document.getElementById('zoom-card-menu-trigger');
+  const zoomCardDropdown = document.getElementById('zoom-card-dropdown');
+  const zoomCardMenuUnlink = document.getElementById('zoom-card-menu-unlink');
+  
+  let isZoomLinked = false;
+
+  // 🌟 親ウィンドウ(zoom_demo.html)への安全なメッセージ送信関数 (同一オリジン/file:// CORS制限回避)
+  function sendToParent(type, data, email) {
+    if (window.parent) {
+      window.parent.postMessage({ type: type, data: data, email: email }, '*');
+    }
+  }
+
+  // 🌟 連携解除（初期状態に戻す共通処理）
+  function unlinkZoomAccount(reasonText) {
+    isZoomLinked = false;
+    
+    if (btnZoomConnect) {
+      btnZoomConnect.style.background = 'var(--bg-surface)';
+      btnZoomConnect.style.borderColor = 'var(--border-color)';
+    }
+    
+    const titleEl = document.getElementById('mypage-zoom-connect-title');
+    const descEl = document.getElementById('mypage-zoom-connect-desc');
+    
+    if (titleEl) titleEl.innerText = 'Zoomと連携';
+    if (descEl) descEl.innerText = 'Zoomアカウントと連携し、面談での通話を可能にします';
+    
+    if (zoomCardMenuTrigger) zoomCardMenuTrigger.style.display = 'none';
+    if (zoomCardDropdown) zoomCardDropdown.style.display = 'none';
+    
+    showToast(reasonText || 'Zoomアカウントの連携を解除しました。', 'info');
+    
+    // 親ウィンドウの連携状態を更新し、Zoomを閉じる (postMessageで確実に連動)
+    sendToParent('ZOOM_LINK_STATUS', false);
+    sendToParent('END_ZOOM_LIFECYCLE');
+  }
+
+  if (btnZoomConnect) {
+    btnZoomConnect.onclick = () => {
+      if (!isZoomLinked) {
+        // 未連携時 ➔ ログイン認証モーダルを出す
+        if (zoomOauthModal) {
+          zoomOauthModal.style.display = 'flex';
+          if (zoomOauthEmail) zoomOauthEmail.value = 'sales_01@zoom.us';
+        }
+      } else {
+        // 🌟 連携済み時 ➔ 親ウィンドウのZoom画面を起動して「開く」 (postMessageで確実に連動)
+        sendToParent('START_ZOOM_LIFECYCLE');
+        showToast('Zoomミーティングを起動しました！画面左側をご確認ください。', 'success');
+      }
+    };
+
+    // 🌟 三点リーダーにカーソルを合わせたら（またはカード右上にホバーしたら）連携解除メニューを出す
+    btnZoomConnect.addEventListener('mouseenter', () => {
+      if (isZoomLinked && zoomCardMenuTrigger) {
+        zoomCardMenuTrigger.style.display = 'flex';
+      }
+    });
+
+    btnZoomConnect.addEventListener('mouseleave', () => {
+      if (zoomCardMenuTrigger) {
+        zoomCardMenuTrigger.style.display = 'none';
+      }
+      if (zoomCardDropdown) {
+        zoomCardDropdown.style.display = 'none';
+      }
+    });
+  }
+
+  // 🌟 三点リーダーボタンにホバー/クリックした時の動作
+  if (zoomCardMenuTrigger) {
+    zoomCardMenuTrigger.onmouseenter = () => {
+      if (zoomCardDropdown) zoomCardDropdown.style.display = 'flex';
+    };
+    zoomCardMenuTrigger.onclick = (e) => {
+      e.stopPropagation();
+      if (zoomCardDropdown) {
+        zoomCardDropdown.style.display = zoomCardDropdown.style.display === 'flex' ? 'none' : 'flex';
+      }
+    };
+  }
+
+  // 🌟 三点リーダーのメニューからマウスが離れたら閉じる
+  if (zoomCardDropdown) {
+    zoomCardDropdown.onmouseleave = () => {
+      zoomCardDropdown.style.display = 'none';
+    };
+  }
+
+  // 🌟 「連携解除」クリック処理
+  if (zoomCardMenuUnlink) {
+    zoomCardMenuUnlink.onclick = (e) => {
+      e.stopPropagation();
+      if (confirm('Zoomアカウントの連携を解除しますか？')) {
+        unlinkZoomAccount('Zoomアカウントの連携を解除しました。');
+      }
+    };
+  }
+
+  // OAuthモーダルのキャンセル処理
+  if (zoomOauthCancel) {
+    zoomOauthCancel.onclick = () => {
+      if (zoomOauthModal) {
+        zoomOauthModal.style.display = 'none';
+      }
+    };
+  }
+
+  // OAuthモーダルのログイン・承認処理
+  if (zoomOauthSubmit) {
+    zoomOauthSubmit.onclick = () => {
+      const emailVal = zoomOauthEmail ? zoomOauthEmail.value.trim() : 'sales_01@zoom.us';
+      if (!emailVal) {
+        showToast('メールアドレスを入力してください。', 'error');
+        return;
+      }
+
+      isZoomLinked = true;
+      
+      const titleEl = document.getElementById('mypage-zoom-connect-title');
+      const descEl = document.getElementById('mypage-zoom-connect-desc');
+
+      if (btnZoomConnect) {
+        btnZoomConnect.style.background = 'rgba(45, 140, 255, 0.08)';
+        btnZoomConnect.style.borderColor = '#2D8CFF';
+      }
+      // 🌟 連携後は「Zoomを開く」に変更
+      if (titleEl) titleEl.innerText = 'Zoomを開く';
+      if (descEl) descEl.innerText = `連携中: ${emailVal}`;
+
+      // 三点リーダーを表示可能にする
+      if (zoomCardMenuTrigger) zoomCardMenuTrigger.style.display = 'flex';
+
+      if (zoomOauthModal) {
+        zoomOauthModal.style.display = 'none';
+      }
+
+      showToast('Zoomアカウントと正常に連携されました！', 'success');
+      
+      // 親ウィンドウの連携状態を更新 (postMessageで確実に連動)
+      sendToParent('ZOOM_LINK_STATUS', true, emailVal);
     };
   }
 
