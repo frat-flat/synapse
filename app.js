@@ -1520,132 +1520,159 @@ async function loadPartyIds() {
   const tableBody = document.getElementById('party-id-list-table-body');
   if (!tableBody) return;
 
-  if (!partnerSupabaseClient) {
-    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">パートナーDBが初期化されていません。設定画面で接続情報を設定してください。</td></tr>`;
+  tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="spinner"></i> データを読み込み中...</td></tr>`;
+
+  let partyIds = [];
+  let isFallback = false;
+  let fallbackMessage = '';
+
+  if (partnerSupabaseClient) {
+    try {
+      // partnerSupabaseClient からデータを全件取得 (ソートはcreated_atの降順)
+      const { data, error } = await partnerSupabaseClient
+        .from('party_ids')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      partyIds = data || [];
+    } catch (err) {
+      console.warn('[Supabase Partner] Failed to load party IDs from DB. Falling back to local drafts:', err);
+      isFallback = true;
+      fallbackMessage = err.message;
+    }
+  } else {
+    isFallback = true;
+    fallbackMessage = 'パートナーDBが初期化されていません。';
+  }
+
+  // 権限エラーまたはDB接続なしの場合、ローカルストレージのアポイント破棄履歴（cancelled）をロードして表示
+  if (isFallback) {
+    const localCancelled = (state.appointments || []).filter(a => a.status === 'cancelled');
+    partyIds = localCancelled.map((a, idx) => ({
+      party_id: a.id || 'UNKNOWN',
+      seq_value: idx + 1,
+      source: 'synapse_appoint',
+      status: 'reusable',
+      created_at: a.registeredAt || new Date().toISOString(),
+      reset_at: a.registeredAt || new Date().toISOString(),
+      activated_at: null
+    }));
+  }
+
+  if (!partyIds || partyIds.length === 0) {
+    const emptyMsg = isFallback 
+      ? `発行済みのParty IDはありません。<br><span style="font-size: 0.72rem; color: var(--text-muted);">(※パートナーDBの接続エラー: ${fallbackMessage})</span>`
+      : '発行済みのParty IDはありません。';
+    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">${emptyMsg}</td></tr>`;
     return;
   }
 
-  tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="spinner"></i> データを読み込み中...</td></tr>`;
+  // クライアントサイドでのフィルタリングの適用
+  const filterStatus = document.getElementById('party-id-filter-status')?.value || '';
+  const filterPeriod = document.getElementById('party-id-filter-period')?.value || '';
+  const filterSearch = document.getElementById('party-id-filter-search')?.value.trim().toLowerCase() || '';
 
-  try {
-    // partnerSupabaseClient からデータを全件取得 (ソートはcreated_atの降順)
-    let { data: partyIds, error } = await partnerSupabaseClient
-      .from('party_ids')
-      .select('*')
-      .order('created_at', { ascending: false });
+  const now = new Date();
 
-    if (error) throw error;
+  const filtered = partyIds.filter(item => {
+    // ステータスフィルター
+    if (filterStatus && item.status !== filterStatus) return false;
 
-    if (!partyIds || partyIds.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">発行済みのParty IDはありません。</td></tr>`;
-      return;
+    // 期間フィルター (reset_at または created_at からの経過時間)
+    if (filterPeriod) {
+      const itemDate = new Date(item.status === 'reusable' ? (item.reset_at || item.created_at) : item.created_at);
+      const diffMs = now - itemDate;
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+      if (filterPeriod === '3years') {
+        if (item.status !== 'reusable') return false;
+        const resetDate = new Date(item.reset_at || item.created_at);
+        const resetDiffDays = (now - resetDate) / (1000 * 60 * 60 * 24);
+        if (resetDiffDays < 365 * 3) return false;
+      } else if (filterPeriod === '1year' && diffDays < 365) {
+        return false;
+      } else if (filterPeriod === '30days' && diffDays < 30) {
+        return false;
+      }
     }
 
-    // クライアントサイドでのフィルタリングの適用
-    const filterStatus = document.getElementById('party-id-filter-status')?.value || '';
-    const filterPeriod = document.getElementById('party-id-filter-period')?.value || '';
-    const filterSearch = document.getElementById('party-id-filter-search')?.value.trim().toLowerCase() || '';
-
-    const now = new Date();
-
-    const filtered = partyIds.filter(item => {
-      // ステータスフィルター
-      if (filterStatus && item.status !== filterStatus) return false;
-
-      // 期間フィルター (reset_at または created_at からの経過時間)
-      if (filterPeriod) {
-        const itemDate = new Date(item.status === 'reusable' ? (item.reset_at || item.created_at) : item.created_at);
-        const diffMs = now - itemDate;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-        if (filterPeriod === '3years') {
-          if (item.status !== 'reusable') return false;
-          const resetDate = new Date(item.reset_at || item.created_at);
-          const resetDiffDays = (now - resetDate) / (1000 * 60 * 60 * 24);
-          if (resetDiffDays < 365 * 3) return false;
-        } else if (filterPeriod === '1year' && diffDays < 365) {
-          return false;
-        } else if (filterPeriod === '30days' && diffDays < 30) {
-          return false;
-        }
-      }
-
-      // 検索ワードフィルター (ID or source)
-      if (filterSearch) {
-        const idMatch = item.party_id.toLowerCase().includes(filterSearch);
-        const sourceMatch = (item.source || '').toLowerCase().includes(filterSearch);
-        if (!idMatch && !sourceMatch) return false;
-      }
-
-      return true;
-    });
-
-    if (filtered.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">該当するデータがありません。</td></tr>`;
-      return;
+    // 検索ワードフィルター (ID or source)
+    if (filterSearch) {
+      const idMatch = item.party_id.toLowerCase().includes(filterSearch);
+      const sourceMatch = (item.source || '').toLowerCase().includes(filterSearch);
+      if (!idMatch && !sourceMatch) return false;
     }
 
-    // テーブルの描画
-    tableBody.innerHTML = '';
-    filtered.forEach(item => {
-      const tr = document.createElement('tr');
-      tr.style.borderBottom = '1px solid var(--border-color)';
-      
-      // ステータスバッジ
-      let statusBadge = '';
-      if (item.status === 'active') {
-        statusBadge = `<span style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">本登録 (active)</span>`;
-      } else if (item.status === 'temporary') {
-        statusBadge = `<span style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">仮発行 (temporary)</span>`;
-      } else if (item.status === 'reusable') {
-        const resetDiffDays = Math.floor((now - new Date(item.reset_at || item.created_at)) / (1000 * 60 * 60 * 24));
-        const canReuse = resetDiffDays >= 365 * 3;
-        const color = canReuse ? '#3b82f6' : '#6b7280';
-        const bg = canReuse ? 'rgba(59, 130, 246, 0.1)' : 'rgba(107, 114, 128, 0.1)';
-        const text = canReuse ? '再利用可能 (reusable)' : `冷却中 (${(365*3) - resetDiffDays}日後再利用可)`;
-        statusBadge = `<span style="background: ${bg}; color: ${color}; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">${text}</span>`;
-      }
+    return true;
+  });
 
-      // 日時フォーマット
-      const formatDate = (isoString) => {
-        if (!isoString) return '-';
-        const d = new Date(isoString);
-        return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-      };
-
-      // 操作ボタン (仮発行 temporary だけを手動リセット可能にする)
-      let actionBtn = '';
-      if (item.status === 'temporary') {
-        actionBtn = `<button class="btn btn-sm btn-danger btn-reset-party-id" data-id="${item.party_id}" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600;">🔄 リセット</button>`;
-      } else {
-        actionBtn = `<button class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; opacity: 0.4; cursor: not-allowed;" disabled>対象外</button>`;
-      }
-
-      tr.innerHTML = `
-        <td style="padding: 0.75rem 1rem; font-weight: 600; font-family: monospace; font-size: 0.85rem; color: var(--text-primary);">${item.party_id}</td>
-        <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">${item.seq_value || '-'}</td>
-        <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">${item.source || '-'}</td>
-        <td style="padding: 0.75rem 1rem;">${statusBadge}</td>
-        <td style="padding: 0.75rem 1rem; color: var(--text-muted);">${formatDate(item.status === 'reusable' ? item.reset_at : item.created_at)}</td>
-        <td style="padding: 0.75rem 1rem; color: var(--text-muted);">${formatDate(item.activated_at)}</td>
-        <td style="padding: 0.75rem 1rem; text-align: center;">${actionBtn}</td>
-      `;
-
-      tableBody.appendChild(tr);
-    });
-
-    // リセットボタンにイベントリスナーを貼る
-    tableBody.querySelectorAll('.btn-reset-party-id').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        resetPartyId(id);
-      });
-    });
-
-  } catch (err) {
-    console.error('[Supabase Partner] Failed to load party IDs:', err);
-    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-danger);">データの読み込みに失敗しました: ${err.message}</td></tr>`;
+  if (filtered.length === 0) {
+    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">該当するデータがありません。</td></tr>`;
+    return;
   }
+
+  // テーブルの描画
+  tableBody.innerHTML = '';
+  filtered.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--border-color)';
+    
+    // ステータスバッジ
+    let statusBadge = '';
+    if (item.status === 'active') {
+      statusBadge = `<span style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">本登録 (active)</span>`;
+    } else if (item.status === 'temporary') {
+      statusBadge = `<span style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">仮発行 (temporary)</span>`;
+    } else if (item.status === 'reusable') {
+      const resetDiffDays = Math.floor((now - new Date(item.reset_at || item.created_at)) / (1000 * 60 * 60 * 24));
+      const canReuse = resetDiffDays >= 365 * 3;
+      const color = canReuse ? '#3b82f6' : '#6b7280';
+      const bg = canReuse ? 'rgba(59, 130, 246, 0.1)' : 'rgba(107, 114, 128, 0.1)';
+      const text = canReuse ? '再利用可能 (reusable)' : `冷却中 (${(365*3) - resetDiffDays}日後再利用可)`;
+      statusBadge = `<span style="background: ${bg}; color: ${color}; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">${text}</span>`;
+    }
+
+    // 日時フォーマット
+    const formatDate = (isoString) => {
+      if (!isoString) return '-';
+      const d = new Date(isoString);
+      return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    };
+
+    // 操作ボタン (仮発行 temporary だけを手動リセット可能にする)
+    let actionBtn = '';
+    if (item.status === 'temporary') {
+      actionBtn = `<button class="btn btn-sm btn-danger btn-reset-party-id" data-id="${item.party_id}" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600;">🔄 リセット</button>`;
+    } else {
+      actionBtn = `<button class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; opacity: 0.4; cursor: not-allowed;" disabled>対象外</button>`;
+    }
+
+    let errorBadge = '';
+    if (isFallback) {
+      errorBadge = `<span style="font-size: 0.65rem; color: #ef4444; border: 1px solid #ef4444; border-radius: 2px; padding: 0 0.15rem; margin-left: 0.35rem; font-weight: bold;" title="DB同期が失敗したためローカルデータを一時表示中">ローカルのみ</span>`;
+    }
+
+    tr.innerHTML = `
+      <td style="padding: 0.75rem 1rem; font-weight: 600; font-family: monospace; font-size: 0.85rem; color: var(--text-primary);">${item.party_id}${errorBadge}</td>
+      <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">${item.seq_value || '-'}</td>
+      <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">${item.source || '-'}</td>
+      <td style="padding: 0.75rem 1rem;">${statusBadge}</td>
+      <td style="padding: 0.75rem 1rem; color: var(--text-muted);">${formatDate(item.status === 'reusable' ? item.reset_at : item.created_at)}</td>
+      <td style="padding: 0.75rem 1rem; color: var(--text-muted);">${formatDate(item.activated_at)}</td>
+      <td style="padding: 0.75rem 1rem; text-align: center;">${actionBtn}</td>
+    `;
+
+    tableBody.appendChild(tr);
+  });
+
+  // リセットボタンにイベントリスナーを貼る
+  tableBody.querySelectorAll('.btn-reset-party-id').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-id');
+      resetPartyId(id);
+    });
+  });
 }
 
 async function resetPartyId(partyId) {
@@ -14944,18 +14971,42 @@ function viewAppointmentDetails(appointId) {
 }
 
 // 下書きアポイントの破棄（削除ではなく、ステータスを cancelled に変更して監査証跡を残す）
-function handleDeleteDraft() {
+async function handleDeleteDraft() {
   if (!state.editingAppointId) return;
 
   if (confirm('この下書きアポイントを破棄しますか？（IDはキャンセル状態として保存され、履歴として残ります）')) {
-    const appoint = state.appointments.find(a => a.id === state.editingAppointId);
+    const targetId = state.editingAppointId;
+    const appoint = state.appointments.find(a => a.id === targetId);
     if (appoint) {
       appoint.status = 'cancelled';
       appoint.registeredAt = new Date().toISOString();
       localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
-      showToast('下書きを破棄しました（ステータス：無効 / cancelled）。', 'warning');
     }
     
+    // パートナーDB（DBMake）側の party_ids テーブルのステータスも「reusable（再利用待ち / 破棄）」に更新する
+    if (partnerSupabaseClient) {
+      try {
+        const { error } = await partnerSupabaseClient
+          .from('party_ids')
+          .update({
+            status: 'reusable',
+            reset_at: new Date().toISOString(),
+            activated_at: null
+          })
+          .eq('party_id', targetId);
+        
+        if (error) {
+          console.warn('[Party ID] Failed to update status in partner DB:', error.message);
+        } else {
+          console.log(`[Party ID] Updated status to reusable in partner DB for: ${targetId}`);
+        }
+      } catch (err) {
+        console.error('[Party ID] Discard DB update error:', err);
+      }
+    }
+    
+    showToast('下書きを破棄しました（ステータス：無効 / cancelled）。', 'warning');
+
     state.editingAppointId = null;
     state.selectedExistingCustomer = null;
     state.selectedIntroducer = null;
