@@ -778,6 +778,106 @@
   </div>
 </section>
 
+<!-- ================= 👤 アカウント情報画面 ================= -->
+<section id="mypage-account-info-screen" class="screen-view" style="display: none; padding: 1.25rem;">
+  <div style="display: flex; flex-direction: column; gap: 1.25rem; flex: 1; height: 100%;">
+    <!-- ヘッダー & メニューに戻るボタン -->
+    <div style="border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <button id="mypage-account-info-back-btn" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem;">
+          ⬅️ メニューに戻る
+        </button>
+        <div>
+          <h1 style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+            👤 アカウント情報
+          </h1>
+          <p style="margin: 0.2rem 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">ご登録のプロフィールおよびアカウントセキュリティ情報を確認・変更できます。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- コンテンツ (2カラムレイアウト) -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+      
+      <!-- 左カラム: プロフィール / アカウントセキュリティ情報 -->
+      <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+        <h3 style="margin: 0 0 0.5rem 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem; border-left: 3px solid var(--primary); padding-left: 0.5rem;">
+          🔒 登録プロフィール情報
+        </h3>
+        
+        <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left; font-size: 0.82rem;">
+          <!-- お名前 (編集不可) -->
+          <div>
+            <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">お名前 (氏名)</span>
+            <input type="text" id="info-disp-name" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;" value="-">
+          </div>
+          
+          <!-- ログインID (編集不可) -->
+          <div>
+            <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">ログインID</span>
+            <input type="text" id="info-disp-loginid" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;" value="-">
+          </div>
+
+          <!-- 生年月日 (編集不可) -->
+          <div>
+            <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">生年月日</span>
+            <input type="text" id="info-disp-birthday" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;" value="-">
+          </div>
+
+          <!-- アカウントコード (編集不可) -->
+          <div>
+            <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">アカウントコード</span>
+            <input type="text" id="info-disp-code" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed; font-family: monospace;" value="-">
+          </div>
+
+          <!-- 登録メールアドレス (編集ポップアップ起動ボタン付き) -->
+          <div>
+            <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">
+              登録メールアドレス <span style="font-weight: normal; font-size: 0.72rem; color: var(--primary); margin-left: 0.25rem;">(編集可能)</span>
+            </span>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <input type="text" id="info-disp-email" readonly style="flex: 1; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-primary); outline: none; cursor: default; font-weight: 600;" value="-">
+              <button id="info-edit-email-btn" class="btn btn-secondary" style="padding: 0.45rem 0.75rem; font-size: 0.78rem; display: flex; align-items: center; gap: 0.25rem; white-space: nowrap; cursor: pointer; border-radius: var(--radius-sm);" title="メールアドレスを変更する">
+                ✏️ 変更する
+              </button>
+            </div>
+          </div>
+
+          <!-- 登録電話番号 (編集ポップアップ起動ボタン付き) -->
+          <div>
+            <span style="color: var(--text-secondary); display: block; margin-bottom: 0.25rem; font-weight: 600;">
+              📞 登録電話番号 (SMS認証用) <span style="font-weight: normal; font-size: 0.72rem; color: var(--primary); margin-left: 0.25rem;">(編集可能)</span>
+            </span>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <input type="text" id="info-disp-phone" readonly style="flex: 1; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-primary); outline: none; cursor: default; font-weight: 600;" value="-">
+              <button id="info-edit-phone-btn" class="btn btn-secondary" style="padding: 0.45rem 0.75rem; font-size: 0.78rem; display: flex; align-items: center; gap: 0.25rem; white-space: nowrap; cursor: pointer; border-radius: var(--radius-sm);" title="電話番号を変更する">
+                ✏️ 変更する
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右カラム: 認証済み端末一覧 -->
+      <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+        <h3 style="margin: 0 0 0.5rem 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem; border-left: 3px solid var(--primary); padding-left: 0.5rem;">
+          💻 認証済み端末一覧 (最大3台)
+        </h3>
+        <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+          現在ログインが許可されているデバイスの一覧です。
+        </p>
+        <div id="screen-info-device-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 250px; overflow-y: auto;">
+          <div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">デバイス情報を読み込み中...</div>
+        </div>
+        <div style="font-size: 0.7rem; color: var(--text-secondary); background: var(--bg-surface); padding: 0.5rem; border-radius: var(--radius-xs); border: 1px dashed var(--border-color); line-height: 1.4; text-align: left;">
+          ⚠️ <strong>登録解除について:</strong> 不要になった端末の登録解除（削除）は、不正利用防止のため管理者のみが行えます。管理者に不要な端末の削除を依頼してください。
+        </div>
+      </div>
+      
+    </div>
+  </div>
+</section>
+
 <!-- ================= 個人メモ帳画面 ================= -->
 <section id="mypage-memo-screen" class="screen-view" style="display: none; padding: 1.25rem;">
   <div id="mypage-memo-view-wrapper" style="display: flex; flex-direction: column; gap: 1rem; flex: 1; height: 100%;">
@@ -3008,78 +3108,73 @@
   </div>
 </div>
 
-<!-- ================= 👤 アカウント情報モーダル ================= -->
-<div id="mypage-account-info-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 20000; align-items: center; justify-content: center; backdrop-filter: blur(4px); font-family: 'Inter', 'Noto Sans JP', sans-serif;">
-  <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 680px; max-width: 90%; padding: 2rem; box-shadow: var(--shadow-lg); color: var(--text-primary); text-align: left; display: flex; flex-direction: column; gap: 1.5rem;">
-    
-    <!-- ヘッダー -->
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
-      <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
-        👤 アカウント情報
+<!-- ================= 📧 メールアドレス変更モーダル ================= -->
+<div id="edit-email-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 20000; align-items: center; justify-content: center; backdrop-filter: blur(4px); font-family: 'Inter', 'Noto Sans JP', sans-serif;">
+  <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 420px; max-width: 90%; padding: 1.75rem; box-shadow: var(--shadow-lg); color: var(--text-primary); text-align: left; display: flex; flex-direction: column; gap: 1.25rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+      <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.3rem;">
+        📧 メールアドレスの変更
       </h3>
-      <button id="mypage-account-info-close" style="background: none; border: none; font-size: 1.25rem; color: var(--text-muted); cursor: pointer; padding: 0;" title="閉じる">✕</button>
+      <button id="edit-email-close" style="background: none; border: none; font-size: 1.1rem; color: var(--text-muted); cursor: pointer; padding: 0;" title="閉じる">✕</button>
     </div>
-
-    <!-- コンテンツ (2カラム構成) -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; max-height: 60vh; overflow-y: auto; padding-right: 0.5rem;">
-      
-      <!-- 左側: プロフィール設定 -->
-      <div style="display: flex; flex-direction: column; gap: 1rem;">
-        <h4 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); border-left: 3px solid var(--primary); padding-left: 0.5rem;">
-          👤 登録情報
-        </h4>
-        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-          <div>
-            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">お名前 (氏名)</label>
-            <input type="text" id="acc-info-name" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;">
-          </div>
-          <div>
-            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">ログインID</label>
-            <input type="text" id="acc-info-loginid" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;">
-          </div>
-          <div>
-            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">生年月日</label>
-            <input type="text" id="acc-info-birthday" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;">
-          </div>
-          <div>
-            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">アカウントコード</label>
-            <input type="text" id="acc-info-code" readonly style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-muted); outline: none; cursor: not-allowed;">
-          </div>
-          <div>
-            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">登録メールアドレス <span style="color: var(--primary); font-size: 0.65rem;">(編集可能)</span></label>
-            <input type="email" id="acc-info-email" style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-          </div>
-          <div>
-            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">登録電話番号 (SMS認証用) <span style="color: var(--primary); font-size: 0.65rem;">(編集可能)</span></label>
-            <input type="tel" id="acc-info-phone" style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-          </div>
-        </div>
+    
+    <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.8rem;">
+      <div>
+        <label style="color: var(--text-secondary); display: block; margin-bottom: 0.2rem; font-weight: 600;">現在のメールアドレス</label>
+        <div id="edit-email-current" style="background: var(--bg-surface); padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-muted); font-weight: 600; min-height: 26px;">-</div>
       </div>
-
-      <!-- 右側: 端末情報一覧 -->
-      <div style="display: flex; flex-direction: column; gap: 1rem;">
-        <h4 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); border-left: 3px solid var(--primary); padding-left: 0.5rem;">
-          💻 認証済み端末一覧 (最大3台)
-        </h4>
-        <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
-          現在ログインが許可されているデバイスの一覧です。
-        </p>
-        <div id="acc-info-device-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 220px; overflow-y: auto;">
-          <div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">デバイス情報を読み込み中...</div>
-        </div>
-        <div style="font-size: 0.7rem; color: var(--text-secondary); background: var(--bg-surface); padding: 0.5rem; border-radius: var(--radius-xs); border: 1px dashed var(--border-color); line-height: 1.4; text-align: left;">
-          ⚠️ <strong>登録解除について:</strong> 不要になった端末の登録解除（削除）は、不正利用防止のため管理者のみが行えます。管理者に不要な端末の削除を依頼してください。
-        </div>
+      <div>
+        <label style="color: var(--text-secondary); display: block; margin-bottom: 0.2rem; font-weight: 600;">新しいメールアドレス</label>
+        <input type="email" id="edit-email-new" placeholder="new-email@example.com" style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
       </div>
-
+      <div>
+        <label style="color: var(--text-secondary); display: block; margin-bottom: 0.2rem; font-weight: 600;">新しいメールアドレス (確認用)</label>
+        <input type="email" id="edit-email-confirm" placeholder="確認のためもう一度入力..." style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+      </div>
+      <div style="font-size: 0.72rem; color: var(--text-secondary); background: var(--bg-surface); padding: 0.5rem; border-radius: var(--radius-xs); border: 1px dashed var(--border-color); line-height: 1.4;">
+        ※ 変更ボタンを押すと、新しいメールアドレス宛てに確認メールが送信されます。メール内の確認リンクをクリックするまで変更は確定されません。
+      </div>
     </div>
-
-    <!-- フッター / 保存ボタン -->
-    <div style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-      <button id="mypage-account-info-cancel" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm);">キャンセル</button>
-      <button id="mypage-account-info-save" class="btn btn-primary" style="padding: 0.5rem 1.25rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm);">変更を保存</button>
+    
+    <div style="display: flex; justify-content: flex-end; gap: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+      <button id="edit-email-cancel" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; cursor: pointer;">キャンセル</button>
+      <button id="edit-email-submit" class="btn btn-primary" style="padding: 0.4rem 1rem; font-size: 0.78rem; cursor: pointer;">変更を申請する</button>
     </div>
+  </div>
+</div>
 
+<!-- ================= 📞 電話番号変更モーダル ================= -->
+<div id="edit-phone-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 20000; align-items: center; justify-content: center; backdrop-filter: blur(4px); font-family: 'Inter', 'Noto Sans JP', sans-serif;">
+  <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 420px; max-width: 90%; padding: 1.75rem; box-shadow: var(--shadow-lg); color: var(--text-primary); text-align: left; display: flex; flex-direction: column; gap: 1.25rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+      <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.3rem;">
+        📞 電話番号の変更
+      </h3>
+      <button id="edit-phone-close" style="background: none; border: none; font-size: 1.1rem; color: var(--text-muted); cursor: pointer; padding: 0;" title="閉じる">✕</button>
+    </div>
+    
+    <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.8rem;">
+      <div>
+        <label style="color: var(--text-secondary); display: block; margin-bottom: 0.2rem; font-weight: 600;">現在の電話番号</label>
+        <div id="edit-phone-current" style="background: var(--bg-surface); padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-muted); font-weight: 600; min-height: 26px;">-</div>
+      </div>
+      <div>
+        <label style="color: var(--text-secondary); display: block; margin-bottom: 0.2rem; font-weight: 600;">新しい電話番号 (半角数字、ハイフンなし)</label>
+        <input type="tel" id="edit-phone-new" placeholder="例: 09012345678" style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+      </div>
+      <div>
+        <label style="color: var(--text-secondary); display: block; margin-bottom: 0.2rem; font-weight: 600;">新しい電話番号 (確認用)</label>
+        <input type="tel" id="edit-phone-confirm" placeholder="確認のためもう一度入力..." style="width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+      </div>
+      <div style="font-size: 0.72rem; color: var(--text-secondary); background: var(--bg-surface); padding: 0.5rem; border-radius: var(--radius-xs); border: 1px dashed var(--border-color); line-height: 1.4;">
+        ※ 変更ボタンを押すと、新しい電話番号宛てに SMS で6桁の認証コードが送信されます。
+      </div>
+    </div>
+    
+    <div style="display: flex; justify-content: flex-end; gap: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+      <button id="edit-phone-cancel" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; cursor: pointer;">キャンセル</button>
+      <button id="edit-phone-submit" class="btn btn-primary" style="padding: 0.4rem 1rem; font-size: 0.78rem; cursor: pointer;">認証SMSを送信</button>
+    </div>
   </div>
 </div>
 

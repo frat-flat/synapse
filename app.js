@@ -9058,8 +9058,7 @@ function renderCustomerDetailView(customerId) {
   container.appendChild(layout);
 }
 function openTab(id, type, title, appointData = null) {
-  // 🔑 権限チェックを追加
-  if (type && type !== 'mypage-screen') {
+  if (type && type !== 'mypage-screen' && type !== 'mypage-account-info-screen' && type !== 'mypage-memo-screen') {
     const access = checkTableAccess(type);
     if (!access.visible) {
       showToast(`「${title}」画面へのアクセス権限がありません。`, 'error');
@@ -9195,8 +9194,7 @@ function activateTab(id) {
   const tab = state.tabs.find(t => t.id === id);
   if (!tab) return;
 
-  // 🔑 権限チェックを追加
-  if (tab.type && tab.type !== 'mypage-screen') {
+  if (tab.type && tab.type !== 'mypage-screen' && tab.type !== 'mypage-account-info-screen' && tab.type !== 'mypage-memo-screen') {
     const access = checkTableAccess(tab.type);
     if (!access.visible) {
       showToast(`「${tab.title}」画面へのアクセス権限がありません。`, 'error');
@@ -9250,6 +9248,9 @@ function activateTab(id) {
     state.activeCustomTableId = null;
   } else if (tab.type === 'mypage-memo-screen') {
     if (typeof window.updateMypageMemoUI === 'function') window.updateMypageMemoUI();
+  } else if (tab.type === 'mypage-account-info-screen') {
+    if (typeof loadCurrentUserProfile === 'function') loadCurrentUserProfile();
+    if (typeof renderMypageDeviceList === 'function') renderMypageDeviceList();
   } else if (tab.type === 'party-id-mgmt-screen') {
     loadPartyIds();
   }
@@ -20271,12 +20272,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // アカウント情報モーダルの開閉および保存ロジック
+  // アカウント情報画面（タブ遷移）および編集ロジック
   const mypageAccInfoBtn = document.getElementById('mypage-btn-account-info');
-  const accInfoModal = document.getElementById('mypage-account-info-modal');
-  const accInfoClose = document.getElementById('mypage-account-info-close');
-  const accInfoCancel = document.getElementById('mypage-account-info-cancel');
-  const accInfoSave = document.getElementById('mypage-account-info-save');
+
+  if (mypageAccInfoBtn) {
+    mypageAccInfoBtn.addEventListener('click', () => {
+      openTab('mypage-account-info-screen', 'mypage-account-info-screen', '👤 アカウント情報');
+    });
+  }
+
+  // アカウント情報画面からメニューに戻るボタン
+  const mypageAccInfoBackBtn = document.getElementById('mypage-account-info-back-btn');
+  if (mypageAccInfoBackBtn) {
+    mypageAccInfoBackBtn.addEventListener('click', () => {
+      const isSystemAdmin = isOwnerUser();
+      const menuView = document.getElementById('mypage-menu-view');
+      const screenView = document.getElementById('mypage-account-info-screen');
+      if (!isSystemAdmin) {
+        switchView('home-screen');
+      } else {
+        if (menuView) menuView.style.display = 'flex';
+        if (screenView) screenView.style.display = 'none';
+      }
+      // タブ自体のクリーンアップ（アクティブタブをマイページに）
+      state.activeTabId = 'mypage-tab';
+      renderTabBar();
+    });
+  }
 
   async function loadCurrentUserProfile() {
     if (!state.currentUser) return;
@@ -20314,24 +20336,24 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // モーダルの入力欄へセット
-    const nameEl = document.getElementById('acc-info-name');
-    const loginidEl = document.getElementById('acc-info-loginid');
-    const birthdayEl = document.getElementById('acc-info-birthday');
-    const codeEl = document.getElementById('acc-info-code');
-    const emailEl = document.getElementById('acc-info-email');
-    const phoneEl = document.getElementById('acc-info-phone');
+    // 画面のテキストフィールドへセット (編集不可の表示用)
+    const nameEl = document.getElementById('info-disp-name');
+    const loginidEl = document.getElementById('info-disp-loginid');
+    const birthdayEl = document.getElementById('info-disp-birthday');
+    const codeEl = document.getElementById('info-disp-code');
+    const emailEl = document.getElementById('info-disp-email');
+    const phoneEl = document.getElementById('info-disp-phone');
 
     if (nameEl) nameEl.value = profile.name;
     if (loginidEl) loginidEl.value = profile.login_id;
     if (birthdayEl) birthdayEl.value = profile.birthday;
     if (codeEl) codeEl.value = profile.code;
     if (emailEl) emailEl.value = profile.email;
-    if (phoneEl) phoneEl.value = profile.phone_number === '未設定' ? '' : profile.phone_number;
+    if (phoneEl) phoneEl.value = profile.phone_number === '未設定' ? '未設定' : profile.phone_number;
   }
 
   async function renderMypageDeviceList() {
-    const deviceListEl = document.getElementById('acc-info-device-list');
+    const deviceListEl = document.getElementById('screen-info-device-list');
     if (!deviceListEl) return;
     if (!supabaseClient || !state.currentUser || state.currentUser.id === 'owner') {
       deviceListEl.innerHTML = '<div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 1rem 0;">デバイス情報の同期は無効です。</div>';
@@ -20381,73 +20403,160 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  if (mypageAccInfoBtn && accInfoModal) {
-    mypageAccInfoBtn.addEventListener('click', async () => {
-      accInfoModal.style.display = 'flex';
-      await loadCurrentUserProfile();
-      await renderMypageDeviceList();
+  // --- メールアドレス編集モーダル関連イベント ---
+  const editEmailBtn = document.getElementById('info-edit-email-btn');
+  const editEmailModal = document.getElementById('edit-email-modal');
+  const editEmailClose = document.getElementById('edit-email-close');
+  const editEmailCancel = document.getElementById('edit-email-cancel');
+  const editEmailSubmit = document.getElementById('edit-email-submit');
+
+  if (editEmailBtn && editEmailModal) {
+    editEmailBtn.addEventListener('click', () => {
+      const curEmail = document.getElementById('info-disp-email').value;
+      const curEmailLabel = document.getElementById('edit-email-current');
+      if (curEmailLabel) curEmailLabel.textContent = curEmail;
+      document.getElementById('edit-email-new').value = '';
+      document.getElementById('edit-email-confirm').value = '';
+      editEmailModal.style.display = 'flex';
     });
   }
 
-  const closeAccInfo = () => {
-    if (accInfoModal) accInfoModal.style.display = 'none';
+  const closeEmailModal = () => {
+    if (editEmailModal) editEmailModal.style.display = 'none';
   };
+  if (editEmailClose) editEmailClose.addEventListener('click', closeEmailModal);
+  if (editEmailCancel) editEmailCancel.addEventListener('click', closeEmailModal);
 
-  if (accInfoClose) accInfoClose.addEventListener('click', closeAccInfo);
-  if (accInfoCancel) accInfoCancel.addEventListener('click', closeAccInfo);
+  if (editEmailSubmit) {
+    editEmailSubmit.addEventListener('click', async () => {
+      const newEmail = document.getElementById('edit-email-new').value.trim();
+      const confirmEmail = document.getElementById('edit-email-confirm').value.trim();
 
-  if (accInfoSave) {
-    accInfoSave.addEventListener('click', async () => {
-      const emailVal = document.getElementById('acc-info-email').value.trim();
-      const phoneVal = document.getElementById('acc-info-phone').value.trim();
-
-      if (!emailVal || !phoneVal) {
-        showToast('メールアドレスと電話番号を入力してください。', 'error');
+      if (!newEmail || !confirmEmail) {
+        showToast('新しいメールアドレスを入力してください。', 'error');
         return;
       }
-
-      if (!/.+@.+\..+/.test(emailVal)) {
+      if (newEmail !== confirmEmail) {
+        showToast('新しいメールアドレスと確認用メールアドレスが一致しません。', 'error');
+        return;
+      }
+      if (!/.+@.+\..+/.test(newEmail)) {
         showToast('メールアドレスの形式が正しくありません。', 'error');
         return;
       }
 
-      if (!/^0\d{9,10}$/.test(phoneVal)) {
+      editEmailSubmit.disabled = true;
+      editEmailSubmit.textContent = '申請中...';
+
+      try {
+        if (supabaseClient && state.currentUser.id !== 'owner') {
+          const { error } = await supabaseClient.auth.updateUser({ email: newEmail });
+          if (error) throw error;
+          
+          showAppConfirm(
+            '✉️ 確認メールを送信しました',
+            `変更先のメールアドレス（${newEmail}）宛てに疎通確認メールを送信しました。\nメール内の確認リンクをクリックするまで変更は確定しません。\n変更が承認され次第、新しいメールアドレスが有効になります。`
+          );
+        } else {
+          // デモまたはowner
+          state.currentUser.id = newEmail;
+          state.currentUser.loginId = newEmail;
+          localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
+          const emailEl = document.getElementById('info-disp-email');
+          if (emailEl) emailEl.value = newEmail;
+          
+          // マイページのセキュリティ情報表示も更新
+          renderMypageSecurityInfo();
+          showToast('メールアドレスを更新しました（デモ）。', 'success');
+        }
+        closeEmailModal();
+      } catch (err) {
+        console.error('[Email Update] Failure:', err);
+        showToast('メールアドレスの変更申請に失敗しました: ' + err.message, 'error');
+      } finally {
+        editEmailSubmit.disabled = false;
+        editEmailSubmit.textContent = '変更を申請する';
+      }
+    });
+  }
+
+  // --- 電話番号編集モーダル関連イベント ---
+  const editPhoneBtn = document.getElementById('info-edit-phone-btn');
+  const editPhoneModal = document.getElementById('edit-phone-modal');
+  const editPhoneClose = document.getElementById('edit-phone-close');
+  const editPhoneCancel = document.getElementById('edit-phone-cancel');
+  const editPhoneSubmit = document.getElementById('edit-phone-submit');
+
+  if (editPhoneBtn && editPhoneModal) {
+    editPhoneBtn.addEventListener('click', () => {
+      const curPhone = document.getElementById('info-disp-phone').value;
+      const curPhoneLabel = document.getElementById('edit-phone-current');
+      if (curPhoneLabel) curPhoneLabel.textContent = curPhone;
+      document.getElementById('edit-phone-new').value = '';
+      document.getElementById('edit-phone-confirm').value = '';
+      editPhoneModal.style.display = 'flex';
+    });
+  }
+
+  const closePhoneModal = () => {
+    if (editPhoneModal) editPhoneModal.style.display = 'none';
+  };
+  if (editPhoneClose) editPhoneClose.addEventListener('click', closePhoneModal);
+  if (editPhoneCancel) editPhoneCancel.addEventListener('click', closePhoneModal);
+
+  if (editPhoneSubmit) {
+    editPhoneSubmit.addEventListener('click', async () => {
+      const newPhone = document.getElementById('edit-phone-new').value.trim();
+      const confirmPhone = document.getElementById('edit-phone-confirm').value.trim();
+
+      if (!newPhone || !confirmPhone) {
+        showToast('新しい電話番号を入力してください。', 'error');
+        return;
+      }
+      if (newPhone !== confirmPhone) {
+        showToast('新しい電話番号と確認用電話番号が一致しません。', 'error');
+        return;
+      }
+      if (!/^0\d{9,10}$/.test(newPhone)) {
         showToast('電話番号はハイフンなしの半角数字（10桁または11桁）で入力してください。', 'error');
         return;
       }
 
-      accInfoSave.disabled = true;
-      accInfoSave.textContent = '保存中...';
+      // SMS送信画面のトリガーのため、ポップアップは閉じる
+      closePhoneModal();
 
       try {
-        if (supabaseClient && state.currentUser.id !== 'owner') {
-          const { error } = await supabaseClient
-            .from('synapse_users')
-            .update({
-              email: emailVal,
-              phone_number: phoneVal
-            })
-            .eq('id', state.currentUser.id);
-
-          if (error) throw error;
-          
-          state.currentUser.phone_number = phoneVal;
-          localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
-          
-          renderMypageSecurityInfo();
+        showToast('変更先の電話番号宛てに認証コードを送信します。', 'info');
+        const isSmsVerified = await triggerSmsMfa(newPhone);
+        
+        if (isSmsVerified) {
+          if (supabaseClient && state.currentUser.id !== 'owner') {
+            const { error } = await supabaseClient
+              .from('synapse_users')
+              .update({ phone_number: newPhone })
+              .eq('id', state.currentUser.id);
+            if (error) throw error;
+            
+            state.currentUser.phone_number = newPhone;
+            localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
+            
+            const phoneEl = document.getElementById('info-disp-phone');
+            if (phoneEl) phoneEl.value = newPhone;
+            
+            renderMypageSecurityInfo();
+          } else {
+            state.currentUser.phone_number = newPhone;
+            localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
+            const phoneEl = document.getElementById('info-disp-phone');
+            if (phoneEl) phoneEl.value = newPhone;
+          }
+          showToast('電話番号を正常に更新しました！', 'success');
         } else {
-          state.currentUser.phone_number = phoneVal;
-          localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
+          showToast('SMS認証が完了しなかったため、電話番号は変更されませんでした。', 'warning');
         }
-
-        showToast('アカウント情報を更新しました。', 'success');
-        closeAccInfo();
       } catch (err) {
-        console.error('[Profile] Failed to update profile:', err);
-        showToast('アカウント情報の更新に失敗しました: ' + err.message, 'error');
-      } finally {
-        accInfoSave.disabled = false;
-        accInfoSave.textContent = '変更を保存';
+        console.error('[Phone Update] Failure:', err);
+        showToast('電話番号の更新に失敗しました: ' + err.message, 'error');
       }
     });
   }
