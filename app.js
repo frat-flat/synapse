@@ -1502,6 +1502,8 @@ async function fetchNewPartyId(sourceSystem = 'synapse_appoint', isTemporary = t
       if (error) throw error;
       if (data) {
         console.log(`[Party ID] Generated successfully via partner DB: ${data}`);
+        // DBで発行されたIDも即座にローカルIDログに登録して同期追跡する
+        logLocalPartyId(data, sourceSystem, isTemporary ? 'temporary' : 'active');
         return data;
       }
     } catch (err) {
@@ -1512,7 +1514,90 @@ async function fetchNewPartyId(sourceSystem = 'synapse_appoint', isTemporary = t
   }
   
   // フォールバック：ローカルの8桁ID生成ロジックを使用
-  return generate8DigitId();
+  const localId = generate8DigitId();
+  // ローカルIDログにも即座に記録
+  logLocalPartyId(localId, sourceSystem, isTemporary ? 'temporary' : 'active');
+  return localId;
+}
+
+// === ローカルでのParty ID発行・ステータス履歴の管理 ===
+function logLocalPartyId(partyId, source = 'synapse_appoint', status = 'temporary') {
+  const key = 'synapse_local_party_ids';
+  let localIds = [];
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) localIds = JSON.parse(saved);
+  } catch (e) {}
+
+  const exists = localIds.find(item => item.party_id === partyId);
+  if (!exists) {
+    localIds.push({
+      party_id: partyId,
+      seq_value: localIds.length + 1,
+      source: source,
+      status: status,
+      created_at: new Date().toISOString(),
+      reset_at: null,
+      activated_at: null
+    });
+    localStorage.setItem(key, JSON.stringify(localIds));
+    console.log(`[Local Party ID] Logged new ID: ${partyId} (${status})`);
+  }
+}
+
+function replaceLocalPartyId(oldId, newId) {
+  const key = 'synapse_local_party_ids';
+  let localIds = [];
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) localIds = JSON.parse(saved);
+  } catch (e) {}
+
+  const index = localIds.findIndex(item => item.party_id === oldId);
+  if (index !== -1) {
+    // 重複登録を避ける
+    const alreadyExists = localIds.some(item => item.party_id === newId);
+    if (alreadyExists) {
+      localIds.splice(index, 1);
+    } else {
+      localIds[index].party_id = newId;
+      localIds[index].created_at = new Date().toISOString();
+    }
+    localStorage.setItem(key, JSON.stringify(localIds));
+    console.log(`[Local Party ID] Replaced temporary ID ${oldId} with official ID ${newId}`);
+  } else {
+    // 古いIDが見つからない場合は新規登録
+    logLocalPartyId(newId, 'synapse_appoint', 'temporary');
+  }
+}
+
+function updateLocalPartyIdStatus(partyId, newStatus, additionalData = {}) {
+  const key = 'synapse_local_party_ids';
+  let localIds = [];
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) localIds = JSON.parse(saved);
+  } catch (e) {}
+
+  const target = localIds.find(item => item.party_id === partyId);
+  if (target) {
+    target.status = newStatus;
+    if (newStatus === 'reusable') {
+      target.reset_at = additionalData.reset_at || new Date().toISOString();
+      target.activated_at = null;
+    } else if (newStatus === 'active') {
+      target.activated_at = additionalData.activated_at || new Date().toISOString();
+      target.reset_at = null;
+    }
+    localStorage.setItem(key, JSON.stringify(localIds));
+    console.log(`[Local Party ID] Updated status for ${partyId} to ${newStatus}`);
+  } else {
+    // 存在しない場合は新規登録して更新
+    logLocalPartyId(partyId, 'synapse_appoint', newStatus);
+    if (newStatus !== 'temporary') {
+      updateLocalPartyIdStatus(partyId, newStatus, additionalData);
+    }
+  }
 }
 
 // === Party ID 管理画面のロジック ===
@@ -1546,21 +1631,32 @@ async function loadPartyIds() {
     fallbackMessage = 'パートナーDBが初期化されていません。';
   }
 
-  // 権限エラーまたはDB接続なしの場合、ローカルストレージのアポイント破棄履歴（cancelled）をロードして表示
-  if (isFallback) {
-    const localCancelled = (state.appointments || []).filter(a => a.status === 'cancelled');
-    partyIds = localCancelled.map((a, idx) => ({
-      party_id: a.id || 'UNKNOWN',
-      seq_value: idx + 1,
-      source: 'synapse_appoint',
-      status: 'reusable',
-      created_at: a.registeredAt || new Date().toISOString(),
-      reset_at: a.registeredAt || new Date().toISOString(),
-      activated_at: null
-    }));
-  }
+  // ローカルログをロードしてマージ表示
+  let localIds = [];
+  try {
+    const saved = localStorage.getItem('synapse_local_party_ids');
+    if (saved) localIds = JSON.parse(saved);
+  } catch (e) {}
 
-  if (!partyIds || partyIds.length === 0) {
+  // DBデータとローカルデータをマージ（IDをキーにして重複排除、DB側のデータを優先）
+  let mergedMap = new Map();
+  
+  // 先にローカルデータを登録
+  localIds.forEach(item => {
+    mergedMap.set(item.party_id, { ...item, isLocalOnly: true });
+  });
+
+  // DBデータで上書き（DB側のステータスや正確なシーケンス値を優先）
+  partyIds.forEach(item => {
+    mergedMap.set(item.party_id, { ...item, isLocalOnly: false });
+  });
+
+  const mergedList = Array.from(mergedMap.values());
+  
+  // 作成日時の降順でソート
+  mergedList.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  if (mergedList.length === 0) {
     const emptyMsg = isFallback 
       ? `発行済みのParty IDはありません。<br><span style="font-size: 0.72rem; color: var(--text-muted);">(※パートナーDBの接続エラー: ${fallbackMessage})</span>`
       : '発行済みのParty IDはありません。';
@@ -1575,7 +1671,7 @@ async function loadPartyIds() {
 
   const now = new Date();
 
-  const filtered = partyIds.filter(item => {
+  const filtered = mergedList.filter(item => {
     // ステータスフィルター
     if (filterStatus && item.status !== filterStatus) return false;
 
@@ -1649,7 +1745,7 @@ async function loadPartyIds() {
     }
 
     let errorBadge = '';
-    if (isFallback) {
+    if (item.isLocalOnly) {
       errorBadge = `<span style="font-size: 0.65rem; color: #ef4444; border: 1px solid #ef4444; border-radius: 2px; padding: 0 0.15rem; margin-left: 0.35rem; font-weight: bold;" title="DB同期が失敗したためローカルデータを一時表示中">ローカルのみ</span>`;
     }
 
@@ -9156,6 +9252,8 @@ function openTab(id, type, title, appointData = null) {
           registeredAt: new Date().toISOString()
         });
         localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+        // 新規作成された仮のIDも即座にローカルIDログに登録して追跡する
+        logLocalPartyId(defaultAppointData.id, 'synapse_appoint', 'temporary');
       }
     }
 
@@ -9191,6 +9289,9 @@ function openTab(id, type, title, appointData = null) {
       tab.appointData.isPartyIdLoading = false;
       tab.appointData.id = realPartyId;
       
+      // ローカルログの一時IDを本物のParty IDに差し替え
+      replaceLocalPartyId(tempId, realPartyId);
+
       // もしIDロード前に下書きが破棄されていた場合の予約処理
       if (tab.appointData.isDiscardedBeforeLoaded) {
         if (partnerSupabaseClient) {
@@ -9203,6 +9304,9 @@ function openTab(id, type, title, appointData = null) {
           });
         }
         
+        // ローカルIDログのステータスも「reusable（破棄）」に更新
+        updateLocalPartyIdStatus(realPartyId, 'reusable');
+
         const draftIndex = state.appointments.findIndex(a => a.id === tempId);
         if (draftIndex !== -1) {
           state.appointments[draftIndex].id = realPartyId;
@@ -14917,6 +15021,26 @@ function saveAppointmentData(status) {
     }
   }
 
+  // ID管理ステータスの同期
+  if (status === 'official') {
+    if (partnerSupabaseClient) {
+      partnerSupabaseClient
+        .from('party_ids')
+        .update({
+          status: 'active',
+          activated_at: new Date().toISOString()
+        })
+        .eq('party_id', appointId)
+        .then(({ error }) => {
+          if (error) console.warn('[Party ID] Failed to update status to active in partner DB:', error.message);
+        });
+    }
+    updateLocalPartyIdStatus(appointId, 'active');
+  } else {
+    // 下書き保存の場合は仮発行 (temporary)
+    updateLocalPartyIdStatus(appointId, 'temporary');
+  }
+
   // 編集状態リセット
   state.editingAppointId = null;
   state.selectedExistingCustomer = null;
@@ -15046,6 +15170,9 @@ async function handleDeleteDraft() {
           console.error('[Party ID] Discard DB update error:', err);
         }
       }
+      
+      // ローカルログのステータスも「reusable（破棄）」に更新
+      updateLocalPartyIdStatus(targetId, 'reusable');
     }
 
     showToast('下書きを破棄しました（ステータス：無効 / cancelled）。', 'warning');
