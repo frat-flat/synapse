@@ -1828,3 +1828,9 @@ input:-webkit-autofill:active {
   flex-shrink: 0 !important;
 }
 
+/* 🔙 ダッシュボードへの戻るボタン */
+.btn-back-to-dashboard:hover {
+  background-color: #f1f3f4 !important;
+  color: #202124 !important;
+}
+

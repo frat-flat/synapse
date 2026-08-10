@@ -1417,6 +1417,11 @@
               }
             }
             
+            // 🔙 戻るボタンの表示状態の更新
+            if (typeof updateHeaderBackButton === 'function') {
+              updateHeaderBackButton(finalTab);
+            }
+            
             return res;
           };
         }
@@ -1439,6 +1444,10 @@
         // フォーム選択プルダウンのリスト作成と変更リスナー登録
         updateFlowmapFormDropdown();
         setupFlowmapFormSelectListener();
+
+        // 🔙 戻るボタンのリスナー登録と初期表示同期
+        setupHeaderBackButtonListener();
+        updateHeaderBackButton(localStorage.getItem('form_customize_active_tab') || 'dashboard');
 
         setTimeout(() => {
           renderLivePreview();
@@ -1690,6 +1699,11 @@
         const targetPanel = document.getElementById(`panel-${tabName}`);
         if (targetPanel) {
           targetPanel.classList.add('active');
+        }
+
+        // 🔙 戻るボタンの表示状態の更新
+        if (typeof updateHeaderBackButton === 'function') {
+          updateHeaderBackButton(tabName);
         }
 
         // プレビュー表示切り替えボタンのトグル
@@ -2891,6 +2905,51 @@
       }
     } catch (err) {
       console.error(`[Extension] Error inside updateHeaderActiveFormTitle:`, err);
+    }
+  }
+
+  // 🔙 共通ヘッダーの「←（戻る）」ボタンの表示状態を動的に切り替える
+  function updateHeaderBackButton(tabName) {
+    try {
+      const backBtn = document.getElementById('btn-back-to-dashboard');
+      if (backBtn) {
+        if (tabName && tabName !== 'dashboard') {
+          backBtn.style.setProperty('display', 'inline-flex', 'important');
+        } else {
+          backBtn.style.setProperty('display', 'none', 'important');
+        }
+      }
+    } catch(e) {
+      console.error('[BackButton] Failed to update state:', e);
+    }
+  }
+
+  // 🔙 「←（戻る）」ボタンのクリックリスナーを登録
+  function setupHeaderBackButtonListener() {
+    try {
+      const backBtn = document.getElementById('btn-back-to-dashboard');
+      if (backBtn && !backBtn.dataset.listenerBound) {
+        backBtn.dataset.listenerBound = "true";
+        backBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          console.log('[BackButton] Back arrow clicked. Navigating back to dashboard...');
+          
+          // ダッシュボードタブをクリックしてホームに戻る
+          const dashboardTab = document.getElementById('btn-tab-dashboard');
+          if (dashboardTab) {
+            dashboardTab.click();
+          } else {
+            // 直接 Z をコールしてフォールバック
+            if (typeof window.Z === 'function') {
+              window.Z('dashboard');
+            }
+          }
+        });
+      }
+    } catch(e) {
+      console.error('[BackButton] Failed to setup listener:', e);
     }
   }
 
