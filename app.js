@@ -1772,30 +1772,41 @@ async function loadPartyIds() {
 }
 
 async function resetPartyId(partyId) {
-  if (!partnerSupabaseClient) return;
-
   const isConfirmed = confirm(`警告: Party ID 「${partyId}」を再利用可能（リセット）にします。\nこのIDはリセット実行日から「さらに3年間」経過するまで再発行はされません。\nよろしいですか？`);
   if (!isConfirmed) return;
 
-  try {
-    const { error } = await partnerSupabaseClient
-      .from('party_ids')
-      .update({
-        status: 'reusable',
-        reset_at: new Date().toISOString(),
-        activated_at: null
-      })
-      .eq('party_id', partyId);
+  let dbSuccess = false;
+  let errorMsg = '';
 
-    if (error) throw error;
+  if (partnerSupabaseClient) {
+    try {
+      const { error } = await partnerSupabaseClient
+        .from('party_ids')
+        .update({
+          status: 'reusable',
+          reset_at: new Date().toISOString(),
+          activated_at: null
+        })
+        .eq('party_id', partyId);
 
-    showToast(`Party ID ${partyId} をリセットしました。リセットから3年経過後に自動的に再利用されます。`, 'success');
-    loadPartyIds(); // テーブル再読み込み
-
-  } catch (err) {
-    console.error('[Supabase Partner] Failed to reset party ID:', err);
-    showToast(`リセットに失敗しました: ${err.message}`, 'error');
+      if (error) throw error;
+      dbSuccess = true;
+    } catch (err) {
+      console.error('[Supabase Partner] Failed to reset party ID in DB:', err);
+      errorMsg = err.message;
+    }
   }
+
+  // DBの成否に関わらず、ローカルログ側のステータスを reusable に更新してフェイルセーフにする
+  updateLocalPartyIdStatus(partyId, 'reusable');
+
+  if (partnerSupabaseClient && !dbSuccess) {
+    showToast(`DB同期は失敗しましたが、ローカル上で ${partyId} をリセットしました (エラー: ${errorMsg})。`, 'warning');
+  } else {
+    showToast(`Party ID ${partyId} をリセットしました。リセットから3年経過後に自動的に再利用されます。`, 'success');
+  }
+
+  loadPartyIds(); // テーブル再読み込み
 }
 
 // Supabaseへのデータ送信 (プッシュ)
