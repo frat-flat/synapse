@@ -9191,6 +9191,29 @@ function openTab(id, type, title, appointData = null) {
       tab.appointData.isPartyIdLoading = false;
       tab.appointData.id = realPartyId;
       
+      // もしIDロード前に下書きが破棄されていた場合の予約処理
+      if (tab.appointData.isDiscardedBeforeLoaded) {
+        if (partnerSupabaseClient) {
+          partnerSupabaseClient.from('party_ids').update({
+            status: 'reusable',
+            reset_at: new Date().toISOString(),
+            activated_at: null
+          }).eq('party_id', realPartyId).then(({ error }) => {
+            if (error) console.warn('[Party ID] Async update failed for discarded before load:', error.message);
+          });
+        }
+        
+        const draftIndex = state.appointments.findIndex(a => a.id === tempId);
+        if (draftIndex !== -1) {
+          state.appointments[draftIndex].id = realPartyId;
+          state.appointments[draftIndex].status = 'cancelled';
+          state.appointments[draftIndex].registeredAt = new Date().toISOString();
+          localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+        }
+        console.log(`[Party ID] Discard-before-load processed for ID: ${realPartyId}`);
+        return;
+      }
+
       // アクティブタブが同じであればUIと編集IDを更新
       if (state.activeTabId === id) {
         state.editingAppointId = realPartyId;
@@ -14972,39 +14995,59 @@ function viewAppointmentDetails(appointId) {
 
 // 下書きアポイントの破棄（削除ではなく、ステータスを cancelled に変更して監査証跡を残す）
 async function handleDeleteDraft() {
-  if (!state.editingAppointId) return;
+  const currentTabId = state.activeTabId;
+  if (!currentTabId) return;
+
+  const currentTab = state.tabs.find(t => t.id === currentTabId);
+  if (!currentTab || currentTab.type !== 'appointment-screen') return;
 
   if (confirm('この下書きアポイントを破棄しますか？（IDはキャンセル状態として保存され、履歴として残ります）')) {
-    const targetId = state.editingAppointId;
-    const appoint = state.appointments.find(a => a.id === targetId);
-    if (appoint) {
-      appoint.status = 'cancelled';
-      appoint.registeredAt = new Date().toISOString();
-      localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
-    }
-    
-    // パートナーDB（DBMake）側の party_ids テーブルのステータスも「reusable（再利用待ち / 破棄）」に更新する
-    if (partnerSupabaseClient) {
-      try {
-        const { error } = await partnerSupabaseClient
-          .from('party_ids')
-          .update({
-            status: 'reusable',
-            reset_at: new Date().toISOString(),
-            activated_at: null
-          })
-          .eq('party_id', targetId);
-        
-        if (error) {
-          console.warn('[Party ID] Failed to update status in partner DB:', error.message);
-        } else {
-          console.log(`[Party ID] Updated status to reusable in partner DB for: ${targetId}`);
+    const targetId = currentTab.appointData.id;
+    const isStillLoading = currentTab.appointData.isPartyIdLoading;
+
+    if (isStillLoading) {
+      // IDがまだ取得中の場合は、ロード完了後の破棄予約フラグをセット
+      currentTab.appointData.isDiscardedBeforeLoaded = true;
+      
+      // ローカルストレージ上にも一旦破棄ステータスで保存 (一時IDのまま)
+      const appoint = state.appointments.find(a => a.id === targetId);
+      if (appoint) {
+        appoint.status = 'cancelled';
+        appoint.registeredAt = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+      }
+    } else {
+      // すでにIDロード完了済みの通常破棄処理
+      const appoint = state.appointments.find(a => a.id === targetId);
+      if (appoint) {
+        appoint.status = 'cancelled';
+        appoint.registeredAt = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+      }
+
+      // パートナーDB（DBMake）側の party_ids テーブルのステータスも「reusable（再利用待ち / 破棄）」に更新する
+      if (partnerSupabaseClient) {
+        try {
+          const { error } = await partnerSupabaseClient
+            .from('party_ids')
+            .update({
+              status: 'reusable',
+              reset_at: new Date().toISOString(),
+              activated_at: null
+            })
+            .eq('party_id', targetId);
+          
+          if (error) {
+            console.warn('[Party ID] Failed to update status in partner DB:', error.message);
+          } else {
+            console.log(`[Party ID] Updated status to reusable in partner DB for: ${targetId}`);
+          }
+        } catch (err) {
+          console.error('[Party ID] Discard DB update error:', err);
         }
-      } catch (err) {
-        console.error('[Party ID] Discard DB update error:', err);
       }
     }
-    
+
     showToast('下書きを破棄しました（ステータス：無効 / cancelled）。', 'warning');
 
     state.editingAppointId = null;
@@ -15012,14 +15055,8 @@ async function handleDeleteDraft() {
     state.selectedIntroducer = null;
     state.isFormDirty = false;
     
-    const currentTabId = state.activeTabId;
-    if (currentTabId) {
-      const currentTab = state.tabs.find(t => t.id === currentTabId);
-      if (currentTab && currentTab.appointData) {
-        currentTab.appointData.isFormDirty = false;
-      }
-      closeTab(currentTabId);
-    }
+    currentTab.appointData.isFormDirty = false;
+    closeTab(currentTabId);
   }
 }
 
