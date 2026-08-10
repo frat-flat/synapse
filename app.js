@@ -1672,17 +1672,25 @@ async function loadPartyIds() {
   const now = new Date();
 
   const filtered = mergedList.filter(item => {
-    // 再利用可能になったID (リセットから3年経過、または手動リセット完了) は一覧から削除 (非表示) とする
+    // 再利用可能になったID (冷却ロック期間が満了したID) は一覧から削除 (非表示) とする
     if (item.status === 'reusable') {
-      const resetDiffDays = Math.floor((now - new Date(item.reset_at || item.created_at)) / (1000 * 60 * 60 * 24));
-      const canReuse = !item.reset_at || resetDiffDays >= 365 * 3; // reset_atがない(手動リセット直後)または3年経過
-      if (canReuse) return false;
+      const createdDate = new Date(item.created_at || item.reset_at || now);
+      const createdDiffDays = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
+      
+      if (item.reset_at) {
+        // 手動リセットの場合：リセット日から3年経過で冷却満了
+        const resetDiffDays = Math.floor((now - new Date(item.reset_at)) / (1000 * 60 * 60 * 24));
+        if (resetDiffDays >= 365 * 3) return false;
+      } else {
+        // 自動リセットの場合：破棄から6年経過 (3年後に自動冷却開始 + 3年冷却) で冷却満了
+        if (createdDiffDays >= 365 * 6) return false;
+      }
     }
 
     // ステータスフィルター
     if (filterStatus && item.status !== filterStatus) return false;
 
-    // 期間フィルター (reset_at または created_at からの経過時間)
+    // 期間フィルター
     if (filterPeriod) {
       const itemDate = new Date(item.status === 'reusable' ? (item.reset_at || item.created_at) : item.created_at);
       const diffMs = now - itemDate;
@@ -1700,7 +1708,7 @@ async function loadPartyIds() {
       }
     }
 
-    // 検索ワードフィルター (ID or source)
+    // 検索ワードフィルター
     if (filterSearch) {
       const idMatch = item.party_id.toLowerCase().includes(filterSearch);
       const sourceMatch = (item.source || '').toLowerCase().includes(filterSearch);
@@ -1723,6 +1731,11 @@ async function loadPartyIds() {
     
     // ステータスバッジ
     let statusBadge = '';
+    const createdDate = new Date(item.created_at || item.reset_at || now);
+    const createdDiffDays = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
+    const isManualReset = !!item.reset_at;
+    const isAutoReset = !item.reset_at && createdDiffDays >= 365 * 3;
+
     if (item.status === 'active') {
       // 契約データ（apContracts, joContracts）に紐付いてParty IDとして昇格されているかチェック
       const isConnectedToContract = 
@@ -1735,15 +1748,20 @@ async function loadPartyIds() {
         statusBadge = `<span style="background: rgba(13, 148, 136, 0.1); color: #0d9488; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">アポイント登録完了 (registered)</span>`;
       }
     } else if (item.status === 'temporary') {
-      // 下書きも含め登録前のものは一律「仮発行」とする
       statusBadge = `<span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">仮発行 (temporary)</span>`;
     } else if (item.status === 'reusable') {
-      // リセット日時がある場合は「冷却中」、ない場合は「アポイント発行後破棄」とする
-      if (item.reset_at) {
-        const resetDiffDays = Math.floor((now - new Date(item.reset_at)) / (1000 * 60 * 60 * 24));
-        const remainingDays = (365 * 3) - resetDiffDays;
+      if (isManualReset || isAutoReset) {
+        // ⑤ 破棄からリセット（冷却中）: 手動リセット後、または自動で3年経過して冷却ロックが開始された状態
+        let remainingDays = 0;
+        if (isManualReset) {
+          const resetDiffDays = Math.floor((now - new Date(item.reset_at)) / (1000 * 60 * 60 * 24));
+          remainingDays = (365 * 3) - resetDiffDays;
+        } else {
+          remainingDays = (365 * 6) - createdDiffDays;
+        }
         statusBadge = `<span style="background: rgba(107, 114, 128, 0.1); color: #6b7280; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">冷却中 (${remainingDays}日後再利用可)</span>`;
       } else {
+        // ④ アポイント発行後破棄: 冷却前の状態、破棄されただけの状態
         statusBadge = `<span style="background: rgba(239, 68, 68, 0.08); color: #ef4444; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">アポイント発行後破棄</span>`;
       }
     }
@@ -1755,9 +1773,10 @@ async function loadPartyIds() {
       return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
     };
 
-    // 操作ボタン (仮発行 temporary だけを手動リセット可能にする)
+    // 操作ボタン (④アポイント発行後破棄 状態だけを手動リセット可能にする)
     let actionBtn = '';
-    if (item.status === 'temporary') {
+    const isAppointDiscarded = item.status === 'reusable' && !isManualReset && !isAutoReset;
+    if (isAppointDiscarded) {
       actionBtn = `<button class="btn btn-sm btn-danger btn-reset-party-id" data-id="${item.party_id}" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600;">🔄 リセット</button>`;
     } else {
       actionBtn = `<button class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; opacity: 0.4; cursor: not-allowed;" disabled>対象外</button>`;
