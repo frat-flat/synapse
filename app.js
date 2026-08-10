@@ -1806,18 +1806,18 @@ async function loadPartyIds() {
       return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
     };
 
-    // 操作ボタン (④アポイント発行後破棄 状態だけを手動リセット可能にする)
+    // 操作ボタン (仮発行 temporary または ④アポイント発行後破棄 状態だけを手動リセット可能にする)
     let actionBtn = '';
-    const isAppointDiscarded = item.status === 'reusable' && !isManualReset && !isAutoReset;
-    if (isAppointDiscarded) {
+    const isResettable = item.status === 'temporary' || (item.status === 'reusable' && !isManualReset && !isAutoReset);
+    if (isResettable) {
       actionBtn = `<button class="btn btn-sm btn-danger btn-reset-party-id" data-id="${item.party_id}" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600;">🔄 リセット</button>`;
     } else {
       actionBtn = `<button class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; opacity: 0.4; cursor: not-allowed;" disabled>対象外</button>`;
     }
 
-    // チェックボックス表示 (④アポイント発行後破棄 状態のみ選択可能、他はdisabled)
+    // チェックボックス表示 (リセット可能な状態のみ選択可能、他はdisabled)
     let checkboxHtml = '';
-    if (isAppointDiscarded) {
+    if (isResettable) {
       checkboxHtml = `<input type="checkbox" class="party-id-row-checkbox" data-id="${item.party_id}" style="cursor: pointer;">`;
     } else {
       checkboxHtml = `<input type="checkbox" style="opacity: 0.2; cursor: not-allowed;" disabled>`;
