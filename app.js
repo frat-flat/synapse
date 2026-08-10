@@ -1672,6 +1672,13 @@ async function loadPartyIds() {
   const now = new Date();
 
   const filtered = mergedList.filter(item => {
+    // 再利用可能になったID (リセットから3年経過、または手動リセット完了) は一覧から削除 (非表示) とする
+    if (item.status === 'reusable') {
+      const resetDiffDays = Math.floor((now - new Date(item.reset_at || item.created_at)) / (1000 * 60 * 60 * 24));
+      const canReuse = !item.reset_at || resetDiffDays >= 365 * 3; // reset_atがない(手動リセット直後)または3年経過
+      if (canReuse) return false;
+    }
+
     // ステータスフィルター
     if (filterStatus && item.status !== filterStatus) return false;
 
@@ -1717,20 +1724,28 @@ async function loadPartyIds() {
     // ステータスバッジ
     let statusBadge = '';
     if (item.status === 'active') {
-      statusBadge = `<span style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">本登録 (active)</span>`;
+      // 契約データ（apContracts, joContracts）に紐付いてParty IDとして昇格されているかチェック
+      const isConnectedToContract = 
+        (state.apContracts?.some(ap => ap.customerPersonalityId === item.party_id)) ||
+        (state.joContracts?.some(jo => jo.customerPersonalityId === item.party_id));
+      
+      if (isConnectedToContract) {
+        statusBadge = `<span style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">Party ID昇格 (active)</span>`;
+      } else {
+        statusBadge = `<span style="background: rgba(13, 148, 136, 0.1); color: #0d9488; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">アポイント登録完了 (registered)</span>`;
+      }
     } else if (item.status === 'temporary') {
-      const localAppoint = state.appointments?.find(a => a.id === item.party_id);
-      const isDraft = localAppoint && localAppoint.status === 'draft';
-      const label = isDraft ? '下書き保存 (temporary)' : '仮発行 (temporary)';
-      const bg = isDraft ? 'rgba(245, 158, 11, 0.08)' : 'rgba(245, 158, 11, 0.15)';
-      statusBadge = `<span style="background: ${bg}; color: #f59e0b; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">${label}</span>`;
+      // 下書きも含め登録前のものは一律「仮発行」とする
+      statusBadge = `<span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">仮発行 (temporary)</span>`;
     } else if (item.status === 'reusable') {
-      const resetDiffDays = Math.floor((now - new Date(item.reset_at || item.created_at)) / (1000 * 60 * 60 * 24));
-      const canReuse = resetDiffDays >= 365 * 3;
-      const color = canReuse ? '#3b82f6' : '#6b7280';
-      const bg = canReuse ? 'rgba(59, 130, 246, 0.1)' : 'rgba(107, 114, 128, 0.1)';
-      const text = canReuse ? '再利用可能 (reusable)' : `冷却中 (${(365*3) - resetDiffDays}日後再利用可)`;
-      statusBadge = `<span style="background: ${bg}; color: ${color}; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">${text}</span>`;
+      // リセット日時がある場合は「冷却中」、ない場合は「アポイント発行後破棄」とする
+      if (item.reset_at) {
+        const resetDiffDays = Math.floor((now - new Date(item.reset_at)) / (1000 * 60 * 60 * 24));
+        const remainingDays = (365 * 3) - resetDiffDays;
+        statusBadge = `<span style="background: rgba(107, 114, 128, 0.1); color: #6b7280; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">冷却中 (${remainingDays}日後再利用可)</span>`;
+      } else {
+        statusBadge = `<span style="background: rgba(239, 68, 68, 0.08); color: #ef4444; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">アポイント発行後破棄</span>`;
+      }
     }
 
     // 日時フォーマット
