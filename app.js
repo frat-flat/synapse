@@ -1688,7 +1688,28 @@ async function loadPartyIds() {
     }
 
     // ステータスフィルター
-    if (filterStatus && item.status !== filterStatus) return false;
+    if (filterStatus) {
+      if (filterStatus === 'temporary') {
+        if (item.status !== 'temporary') return false;
+      } else if (filterStatus === 'registered' || filterStatus === 'active') {
+        if (item.status !== 'active') return false;
+        const isConnected = 
+          (state.apContracts?.some(ap => ap.customerPersonalityId === item.party_id)) ||
+          (state.joContracts?.some(jo => jo.customerPersonalityId === item.party_id));
+        if (filterStatus === 'registered' && isConnected) return false;
+        if (filterStatus === 'active' && !isConnected) return false;
+      } else if (filterStatus === 'discarded') {
+        const createdDate = new Date(item.created_at || item.reset_at || now);
+        const createdDiffDays = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
+        const isDiscarded = item.status === 'reusable' && !item.reset_at && createdDiffDays < 365 * 3;
+        if (!isDiscarded) return false;
+      } else if (filterStatus === 'cooling') {
+        const createdDate = new Date(item.created_at || item.reset_at || now);
+        const createdDiffDays = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
+        const isCooling = item.status === 'reusable' && (!!item.reset_at || createdDiffDays >= 365 * 3);
+        if (!isCooling) return false;
+      }
+    }
 
     // 期間フィルター
     if (filterPeriod) {
@@ -1719,7 +1740,7 @@ async function loadPartyIds() {
   });
 
   if (filtered.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">該当するデータがありません。</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">該当するデータがありません。</td></tr>`;
     return;
   }
 
@@ -1782,12 +1803,21 @@ async function loadPartyIds() {
       actionBtn = `<button class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; opacity: 0.4; cursor: not-allowed;" disabled>対象外</button>`;
     }
 
+    // チェックボックス表示 (④アポイント発行後破棄 状態のみ選択可能、他はdisabled)
+    let checkboxHtml = '';
+    if (isAppointDiscarded) {
+      checkboxHtml = `<input type="checkbox" class="party-id-row-checkbox" data-id="${item.party_id}" style="cursor: pointer;">`;
+    } else {
+      checkboxHtml = `<input type="checkbox" style="opacity: 0.2; cursor: not-allowed;" disabled>`;
+    }
+
     let errorBadge = '';
     if (item.isLocalOnly) {
       errorBadge = `<span style="font-size: 0.65rem; color: #ef4444; border: 1px solid #ef4444; border-radius: 2px; padding: 0 0.15rem; margin-left: 0.35rem; font-weight: bold;" title="DB同期が失敗したためローカルデータを一時表示中">ローカルのみ</span>`;
     }
 
     tr.innerHTML = `
+      <td style="padding: 0.75rem 1rem; text-align: center;">${checkboxHtml}</td>
       <td style="padding: 0.75rem 1rem; font-weight: 600; font-family: monospace; font-size: 0.85rem; color: var(--text-primary);">${item.party_id}${errorBadge}</td>
       <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">${item.seq_value || '-'}</td>
       <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">${item.source || '-'}</td>
@@ -1807,6 +1837,98 @@ async function loadPartyIds() {
       resetPartyId(id);
     });
   });
+
+  // チェックボックスと一括リセットの制御イベント
+  const selectAllCheckbox = document.getElementById('party-id-select-all');
+  const bulkResetBtn = document.getElementById('btn-bulk-reset-party-ids');
+  const rowCheckboxes = tableBody.querySelectorAll('.party-id-row-checkbox');
+
+  const updateBulkResetButtonState = () => {
+    if (!bulkResetBtn) return;
+    const checkedIds = Array.from(tableBody.querySelectorAll('.party-id-row-checkbox:checked')).map(cb => cb.getAttribute('data-id'));
+    
+    if (checkedIds.length > 0) {
+      bulkResetBtn.disabled = false;
+      bulkResetBtn.style.opacity = '1';
+      bulkResetBtn.style.cursor = 'pointer';
+      bulkResetBtn.innerHTML = `🔄 選択した ${checkedIds.length}件のIDを一括リセット`;
+    } else {
+      bulkResetBtn.disabled = true;
+      bulkResetBtn.style.opacity = '0.5';
+      bulkResetBtn.style.cursor = 'not-allowed';
+      bulkResetBtn.innerHTML = `🔄 選択した破棄IDを一括リセット`;
+    }
+  };
+
+  if (selectAllCheckbox) {
+    selectAllCheckbox.checked = false; // 再描画時はクリア
+    selectAllCheckbox.onchange = (e) => {
+      const checked = e.target.checked;
+      rowCheckboxes.forEach(cb => {
+        if (!cb.disabled) cb.checked = checked;
+      });
+      updateBulkResetButtonState();
+    };
+  }
+
+  rowCheckboxes.forEach(cb => {
+    cb.onchange = () => {
+      if (selectAllCheckbox) {
+        const enabledCbs = Array.from(rowCheckboxes).filter(c => !c.disabled);
+        const checkedCbs = enabledCbs.filter(c => c.checked);
+        selectAllCheckbox.checked = enabledCbs.length > 0 && enabledCbs.length === checkedCbs.length;
+      }
+      updateBulkResetButtonState();
+    };
+  });
+
+  // 初期値の同期
+  updateBulkResetButtonState();
+
+  if (bulkResetBtn) {
+    bulkResetBtn.onclick = async () => {
+      const checkedIds = Array.from(tableBody.querySelectorAll('.party-id-row-checkbox:checked')).map(cb => cb.getAttribute('data-id'));
+      if (checkedIds.length === 0) return;
+
+      const isConfirmed = confirm(`警告: 選択した ${checkedIds.length}件の Party ID を一括で再利用可能（リセット）にします。\nこれらのIDは本日から「さらに3年間」経過するまで再発行はされません。\n実行してよろしいですか？`);
+      if (!isConfirmed) return;
+
+      showToast(`選択した ${checkedIds.length}件のIDを一括リセットしています...`, 'info');
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const partyId of checkedIds) {
+        try {
+          let dbSuccess = false;
+          if (partnerSupabaseClient) {
+            const { error } = await partnerSupabaseClient
+              .from('party_ids')
+              .update({
+                status: 'reusable',
+                reset_at: new Date().toISOString(),
+                activated_at: null
+              })
+              .eq('party_id', partyId);
+            if (!error) dbSuccess = true;
+          }
+          updateLocalPartyIdStatus(partyId, 'reusable');
+          successCount++;
+        } catch (err) {
+          console.error(`[Party ID] Bulk reset failed for ${partyId}:`, err);
+          failCount++;
+        }
+      }
+
+      if (failCount > 0) {
+        showToast(`${successCount}件のリセットに成功しました。${failCount}件に失敗しました。`, 'warning');
+      } else {
+        showToast(`選択した ${successCount}件の Party ID をリセットしました。冷却ロック（3年間）が開始されます。`, 'success');
+      }
+
+      loadPartyIds(); // テーブル再読み込み
+    };
+  }
 }
 
 async function resetPartyId(partyId) {
