@@ -14,8 +14,9 @@ CREATE TABLE IF NOT EXISTS public.synapse_users (
   role TEXT DEFAULT 'sales',
   email TEXT,
   code TEXT,
-  login_id TEXT, -- 新規追加：ログインID
-  birthday TEXT, -- 新規追加：生年月日 (西暦)
+  login_id TEXT, -- ログインID
+  birthday TEXT, -- 生年月日 (西暦)
+  phone_number TEXT, -- 新規追加：電話番号
   created_at TIMESTAMPTZ DEFAULT NOW(),
   last_login_at TIMESTAMPTZ,
   pwd_changed_at TIMESTAMPTZ
@@ -34,20 +35,22 @@ CREATE TABLE IF NOT EXISTS public.synapse_storage (
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.synapse_users (id, name, role, email, code, created_at)
+  INSERT INTO public.synapse_users (id, name, role, email, code, phone_number, created_at)
   VALUES (
     new.email,
     COALESCE(new.raw_user_meta_data->>'name', new.email),
     COALESCE(new.raw_user_meta_data->>'role', 'sales'),
     new.email,
     COALESCE(new.raw_user_meta_data->>'code', ''),
+    COALESCE(new.raw_user_meta_data->>'phone', new.raw_user_meta_data->>'phone_number', ''),
     new.created_at
   )
   ON CONFLICT (id) DO UPDATE
   SET
     name = EXCLUDED.name,
     role = COALESCE(EXCLUDED.role, synapse_users.role),
-    code = COALESCE(EXCLUDED.code, synapse_users.code);
+    code = COALESCE(EXCLUDED.code, synapse_users.code),
+    phone_number = COALESCE(EXCLUDED.phone_number, synapse_users.phone_number);
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -55,7 +58,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- トリガーの登録
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
+  AFTER INSERT OR UPDATE ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- 4. 行レベルセキュリティ (Row Level Security - RLS) の有効化
@@ -118,7 +121,48 @@ CREATE POLICY "Allow owner manage synapse_users"
     )
   );
 
--- 7. 初期のオーナーアカウント用シード（DBに最初の管理者を作成するための安全弁）
+-- [ポリシーE] ユーザー自身による自分自身のプロファイルの更新を許可します（本登録および暗証番号・電話番号同期用）
+DROP POLICY IF EXISTS "Allow users to update their own profile" ON public.synapse_users;
+CREATE POLICY "Allow users to update their own profile"
+  ON public.synapse_users
+  FOR UPDATE
+  TO authenticated
+  USING (id = auth.jwt()->>'email')
+  WITH CHECK (id = auth.jwt()->>'email');
+
+-- 7. synapse_user_devices テーブルの作成（認証済み端末管理用）
+CREATE TABLE IF NOT EXISTS public.synapse_user_devices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL REFERENCES public.synapse_users(id) ON DELETE CASCADE,
+  device_token TEXT NOT NULL,
+  device_name TEXT,
+  device_type TEXT CHECK (device_type IN ('smartphone', 'tablet', 'desktop')),
+  last_used_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLSの有効化
+ALTER TABLE public.synapse_user_devices ENABLE ROW LEVEL SECURITY;
+
+-- セキュリティポリシー：自分自身のデバイスのみ閲覧・追加が可能、ownerはすべてのデバイスを管理（削除）可能
+DROP POLICY IF EXISTS "Allow users to read their own devices" ON public.synapse_user_devices;
+CREATE POLICY "Allow users to read their own devices" ON public.synapse_user_devices
+  FOR SELECT TO authenticated USING (user_id = auth.jwt()->>'email');
+
+DROP POLICY IF EXISTS "Allow users to insert their own devices" ON public.synapse_user_devices;
+CREATE POLICY "Allow users to insert their own devices" ON public.synapse_user_devices
+  FOR INSERT TO authenticated WITH CHECK (user_id = auth.jwt()->>'email');
+
+DROP POLICY IF EXISTS "Allow owner to manage all devices" ON public.synapse_user_devices;
+CREATE POLICY "Allow owner to manage all devices" ON public.synapse_user_devices
+  FOR ALL TO authenticated USING (
+    EXISTS (
+      SELECT 1 FROM public.synapse_users
+      WHERE synapse_users.id = auth.jwt()->>'email' AND synapse_users.role = 'owner'
+    )
+  );
+
+-- 8. 初期のオーナーアカウント用シード（DBに最初の管理者を作成するための安全弁）
 -- ※認証用のメールアドレス owner@synapse.management などを登録する前に、
 -- public.synapse_users 側に最初のownerを定義しておくことで、RLSでエラーになるのを防ぎます。
 INSERT INTO public.synapse_users (id, name, role, email, code)

@@ -2954,50 +2954,133 @@
       try {
         // 1. 新規フォーム作成ボタンのフックはグローバルデリゲーションで処理されるため省略します。
 
-        // 2. リスト表示（テーブル行）への「⭐ テンプレート登録」ボタン自動アペンド
+        // 2. リスト表示（テーブル行）への「⭐ テンプレート登録」ボタン自動アペンド＆日付フォーマット処理
         const listRows = document.querySelectorAll('#dashboard-view-list tbody tr');
         listRows.forEach((row, idx) => {
-          if (row.dataset.templateHooked) return;
-          row.dataset.templateHooked = "true";
+          // 2-1. テンプレート登録ボタンの自動アペンド
+          if (!row.dataset.templateHooked) {
+            row.dataset.templateHooked = "true";
+            const actionTd = row.querySelector('td:last-child');
+            if (actionTd) {
+              const regBtn = document.createElement('button');
+              regBtn.type = 'button';
+              regBtn.className = 'btn-register-template';
+              regBtn.innerHTML = '⭐ テンプレート登録';
+              
+              regBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                registerFormAsTemplate(idx);
+              });
+              
+              actionTd.insertBefore(regBtn, actionTd.firstChild);
+            }
+          }
 
-          const actionTd = row.querySelector('td:last-child');
-          if (actionTd) {
-            const regBtn = document.createElement('button');
-            regBtn.type = 'button';
-            regBtn.className = 'btn-register-template';
-            regBtn.innerHTML = '⭐ テンプレート登録';
-            
-            regBtn.addEventListener('click', (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              registerFormAsTemplate(idx);
-            });
-            
-            actionTd.insertBefore(regBtn, actionTd.firstChild);
+          // 2-2. 今日以外の日付セルを YYYY/MM/DD へ自動書き換え
+          try {
+            const key = 'form_customize_all_forms';
+            let allForms = [];
+            try {
+              allForms = JSON.parse(localStorage.getItem(key) || '[]');
+            } catch(e) {}
+
+            const form = allForms[idx];
+            if (form) {
+              const formDateStr = form.lastModified || form.date;
+              if (formDateStr) {
+                const fDate = new Date(formDateStr);
+                const today = new Date();
+
+                const isToday = fDate.getFullYear() === today.getFullYear() &&
+                                fDate.getMonth() === today.getMonth() &&
+                                fDate.getDate() === today.getDate();
+
+                if (!isToday) {
+                  const tds = row.querySelectorAll('td');
+                  if (tds.length >= 2) {
+                    const dateTd = tds[tds.length - 2];
+                    const txt = dateTd.textContent.trim();
+                    
+                    const yyyy = fDate.getFullYear();
+                    const mm = String(fDate.getMonth() + 1).padStart(2, '0');
+                    const dd = String(fDate.getDate()).padStart(2, '0');
+                    const expectedStr = `${yyyy}/${mm}/${dd}`;
+
+                    if (txt !== expectedStr) {
+                      dateTd.textContent = expectedStr;
+                    }
+                  }
+                }
+              }
+            }
+          } catch(dateErr) {
+            console.error('[Dashboard Hook] Date formatting error:', dateErr);
           }
         });
 
-        // 3. プレビューカード（グリッド表示）への「⭐ テンプレート登録」ボタン自動アペンド
+        // 3. プレビューカード（グリッド表示）への「⭐ テンプレート登録」ボタン自動アペンド＆日付フォーマット処理
         const previewCards = document.querySelectorAll('#dashboard-view-preview .dashboard-preview-card');
         previewCards.forEach((card, idx) => {
-          if (card.dataset.templateHooked) return;
-          card.dataset.templateHooked = "true";
+          // 3-1. テンプレート登録ボタンの自動アペンド
+          if (!card.dataset.templateHooked) {
+            card.dataset.templateHooked = "true";
+            const footer = card.querySelector('.card-footer') || card;
+            if (footer) {
+              const regBtn = document.createElement('button');
+              regBtn.type = 'button';
+              regBtn.className = 'btn-register-template';
+              regBtn.style.marginTop = '6px';
+              regBtn.innerHTML = '⭐ テンプレート登録';
+              
+              regBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                registerFormAsTemplate(idx);
+              });
+              
+              footer.appendChild(regBtn);
+            }
+          }
 
-          const footer = card.querySelector('.card-footer') || card;
-          if (footer) {
-            const regBtn = document.createElement('button');
-            regBtn.type = 'button';
-            regBtn.className = 'btn-register-template';
-            regBtn.style.marginTop = '6px';
-            regBtn.innerHTML = '⭐ テンプレート登録';
-            
-            regBtn.addEventListener('click', (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              registerFormAsTemplate(idx);
-            });
-            
-            footer.appendChild(regBtn);
+          // 3-2. 今日以外の日付セルを YYYY/MM/DD へ自動書き換え
+          try {
+            const key = 'form_customize_all_forms';
+            let allForms = [];
+            try {
+              allForms = JSON.parse(localStorage.getItem(key) || '[]');
+            } catch(e) {}
+
+            const form = allForms[idx];
+            if (form) {
+              const formDateStr = form.lastModified || form.date;
+              if (formDateStr) {
+                const fDate = new Date(formDateStr);
+                const today = new Date();
+
+                const isToday = fDate.getFullYear() === today.getFullYear() &&
+                                fDate.getMonth() === today.getMonth() &&
+                                fDate.getDate() === today.getDate();
+
+                if (!isToday) {
+                  const footerTextEl = card.querySelector('.card-footer') || card;
+                  if (footerTextEl) {
+                    const yyyy = fDate.getFullYear();
+                    const mm = String(fDate.getMonth() + 1).padStart(2, '0');
+                    const dd = String(fDate.getDate()).padStart(2, '0');
+                    const expectedDate = `${yyyy}/${mm}/${dd}`;
+
+                    let html = footerTextEl.innerHTML;
+                    const timeRegex = /\d{1,2}:\d{2}/;
+                    if (timeRegex.test(html) && !html.includes(expectedDate)) {
+                      footerTextEl.innerHTML = html.replace(timeRegex, expectedDate);
+                    }
+                  }
+                }
+              }
+            }
+          } catch(cardDateErr) {
+            console.error('[Dashboard Hook] Card date replacement error:', cardDateErr);
           }
         });
 
@@ -3013,9 +3096,93 @@
     }, 500);
   }
 
-  // 安全のためのダミー定義（クラッシュ防止）
+  // ダッシュボードフォーム一覧のソート処理
+  function sortDashboardForms(sortBy) {
+    try {
+      const key = 'form_customize_all_forms';
+      let allForms = [];
+      try {
+        allForms = JSON.parse(localStorage.getItem(key) || '[]');
+      } catch(e) {}
+      
+      if (!Array.isArray(allForms) || allForms.length <= 1) return;
+
+      // 選択中のアクティブフォームタイトルを取得しておき、ソート後のアクティブインデックスを追跡・補正する
+      const activeIdx = parseInt(localStorage.getItem('form_customize_active_index') || '0');
+      const activeFormTitle = allForms[activeIdx] ? allForms[activeIdx].title : null;
+
+      allForms.sort((a, b) => {
+        if (!a || !b) return 0;
+        
+        if (sortBy === 'title_asc') {
+          return (a.title || '').localeCompare(b.title || '', 'ja');
+        } else if (sortBy === 'title_desc') {
+          return (b.title || '').localeCompare(a.title || '', 'ja');
+        } else if (sortBy === 'lastModified_desc') {
+          const tA = new Date(a.lastModified || a.date || 0).getTime();
+          const tB = new Date(b.lastModified || b.date || 0).getTime();
+          return tB - tA;
+        } else if (sortBy === 'lastModified_asc') {
+          const tA = new Date(a.lastModified || a.date || 0).getTime();
+          const tB = new Date(b.lastModified || b.date || 0).getTime();
+          return tA - tB;
+        } else {
+          // 'date' (最終閲覧 - 自分) またはデフォルト
+          const tA = new Date(a.lastViewed || a.date || 0).getTime();
+          const tB = new Date(b.lastViewed || b.date || 0).getTime();
+          return tB - tA;
+        }
+      });
+
+      localStorage.setItem(key, JSON.stringify(allForms));
+
+      // アクティブインデックスの補正 (編集中フォームが変わらないようにする)
+      if (activeFormTitle) {
+        const newActiveIdx = allForms.findIndex(f => f.title === activeFormTitle);
+        if (newActiveIdx !== -1) {
+          localStorage.setItem('form_customize_active_index', newActiveIdx.toString());
+        }
+      }
+
+      console.log('[Sort] Sorted forms by:', sortBy);
+    } catch(err) {
+      console.error('[Sort] Failed to sort dashboard forms:', err);
+    }
+  }
+
+  // ダッシュボードのグローバルリスナー（ソート等のハンドリング本実装）
   function setupDashboardGlobalListeners() {
-    console.log('[Dashboard] setupDashboardGlobalListeners stub executed.');
+    try {
+      console.log('[Dashboard] setupDashboardGlobalListeners initialization started.');
+      
+      // 並び替えドロップダウンの変更検知 (キャプチャ型)
+      document.addEventListener('change', (e) => {
+        if (e.target && e.target.id === 'sort-label-text') {
+          const sortBy = e.target.value;
+          localStorage.setItem('form_customize_dashboard_sort_by', sortBy);
+          
+          // ソート実行
+          sortDashboardForms(sortBy);
+          
+          // トーストで通知しつつ、React側にロードさせるためリロード
+          showCustomToast('表示順を変更しました。', 'success');
+          setTimeout(() => {
+            location.reload();
+          }, 350);
+        }
+      }, true);
+
+      // 初期ロード時にLocalStorageのソート設定値をプルダウンに反映する
+      const savedSort = localStorage.getItem('form_customize_dashboard_sort_by') || 'date';
+      const selectEl = document.getElementById('sort-label-text');
+      if (selectEl) {
+        selectEl.value = savedSort;
+      }
+      
+      console.log('[Dashboard] setupDashboardGlobalListeners initialized successfully. SortState:', savedSort);
+    } catch(err) {
+      console.error('[Dashboard Init] Failed to setup global listeners:', err);
+    }
   }
 
   // ページ起動時ロード処理の末尾でフックを起動

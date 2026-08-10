@@ -1,0 +1,2013 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zoom × Synapse コラボレーション体験デモ (Zoomホーム搭載版)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --zoom-bg: #1a1a1a;
+    --zoom-panel-bg: #242424;
+    --zoom-accent: #2D8CFF;
+    --zoom-text: #ffffff;
+    --synapse-bg: #f8fafc;
+    --border-color: #cbd5e1;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Inter', 'Noto Sans JP', sans-serif;
+    background-color: #0f172a;
+    color: #f8fafc;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 操作ガイドヘッダー */
+  header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #334155;
+    z-index: 100;
+    box-shadow: var(--shadow-md);
+  }
+
+  .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .logo-badge {
+    background: var(--zoom-accent);
+    color: white;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+  }
+
+  .logo-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #f8fafc;
+  }
+
+  .control-panel {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .swap-btn {
+    background: #10b981;
+    border: none;
+    color: white;
+    padding: 0.45rem 0.9rem;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: bold;
+    transition: background 0.2s, transform 0.1s;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .swap-btn:hover {
+    background: #059669;
+  }
+  .swap-btn:active {
+    transform: scale(0.97);
+  }
+
+  .swap-btn.blue-btn {
+    background: #2D8CFF;
+    box-shadow: 0 0 10px rgba(45, 140, 255, 0.4);
+  }
+  .swap-btn.blue-btn:hover {
+    background: #1e70d6;
+  }
+  .swap-btn.red-btn {
+    background: #ef4444;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+  }
+  .swap-btn.red-btn:hover {
+    background: #dc2626;
+  }
+
+  .guide-steps {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .step-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #cbd5e1;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+
+  .step-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+  }
+
+  .step-btn.active {
+    background: var(--zoom-accent);
+    border-color: var(--zoom-accent);
+    color: white;
+    box-shadow: 0 0 12px rgba(45, 140, 255, 0.4);
+  }
+
+  /* メインレイアウト */
+  .main-container {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 58px);
+    background-color: var(--synapse-bg);
+  }
+
+  /* 左右分割用パネル (初期状態は非表示) */
+  .split-panel-left {
+    width: 0%;
+    display: none;
+    min-width: 320px;
+    background-color: var(--zoom-bg);
+    flex-direction: column;
+    position: relative;
+    z-index: 5;
+    order: 1;
+  }
+
+  .split-panel-right {
+    width: 100%;
+    min-width: 400px;
+    height: 100%;
+    background-color: var(--synapse-bg);
+    position: relative;
+    z-index: 4;
+    order: 3;
+  }
+
+  /* ドラッグ境界線 (初期状態は非表示) */
+  .resizer-bar {
+    width: 8px;
+    background-color: #cbd5e1;
+    cursor: col-resize;
+    position: relative;
+    z-index: 10;
+    transition: background-color 0.2s;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    order: 2;
+  }
+
+  .resizer-bar::after {
+    content: "||";
+    color: #64748b;
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: -1px;
+  }
+
+  .resizer-bar:hover, .resizer-bar.dragging {
+    background-color: var(--zoom-accent);
+  }
+
+  /* Zoom UI デザイン */
+  .zoom-header {
+    background-color: var(--zoom-panel-bg);
+    padding: 0.5rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    color: #a3a3a3;
+    border-bottom: 1px solid #333;
+  }
+
+  .zoom-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .green-shield {
+    color: #22c55e;
+  }
+
+  .zoom-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .float-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: background 0.2s;
+  }
+
+  .float-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .zoom-viewport {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+    background-color: #000;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* 🌟 Zoom ホーム画面のデザイン */
+  .zoom-home-screen {
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1a;
+    color: white;
+    padding: 1.5rem;
+    display: none;
+    flex-direction: column;
+    justify-content: space-between;
+    z-index: 12;
+    text-align: left;
+  }
+
+  .zoom-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .zoom-tile-icon {
+    width: 58px;
+    height: 58px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.9rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  }
+
+  .zoom-tile:hover .zoom-tile-icon {
+    transform: scale(1.06);
+  }
+
+  /* 接続中スピナー画面 */
+  .zoom-connecting-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #111;
+    z-index: 20;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    color: white;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top: 4px solid var(--zoom-accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .video-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: none; /* 起動完了まで非表示 */
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .zoom-video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transition: filter 0.3s ease;
+  }
+
+  /* 画面共有シミュレータ */
+  .screen-share-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #111827;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    z-index: 2;
+  }
+
+  .share-doc {
+    width: 90%;
+    max-width: 90%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    background: #1f2937;
+    border: 2px dashed #4b5563;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    box-shadow: var(--shadow-lg);
+    justify-content: space-between;
+  }
+
+  .share-header {
+    border-bottom: 1px solid #374151;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+    color: #9ca3af;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .share-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .bar-chart {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 80px;
+    padding-top: 10px;
+  }
+
+  .chart-bar {
+    width: 15%;
+    background: var(--zoom-accent);
+    border-radius: 4px 4px 0 0;
+    animation: grow 1s ease-out;
+  }
+
+  @keyframes grow {
+    from { height: 0; }
+  }
+
+  /* 浮き上がるアクティブスピーカー（顔写真） */
+  .active-speaker-mini {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 120px;
+    height: 90px;
+    border: 2px solid var(--zoom-accent);
+    border-radius: 6px;
+    overflow: hidden;
+    z-index: 3;
+    box-shadow: var(--shadow-md);
+    background: #000;
+    display: none;
+  }
+
+  .active-speaker-mini img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .speaker-label {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    font-size: 0.65rem;
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  /* バーチャル背景用のぼかし効果 */
+  .video-blur {
+    filter: blur(10px);
+  }
+  .video-bg-beach {
+    background: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop') no-repeat center center;
+    background-size: cover;
+  }
+
+  .video-overlay-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    display: none;
+  }
+
+  .name-tag {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    backdrop-filter: blur(4px);
+    z-index: 2;
+  }
+
+  /* Zoom チャットパネル */
+  .zoom-chat-panel {
+    width: 240px;
+    background-color: var(--zoom-panel-bg);
+    border-left: 1px solid #333;
+    display: none;
+    flex-direction: column;
+    z-index: 4;
+  }
+
+  .chat-header {
+    padding: 0.75rem;
+    border-bottom: 1px solid #333;
+    font-size: 0.85rem;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .chat-close-btn {
+    background: none;
+    border: none;
+    color: #a3a3a3;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+
+  .chat-messages {
+    flex: 1;
+    padding: 0.75rem;
+    overflow-y: auto;
+    font-size: 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .chat-msg {
+    background: rgba(255,255,255,0.05);
+    padding: 0.5rem;
+    border-radius: 6px;
+  }
+
+  .chat-sender {
+    font-weight: bold;
+    color: var(--zoom-accent);
+    margin-bottom: 0.2rem;
+  }
+
+  .chat-input-area {
+    padding: 0.75rem;
+    border-top: 1px solid #333;
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .chat-input {
+    flex: 1;
+    background: #111;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: white;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .chat-send-btn {
+    background: var(--zoom-accent);
+    border: none;
+    color: white;
+    padding: 0.35rem 0.6rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+  }
+
+  /* Zoom コントロールバー */
+  .zoom-controls {
+    background-color: var(--zoom-panel-bg);
+    padding: 0.75rem 1rem;
+    display: none; /* 🌟 初期は非表示(ホーム画面中は出さない) */
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #333;
+  }
+
+  .control-group {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .control-btn {
+    background: none;
+    border: none;
+    color: #e5e5e5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+    font-size: 0.75rem;
+    min-width: 48px;
+    transition: color 0.2s;
+  }
+
+  .control-btn:hover {
+    color: white;
+  }
+
+  .control-btn.active {
+    color: var(--zoom-accent);
+  }
+
+  .control-btn.red-text {
+    color: #ef4444;
+  }
+
+  .end-btn {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: background 0.2s;
+  }
+
+  .end-btn:hover {
+    background-color: #dc2626;
+  }
+
+  /* 背景変更メニュー */
+  .bg-menu {
+    position: absolute;
+    bottom: 60px;
+    left: 20px;
+    background: var(--zoom-panel-bg);
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 0.5rem;
+    display: none;
+    flex-direction: column;
+    gap: 0.4rem;
+    z-index: 15;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .bg-option {
+    background: rgba(255,255,255,0.05);
+    border: none;
+    color: white;
+    padding: 0.35rem 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    text-align: left;
+    transition: background 0.2s;
+  }
+
+  .bg-option:hover {
+    background: var(--zoom-accent);
+  }
+
+  /* ----------------------------------------------------
+     フローティング Zoom ウィンドウ内の専用デザイン
+     ---------------------------------------------------- */
+  .floating-zoom-window {
+    position: absolute;
+    width: 480px;
+    height: 360px;
+    background: var(--zoom-bg);
+    border: 2px solid #444;
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg), 0 20px 25px -5px rgba(0,0,0,0.3);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    cursor: move;
+  }
+
+  .floating-window-header {
+    background: var(--zoom-panel-bg);
+    padding: 0.4rem 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    border-bottom: 1px solid #333;
+    user-select: none;
+  }
+
+  .float-btn-mini {
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: white;
+    padding: 0.1rem 0.3rem;
+    font-size: 0.65rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .float-btn-mini:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  .floating-window-body {
+    flex: 1;
+    display: flex;
+    position: relative;
+    background: #000;
+    cursor: default;
+  }
+
+  /* 画面切り替えリスト（ドロップダウンメニュー）の定義 */
+  .float-screen-selector {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1003;
+  }
+
+  .selector-trigger {
+    background: rgba(0, 0, 0, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: white;
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: background 0.2s;
+    user-select: none;
+  }
+
+  .selector-trigger:hover {
+    background: rgba(0, 0, 0, 0.9);
+  }
+
+  .selector-dropdown {
+    position: absolute;
+    top: 32px;
+    left: 0;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 0.4rem;
+    width: 220px;
+    display: none;
+    flex-direction: column;
+    gap: 0.25rem;
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(8px);
+    z-index: 1004;
+  }
+
+  .selector-dropdown.show {
+    display: flex;
+  }
+
+  .selector-item {
+    background: none;
+    border: none;
+    color: #cbd5e1;
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: left;
+    transition: all 0.2s;
+    width: 100%;
+  }
+
+  .selector-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+  }
+
+  .selector-item.active {
+    background: var(--zoom-accent);
+    color: white;
+    font-weight: bold;
+  }
+
+  .selector-thumb {
+    width: 28px;
+    height: 21px;
+    border-radius: 3px;
+    object-fit: cover;
+    background: #111827;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  /* 下部の半透明クイックコントロール（マイク/ビデオのマークだけ） */
+  .float-quick-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 48px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0) 100%);
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    gap: 0.75rem;
+    z-index: 1002;
+    opacity: 0; /* 通常時は隠す */
+    transition: opacity 0.25s ease;
+  }
+
+  /* マウスがウィンドウに乗ったときにコントロールを表示 */
+  .floating-zoom-window:hover .float-quick-controls {
+    opacity: 1;
+  }
+
+  .quick-ctrl-btn {
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    backdrop-filter: blur(4px);
+  }
+
+  .quick-ctrl-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+    transform: scale(1.05);
+  }
+
+  .quick-ctrl-btn.active {
+    background: #ef4444; /* ミュート時は赤にする */
+  }
+
+  .quick-ctrl-btn.return-btn {
+    border-radius: 6px;
+    width: auto;
+    padding: 0 0.5rem;
+    font-size: 0.7rem;
+    background: var(--zoom-accent);
+    font-weight: bold;
+  }
+
+  .quick-ctrl-btn.return-btn:hover {
+    background: #2563eb;
+  }
+
+  /* 操作ガイドの開閉可能ボックス */
+  .guide-overlay-box {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid #3b82f6;
+    color: #93c5fd;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    z-index: 100;
+    max-width: 320px;
+    box-shadow: var(--shadow-lg);
+    pointer-events: auto;
+    transition: all 0.3s ease;
+  }
+
+  .guide-close-btn {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: bold;
+    padding: 0.1rem 0.3rem;
+  }
+
+  .guide-close-btn:hover {
+    color: #ef4444;
+  }
+
+  /* ガイド再表示ボタン */
+  .show-guide-floating-btn {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1005;
+    background: #1e293b;
+    border: 1.5px solid #3b82f6;
+    color: #93c5fd;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: bold;
+    box-shadow: var(--shadow-md);
+    display: none;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .show-guide-floating-btn:hover {
+    background: #0f172a;
+    transform: scale(1.05);
+  }
+
+  /* ZOOM URL 発行・コピー用ポップアップ */
+  .url-preparer-popup {
+    position: absolute;
+    top: 50px;
+    left: 20px;
+    width: 300px;
+    background: var(--zoom-panel-bg);
+    border: 1.5px solid #334155;
+    border-radius: 10px;
+    padding: 0.75rem;
+    z-index: 1010;
+    box-shadow: var(--shadow-lg);
+    display: none;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .preparer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #333;
+    padding-bottom: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: white;
+  }
+
+  .preparer-item-btn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+    color: #cbd5e1;
+  }
+
+  .preparer-item-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--zoom-accent);
+    color: white;
+  }
+
+  .preparer-item-btn.active {
+    background: rgba(45, 140, 255, 0.15);
+    border-color: var(--zoom-accent);
+    color: white;
+  }
+
+  /* iframe ラッパー */
+  .iframe-container {
+    width: 100%;
+    height: 100%;
+    background: white;
+  }
+
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+</style>
+</head>
+<body>
+
+  <!-- 操作ガイドヘッダー -->
+  <header>
+    <div class="logo-area">
+      <span class="logo-badge">HOME DASHBOARD</span>
+      <span class="logo-title">Zoom 起動＆ホーム画面ダッシュボード</span>
+    </div>
+    <div class="control-panel">
+      <!-- Zoom 起動＆終了コントロールボタン -->
+      <button class="swap-btn blue-btn" id="btn-toggle-zoom-visibility" onclick="toggleZoomLifecycle()">
+        💻 Zoomを起動する
+      </button>
+      <button class="swap-btn" onclick="toggleLayoutDirection()">
+        🔄 左右を入れ替える
+      </button>
+      <div class="guide-steps">
+        <button class="step-btn active" id="btn-step-1" onclick="loadStep(1)">① ドラッグ & 左右切替</button>
+        <button class="step-btn" id="btn-step-2" onclick="loadStep(2)">② フロート窓 & 移動・変形</button>
+        <button class="step-btn" id="btn-step-3" onclick="loadStep(3)">③ 画面共有 & チャット連動</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <div class="main-container" id="main-container">
+
+    <!-- 左パネル: 埋め込み時のZoom (初期状態は非表示) -->
+    <div class="split-panel-left" id="zoom-panel-embed">
+      <!-- Zoomヘッダー -->
+      <div class="zoom-header">
+        <div class="zoom-header-left">
+          <span class="green-shield">🛡️</span>
+          <strong>Zoom</strong>
+        </div>
+        <div class="zoom-header-right">
+          <button class="float-btn" onclick="toggleFloatMode(true)">
+            <span>🔲</span> フロート窓
+          </button>
+          <!-- 埋め込み側 Zoom を閉じる(切断終了)ボタン -->
+          <button class="float-btn" style="background: rgba(239, 68, 68, 0.25); border: 1px solid #ef4444;" onclick="confirmEndCall()">
+            ❌ 終了
+          </button>
+        </div>
+      </div>
+
+      <!-- ビューポート -->
+      <div class="zoom-viewport" id="embed-viewport">
+        
+        <!-- 接続中スピナー画面 -->
+        <div class="zoom-connecting-overlay" id="zoom-connecting-screen">
+          <div class="spinner"></div>
+          <span style="font-size: 0.85rem; font-weight: bold;" id="spinner-text">Zoomを起動中...</span>
+        </div>
+
+        <!-- 🌟 Zoom ホーム画面 (起動完了後にまずこれを出します) -->
+        <div class="zoom-home-screen" id="zoom-home-screen">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+            <div style="font-size: 0.75rem; color: #a3a3a3; text-align: left;">
+              <span>接続アカウント:</span><br>
+              <span style="color: var(--zoom-accent); font-weight: 700; font-size: 0.8rem;" id="home-account-email">sales_01@zoom.us</span>
+            </div>
+            <!-- 時計表示 -->
+            <div style="text-align: right; user-select: none;">
+              <div style="font-size: 1.5rem; font-weight: 300; color: #f8fafc;" id="zoom-clock-time">16:30</div>
+              <div style="font-size: 0.65rem; color: #a3a3a3;" id="zoom-clock-date">2026年8月9日 日曜日</div>
+            </div>
+          </div>
+
+          <!-- 4アクションタイル -->
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.2rem; width: 100%; max-width: 260px; margin: 1.25rem auto;">
+            <!-- 新規ミーティング (オレンジ) -->
+            <div class="zoom-tile" onclick="startMeetingFromHome()">
+              <div class="zoom-tile-icon" style="background: #ea580c;">📹</div>
+              <span style="font-size: 0.7rem; font-weight: 500;">新規ミーティング</span>
+            </div>
+            <!-- 参加 (ブルー) -->
+            <div class="zoom-tile" onclick="toast('アポイント入室コードを入力して入室します(モック)')">
+              <div class="zoom-tile-icon" style="background: var(--zoom-accent);">➕</div>
+              <span style="font-size: 0.7rem; font-weight: 500;">参加</span>
+            </div>
+            <!-- スケジュール (ブルー) -->
+            <div class="zoom-tile" onclick="toast('ミーティングスケジュールを設定します (モック)')">
+              <div class="zoom-tile-icon" style="background: var(--zoom-accent);">📅</div>
+              <span style="font-size: 0.7rem; font-weight: 500;">スケジュール</span>
+            </div>
+            <!-- 画面共有 (ブルー) -->
+            <div class="zoom-tile" onclick="toast('即時画面共有を開始します(モック)')">
+              <div class="zoom-tile-icon" style="background: var(--zoom-accent);">🖥️</div>
+              <span style="font-size: 0.7rem; font-weight: 500;">画面共有</span>
+            </div>
+          </div>
+
+          <!-- 本日の予定 -->
+          <div style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.6rem; font-size: 0.7rem; border: 1px solid rgba(255,255,255,0.06); width: 100%; text-align: left;">
+            <div style="font-weight: bold; color: #a3a3a3; margin-bottom: 0.2rem; font-size: 0.65rem;">本日の予定</div>
+            <div style="display: flex; justify-content: space-between; color: white;">
+              <span>鈴木 さくら 様 (新規面談)</span>
+              <span style="color: #10b981; font-weight: bold;">16:30 - 17:00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 映像・コンテンツコンテナ (新規ミーティング起動後に表示) -->
+        <div class="video-container" id="embed-video-container">
+          <!-- 画面切り替えリスト (映像の上に常時オーバーレイ、埋め込み・フロート共通) -->
+          <div class="float-screen-selector" id="video-screen-selector">
+            <button class="selector-trigger" onclick="toggleScreenDropdown(event)">
+              🎥 画面の切り替え ▼
+            </button>
+            <div class="selector-dropdown" id="screen-dropdown-menu">
+              <button class="selector-item active" onclick="switchVideoSource('client', event)">
+                <img src="zoom_meeting_placeholder.jpg" class="selector-thumb">
+                <span>👤 鈴木 さくら (顧客の画面)</span>
+              </button>
+              <button class="selector-item" onclick="switchVideoSource('colleague', event)">
+                <img src="zoom_colleague_placeholder.jpg" class="selector-thumb">
+                <span>👤 山田 太郎 (同僚の画面)</span>
+              </button>
+              <button class="selector-item" onclick="switchVideoSource('share', event)">
+                <div class="selector-thumb" style="display: flex; align-items: center; justify-content: center; font-size: 10px; background: #374151;">🖥️</div>
+                <span>🖥️ 提案資料.pdf (共有中の画面)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- ビデオ画像（鈴木さくら / 顧客） -->
+          <div class="video-overlay-bg" id="embed-blur-bg"></div>
+          <img src="zoom_meeting_placeholder.jpg" alt="Client Video" class="zoom-video" id="embed-video-img">
+          
+          <!-- ビデオ画像（山田太郎 / 同僚） -->
+          <img src="zoom_colleague_placeholder.jpg" alt="Colleague Video" class="zoom-video" id="embed-video-img-colleague" style="display: none;">
+          
+          <div class="name-tag" id="embed-name-tag">鈴木 さくら (アポイント相手)</div>
+
+          <!-- 画面共有オーバーレイ -->
+          <div class="screen-share-overlay" id="embed-share-overlay">
+            <div class="share-doc">
+              <div class="share-header">
+                <span>📋 提案資料.pdf (画面共有中)</span>
+                <span>共有者: 鈴木 さくら</span>
+              </div>
+              <div class="share-body">
+                <h4 style="font-size: 0.9rem; text-align: center; color: white;">直近 of 売上推移と課題分析</h4>
+                <div class="bar-chart">
+                  <div class="chart-bar" style="height: 40%"></div>
+                  <div class="chart-bar" style="height: 60%"></div>
+                  <div class="chart-bar" style="height: 85%"></div>
+                  <div class="chart-bar" style="height: 95%"></div>
+                </div>
+                <p style="font-size: 0.65rem; color: #9ca3af; text-align: center;">※ 画面幅を縮小・拡大すると、この資料やビデオのアスペクト比が自動追従します。</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 画面共有時の右上のアクティブスピーカー小画面 -->
+          <div class="active-speaker-mini" id="embed-active-speaker">
+            <img src="zoom_meeting_placeholder.jpg" alt="Mini Client">
+            <div class="speaker-label">鈴木 さくら</div>
+          </div>
+        </div>
+
+
+
+        <!-- Zoomチャットパネル (埋め込み時のみ使用) -->
+        <div class="zoom-chat-panel" id="embed-chat-panel">
+          <div class="chat-header">
+            <span>チャット</span>
+            <button class="chat-close-btn" onclick="toggleChat(false)">×</button>
+          </div>
+          <div class="chat-messages" id="embed-chat-messages">
+            <div class="chat-msg">
+              <div class="chat-sender">鈴木 さくら</div>
+              <div>本日の提案用資料を共有させていただきますね。</div>
+            </div>
+            <div class="chat-msg">
+              <div class="chat-sender">鈴木 さくら</div>
+              <div>アポイント日時は今月の25日でいかがでしょうか？</div>
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <input type="text" class="chat-input" placeholder="メッセージを入力..." id="embed-chat-input">
+            <button class="chat-send-btn" onclick="sendChatMessage()">送信</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Zoomコントロールバー (埋め込み用) -->
+      <div class="zoom-controls" id="embed-zoom-controls">
+        <div class="control-group">
+          <button class="control-btn" id="btn-mute" onclick="toggleMute()">
+            <span class="icon">🎙️</span>
+            <span>ミュート解除</span>
+          </button>
+          <button class="control-btn" id="btn-video" onclick="toggleVideo()">
+            <span class="icon">📹</span>
+            <span>ビデオの停止</span>
+          </button>
+        </div>
+        <div class="control-group">
+          <button class="control-btn" id="btn-bg" onclick="toggleBgMenu()">
+            <span class="icon">🖼️</span>
+            <span>背景変更</span>
+          </button>
+          <button class="control-btn" id="btn-share" onclick="toggleShareScreen()">
+            <span class="icon">🖥️</span>
+            <span>画面共有</span>
+          </button>
+          <button class="control-btn" id="btn-chat" onclick="toggleChat()">
+            <span class="icon">💬</span>
+            <span>チャット</span>
+          </button>
+        </div>
+        <div>
+          <button class="end-btn" onclick="confirmEndCall()">終了</button>
+        </div>
+      </div>
+
+      <!-- 背景変更メニュー -->
+      <div class="bg-menu" id="embed-bg-menu">
+        <button class="bg-option" onclick="changeVirtualBg('none')">背景なし</button>
+        <button class="bg-option" onclick="changeVirtualBg('blur')">ぼかし背景</button>
+        <button class="bg-option" onclick="changeVirtualBg('beach')">バーチャル背景 (ビーチ)</button>
+      </div>
+    </div>
+
+    <!-- 左右のリサイズドラッグバー -->
+    <div class="resizer-bar" id="drag-bar"></div>
+
+    <!-- 右パネル: 本物のSynapseを埋め込むエリア -->
+    <div class="split-panel-right" id="synapse-panel">
+      
+      <!-- 操作ガイド浮遊ボックス -->
+      <div class="guide-overlay-box" id="demo-guide-box">
+        <button class="guide-close-btn" onclick="toggleGuideBox(false)" title="ガイドを閉じる">×</button>
+        <div id="guide-box-content-area">
+          💡 <b>体験ステップ①: マイページでZoom連携 ＆ 起動</b><br>
+          ・特定のロール制限を模しているため、最初はZoomを起動できません。<br>
+          ・右側の本物のSynapseで<b>「👤 マイページ」</b>を開き、新規追加された<b>「Zoomと連携」</b>アイコンをクリックしてください。<br>
+          ・連携が完了すると、左側の起動ボタンが青くなり、Zoomミーティングを起動できるようになります！
+        </div>
+      </div>
+
+      <!-- iframeで本物の index.html をマウント -->
+      <div class="iframe-container">
+        <iframe src="index.html" id="synapse-iframe"></iframe>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- フローティング Zoom ウィンドウ -->
+  <div class="floating-zoom-window" id="zoom-panel-float" style="display: none; left: 50px; top: 100px;">
+    <!-- フローティングヘッダー (ドラッグ用) -->
+    <div class="floating-window-header" id="float-drag-header">
+      <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: bold; color: white;">
+        <span>📹 Zoom (映像のみ)</span>
+      </div>
+      <div style="display: flex; gap: 0.4rem;">
+        <button class="float-btn-mini" onclick="changeFloatSize('small')">小</button>
+        <button class="float-btn-mini" onclick="changeFloatSize('medium')">中</button>
+        <button class="float-btn-mini" onclick="changeFloatSize('large')">大</button>
+      </div>
+    </div>
+    
+    <!-- 映像表示ビューポート (ビデオや共有画面がここに入る) -->
+    <div class="floating-window-body" id="float-viewport">
+      <!-- ビューポートがここにイメージされます -->
+    </div>
+
+    <!-- 下部の半透明クイックコントロール (Zoom顔負けデザイン) -->
+    <div class="float-quick-controls">
+      <!-- マイクマーク -->
+      <button class="quick-ctrl-btn" id="float-quick-mute" onclick="toggleMute()" title="マイクのオン/オフ">
+        <span class="ctrl-icon">🎙️</span>
+      </button>
+      <!-- カメラマーク -->
+      <button class="quick-ctrl-btn" id="float-quick-video" onclick="toggleVideo()" title="カメラのオン/オフ">
+        <span class="ctrl-icon">📹</span>
+      </button>
+      <div style="flex: 1;"></div>
+      <!-- 埋め込みに戻すマーク -->
+      <button class="quick-ctrl-btn return-btn" onclick="toggleFloatMode(false)" title="Synapseに埋め込む">
+        📥 埋め込みに戻す
+      </button>
+    </div>
+    
+    <div class="resize-handle-se" id="float-resize-handle"></div>
+  </div>
+
+  <!-- ガイド再表示用の右下フローティングボタン -->
+  <button class="show-guide-floating-btn" id="btn-show-guide" onclick="toggleGuideBox(true)">
+    💡 ガイド表示
+  </button>
+
+  <!-- トースト通知 -->
+  <div class="toast" id="toast-notification">
+    <span id="toast-icon">ℹ️</span>
+    <span id="toast-text">メッセージ</span>
+  </div>
+
+  <script>
+    // --- 状態管理 ---
+    let isFloating = false;
+    let muteState = false;
+    let videoState = true;
+    let chatState = false;
+    let shareState = false;
+    let activeBg = 'none';
+    let isReverse = false; // 左右反転状態
+    
+    // Zoom 起動ライフサイクル状態
+    let zoomActive = false; // 最初は「未起動」
+    let zoomLinked = false; // ロール制限用の連携フラグ (最初は未連携)
+    let meetingActive = false; // 通話（面談）が開始されているか
+
+    // パネルの幅 (初期表示)
+    let zoomWidthPercent = 45;
+    let synapseWidthPercent = 55;
+
+    // DOM要素の参照
+    const dragBar = document.getElementById('drag-bar');
+    const embedZoom = document.getElementById('zoom-panel-embed');
+    const floatZoom = document.getElementById('zoom-panel-float');
+    const mainContainer = document.getElementById('main-container');
+    const embedViewport = document.getElementById('embed-viewport');
+    const floatViewport = document.getElementById('float-viewport');
+    const floatHeader = document.getElementById('float-drag-header');
+    const floatResize = document.getElementById('float-resize-handle');
+    const demoGuide = document.getElementById('demo-guide-box');
+    const synapseIframe = document.getElementById('synapse-iframe');
+    const btnShowGuide = document.getElementById('btn-show-guide');
+    const synapsePanel = document.getElementById('synapse-panel');
+    const btnToggleZoomVis = document.getElementById('btn-toggle-zoom-visibility');
+
+    const zoomConnectingScreen = document.getElementById('zoom-connecting-screen');
+    const zoomHomeScreen = document.getElementById('zoom-home-screen');
+    const embedVideoContainer = document.getElementById('embed-video-container');
+    const embedZoomControls = document.getElementById('embed-zoom-controls');
+
+    // 🌟 CORSを100%回避する安全な親子間 postMessage メッセージハンドラ
+    window.addEventListener('message', (event) => {
+      const message = event.data;
+      if (!message || typeof message !== 'object') return;
+      
+      if (message.type === 'ZOOM_LINK_STATUS') {
+        // マイページでのアカウント連携が完了/解除された
+        updateZoomConnectionStatus(message.data, message.email);
+      } else if (message.type === 'START_ZOOM_LIFECYCLE') {
+        // マイページで「Zoomを開く」がクリックされた ➔ 起動
+        startZoomLifecycle();
+      } else if (message.type === 'END_ZOOM_LIFECYCLE') {
+        // 連携解除等によるZoom強制シャットダウン
+        endZoomLifecycle();
+      }
+    });
+
+    // Zoomアカウント連携状態の更新
+    function updateZoomConnectionStatus(status, email) {
+      zoomLinked = status;
+      const btnHeader = document.getElementById('btn-toggle-zoom-visibility');
+      const accountEmailEl = document.getElementById('home-account-email');
+      
+      if (email && accountEmailEl) {
+        accountEmailEl.innerText = email;
+      }
+      
+      if (zoomLinked) {
+        btnHeader.style.opacity = '1';
+        btnHeader.style.cursor = 'pointer';
+        btnHeader.title = 'Zoomを起動します';
+        
+        btnToggleZoomVis.innerText = '💻 Zoomを起動する';
+        btnToggleZoomVis.className = 'swap-btn blue-btn';
+        
+        toast('マイページでZoom連携が確認されました。起動が可能です。');
+      } else {
+        btnHeader.style.opacity = '0.5';
+        btnHeader.title = 'マイページでZoom連携を完了してください';
+        
+        btnToggleZoomVis.innerText = '💻 Zoom (未連携)';
+        btnToggleZoomVis.className = 'swap-btn blue-btn';
+      }
+    }
+
+    // Zoomの「起動・終了」ライフサイクル制御
+    function toggleZoomLifecycle() {
+      if (!zoomLinked && !zoomActive) {
+        alert('⚠️ Zoom機能を利用できません。\n\n右側のSynapseで「👤 マイページ」を開き、「Zoomと連携」をクリックして連携を完了してください。');
+        toast('先にマイページでのZoomアカウント連携が必要です。');
+        return;
+      }
+      if (!zoomActive) {
+        startZoomLifecycle();
+      } else {
+        confirmEndCall();
+      }
+    }
+
+    // 🌟 Zoomを起動する処理 (接続後 ➔ まずZoomホーム画面を表示)
+    function startZoomLifecycle() {
+      if (!zoomLinked) {
+        alert('⚠️ Zoom機能を利用できません。\n\n右側のSynapseで「👤 マイページ」を開き、「Zoomと連携」をクリックして連携を完了してください。');
+        toast('先にマイページでのZoomアカウント連携が必要です。');
+        return;
+      }
+      
+      zoomActive = true;
+      meetingActive = false;
+      
+      // Zoomパネルと境界線を表示し、分割幅を適用
+      embedZoom.style.display = 'flex';
+      dragBar.style.display = 'flex';
+      embedZoom.style.width = `${zoomWidthPercent}%`;
+      synapsePanel.style.width = `${synapseWidthPercent}%`;
+
+      // 画面の状態を初期化
+      zoomHomeScreen.style.display = 'none';
+      embedVideoContainer.style.display = 'none';
+      embedZoomControls.style.display = 'none';
+      
+      // スピナー起動
+      document.getElementById('spinner-text').innerText = 'Zoomを起動中...';
+      zoomConnectingScreen.style.display = 'flex';
+
+      btnToggleZoomVis.innerText = '⏳ 起動中...';
+      btnToggleZoomVis.className = 'swap-btn blue-btn';
+
+      toast('Zoomを起動しています...');
+
+      // 1.5秒後に接続完了し、🌟「Zoomホーム画面」を表示
+      setTimeout(() => {
+        if (!zoomActive || meetingActive) return;
+        zoomConnectingScreen.style.display = 'none';
+        zoomHomeScreen.style.display = 'flex'; // ホーム画面を表示
+        
+        btnToggleZoomVis.innerText = '🔴 Zoomを終了する';
+        btnToggleZoomVis.className = 'swap-btn red-btn';
+        
+        toast('Zoomが起動しました！ホーム画面が表示されています。');
+      }, 1500);
+    }
+
+    // 🌟 ホーム画面から新規ミーティング（通話）を開始する処理
+    function startMeetingFromHome() {
+      meetingActive = true;
+      zoomHomeScreen.style.display = 'none';
+      
+      // 接続スピナー
+      document.getElementById('spinner-text').innerText = 'ミーティングを開始中...';
+      zoomConnectingScreen.style.display = 'flex';
+      
+      toast('新規ミーティングを作成しています。お客様を呼び出し中...');
+
+      // 1.5秒後にお客様が応答し、ビデオ通話へ移行
+      setTimeout(() => {
+        if (!zoomActive || !meetingActive) return;
+        zoomConnectingScreen.style.display = 'none';
+        embedVideoContainer.style.display = 'flex';
+        embedZoomControls.style.display = 'flex'; // コントロールバー表示
+        
+        toast('ミーティングに接続しました。面談を開始します。');
+      }, 1500);
+    }
+
+    // Zoom会議を終了する（閉じる）確認
+    function confirmEndCall() {
+      if (meetingActive) {
+        if (confirm('Zoomミーティングを終了して切断しますか？カメラ・マイクの接続も完全に解除され、Zoomが閉じられます。')) {
+          endZoomLifecycle();
+        }
+      } else {
+        // ホーム画面中に閉じる場合
+        endZoomLifecycle();
+      }
+    }
+
+    // Zoomを閉じる（終了・完全非表示）処理
+    function endZoomLifecycle() {
+      zoomActive = false;
+      meetingActive = false;
+
+      // すべての内部画面を非表示に戻す
+      embedVideoContainer.style.display = 'none';
+      zoomConnectingScreen.style.display = 'none';
+      zoomHomeScreen.style.display = 'none';
+      embedZoomControls.style.display = 'none';
+
+      // 🌟 Zoomパネルと境界線を完全に非表示にし、Synapseを全画面(100%)にする
+      embedZoom.style.display = 'none';
+      dragBar.style.display = 'none';
+      synapsePanel.style.width = '100%';
+
+      // もしフローティング窓が開いていたら、マウントを戻す
+      if (isFloating) {
+        toggleFloatMode(false);
+      }
+
+      // 起動ボタンの表記を元に戻す
+      if (zoomLinked) {
+        btnToggleZoomVis.innerText = '💻 Zoomを起動する';
+        btnToggleZoomVis.className = 'swap-btn blue-btn';
+      } else {
+        btnToggleZoomVis.innerText = '💻 Zoom (未連携)';
+        btnToggleZoomVis.className = 'swap-btn blue-btn';
+      }
+
+      toast('Zoomを終了し、システムを閉じました。');
+    }
+
+    // クロック・時計表示のリアルタイム更新
+    function updateClock() {
+      const now = new Date();
+      const timeEl = document.getElementById('zoom-clock-time');
+      const dateEl = document.getElementById('zoom-clock-date');
+      
+      if (timeEl) {
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        timeEl.innerText = `${hh}:${mm}`;
+      }
+      
+      if (dateEl) {
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const date = now.getDate();
+        const days = ['日', '月', '火', '水', '木', '金', '土'];
+        const day = days[now.getDay()];
+        dateEl.innerText = `${year}年${month}月${date}日 ${day}曜日`;
+      }
+    }
+    
+    // 初回クロック設定 & 10秒毎に更新
+    updateClock();
+    setInterval(updateClock, 10000);
+
+    // 操作ガイドの開閉処理
+    function toggleGuideBox(show) {
+      if (show) {
+        demoGuide.style.display = 'block';
+        btnShowGuide.style.display = 'none';
+      } else {
+        demoGuide.style.display = 'none';
+        btnShowGuide.style.display = 'flex';
+      }
+    }
+
+    // 画面切り替えリスト（ドロップダウン）のトグル制御
+    function toggleScreenDropdown(event) {
+      event.stopPropagation();
+      const menu = document.getElementById('screen-dropdown-menu');
+      menu.classList.toggle('show');
+    }
+
+    document.addEventListener('click', () => {
+      const menu = document.getElementById('screen-dropdown-menu');
+      if (menu) menu.classList.remove('show');
+    });
+
+    // 映像ソースの切り替え処理
+    function switchVideoSource(sourceType, event) {
+      if (event) event.stopPropagation();
+
+      const imgClient = document.getElementById('embed-video-img');
+      const imgColleague = document.getElementById('embed-video-img-colleague');
+      const shareOverlay = document.getElementById('embed-share-overlay');
+      const miniSpeaker = document.getElementById('embed-active-speaker');
+      const nameTag = document.getElementById('embed-name-tag');
+      
+      const items = document.querySelectorAll('.selector-item');
+      items.forEach(item => item.classList.remove('active'));
+
+      imgClient.style.display = 'none';
+      imgColleague.style.display = 'none';
+      shareOverlay.style.display = 'none';
+      miniSpeaker.style.display = 'none';
+
+      if (sourceType === 'client') {
+        imgClient.style.display = 'block';
+        nameTag.innerText = "鈴木 さくら (アポイント相手)";
+        items[0].classList.add('active');
+        shareState = false;
+        toast('鈴木 さくら さんのカメラ映像に切り替えました。');
+      } else if (sourceType === 'colleague') {
+        imgColleague.style.display = 'block';
+        nameTag.innerText = "山田 太郎 (担当JO/同僚)";
+        items[1].classList.add('active');
+        shareState = false;
+        toast('山田 太郎 さんのカメラ映像に切り替えました。');
+      } else if (sourceType === 'share') {
+        shareOverlay.style.display = 'flex';
+        miniSpeaker.style.display = 'block';
+        nameTag.innerText = "画面共有中: 提案資料.pdf";
+        items[2].classList.add('active');
+        shareState = true;
+        toast('鈴木さんが共有している画面に切り替えました。');
+      }
+
+      const menu = document.getElementById('screen-dropdown-menu');
+      menu.classList.remove('show');
+    }
+
+    // CSS order プロパティによるレイアウト左右入れ替え
+    function toggleLayoutDirection() {
+      isReverse = !isReverse;
+      
+      if (isReverse) {
+        synapsePanel.style.order = '1';
+        dragBar.style.order = '2';
+        embedZoom.style.order = '3';
+        toast('左右を入れ替えました (左: Synapse / 右: Zoom)');
+      } else {
+        embedZoom.style.order = '1';
+        dragBar.style.order = '2';
+        synapsePanel.style.order = '3';
+        toast('左右を入れ替えました (左: Zoom / 右: Synapse)');
+      }
+    }
+
+    // 境界線ドラッグ幅変動の実装
+    let isDraggingBar = false;
+
+    dragBar.addEventListener('mousedown', (e) => {
+      isDraggingBar = true;
+      dragBar.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      synapseIframe.style.pointerEvents = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDraggingBar || isFloating || !zoomActive) return;
+      
+      const containerRect = mainContainer.getBoundingClientRect();
+      const pointerX = e.clientX - containerRect.left;
+      
+      const barWidthPercent = (8 / containerRect.width) * 100;
+      const pointerPercent = (pointerX / containerRect.width) * 100;
+      
+      if (!isReverse) {
+        zoomWidthPercent = pointerPercent;
+        synapseWidthPercent = 100 - pointerPercent - barWidthPercent;
+      } else {
+        synapseWidthPercent = pointerPercent;
+        zoomWidthPercent = 100 - pointerPercent - barWidthPercent;
+      }
+      
+      if (zoomWidthPercent >= 20 && synapseWidthPercent >= 25) {
+        embedZoom.style.width = `${zoomWidthPercent}%`;
+        synapsePanel.style.width = `${synapseWidthPercent}%`;
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDraggingBar) {
+        isDraggingBar = false;
+        dragBar.classList.remove('dragging');
+        document.body.style.cursor = 'default';
+        document.body.style.userSelect = 'auto';
+        synapseIframe.style.pointerEvents = 'auto';
+      }
+    });
+
+    // --- フローティングウィンドウのドラッグ移動 ＆ リサイズ処理 ---
+    let isDraggingFloat = false;
+    let isResizingFloat = false;
+    let floatStartX = 0;
+    let floatStartY = 0;
+    let floatStartLeft = 50;
+    let floatStartTop = 100;
+    let floatStartWidth = 480;
+    let floatStartHeight = 360;
+
+    if (floatHeader) {
+      floatHeader.style.cursor = 'move';
+      floatHeader.addEventListener('mousedown', (e) => {
+        if (e.target.tagName.toLowerCase() === 'button') return;
+        isDraggingFloat = true;
+        document.body.style.userSelect = 'none';
+        synapseIframe.style.pointerEvents = 'none';
+
+        floatStartX = e.clientX;
+        floatStartY = e.clientY;
+        floatStartLeft = parseInt(floatZoom.style.left) || 50;
+        floatStartTop = parseInt(floatZoom.style.top) || 100;
+        
+        floatHeader.style.cursor = 'grabbing';
+      });
+    }
+
+    if (floatResize) {
+      floatResize.style.position = 'absolute';
+      floatResize.style.right = '0';
+      floatResize.style.bottom = '0';
+      floatResize.style.width = '14px';
+      floatResize.style.height = '14px';
+      floatResize.style.cursor = 'se-resize';
+      floatResize.style.background = 'linear-gradient(135deg, transparent 45%, #64748b 45%, #64748b 55%, transparent 55%, transparent 65%, #64748b 65%)';
+      floatResize.style.borderRadius = '0 0 10px 0';
+      floatResize.style.zIndex = '1010';
+
+      floatResize.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        isResizingFloat = true;
+        document.body.style.userSelect = 'none';
+        synapseIframe.style.pointerEvents = 'none';
+
+        floatStartX = e.clientX;
+        floatStartY = e.clientY;
+        floatStartWidth = floatZoom.offsetWidth;
+        floatStartHeight = floatZoom.offsetHeight;
+      });
+    }
+
+    document.addEventListener('mousemove', (e) => {
+      if (isDraggingFloat) {
+        const deltaX = e.clientX - floatStartX;
+        const deltaY = e.clientY - floatStartY;
+
+        let newLeft = floatStartLeft + deltaX;
+        let newTop = floatStartTop + deltaY;
+
+        const maxLeft = window.innerWidth - 100;
+        const maxTop = window.innerHeight - 80;
+        if (newLeft < 0) newLeft = 0;
+        if (newLeft > maxLeft) newLeft = maxLeft;
+        if (newTop < 0) newTop = 0;
+        if (newTop > maxTop) newTop = maxTop;
+
+        floatZoom.style.left = `${newLeft}px`;
+        floatZoom.style.top = `${newTop}px`;
+      } else if (isResizingFloat) {
+        const deltaX = e.clientX - floatStartX;
+        const deltaY = e.clientY - floatStartY;
+
+        let newWidth = floatStartWidth + deltaX;
+        let newHeight = floatStartHeight + deltaY;
+
+        if (newWidth < 320) newWidth = 320;
+        if (newWidth > 1200) newWidth = 1200;
+        if (newHeight < 240) newHeight = 240;
+        if (newHeight > 900) newHeight = 900;
+
+        floatZoom.style.width = `${newWidth}px`;
+        floatZoom.style.height = `${newHeight}px`;
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDraggingFloat) {
+        isDraggingFloat = false;
+        document.body.style.userSelect = 'auto';
+        synapseIframe.style.pointerEvents = 'auto';
+        if (floatHeader) floatHeader.style.cursor = 'move';
+      }
+      if (isResizingFloat) {
+        isResizingFloat = false;
+        document.body.style.userSelect = 'auto';
+        synapseIframe.style.pointerEvents = 'auto';
+      }
+    });
+
+    // フローティングモードと埋め込みモードの切り替え
+    function toggleFloatMode(toFloat) {
+      isFloating = toFloat;
+      const videoContainer = document.getElementById('embed-video-container');
+      
+      if (toFloat) {
+        floatViewport.appendChild(videoContainer);
+        embedZoom.style.display = 'none';
+        dragBar.style.display = 'none';
+        floatZoom.style.display = 'flex';
+        
+        floatZoom.style.left = '50px';
+        floatZoom.style.top = '100px';
+        floatZoom.style.width = '480px';
+        floatZoom.style.height = '360px';
+
+        toggleChat(false);
+        toast('Zoomを「映像特化」フローティング窓に切り替えました。');
+      } else {
+        embedViewport.insertBefore(videoContainer, embedViewport.firstChild);
+        if (zoomActive) {
+          embedZoom.style.display = 'flex';
+          dragBar.style.display = 'flex';
+          embedZoom.style.width = `${zoomWidthPercent}%`;
+          synapsePanel.style.width = `${synapseWidthPercent}%`;
+        } else {
+          embedZoom.style.display = 'none';
+          dragBar.style.display = 'none';
+          synapsePanel.style.width = '100%';
+        }
+        floatZoom.style.display = 'none';
+        
+        toast('Zoomを埋め込み表示に戻しました。');
+      }
+    }
+
+    function changeFloatSize(size) {
+      if (size === 'small') {
+        floatZoom.style.width = '320px';
+        floatZoom.style.height = '240px';
+      } else if (size === 'medium') {
+        floatZoom.style.width = '480px';
+        floatZoom.style.height = '360px';
+      } else if (size === 'large') {
+        floatZoom.style.width = '640px';
+        floatZoom.style.height = '480px';
+      }
+    }
+
+    // コントロール同期
+    function toggleMute() {
+      muteState = !muteState;
+      const btnEmbed = document.getElementById('btn-mute');
+      const btnFloat = document.getElementById('float-quick-mute');
+      
+      if (muteState) {
+        btnEmbed.classList.add('active');
+        btnEmbed.querySelector('.icon').innerText = '🔇';
+        btnEmbed.querySelector('span:last-child').innerText = 'ミュート中';
+        
+        btnFloat.classList.add('active');
+        btnFloat.querySelector('.ctrl-icon').innerText = '🔇';
+        toast('マイクをミュートにしました。');
+      } else {
+        btnEmbed.classList.remove('active');
+        btnEmbed.querySelector('.icon').innerText = '🎙️';
+        btnEmbed.querySelector('span:last-child').innerText = 'ミュート解除';
+        
+        btnFloat.classList.remove('active');
+        btnFloat.querySelector('.ctrl-icon').innerText = '🎙️';
+        toast('マイクのミュートを解除しました。');
+      }
+    }
+
+    function toggleVideo() {
+      videoState = !videoState;
+      const btnEmbed = document.getElementById('btn-video');
+      const btnFloat = document.getElementById('float-quick-video');
+      const videoImg = document.getElementById('embed-video-img');
+      const videoColleague = document.getElementById('embed-video-img-colleague');
+      
+      if (!videoState) {
+        btnEmbed.classList.add('red-text');
+        btnEmbed.querySelector('.icon').innerText = '❌📹';
+        btnEmbed.querySelector('span:last-child').innerText = 'ビデオの開始';
+        
+        btnFloat.classList.add('active');
+        btnFloat.querySelector('.ctrl-icon').innerText = '❌📹';
+        videoImg.style.visibility = 'hidden';
+        videoColleague.style.visibility = 'hidden';
+        toast('ビデオカメラをオフにしました。');
+      } else {
+        btnEmbed.classList.remove('red-text');
+        btnEmbed.querySelector('.icon').innerText = '📹';
+        btnEmbed.querySelector('span:last-child').innerText = 'ビデオの停止';
+        
+        btnFloat.classList.remove('active');
+        btnFloat.querySelector('.ctrl-icon').innerText = '📹';
+        videoImg.style.visibility = 'visible';
+        videoColleague.style.visibility = 'visible';
+        toast('ビデオカメラをオンにしました。');
+      }
+    }
+
+    function toggleChat(state) {
+      chatState = (state !== undefined) ? state : !chatState;
+      const btn = document.getElementById('btn-chat');
+      const chatPanel = document.getElementById('embed-chat-panel');
+      
+      if (chatState) {
+        btn.classList.add('active');
+        chatPanel.style.display = 'flex';
+      } else {
+        btn.classList.remove('active');
+        chatPanel.style.display = 'none';
+      }
+    }
+
+    function toggleShareScreen() {
+      shareState = !shareState;
+      const btn = document.getElementById('btn-share');
+      
+      if (shareState) {
+        btn.classList.add('active');
+        switchVideoSource('share');
+      } else {
+        btn.classList.remove('active');
+        switchVideoSource('client');
+      }
+    }
+
+    function toggleBgMenu() {
+      const menu = document.getElementById('embed-bg-menu');
+      menu.style.display = (menu.style.display === 'flex') ? 'none' : 'flex';
+    }
+
+    function changeVirtualBg(bg) {
+      activeBg = bg;
+      const blurBg = document.getElementById('embed-blur-bg');
+      const videoImg = document.getElementById('embed-video-img');
+      const menu = document.getElementById('embed-bg-menu');
+      
+      menu.style.display = 'none';
+      blurBg.style.display = 'none';
+      videoImg.className = 'zoom-video';
+      
+      if (bg === 'blur') {
+        videoImg.className = 'zoom-video video-blur';
+        toast('背景に「ぼかし」を適用しました。');
+      } else if (bg === 'beach') {
+        blurBg.style.display = 'block';
+        blurBg.className = 'video-overlay-bg video-bg-beach';
+        toast('バーチャル背景（ビーチ）を適用しました。');
+      } else {
+        toast('背景効果をオフにしました。');
+      }
+    }
+
+    function sendChatMessage() {
+      const input = document.getElementById('embed-chat-input');
+      const container = document.getElementById('embed-chat-messages');
+      if (!input.value.trim()) return;
+      
+      const msg = document.createElement('div');
+      msg.className = 'chat-msg';
+      msg.innerHTML = `
+        <div class="chat-sender" style="color: #10b981;">あなた (Synapse)</div>
+        <div>${input.value}</div>
+      `;
+      container.appendChild(msg);
+      container.scrollTop = container.scrollHeight;
+      input.value = '';
+    }
+
+    // ステップ切り替えガイド
+    let currentStep = 1;
+    function loadStep(step) {
+      currentStep = step;
+      toggleGuideBox(true);
+      
+      for (let i = 1; i <= 3; i++) {
+        document.getElementById(`btn-step-${i}`).classList.remove('active');
+      }
+      document.getElementById(`btn-step-${step}`).classList.add('active');
+
+      const content = document.getElementById('guide-box-content-area');
+
+      if (step === 1) {
+        endZoomLifecycle();
+        content.innerHTML = `
+          💡 <b>体験ステップ①: マイページでZoom連携 ＆ 起動</b><br>
+          ・特定のロール制限を模しているため、最初はZoomを起動できません。<br>
+          ・右側の本物のSynapseで<b>「👤 マイページ」</b>を開き、新規追加された<b>「Zoomと連携」</b>アイコンをクリックしてください。<br>
+          ・連携が完了すると、左側の起動ボタンが青くなり、Zoomミーティングを起動できるようになります！
+        `;
+      } else if (step === 2) {
+        // ステップ2では自動的に連携＆起動し、1秒後にフロート窓にする
+        updateZoomConnectionStatus(true);
+        startZoomLifecycle();
+        setTimeout(() => {
+          if (zoomActive) {
+            toggleFloatMode(true);
+          }
+        }, 1000);
+        
+        content.innerHTML = `
+          💡 <b>体験ステップ②: フロート窓 ＆ 移動・変形</b><br>
+          ・Zoom画面右上の<b>「🔲 フロート窓」</b>をクリックすると、別窓でZoomが浮き上がります！<br>
+          ・上部のヘッダー部分をマウスでドラッグして、画面上の好きな場所へ移動できます。<br>
+          ・ウィンドウ右下隅の角をドラッグして、サイズも自由に変更（リサイズ）可能です。
+        `;
+      } else if (step === 3) {
+        // ステップ3では自動的にZoom連携状態を擬似的にONにして起動させます
+        updateZoomConnectionStatus(true);
+        startZoomLifecycle();
+        
+        // ホームからミーティング開始の疑似自動呼び出し
+        setTimeout(() => {
+          startMeetingFromHome();
+        }, 1800);
+
+        setTimeout(() => {
+          toggleChat(true);
+          switchVideoSource('share');
+        }, 3600);
+        
+        content.innerHTML = `
+          💡 <b>体験ステップ③: 画面共有 & チャット連動</b><br>
+          ・画面共有やチャットとの並行動作を確認できます。<br>
+          ・右側の本物のSynapseで情報を調べながら、Zoomでのコミュニケーションをスムーズに行う様子をイメージできます。
+        `;
+      }
+    }
+
+    // トースト表示用の汎用関数 (JSエラー回避およびデモ通知用)
+    function toast(message, type = 'info') {
+      const toastEl = document.getElementById('toast-notification');
+      const textEl = document.getElementById('toast-text');
+      const iconEl = document.getElementById('toast-icon');
+      if (!toastEl) return;
+
+      if (textEl) textEl.innerText = message;
+      if (iconEl) {
+        if (type === 'success') iconEl.innerText = '✅';
+        else if (type === 'error') iconEl.innerText = '❌';
+        else iconEl.innerText = 'ℹ️';
+      }
+
+      // インラインで美しいスタイルを適用
+      toastEl.style.display = 'flex';
+      toastEl.style.alignItems = 'center';
+      toastEl.style.gap = '0.5rem';
+      toastEl.style.position = 'fixed';
+      toastEl.style.bottom = '20px';
+      toastEl.style.right = '20px';
+      toastEl.style.backgroundColor = '#1e293b';
+      toastEl.style.color = '#f8fafc';
+      toastEl.style.padding = '0.75rem 1.25rem';
+      toastEl.style.borderRadius = '8px';
+      toastEl.style.border = '1px solid #334155';
+      toastEl.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.3), 0 4px 6px -2px rgba(0,0,0,0.05)';
+      toastEl.style.zIndex = '99999';
+      toastEl.style.fontSize = '0.82rem';
+      toastEl.style.fontWeight = '500';
+      toastEl.style.transition = 'opacity 0.3s ease';
+      toastEl.style.opacity = '1';
+
+      if (window.toastTimer) clearTimeout(window.toastTimer);
+
+      window.toastTimer = setTimeout(() => {
+        toastEl.style.opacity = '0';
+        setTimeout(() => {
+          toastEl.style.display = 'none';
+        }, 300);
+      }, 3000);
+    }
+
+    // 初期化時にZoom連携状態を「未連携（無効）」にセット
+    updateZoomConnectionStatus(false);
+  </script>
+</body>
+</html>
