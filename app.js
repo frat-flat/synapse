@@ -1533,7 +1533,7 @@ function logLocalPartyId(partyId, source = 'synapse_appoint', status = 'temporar
   if (!exists) {
     localIds.push({
       party_id: partyId,
-      seq_value: localIds.length + 1,
+      seq_value: 1, // 新規ローカル生成IDのシーケンスは初期値の「1」から開始する
       source: source,
       status: status,
       created_at: new Date().toISOString(),
@@ -1635,7 +1635,19 @@ async function loadPartyIds() {
   let localIds = [];
   try {
     const saved = localStorage.getItem('synapse_local_party_ids');
-    if (saved) localIds = JSON.parse(saved);
+    if (saved) {
+      localIds = JSON.parse(saved);
+      let hasChange = false;
+      localIds.forEach(item => {
+        if (item.seq_value !== 1) {
+          item.seq_value = 1;
+          hasChange = true;
+        }
+      });
+      if (hasChange) {
+        localStorage.setItem('synapse_local_party_ids', JSON.stringify(localIds));
+      }
+    }
   } catch (e) {}
 
   // DBデータとローカルデータをマージ（IDをキーにして重複排除、DB側のデータを優先）
