@@ -1719,7 +1719,11 @@ async function loadPartyIds() {
     if (item.status === 'active') {
       statusBadge = `<span style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">本登録 (active)</span>`;
     } else if (item.status === 'temporary') {
-      statusBadge = `<span style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">仮発行 (temporary)</span>`;
+      const localAppoint = state.appointments?.find(a => a.id === item.party_id);
+      const isDraft = localAppoint && localAppoint.status === 'draft';
+      const label = isDraft ? '下書き保存 (temporary)' : '仮発行 (temporary)';
+      const bg = isDraft ? 'rgba(245, 158, 11, 0.08)' : 'rgba(245, 158, 11, 0.15)';
+      statusBadge = `<span style="background: ${bg}; color: #f59e0b; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">${label}</span>`;
     } else if (item.status === 'reusable') {
       const resetDiffDays = Math.floor((now - new Date(item.reset_at || item.created_at)) / (1000 * 60 * 60 * 24));
       const canReuse = resetDiffDays >= 365 * 3;
