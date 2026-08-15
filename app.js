@@ -31502,39 +31502,29 @@ window.openResumableUrl = function(urlStr) {
       };
     }
 
-    // Googleカレンダー連携モーダル制御
+    // Googleカレンダー連携ボタン制御 (本物API連携の起動)
     if (googleConnectBtn) {
       googleConnectBtn.onclick = () => {
         if (!isGoogleLinked) {
-          if (googleOauthModal) {
-            googleOauthModal.style.display = 'flex';
-            if (googleOauthEmailInput) {
-              googleOauthEmailInput.value = state.currentUser ? state.currentUser.id : 'user_01@gmail.com';
+          const me = state.currentUser ? state.currentUser.id : 'guest';
+          const clientId = localStorage.getItem(`SYNAPSE_GOOGLE_CLIENT_ID_${me}`);
+          const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
+          
+          if (!clientId || !apiKey) {
+            showToast('Google API詳細設定に Client ID と API Key を入力・保存してください。', 'warning');
+            if (googleSettingsContent && googleSettingsContent.style.display === 'none') {
+              googleSettingsContent.style.display = 'flex';
+              googleSettingsArrow.textContent = '▲';
             }
+            return;
           }
+
+          startRealGoogleAuth(clientId, apiKey);
         } else {
           if (confirm('Googleカレンダーの連携を解除しますか？')) {
             unlinkGoogleCalendar();
           }
         }
-      };
-    }
-
-    if (googleOauthCancel) {
-      googleOauthCancel.onclick = () => {
-        if (googleOauthModal) googleOauthModal.style.display = 'none';
-      };
-    }
-
-    if (googleOauthSubmit) {
-      googleOauthSubmit.onclick = () => {
-        const email = googleOauthEmailInput ? googleOauthEmailInput.value.trim() : 'user_01@gmail.com';
-        if (!email) {
-          showToast('Googleメールアドレスを入力してください。', 'error');
-          return;
-        }
-        linkGoogleCalendar(email);
-        if (googleOauthModal) googleOauthModal.style.display = 'none';
       };
     }
 
@@ -31666,6 +31656,11 @@ window.openResumableUrl = function(urlStr) {
     updateSelectedDateLabel();
     loadEventsForSelectedDate();
     resetEventForm();
+
+    // Googleカレンダー実連携中なら自動同期を行う
+    if (isGoogleLinked && clientId && apiKey) {
+      silentGoogleSync(clientId, apiKey);
+    }
   }
 
   // メンバー一覧をSupabaseまたはダミーから取得
@@ -32525,7 +32520,49 @@ window.openResumableUrl = function(urlStr) {
     label.textContent = `選択日: ${month}月${day}日(${dayName})`;
   }
 
-  // 6. Googleカレンダー連携処理
+  // 6. 本物の Google Calendar API 連携処理
+
+  // 6-A. ポップアップ起動による Google OAuth 認証
+  function startRealGoogleAuth(clientId, apiKey) {
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+      showToast('Google API ライブラリがロードされていません。リロードしてください。', 'error');
+      return;
+    }
+
+    showToast('Google公式サインイン画面を起動します...', 'info');
+
+    try {
+      const tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'https://www.googleapis.com/auth/calendar.events',
+        callback: async (tokenResponse) => {
+          if (tokenResponse && tokenResponse.access_token) {
+            googleAccessToken = tokenResponse.access_token;
+            console.log("[Google Calendar API] Token client callback success!");
+            
+            const me = state.currentUser ? state.currentUser.id : 'guest';
+            
+            let email = 'user_01@gmail.com';
+            try {
+              const res = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${googleAccessToken}`);
+              const info = await res.json();
+              if (info && info.email) email = info.email;
+            } catch (e) {
+              console.warn("OAuth email resolution failed, using active user id instead.", e);
+              email = me;
+            }
+
+            linkGoogleCalendar(email);
+          }
+        }
+      });
+      
+      tokenClient.requestAccessToken();
+    } catch (err) {
+      console.error("[Google Calendar API] GIS Authorization failed:", err);
+      showToast('Google認証の起動に失敗しました。', 'error');
+    }
+  }
 
   function linkGoogleCalendar(email) {
     const me = state.currentUser ? state.currentUser.id : 'guest';
@@ -32539,25 +32576,30 @@ window.openResumableUrl = function(urlStr) {
     updateGoogleStatusUI();
     showToast('Googleカレンダーと連携されました！', 'success');
     
-    // サイドバーとカレンダー再描画
-    renderLeftSidebarMembers();
-    renderMypageCalendar();
-    loadEventsForSelectedDate();
-    
-    // 【本物API連携コードのプレビュー】
-    // API Key と Client ID が設定されている場合に Google Auth 認証処理を自動バックグラウンドで開始するための準備
-    const clientId = localStorage.getItem(`SYNAPSE_GOOGLE_CLIENT_ID_${me}`);
-    const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
-    if (clientId && apiKey) {
-      initRealGoogleCalendarSync(clientId, apiKey);
-    }
+    syncWithGoogleCalendar();
   }
 
-  function unlinkGoogleCalendar() {
+  async function unlinkGoogleCalendar() {
     const me = state.currentUser ? state.currentUser.id : 'guest';
     
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        await partnerSupabaseClient
+          .from('synapse_calendar_events')
+          .delete()
+          .eq('user_id', me)
+          .eq('is_google_event', true);
+      } catch (e) {
+        console.warn("Failed to clear DB Google cache events:", e);
+      }
+    }
+
+    state.calendarEvents = state.calendarEvents.filter(ev => !(ev.user_id === me && ev.is_google_event));
+    localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${me}`, JSON.stringify(state.calendarEvents));
+
     isGoogleLinked = false;
     googleLinkedEmail = '';
+    googleAccessToken = null;
     
     localStorage.setItem(`SYNAPSE_GOOGLE_LINKED_${me}`, 'false');
     localStorage.setItem(`SYNAPSE_GOOGLE_EMAIL_${me}`, '');
@@ -32570,6 +32612,156 @@ window.openResumableUrl = function(urlStr) {
     loadEventsForSelectedDate();
   }
 
+  function silentGoogleSync(clientId, apiKey) {
+    console.log("[Google Calendar API] Linked account auto-sync triggered on load.");
+    syncWithGoogleCalendar();
+  }
+
+  // 6-B. Google Calendar API からのイベント取得 ＆ 同期保存
+  async function syncWithGoogleCalendar() {
+    if (!isGoogleLinked || !googleAccessToken) {
+      console.log("[Google Calendar API] No active OAuth token. Keeping dummy events.");
+      return;
+    }
+
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const myName = state.currentUser ? (state.currentUser.name || state.currentUser.id) : '自分';
+    const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
+
+    const timeMin = new Date();
+    timeMin.setMonth(timeMin.getMonth() - 2);
+    const timeMax = new Date();
+    timeMax.setMonth(timeMax.getMonth() + 2);
+
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events` + 
+                `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&key=${apiKey}`;
+
+    showToast('Googleカレンダーから予定を同期中...', 'info');
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${googleAccessToken}`
+        }
+      });
+      const data = await response.json();
+      
+      if (data && data.items) {
+        const newGoogleEvents = data.items.map(event => {
+          return {
+            id: `google-${event.id}`,
+            user_id: me,
+            user_name: myName,
+            title: event.summary || '予定なし',
+            start_time: event.start.dateTime || event.start.date + 'T00:00:00Z',
+            end_time: event.end.dateTime || event.end.date + 'T23:59:59Z',
+            location: event.location || '',
+            description: event.description || '',
+            category: '一般',
+            color: '#4285F4',
+            shared_with: ['*'],
+            is_google_event: true
+          };
+        });
+
+        if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+          try {
+            await partnerSupabaseClient
+              .from('synapse_calendar_events')
+              .delete()
+              .eq('user_id', me)
+              .eq('is_google_event', true);
+            
+            if (newGoogleEvents.length > 0) {
+              await partnerSupabaseClient
+                .from('synapse_calendar_events')
+                .insert(newGoogleEvents);
+            }
+          } catch (e) {
+            console.error("Supabase DB Google cache sync failed:", e);
+          }
+        }
+
+        state.calendarEvents = state.calendarEvents.filter(ev => !(ev.user_id === me && ev.is_google_event));
+        state.calendarEvents = state.calendarEvents.concat(newGoogleEvents);
+        localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${me}`, JSON.stringify(state.calendarEvents));
+
+        showToast(`Googleカレンダーから ${data.items.length} 件の予定を同期しました！`, 'success');
+        
+        renderMypageCalendar();
+        loadEventsForSelectedDate();
+      }
+    } catch (e) {
+      console.error("[Google Calendar API] Fetch failed:", e);
+      showToast('Googleカレンダーのイベント取得に失敗しました。', 'error');
+    }
+  }
+
+  // 6-C. Googleカレンダーに予定を書き込む (POST)
+  async function addEventToGoogleCalendar(event) {
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
+
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?key=${apiKey}`;
+
+    const body = {
+      summary: event.title,
+      location: event.location,
+      description: event.description,
+      start: { dateTime: event.start_time },
+      end: { dateTime: event.end_time }
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${googleAccessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      const data = await response.json();
+      if (data && data.id) {
+        event.google_event_id = data.id;
+        if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+          await partnerSupabaseClient
+            .from('synapse_calendar_events')
+            .update({ google_event_id: data.id })
+            .eq('id', event.id);
+        }
+        const idx = state.calendarEvents.findIndex(ev => ev.id === event.id);
+        if (idx !== -1) {
+          state.calendarEvents[idx].google_event_id = data.id;
+          localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${me}`, JSON.stringify(state.calendarEvents));
+        }
+        console.log("[Google Calendar API] Event created on Google Calendar:", data.id);
+      }
+    } catch (e) {
+      console.error("[Google Calendar API] Post event failed:", e);
+    }
+  }
+
+  // 6-D. Googleカレンダーの予定を削除する (DELETE)
+  async function deleteEventFromGoogleCalendar(googleEventId) {
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
+
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}?key=${apiKey}`;
+
+    try {
+      await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${googleAccessToken}`
+        }
+      });
+      console.log("[Google Calendar API] Event deleted on Google Calendar:", googleEventId);
+    } catch (e) {
+      console.error("[Google Calendar API] Delete event failed:", e);
+    }
+  }
+
   function updateGoogleStatusUI() {
     const dot = document.getElementById('google-calendar-status-dot');
     const text = document.getElementById('google-calendar-status-text');
@@ -32579,12 +32771,11 @@ window.openResumableUrl = function(urlStr) {
     if (!dot || !text || !btn) return;
 
     if (isGoogleLinked) {
-      dot.style.backgroundColor = '#10b981'; // グリーン
-      text.textContent = `G連携中: ${googleLinkedEmail}`;
+      dot.style.backgroundColor = '#10b981';
+      text.textContent = `Google連携中: ${googleLinkedEmail}`;
       btn.textContent = '連携解除';
       btn.className = 'btn btn-secondary';
       
-      // マイページのランチャーカード表示の更新
       if (btnCalendar) {
         btnCalendar.style.background = 'rgba(66, 133, 244, 0.08)';
         btnCalendar.style.borderColor = '#4285F4';
@@ -32594,7 +32785,7 @@ window.openResumableUrl = function(urlStr) {
         if (descSpan) descSpan.innerText = `連携中: ${googleLinkedEmail}`;
       }
     } else {
-      dot.style.backgroundColor = '#ef4444'; // レッド
+      dot.style.backgroundColor = '#ef4444';
       text.textContent = 'Google未連携';
       btn.textContent = '連携する';
       btn.className = 'btn btn-primary';
@@ -32608,60 +32799,6 @@ window.openResumableUrl = function(urlStr) {
         if (titleSpan) titleSpan.innerText = 'カレンダー';
         if (descSpan) descSpan.innerText = '個人・共有の予定管理とGoogleカレンダーの同期連携を行います';
       }
-    }
-  }
-
-  // 本物の Google Calendar API 同期処理（デベロッパー用実装コード）
-  function initRealGoogleCalendarSync(clientId, apiKey) {
-    console.log("[Google Calendar API] Initializing sync with API settings...", { clientId: clientId.substring(0,10) + "...", apiKey: "RESTRICTED" });
-    
-    // GIS (Google Identity Services) ライブラリが読み込まれていれば実行
-    if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
-      try {
-        const tokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/calendar.events.readonly',
-          callback: async (tokenResponse) => {
-            if (tokenResponse && tokenResponse.access_token) {
-              console.log("[Google Calendar API] Access token acquired!");
-              fetchRealGoogleEvents(tokenResponse.access_token, apiKey);
-            }
-          }
-        });
-        // トークン取得ポップアップを実行
-        tokenClient.requestAccessToken();
-      } catch (err) {
-        console.error("[Google Calendar API] Token client initialization failed:", err);
-      }
-    } else {
-      console.log("[Google Calendar API] Google API scripts not loaded in index.html. Simulating real fetch...");
-    }
-  }
-
-  // アクセストークンとAPIキーを使ったカレンダーイベントの実際のフェッチ
-  async function fetchRealGoogleEvents(accessToken, apiKey) {
-    const timeMin = new Date();
-    timeMin.setMonth(timeMin.getMonth() - 2); // 過去2ヶ月分
-    const timeMax = new Date();
-    timeMax.setMonth(timeMax.getMonth() + 2); // 未来2ヶ月分
-
-    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events` + 
-                `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&key=${apiKey}`;
-
-    try {
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-      const data = await response.json();
-      if (data && data.items) {
-        console.log("[Google Calendar API] Synced events count:", data.items.length);
-        // 本物のイベントが取得できたら、ダミーイベントの代わりに state にマージする処理などを行う
-        showToast(`Googleカレンダーから ${data.items.length} 件の予定を同期しました！`, 'success');
-      }
-    } catch (e) {
-      console.error("[Google Calendar API] Fetch events failed:", e);
     }
   }
 
