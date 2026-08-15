@@ -31766,7 +31766,7 @@ window.openResumableUrl = function(urlStr) {
     await fetchCalendarEvents();
 
     // デフォルト共有設定の復元
-    const defaultShareType = localStorage.getItem(`SYNAPSE_CALENDAR_DEFAULT_SHARE_TYPE_${me}`) || 'all';
+    const defaultShareType = localStorage.getItem(`SYNAPSE_CALENDAR_DEFAULT_SHARE_TYPE_${me}`) || 'private';
     if (defaultShareTypeSelect) {
       defaultShareTypeSelect.value = defaultShareType;
       defaultShareTypeSelect.dispatchEvent(new Event('change'));
@@ -32570,7 +32570,7 @@ window.openResumableUrl = function(urlStr) {
     const shareTypeSelect = document.getElementById('calendar-form-share-type');
     if (shareTypeSelect) {
       const me = state.currentUser ? state.currentUser.id : 'guest';
-      const defaultShareType = localStorage.getItem(`SYNAPSE_CALENDAR_DEFAULT_SHARE_TYPE_${me}`) || 'all';
+      const defaultShareType = localStorage.getItem(`SYNAPSE_CALENDAR_DEFAULT_SHARE_TYPE_${me}`) || 'private';
       shareTypeSelect.value = defaultShareType;
       shareTypeSelect.dispatchEvent(new Event('change'));
       
