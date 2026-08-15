@@ -31310,6 +31310,9 @@ window.openResumableUrl = function(urlStr) {
   let isGoogleLinked = false;
   let googleLinkedEmail = '';
   
+  // 表示モード ('month' または 'week')
+  state.calendarViewMode = 'month';
+  
   // メンバーカラーのプリセット
   const MEMBER_COLORS = [
     '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', 
@@ -31385,13 +31388,21 @@ window.openResumableUrl = function(urlStr) {
     // ナビゲーション操作
     if (prevMonthBtn) {
       prevMonthBtn.onclick = () => {
-        calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() - 1);
+        if (state.calendarViewMode === 'week') {
+          calendarCurrentDate.setDate(calendarCurrentDate.getDate() - 7);
+        } else {
+          calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() - 1);
+        }
         renderMypageCalendar();
       };
     }
     if (nextMonthBtn) {
       nextMonthBtn.onclick = () => {
-        calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() + 1);
+        if (state.calendarViewMode === 'week') {
+          calendarCurrentDate.setDate(calendarCurrentDate.getDate() + 7);
+        } else {
+          calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() + 1);
+        }
         renderMypageCalendar();
       };
     }
@@ -31570,6 +31581,75 @@ window.openResumableUrl = function(urlStr) {
       filterAllBtn.onclick = () => {
         calendarFilteredMembers = synapseMembers.map(m => m.id);
         updateMemberFilterUI();
+        renderMypageCalendar();
+      };
+    }
+
+    // === 左サイドバーの折りたたみ・展開 ===
+    const sidebar = document.querySelector('.calendar-left-sidebar');
+    const collapseBtn = document.getElementById('calendar-sidebar-collapse-btn');
+    const expandBtn = document.getElementById('calendar-sidebar-expand-btn');
+
+    if (collapseBtn && sidebar) {
+      collapseBtn.onclick = (e) => {
+        e.stopPropagation();
+        sidebar.classList.add('collapsed');
+        if (expandBtn) expandBtn.style.display = 'block';
+      };
+    }
+
+    if (expandBtn && sidebar) {
+      expandBtn.onclick = (e) => {
+        e.stopPropagation();
+        sidebar.classList.remove('collapsed');
+        expandBtn.style.display = 'none';
+      };
+    }
+
+    // === 共有メンバー表示 アコーディオントグル ===
+    const filterAccordionTrigger = document.getElementById('calendar-filter-accordion-trigger');
+    const filterAccordionContent = document.getElementById('calendar-filter-accordion-content');
+    const filterAccordionArrow = document.getElementById('calendar-filter-accordion-arrow');
+
+    if (filterAccordionTrigger && filterAccordionContent) {
+      filterAccordionTrigger.onclick = () => {
+        const isCollapsed = filterAccordionContent.classList.toggle('collapsed');
+        if (filterAccordionArrow) {
+          filterAccordionArrow.textContent = isCollapsed ? '▶' : '▼';
+        }
+      };
+    }
+
+    // === 月 / 週 表示モード切り替え ===
+    const viewMonthBtn = document.getElementById('calendar-view-month');
+    const viewWeekBtn = document.getElementById('calendar-view-week');
+
+    if (viewMonthBtn && viewWeekBtn) {
+      viewMonthBtn.onclick = () => {
+        if (state.calendarViewMode === 'month') return;
+        state.calendarViewMode = 'month';
+        viewMonthBtn.classList.add('active');
+        viewWeekBtn.classList.remove('active');
+        // 背景色とカラーのトグル
+        viewMonthBtn.style.background = 'var(--primary)';
+        viewMonthBtn.style.color = 'white';
+        viewWeekBtn.style.background = 'transparent';
+        viewWeekBtn.style.color = 'var(--text-secondary)';
+        
+        renderMypageCalendar();
+      };
+
+      viewWeekBtn.onclick = () => {
+        if (state.calendarViewMode === 'week') return;
+        state.calendarViewMode = 'week';
+        viewWeekBtn.classList.add('active');
+        viewMonthBtn.classList.remove('active');
+        // 背景色とカラーのトグル
+        viewWeekBtn.style.background = 'var(--primary)';
+        viewWeekBtn.style.color = 'white';
+        viewMonthBtn.style.background = 'transparent';
+        viewMonthBtn.style.color = 'var(--text-secondary)';
+        
         renderMypageCalendar();
       };
     }
@@ -31891,50 +31971,58 @@ window.openResumableUrl = function(urlStr) {
     const year = calendarCurrentDate.getFullYear();
     const month = calendarCurrentDate.getMonth();
     
-    // タイトルの設定
-    monthYearTitle.textContent = `${year}年 ${month + 1}月`;
+    let totalGridCount = 42;
+    let startDate = null;
     
-    // 月の最初の日と最後の日
-    const firstDayIndex = new Date(year, month, 1).getDay();
-    const lastDayDate = new Date(year, month + 1, 0).getDate();
+    if (state.calendarViewMode === 'week') {
+      daysGrid.classList.add('week-view');
+      totalGridCount = 7;
+      
+      // 基準日 (calendarCurrentDate) からその週の日曜日を取得
+      const current = new Date(calendarCurrentDate);
+      const currentDay = current.getDay(); // 0:日〜6:土
+      startDate = new Date(current);
+      startDate.setDate(current.getDate() - currentDay);
+      
+      // タイトルの設定 (週表示)
+      const endOfWeek = new Date(startDate);
+      endOfWeek.setDate(startDate.getDate() + 6);
+      
+      const startStr = `${startDate.getMonth() + 1}/${startDate.getDate()}`;
+      const endStr = `${endOfWeek.getMonth() + 1}/${endOfWeek.getDate()}`;
+      monthYearTitle.textContent = `${startDate.getFullYear()}年 ${startDate.getMonth() + 1}月 (${startStr}〜${endStr})`;
+    } else {
+      daysGrid.classList.remove('week-view');
+      totalGridCount = 42;
+      
+      // 月の最初の日と最後の日
+      const firstDayIndex = new Date(year, month, 1).getDay();
+      startDate = new Date(year, month, 1 - firstDayIndex);
+      
+      // タイトルの設定 (月表示)
+      monthYearTitle.textContent = `${year}年 ${month + 1}月`;
+    }
     
-    // 前月の最後の日付
-    const prevLastDayDate = new Date(year, month, 0).getDate();
-    
-    // カレンダーの総グリッド数は、前月余白＋当月日数。
-    // 7曜日のマス目（6週間分＝42マス）に収める
-    const totalGridCount = 42;
-    
-    // 予定データを取り込む
-    const currentMonthEvents = getVisibleEventsForMonth(year, month);
+    // 予定データ（全件）を取り込む
+    const visibleEvents = getVisibleEventsForMonth(year, month);
     
     for (let i = 0; i < totalGridCount; i++) {
+      const cellDate = new Date(startDate);
+      cellDate.setDate(startDate.getDate() + i);
+      const dayNum = cellDate.getDate();
+      
       const cell = document.createElement('div');
       cell.className = 'calendar-day-cell';
       
-      let dayNum;
-      let cellDate;
+      // 他の月の判定 (月表示のみ)
+      if (state.calendarViewMode === 'month' && cellDate.getMonth() !== month) {
+        cell.classList.add('other-month');
+      }
       
-      if (i < firstDayIndex) {
-        // 前月の余白
-        dayNum = prevLastDayDate - firstDayIndex + i + 1;
-        cell.classList.add('other-month');
-        cellDate = new Date(year, month - 1, dayNum);
-      } else if (i >= firstDayIndex + lastDayDate) {
-        // 翌月の余白
-        dayNum = i - (firstDayIndex + lastDayDate) + 1;
-        cell.classList.add('other-month');
-        cellDate = new Date(year, month + 1, dayNum);
-      } else {
-        // 当月の日付
-        dayNum = i - firstDayIndex + 1;
-        cellDate = new Date(year, month, dayNum);
-        
-        // 本日の判定
-        const today = new Date();
-        if (cellDate.getDate() === today.getDate() && cellDate.getMonth() === today.getMonth() && cellDate.getFullYear() === today.getFullYear()) {
-          cell.classList.add('today');
-        }
+      // 本日の判定
+      const today = new Date();
+      if (cellDate.getDate() === today.getDate() && cellDate.getMonth() === today.getMonth() && cellDate.getFullYear() === today.getFullYear()) {
+        cell.classList.add('today');
       }
       
       // 選択日のハイライト
@@ -31945,15 +32033,19 @@ window.openResumableUrl = function(urlStr) {
       // 日付数値の描画
       const dayNumberEl = document.createElement('span');
       dayNumberEl.className = 'day-number';
-      dayNumberEl.textContent = dayNum;
+      if (state.calendarViewMode === 'week') {
+        dayNumberEl.textContent = `${cellDate.getMonth() + 1}/${dayNum}`;
+      } else {
+        dayNumberEl.textContent = dayNum;
+      }
       cell.appendChild(dayNumberEl);
       
       // 予定コンテナの追加
       const eventContainer = document.createElement('div');
       eventContainer.className = 'calendar-cell-events';
       
-      // 当日の予定をフィルタリングして追加
-      const dayEvents = currentMonthEvents.filter(ev => {
+      // 当日の予定をフィルタリング
+      const dayEvents = visibleEvents.filter(ev => {
         const evStart = new Date(ev.start_time);
         return evStart.getDate() === cellDate.getDate() && 
                evStart.getMonth() === cellDate.getMonth() && 
@@ -31963,11 +32055,19 @@ window.openResumableUrl = function(urlStr) {
       // 開始時間順にソート
       dayEvents.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
 
-      // セルに描画（最大3件まで表示、それ以上は「+○件」）
-      const maxDisplay = 3;
+      // セルに描画（週表示なら最大8件、月表示なら最大3件）
+      const maxDisplay = state.calendarViewMode === 'week' ? 8 : 3;
       dayEvents.slice(0, maxDisplay).forEach(ev => {
         const evMicro = document.createElement('div');
         evMicro.className = 'calendar-event-micro';
+        
+        // 週表示時は時間テキストを data-time に埋め込み CSS 経由で表示
+        if (state.calendarViewMode === 'week') {
+          const evStart = new Date(ev.start_time);
+          const evEnd = new Date(ev.end_time);
+          const formatTime = (d) => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+          evMicro.setAttribute('data-time', `${formatTime(evStart)} - ${formatTime(evEnd)}`);
+        }
         
         // Google予定ならGoogle色、通常予定なら予定の設定色を適用
         if (ev.is_google_event) {
@@ -31998,7 +32098,6 @@ window.openResumableUrl = function(urlStr) {
       
       // クリックイベントの登録
       cell.onclick = () => {
-        // 古い選択解除
         const prevSelected = daysGrid.querySelector('.calendar-day-cell.selected');
         if (prevSelected) prevSelected.classList.remove('selected');
         

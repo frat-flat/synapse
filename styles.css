@@ -4606,3 +4606,96 @@ h3 {
   gap: 0.6rem;
 }
 
+/* カレンダー左サイドバーの折りたたみアニメーション */
+.calendar-left-sidebar {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease, margin 0.3s ease, opacity 0.2s;
+  will-change: width, padding, opacity;
+}
+
+.calendar-left-sidebar.collapsed {
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  opacity: 0 !important;
+  border: none !important;
+  pointer-events: none;
+}
+
+/* サイドバー折りたたみボタンのホバーエフェクト */
+#calendar-sidebar-collapse-btn:hover {
+  background-color: var(--bg-surface-elevated) !important;
+  color: var(--text-primary) !important;
+}
+
+/* アコーディオン開閉アニメーション */
+#calendar-filter-accordion-content {
+  transition: max-height 0.3s ease, opacity 0.2s ease, margin 0.3s ease;
+  overflow: hidden;
+  max-height: 500px;
+  opacity: 1;
+}
+
+#calendar-filter-accordion-content.collapsed {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  margin: 0 !important;
+  pointer-events: none;
+}
+
+/* 週表示 (Week View) グリッドスタイル */
+.calendar-days-container.week-view {
+  grid-template-rows: 1fr !important;
+  flex: 1;
+  min-height: 250px;
+}
+
+.calendar-days-container.week-view .calendar-day-cell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+/* 週表示時の詳細な予定リストとスクロール */
+.calendar-days-container.week-view .calendar-cell-events {
+  gap: 4px;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+}
+
+/* 週表示での詳細予定カード */
+.calendar-days-container.week-view .calendar-event-micro {
+  white-space: normal;
+  word-break: break-all;
+  padding: 4px 6px;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.calendar-days-container.week-view .calendar-event-micro::before {
+  content: attr(data-time);
+  font-size: 0.58rem;
+  opacity: 0.85;
+  font-weight: 500;
+  display: block;
+  margin-bottom: 1px;
+}
+
+/* ボタングループのスタイリング */
+.calendar-view-selector button {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  transition: all 0.2s;
+}
+
+.calendar-view-selector button.active {
+  background: var(--primary) !important;
+  color: white !important;
+}
+
