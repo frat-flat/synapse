@@ -31662,6 +31662,11 @@ window.openResumableUrl = function(urlStr) {
         
         await saveAllowedShareMembers(allowedIds);
         
+        // 表示フィルターの対象も、許可されたメンバーのみに即座に同期・制限する
+        calendarFilteredMembers = calendarFilteredMembers.filter(id => 
+          id === me || allowedIds.includes(id)
+        );
+        
         if (typeof showToast === 'function') {
           showToast("共有候補メンバーの設定を更新しました");
         } else {
@@ -31672,6 +31677,9 @@ window.openResumableUrl = function(urlStr) {
         renderLeftSidebarMembers();
         renderDefaultShareMemberList();
         renderFormShareMemberList();
+        
+        // カレンダー表示も更新（予定フィルタリングを再適用）
+        renderMypageCalendar();
         
         // モーダルを閉じる
         if (shareModal) shareModal.style.display = 'none';
@@ -31808,6 +31816,11 @@ window.openResumableUrl = function(urlStr) {
     
     // デフォルトで自分＋共有者全員を表示対象にする
     calendarFilteredMembers = synapseMembers.map(m => m.id);
+    
+    // 表示フィルターの対象も、許可されたメンバーのみに同期・制限する
+    calendarFilteredMembers = calendarFilteredMembers.filter(id => 
+      id === me || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(id))
+    );
     
     renderLeftSidebarMembers();
     updateMemberFilterUI();
@@ -32516,6 +32529,8 @@ window.openResumableUrl = function(urlStr) {
   // 指定年月かつフィルターに合致する予定を取得（Google予定も含む）
   function getVisibleEventsForMonth(year, month) {
     let events = [];
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const isMeAllowed = me === 'owner' || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(me));
     
     // 通常予定（ローカル/Supabase）のフィルタリング
     if (state.calendarEvents) {
@@ -32523,12 +32538,19 @@ window.openResumableUrl = function(urlStr) {
         // Google予定ではないこと
         if (ev.is_google_event) return false;
         
+        const isOwner = ev.user_id === me;
+        
+        // 作成者がオーナーからカレンダー共有を許可されていること（本人は常に表示）
+        const isCreatorAllowed = ev.user_id === me || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(ev.user_id));
+        if (!isCreatorAllowed) return false;
+        
+        // ログインユーザー自身がオーナーから共有許可されていない場合、他人の予定は一切見えない
+        if (!isMeAllowed && !isOwner) return false;
+
         // 作成者が表示対象のメンバーに含まれていること
         if (!calendarFilteredMembers.includes(ev.user_id)) return false;
         
         // ログインユーザーの閲覧権限があるか（RLSと同様のフロントエンドでの検算）
-        const me = state.currentUser ? state.currentUser.id : 'guest';
-        const isOwner = ev.user_id === me;
         const isSharedAll = ev.shared_with && ev.shared_with.includes('*');
         const isSharedMe = ev.shared_with && ev.shared_with.includes(me);
         
@@ -32538,6 +32560,14 @@ window.openResumableUrl = function(urlStr) {
 
     // Googleカレンダー予定のフィルタリングとマージ
     synapseMembers.forEach(member => {
+      const isOwner = member.id === me;
+      // Google同期イベントを他者へ表示する場合も、そのメンバー自身がオーナーから共有許可されている必要がある
+      const isMemberAllowed = isOwner || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(member.id));
+      if (!isMemberAllowed) return;
+
+      // ログインユーザー自身が許可されていない場合、他者のGoogle同期イベントは見えない
+      if (!isMeAllowed && !isOwner) return;
+
       // フィルターでチェックが入っているメンバーのみGoogle同期イベントを描画
       if (calendarFilteredMembers.includes(member.id)) {
         const dummyGoogle = getGoogleDummyEventsForMember(member.id);
@@ -32844,14 +32874,16 @@ window.openResumableUrl = function(urlStr) {
     }
 
     // 共有範囲の作成
-    let shared_with = ['*']; // デフォルトは全員共有
+    let shared_with = [me]; // 自分は常に共有
     if (shareType === 'private') {
       shared_with = [me];
     } else if (shareType === 'select') {
-      shared_with = [me]; // 自分は常に共有
       const checkboxes = document.querySelectorAll('#calendar-form-share-members-list input[type="checkbox"]:checked');
       checkboxes.forEach(cb => {
-        shared_with.push(cb.value);
+        const isAllowed = state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(cb.value);
+        if (isAllowed) {
+          shared_with.push(cb.value);
+        }
       });
     }
 
