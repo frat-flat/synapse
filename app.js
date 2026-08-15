@@ -31635,6 +31635,37 @@ window.openResumableUrl = function(urlStr) {
       }
     });
 
+    // === 👑 管理者専用: 共有候補メンバーの設定保存 ===
+    const adminAllowedSaveBtn = document.getElementById('calendar-admin-allowed-save-btn');
+    if (adminAllowedSaveBtn) {
+      adminAllowedSaveBtn.onclick = async () => {
+        const checkboxes = document.querySelectorAll('#calendar-admin-allowed-members-list input[type="checkbox"]:checked');
+        const allowedIds = Array.from(checkboxes).map(cb => cb.value);
+        
+        // 管理者本人のIDは必ず含める
+        const me = state.currentUser ? state.currentUser.id : 'guest';
+        if (!allowedIds.includes(me)) {
+          allowedIds.push(me);
+        }
+        
+        await saveAllowedShareMembers(allowedIds);
+        
+        if (typeof showToast === 'function') {
+          showToast("共有候補メンバーの設定を更新しました");
+        } else {
+          alert("共有候補メンバーの設定を更新しました");
+        }
+        
+        // 各メンバーリストを即時再描画
+        renderLeftSidebarMembers();
+        renderDefaultShareMemberList();
+        renderFormShareMemberList();
+        
+        // モーダルを閉じる
+        if (shareModal) shareModal.style.display = 'none';
+      };
+    }
+
     // === 月 / 週 / 日 表示モード切り替え ===
     const viewMonthBtn = document.getElementById('calendar-view-month');
     const viewWeekBtn = document.getElementById('calendar-view-week');
@@ -31706,6 +31737,10 @@ window.openResumableUrl = function(urlStr) {
 
     synapseMembers.forEach(member => {
       if (member.id === me) return;
+      
+      const isAllowed = state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(member.id);
+      if (!isAllowed) return;
+
       const item = document.createElement('div');
       item.style.display = 'flex';
       item.style.alignItems = 'center';
@@ -31756,11 +31791,17 @@ window.openResumableUrl = function(urlStr) {
     // メンバー一覧のフェッチ
     await fetchSynapseMembers();
     
+    // 管理者指定の共有許可メンバーをロード
+    await loadAllowedShareMembers();
+    
     // デフォルトで自分＋共有者全員を表示対象にする
     calendarFilteredMembers = synapseMembers.map(m => m.id);
     
     renderLeftSidebarMembers();
     updateMemberFilterUI();
+
+    // 管理者専用設定UIの描画
+    renderAdminAllowedMemberList();
 
     // 予定のフェッチ
     await fetchCalendarEvents();
@@ -31793,6 +31834,114 @@ window.openResumableUrl = function(urlStr) {
     if (isGoogleLinked && clientId && apiKey) {
       silentGoogleSync(clientId, apiKey);
     }
+  }
+
+  // 共有候補メンバーの設定を読み込む
+  async function loadAllowedShareMembers() {
+    let allowedIds = null;
+    
+    // Supabaseからの取得
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        const { data, error } = await partnerSupabaseClient
+          .from('synapse_storage')
+          .select('value')
+          .eq('key', 'calendar_allowed_share_members')
+          .single();
+        if (data && !error && data.value && Array.isArray(data.value.allowed_ids)) {
+          allowedIds = data.value.allowed_ids;
+        }
+      } catch (e) {
+        console.warn("Supabase load allowed share members failed:", e);
+      }
+    }
+    
+    // ローカルストレージまたはフォールバック
+    if (!allowedIds) {
+      const localData = localStorage.getItem('SYNAPSE_CALENDAR_ALLOWED_SHARE_MEMBERS');
+      if (localData) {
+        try {
+          allowedIds = JSON.parse(localData);
+        } catch (e) {
+          console.warn("Local storage parse allowed share members failed:", e);
+        }
+      }
+    }
+    
+    // まだ値がない場合は、全メンバーをデフォルトとする
+    if (!allowedIds) {
+      allowedIds = synapseMembers.map(m => m.id);
+    }
+    
+    state.calendarAllowedShareMembers = allowedIds;
+  }
+
+  // 共有候補メンバーの設定を保存する (管理者専用)
+  async function saveAllowedShareMembers(allowedIds) {
+    state.calendarAllowedShareMembers = allowedIds;
+    localStorage.setItem('SYNAPSE_CALENDAR_ALLOWED_SHARE_MEMBERS', JSON.stringify(allowedIds));
+    
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        await partnerSupabaseClient
+          .from('synapse_storage')
+          .upsert({
+            key: 'calendar_allowed_share_members',
+            value: { allowed_ids: allowedIds },
+            updated_at: new Date().toISOString()
+          });
+      } catch (e) {
+        console.warn("Supabase save allowed share members failed:", e);
+      }
+    }
+  }
+
+  // 👑 管理者用：共有候補メンバー選択リストを描画
+  function renderAdminAllowedMemberList() {
+    const section = document.getElementById('calendar-admin-allowed-members-section');
+    const listContainer = document.getElementById('calendar-admin-allowed-members-list');
+    if (!section || !listContainer) return;
+    
+    // 管理者ユーザーでなければセクション自体を表示しない
+    if (!isOwnerUser()) {
+      section.style.display = 'none';
+      return;
+    }
+    
+    section.style.display = 'flex';
+    listContainer.innerHTML = '';
+    
+    synapseMembers.forEach(member => {
+      // 管理者自身は常にチェック必須で、チェック解除不可とするのが安全
+      const isMe = state.currentUser && member.id === state.currentUser.id;
+      const isChecked = isMe || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(member.id));
+      
+      const item = document.createElement('div');
+      item.style.display = 'flex';
+      item.style.alignItems = 'center';
+      item.style.gap = '0.35rem';
+      item.style.fontSize = '0.75rem';
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = member.id;
+      checkbox.id = `admin-allowed-cb-${member.id}`;
+      checkbox.checked = isChecked;
+      checkbox.style.cursor = 'pointer';
+      if (isMe) {
+        checkbox.disabled = true; // 管理者本人は強制チェック
+      }
+      
+      const label = document.createElement('label');
+      label.htmlFor = `admin-allowed-cb-${member.id}`;
+      label.textContent = member.name + (isMe ? ' (管理者・固定)' : '');
+      label.style.cursor = 'pointer';
+      label.style.flex = '1';
+      
+      item.appendChild(checkbox);
+      item.appendChild(label);
+      listContainer.appendChild(item);
+    });
   }
 
   // メンバー一覧をSupabaseまたはダミーから取得
@@ -31942,6 +32091,10 @@ window.openResumableUrl = function(urlStr) {
     listContainer.innerHTML = '';
     
     synapseMembers.forEach(member => {
+      const isMe = state.currentUser && member.id === state.currentUser.id;
+      const isAllowed = isMe || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(member.id));
+      if (!isAllowed) return;
+
       const isChecked = calendarFilteredMembers.includes(member.id);
       
       const item = document.createElement('div');
@@ -32614,6 +32767,9 @@ window.openResumableUrl = function(urlStr) {
     // 自分以外のメンバーを共有候補としてリスト
     synapseMembers.forEach(member => {
       if (member.id === me) return;
+
+      const isAllowed = state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(member.id);
+      if (!isAllowed) return;
 
       const item = document.createElement('div');
       item.style.display = 'flex';

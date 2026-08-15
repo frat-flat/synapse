@@ -3410,6 +3410,21 @@
         </div>
         <button id="calendar-default-share-save-btn" class="btn btn-primary" style="padding: 0.45rem; font-size: 0.75rem; font-weight: 700; width: 100%; border-radius: var(--radius-sm);">デフォルトとして保存</button>
       </div>
+      
+      <!-- 👑 管理者専用: 共有候補メンバーの設定 -->
+      <div id="calendar-admin-allowed-members-section" style="display: none; border-top: 1px dashed var(--border-color); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.6rem;">
+        <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0; color: #1e293b; display: flex; align-items: center; gap: 0.25rem;">
+          👑 管理者用：表示・共有するメンバーの選択
+        </h4>
+        <p style="font-size: 0.68rem; color: var(--text-secondary); margin: 0; line-height: 1.3;">
+          ここでチェックしたメンバーだけが、共有カレンダーの候補として全メンバーに表示されます。
+        </p>
+        <div id="calendar-admin-allowed-members-list" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: var(--radius-sm); background: #f8fafc; display: flex; flex-direction: column; gap: 0.4rem;">
+          <!-- 全メンバーの一覧（管理者による選択用）が動的に出力されます -->
+        </div>
+        <button id="calendar-admin-allowed-save-btn" class="btn btn-primary" style="padding: 0.45rem; font-size: 0.75rem; font-weight: 700; width: 100%; border-radius: var(--radius-sm); background: #8b5cf6; border-color: #8b5cf6;">共有候補メンバー設定を保存</button>
+      </div>
+      
     </div>
   </div>
 </div>
