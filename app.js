@@ -31512,9 +31512,12 @@ window.openResumableUrl = function(urlStr) {
           
           if (!clientId || !apiKey) {
             showToast('Google API詳細設定に Client ID と API Key を入力・保存してください。', 'warning');
-            if (googleSettingsContent && googleSettingsContent.style.display === 'none') {
+            if (googleSettingsContent) {
               googleSettingsContent.style.display = 'flex';
-              googleSettingsArrow.textContent = '▲';
+              if (googleSettingsArrow) googleSettingsArrow.textContent = '▲';
+              setTimeout(() => {
+                googleSettingsContent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              }, 150);
             }
             return;
           }
@@ -31529,11 +31532,16 @@ window.openResumableUrl = function(urlStr) {
     }
 
     // Google API 詳細設定アコーディオン制御
-    if (googleSettingsTrigger) {
+    if (googleSettingsTrigger && googleSettingsContent) {
       googleSettingsTrigger.onclick = () => {
-        const isHidden = googleSettingsContent.style.display === 'none';
+        const isHidden = googleSettingsContent.style.display === 'none' || googleSettingsContent.style.display === '';
         googleSettingsContent.style.display = isHidden ? 'flex' : 'none';
-        googleSettingsArrow.textContent = isHidden ? '▲' : '▼';
+        if (googleSettingsArrow) googleSettingsArrow.textContent = isHidden ? '▲' : '▼';
+        if (isHidden) {
+          setTimeout(() => {
+            googleSettingsContent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }, 150);
+        }
       };
     }
 
