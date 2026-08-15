@@ -1228,6 +1228,20 @@
         <div class="calendar-member-list" id="calendar-filter-member-list">
           <!-- メンバー一覧が動的に出力されます -->
         </div>
+
+        <!-- デフォルト共有設定セクション -->
+        <div style="border-top: 1px dashed var(--border-color); padding-top: 0.75rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; text-align: left;">
+          <div class="calendar-sidebar-title" style="border: none; padding: 0; margin: 0; font-size: 0.8rem;">⚙️ カレンダーデフォルト共有設定</div>
+          <select id="calendar-default-share-type" class="calendar-form-control" style="font-size: 0.75rem; padding: 0.35rem; cursor: pointer;">
+            <option value="all">全員に共有する</option>
+            <option value="private">自分のみ（非公開）</option>
+            <option value="select">メンバーを指定して共有</option>
+          </select>
+          <div id="calendar-default-share-members-list" style="display: none; max-height: 80px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.3rem; border-radius: var(--radius-sm); background: var(--bg-surface-elevated); flex-direction: column; gap: 0.25rem;">
+            <!-- メンバーチェックボックスが動的出力されます -->
+          </div>
+          <button id="calendar-default-share-save-btn" class="btn btn-primary" style="padding: 0.3rem; font-size: 0.72rem; font-weight: 700; width: 100%;">デフォルトとして保存</button>
+        </div>
       </div>
       
       <!-- 中央カラム: カレンダー表示 -->

@@ -31348,6 +31348,11 @@ window.openResumableUrl = function(urlStr) {
     const shareTypeSelect = document.getElementById('calendar-form-share-type');
     const shareMembersContainer = document.getElementById('calendar-form-share-members-list');
 
+    // デフォルト共有設定DOM
+    const defaultShareTypeSelect = document.getElementById('calendar-default-share-type');
+    const defaultShareMembersContainer = document.getElementById('calendar-default-share-members-list');
+    const defaultShareSaveBtn = document.getElementById('calendar-default-share-save-btn');
+
     // カレンダーボタンクリックでタブ遷移
     if (btnCalendar) {
       btnCalendar.onclick = () => {
@@ -31421,6 +31426,37 @@ window.openResumableUrl = function(urlStr) {
         } else {
           shareMembersContainer.style.display = 'none';
         }
+      };
+    }
+
+    // デフォルト共有タイプ変更イベント
+    if (defaultShareTypeSelect) {
+      defaultShareTypeSelect.onchange = () => {
+        if (defaultShareTypeSelect.value === 'select') {
+          defaultShareMembersContainer.style.display = 'flex';
+          renderDefaultShareMemberList();
+        } else {
+          defaultShareMembersContainer.style.display = 'none';
+        }
+      };
+    }
+
+    // デフォルト共有設定保存
+    if (defaultShareSaveBtn) {
+      defaultShareSaveBtn.onclick = () => {
+        const me = state.currentUser ? state.currentUser.id : 'guest';
+        const shareType = defaultShareTypeSelect.value;
+        let sharedWith = ['*'];
+        if (shareType === 'private') {
+          sharedWith = [me];
+        } else if (shareType === 'select') {
+          sharedWith = [me];
+          const checked = defaultShareMembersContainer.querySelectorAll('input[type="checkbox"]:checked');
+          checked.forEach(cb => sharedWith.push(cb.value));
+        }
+        localStorage.setItem(`SYNAPSE_CALENDAR_DEFAULT_SHARE_TYPE_${me}`, shareType);
+        localStorage.setItem(`SYNAPSE_CALENDAR_DEFAULT_SHARE_MEMBERS_${me}`, JSON.stringify(sharedWith));
+        showToast('デフォルト共有設定を保存しました。', 'success');
       };
     }
 
@@ -31544,6 +31580,39 @@ window.openResumableUrl = function(urlStr) {
     loadInitialData();
   };
 
+  // デフォルト共有先メンバーリストを描画
+  function renderDefaultShareMemberList() {
+    const listContainer = document.getElementById('calendar-default-share-members-list');
+    if (!listContainer) return;
+    listContainer.innerHTML = '';
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+
+    synapseMembers.forEach(member => {
+      if (member.id === me) return;
+      const item = document.createElement('div');
+      item.style.display = 'flex';
+      item.style.alignItems = 'center';
+      item.style.gap = '0.3rem';
+      item.style.fontSize = '0.72rem';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = member.id;
+      checkbox.id = `default-share-cb-${member.id}`;
+      checkbox.style.cursor = 'pointer';
+
+      const label = document.createElement('label');
+      label.htmlFor = `default-share-cb-${member.id}`;
+      label.textContent = member.name;
+      label.style.cursor = 'pointer';
+      label.style.flex = '1';
+
+      item.appendChild(checkbox);
+      item.appendChild(label);
+      listContainer.appendChild(item);
+    });
+  }
+
   // 2. 初期データロード
   async function loadInitialData() {
     const me = state.currentUser ? state.currentUser.id : 'guest';
@@ -31573,6 +31642,24 @@ window.openResumableUrl = function(urlStr) {
 
     // 予定のフェッチ
     await fetchCalendarEvents();
+
+    // デフォルト共有設定の復元
+    const defaultShareType = localStorage.getItem(`SYNAPSE_CALENDAR_DEFAULT_SHARE_TYPE_${me}`) || 'all';
+    if (defaultShareTypeSelect) {
+      defaultShareTypeSelect.value = defaultShareType;
+      defaultShareTypeSelect.dispatchEvent(new Event('change'));
+      
+      if (defaultShareType === 'select') {
+        const defaultMembersData = localStorage.getItem(`SYNAPSE_CALENDAR_DEFAULT_SHARE_MEMBERS_${me}`);
+        const defaultMembers = defaultMembersData ? JSON.parse(defaultMembersData) : [];
+        setTimeout(() => {
+          const checkboxes = defaultShareMembersContainer.querySelectorAll('input[type="checkbox"]');
+          checkboxes.forEach(cb => {
+            cb.checked = defaultMembers.includes(cb.value);
+          });
+        }, 50);
+      }
+    }
 
     // 画面初期表示
     renderMypageCalendar();
@@ -32139,8 +32226,24 @@ window.openResumableUrl = function(urlStr) {
     
     const shareTypeSelect = document.getElementById('calendar-form-share-type');
     if (shareTypeSelect) {
-      shareTypeSelect.value = 'all';
+      const me = state.currentUser ? state.currentUser.id : 'guest';
+      const defaultShareType = localStorage.getItem(`SYNAPSE_CALENDAR_DEFAULT_SHARE_TYPE_${me}`) || 'all';
+      shareTypeSelect.value = defaultShareType;
       shareTypeSelect.dispatchEvent(new Event('change'));
+      
+      if (defaultShareType === 'select') {
+        const defaultMembersData = localStorage.getItem(`SYNAPSE_CALENDAR_DEFAULT_SHARE_MEMBERS_${me}`);
+        const defaultMembers = defaultMembersData ? JSON.parse(defaultMembersData) : [];
+        setTimeout(() => {
+          const listContainer = document.getElementById('calendar-form-share-members-list');
+          if (listContainer) {
+            const inputs = listContainer.querySelectorAll('input[type="checkbox"]');
+            inputs.forEach(input => {
+              input.checked = defaultMembers.includes(input.value);
+            });
+          }
+        }, 50);
+      }
     }
 
     // 新規登録のため全フィールドを有効化し、削除ボタンを非表示にする
