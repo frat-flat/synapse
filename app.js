@@ -31388,7 +31388,12 @@ window.openResumableUrl = function(urlStr) {
     // ナビゲーション操作
     if (prevMonthBtn) {
       prevMonthBtn.onclick = () => {
-        if (state.calendarViewMode === 'week') {
+        if (state.calendarViewMode === 'day') {
+          calendarCurrentDate.setDate(calendarCurrentDate.getDate() - 1);
+          calendarSelectedDate = new Date(calendarCurrentDate);
+          updateSelectedDateLabel();
+          loadEventsForSelectedDate();
+        } else if (state.calendarViewMode === 'week') {
           calendarCurrentDate.setDate(calendarCurrentDate.getDate() - 7);
         } else {
           calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() - 1);
@@ -31398,7 +31403,12 @@ window.openResumableUrl = function(urlStr) {
     }
     if (nextMonthBtn) {
       nextMonthBtn.onclick = () => {
-        if (state.calendarViewMode === 'week') {
+        if (state.calendarViewMode === 'day') {
+          calendarCurrentDate.setDate(calendarCurrentDate.getDate() + 1);
+          calendarSelectedDate = new Date(calendarCurrentDate);
+          updateSelectedDateLabel();
+          loadEventsForSelectedDate();
+        } else if (state.calendarViewMode === 'week') {
           calendarCurrentDate.setDate(calendarCurrentDate.getDate() + 7);
         } else {
           calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() + 1);
@@ -31410,6 +31420,21 @@ window.openResumableUrl = function(urlStr) {
       todayBtn.onclick = () => {
         calendarCurrentDate = new Date();
         calendarSelectedDate = new Date();
+        state.calendarViewMode = 'day';
+        const vMonth = document.getElementById('calendar-view-month');
+        const vWeek = document.getElementById('calendar-view-week');
+        const vDay = document.getElementById('calendar-view-day');
+        if (vMonth && vWeek && vDay) {
+          vDay.classList.add('active');
+          vMonth.classList.remove('active');
+          vWeek.classList.remove('active');
+          vDay.style.background = 'var(--primary)';
+          vDay.style.color = 'white';
+          vMonth.style.background = 'transparent';
+          vMonth.style.color = 'var(--text-secondary)';
+          vWeek.style.background = 'transparent';
+          vWeek.style.color = 'var(--text-secondary)';
+        }
         renderMypageCalendar();
         updateSelectedDateLabel();
         loadEventsForSelectedDate();
@@ -31620,21 +31645,25 @@ window.openResumableUrl = function(urlStr) {
       };
     }
 
-    // === 月 / 週 表示モード切り替え ===
+    // === 月 / 週 / 日 表示モード切り替え ===
     const viewMonthBtn = document.getElementById('calendar-view-month');
     const viewWeekBtn = document.getElementById('calendar-view-week');
+    const viewDayBtn = document.getElementById('calendar-view-day');
 
-    if (viewMonthBtn && viewWeekBtn) {
+    if (viewMonthBtn && viewWeekBtn && viewDayBtn) {
       viewMonthBtn.onclick = () => {
         if (state.calendarViewMode === 'month') return;
         state.calendarViewMode = 'month';
         viewMonthBtn.classList.add('active');
         viewWeekBtn.classList.remove('active');
-        // 背景色とカラーのトグル
+        viewDayBtn.classList.remove('active');
+        
         viewMonthBtn.style.background = 'var(--primary)';
         viewMonthBtn.style.color = 'white';
         viewWeekBtn.style.background = 'transparent';
         viewWeekBtn.style.color = 'var(--text-secondary)';
+        viewDayBtn.style.background = 'transparent';
+        viewDayBtn.style.color = 'var(--text-secondary)';
         
         renderMypageCalendar();
       };
@@ -31644,11 +31673,31 @@ window.openResumableUrl = function(urlStr) {
         state.calendarViewMode = 'week';
         viewWeekBtn.classList.add('active');
         viewMonthBtn.classList.remove('active');
-        // 背景色とカラーのトグル
+        viewDayBtn.classList.remove('active');
+        
         viewWeekBtn.style.background = 'var(--primary)';
         viewWeekBtn.style.color = 'white';
         viewMonthBtn.style.background = 'transparent';
         viewMonthBtn.style.color = 'var(--text-secondary)';
+        viewDayBtn.style.background = 'transparent';
+        viewDayBtn.style.color = 'var(--text-secondary)';
+        
+        renderMypageCalendar();
+      };
+
+      viewDayBtn.onclick = () => {
+        if (state.calendarViewMode === 'day') return;
+        state.calendarViewMode = 'day';
+        viewDayBtn.classList.add('active');
+        viewMonthBtn.classList.remove('active');
+        viewWeekBtn.classList.remove('active');
+        
+        viewDayBtn.style.background = 'var(--primary)';
+        viewDayBtn.style.color = 'white';
+        viewMonthBtn.style.background = 'transparent';
+        viewMonthBtn.style.color = 'var(--text-secondary)';
+        viewWeekBtn.style.background = 'transparent';
+        viewWeekBtn.style.color = 'var(--text-secondary)';
         
         renderMypageCalendar();
       };
@@ -31964,13 +32013,210 @@ window.openResumableUrl = function(urlStr) {
   function renderMypageCalendar() {
     const daysGrid = document.getElementById('calendar-days-grid');
     const monthYearTitle = document.getElementById('calendar-month-year');
+    const weekHeader = document.getElementById('calendar-week-days-header');
+    const timelineContainer = document.getElementById('calendar-timeline-container');
     if (!daysGrid || !monthYearTitle) return;
 
     daysGrid.innerHTML = '';
+    if (timelineContainer) timelineContainer.innerHTML = '';
     
     const year = calendarCurrentDate.getFullYear();
     const month = calendarCurrentDate.getMonth();
     
+    const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+    
+    if (state.calendarViewMode === 'day') {
+      if (weekHeader) weekHeader.style.display = 'none';
+      daysGrid.style.display = 'none';
+      if (timelineContainer) timelineContainer.style.display = 'block';
+      
+      const dayJp = dayNames[calendarCurrentDate.getDay()];
+      monthYearTitle.textContent = `${year}年 ${month + 1}月 ${calendarCurrentDate.getDate()}日 (${dayJp})`;
+      
+      // 予定データ（全件）を取り込む
+      const visibleEvents = getVisibleEventsForMonth(year, month);
+      const dayEvents = visibleEvents.filter(ev => {
+        const evStart = new Date(ev.start_time);
+        return evStart.getDate() === calendarCurrentDate.getDate() && 
+               evStart.getMonth() === calendarCurrentDate.getMonth() && 
+               evStart.getFullYear() === calendarCurrentDate.getFullYear();
+      });
+      
+      if (timelineContainer) {
+        const timelineWrapper = document.createElement('div');
+        timelineWrapper.style.display = 'flex';
+        timelineWrapper.style.position = 'relative';
+        timelineWrapper.style.height = '1440px'; // 24時間 * 60px
+        timelineWrapper.style.width = '100%';
+        
+        const leftAxis = document.createElement('div');
+        leftAxis.style.width = '60px';
+        leftAxis.style.minWidth = '60px';
+        leftAxis.style.borderRight = '1px solid var(--border-color)';
+        leftAxis.style.position = 'relative';
+        leftAxis.style.background = 'rgba(var(--bg-surface-rgb), 0.5)';
+        
+        const rightCanvas = document.createElement('div');
+        rightCanvas.style.flex = '1';
+        rightCanvas.style.position = 'relative';
+        rightCanvas.style.height = '1440px';
+        
+        // 24時間スロット生成
+        for (let h = 0; h < 24; h++) {
+          const timeLabel = document.createElement('div');
+          timeLabel.style.position = 'absolute';
+          timeLabel.style.top = `${h * 60}px`;
+          timeLabel.style.width = '100%';
+          timeLabel.style.height = '60px';
+          timeLabel.style.fontSize = '0.72rem';
+          timeLabel.style.color = 'var(--text-secondary)';
+          timeLabel.style.textAlign = 'right';
+          timeLabel.style.paddingRight = '8px';
+          timeLabel.style.paddingTop = '4px';
+          timeLabel.style.boxSizing = 'border-box';
+          timeLabel.textContent = `${h}:00`;
+          leftAxis.appendChild(timeLabel);
+          
+          const hourGridLine = document.createElement('div');
+          hourGridLine.style.position = 'absolute';
+          hourGridLine.style.top = `${h * 60}px`;
+          hourGridLine.style.left = '0';
+          hourGridLine.style.right = '0';
+          hourGridLine.style.height = '60px';
+          hourGridLine.style.borderBottom = '1px dashed var(--border-color)';
+          hourGridLine.style.boxSizing = 'border-box';
+          rightCanvas.appendChild(hourGridLine);
+        }
+        
+        timelineWrapper.appendChild(leftAxis);
+        timelineWrapper.appendChild(rightCanvas);
+        timelineContainer.appendChild(timelineWrapper);
+        
+        // 重なり合い（コンフリクト）の調整
+        const processedEvents = dayEvents.map(ev => {
+          const start = new Date(ev.start_time);
+          const end = new Date(ev.end_time);
+          
+          const startMin = start.getHours() * 60 + start.getMinutes();
+          const endMin = end.getHours() * 60 + end.getMinutes();
+          const duration = Math.max(30, endMin - startMin); // 最小30分
+          
+          return {
+            event: ev,
+            start: startMin,
+            end: startMin + duration,
+            col: 0,
+            maxCols: 1
+          };
+        });
+        
+        processedEvents.sort((a, b) => a.start - b.start);
+        
+        for (let i = 0; i < processedEvents.length; i++) {
+          const current = processedEvents[i];
+          const overlaps = [];
+          for (let j = 0; j < i; j++) {
+            const prev = processedEvents[j];
+            if (current.start < prev.end && current.end > prev.start) {
+              overlaps.push(prev);
+            }
+          }
+          
+          if (overlaps.length > 0) {
+            const usedCols = overlaps.map(o => o.col);
+            let myCol = 0;
+            while (usedCols.includes(myCol)) {
+              myCol++;
+            }
+            current.col = myCol;
+            
+            const totalGroup = overlaps.concat(current);
+            const neededCols = Math.max(...totalGroup.map(o => o.col)) + 1;
+            
+            totalGroup.forEach(g => {
+              g.maxCols = Math.max(g.maxCols, neededCols);
+            });
+            
+            overlaps.forEach(o => {
+              processedEvents.forEach(p => {
+                if (p !== o && p !== current && (p.start < o.end && p.end > o.start)) {
+                  p.maxCols = Math.max(p.maxCols, neededCols);
+                }
+              });
+            });
+          }
+        }
+        
+        processedEvents.forEach(p => {
+          const ev = p.event;
+          const card = document.createElement('div');
+          card.className = 'timeline-event-card';
+          if (ev.is_google_event) {
+            card.classList.add('google-event');
+          } else {
+            card.style.backgroundColor = ev.color || '#3b82f6';
+          }
+          
+          const top = p.start;
+          const height = p.end - p.start;
+          const widthPercent = 100 / p.maxCols;
+          const leftPercent = p.col * widthPercent;
+          
+          card.style.top = `${top}px`;
+          card.style.height = `${height}px`;
+          card.style.width = `calc(${widthPercent}% - 6px)`;
+          card.style.left = `calc(${leftPercent}% + 3px)`;
+          
+          const titleEl = document.createElement('div');
+          titleEl.className = 'card-title';
+          titleEl.textContent = ev.is_google_event ? `G: ${ev.title}` : ev.title;
+          
+          const timeEl = document.createElement('div');
+          timeEl.className = 'card-time';
+          const start = new Date(ev.start_time);
+          const end = new Date(ev.end_time);
+          const formatTime = (d) => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+          timeEl.textContent = `${formatTime(start)} - ${formatTime(end)}`;
+          
+          card.appendChild(titleEl);
+          card.appendChild(timeEl);
+          
+          if (!ev.is_google_event && ev.user_name) {
+            const metaEl = document.createElement('div');
+            metaEl.className = 'card-meta';
+            metaEl.textContent = `${ev.category} / ${ev.user_name}`;
+            card.appendChild(metaEl);
+          }
+          
+          card.onclick = (e) => {
+            e.stopPropagation();
+            calendarSelectedDate = start;
+            updateSelectedDateLabel();
+            loadEventsForSelectedDate();
+            
+            if (!ev.is_google_event) {
+              loadEventIntoForm(ev);
+            } else {
+              resetEventForm();
+            }
+          };
+          
+          rightCanvas.appendChild(card);
+        });
+        
+        // 朝8時に自動スクロール
+        setTimeout(() => {
+          timelineContainer.scrollTop = 480;
+        }, 100);
+      }
+      return;
+    }
+
+    // 月・週表示の時は曜日ヘッダーとグリッドを表示
+    if (weekHeader) weekHeader.style.display = 'grid';
+    daysGrid.style.display = 'grid';
+    if (timelineContainer) timelineContainer.style.display = 'none';
+
     let totalGridCount = 42;
     let startDate = null;
     
@@ -31978,13 +32224,11 @@ window.openResumableUrl = function(urlStr) {
       daysGrid.classList.add('week-view');
       totalGridCount = 7;
       
-      // 基準日 (calendarCurrentDate) からその週の日曜日を取得
       const current = new Date(calendarCurrentDate);
-      const currentDay = current.getDay(); // 0:日〜6:土
+      const currentDay = current.getDay();
       startDate = new Date(current);
       startDate.setDate(current.getDate() - currentDay);
       
-      // タイトルの設定 (週表示)
       const endOfWeek = new Date(startDate);
       endOfWeek.setDate(startDate.getDate() + 6);
       
@@ -31995,15 +32239,12 @@ window.openResumableUrl = function(urlStr) {
       daysGrid.classList.remove('week-view');
       totalGridCount = 42;
       
-      // 月の最初の日と最後の日
       const firstDayIndex = new Date(year, month, 1).getDay();
       startDate = new Date(year, month, 1 - firstDayIndex);
       
-      // タイトルの設定 (月表示)
       monthYearTitle.textContent = `${year}年 ${month + 1}月`;
     }
     
-    // 予定データ（全件）を取り込む
     const visibleEvents = getVisibleEventsForMonth(year, month);
     
     for (let i = 0; i < totalGridCount; i++) {
@@ -32014,23 +32255,19 @@ window.openResumableUrl = function(urlStr) {
       const cell = document.createElement('div');
       cell.className = 'calendar-day-cell';
       
-      // 他の月の判定 (月表示のみ)
       if (state.calendarViewMode === 'month' && cellDate.getMonth() !== month) {
         cell.classList.add('other-month');
       }
       
-      // 本日の判定
       const today = new Date();
       if (cellDate.getDate() === today.getDate() && cellDate.getMonth() === today.getMonth() && cellDate.getFullYear() === today.getFullYear()) {
         cell.classList.add('today');
       }
       
-      // 選択日のハイライト
       if (cellDate.getDate() === calendarSelectedDate.getDate() && cellDate.getMonth() === calendarSelectedDate.getMonth() && cellDate.getFullYear() === calendarSelectedDate.getFullYear()) {
         cell.classList.add('selected');
       }
       
-      // 日付数値の描画
       const dayNumberEl = document.createElement('span');
       dayNumberEl.className = 'day-number';
       if (state.calendarViewMode === 'week') {
@@ -32040,11 +32277,9 @@ window.openResumableUrl = function(urlStr) {
       }
       cell.appendChild(dayNumberEl);
       
-      // 予定コンテナの追加
       const eventContainer = document.createElement('div');
       eventContainer.className = 'calendar-cell-events';
       
-      // 当日の予定をフィルタリング
       const dayEvents = visibleEvents.filter(ev => {
         const evStart = new Date(ev.start_time);
         return evStart.getDate() === cellDate.getDate() && 
@@ -32052,16 +32287,13 @@ window.openResumableUrl = function(urlStr) {
                evStart.getFullYear() === cellDate.getFullYear();
       });
 
-      // 開始時間順にソート
       dayEvents.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
 
-      // セルに描画（週表示なら最大8件、月表示なら最大3件）
       const maxDisplay = state.calendarViewMode === 'week' ? 8 : 3;
       dayEvents.slice(0, maxDisplay).forEach(ev => {
         const evMicro = document.createElement('div');
         evMicro.className = 'calendar-event-micro';
         
-        // 週表示時は時間テキストを data-time に埋め込み CSS 経由で表示
         if (state.calendarViewMode === 'week') {
           const evStart = new Date(ev.start_time);
           const evEnd = new Date(ev.end_time);
@@ -32069,7 +32301,6 @@ window.openResumableUrl = function(urlStr) {
           evMicro.setAttribute('data-time', `${formatTime(evStart)} - ${formatTime(evEnd)}`);
         }
         
-        // Google予定ならGoogle色、通常予定なら予定の設定色を適用
         if (ev.is_google_event) {
           evMicro.classList.add('google-event');
           evMicro.textContent = `G: ${ev.title}`;
@@ -32096,13 +32327,28 @@ window.openResumableUrl = function(urlStr) {
       
       cell.appendChild(eventContainer);
       
-      // クリックイベントの登録
+      // セルクリック時のイベント (自動的に「日表示」へ切り替えるズームイン連動)
       cell.onclick = () => {
-        const prevSelected = daysGrid.querySelector('.calendar-day-cell.selected');
-        if (prevSelected) prevSelected.classList.remove('selected');
-        
-        cell.classList.add('selected');
         calendarSelectedDate = cellDate;
+        calendarCurrentDate = cellDate; // 日表示の基準日も合わせる
+        state.calendarViewMode = 'day';
+        
+        const vMonth = document.getElementById('calendar-view-month');
+        const vWeek = document.getElementById('calendar-view-week');
+        const vDay = document.getElementById('calendar-view-day');
+        if (vMonth && vWeek && vDay) {
+          vDay.classList.add('active');
+          vMonth.classList.remove('active');
+          vWeek.classList.remove('active');
+          vDay.style.background = 'var(--primary)';
+          vDay.style.color = 'white';
+          vMonth.style.background = 'transparent';
+          vMonth.style.color = 'var(--text-secondary)';
+          vWeek.style.background = 'transparent';
+          vWeek.style.color = 'var(--text-secondary)';
+        }
+        
+        renderMypageCalendar();
         updateSelectedDateLabel();
         loadEventsForSelectedDate();
         resetEventForm();

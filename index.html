@@ -1269,16 +1269,17 @@
             <!-- 今日に戻るボタン -->
             <button id="calendar-today-btn" class="btn btn-secondary" style="font-size: 0.75rem; font-weight: 600; padding: 0.35rem 0.6rem;">今日</button>
             
-            <!-- 月/週表示切り替え -->
+            <!-- 月/週/日表示切り替え -->
             <div class="calendar-view-selector" style="display: flex; border: 1px solid var(--border-color); border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-surface-elevated);">
               <button id="calendar-view-month" class="btn active" style="font-size: 0.72rem; padding: 0.35rem 0.6rem; border: none; border-radius: 0; cursor: pointer; font-weight: 600; background: var(--primary); color: white;">月</button>
               <button id="calendar-view-week" class="btn" style="font-size: 0.72rem; padding: 0.35rem 0.6rem; border: none; border-radius: 0; cursor: pointer; background: transparent; color: var(--text-secondary); font-weight: 600;">週</button>
+              <button id="calendar-view-day" class="btn" style="font-size: 0.72rem; padding: 0.35rem 0.6rem; border: none; border-radius: 0; cursor: pointer; background: transparent; color: var(--text-secondary); font-weight: 600;">日</button>
             </div>
           </div>
         </div>
         
-        <div class="calendar-grid-table">
-          <div class="calendar-week-header">
+        <div class="calendar-grid-table" style="display: flex; flex-direction: column; flex: 1; height: 100%;">
+          <div class="calendar-week-header" id="calendar-week-days-header">
             <div>日</div>
             <div>月</div>
             <div>火</div>
@@ -1289,6 +1290,10 @@
           </div>
           <div class="calendar-days-container" id="calendar-days-grid">
             <!-- 日付セルが動的に出力されます -->
+          </div>
+          <!-- 24時間タイムライン表示用コンテナ -->
+          <div id="calendar-timeline-container" style="display: none; flex: 1; overflow-y: auto; position: relative; border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); border-radius: 0 0 var(--radius-md) var(--radius-md); background: var(--bg-surface); min-height: 350px;">
+            <!-- タイムラインの行がJSから動的に生成されます -->
           </div>
         </div>
       </div>

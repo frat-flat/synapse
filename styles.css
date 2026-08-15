@@ -4699,3 +4699,105 @@ h3 {
   color: white !important;
 }
 
+/* 日表示タイムラインコンテナ */
+#calendar-timeline-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  scrollbar-width: thin;
+}
+
+/* タイムラインの行スロット（1時間単位） */
+.timeline-row {
+  display: flex;
+  height: 60px; /* 1時間=60pxとする（1分=1px換算でtop計算ができるため） */
+  border-bottom: 1px dashed var(--border-color);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.timeline-row:last-child {
+  border-bottom: none;
+}
+
+/* 時間表示ラベル（左カラム） */
+.timeline-time-label {
+  width: 60px;
+  min-width: 60px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  text-align: right;
+  padding-right: 0.75rem;
+  padding-top: 4px;
+  font-weight: 500;
+  user-select: none;
+  border-right: 1px solid var(--border-color);
+  box-sizing: border-box;
+  background: rgba(var(--bg-surface-rgb), 0.5);
+}
+
+/* 予定配置エリア（右カラム） */
+.timeline-events-area {
+  flex: 1;
+  position: relative;
+  background: transparent;
+  height: 100%;
+}
+
+/* タイムライン上に絶対配置される予定カード */
+.timeline-event-card {
+  position: absolute;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 2px;
+  z-index: 10;
+  overflow: hidden;
+  border-left: 4px solid rgba(0, 0, 0, 0.2);
+}
+
+.timeline-event-card:hover {
+  transform: translateY(-1px) scale(1.01);
+  box-shadow: var(--shadow-md);
+  filter: brightness(1.05);
+  z-index: 20;
+}
+
+/* タイムライン上のGoogle予定カード */
+.timeline-event-card.google-event {
+  background: #4285F4 !important;
+}
+
+/* 予定カード内の詳細情報 */
+.timeline-event-card .card-title {
+  font-weight: 700;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timeline-event-card .card-time {
+  font-size: 0.65rem;
+  opacity: 0.85;
+}
+
+.timeline-event-card .card-meta {
+  font-size: 0.62rem;
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: auto;
+}
+
