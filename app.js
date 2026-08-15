@@ -905,6 +905,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSignupEvents();
   checkLoginStatus();
   initMypageMemo();          // メモ帳の初回初期化
+  if (typeof initMypageCalendar === 'function') initMypageCalendar(); // カレンダーの初回初期化
   initFloatingStickyNotes(); // 浮遊付箋の復元
   setupInactivityMonitors(); // 無操作監視の初期化
 
@@ -9366,7 +9367,7 @@ function renderCustomerDetailView(customerId) {
   container.appendChild(layout);
 }
 function openTab(id, type, title, appointData = null) {
-  if (type && type !== 'mypage-screen' && type !== 'mypage-account-info-screen' && type !== 'mypage-settings-screen' && type !== 'mypage-memo-screen') {
+  if (type && type !== 'mypage-screen' && type !== 'mypage-account-info-screen' && type !== 'mypage-settings-screen' && type !== 'mypage-memo-screen' && type !== 'mypage-calendar-screen') {
     const access = checkTableAccess(type);
     if (!access.visible) {
       showToast(`「${title}」画面へのアクセス権限がありません。`, 'error');
@@ -9533,7 +9534,7 @@ function activateTab(id) {
   const tab = state.tabs.find(t => t.id === id);
   if (!tab) return;
 
-  if (tab.type && tab.type !== 'mypage-screen' && tab.type !== 'mypage-account-info-screen' && tab.type !== 'mypage-settings-screen' && tab.type !== 'mypage-memo-screen') {
+  if (tab.type && tab.type !== 'mypage-screen' && tab.type !== 'mypage-account-info-screen' && tab.type !== 'mypage-settings-screen' && tab.type !== 'mypage-memo-screen' && tab.type !== 'mypage-calendar-screen') {
     const access = checkTableAccess(tab.type);
     if (!access.visible) {
       showToast(`「${tab.title}」画面へのアクセス権限がありません。`, 'error');
@@ -9587,6 +9588,8 @@ function activateTab(id) {
     state.activeCustomTableId = null;
   } else if (tab.type === 'mypage-memo-screen') {
     if (typeof window.updateMypageMemoUI === 'function') window.updateMypageMemoUI();
+  } else if (tab.type === 'mypage-calendar-screen') {
+    if (typeof window.initMypageCalendar === 'function') window.initMypageCalendar();
   } else if (tab.type === 'mypage-settings-screen') {
     if (typeof loadCurrentUserProfile === 'function') loadCurrentUserProfile();
     if (typeof renderMypageDeviceList === 'function') renderMypageDeviceList();
@@ -31288,6 +31291,1289 @@ window.openResumableUrl = function(urlStr) {
     showToast('フォーム作成画面が見つかりません。', 'error');
   }
 };
+
+// ==========================================
+// 📅 個人＆共有カレンダー ＆ Google連携機能
+// ==========================================
+(function() {
+  let calendarCurrentDate = new Date();
+  let calendarSelectedDate = new Date();
+  let calendarFilteredMembers = []; // 表示するメンバーID(email)のリスト
+  let synapseMembers = []; // synapse_usersテーブルから取得した全メンバー
+  let isGoogleLinked = false;
+  let googleLinkedEmail = '';
+  
+  // メンバーカラーのプリセット
+  const MEMBER_COLORS = [
+    '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', 
+    '#06b6d4', '#14b8a6', '#6366f1', '#a855f7', '#f43f5e'
+  ];
+
+  // 1. カレンダー初期化
+  window.initMypageCalendar = function() {
+    if (state.mypageCalendarInitialized) {
+      refreshCalendarView();
+      return;
+    }
+    state.mypageCalendarInitialized = true;
+
+    // DOM要素のバインド
+    const btnCalendar = document.getElementById('mypage-btn-calendar');
+    const backBtn = document.getElementById('mypage-calendar-back-btn');
+    const prevMonthBtn = document.getElementById('calendar-prev-month');
+    const nextMonthBtn = document.getElementById('calendar-next-month');
+    const todayBtn = document.getElementById('calendar-today-btn');
+    const newEventBtn = document.getElementById('calendar-new-event-btn');
+    const saveEventBtn = document.getElementById('calendar-event-save-btn');
+    const deleteEventBtn = document.getElementById('calendar-event-delete-btn');
+    
+    // Googleカレンダー連携用DOM
+    const googleConnectBtn = document.getElementById('google-calendar-connect-btn');
+    const googleOauthModal = document.getElementById('google-calendar-oauth-modal');
+    const googleOauthCancel = document.getElementById('google-calendar-oauth-cancel-btn');
+    const googleOauthSubmit = document.getElementById('google-calendar-oauth-submit-btn');
+    const googleOauthEmailInput = document.getElementById('google-calendar-oauth-email');
+    
+    // Google API設定用DOM
+    const googleSettingsTrigger = document.getElementById('google-settings-accordion-trigger');
+    const googleSettingsContent = document.getElementById('google-settings-accordion-content');
+    const googleSettingsArrow = document.getElementById('google-settings-accordion-arrow');
+    const googleSettingsSaveBtn = document.getElementById('google-api-settings-save-btn');
+
+    // フィルタボタン
+    const filterOnlyMeBtn = document.getElementById('calendar-filter-only-me');
+    const filterAllBtn = document.getElementById('calendar-filter-all');
+    
+    // 予定共有設定のドロップダウン
+    const shareTypeSelect = document.getElementById('calendar-form-share-type');
+    const shareMembersContainer = document.getElementById('calendar-form-share-members-list');
+
+    // カレンダーボタンクリックでタブ遷移
+    if (btnCalendar) {
+      btnCalendar.onclick = () => {
+        openTab('mypage-calendar-screen', 'mypage-calendar-screen', '📅 カレンダー');
+      };
+    }
+
+    // メニューに戻る
+    if (backBtn) {
+      backBtn.onclick = () => {
+        const isSystemAdmin = isOwnerUser();
+        if (!isSystemAdmin) {
+          switchView('home-screen');
+        } else {
+          const menuView = document.getElementById('mypage-menu-view');
+          const calScreen = document.getElementById('mypage-calendar-screen');
+          if (menuView) menuView.style.display = 'flex';
+          if (calScreen) calScreen.style.display = 'none';
+        }
+      };
+    }
+
+    // ナビゲーション操作
+    if (prevMonthBtn) {
+      prevMonthBtn.onclick = () => {
+        calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() - 1);
+        renderMypageCalendar();
+      };
+    }
+    if (nextMonthBtn) {
+      nextMonthBtn.onclick = () => {
+        calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() + 1);
+        renderMypageCalendar();
+      };
+    }
+    if (todayBtn) {
+      todayBtn.onclick = () => {
+        calendarCurrentDate = new Date();
+        calendarSelectedDate = new Date();
+        renderMypageCalendar();
+        updateSelectedDateLabel();
+        loadEventsForSelectedDate();
+      };
+    }
+
+    // 新規予定ボタン
+    if (newEventBtn) {
+      newEventBtn.onclick = () => {
+        resetEventForm();
+      };
+    }
+
+    // 保存・削除ボタン
+    if (saveEventBtn) {
+      saveEventBtn.onclick = () => {
+        saveCalendarEvent();
+      };
+    }
+    if (deleteEventBtn) {
+      deleteEventBtn.onclick = () => {
+        deleteCalendarEvent();
+      };
+    }
+
+    // 共有タイプ変更イベント
+    if (shareTypeSelect) {
+      shareTypeSelect.onchange = () => {
+        if (shareTypeSelect.value === 'select') {
+          shareMembersContainer.style.display = 'flex';
+          renderFormShareMemberList();
+        } else {
+          shareMembersContainer.style.display = 'none';
+        }
+      };
+    }
+
+    // カテゴリ変更でカラー・共有デフォルトをアシスト
+    const categorySelect = document.getElementById('calendar-form-category');
+    if (categorySelect) {
+      categorySelect.onchange = () => {
+        const cat = categorySelect.value;
+        const colorInput = document.getElementById('calendar-form-color');
+        
+        // カテゴリごとの推奨カラーと共有範囲
+        if (cat === 'プライベート') {
+          if (colorInput) colorInput.value = '#ec4899'; // パステルピンク
+          if (shareTypeSelect) {
+            shareTypeSelect.value = 'private';
+            shareTypeSelect.dispatchEvent(new Event('change'));
+          }
+        } else if (cat === '会議') {
+          if (colorInput) colorInput.value = '#3b82f6'; // ブルー
+          if (shareTypeSelect) {
+            shareTypeSelect.value = 'all';
+            shareTypeSelect.dispatchEvent(new Event('change'));
+          }
+        } else if (cat === '面談') {
+          if (colorInput) colorInput.value = '#8b5cf6'; // パープル
+          if (shareTypeSelect) {
+            shareTypeSelect.value = 'all';
+            shareTypeSelect.dispatchEvent(new Event('change'));
+          }
+        } else if (cat === '作業') {
+          if (colorInput) colorInput.value = '#10b981'; // グリーン
+          if (shareTypeSelect) {
+            shareTypeSelect.value = 'private';
+            shareTypeSelect.dispatchEvent(new Event('change'));
+          }
+        } else {
+          if (colorInput) colorInput.value = '#3b82f6';
+          if (shareTypeSelect) {
+            shareTypeSelect.value = 'all';
+            shareTypeSelect.dispatchEvent(new Event('change'));
+          }
+        }
+      };
+    }
+
+    // Googleカレンダー連携モーダル制御
+    if (googleConnectBtn) {
+      googleConnectBtn.onclick = () => {
+        if (!isGoogleLinked) {
+          if (googleOauthModal) {
+            googleOauthModal.style.display = 'flex';
+            if (googleOauthEmailInput) {
+              googleOauthEmailInput.value = state.currentUser ? state.currentUser.id : 'user_01@gmail.com';
+            }
+          }
+        } else {
+          if (confirm('Googleカレンダーの連携を解除しますか？')) {
+            unlinkGoogleCalendar();
+          }
+        }
+      };
+    }
+
+    if (googleOauthCancel) {
+      googleOauthCancel.onclick = () => {
+        if (googleOauthModal) googleOauthModal.style.display = 'none';
+      };
+    }
+
+    if (googleOauthSubmit) {
+      googleOauthSubmit.onclick = () => {
+        const email = googleOauthEmailInput ? googleOauthEmailInput.value.trim() : 'user_01@gmail.com';
+        if (!email) {
+          showToast('Googleメールアドレスを入力してください。', 'error');
+          return;
+        }
+        linkGoogleCalendar(email);
+        if (googleOauthModal) googleOauthModal.style.display = 'none';
+      };
+    }
+
+    // Google API 詳細設定アコーディオン制御
+    if (googleSettingsTrigger) {
+      googleSettingsTrigger.onclick = () => {
+        const isHidden = googleSettingsContent.style.display === 'none';
+        googleSettingsContent.style.display = isHidden ? 'flex' : 'none';
+        googleSettingsArrow.textContent = isHidden ? '▲' : '▼';
+      };
+    }
+
+    if (googleSettingsSaveBtn) {
+      googleSettingsSaveBtn.onclick = () => {
+        const clientId = document.getElementById('google-api-client-id').value.trim();
+        const apiKey = document.getElementById('google-api-key').value.trim();
+        const userId = state.currentUser ? state.currentUser.id : 'guest';
+        localStorage.setItem(`SYNAPSE_GOOGLE_CLIENT_ID_${userId}`, clientId);
+        localStorage.setItem(`SYNAPSE_GOOGLE_API_KEY_${userId}`, apiKey);
+        showToast('Google API 詳細設定を保存しました。', 'success');
+      };
+    }
+
+    // クイックフィルタボタン
+    if (filterOnlyMeBtn) {
+      filterOnlyMeBtn.onclick = () => {
+        const me = state.currentUser ? state.currentUser.id : 'guest';
+        calendarFilteredMembers = [me];
+        updateMemberFilterUI();
+        renderMypageCalendar();
+      };
+    }
+
+    if (filterAllBtn) {
+      filterAllBtn.onclick = () => {
+        calendarFilteredMembers = synapseMembers.map(m => m.id);
+        updateMemberFilterUI();
+        renderMypageCalendar();
+      };
+    }
+
+    // 初回ロード
+    loadInitialData();
+  };
+
+  // 2. 初期データロード
+  async function loadInitialData() {
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+    
+    // Google連携状態の復元
+    isGoogleLinked = localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${me}`) === 'true';
+    googleLinkedEmail = localStorage.getItem(`SYNAPSE_GOOGLE_EMAIL_${me}`) || '';
+    
+    // Google API設定の復元
+    const clientId = localStorage.getItem(`SYNAPSE_GOOGLE_CLIENT_ID_${me}`) || '';
+    const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`) || '';
+    const googleClientIdInput = document.getElementById('google-api-client-id');
+    const googleApiKeyInput = document.getElementById('google-api-key');
+    if (googleClientIdInput) googleClientIdInput.value = clientId;
+    if (googleApiKeyInput) googleApiKeyInput.value = apiKey;
+
+    updateGoogleStatusUI();
+
+    // メンバー一覧のフェッチ
+    await fetchSynapseMembers();
+    
+    // デフォルトで自分＋共有者全員を表示対象にする
+    calendarFilteredMembers = synapseMembers.map(m => m.id);
+    
+    renderLeftSidebarMembers();
+    updateMemberFilterUI();
+
+    // 予定のフェッチ
+    await fetchCalendarEvents();
+
+    // 画面初期表示
+    renderMypageCalendar();
+    updateSelectedDateLabel();
+    loadEventsForSelectedDate();
+    resetEventForm();
+  }
+
+  // メンバー一覧をSupabaseまたはダミーから取得
+  async function fetchSynapseMembers() {
+    let members = [];
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        const { data, error } = await partnerSupabaseClient
+          .from('synapse_users')
+          .select('id, name, role');
+        if (data && !error) {
+          members = data;
+        }
+      } catch (e) {
+        console.warn("Supabase fetch users failed, falling back to local list:", e);
+      }
+    }
+    
+    // データがない場合のフォールバック（デモ・開発用）
+    if (members.length === 0) {
+      members = [
+        { id: 'sales_01@synapse.management', name: '山田 太郎', role: 'sales' },
+        { id: 'sales_02@synapse.management', name: '佐藤 花子', role: 'sales' },
+        { id: 'owner@synapse.management', name: 'オーナー (管理者)', role: 'owner' }
+      ];
+      // ログイン中のユーザー自身も追加する
+      if (state.currentUser && !members.some(m => m.id === state.currentUser.id)) {
+        members.unshift({
+          id: state.currentUser.id,
+          name: state.currentUser.name || state.currentUser.id,
+          role: state.currentUser.role || 'sales'
+        });
+      }
+    }
+
+    // メンバーに色を自動割り当て
+    synapseMembers = members.map((m, idx) => ({
+      ...m,
+      color: MEMBER_COLORS[idx % MEMBER_COLORS.length]
+    }));
+  }
+
+  // 予定データをフェッチ
+  async function fetchCalendarEvents() {
+    let events = [];
+    const userId = state.currentUser ? state.currentUser.id : 'guest';
+    
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        const { data, error } = await partnerSupabaseClient
+          .from('synapse_calendar_events')
+          .select('*');
+        if (data && !error) {
+          events = data;
+        }
+      } catch (e) {
+        console.warn("Supabase fetch calendar events failed, falling back to local storage:", e);
+      }
+    }
+
+    // Supabaseが未取得またはエラー時のローカルストレージからのロード
+    if (events.length === 0) {
+      const localData = localStorage.getItem(`SYNAPSE_USER_CALENDAR_EVENTS_${userId}`);
+      events = localData ? JSON.parse(localData) : [];
+      
+      // デモ用ダミーデータを初回のみ自動投入
+      if (events.length === 0) {
+        events = getInitialDummyEvents();
+        localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${userId}`, JSON.stringify(events));
+      }
+    }
+
+    state.calendarEvents = events;
+  }
+
+  // デモ用の初期予定データを生成する
+  function getInitialDummyEvents() {
+    const today = new Date();
+    const parseDateStr = (offsetDays, hours, mins) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() + offsetDays);
+      d.setHours(hours, mins, 0, 0);
+      return d.toISOString();
+    };
+
+    return [
+      {
+        id: 'dummy-1',
+        user_id: 'sales_01@synapse.management',
+        user_name: '山田 太郎',
+        title: 'クライアントA面談',
+        start_time: parseDateStr(0, 10, 0),
+        end_time: parseDateStr(0, 11, 30),
+        location: '第2会議室',
+        description: '資料の最終確認とデモ実施',
+        category: '面談',
+        color: '#8b5cf6',
+        shared_with: ['*']
+      },
+      {
+        id: 'dummy-2',
+        user_id: 'sales_02@synapse.management',
+        user_name: '佐藤 花子',
+        title: '週次進捗報告MTG',
+        start_time: parseDateStr(0, 13, 0),
+        end_time: parseDateStr(0, 14, 0),
+        location: 'Zoom会議室',
+        description: 'チーム内の定例報告会。今週の進捗と課題。',
+        category: '会議',
+        color: '#3b82f6',
+        shared_with: ['*']
+      },
+      {
+        id: 'dummy-3',
+        user_id: 'sales_01@synapse.management',
+        user_name: '山田 太郎',
+        title: '見積書作成（集中作業）',
+        start_time: parseDateStr(0, 15, 0),
+        end_time: parseDateStr(0, 17, 0),
+        location: '自席',
+        description: '他の人からは見えない個人用のタスクです。',
+        category: '作業',
+        color: '#10b981',
+        shared_with: ['sales_01@synapse.management'] // 非公開
+      },
+      {
+        id: 'dummy-4',
+        user_id: 'sales_02@synapse.management',
+        user_name: '佐藤 花子',
+        title: '商談準備',
+        start_time: parseDateStr(1, 10, 0),
+        end_time: parseDateStr(1, 11, 30),
+        location: '会議室A',
+        description: '明日のクライアント面談に向けての資料整理。',
+        category: '作業',
+        color: '#10b981',
+        shared_with: ['*']
+      }
+    ];
+  }
+
+  // 3. 左サイドバーのメンバーリストを描画
+  function renderLeftSidebarMembers() {
+    const listContainer = document.getElementById('calendar-filter-member-list');
+    if (!listContainer) return;
+    
+    listContainer.innerHTML = '';
+    
+    synapseMembers.forEach(member => {
+      const isChecked = calendarFilteredMembers.includes(member.id);
+      
+      const item = document.createElement('div');
+      item.className = 'calendar-member-item';
+      item.onclick = () => {
+        toggleMemberFilter(member.id);
+      };
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = isChecked;
+      checkbox.style.margin = '0';
+      checkbox.style.cursor = 'pointer';
+      checkbox.onclick = (e) => e.stopPropagation();
+      checkbox.onchange = () => toggleMemberFilter(member.id);
+      
+      const avatar = document.createElement('div');
+      avatar.className = 'calendar-member-avatar';
+      avatar.style.background = member.color;
+      avatar.textContent = member.name.charAt(0);
+      
+      const name = document.createElement('span');
+      name.className = 'calendar-member-name';
+      name.textContent = member.name;
+      
+      // Google連携マークの付与
+      if (member.id === (state.currentUser ? state.currentUser.id : 'guest') && isGoogleLinked) {
+        name.innerHTML += ' <span style="font-size: 0.65rem; color: #4285F4; font-weight: bold;">(G連携)</span>';
+      } else if (member.id !== (state.currentUser ? state.currentUser.id : 'guest') && member.role === 'sales') {
+        // 山田さん佐藤さんはデモとして常にGoogle連携中にしておく
+        name.innerHTML += ' <span style="font-size: 0.65rem; color: #4285F4; opacity: 0.7;">(G連携)</span>';
+      }
+      
+      item.appendChild(checkbox);
+      item.appendChild(avatar);
+      item.appendChild(name);
+      
+      listContainer.appendChild(item);
+    });
+  }
+
+  // メンバー表示フィルターのオンオフ
+  function toggleMemberFilter(memberId) {
+    const idx = calendarFilteredMembers.indexOf(memberId);
+    if (idx === -1) {
+      calendarFilteredMembers.push(memberId);
+    } else {
+      calendarFilteredMembers.splice(idx, 1);
+    }
+    updateMemberFilterUI();
+    renderMypageCalendar();
+  }
+
+  function updateMemberFilterUI() {
+    renderLeftSidebarMembers();
+  }
+
+  // 4. マンスリーカレンダーの描画
+  function renderMypageCalendar() {
+    const daysGrid = document.getElementById('calendar-days-grid');
+    const monthYearTitle = document.getElementById('calendar-month-year');
+    if (!daysGrid || !monthYearTitle) return;
+
+    daysGrid.innerHTML = '';
+    
+    const year = calendarCurrentDate.getFullYear();
+    const month = calendarCurrentDate.getMonth();
+    
+    // タイトルの設定
+    monthYearTitle.textContent = `${year}年 ${month + 1}月`;
+    
+    // 月の最初の日と最後の日
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const lastDayDate = new Date(year, month + 1, 0).getDate();
+    
+    // 前月の最後の日付
+    const prevLastDayDate = new Date(year, month, 0).getDate();
+    
+    // カレンダーの総グリッド数は、前月余白＋当月日数。
+    // 7曜日のマス目（6週間分＝42マス）に収める
+    const totalGridCount = 42;
+    
+    // 予定データを取り込む
+    const currentMonthEvents = getVisibleEventsForMonth(year, month);
+    
+    for (let i = 0; i < totalGridCount; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'calendar-day-cell';
+      
+      let dayNum;
+      let cellDate;
+      
+      if (i < firstDayIndex) {
+        // 前月の余白
+        dayNum = prevLastDayDate - firstDayIndex + i + 1;
+        cell.classList.add('other-month');
+        cellDate = new Date(year, month - 1, dayNum);
+      } else if (i >= firstDayIndex + lastDayDate) {
+        // 翌月の余白
+        dayNum = i - (firstDayIndex + lastDayDate) + 1;
+        cell.classList.add('other-month');
+        cellDate = new Date(year, month + 1, dayNum);
+      } else {
+        // 当月の日付
+        dayNum = i - firstDayIndex + 1;
+        cellDate = new Date(year, month, dayNum);
+        
+        // 本日の判定
+        const today = new Date();
+        if (cellDate.getDate() === today.getDate() && cellDate.getMonth() === today.getMonth() && cellDate.getFullYear() === today.getFullYear()) {
+          cell.classList.add('today');
+        }
+      }
+      
+      // 選択日のハイライト
+      if (cellDate.getDate() === calendarSelectedDate.getDate() && cellDate.getMonth() === calendarSelectedDate.getMonth() && cellDate.getFullYear() === calendarSelectedDate.getFullYear()) {
+        cell.classList.add('selected');
+      }
+      
+      // 日付数値の描画
+      const dayNumberEl = document.createElement('span');
+      dayNumberEl.className = 'day-number';
+      dayNumberEl.textContent = dayNum;
+      cell.appendChild(dayNumberEl);
+      
+      // 予定コンテナの追加
+      const eventContainer = document.createElement('div');
+      eventContainer.className = 'calendar-cell-events';
+      
+      // 当日の予定をフィルタリングして追加
+      const dayEvents = currentMonthEvents.filter(ev => {
+        const evStart = new Date(ev.start_time);
+        return evStart.getDate() === cellDate.getDate() && 
+               evStart.getMonth() === cellDate.getMonth() && 
+               evStart.getFullYear() === cellDate.getFullYear();
+      });
+
+      // 開始時間順にソート
+      dayEvents.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+
+      // セルに描画（最大3件まで表示、それ以上は「+○件」）
+      const maxDisplay = 3;
+      dayEvents.slice(0, maxDisplay).forEach(ev => {
+        const evMicro = document.createElement('div');
+        evMicro.className = 'calendar-event-micro';
+        
+        // Google予定ならGoogle色、通常予定なら予定の設定色を適用
+        if (ev.is_google_event) {
+          evMicro.classList.add('google-event');
+          evMicro.textContent = `G: ${ev.title}`;
+          evMicro.title = `[Google] ${ev.title}`;
+        } else {
+          evMicro.style.backgroundColor = ev.color || '#3b82f6';
+          evMicro.textContent = ev.title;
+          evMicro.title = `[${ev.category}] ${ev.title} (${ev.user_name || '不明'})`;
+        }
+        
+        eventContainer.appendChild(evMicro);
+      });
+
+      if (dayEvents.length > maxDisplay) {
+        const moreBadge = document.createElement('div');
+        moreBadge.style.fontSize = '0.62rem';
+        moreBadge.style.color = 'var(--text-secondary)';
+        moreBadge.style.textAlign = 'right';
+        moreBadge.style.fontWeight = 'bold';
+        moreBadge.style.paddingRight = '2px';
+        moreBadge.textContent = `他 +${dayEvents.length - maxDisplay}件`;
+        eventContainer.appendChild(moreBadge);
+      }
+      
+      cell.appendChild(eventContainer);
+      
+      // クリックイベントの登録
+      cell.onclick = () => {
+        // 古い選択解除
+        const prevSelected = daysGrid.querySelector('.calendar-day-cell.selected');
+        if (prevSelected) prevSelected.classList.remove('selected');
+        
+        cell.classList.add('selected');
+        calendarSelectedDate = cellDate;
+        updateSelectedDateLabel();
+        loadEventsForSelectedDate();
+        resetEventForm();
+      };
+
+      daysGrid.appendChild(cell);
+    }
+  }
+
+  // 指定年月かつフィルターに合致する予定を取得（Google予定も含む）
+  function getVisibleEventsForMonth(year, month) {
+    let events = [];
+    
+    // 通常予定（ローカル/Supabase）のフィルタリング
+    if (state.calendarEvents) {
+      events = state.calendarEvents.filter(ev => {
+        // Google予定ではないこと
+        if (ev.is_google_event) return false;
+        
+        // 作成者が表示対象のメンバーに含まれていること
+        if (!calendarFilteredMembers.includes(ev.user_id)) return false;
+        
+        // ログインユーザーの閲覧権限があるか（RLSと同様のフロントエンドでの検算）
+        const me = state.currentUser ? state.currentUser.id : 'guest';
+        const isOwner = ev.user_id === me;
+        const isSharedAll = ev.shared_with && ev.shared_with.includes('*');
+        const isSharedMe = ev.shared_with && ev.shared_with.includes(me);
+        
+        return isOwner || isSharedAll || isSharedMe;
+      });
+    }
+
+    // Googleカレンダー予定のフィルタリングとマージ
+    synapseMembers.forEach(member => {
+      // フィルターでチェックが入っているメンバーのみGoogle同期イベントを描画
+      if (calendarFilteredMembers.includes(member.id)) {
+        const dummyGoogle = getGoogleDummyEventsForMember(member.id);
+        events = events.concat(dummyGoogle);
+      }
+    });
+
+    return events;
+  }
+
+  // メンバー固有のGoogleダミー予定データを返す
+  function getGoogleDummyEventsForMember(memberId) {
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const isMe = memberId === me;
+    
+    // 自分かつGoogle未連携なら何も返さない
+    if (isMe && !isGoogleLinked) return [];
+    
+    // 山田・佐藤さんはデモとして常にGoogle連携済みの予定を返す
+    const today = new Date();
+    const parseDateStr = (offsetDays, hours, mins) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() + offsetDays);
+      d.setHours(hours, mins, 0, 0);
+      return d.toISOString();
+    };
+
+    if (memberId === 'sales_01@synapse.management') {
+      return [
+        {
+          id: `google-s1-1`,
+          user_id: memberId,
+          user_name: '山田 太郎',
+          title: 'Google: 営業部進捗定例会議',
+          start_time: parseDateStr(-2, 10, 0),
+          end_time: parseDateStr(-2, 11, 0),
+          is_google_event: true
+        },
+        {
+          id: `google-s1-2`,
+          user_id: memberId,
+          user_name: '山田 太郎',
+          title: 'Google: クライクライアント面談 (オンライン)',
+          start_time: parseDateStr(2, 14, 0),
+          end_time: parseDateStr(2, 15, 0),
+          is_google_event: true
+        }
+      ];
+    } else if (memberId === 'sales_02@synapse.management') {
+      return [
+        {
+          id: `google-s2-1`,
+          user_id: memberId,
+          user_name: '佐藤 花子',
+          title: 'Google: 採用説明会資料チェック',
+          start_time: parseDateStr(-1, 14, 0),
+          end_time: parseDateStr(-1, 15, 30),
+          is_google_event: true
+        },
+        {
+          id: `google-s2-2`,
+          user_id: memberId,
+          user_name: '佐藤 花子',
+          title: 'Google: 役員会議の準備MTG',
+          start_time: parseDateStr(3, 11, 0),
+          end_time: parseDateStr(3, 12, 0),
+          is_google_event: true
+        }
+      ];
+    } else if (isMe && isGoogleLinked) {
+      // ログインユーザー自身のGoogle同期予定
+      return [
+        {
+          id: `google-me-1`,
+          user_id: memberId,
+          user_name: '自分',
+          title: 'Google: プライベート同期イベント',
+          start_time: parseDateStr(0, 11, 0),
+          end_time: parseDateStr(0, 12, 0),
+          is_google_event: true
+        },
+        {
+          id: `google-me-2`,
+          user_id: memberId,
+          user_name: '自分',
+          title: 'Google: 外部カレンダーMTG',
+          start_time: parseDateStr(1, 16, 0),
+          end_time: parseDateStr(1, 17, 0),
+          is_google_event: true
+        }
+      ];
+    }
+    
+    return [];
+  }
+
+  // 選択日の予定詳細リストをロード
+  function loadEventsForSelectedDate() {
+    const listContainer = document.getElementById('calendar-day-events-list');
+    if (!listContainer) return;
+    
+    listContainer.innerHTML = '';
+    
+    const year = calendarSelectedDate.getFullYear();
+    const month = calendarSelectedDate.getMonth();
+    const day = calendarSelectedDate.getDate();
+    
+    // 表示中月の予定一覧（フィルタ適用済み）から、選択日のみを抽出
+    const visibleEvents = getVisibleEventsForMonth(year, month);
+    const dayEvents = visibleEvents.filter(ev => {
+      const evStart = new Date(ev.start_time);
+      return evStart.getDate() === day && 
+             evStart.getMonth() === month && 
+             evStart.getFullYear() === year;
+    });
+
+    dayEvents.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+
+    if (dayEvents.length === 0) {
+      listContainer.innerHTML = `<div style="font-size: 0.75rem; color: var(--text-secondary); text-align: center; padding: 1.5rem 0;">この日の予定はありません。</div>`;
+      return;
+    }
+
+    dayEvents.forEach(ev => {
+      const card = document.createElement('div');
+      card.className = 'calendar-event-card';
+      
+      // カラーバーの設定
+      const color = ev.is_google_event ? '#4285F4' : (ev.color || '#3b82f6');
+      card.style.borderLeft = `4px solid ${color}`;
+      
+      const title = document.createElement('div');
+      title.className = 'calendar-event-card-title';
+      title.textContent = ev.title;
+      
+      if (ev.is_google_event) {
+        title.innerHTML = `<span style="color: #4285F4; font-size: 0.72rem;">G</span> ` + ev.title;
+      }
+      
+      const start = new Date(ev.start_time);
+      const end = new Date(ev.end_time);
+      const formatTime = (date) => {
+        return date.toTimeString().slice(0, 5);
+      };
+      
+      const time = document.createElement('div');
+      time.className = 'calendar-event-card-time';
+      time.textContent = `⏰ ${formatTime(start)} 〜 ${formatTime(end)}` + (ev.location ? ` @ ${ev.location}` : '');
+      
+      const owner = document.createElement('div');
+      owner.className = 'calendar-event-card-owner';
+      
+      const me = state.currentUser ? state.currentUser.id : 'guest';
+      const isMyEvent = ev.user_id === me;
+      
+      if (ev.is_google_event) {
+        owner.innerHTML = `👤 Google同期予定 (所有者: ${ev.user_name})`;
+      } else {
+        const ownerName = isMyEvent ? '自分' : ev.user_name;
+        owner.innerHTML = `👤 登録者: ${ownerName} [${ev.category}]`;
+        
+        if (!isMyEvent) {
+          owner.innerHTML += ' <span style="color: var(--text-muted); font-size: 0.65rem;">🔒 閲覧専用</span>';
+        }
+      }
+      
+      card.appendChild(title);
+      card.appendChild(time);
+      card.appendChild(owner);
+      
+      card.onclick = () => {
+        selectEventForEdit(ev);
+      };
+
+      listContainer.appendChild(card);
+    });
+  }
+
+  // 5. 予定のCRUDアクション
+
+  // 新規追加用にフォームをリセット
+  function resetEventForm() {
+    const eventIdInput = document.getElementById('calendar-form-event-id');
+    if (!eventIdInput) return; // UIがDOMにない場合はスキップ
+
+    eventIdInput.value = '';
+    document.getElementById('calendar-form-title').value = '';
+    document.getElementById('calendar-form-start-time').value = '09:00';
+    document.getElementById('calendar-form-end-time').value = '10:00';
+    document.getElementById('calendar-form-category').value = '一般';
+    document.getElementById('calendar-form-color').value = '#3b82f6';
+    document.getElementById('calendar-form-location').value = '';
+    document.getElementById('calendar-form-desc').value = '';
+    
+    const shareTypeSelect = document.getElementById('calendar-form-share-type');
+    if (shareTypeSelect) {
+      shareTypeSelect.value = 'all';
+      shareTypeSelect.dispatchEvent(new Event('change'));
+    }
+
+    // 新規登録のため全フィールドを有効化し、削除ボタンを非表示にする
+    enableFormFields(true);
+    const deleteBtn = document.getElementById('calendar-event-delete-btn');
+    if (deleteBtn) deleteBtn.style.display = 'none';
+  }
+
+  // 既存予定をフォームに読み込む
+  function selectEventForEdit(event) {
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const isGoogle = event.is_google_event;
+    const isMine = event.user_id === me;
+
+    document.getElementById('calendar-form-event-id').value = event.id;
+    document.getElementById('calendar-form-title').value = event.title;
+    
+    const start = new Date(event.start_time);
+    const end = new Date(event.end_time);
+    const formatTime = (date) => date.toTimeString().slice(0, 5);
+    
+    document.getElementById('calendar-form-start-time').value = formatTime(start);
+    document.getElementById('calendar-form-end-time').value = formatTime(end);
+    document.getElementById('calendar-form-category').value = event.category || '一般';
+    document.getElementById('calendar-form-color').value = event.color || '#3b82f6';
+    document.getElementById('calendar-form-location').value = event.location || '';
+    document.getElementById('calendar-form-desc').value = event.description || '';
+
+    const shareTypeSelect = document.getElementById('calendar-form-share-type');
+    
+    // 共有範囲の復元
+    if (shareTypeSelect) {
+      if (!event.shared_with || event.shared_with.includes('*')) {
+        shareTypeSelect.value = 'all';
+      } else if (event.shared_with.length === 1 && event.shared_with.includes(event.user_id)) {
+        shareTypeSelect.value = 'private';
+      } else {
+        shareTypeSelect.value = 'select';
+      }
+      shareTypeSelect.dispatchEvent(new Event('change'));
+
+      // 個別選択メンバーの復元
+      if (shareTypeSelect.value === 'select' && event.shared_with) {
+        setTimeout(() => {
+          const listContainer = document.getElementById('calendar-form-share-members-list');
+          if (listContainer) {
+            const inputs = listContainer.querySelectorAll('input[type="checkbox"]');
+            inputs.forEach(input => {
+              input.checked = event.shared_with.includes(input.value);
+            });
+          }
+        }, 50);
+      }
+    }
+
+    const deleteBtn = document.getElementById('calendar-event-delete-btn');
+
+    if (isMine && !isGoogle) {
+      // 自分の予定なら編集・削除を許可
+      enableFormFields(true);
+      if (deleteBtn) deleteBtn.style.display = 'block';
+    } else {
+      // 他人の予定、またはGoogle予定なら「閲覧専用」にする
+      enableFormFields(false);
+      if (deleteBtn) deleteBtn.style.display = 'none';
+    }
+  }
+
+  // フォームフィールドの有効・無効切り替え
+  function enableFormFields(enable) {
+    const fields = [
+      'calendar-form-title', 'calendar-form-start-time', 'calendar-form-end-time',
+      'calendar-form-category', 'calendar-form-color', 'calendar-form-location',
+      'calendar-form-desc', 'calendar-form-share-type'
+    ];
+    
+    fields.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !enable;
+    });
+
+    const shareMembersContainer = document.getElementById('calendar-form-share-members-list');
+    if (shareMembersContainer) {
+      const checkboxes = shareMembersContainer.querySelectorAll('input');
+      checkboxes.forEach(cb => cb.disabled = !enable);
+    }
+
+    const saveBtn = document.getElementById('calendar-event-save-btn');
+    if (saveBtn) {
+      saveBtn.style.display = enable ? 'block' : 'none';
+    }
+  }
+
+  // フォーム内の共有用メンバーチェックリストを描画
+  function renderFormShareMemberList() {
+    const listContainer = document.getElementById('calendar-form-share-members-list');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '';
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+
+    // 自分以外のメンバーを共有候補としてリスト
+    synapseMembers.forEach(member => {
+      if (member.id === me) return;
+
+      const item = document.createElement('div');
+      item.style.display = 'flex';
+      item.style.alignItems = 'center';
+      item.style.gap = '0.35rem';
+      item.style.fontSize = '0.75rem';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = member.id;
+      checkbox.id = `share-member-cb-${member.id}`;
+      checkbox.style.cursor = 'pointer';
+
+      const label = document.createElement('label');
+      label.htmlFor = `share-member-cb-${member.id}`;
+      label.textContent = member.name;
+      label.style.cursor = 'pointer';
+      label.style.flex = '1';
+
+      item.appendChild(checkbox);
+      item.appendChild(label);
+      listContainer.appendChild(item);
+    });
+  }
+
+  // 予定の保存処理 (INSERT / UPDATE)
+  async function saveCalendarEvent() {
+    const id = document.getElementById('calendar-form-event-id').value;
+    const title = document.getElementById('calendar-form-title').value.trim();
+    const startTimeStr = document.getElementById('calendar-form-start-time').value;
+    const endTimeStr = document.getElementById('calendar-form-end-time').value;
+    const category = document.getElementById('calendar-form-category').value;
+    const color = document.getElementById('calendar-form-color').value;
+    const location = document.getElementById('calendar-form-location').value.trim();
+    const description = document.getElementById('calendar-form-desc').value.trim();
+    const shareType = document.getElementById('calendar-form-share-type').value;
+
+    if (!title) {
+      showToast('予定のタイトルを入力してください。', 'error');
+      return;
+    }
+
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const myName = state.currentUser ? (state.currentUser.name || state.currentUser.id) : '自分';
+
+    // 開始日時・終了日時のDateオブジェクト作成
+    const getFullDateISO = (timeStr) => {
+      const [hours, mins] = timeStr.split(':');
+      const d = new Date(calendarSelectedDate);
+      d.setHours(parseInt(hours, 10), parseInt(mins, 10), 0, 0);
+      return d.toISOString();
+    };
+
+    const start_time = getFullDateISO(startTimeStr);
+    const end_time = getFullDateISO(endTimeStr);
+
+    if (new Date(start_time) >= new Date(end_time)) {
+      showToast('終了時刻は開始時刻より後に設定してください。', 'error');
+      return;
+    }
+
+    // 共有範囲の作成
+    let shared_with = ['*']; // デフォルトは全員共有
+    if (shareType === 'private') {
+      shared_with = [me];
+    } else if (shareType === 'select') {
+      shared_with = [me]; // 自分は常に共有
+      const checkboxes = document.querySelectorAll('#calendar-form-share-members-list input[type="checkbox"]:checked');
+      checkboxes.forEach(cb => {
+        shared_with.push(cb.value);
+      });
+    }
+
+    const eventData = {
+      id: id || generateUUID(),
+      user_id: me,
+      user_name: myName,
+      title: title,
+      start_time: start_time,
+      end_time: end_time,
+      location: location,
+      description: description,
+      category: category,
+      color: color,
+      shared_with: shared_with,
+      is_google_event: false
+    };
+
+    // DBへの同期保存を試みる
+    let success = false;
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        const { error } = await partnerSupabaseClient
+          .from('synapse_calendar_events')
+          .upsert(eventData);
+        if (!error) {
+          success = true;
+        } else {
+          console.error("Supabase upsert error:", error.message);
+        }
+      } catch (e) {
+        console.error("Supabase connection error during save:", e);
+      }
+    }
+
+    // ローカルストレージでの保存・更新 (フォールバック ＆ 即座の描画反映)
+    const idx = state.calendarEvents.findIndex(ev => ev.id === eventData.id);
+    if (idx !== -1) {
+      state.calendarEvents[idx] = eventData;
+    } else {
+      state.calendarEvents.push(eventData);
+    }
+    localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${me}`, JSON.stringify(state.calendarEvents));
+    
+    showToast(id ? '予定を更新しました。' : '予定を新規作成しました！', 'success');
+    
+    // カレンダー再描画とフォームリセット
+    renderMypageCalendar();
+    loadEventsForSelectedDate();
+    resetEventForm();
+  }
+
+  // 予定の削除処理
+  async function deleteCalendarEvent() {
+    const id = document.getElementById('calendar-form-event-id').value;
+    if (!id) return;
+
+    if (!confirm('この予定を削除しますか？')) return;
+
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+
+    // DBからの削除を試みる
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        await partnerSupabaseClient
+          .from('synapse_calendar_events')
+          .delete()
+          .eq('id', id)
+          .eq('user_id', me); // 作成者本人しか削除できないRLSに準拠
+      } catch (e) {
+        console.error("Supabase event delete failed:", e);
+      }
+    }
+
+    // ローカルストレージからも削除
+    state.calendarEvents = state.calendarEvents.filter(ev => ev.id !== id);
+    localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${me}`, JSON.stringify(state.calendarEvents));
+
+    showToast('予定を削除しました。', 'info');
+
+    // カレンダー再描画とフォームリセット
+    renderMypageCalendar();
+    loadEventsForSelectedDate();
+    resetEventForm();
+  }
+
+  // UUID生成ヘルパー
+  function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  // 日付ラベル更新
+  function updateSelectedDateLabel() {
+    const label = document.getElementById('calendar-selected-date-label');
+    if (!label) return;
+    
+    const year = calendarSelectedDate.getFullYear();
+    const month = calendarSelectedDate.getMonth() + 1;
+    const day = calendarSelectedDate.getDate();
+    const dayName = ['日', '月', '火', '水', '木', '金', '土'][calendarSelectedDate.getDay()];
+    
+    label.textContent = `選択日: ${month}月${day}日(${dayName})`;
+  }
+
+  // 6. Googleカレンダー連携処理
+
+  function linkGoogleCalendar(email) {
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+    
+    isGoogleLinked = true;
+    googleLinkedEmail = email;
+    
+    localStorage.setItem(`SYNAPSE_GOOGLE_LINKED_${me}`, 'true');
+    localStorage.setItem(`SYNAPSE_GOOGLE_EMAIL_${me}`, email);
+    
+    updateGoogleStatusUI();
+    showToast('Googleカレンダーと連携されました！', 'success');
+    
+    // サイドバーとカレンダー再描画
+    renderLeftSidebarMembers();
+    renderMypageCalendar();
+    loadEventsForSelectedDate();
+    
+    // 【本物API連携コードのプレビュー】
+    // API Key と Client ID が設定されている場合に Google Auth 認証処理を自動バックグラウンドで開始するための準備
+    const clientId = localStorage.getItem(`SYNAPSE_GOOGLE_CLIENT_ID_${me}`);
+    const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
+    if (clientId && apiKey) {
+      initRealGoogleCalendarSync(clientId, apiKey);
+    }
+  }
+
+  function unlinkGoogleCalendar() {
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+    
+    isGoogleLinked = false;
+    googleLinkedEmail = '';
+    
+    localStorage.setItem(`SYNAPSE_GOOGLE_LINKED_${me}`, 'false');
+    localStorage.setItem(`SYNAPSE_GOOGLE_EMAIL_${me}`, '');
+    
+    updateGoogleStatusUI();
+    showToast('Googleカレンダーの連携を解除しました。', 'info');
+    
+    renderLeftSidebarMembers();
+    renderMypageCalendar();
+    loadEventsForSelectedDate();
+  }
+
+  function updateGoogleStatusUI() {
+    const dot = document.getElementById('google-calendar-status-dot');
+    const text = document.getElementById('google-calendar-status-text');
+    const btn = document.getElementById('google-calendar-connect-btn');
+    const btnCalendar = document.getElementById('mypage-btn-calendar');
+
+    if (!dot || !text || !btn) return;
+
+    if (isGoogleLinked) {
+      dot.style.backgroundColor = '#10b981'; // グリーン
+      text.textContent = `G連携中: ${googleLinkedEmail}`;
+      btn.textContent = '連携解除';
+      btn.className = 'btn btn-secondary';
+      
+      // マイページのランチャーカード表示の更新
+      if (btnCalendar) {
+        btnCalendar.style.background = 'rgba(66, 133, 244, 0.08)';
+        btnCalendar.style.borderColor = '#4285F4';
+        const titleSpan = btnCalendar.querySelector('span:nth-of-type(1)');
+        const descSpan = btnCalendar.querySelector('span:nth-of-type(2)');
+        if (titleSpan) titleSpan.innerText = 'カレンダーを開く';
+        if (descSpan) descSpan.innerText = `連携中: ${googleLinkedEmail}`;
+      }
+    } else {
+      dot.style.backgroundColor = '#ef4444'; // レッド
+      text.textContent = 'Google未連携';
+      btn.textContent = '連携する';
+      btn.className = 'btn btn-primary';
+      btn.style.background = '#4285F4';
+      
+      if (btnCalendar) {
+        btnCalendar.style.background = 'var(--bg-surface)';
+        btnCalendar.style.borderColor = 'var(--border-color)';
+        const titleSpan = btnCalendar.querySelector('span:nth-of-type(1)');
+        const descSpan = btnCalendar.querySelector('span:nth-of-type(2)');
+        if (titleSpan) titleSpan.innerText = 'カレンダー';
+        if (descSpan) descSpan.innerText = '個人・共有の予定管理とGoogleカレンダーの同期連携を行います';
+      }
+    }
+  }
+
+  // 本物の Google Calendar API 同期処理（デベロッパー用実装コード）
+  function initRealGoogleCalendarSync(clientId, apiKey) {
+    console.log("[Google Calendar API] Initializing sync with API settings...", { clientId: clientId.substring(0,10) + "...", apiKey: "RESTRICTED" });
+    
+    // GIS (Google Identity Services) ライブラリが読み込まれていれば実行
+    if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+      try {
+        const tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/calendar.events.readonly',
+          callback: async (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+              console.log("[Google Calendar API] Access token acquired!");
+              fetchRealGoogleEvents(tokenResponse.access_token, apiKey);
+            }
+          }
+        });
+        // トークン取得ポップアップを実行
+        tokenClient.requestAccessToken();
+      } catch (err) {
+        console.error("[Google Calendar API] Token client initialization failed:", err);
+      }
+    } else {
+      console.log("[Google Calendar API] Google API scripts not loaded in index.html. Simulating real fetch...");
+    }
+  }
+
+  // アクセストークンとAPIキーを使ったカレンダーイベントの実際のフェッチ
+  async function fetchRealGoogleEvents(accessToken, apiKey) {
+    const timeMin = new Date();
+    timeMin.setMonth(timeMin.getMonth() - 2); // 過去2ヶ月分
+    const timeMax = new Date();
+    timeMax.setMonth(timeMax.getMonth() + 2); // 未来2ヶ月分
+
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events` + 
+                `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&key=${apiKey}`;
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+      const data = await response.json();
+      if (data && data.items) {
+        console.log("[Google Calendar API] Synced events count:", data.items.length);
+        // 本物のイベントが取得できたら、ダミーイベントの代わりに state にマージする処理などを行う
+        showToast(`Googleカレンダーから ${data.items.length} 件の予定を同期しました！`, 'success');
+      }
+    } catch (e) {
+      console.error("[Google Calendar API] Fetch events failed:", e);
+    }
+  }
+
+  // 外部からのタブ活性化時の再描画用ブリッジ
+  function refreshCalendarView() {
+    fetchCalendarEvents().then(() => {
+      renderMypageCalendar();
+      updateSelectedDateLabel();
+      loadEventsForSelectedDate();
+      resetEventForm();
+    });
+  }
+
+})();
+
 
 
 

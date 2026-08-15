@@ -4237,3 +4237,372 @@ h3 {
   filter: grayscale(0.2);
 }
 
+/* ============================================================================
+   📅 個人＆共有カレンダー機能 スタイル
+   ============================================================================ */
+.mypage-calendar-layout {
+  display: flex;
+  gap: 1.25rem;
+  height: calc(100vh - 160px);
+  min-height: 550px;
+  overflow: hidden;
+  align-items: stretch;
+  position: relative;
+  width: 100%;
+}
+
+/* 左カラム：メンバーフィルター */
+.calendar-left-sidebar {
+  width: 250px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: var(--shadow-sm);
+  overflow-y: auto;
+}
+
+.calendar-sidebar-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
+  text-align: left;
+}
+
+.calendar-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.calendar-member-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+  user-select: none;
+}
+
+.calendar-member-item:hover {
+  background: var(--bg-surface-elevated);
+}
+
+.calendar-member-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+}
+
+.calendar-member-name {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 中央カラム：カレンダー本体 */
+.calendar-main-panel {
+  flex: 1;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.calendar-header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.calendar-month-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.calendar-month-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 120px;
+  text-align: center;
+}
+
+.calendar-grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-week-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0.5rem;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.calendar-week-header div {
+  text-align: center;
+}
+
+.calendar-week-header div:nth-child(1) { color: #ef4444; } /* 日曜日 */
+.calendar-week-header div:nth-child(7) { color: #3b82f6; } /* 土曜日 */
+
+.calendar-days-container {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 1fr;
+  flex: 1;
+  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+}
+
+.calendar-day-cell {
+  border-top: 1px solid var(--border-color);
+  border-left: 1px solid var(--border-color);
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-height: 0;
+  overflow: hidden;
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.calendar-day-cell:hover {
+  background: var(--bg-surface-elevated);
+}
+
+.calendar-day-cell.other-month {
+  background: rgba(var(--bg-surface-rgb), 0.3);
+  opacity: 0.4;
+}
+
+.calendar-day-cell.today {
+  background: rgba(var(--primary-rgb), 0.06);
+}
+
+.calendar-day-cell.today .day-number {
+  background: var(--primary);
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.calendar-day-cell.selected {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  background: rgba(var(--primary-rgb), 0.03);
+}
+
+.day-number {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  align-self: flex-start;
+}
+
+.calendar-day-cell:nth-child(7n+1) .day-number { color: #ef4444; } /* 日曜日 */
+.calendar-day-cell:nth-child(7n) .day-number { color: #3b82f6; } /* 土曜日 */
+
+.calendar-cell-events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  flex: 1;
+  padding-bottom: 2px;
+}
+
+.calendar-event-micro {
+  font-size: 0.65rem;
+  padding: 2px 4px;
+  border-radius: 3px;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  font-weight: 600;
+  border-left: 3px solid rgba(0,0,0,0.15);
+}
+
+.calendar-event-micro.google-event {
+  background: #4285F4 !important;
+}
+
+/* 右カラム：予定詳細・作成 */
+.calendar-right-panel {
+  width: 320px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  overflow-y: auto;
+}
+
+.calendar-section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0.5rem;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calendar-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.calendar-event-card {
+  padding: 0.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+  text-align: left;
+}
+
+.calendar-event-card:hover {
+  transform: translateX(2px);
+  border-color: var(--primary);
+}
+
+.calendar-event-card-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.calendar-event-card-time {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.calendar-event-card-owner {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* 予定登録フォーム */
+.calendar-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: left;
+}
+
+.calendar-form-group label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.calendar-form-control {
+  padding: 0.45rem 0.6rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.calendar-form-control:focus {
+  border-color: var(--primary);
+}
+
+/* Google API詳細設定（アコーディオン） */
+.google-settings-accordion {
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: rgba(var(--bg-surface-rgb), 0.5);
+}
+
+.google-settings-header {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+
+.google-settings-header:hover {
+  background: var(--bg-surface-elevated);
+}
+
+.google-settings-content {
+  padding: 0.75rem;
+  border-top: 1px dashed var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+

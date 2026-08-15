@@ -715,6 +715,13 @@
           <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;" id="mypage-zoom-connect-desc">Zoomアカウントと連携し、面談での通話を可能にします</span>
         </div>
 
+        <!-- カレンダー -->
+        <div class="admin-app-icon" id="mypage-btn-calendar" title="カレンダー" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+          <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">📅</div>
+          <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">カレンダー</span>
+          <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">個人・共有の予定管理とGoogleカレンダーの同期連携を行います</span>
+        </div>
+
       </div>
 
       <!-- プロファイル ＆ 登録デバイス一覧 -->
@@ -1178,6 +1185,185 @@
 
       </div>
     </div>
+</section>
+
+<!-- ================= 個人・共有カレンダー画面 ================= -->
+<section id="mypage-calendar-screen" class="screen-view" style="display: none; padding: 1.25rem;">
+  <div style="display: flex; flex-direction: column; gap: 1rem; height: calc(100vh - 120px);">
+    
+    <!-- ヘッダー -->
+    <div style="border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <button id="mypage-calendar-back-btn" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem;">
+          ⬅️ メニューに戻る
+        </button>
+        <div>
+          <h1 style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+            📅 カレンダー ＆ Google連携
+          </h1>
+          <p style="margin: 0.2rem 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">個人予定の管理、メンバー間の予定共有、Googleカレンダー同期が行えます。</p>
+        </div>
+      </div>
+      
+      <!-- Googleカレンダー連携ステータス表示 -->
+      <div style="display: flex; align-items: center; gap: 0.75rem; background: var(--bg-surface-elevated); padding: 0.4rem 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+        <span id="google-calendar-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;"></span>
+        <span id="google-calendar-status-text" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary);">Google未連携</span>
+        <button id="google-calendar-connect-btn" class="btn btn-primary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; font-weight: 700; cursor: pointer; border-radius: var(--radius-sm); background: #4285F4; border: none; color: white;">連携する</button>
+      </div>
+    </div>
+
+    <!-- 3カラムレイアウト -->
+    <div class="mypage-calendar-layout">
+      
+      <!-- 左カラム: 表示メンバー選択フィルター -->
+      <div class="calendar-left-sidebar">
+        <div class="calendar-sidebar-title">👥 共有メンバー表示</div>
+        
+        <div style="display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem;">
+          <button id="calendar-filter-only-me" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.3rem; font-weight: 600; text-align: center;">自分のみ表示</button>
+          <button id="calendar-filter-all" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.3rem; font-weight: 600; text-align: center;">全員を表示</button>
+        </div>
+        
+        <div class="calendar-member-list" id="calendar-filter-member-list">
+          <!-- メンバー一覧が動的に出力されます -->
+        </div>
+      </div>
+      
+      <!-- 中央カラム: カレンダー表示 -->
+      <div class="calendar-main-panel">
+        <div class="calendar-header-actions">
+          <div class="calendar-month-nav">
+            <button id="calendar-prev-month" class="btn btn-secondary" style="padding: 0.3rem 0.5rem;">◀</button>
+            <span id="calendar-month-year" class="calendar-month-title">2026年 8月</span>
+            <button id="calendar-next-month" class="btn btn-secondary" style="padding: 0.3rem 0.5rem;">▶</button>
+          </div>
+          
+          <!-- 今日に戻るボタン -->
+          <button id="calendar-today-btn" class="btn btn-secondary" style="font-size: 0.75rem; font-weight: 600; padding: 0.35rem 0.6rem;">今日</button>
+        </div>
+        
+        <div class="calendar-grid-table">
+          <div class="calendar-week-header">
+            <div>日</div>
+            <div>月</div>
+            <div>火</div>
+            <div>水</div>
+            <div>木</div>
+            <div>金</div>
+            <div>土</div>
+          </div>
+          <div class="calendar-days-container" id="calendar-days-grid">
+            <!-- 日付セルが動的に出力されます -->
+          </div>
+        </div>
+      </div>
+      
+      <!-- 右カラム: 予定一覧 & 登録・編集フォーム -->
+      <div class="calendar-right-panel">
+        <!-- 日付表示 -->
+        <div class="calendar-section-title">
+          <span id="calendar-selected-date-label">選択日: 8月15日(土)</span>
+          <button id="calendar-new-event-btn" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.72rem; font-weight: 700; display: flex; align-items: center; gap: 0.15rem;">➕ 新規予定</button>
+        </div>
+        
+        <!-- その日の予定リスト -->
+        <div class="calendar-event-list" id="calendar-day-events-list">
+          <!-- 選択日の予定が並びます -->
+        </div>
+        
+        <!-- 予定作成・編集フォーム -->
+        <div id="calendar-event-form-container" style="display: flex; flex-direction: column; gap: 0.8rem; border-top: 1px solid var(--border-color); padding-top: 0.8rem; text-align: left;">
+          <input type="hidden" id="calendar-form-event-id">
+          
+          <div class="calendar-form-group">
+            <label for="calendar-form-title">予定タイトル <span style="color: #ef4444;">*</span></label>
+            <input type="text" id="calendar-form-title" class="calendar-form-control" placeholder="予定のタイトルを入力...">
+          </div>
+          
+          <div style="display: flex; gap: 0.5rem; width: 100%;">
+            <div class="calendar-form-group" style="flex: 1;">
+              <label for="calendar-form-start-time">開始時刻 <span style="color: #ef4444;">*</span></label>
+              <input type="time" id="calendar-form-start-time" class="calendar-form-control" value="09:00">
+            </div>
+            <div class="calendar-form-group" style="flex: 1;">
+              <label for="calendar-form-end-time">終了時刻 <span style="color: #ef4444;">*</span></label>
+              <input type="time" id="calendar-form-end-time" class="calendar-form-control" value="10:00">
+            </div>
+          </div>
+          
+          <div style="display: flex; gap: 0.5rem; width: 100%;">
+            <div class="calendar-form-group" style="flex: 1;">
+              <label for="calendar-form-category">カテゴリ</label>
+              <select id="calendar-form-category" class="calendar-form-control" style="cursor: pointer;">
+                <option value="一般">一般</option>
+                <option value="会議">会議</option>
+                <option value="面談">面談</option>
+                <option value="作業">作業</option>
+                <option value="プライベート">プライベート</option>
+              </select>
+            </div>
+            <div class="calendar-form-group" style="flex: 1;">
+              <label for="calendar-form-color">カラー</label>
+              <input type="color" id="calendar-form-color" class="calendar-form-control" value="#3b82f6" style="padding: 2px; height: 32px; cursor: pointer;">
+            </div>
+          </div>
+          
+          <div class="calendar-form-group">
+            <label for="calendar-form-location">場所</label>
+            <input type="text" id="calendar-form-location" class="calendar-form-control" placeholder="会議室、Zoomなど">
+          </div>
+          
+          <div class="calendar-form-group">
+            <label for="calendar-form-desc">詳細メモ</label>
+            <textarea id="calendar-form-desc" class="calendar-form-control" rows="2" placeholder="詳細を入力..."></textarea>
+          </div>
+          
+          <!-- 共有設定 -->
+          <div class="calendar-form-group" style="border-top: 1px dashed var(--border-color); padding-top: 0.5rem;">
+            <label>共有先の設定</label>
+            <select id="calendar-form-share-type" class="calendar-form-control" style="cursor: pointer; margin-bottom: 0.4rem;">
+              <option value="all">全員に共有する</option>
+              <option value="private">自分のみ（非公開）</option>
+              <option value="select">メンバーを指定して共有</option>
+            </select>
+            
+            <!-- メンバー個別選択エリア -->
+            <div id="calendar-form-share-members-list" style="display: none; max-height: 100px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.4rem; border-radius: var(--radius-sm); background: var(--bg-surface-elevated); flex-direction: column; gap: 0.35rem;">
+              <!-- チェックボックス付きメンバーリストが動的出力されます -->
+            </div>
+          </div>
+          
+          <!-- 保存・削除アクションボタン -->
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;" id="calendar-form-actions">
+            <button id="calendar-event-delete-btn" class="btn btn-secondary" style="background: #ef4444; border: none; color: white; flex: 1; padding: 0.5rem; font-weight: 700; cursor: pointer; display: none;">削除</button>
+            <button id="calendar-event-save-btn" class="btn btn-primary" style="flex: 2; padding: 0.5rem; font-weight: 700; cursor: pointer;">保存</button>
+          </div>
+        </div>
+        
+        <!-- Google API 詳細設定アコーディオン -->
+        <div class="google-settings-accordion" style="margin-top: 0.5rem;">
+          <div class="google-settings-header" id="google-settings-accordion-trigger">
+            <span>⚙️ Google API 連携詳細設定</span>
+            <span id="google-settings-accordion-arrow">▼</span>
+          </div>
+          <div class="google-settings-content" id="google-settings-accordion-content" style="display: none;">
+            <p style="font-size: 0.65rem; color: var(--text-secondary); margin: 0 0 0.25rem 0; line-height: 1.3; text-align: left;">自身のGoogle Cloud Consoleで作成したAPIキーを設定することで本物のカレンダーと連携可能です。</p>
+            <div class="calendar-form-group">
+              <label style="font-size: 0.68rem;">Google Client ID</label>
+              <input type="text" id="google-api-client-id" class="calendar-form-control" style="font-size: 0.72rem; padding: 0.35rem;" placeholder="OAuth クライアント ID...">
+            </div>
+            <div class="calendar-form-group">
+              <label style="font-size: 0.68rem;">API Key</label>
+              <input type="password" id="google-api-key" class="calendar-form-control" style="font-size: 0.72rem; padding: 0.35rem;" placeholder="API キー...">
+            </div>
+            <button id="google-api-settings-save-btn" class="btn btn-primary" style="padding: 0.35rem; font-size: 0.75rem; font-weight: 700; width: 100%;">設定を保存</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
 </section>
 
 <!-- ================= ホーム画面 ================= -->
@@ -3190,6 +3376,41 @@
     <div style="display: flex; gap: 0.75rem; justify-content: center; margin-top: 1.5rem;">
       <button id="zoom-oauth-cancel-btn" style="flex: 1; padding: 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #475569; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;">キャンセル</button>
       <button id="zoom-oauth-submit-btn" style="flex: 1; padding: 0.6rem; border: none; border-radius: 6px; background: #2D8CFF; color: white; font-weight: 700; font-size: 0.8rem; cursor: pointer; box-shadow: 0 4px 10px rgba(45, 140, 255, 0.3); transition: all 0.2s;">サインインして承認</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 🌐 Google カレンダー OAuth 認証連携モーダル ================= -->
+<div id="google-calendar-oauth-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 20000; align-items: center; justify-content: center; backdrop-filter: blur(4px); font-family: 'Inter', 'Noto Sans JP', sans-serif;">
+  <div style="background: white; border-radius: 12px; width: 380px; padding: 2rem; box-shadow: var(--shadow-lg); color: #1e293b; text-align: center; border: 1px solid rgba(0,0,0,0.1);">
+    <!-- Google公式風ロゴマーク -->
+    <div style="display: flex; justify-content: center; margin-bottom: 1rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">
+      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.5 24c0-1.61-.15-3.16-.42-4.67H24v8.83h12.7c-.55 2.87-2.17 5.31-4.6 6.94l7.15 5.54C43.5 36.33 46.5 30.82 46.5 24z"/>
+        <path fill="#FBBC05" d="M10.54 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.98-6.19z"/>
+        <path fill="#34A853" d="M24 38.5c-6.26 0-11.57-4.22-13.46-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48c6.48 0 11.93-2.13 15.89-5.81l-7.15-5.54c-2.11 1.41-4.8 2.25-7.74 2.25z"/>
+      </svg>
+    </div>
+    <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #0f172a;">Googleアカウントと連携</h3>
+    <p style="font-size: 0.75rem; color: #64748b; margin-bottom: 1.5rem; line-height: 1.4; padding: 0 0.5rem;">自身のGoogleアカウントでサインインし、SynapseカレンダーへのGoogleカレンダー予定の同期を許可します。</p>
+    
+    <!-- 認証フォーム -->
+    <div style="display: flex; flex-direction: column; gap: 0.8rem; text-align: left; margin-bottom: 1.5rem;">
+      <div>
+        <label style="font-size: 0.72rem; font-weight: 700; color: #475569; display: block; margin-bottom: 0.3rem;">Google メールアドレス</label>
+        <input type="email" id="google-calendar-oauth-email" value="user_01@gmail.com" placeholder="example@gmail.com" style="width: 100%; padding: 0.55rem 0.7rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.82rem; outline: none; box-sizing: border-box; background: #f8fafc; color: #0f172a;">
+      </div>
+      <div>
+        <label style="font-size: 0.72rem; font-weight: 700; color: #475569; display: block; margin-bottom: 0.3rem;">パスワード</label>
+        <input type="password" id="google-calendar-oauth-password" value="password123" placeholder="パスワードを入力..." style="width: 100%; padding: 0.55rem 0.7rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.82rem; outline: none; box-sizing: border-box; background: #f8fafc; color: #0f172a;">
+      </div>
+    </div>
+    
+    <!-- アクションボタン -->
+    <div style="display: flex; gap: 0.75rem; justify-content: center; margin-top: 1.5rem;">
+      <button id="google-calendar-oauth-cancel-btn" style="flex: 1; padding: 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #475569; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;">キャンセル</button>
+      <button id="google-calendar-oauth-submit-btn" style="flex: 1; padding: 0.6rem; border: none; border-radius: 6px; background: #4285F4; color: white; font-weight: 700; font-size: 0.8rem; cursor: pointer; box-shadow: 0 4px 10px rgba(66, 133, 244, 0.3); transition: all 0.2s;">サインインして承認</button>
     </div>
   </div>
 </div>
