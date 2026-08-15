@@ -8483,7 +8483,7 @@ function checkLoginStatus() {
     const defaultOwner = {
       id: 'owner',
       loginId: 'owner',
-      name: 'システム管理者',
+      name: 'オーナー',
       role: 'owner',
       code: '4X9N3K75'
     };
@@ -8494,7 +8494,13 @@ function checkLoginStatus() {
   if (loggedUser) {
     state.currentUser = JSON.parse(loggedUser);
     
-    // 既存ログインデータ（古い形式）に対する id/role 構成の自動マイグレーション
+    // システム管理者からオーナーへの自動移行・名称修正
+    if (state.currentUser && state.currentUser.id === 'owner' && state.currentUser.name === 'システム管理者') {
+      state.currentUser.name = 'オーナー';
+      localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
+    }
+
+    // 既存ログインデータ（古い形式）に対する id/role 構成 of 自動マイグレーション
     if (state.currentUser && !state.currentUser.role && state.currentUser.loginId) {
       state.currentUser.role = state.currentUser.id; // 旧id（ロール）をroleに代入
       state.currentUser.id = state.currentUser.loginId; // loginIdを本IDに昇格
@@ -10990,8 +10996,8 @@ function changeUserMode(mode) {
   let targetId = 'sales_01';
   let targetName = '営業担当A';
   if (mode === 'admin') {
-    targetId = 'admin';
-    targetName = 'システム管理者';
+    targetId = 'owner';
+    targetName = 'オーナー';
   } else if (mode === 'support' || mode === 'setup-support') {
     targetId = 'support_01';
     targetName = '開設サポート担当';
@@ -11059,7 +11065,7 @@ function changeUserMode(mode) {
 // ロール名の日本語表記を取得するグローバルヘルパー
 function getRoleJpName(role) {
   switch (role) {
-    case 'admin': return 'システム管理者';
+    case 'admin': return 'オーナー';
     case 'sales': return '営業担当';
     case 'setup-support': return '開設サポート';
     case 'store-patrol': return '店舗パトロール';
@@ -22129,7 +22135,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ロール名の日本語表記を取得
   function getRoleJpName(role) {
     switch (role) {
-      case 'admin': return 'システム管理者';
+      case 'admin': return 'オーナー';
       case 'sales': return '営業担当';
       case 'setup-support': return '開設サポート';
       case 'store-patrol': return '店舗パトロール';
