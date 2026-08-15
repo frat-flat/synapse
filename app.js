@@ -32469,86 +32469,9 @@ window.openResumableUrl = function(urlStr) {
     return [];
   }
 
-  // 選択日の予定詳細リストをロード
+  // 選択日の予定詳細リストをロード (タイムライン表示移行に伴い不要になったため廃止)
   function loadEventsForSelectedDate() {
-    const listContainer = document.getElementById('calendar-day-events-list');
-    if (!listContainer) return;
-    
-    listContainer.innerHTML = '';
-    
-    const year = calendarSelectedDate.getFullYear();
-    const month = calendarSelectedDate.getMonth();
-    const day = calendarSelectedDate.getDate();
-    
-    // 表示中月の予定一覧（フィルタ適用済み）から、選択日のみを抽出
-    const visibleEvents = getVisibleEventsForMonth(year, month);
-    const dayEvents = visibleEvents.filter(ev => {
-      const evStart = new Date(ev.start_time);
-      return evStart.getDate() === day && 
-             evStart.getMonth() === month && 
-             evStart.getFullYear() === year;
-    });
-
-    dayEvents.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-
-    if (dayEvents.length === 0) {
-      listContainer.innerHTML = `<div style="font-size: 0.75rem; color: var(--text-secondary); text-align: center; padding: 1.5rem 0;">この日の予定はありません。</div>`;
-      return;
-    }
-
-    dayEvents.forEach(ev => {
-      const card = document.createElement('div');
-      card.className = 'calendar-event-card';
-      
-      // カラーバーの設定
-      const color = ev.is_google_event ? '#4285F4' : (ev.color || '#3b82f6');
-      card.style.borderLeft = `4px solid ${color}`;
-      
-      const title = document.createElement('div');
-      title.className = 'calendar-event-card-title';
-      title.textContent = ev.title;
-      
-      if (ev.is_google_event) {
-        title.innerHTML = `<span style="color: #4285F4; font-size: 0.72rem;">G</span> ` + ev.title;
-      }
-      
-      const start = new Date(ev.start_time);
-      const end = new Date(ev.end_time);
-      const formatTime = (date) => {
-        return date.toTimeString().slice(0, 5);
-      };
-      
-      const time = document.createElement('div');
-      time.className = 'calendar-event-card-time';
-      time.textContent = `⏰ ${formatTime(start)} 〜 ${formatTime(end)}` + (ev.location ? ` @ ${ev.location}` : '');
-      
-      const owner = document.createElement('div');
-      owner.className = 'calendar-event-card-owner';
-      
-      const me = state.currentUser ? state.currentUser.id : 'guest';
-      const isMyEvent = ev.user_id === me;
-      
-      if (ev.is_google_event) {
-        owner.innerHTML = `👤 Google同期予定 (所有者: ${ev.user_name})`;
-      } else {
-        const ownerName = isMyEvent ? '自分' : ev.user_name;
-        owner.innerHTML = `👤 登録者: ${ownerName} [${ev.category}]`;
-        
-        if (!isMyEvent) {
-          owner.innerHTML += ' <span style="color: var(--text-muted); font-size: 0.65rem;">🔒 閲覧専用</span>';
-        }
-      }
-      
-      card.appendChild(title);
-      card.appendChild(time);
-      card.appendChild(owner);
-      
-      card.onclick = () => {
-        selectEventForEdit(ev);
-      };
-
-      listContainer.appendChild(card);
-    });
+    // タイムライン機能で時間単位で閲覧できるようになったため、右パネルのリストは廃止されました。
   }
 
   // 5. 予定のCRUDアクション
