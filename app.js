@@ -8495,8 +8495,13 @@ function checkLoginStatus() {
     state.currentUser = JSON.parse(loggedUser);
     
     // システム管理者からオーナーへの自動移行・名称修正
-    if (state.currentUser && state.currentUser.id === 'owner' && state.currentUser.name === 'システム管理者') {
+    if (state.currentUser && 
+        (state.currentUser.id === 'owner' || state.currentUser.id === 'admin') && 
+        (state.currentUser.name === 'システム管理者' || state.currentUser.role === 'admin')) {
       state.currentUser.name = 'オーナー';
+      state.currentUser.id = 'owner';
+      state.currentUser.loginId = 'owner';
+      state.currentUser.role = 'owner';
       localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(state.currentUser));
     }
 
@@ -26792,16 +26797,17 @@ function renderUserManagerList() {
     
     // ロールごとのバッジ
     let roleBadgeColor = 'var(--text-muted)';
-    let roleLabel = '一般';
-    if (user.role === 'admin') {
-      roleBadgeColor = '#ef4444'; // adminは赤
-      roleLabel = '管理者';
+    let roleLabel = getRoleJpName(user.role);
+    if (user.role === 'owner' || user.role === 'admin') {
+      roleBadgeColor = '#8b5cf6'; // オーナーは高級感ある紫
     } else if (user.role === 'sales') {
       roleBadgeColor = 'var(--primary)'; // 営業はプライマリブルー
-      roleLabel = '営業担当';
-    } else if (user.role === 'support') {
+    } else if (user.role === 'setup-support' || user.role === 'support') {
       roleBadgeColor = 'var(--secondary)'; // サポートはセカンダリグリーン
-      roleLabel = 'サポート';
+    } else if (user.role === 'store-patrol') {
+      roleBadgeColor = '#f59e0b'; // 店舗パトロールはオレンジ
+    } else if (user.role === 'back-office') {
+      roleBadgeColor = '#10b981'; // バックオフィスはエメラルドグリーン
     }
 
     // 最終ログインから3ヶ月(90日)経過しているか検知
