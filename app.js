@@ -31610,40 +31610,30 @@ window.openResumableUrl = function(urlStr) {
       };
     }
 
-    // === 左サイドバーの折りたたみ・展開 ===
-    const sidebar = document.querySelector('.calendar-left-sidebar');
-    const collapseBtn = document.getElementById('calendar-sidebar-collapse-btn');
-    const expandBtn = document.getElementById('calendar-sidebar-expand-btn');
+    // === 👥 カレンダー共有＆デフォルト設定ポップアップモーダルの開閉 ===
+    const shareModal = document.getElementById('calendar-share-modal');
+    const shareMenuBtn = document.getElementById('calendar-share-menu-btn');
+    const shareModalClose = document.getElementById('calendar-share-modal-close');
 
-    if (collapseBtn && sidebar) {
-      collapseBtn.onclick = (e) => {
+    if (shareMenuBtn && shareModal) {
+      shareMenuBtn.onclick = (e) => {
         e.stopPropagation();
-        sidebar.classList.add('collapsed');
-        if (expandBtn) expandBtn.style.display = 'block';
+        shareModal.style.display = 'flex';
       };
     }
 
-    if (expandBtn && sidebar) {
-      expandBtn.onclick = (e) => {
-        e.stopPropagation();
-        sidebar.classList.remove('collapsed');
-        expandBtn.style.display = 'none';
+    if (shareModalClose && shareModal) {
+      shareModalClose.onclick = () => {
+        shareModal.style.display = 'none';
       };
     }
 
-    // === 共有メンバー表示 アコーディオントグル ===
-    const filterAccordionTrigger = document.getElementById('calendar-filter-accordion-trigger');
-    const filterAccordionContent = document.getElementById('calendar-filter-accordion-content');
-    const filterAccordionArrow = document.getElementById('calendar-filter-accordion-arrow');
-
-    if (filterAccordionTrigger && filterAccordionContent) {
-      filterAccordionTrigger.onclick = () => {
-        const isCollapsed = filterAccordionContent.classList.toggle('collapsed');
-        if (filterAccordionArrow) {
-          filterAccordionArrow.textContent = isCollapsed ? '▶' : '▼';
-        }
-      };
-    }
+    // モーダル外部クリックで閉じる
+    window.addEventListener('click', (e) => {
+      if (shareModal && e.target === shareModal) {
+        shareModal.style.display = 'none';
+      }
+    });
 
     // === 月 / 週 / 日 表示モード切り替え ===
     const viewMonthBtn = document.getElementById('calendar-view-month');

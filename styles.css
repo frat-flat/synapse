@@ -4801,3 +4801,32 @@ h3 {
   margin-top: auto;
 }
 
+/* カレンダー共有モーダルのホバーエフェクト */
+#calendar-share-modal-close:hover {
+  color: #0f172a !important;
+}
+
+/* 三点リーダー（設定ボタン）のプレミアムデザイン */
+#calendar-share-menu-btn {
+  font-size: 1.1rem;
+  padding: 0.3rem 0.6rem;
+  margin-left: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  width: 32px;
+  height: 32px;
+}
+
+#calendar-share-menu-btn:hover {
+  background: var(--primary) !important;
+  color: white !important;
+  border-color: var(--primary) !important;
+  transform: scale(1.05);
+}
+

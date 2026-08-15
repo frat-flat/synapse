@@ -1195,9 +1195,6 @@
     <!-- ヘッダー -->
     <div style="border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
       <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <button id="mypage-calendar-back-btn" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem;">
-          ⬅️ メニューに戻る
-        </button>
         <div>
           <h1 style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
             📅 カレンダー ＆ Google連携
@@ -1214,50 +1211,13 @@
       </div>
     </div>
 
-    <!-- 3カラムレイアウト -->
+    <!-- 1カラム全幅レイアウト（サイドバー廃止） -->
     <div class="mypage-calendar-layout">
-      
-      <!-- 左カラム: 表示メンバー選択フィルター -->
-      <div class="calendar-left-sidebar">
-        <div class="calendar-sidebar-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem; margin-bottom: 0.25rem;">
-          <div class="calendar-sidebar-title" id="calendar-filter-accordion-trigger" style="border: none; padding: 0; margin: 0; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 0.2rem; user-select: none;">
-            👥 共有メンバー表示 <span id="calendar-filter-accordion-arrow" style="font-size: 0.65rem; color: var(--text-secondary);">▼</span>
-          </div>
-          <button id="calendar-sidebar-collapse-btn" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; padding: 2px 4px; border-radius: var(--radius-sm);" title="サイドバーを閉じる">◀</button>
-        </div>
-        
-        <!-- 折りたたみ対応コンテナ -->
-        <div id="calendar-filter-accordion-content" style="display: flex; flex-direction: column; gap: 0.4rem;">
-          <div style="display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.2rem;">
-            <button id="calendar-filter-only-me" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.3rem; font-weight: 600; text-align: center;">自分のみ表示</button>
-            <button id="calendar-filter-all" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.3rem; font-weight: 600; text-align: center;">全員を表示</button>
-          </div>
-          
-          <div class="calendar-member-list" id="calendar-filter-member-list">
-            <!-- メンバー一覧が動的に出力されます -->
-          </div>
-        </div>
-
-        <!-- デフォルト共有設定セクション -->
-        <div style="border-top: 1px dashed var(--border-color); padding-top: 0.75rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; text-align: left;">
-          <div class="calendar-sidebar-title" style="border: none; padding: 0; margin: 0; font-size: 0.8rem;">⚙️ カレンダーデフォルト共有設定</div>
-          <select id="calendar-default-share-type" class="calendar-form-control" style="font-size: 0.75rem; padding: 0.35rem; cursor: pointer;">
-            <option value="all">全員に共有する</option>
-            <option value="private">自分のみ（非公開）</option>
-            <option value="select">メンバーを指定して共有</option>
-          </select>
-          <div id="calendar-default-share-members-list" style="display: none; max-height: 80px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.3rem; border-radius: var(--radius-sm); background: var(--bg-surface-elevated); flex-direction: column; gap: 0.25rem;">
-            <!-- メンバーチェックボックスが動的出力されます -->
-          </div>
-          <button id="calendar-default-share-save-btn" class="btn btn-primary" style="padding: 0.3rem; font-size: 0.72rem; font-weight: 700; width: 100%;">デフォルトとして保存</button>
-        </div>
-      </div>
       
       <!-- 中央カラム: カレンダー表示 -->
       <div class="calendar-main-panel">
         <div class="calendar-header-actions">
           <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <button id="calendar-sidebar-expand-btn" class="btn btn-secondary" style="display: none; padding: 0.35rem 0.6rem; font-size: 0.75rem; font-weight: 600;" title="サイドバーを開く">▶ メンバー</button>
             <div class="calendar-month-nav">
               <button id="calendar-prev-month" class="btn btn-secondary" style="padding: 0.3rem 0.5rem;">◀</button>
               <span id="calendar-month-year" class="calendar-month-title">2026年 8月</span>
@@ -1266,15 +1226,15 @@
           </div>
           
           <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <!-- 今日に戻るボタン -->
-            <button id="calendar-today-btn" class="btn btn-secondary" style="font-size: 0.75rem; font-weight: 600; padding: 0.35rem 0.6rem;">今日</button>
-            
             <!-- 月/週/日表示切り替え -->
             <div class="calendar-view-selector" style="display: flex; border: 1px solid var(--border-color); border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-surface-elevated);">
               <button id="calendar-view-month" class="btn active" style="font-size: 0.72rem; padding: 0.35rem 0.6rem; border: none; border-radius: 0; cursor: pointer; font-weight: 600; background: var(--primary); color: white;">月</button>
               <button id="calendar-view-week" class="btn" style="font-size: 0.72rem; padding: 0.35rem 0.6rem; border: none; border-radius: 0; cursor: pointer; background: transparent; color: var(--text-secondary); font-weight: 600;">週</button>
               <button id="calendar-view-day" class="btn" style="font-size: 0.72rem; padding: 0.35rem 0.6rem; border: none; border-radius: 0; cursor: pointer; background: transparent; color: var(--text-secondary); font-weight: 600;">日</button>
             </div>
+            
+            <!-- 共有メンバー設定用（三点リーダー）ボタン -->
+            <button id="calendar-share-menu-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.35rem 0.6rem; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer;" title="共有メンバー設定">⋮</button>
           </div>
         </div>
         
@@ -3415,6 +3375,46 @@
     <div style="display: flex; gap: 0.75rem; justify-content: center; margin-top: 1.5rem;">
       <button id="zoom-oauth-cancel-btn" style="flex: 1; padding: 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #475569; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;">キャンセル</button>
       <button id="zoom-oauth-submit-btn" style="flex: 1; padding: 0.6rem; border: none; border-radius: 6px; background: #2D8CFF; color: white; font-weight: 700; font-size: 0.8rem; cursor: pointer; box-shadow: 0 4px 10px rgba(45, 140, 255, 0.3); transition: all 0.2s;">サインインして承認</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 👥 カレンダー共有＆デフォルト設定ポップアップモーダル ================= -->
+<div id="calendar-share-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 20000; align-items: center; justify-content: center; backdrop-filter: blur(4px); font-family: 'Inter', 'Noto Sans JP', sans-serif;">
+  <div style="background: white; border-radius: 12px; width: 420px; max-width: 90%; padding: 1.5rem; box-shadow: var(--shadow-lg); color: #1e293b; border: 1px solid rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+      <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 0.4rem; color: #0f172a;">
+        👥 共有メンバー ＆ 設定
+      </h3>
+      <span id="calendar-share-modal-close" style="font-size: 1.5rem; font-weight: bold; cursor: pointer; color: #94a3b8; transition: color 0.2s;">&times;</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+      
+      <!-- 👥 共有メンバー表示フィルター -->
+      <div>
+        <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0 0 0.5rem 0; color: #334155;">表示メンバーフィルター</h4>
+        <div style="display: flex; gap: 0.4rem; margin-bottom: 0.6rem;">
+          <button id="calendar-filter-only-me" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.35rem; flex: 1; font-weight: 600;">自分のみ表示</button>
+          <button id="calendar-filter-all" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.35rem; flex: 1; font-weight: 600;">全員を表示</button>
+        </div>
+        <div class="calendar-member-list" id="calendar-filter-member-list" style="max-height: 140px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 0.4rem; background: #f8fafc;">
+          <!-- メンバー一覧が動的に出力されます -->
+        </div>
+      </div>
+      
+      <!-- ⚙️ カレンダーデフォルト共有設定 -->
+      <div style="border-top: 1px dashed var(--border-color); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.6rem;">
+        <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0; color: #334155;">新規予定のデフォルト共有範囲</h4>
+        <select id="calendar-default-share-type" class="calendar-form-control" style="font-size: 0.75rem; padding: 0.4rem; cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-sm); outline: none;">
+          <option value="all">全員に共有する</option>
+          <option value="private">自分のみ（非公開）</option>
+          <option value="select">メンバーを指定して共有</option>
+        </select>
+        <div id="calendar-default-share-members-list" style="display: none; max-height: 100px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: var(--radius-sm); background: #f8fafc; flex-direction: column; gap: 0.3rem;">
+          <!-- メンバーチェックボックスが動的出力されます -->
+        </div>
+        <button id="calendar-default-share-save-btn" class="btn btn-primary" style="padding: 0.45rem; font-size: 0.75rem; font-weight: 700; width: 100%; border-radius: var(--radius-sm);">デフォルトとして保存</button>
+      </div>
     </div>
   </div>
 </div>
