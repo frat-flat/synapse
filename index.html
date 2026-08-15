@@ -3393,7 +3393,7 @@
           <button id="calendar-filter-only-me" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.35rem; flex: 1; font-weight: 600;">自分のみ表示</button>
           <button id="calendar-filter-all" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.35rem; flex: 1; font-weight: 600;">全員を表示</button>
         </div>
-        <div class="calendar-member-list" id="calendar-filter-member-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 0.4rem; background: #f8fafc;">
+        <div class="calendar-member-list" id="calendar-filter-member-list" style="max-height: 320px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 0.4rem; background: #f8fafc;">
           <!-- メンバー一覧が動的に出力されます -->
         </div>
       </div>
@@ -3405,7 +3405,7 @@
           <option value="private">自分のみ（非公開）</option>
           <option value="select">メンバーを指定して共有</option>
         </select>
-        <div id="calendar-default-share-members-list" style="display: none; max-height: 160px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: var(--radius-sm); background: #f8fafc; flex-direction: column; gap: 0.3rem;">
+        <div id="calendar-default-share-members-list" style="display: none; max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: var(--radius-sm); background: #f8fafc; flex-direction: column; gap: 0.3rem;">
           <!-- メンバーチェックボックスが動的出力されます -->
         </div>
         <button id="calendar-default-share-save-btn" class="btn btn-primary" style="padding: 0.45rem; font-size: 0.75rem; font-weight: 700; width: 100%; border-radius: var(--radius-sm);">デフォルトとして保存</button>
@@ -3419,7 +3419,7 @@
         <p style="font-size: 0.68rem; color: var(--text-secondary); margin: 0; line-height: 1.3;">
           ここでチェックしたメンバーだけが、共有カレンダーの候補として全メンバーに表示されます。
         </p>
-        <div id="calendar-admin-allowed-members-list" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: var(--radius-sm); background: #f8fafc; display: flex; flex-direction: column; gap: 0.4rem;">
+        <div id="calendar-admin-allowed-members-list" style="max-height: 320px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: var(--radius-sm); background: #f8fafc; display: flex; flex-direction: column; gap: 0.4rem;">
           <!-- 全メンバーの一覧（管理者による選択用）が動的に出力されます -->
         </div>
         <button id="calendar-admin-allowed-save-btn" class="btn btn-primary" style="padding: 0.45rem; font-size: 0.75rem; font-weight: 700; width: 100%; border-radius: var(--radius-sm); background: #8b5cf6; border-color: #8b5cf6;">共有候補メンバー設定を保存</button>
