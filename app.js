@@ -3195,6 +3195,13 @@ function initDatabase() {
           }
         }
       }
+
+      // Google API 接続情報の自動設定 (Vercel環境変数から)
+      if (data.success && data.googleClientId && data.googleApiKey) {
+        state.googleClientId = data.googleClientId;
+        state.googleApiKey = data.googleApiKey;
+        console.log('[Google Calendar API] Loaded client configurations from server environment variables.');
+      }
     })
     .catch(err => {
       console.warn('[Supabase] Failed to fetch automatic config:', err);
@@ -31511,14 +31518,7 @@ window.openResumableUrl = function(urlStr) {
           const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
           
           if (!clientId || !apiKey) {
-            showToast('Google API詳細設定に Client ID と API Key を入力・保存してください。', 'warning');
-            if (googleSettingsContent) {
-              googleSettingsContent.style.display = 'flex';
-              if (googleSettingsArrow) googleSettingsArrow.textContent = '▲';
-              setTimeout(() => {
-                googleSettingsContent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-              }, 150);
-            }
+            showToast('Google カレンダー連携に必要な API 設定がシステム（環境変数）に登録されていません。管理者に設定を依頼してください。', 'error');
             return;
           }
 
@@ -31619,7 +31619,12 @@ window.openResumableUrl = function(urlStr) {
     isGoogleLinked = localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${me}`) === 'true';
     googleLinkedEmail = localStorage.getItem(`SYNAPSE_GOOGLE_EMAIL_${me}`) || '';
     
-    // Google API設定の復元
+    // Google API設定の復元 (サーバー環境変数があればそれを優先キャッシュ)
+    if (state.googleClientId && state.googleApiKey) {
+      localStorage.setItem(`SYNAPSE_GOOGLE_CLIENT_ID_${me}`, state.googleClientId);
+      localStorage.setItem(`SYNAPSE_GOOGLE_API_KEY_${me}`, state.googleApiKey);
+    }
+
     const clientId = localStorage.getItem(`SYNAPSE_GOOGLE_CLIENT_ID_${me}`) || '';
     const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`) || '';
     const googleClientIdInput = document.getElementById('google-api-client-id');

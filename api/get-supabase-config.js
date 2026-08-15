@@ -21,6 +21,8 @@ module.exports = async (req, res) => {
   const anonKey = process.env.SUPABASE_ANON_KEY;
   const partnerUrl = process.env.PARTNER_SUPABASE_URL;
   const partnerAnonKey = process.env.PARTNER_SUPABASE_ANON_KEY;
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  const googleApiKey = process.env.GOOGLE_API_KEY;
 
   if (!url || !anonKey) {
     return res.status(200).json({
@@ -34,6 +36,8 @@ module.exports = async (req, res) => {
     url: url,
     anonKey: anonKey,
     partnerUrl: partnerUrl || null,
-    partnerAnonKey: partnerAnonKey || null
+    partnerAnonKey: partnerAnonKey || null,
+    googleClientId: googleClientId || null,
+    googleApiKey: googleApiKey || null
   });
 };
