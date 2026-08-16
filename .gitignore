@@ -15,3 +15,6 @@ scratch/
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Google API Credentials (Private local memo)
+google_credentials.md
