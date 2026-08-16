@@ -3200,6 +3200,9 @@ function initDatabase() {
       if (data.success && data.googleClientId && data.googleApiKey) {
         state.googleClientId = data.googleClientId;
         state.googleApiKey = data.googleApiKey;
+        const me = state.currentUser ? state.currentUser.id : 'guest';
+        localStorage.setItem(`SYNAPSE_GOOGLE_CLIENT_ID_${me}`, data.googleClientId);
+        localStorage.setItem(`SYNAPSE_GOOGLE_API_KEY_${me}`, data.googleApiKey);
         console.log('[Google Calendar API] Loaded client configurations from server environment variables.');
       }
     })
@@ -31562,8 +31565,8 @@ window.openResumableUrl = function(urlStr) {
       googleConnectBtn.onclick = () => {
         if (!isGoogleLinked) {
           const me = state.currentUser ? state.currentUser.id : 'guest';
-          const clientId = localStorage.getItem(`SYNAPSE_GOOGLE_CLIENT_ID_${me}`);
-          const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
+          const clientId = state.googleClientId || localStorage.getItem(`SYNAPSE_GOOGLE_CLIENT_ID_${me}`);
+          const apiKey = state.googleApiKey || localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
           
           if (!clientId || !apiKey) {
             showToast('Google カレンダー連携に必要な API 設定がシステム（環境変数）に登録されていません。管理者に設定を依頼してください。', 'error');
