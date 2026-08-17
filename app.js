@@ -31324,6 +31324,7 @@ window.openResumableUrl = function(urlStr) {
   let synapseMembers = []; // synapse_usersテーブルから取得した全メンバー
   let isGoogleLinked = false;
   let googleLinkedEmail = '';
+  let googleTokenClient = null;
   
   // 表示モード ('month' または 'week')
   state.calendarViewMode = 'month';
@@ -33006,32 +33007,42 @@ window.openResumableUrl = function(urlStr) {
     showToast('Google公式サインイン画面を起動します...', 'info');
 
     try {
-      const tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: clientId,
-        scope: 'https://www.googleapis.com/auth/calendar.events',
-        callback: async (tokenResponse) => {
-          if (tokenResponse && tokenResponse.access_token) {
-            googleAccessToken = tokenResponse.access_token;
-            console.log("[Google Calendar API] Token client callback success!");
-            
-            const me = state.currentUser ? state.currentUser.id : 'guest';
-            
-            let email = 'user_01@gmail.com';
-            try {
-              const res = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${googleAccessToken}`);
-              const info = await res.json();
-              if (info && info.email) email = info.email;
-            } catch (e) {
-              console.warn("OAuth email resolution failed, using active user id instead.", e);
-              email = me;
-            }
-
-            linkGoogleCalendar(email);
-          }
-        }
-      });
+      const me = state.currentUser ? state.currentUser.id : 'guest';
       
-      tokenClient.requestAccessToken();
+      // Google GIS token client の初期化（無ければ生成）
+      if (!googleTokenClient) {
+        googleTokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/calendar.events',
+          callback: async (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+              googleAccessToken = tokenResponse.access_token;
+              
+              // 有効期限 (ミリ秒) を計算して保存
+              const expiresAt = Date.now() + (tokenResponse.expires_in || 3600) * 1000;
+              localStorage.setItem(`SYNAPSE_GOOGLE_ACCESS_TOKEN_${me}`, googleAccessToken);
+              localStorage.setItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`, expiresAt.toString());
+              
+              console.log("[Google Calendar API] Token client callback success!");
+              
+              let email = 'user_01@gmail.com';
+              try {
+                const res = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${googleAccessToken}`);
+                const info = await res.json();
+                if (info && info.email) email = info.email;
+              } catch (e) {
+                console.warn("OAuth email resolution failed, using active user id instead.", e);
+                email = me;
+              }
+
+              linkGoogleCalendar(email);
+            }
+          }
+        });
+      }
+      
+      // 初回はプロンプトを表示してユーザーの承認とトークン取得を行う
+      googleTokenClient.requestAccessToken();
     } catch (err) {
       console.error("[Google Calendar API] GIS Authorization failed:", err);
       showToast('Google認証の起動に失敗しました。', 'error');
@@ -33074,9 +33085,12 @@ window.openResumableUrl = function(urlStr) {
     isGoogleLinked = false;
     googleLinkedEmail = '';
     googleAccessToken = null;
+    googleTokenClient = null;
     
     localStorage.setItem(`SYNAPSE_GOOGLE_LINKED_${me}`, 'false');
     localStorage.setItem(`SYNAPSE_GOOGLE_EMAIL_${me}`, '');
+    localStorage.removeItem(`SYNAPSE_GOOGLE_ACCESS_TOKEN_${me}`);
+    localStorage.removeItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`);
     
     updateGoogleStatusUI();
     showToast('Googleカレンダーの連携を解除しました。', 'info');
@@ -33086,15 +33100,60 @@ window.openResumableUrl = function(urlStr) {
     loadEventsForSelectedDate();
   }
 
-  function silentGoogleSync(clientId, apiKey) {
-    console.log("[Google Calendar API] Linked account auto-sync triggered on load.");
-    syncWithGoogleCalendar();
+  async function silentGoogleSync(clientId, apiKey) {
+    console.log("[Google Calendar API] Linked account auto-sync triggered.");
+    
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const cachedToken = localStorage.getItem(`SYNAPSE_GOOGLE_ACCESS_TOKEN_${me}`);
+    const expiresStr = localStorage.getItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`);
+    const expiresAt = expiresStr ? parseInt(expiresStr, 10) : 0;
+
+    // トークンが残っており、有効期限の5分前より先であれば再利用する
+    if (cachedToken && expiresAt && (expiresAt - Date.now() > 5 * 60 * 1000)) {
+      googleAccessToken = cachedToken;
+      console.log("[Google Calendar API] Reusing valid cached access token.");
+      syncWithGoogleCalendar();
+      return;
+    }
+
+    // トークンが無い、または期限切れの場合はサイレント更新 (prompt: 'none') を実行
+    if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+      try {
+        console.log("[Google Calendar API] Token expired or missing. Refreshing token silently...");
+        
+        googleTokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/calendar.events',
+          prompt: 'none', // 画面にポップアップを出さずに裏で再取得
+          callback: async (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+              googleAccessToken = tokenResponse.access_token;
+              
+              const newExpiresAt = Date.now() + (tokenResponse.expires_in || 3600) * 1000;
+              localStorage.setItem(`SYNAPSE_GOOGLE_ACCESS_TOKEN_${me}`, googleAccessToken);
+              localStorage.setItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`, newExpiresAt.toString());
+              
+              console.log("[Google Calendar API] Silent token refresh success!");
+              syncWithGoogleCalendar();
+            } else {
+              console.warn("[Google Calendar API] Silent token refresh returned empty token.");
+            }
+          }
+        });
+        
+        googleTokenClient.requestAccessToken({ prompt: 'none' });
+      } catch (e) {
+        console.warn("[Google Calendar API] Silent token refresh failed:", e);
+      }
+    } else {
+      console.warn("[Google Calendar API] Google GIS library not fully loaded for silent sync.");
+    }
   }
 
   // 6-B. Google Calendar API からのイベント取得 ＆ 同期保存
   async function syncWithGoogleCalendar() {
     if (!isGoogleLinked || !googleAccessToken) {
-      console.log("[Google Calendar API] No active OAuth token. Keeping dummy events.");
+      console.log("[Google Calendar API] No active OAuth token available.");
       return;
     }
 
