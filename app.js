@@ -31325,6 +31325,7 @@ window.openResumableUrl = function(urlStr) {
   let isGoogleLinked = false;
   let googleLinkedEmail = '';
   let googleTokenClient = null;
+  let googleAccessToken = null;
   
   // 表示モード ('month' または 'week')
   state.calendarViewMode = 'month';
@@ -33107,25 +33108,41 @@ window.openResumableUrl = function(urlStr) {
     // Googleカレンダー予定の場合、Google APIからも削除
     if (id.startsWith('google-')) {
       const googleEventId = id.replace('google-', '');
-      await deleteEventFromGoogleCalendar(googleEventId);
+      try {
+        await deleteEventFromGoogleCalendar(googleEventId);
+      } catch (e) {
+        console.error("[Google Calendar API] deleteEventFromGoogleCalendar failed:", e);
+      }
     }
 
     // DBからの削除を試みる
     if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
       try {
-        await partnerSupabaseClient
+        let query = partnerSupabaseClient
           .from('synapse_calendar_events')
           .delete()
-          .eq('id', id)
-          .eq('user_id', me); // 作成者本人しか削除できないRLSに準拠
+          .eq('id', id);
+        
+        // 通常の予定のみ user_id で制限する（Google予定は一意のIDで確実にクリーンアップ）
+        if (!id.startsWith('google-')) {
+          query = query.eq('user_id', me);
+        }
+
+        const { error } = await query;
+        if (error) {
+          console.error("Supabase event delete error:", error.message);
+        }
       } catch (e) {
         console.error("Supabase event delete failed:", e);
       }
     }
 
-    // ローカルストレージからも削除
+    // メモリ上の状態から削除
     state.calendarEvents = state.calendarEvents.filter(ev => ev.id !== id);
+
+    // ローカルストレージ（自分・ゲスト両方）からも完全に削除して同期
     localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${me}`, JSON.stringify(state.calendarEvents));
+    localStorage.setItem('SYNAPSE_USER_CALENDAR_EVENTS_guest', JSON.stringify(state.calendarEvents.filter(ev => ev.id !== id)));
 
     showToast('予定を削除しました。', 'info');
 
