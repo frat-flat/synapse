@@ -32551,8 +32551,8 @@ window.openResumableUrl = function(urlStr) {
         // ログインユーザー自身がオーナーから共有許可されていない場合、他人の予定は一切見えない
         if (!isMeAllowed && !isOwner) return false;
 
-        // 作成者が表示対象のメンバーに含まれていること
-        if (!calendarFilteredMembers.includes(ev.user_id)) return false;
+        // 作成者が表示対象のメンバーに含まれていること（自分自身の予定は常に表示）
+        if (!isOwner && !calendarFilteredMembers.includes(ev.user_id)) return false;
         
         // ログインユーザーの閲覧権限があるか（RLSと同様のフロントエンドでの検算）
         const isSharedAll = ev.shared_with && ev.shared_with.includes('*');
@@ -32576,8 +32576,8 @@ window.openResumableUrl = function(urlStr) {
         // ログインユーザー自身がオーナーから共有許可されていない場合、他人の予定は一切見えない
         if (!isMeAllowed && !isOwner) return false;
 
-        // 表示対象メンバーフィルターにチェックが入っていること
-        if (!calendarFilteredMembers.includes(ev.user_id)) return false;
+        // 表示対象メンバーフィルターにチェックが入っていること（自分自身の予定は常に表示）
+        if (!isOwner && !calendarFilteredMembers.includes(ev.user_id)) return false;
 
         return true;
       });
