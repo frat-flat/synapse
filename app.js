@@ -32562,14 +32562,34 @@ window.openResumableUrl = function(urlStr) {
       });
     }
 
-    // Googleカレンダー予定のフィルタリングとマージ
+    // 本物のGoogleカレンダー予定（同期データ）のフィルタリングとマージ
+    if (state.calendarEvents) {
+      const realGoogleEvents = state.calendarEvents.filter(ev => {
+        if (!ev.is_google_event) return false;
+
+        const isOwner = ev.user_id === me;
+
+        // 作成者がオーナーからカレンダー共有を許可されていること（本人は常に表示）
+        const isCreatorAllowed = isOwner || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(ev.user_id));
+        if (!isCreatorAllowed) return false;
+
+        // ログインユーザー自身がオーナーから共有許可されていない場合、他人の予定は一切見えない
+        if (!isMeAllowed && !isOwner) return false;
+
+        // 表示対象メンバーフィルターにチェックが入っていること
+        if (!calendarFilteredMembers.includes(ev.user_id)) return false;
+
+        return true;
+      });
+      events = events.concat(realGoogleEvents);
+    }
+
+    // Googleカレンダー予定（ダミーのモックデータ）のフィルタリングとマージ
     synapseMembers.forEach(member => {
       const isOwner = member.id === me;
-      // Google同期イベントを他者へ表示する場合も、そのメンバー自身がオーナーから共有許可されている必要がある
       const isMemberAllowed = isOwner || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(member.id));
       if (!isMemberAllowed) return;
 
-      // ログインユーザー自身が許可されていない場合、他者のGoogle同期イベントは見えない
       if (!isMeAllowed && !isOwner) return;
 
       // フィルターでチェックが入っているメンバーのみGoogle同期イベントを描画
