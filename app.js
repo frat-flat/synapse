@@ -33033,7 +33033,7 @@ window.openResumableUrl = function(urlStr) {
       if (!googleTokenClient) {
         googleTokenClient = google.accounts.oauth2.initTokenClient({
           client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email',
+          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email',
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
               googleAccessToken = tokenResponse.access_token;
@@ -33152,7 +33152,7 @@ window.openResumableUrl = function(urlStr) {
         
         googleTokenClient = google.accounts.oauth2.initTokenClient({
           client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email',
+          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email',
           prompt: 'none', // 画面にポップアップを出さずに裏で再取得
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
@@ -33190,78 +33190,111 @@ window.openResumableUrl = function(urlStr) {
     const myName = state.currentUser ? (state.currentUser.name || state.currentUser.id) : '自分';
     const apiKey = state.googleApiKey || localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
 
-    const timeMin = new Date();
-    timeMin.setMonth(timeMin.getMonth() - 2);
-    const timeMax = new Date();
-    timeMax.setMonth(timeMax.getMonth() + 2);
-
-    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events` + 
-                `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime&key=${apiKey}`;
-
     showToast('Googleカレンダーから予定を同期中...', 'info');
 
     try {
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${googleAccessToken}`
-        }
+      // 1. カレンダーリスト（マイカレンダー一覧）の取得
+      const calendarListUrl = `https://www.googleapis.com/calendar/v3/users/me/calendarList?key=${apiKey}`;
+      const listResponse = await fetch(calendarListUrl, {
+        headers: { 'Authorization': `Bearer ${googleAccessToken}` }
       });
-      const data = await response.json();
       
-      if (!response.ok) {
-        console.error("[Google Calendar API] Sync failed with error response:", data);
-        showToast(`Google同期エラー: ${data.error?.message || response.statusText}`, 'error');
-        return;
-      }
+      let calendarIds = ['primary']; // デフォルトはプライマリ
       
-      if (data && data.items) {
-        const newGoogleEvents = data.items.map(event => {
-          return {
-            id: `google-${event.id}`,
-            user_id: me,
-            user_name: myName,
-            title: event.summary || '予定なし',
-            start_time: event.start.dateTime || event.start.date + 'T00:00:00Z',
-            end_time: event.end.dateTime || event.end.date + 'T23:59:59Z',
-            location: event.location || '',
-            description: event.description || '',
-            category: '一般',
-            color: '#4285F4',
-            shared_with: ['*'],
-            is_google_event: true
-          };
-        });
-
-        if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
-          try {
-            await partnerSupabaseClient
-              .from('synapse_calendar_events')
-              .delete()
-              .eq('user_id', me)
-              .eq('is_google_event', true);
-            
-            if (newGoogleEvents.length > 0) {
-              await partnerSupabaseClient
-                .from('synapse_calendar_events')
-                .insert(newGoogleEvents);
-            }
-          } catch (e) {
-            console.error("Supabase DB Google cache sync failed:", e);
+      if (listResponse.ok) {
+        const listData = await listResponse.json();
+        if (listData && listData.items) {
+          // selected が true である、オーナー・ライター・リーダー権限を持つカレンダーIDを抽出
+          const activeCalendars = listData.items.filter(cal => 
+            cal.selected && 
+            (cal.accessRole === 'owner' || cal.accessRole === 'writer' || cal.accessRole === 'reader')
+          );
+          if (activeCalendars.length > 0) {
+            calendarIds = activeCalendars.map(cal => cal.id);
           }
         }
-
-        state.calendarEvents = state.calendarEvents.filter(ev => !(ev.user_id === me && ev.is_google_event));
-        state.calendarEvents = state.calendarEvents.concat(newGoogleEvents);
-        localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${me}`, JSON.stringify(state.calendarEvents));
-
-        showToast(`Googleカレンダーから ${data.items.length} 件の予定を同期しました！`, 'success');
-        
-        renderMypageCalendar();
-        loadEventsForSelectedDate();
+      } else {
+        console.warn("[Google Calendar API] Failed to fetch calendar list, fallback to primary.");
       }
-    } catch (e) {
-      console.error("[Google Calendar API] Fetch failed:", e);
-      showToast('Googleカレンダーのイベント取得に失敗しました。', 'error');
+
+      const timeMin = new Date();
+      timeMin.setMonth(timeMin.getMonth() - 2);
+      const timeMax = new Date();
+      timeMax.setMonth(timeMax.getMonth() + 2);
+
+      let allGoogleEvents = [];
+
+      // 2. 各カレンダーから予定を取得してマージ
+      for (const calendarId of calendarIds) {
+        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` + 
+                    `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime&key=${apiKey}`;
+        
+        try {
+          const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+          });
+          
+          if (!response.ok) {
+            const errData = await response.json();
+            console.error(`[Google Calendar API] Fetch failed for calendar ${calendarId}:`, errData);
+            continue;
+          }
+          
+          const data = await response.json();
+          if (data && data.items) {
+            const events = data.items.map(event => {
+              return {
+                id: `google-${event.id}`,
+                user_id: me,
+                user_name: myName,
+                title: event.summary || '予定なし',
+                start_time: event.start.dateTime || event.start.date + 'T00:00:00Z',
+                end_time: event.end.dateTime || event.end.date + 'T23:59:59Z',
+                location: event.location || '',
+                description: event.description || '',
+                category: '一般',
+                color: '#4285F4',
+                shared_with: ['*'],
+                is_google_event: true
+              };
+            });
+            allGoogleEvents = allGoogleEvents.concat(events);
+          }
+        } catch (err) {
+          console.error(`[Google Calendar API] Error fetching events for calendar ${calendarId}:`, err);
+        }
+      }
+
+      // 3. Supabase DB へのキャッシュ保存とメモリ更新
+      if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+        try {
+          await partnerSupabaseClient
+            .from('synapse_calendar_events')
+            .delete()
+            .eq('user_id', me)
+            .eq('is_google_event', true);
+          
+          if (allGoogleEvents.length > 0) {
+            await partnerSupabaseClient
+              .from('synapse_calendar_events')
+              .insert(allGoogleEvents);
+          }
+        } catch (e) {
+          console.error("Supabase DB Google cache sync failed:", e);
+        }
+      }
+
+      state.calendarEvents = state.calendarEvents.filter(ev => !(ev.user_id === me && ev.is_google_event));
+      state.calendarEvents = state.calendarEvents.concat(allGoogleEvents);
+      localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${me}`, JSON.stringify(state.calendarEvents));
+
+      showToast(`Googleカレンダーから ${allGoogleEvents.length} 件の予定を同期しました！`, 'success');
+
+      renderMypageCalendar();
+      loadEventsForSelectedDate();
+    } catch (error) {
+      console.error("[Google Calendar API] Sync error:", error);
+      showToast('Googleカレンダーの同期中にエラーが発生しました。', 'error');
     }
   }
 
