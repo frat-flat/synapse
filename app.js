@@ -33196,7 +33196,7 @@ window.openResumableUrl = function(urlStr) {
     timeMax.setMonth(timeMax.getMonth() + 2);
 
     const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events` + 
-                `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&key=${apiKey}`;
+                `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime&key=${apiKey}`;
 
     showToast('Googleカレンダーから予定を同期中...', 'info');
 
