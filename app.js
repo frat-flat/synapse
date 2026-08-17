@@ -32360,18 +32360,146 @@ window.openResumableUrl = function(urlStr) {
             card.appendChild(metaEl);
           }
           
-          card.onclick = (e) => {
-            e.stopPropagation();
-            calendarSelectedDate = start;
-            updateSelectedDateLabel();
-            loadEventsForSelectedDate();
+          const isMine = ev.user_id === me;
+          if (isMine) {
+            card.style.cursor = 'grab';
             
-            if (!ev.is_google_event) {
-              loadEventIntoForm(ev);
-            } else {
-              resetEventForm();
-            }
-          };
+            card.onmousedown = (e) => {
+              let isDragging = false;
+              const startY = e.clientY;
+              const startTop = top;
+              const duration = p.end - p.start;
+              
+              card.style.cursor = 'grabbing';
+              card.style.zIndex = '1000';
+              card.style.opacity = '0.8';
+              
+              const onMouseMove = (moveEvent) => {
+                isDragging = true;
+                const deltaY = moveEvent.clientY - startY;
+                let newTop = startTop + deltaY;
+                
+                // 15分(15px)単位にスナップ
+                newTop = Math.round(newTop / 15) * 15;
+                
+                // 範囲制限 (0 〜 1440 - duration)
+                newTop = Math.max(0, Math.min(1440 - duration, newTop));
+                
+                card.style.top = `${newTop}px`;
+                
+                // ドラッグ中のプレビュー時刻を一時表示
+                const tempStartHour = Math.floor(newTop / 60);
+                const tempStartMin = newTop % 60;
+                const tempEndHour = Math.floor((newTop + duration) / 60);
+                const tempEndMin = (newTop + duration) % 60;
+                const formatNum = (n) => String(n).padStart(2, '0');
+                timeEl.textContent = `${formatNum(tempStartHour)}:${formatNum(tempStartMin)} - ${formatNum(tempEndHour)}:${formatNum(tempEndMin)} (移動中)`;
+              };
+              
+              const onMouseUp = async (upEvent) => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                
+                card.style.cursor = 'grab';
+                card.style.zIndex = '';
+                card.style.opacity = '';
+                
+                if (!isDragging) {
+                  // ドラッグされなかった場合は通常のクリック（編集フォーム読み込み）
+                  calendarSelectedDate = start;
+                  updateSelectedDateLabel();
+                  loadEventsForSelectedDate();
+                  selectEventForEdit(ev);
+                  return;
+                }
+                
+                // ドラッグ終了時の位置から最終時間を決定
+                let finalTop = parseInt(card.style.top);
+                const newStartHour = Math.floor(finalTop / 60);
+                const newStartMin = finalTop % 60;
+                const newEndTotal = finalTop + duration;
+                const newEndHour = Math.floor(newEndTotal / 60);
+                const newEndMin = newEndTotal % 60;
+                
+                // 重複チェック
+                let hasConflict = false;
+                
+                // 同日の他のすべての表示予定（自分自身を除く）
+                const otherEvents = dayEvents.filter(other => other.id !== ev.id);
+                for (const other of otherEvents) {
+                  const oStart = new Date(other.start_time);
+                  const oEnd = new Date(other.end_time);
+                  const oStartMin = oStart.getHours() * 60 + oStart.getMinutes();
+                  const oEndMin = oEnd.getHours() * 60 + oEnd.getMinutes();
+                  
+                  // 重複しているか
+                  if (oStartMin < newEndTotal && oEndMin > finalTop) {
+                    hasConflict = true;
+                    break;
+                  }
+                }
+                
+                if (hasConflict) {
+                  showToast('他の予定と時間が重複するため移動できません。', 'warning');
+                  // 元の位置に戻す
+                  card.style.top = `${startTop}px`;
+                  const originalStart = new Date(ev.start_time);
+                  const originalEnd = new Date(ev.end_time);
+                  timeEl.textContent = `${formatTime(originalStart)} - ${formatTime(originalEnd)}`;
+                  return;
+                }
+                
+                // 時間を変更して保存
+                const newStart = new Date(start);
+                newStart.setHours(newStartHour, newStartMin, 0, 0);
+                const newEnd = new Date(end);
+                newEnd.setHours(newEndHour, newEndMin, 0, 0);
+                
+                ev.start_time = newStart.toISOString();
+                ev.end_time = newEnd.toISOString();
+                
+                // DB更新処理
+                if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+                  try {
+                    if (ev.is_google_event) {
+                      const googleEventId = ev.id.replace('google-', '');
+                      await updateGoogleCalendarEventTime(googleEventId, ev.title, ev.start_time, ev.end_time);
+                    } else {
+                      await partnerSupabaseClient
+                        .from('synapse_calendar_events')
+                        .update({
+                          start_time: ev.start_time,
+                          end_time: ev.end_time
+                        })
+                        .eq('id', ev.id);
+                    }
+                  } catch (e) {
+                    console.error("Failed to save dragged event:", e);
+                    showToast('予定の保存に失敗しました。', 'error');
+                  }
+                }
+                
+                // メモリ・ローカルストレージ更新
+                localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${me}`, JSON.stringify(state.calendarEvents));
+                showToast('予定を移動しました。', 'success');
+                
+                renderMypageCalendar();
+                loadEventsForSelectedDate();
+              };
+              
+              document.addEventListener('mousemove', onMouseMove);
+              document.addEventListener('mouseup', onMouseUp);
+            };
+          } else {
+            // 他人の予定の場合はクリック閲覧のみ
+            card.onclick = (e) => {
+              e.stopPropagation();
+              calendarSelectedDate = start;
+              updateSelectedDateLabel();
+              loadEventsForSelectedDate();
+              selectEventForEdit(ev);
+            };
+          }
           
           rightCanvas.appendChild(card);
         });
@@ -32482,6 +32610,12 @@ window.openResumableUrl = function(urlStr) {
           evMicro.textContent = ev.title;
           evMicro.title = `[${ev.category}] ${ev.title} (${ev.user_name || '不明'})`;
         }
+        
+        // クリック時に予定編集フォームを開く
+        evMicro.onclick = (e) => {
+          e.stopPropagation();
+          selectEventForEdit(ev);
+        };
         
         eventContainer.appendChild(evMicro);
       });
@@ -32786,12 +32920,12 @@ window.openResumableUrl = function(urlStr) {
 
     const deleteBtn = document.getElementById('calendar-event-delete-btn');
 
-    if (isMine && !isGoogle) {
-      // 自分の予定なら編集・削除を許可
+    if (isMine) {
+      // 自分の予定なら編集・削除を許可（Google予定であっても、自身のアカウントの予定であれば削除を許可する）
       enableFormFields(true);
       if (deleteBtn) deleteBtn.style.display = 'block';
     } else {
-      // 他人の予定、またはGoogle予定なら「閲覧専用」にする
+      // 他人の予定なら「閲覧専用」にする
       enableFormFields(false);
       if (deleteBtn) deleteBtn.style.display = 'none';
     }
@@ -32968,6 +33102,12 @@ window.openResumableUrl = function(urlStr) {
     if (!confirm('この予定を削除しますか？')) return;
 
     const me = state.currentUser ? state.currentUser.id : 'guest';
+
+    // Googleカレンダー予定の場合、Google APIからも削除
+    if (id.startsWith('google-')) {
+      const googleEventId = id.replace('google-', '');
+      await deleteEventFromGoogleCalendar(googleEventId);
+    }
 
     // DBからの削除を試みる
     if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
@@ -33204,13 +33344,14 @@ window.openResumableUrl = function(urlStr) {
       if (listResponse.ok) {
         const listData = await listResponse.json();
         if (listData && listData.items) {
-          // selected が true である、オーナー・ライター・リーダー権限を持つカレンダーIDを抽出
+          // primary, および owner, writer, reader 権限のカレンダーを抽出 (owner/writer は selected に関わらず強制同期)
           const activeCalendars = listData.items.filter(cal => 
-            cal.selected && 
-            (cal.accessRole === 'owner' || cal.accessRole === 'writer' || cal.accessRole === 'reader')
+            cal.id === 'primary' || 
+            cal.selected || 
+            (cal.accessRole === 'owner' || cal.accessRole === 'writer')
           );
           if (activeCalendars.length > 0) {
-            calendarIds = activeCalendars.map(cal => cal.id);
+            calendarIds = Array.from(new Set(['primary', ...activeCalendars.map(cal => cal.id)]));
           }
         }
       } else {
@@ -33360,6 +33501,39 @@ window.openResumableUrl = function(urlStr) {
       console.log("[Google Calendar API] Event deleted on Google Calendar:", googleEventId);
     } catch (e) {
       console.error("[Google Calendar API] Delete event failed:", e);
+    }
+  }
+
+  // 6-E. Googleカレンダーの予定の時間を更新する (PATCH)
+  async function updateGoogleCalendarEventTime(googleEventId, title, startTime, endTime) {
+    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const apiKey = state.googleApiKey || localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
+
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}?key=${apiKey}`;
+
+    const body = {
+      summary: title,
+      start: { dateTime: startTime },
+      end: { dateTime: endTime }
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${googleAccessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      if (response.ok) {
+        console.log("[Google Calendar API] Event time updated on Google Calendar:", googleEventId);
+      } else {
+        const err = await response.json();
+        console.error("[Google Calendar API] Update event failed:", err);
+      }
+    } catch (e) {
+      console.error("[Google Calendar API] Update event failed:", e);
     }
   }
 
