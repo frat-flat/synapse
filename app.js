@@ -32360,7 +32360,7 @@ window.openResumableUrl = function(urlStr) {
             card.appendChild(metaEl);
           }
           
-          const isMine = ev.user_id === me;
+          const isMine = !ev.is_google_event ? (ev.user_id === me) : (ev.category !== '祝日');
           if (isMine) {
             card.style.cursor = 'grab';
             
@@ -32701,19 +32701,12 @@ window.openResumableUrl = function(urlStr) {
       const realGoogleEvents = state.calendarEvents.filter(ev => {
         if (!ev.is_google_event) return false;
 
-        const isOwner = ev.user_id === me;
+        // 日本の祝日は常に表示する
+        if (ev.category === '祝日') return true;
 
-        // 作成者がオーナーからカレンダー共有を許可されていること（本人は常に表示）
-        const isCreatorAllowed = isOwner || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(ev.user_id));
-        if (!isCreatorAllowed) return false;
-
-        // ログインユーザー自身がオーナーから共有許可されていない場合、他人の予定は一切見えない
-        if (!isMeAllowed && !isOwner) return false;
-
-        // 表示対象メンバーフィルターにチェックが入っていること（自分自身の予定は常に表示）
-        if (!isOwner && !calendarFilteredMembers.includes(ev.user_id)) return false;
-
-        return true;
+        // 自分自身のGoogle予定（祝日以外）は常に表示
+        const isMine = ev.user_id === me || ev.category !== '祝日';
+        return isMine;
       });
       events = events.concat(realGoogleEvents);
     }
@@ -32875,7 +32868,7 @@ window.openResumableUrl = function(urlStr) {
   function selectEventForEdit(event) {
     const me = state.currentUser ? state.currentUser.id : 'guest';
     const isGoogle = event.is_google_event;
-    const isMine = event.user_id === me;
+    const isMine = !isGoogle ? (event.user_id === me) : (event.category !== '祝日');
 
     document.getElementById('calendar-form-event-id').value = event.id;
     document.getElementById('calendar-form-title').value = event.title;
@@ -33045,6 +33038,8 @@ window.openResumableUrl = function(urlStr) {
       });
     }
 
+    const isGoogle = id && id.startsWith('google-');
+
     const eventData = {
       id: id || generateUUID(),
       user_id: me,
@@ -33057,8 +33052,14 @@ window.openResumableUrl = function(urlStr) {
       category: category,
       color: color,
       shared_with: shared_with,
-      is_google_event: false
+      is_google_event: isGoogle
     };
+
+    // Google予定の編集の場合、GoogleカレンダーAPIの更新も走らせる
+    if (isGoogle) {
+      const googleEventId = id.replace('google-', '');
+      await updateGoogleCalendarEventTime(googleEventId, title, start_time, end_time);
+    }
 
     // DBへの同期保存を試みる
     let success = false;
@@ -33367,6 +33368,7 @@ window.openResumableUrl = function(urlStr) {
 
       // 2. 各カレンダーから予定を取得してマージ
       for (const calendarId of calendarIds) {
+        const isHolidayCal = calendarId.includes('holiday') || calendarId.includes('group.v.calendar.google.com');
         const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` + 
                     `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime&key=${apiKey}`;
         
@@ -33393,8 +33395,8 @@ window.openResumableUrl = function(urlStr) {
                 end_time: event.end.dateTime || event.end.date + 'T23:59:59Z',
                 location: event.location || '',
                 description: event.description || '',
-                category: '一般',
-                color: '#4285F4',
+                category: isHolidayCal ? '祝日' : '一般',
+                color: isHolidayCal ? '#f43f5e' : '#4285F4',
                 shared_with: ['*'],
                 is_google_event: true
               };
