@@ -33013,7 +33013,7 @@ window.openResumableUrl = function(urlStr) {
       if (!googleTokenClient) {
         googleTokenClient = google.accounts.oauth2.initTokenClient({
           client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/calendar.events',
+          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email',
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
               googleAccessToken = tokenResponse.access_token;
@@ -33025,14 +33025,23 @@ window.openResumableUrl = function(urlStr) {
               
               console.log("[Google Calendar API] Token client callback success!");
               
-              let email = 'user_01@gmail.com';
+              let email = me; // ログイン中ユーザーIDを初期値
               try {
-                const res = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${googleAccessToken}`);
+                // userinfo エンドポイントからメールアドレスを取得
+                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                  headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+                });
                 const info = await res.json();
-                if (info && info.email) email = info.email;
+                if (info && info.email) {
+                  email = info.email;
+                } else {
+                  // userinfo がダメな場合は tokeninfo から取得を試みる
+                  const tokenRes = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${googleAccessToken}`);
+                  const tokenInfo = await tokenRes.json();
+                  if (tokenInfo && tokenInfo.email) email = tokenInfo.email;
+                }
               } catch (e) {
                 console.warn("OAuth email resolution failed, using active user id instead.", e);
-                email = me;
               }
 
               linkGoogleCalendar(email);
@@ -33123,7 +33132,7 @@ window.openResumableUrl = function(urlStr) {
         
         googleTokenClient = google.accounts.oauth2.initTokenClient({
           client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/calendar.events',
+          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email',
           prompt: 'none', // 画面にポップアップを出さずに裏で再取得
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
@@ -33159,7 +33168,7 @@ window.openResumableUrl = function(urlStr) {
 
     const me = state.currentUser ? state.currentUser.id : 'guest';
     const myName = state.currentUser ? (state.currentUser.name || state.currentUser.id) : '自分';
-    const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
+    const apiKey = state.googleApiKey || localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
 
     const timeMin = new Date();
     timeMin.setMonth(timeMin.getMonth() - 2);
@@ -33178,6 +33187,12 @@ window.openResumableUrl = function(urlStr) {
         }
       });
       const data = await response.json();
+      
+      if (!response.ok) {
+        console.error("[Google Calendar API] Sync failed with error response:", data);
+        showToast(`Google同期エラー: ${data.error?.message || response.statusText}`, 'error');
+        return;
+      }
       
       if (data && data.items) {
         const newGoogleEvents = data.items.map(event => {
