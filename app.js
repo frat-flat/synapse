@@ -32037,9 +32037,9 @@ window.openResumableUrl = function(urlStr) {
       const localData = localStorage.getItem(`SYNAPSE_USER_CALENDAR_EVENTS_${userId}`);
       events = localData ? JSON.parse(localData) : [];
       
-      // デモ用ダミーデータを初回のみ自動投入
+      // デモ用ダミーデータを初回のみ自動投入（モックデータ廃止により空のままにする）
       if (events.length === 0) {
-        events = getInitialDummyEvents();
+        events = [];
         localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${userId}`, JSON.stringify(events));
       }
     }
@@ -32674,6 +32674,10 @@ window.openResumableUrl = function(urlStr) {
     // 通常予定（ローカル/Supabase）のフィルタリング
     if (state.calendarEvents) {
       events = state.calendarEvents.filter(ev => {
+        // デモ用モック予定は完全に除外する（IDが 'dummy-' で始まる、またはダミーユーザーの予定）
+        if (ev.id && ev.id.startsWith('dummy-')) return false;
+        if (ev.user_id === 'sales_01@synapse.management' || ev.user_id === 'sales_02@synapse.management') return false;
+
         // Google予定ではないこと
         if (ev.is_google_event) return false;
         
@@ -32732,89 +32736,10 @@ window.openResumableUrl = function(urlStr) {
 
   // メンバー固有のGoogleダミー予定データを返す
   function getGoogleDummyEventsForMember(memberId) {
-    const me = state.currentUser ? state.currentUser.id : 'guest';
-    const isMe = memberId === me;
-    
-    // 自分かつGoogle未連携なら何も返さない
-    if (isMe && !isGoogleLinked) return [];
-    
-    // 山田・佐藤さんはデモとして常にGoogle連携済みの予定を返す
-    const today = new Date();
-    const parseDateStr = (offsetDays, hours, mins) => {
-      const d = new Date(today);
-      d.setDate(today.getDate() + offsetDays);
-      d.setHours(hours, mins, 0, 0);
-      return d.toISOString();
-    };
-
-    if (memberId === 'sales_01@synapse.management') {
-      return [
-        {
-          id: `google-s1-1`,
-          user_id: memberId,
-          user_name: '山田 太郎',
-          title: 'Google: 営業部進捗定例会議',
-          start_time: parseDateStr(-2, 10, 0),
-          end_time: parseDateStr(-2, 11, 0),
-          is_google_event: true
-        },
-        {
-          id: `google-s1-2`,
-          user_id: memberId,
-          user_name: '山田 太郎',
-          title: 'Google: クライクライアント面談 (オンライン)',
-          start_time: parseDateStr(2, 14, 0),
-          end_time: parseDateStr(2, 15, 0),
-          is_google_event: true
-        }
-      ];
-    } else if (memberId === 'sales_02@synapse.management') {
-      return [
-        {
-          id: `google-s2-1`,
-          user_id: memberId,
-          user_name: '佐藤 花子',
-          title: 'Google: 採用説明会資料チェック',
-          start_time: parseDateStr(-1, 14, 0),
-          end_time: parseDateStr(-1, 15, 30),
-          is_google_event: true
-        },
-        {
-          id: `google-s2-2`,
-          user_id: memberId,
-          user_name: '佐藤 花子',
-          title: 'Google: 役員会議の準備MTG',
-          start_time: parseDateStr(3, 11, 0),
-          end_time: parseDateStr(3, 12, 0),
-          is_google_event: true
-        }
-      ];
-    } else if (isMe && isGoogleLinked) {
-      // ログインユーザー自身のGoogle同期予定
-      return [
-        {
-          id: `google-me-1`,
-          user_id: memberId,
-          user_name: '自分',
-          title: 'Google: プライベート同期イベント',
-          start_time: parseDateStr(0, 11, 0),
-          end_time: parseDateStr(0, 12, 0),
-          is_google_event: true
-        },
-        {
-          id: `google-me-2`,
-          user_id: memberId,
-          user_name: '自分',
-          title: 'Google: 外部カレンダーMTG',
-          start_time: parseDateStr(1, 16, 0),
-          end_time: parseDateStr(1, 17, 0),
-          is_google_event: true
-        }
-      ];
-    }
-    
-    return [];
+    return []; // モックデータ廃止のため常に空配列を返す
   }
+  
+
 
   // 選択日の予定詳細リストをロード (タイムライン表示移行に伴い不要になったため廃止)
   function loadEventsForSelectedDate() {
