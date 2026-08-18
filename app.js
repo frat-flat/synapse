@@ -33303,18 +33303,26 @@ window.openResumableUrl = function(urlStr) {
     showToast('Googleカレンダーから予定を同期中...', 'info');
 
     try {
-      // 1. カレンダーリスト（マイカレンダー一覧）の取得 (OAuth Bearerトークンのみで認証。APIキーパラメータはエラー回避のため排除)
-      const calendarListUrl = `https://www.googleapis.com/calendar/v3/users/me/calendarList`;
-      const listResponse = await fetch(calendarListUrl, {
+      // 1. カレンダーリスト（マイカレンダー一覧）の取得
+      // 【二段構え】まずはAPIキーなし（推奨）で試行し、エラーならAPIキー付きでリトライ
+      let calendarListUrl = `https://www.googleapis.com/calendar/v3/users/me/calendarList`;
+      let listResponse = await fetch(calendarListUrl, {
         headers: { 'Authorization': `Bearer ${googleAccessToken}` }
       });
       
+      if (!listResponse.ok && apiKey) {
+        console.log("[Google Calendar API] Fetching calendar list without API Key failed. Retrying with API Key...");
+        calendarListUrl = `https://www.googleapis.com/calendar/v3/users/me/calendarList?key=${apiKey}`;
+        listResponse = await fetch(calendarListUrl, {
+          headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+        });
+      }
+
       let calendarIds = ['primary']; // デフォルトはプライマリ
       
       if (listResponse.ok) {
         const listData = await listResponse.json();
         if (listData && listData.items) {
-          // primary, および owner, writer, reader 権限のカレンダーを抽出 (owner/writer は selected に関わらず強制同期)
           const activeCalendars = listData.items.filter(cal => 
             cal.id === 'primary' || 
             cal.selected || 
@@ -33325,7 +33333,15 @@ window.openResumableUrl = function(urlStr) {
           }
         }
       } else {
-        console.warn("[Google Calendar API] Failed to fetch calendar list, fallback to primary.");
+        let errMsg = "Unknown Error";
+        try {
+          const errData = await listResponse.json();
+          if (errData && errData.error) {
+            errMsg = `[Code: ${errData.error.code}] ${errData.error.message}`;
+          }
+        } catch (_) {}
+        console.error("[Google Calendar API] Failed to fetch calendar list:", errMsg);
+        showToast(`Google連携エラー (リスト取得失敗): ${errMsg}`, 'error');
       }
 
       // 同期取得の期間制限をなくす (過去5年間、未来5年間の計10年分を対象にする)
@@ -33339,17 +33355,35 @@ window.openResumableUrl = function(urlStr) {
       // 2. 各カレンダーから予定を取得してマージ
       for (const calendarId of calendarIds) {
         const isHolidayCal = calendarId.includes('holiday') || calendarId.includes('group.v.calendar.google.com');
-        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` + 
-                    `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime`;
+        
+        // 【二段構え】まずはAPIキーなし（推奨）で試行
+        let url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` + 
+                  `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime`;
         
         try {
-          const response = await fetch(url, {
+          let response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${googleAccessToken}` }
           });
           
+          if (!response.ok && apiKey) {
+            console.log(`[Google Calendar API] Fetch events for ${calendarId} without API Key failed. Retrying with API Key...`);
+            url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` + 
+                  `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime&key=${apiKey}`;
+            response = await fetch(url, {
+              headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+            });
+          }
+          
           if (!response.ok) {
-            const errData = await response.json();
-            console.error(`[Google Calendar API] Fetch failed for calendar ${calendarId}:`, errData);
+            let errMsg = "Unknown Error";
+            try {
+              const errData = await response.json();
+              if (errData && errData.error) {
+                errMsg = `[Code: ${errData.error.code}] ${errData.error.message}`;
+              }
+            } catch (_) {}
+            console.error(`[Google Calendar API] Fetch failed for calendar ${calendarId}:`, errMsg);
+            showToast(`Google同期エラー: ${errMsg}`, 'error');
             continue;
           }
           
