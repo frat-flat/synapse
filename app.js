@@ -31385,10 +31385,15 @@ window.openResumableUrl = function(urlStr) {
     const defaultShareMembersContainer = document.getElementById('calendar-default-share-members-list');
     const defaultShareSaveBtn = document.getElementById('calendar-default-share-save-btn');
 
-    // カレンダーボタンクリックでタブ遷移
+    // カレンダーボタンクリックでタブ遷移 (常に今日の日付・今月にリセットして開くことで迷子を防止)
     if (btnCalendar) {
       btnCalendar.onclick = () => {
+        calendarCurrentDate = new Date();
+        calendarSelectedDate = new Date();
         openTab('mypage-calendar-screen', 'mypage-calendar-screen', '📅 カレンダー');
+        renderMypageCalendar();
+        updateSelectedDateLabel();
+        loadEventsForSelectedDate();
       };
     }
 
@@ -32155,12 +32160,9 @@ window.openResumableUrl = function(urlStr) {
       name.className = 'calendar-member-name';
       name.textContent = member.name;
       
-      // Google連携マークの付与
+      // Google連携マークの付与（ログインユーザー本人が実際に連携中の場合のみ表示）
       if (member.id === (state.currentUser ? state.currentUser.id : 'guest') && isGoogleLinked) {
-        name.innerHTML += ' <span style="font-size: 0.65rem; color: #4285F4; font-weight: bold;">(G連携)</span>';
-      } else if (member.id !== (state.currentUser ? state.currentUser.id : 'guest') && member.role === 'sales') {
-        // 山田さん佐藤さんはデモとして常にGoogle連携中にしておく
-        name.innerHTML += ' <span style="font-size: 0.65rem; color: #4285F4; opacity: 0.7;">(G連携)</span>';
+        name.innerHTML += ' <span style="font-size: 0.62rem; background: rgba(66, 133, 244, 0.1); color: #4285F4; padding: 1px 4px; border-radius: 4px; font-weight: bold; margin-left: 4px;">Google</span>';
       }
       
       item.appendChild(checkbox);
@@ -33301,8 +33303,8 @@ window.openResumableUrl = function(urlStr) {
     showToast('Googleカレンダーから予定を同期中...', 'info');
 
     try {
-      // 1. カレンダーリスト（マイカレンダー一覧）の取得
-      const calendarListUrl = `https://www.googleapis.com/calendar/v3/users/me/calendarList?key=${apiKey}`;
+      // 1. カレンダーリスト（マイカレンダー一覧）の取得 (OAuth Bearerトークンのみで認証。APIキーパラメータはエラー回避のため排除)
+      const calendarListUrl = `https://www.googleapis.com/calendar/v3/users/me/calendarList`;
       const listResponse = await fetch(calendarListUrl, {
         headers: { 'Authorization': `Bearer ${googleAccessToken}` }
       });
@@ -33326,10 +33328,11 @@ window.openResumableUrl = function(urlStr) {
         console.warn("[Google Calendar API] Failed to fetch calendar list, fallback to primary.");
       }
 
+      // 同期取得の期間制限をなくす (過去5年間、未来5年間の計10年分を対象にする)
       const timeMin = new Date();
-      timeMin.setMonth(timeMin.getMonth() - 2);
+      timeMin.setFullYear(timeMin.getFullYear() - 5);
       const timeMax = new Date();
-      timeMax.setMonth(timeMax.getMonth() + 2);
+      timeMax.setFullYear(timeMax.getFullYear() + 5);
 
       let allGoogleEvents = [];
 
@@ -33337,7 +33340,7 @@ window.openResumableUrl = function(urlStr) {
       for (const calendarId of calendarIds) {
         const isHolidayCal = calendarId.includes('holiday') || calendarId.includes('group.v.calendar.google.com');
         const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` + 
-                    `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime&key=${apiKey}`;
+                    `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime`;
         
         try {
           const response = await fetch(url, {
