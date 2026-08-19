@@ -32694,9 +32694,6 @@ window.openResumableUrl = function(urlStr) {
         // Google予定ではないこと
         if (ev.is_google_event) return false;
         
-        // Google連携中は、ログインユーザー自身の通常予定（Synapseローカル予定）は非表示にする
-        if (isGoogleLinked && ev.user_id === me) return false;
-        
         const isOwner = ev.user_id === me;
         
         // 作成者がオーナーからカレンダー共有を許可されていること（本人は常に表示）
@@ -32724,6 +32721,9 @@ window.openResumableUrl = function(urlStr) {
 
         // 日本の祝日は常に表示する
         if (ev.category === '祝日') return true;
+
+        // ログインユーザー自身のGoogle予定（user_id === me）は、無条件で常に表示する
+        if (ev.user_id === me) return true;
 
         // 連携中のGoogleアカウントの予定のみを無条件で常に描画する
         if (isGoogleLinked && googleLinkedEmail && ev.user_name && ev.user_name.toLowerCase() === googleLinkedEmail.toLowerCase()) {
