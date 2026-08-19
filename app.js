@@ -32046,23 +32046,21 @@ window.openResumableUrl = function(urlStr) {
       }
     }
 
-    // ローカルストレージに保存されているGoogle予定（キャッシュ）をマージする
-    // DBに予定があっても、Google予定が含まれていない場合に備え、ローカルのGoogle予定をマージして耐障害性を担保
+    // DBから取得した予定とローカルストレージの予定を、id重複を完全に排除して安全にマージする
     const localData = localStorage.getItem(`SYNAPSE_USER_CALENDAR_EVENTS_${userId}`);
     const localEvents = localData ? JSON.parse(localData) : [];
     
-    if (events.length === 0) {
-      events = localEvents;
-    } else {
-      // DBから取得した予定にGoogle予定が含まれていない場合、ローカルからGoogle予定のみをマージ
-      const dbHasGoogle = events.some(ev => ev.is_google_event);
-      if (!dbHasGoogle) {
-        const localGoogleEvents = localEvents.filter(ev => ev.is_google_event);
-        events = events.concat(localGoogleEvents);
-      }
-    }
-
-    state.calendarEvents = events;
+    const mergedMap = new Map();
+    // 1. まずローカルの予定をマップに追加
+    localEvents.forEach(ev => {
+      if (ev && ev.id) mergedMap.set(ev.id, ev);
+    });
+    // 2. 次にDBから取得した予定をマップに追加（DB側を優先・上書き）
+    events.forEach(ev => {
+      if (ev && ev.id) mergedMap.set(ev.id, ev);
+    });
+    
+    state.calendarEvents = Array.from(mergedMap.values());
   }
 
   // デモ用の初期予定データを生成する
@@ -32723,6 +32721,9 @@ window.openResumableUrl = function(urlStr) {
 
         // 日本の祝日は常に表示する
         if (ev.category === '祝日') return true;
+
+        // ログインユーザー自身のGoogle予定（user_id === me）は、無条件で常に表示する
+        if (ev.user_id === me) return true;
 
         // 連携中のGoogleアカウントの予定のみを無条件で常に描画する
         if (isGoogleLinked && googleLinkedEmail && ev.user_name && ev.user_name.toLowerCase() === googleLinkedEmail.toLowerCase()) {
@@ -33454,7 +33455,9 @@ window.openResumableUrl = function(urlStr) {
       state.calendarEvents = state.calendarEvents.concat(allGoogleEvents);
       localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${me}`, JSON.stringify(state.calendarEvents));
 
-      showToast(`Googleカレンダーから ${allGoogleEvents.length} 件の予定を同期しました！`, 'success');
+      const normalCount = allGoogleEvents.filter(ev => ev.category !== '祝日').length;
+      const holidayCount = allGoogleEvents.filter(ev => ev.category === '祝日').length;
+      showToast(`Google同期完了: 一般 ${normalCount}件 / 祝日 ${holidayCount}件 を同期しました！`, 'success');
 
       renderMypageCalendar();
       loadEventsForSelectedDate();
