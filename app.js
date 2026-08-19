@@ -3200,7 +3200,7 @@ function initDatabase() {
       if (data.success && data.googleClientId && data.googleApiKey) {
         state.googleClientId = data.googleClientId;
         state.googleApiKey = data.googleApiKey;
-        const me = state.currentUser ? state.currentUser.id : 'guest';
+        const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
         localStorage.setItem(`SYNAPSE_GOOGLE_CLIENT_ID_${me}`, data.googleClientId);
         localStorage.setItem(`SYNAPSE_GOOGLE_API_KEY_${me}`, data.googleApiKey);
         console.log('[Google Calendar API] Loaded client configurations from server environment variables.');
@@ -31614,7 +31614,7 @@ window.openResumableUrl = function(urlStr) {
       googleSettingsSaveBtn.onclick = () => {
         const clientId = document.getElementById('google-api-client-id').value.trim();
         const apiKey = document.getElementById('google-api-key').value.trim();
-        const userId = state.currentUser ? state.currentUser.id : 'guest';
+        const userId = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
         localStorage.setItem(`SYNAPSE_GOOGLE_CLIENT_ID_${userId}`, clientId);
         localStorage.setItem(`SYNAPSE_GOOGLE_API_KEY_${userId}`, apiKey);
         showToast('Google API 詳細設定を保存しました。', 'success');
@@ -31624,7 +31624,7 @@ window.openResumableUrl = function(urlStr) {
     // クイックフィルタボタン
     if (filterOnlyMeBtn) {
       filterOnlyMeBtn.onclick = () => {
-        const me = state.currentUser ? state.currentUser.id : 'guest';
+        const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
         calendarFilteredMembers = [me];
         updateMemberFilterUI();
         renderMypageCalendar();
@@ -31802,13 +31802,33 @@ window.openResumableUrl = function(urlStr) {
     });
   }
 
+  // Google 関連の LocalStorage アイテムを大文字小文字を考慮して取得するヘルパー
+  function getLocalStorageGoogleItem(baseKey, userId) {
+    if (!userId) return null;
+    const lowerUserId = userId.toLowerCase();
+    
+    // まず小文字のキーで取得を試みる
+    let val = localStorage.getItem(`${baseKey}_${lowerUserId}`);
+    if (val !== null) return val;
+    
+    // 取れなかった場合、大文字混じりの元のキーで取得を試みる
+    val = localStorage.getItem(`${baseKey}_${userId}`);
+    if (val !== null) {
+      // 見つかったら、今後のために小文字のキーに保存し直す（マイグレーション）
+      localStorage.setItem(`${baseKey}_${lowerUserId}`, val);
+      return val;
+    }
+    return null;
+  }
+
   // 2. 初期データロード
   async function loadInitialData() {
     const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
     
     // Google連携状態の復元
-    isGoogleLinked = localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${me}`) === 'true';
-    googleLinkedEmail = localStorage.getItem(`SYNAPSE_GOOGLE_EMAIL_${me}`) || '';
+    isGoogleLinked = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_LINKED', rawUserId) === 'true';
+    googleLinkedEmail = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_EMAIL', rawUserId) || '';
     
     // Google API設定の復元 (サーバー環境変数があればそれを優先キャッシュ)
     if (state.googleClientId && state.googleApiKey) {
@@ -31816,8 +31836,8 @@ window.openResumableUrl = function(urlStr) {
       localStorage.setItem(`SYNAPSE_GOOGLE_API_KEY_${me}`, state.googleApiKey);
     }
 
-    const clientId = localStorage.getItem(`SYNAPSE_GOOGLE_CLIENT_ID_${me}`) || '';
-    const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`) || '';
+    const clientId = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_CLIENT_ID', rawUserId) || '';
+    const apiKey = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_API_KEY', rawUserId) || '';
     const googleClientIdInput = document.getElementById('google-api-client-id');
     const googleApiKeyInput = document.getElementById('google-api-key');
     if (googleClientIdInput) googleClientIdInput.value = clientId;
@@ -32047,7 +32067,8 @@ window.openResumableUrl = function(urlStr) {
     }
 
     // DBから取得した予定とローカルストレージの予定を、id重複を完全に排除して安全にマージする
-    const localData = localStorage.getItem(`SYNAPSE_USER_CALENDAR_EVENTS_${userId}`);
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const localData = getLocalStorageGoogleItem('SYNAPSE_USER_CALENDAR_EVENTS', rawUserId);
     const localEvents = localData ? JSON.parse(localData) : [];
     
     const mergedMap = new Map();
@@ -33131,7 +33152,7 @@ window.openResumableUrl = function(urlStr) {
     showToast('Google公式サインイン画面を起動します...', 'info');
 
     try {
-      const me = state.currentUser ? state.currentUser.id : 'guest';
+      const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
       
       // Google GIS token client の初期化（無ければ生成）
       if (!googleTokenClient) {
@@ -33235,8 +33256,8 @@ window.openResumableUrl = function(urlStr) {
 
   // 設定ロード完了後に外部から呼び出すためのブリッジ関数
   window.triggerGoogleSyncIfLinked = function(clientId, apiKey) {
-    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
-    const isLinked = localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${me}`) === 'true';
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const isLinked = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_LINKED', rawUserId) === 'true';
     if (isLinked && clientId && apiKey) {
       console.log("[Google Calendar API] Auto-triggering Google Sync after config load...");
       silentGoogleSync(clientId, apiKey);
@@ -33246,13 +33267,14 @@ window.openResumableUrl = function(urlStr) {
   async function silentGoogleSync(clientId, apiKey) {
     console.log("[Google Calendar API] Linked account auto-sync triggered.");
     
-    const me = state.currentUser ? state.currentUser.id : 'guest';
-    const cachedToken = localStorage.getItem(`SYNAPSE_GOOGLE_ACCESS_TOKEN_${me}`);
-    const expiresStr = localStorage.getItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`);
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const cachedToken = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_ACCESS_TOKEN', rawUserId);
+    const expiresStr = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_TOKEN_EXPIRES', rawUserId);
     const expiresAt = expiresStr ? parseInt(expiresStr, 10) : 0;
     
     // 現在の連携メールアドレスをロード
-    googleLinkedEmail = localStorage.getItem(`SYNAPSE_GOOGLE_EMAIL_${me}`) || '';
+    googleLinkedEmail = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_EMAIL', rawUserId) || '';
 
     // トークンが残っており、有効期限の5分前より先であれば再利用する
     if (cachedToken && expiresAt && (expiresAt - Date.now() > 5 * 60 * 1000)) {
@@ -33310,9 +33332,9 @@ window.openResumableUrl = function(urlStr) {
       return;
     }
 
-    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
-    const myName = state.currentUser ? (state.currentUser.name || state.currentUser.id) : '自分';
-    const apiKey = state.googleApiKey || localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+    const apiKey = state.googleApiKey || getLocalStorageGoogleItem('SYNAPSE_GOOGLE_API_KEY', rawUserId);
 
     showToast('Googleカレンダーから予定を同期中...', 'info');
 
@@ -33516,8 +33538,9 @@ window.openResumableUrl = function(urlStr) {
 
   // 6-C. Googleカレンダーに予定を書き込む (POST)
   async function addEventToGoogleCalendar(event) {
-    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
-    const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+    const apiKey = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_API_KEY', rawUserId);
 
     const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?key=${apiKey}`;
 
@@ -33561,8 +33584,9 @@ window.openResumableUrl = function(urlStr) {
 
   // 6-D. Googleカレンダーの予定を削除する (DELETE)
   async function deleteEventFromGoogleCalendar(googleEventId) {
-    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
-    const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+    const apiKey = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_API_KEY', rawUserId);
 
     const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}?key=${apiKey}`;
 
