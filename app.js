@@ -31804,7 +31804,7 @@ window.openResumableUrl = function(urlStr) {
 
   // 2. 初期データロード
   async function loadInitialData() {
-    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
     
     // Google連携状態の復元
     isGoogleLinked = localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${me}`) === 'true';
@@ -32029,7 +32029,7 @@ window.openResumableUrl = function(urlStr) {
   // 予定データをフェッチ
   async function fetchCalendarEvents() {
     let events = [];
-    const userId = state.currentUser ? state.currentUser.id : 'guest';
+    const userId = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
     
     if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
       try {
@@ -32681,8 +32681,8 @@ window.openResumableUrl = function(urlStr) {
   // 指定年月かつフィルターに合致する予定を取得（Google予定も含む）
   function getVisibleEventsForMonth(year, month) {
     let events = [];
-    const me = state.currentUser ? state.currentUser.id : 'guest';
-    const isMeAllowed = me === 'owner' || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(me));
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
+    const isMeAllowed = me === 'owner' || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.map(m => m.toLowerCase()).includes(me));
     
     // 通常予定（ローカル/Supabase）のフィルタリング
     if (state.calendarEvents) {
@@ -32694,21 +32694,21 @@ window.openResumableUrl = function(urlStr) {
         // Google予定ではないこと
         if (ev.is_google_event) return false;
         
-        const isOwner = ev.user_id === me;
+        const isOwner = ev.user_id && ev.user_id.toLowerCase() === me;
         
         // 作成者がオーナーからカレンダー共有を許可されていること（本人は常に表示）
-        const isCreatorAllowed = ev.user_id === me || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(ev.user_id));
+        const isCreatorAllowed = (ev.user_id && ev.user_id.toLowerCase() === me) || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.map(m => m.toLowerCase()).includes(ev.user_id.toLowerCase()));
         if (!isCreatorAllowed) return false;
         
         // ログインユーザー自身がオーナーから共有許可されていない場合、他人の予定は一切見えない
         if (!isMeAllowed && !isOwner) return false;
 
         // 作成者が表示対象 of メンバーに含まれていること（自分自身の予定は常に表示）
-        if (!isOwner && !calendarFilteredMembers.includes(ev.user_id)) return false;
+        if (!isOwner && !calendarFilteredMembers.map(m => m.toLowerCase()).includes(ev.user_id.toLowerCase())) return false;
         
         // ログインユーザーの閲覧権限があるか（RLSと同様のフロントエンドでの検算）
         const isSharedAll = ev.shared_with && ev.shared_with.includes('*');
-        const isSharedMe = ev.shared_with && ev.shared_with.includes(me);
+        const isSharedMe = ev.shared_with && ev.shared_with.map(m => m.toLowerCase()).includes(me);
         
         return isOwner || isSharedAll || isSharedMe;
       });
@@ -32723,7 +32723,7 @@ window.openResumableUrl = function(urlStr) {
         if (ev.category === '祝日') return true;
 
         // ログインユーザー自身のGoogle予定（user_id === me）は、無条件で常に表示する
-        if (ev.user_id === me) return true;
+        if (ev.user_id && ev.user_id.toLowerCase() === me) return true;
 
         // 連携中のGoogleアカウントの予定のみを無条件で常に描画する
         if (isGoogleLinked && googleLinkedEmail && ev.user_name && ev.user_name.toLowerCase() === googleLinkedEmail.toLowerCase()) {
@@ -32731,7 +32731,7 @@ window.openResumableUrl = function(urlStr) {
         }
 
         // 他人のGoogle予定は、表示フィルター（チェックボックス）でチェックが入っているメンバーのもののみを描画
-        const isUserChecked = calendarFilteredMembers.includes(ev.user_id);
+        const isUserChecked = calendarFilteredMembers.some(m => ev.user_id && m.toLowerCase() === ev.user_id.toLowerCase());
         return isUserChecked;
       });
       events = events.concat(realGoogleEvents);
@@ -32952,7 +32952,7 @@ window.openResumableUrl = function(urlStr) {
       return;
     }
 
-    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
     const myName = state.currentUser ? (state.currentUser.name || state.currentUser.id) : '自分';
 
     // 開始日時・終了日時のDateオブジェクト作成
@@ -33183,7 +33183,7 @@ window.openResumableUrl = function(urlStr) {
   }
 
   function linkGoogleCalendar(email) {
-    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
     
     isGoogleLinked = true;
     googleLinkedEmail = email;
@@ -33198,7 +33198,7 @@ window.openResumableUrl = function(urlStr) {
   }
 
   async function unlinkGoogleCalendar() {
-    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
     
     if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
       try {
@@ -33235,7 +33235,7 @@ window.openResumableUrl = function(urlStr) {
 
   // 設定ロード完了後に外部から呼び出すためのブリッジ関数
   window.triggerGoogleSyncIfLinked = function(clientId, apiKey) {
-    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
     const isLinked = localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${me}`) === 'true';
     if (isLinked && clientId && apiKey) {
       console.log("[Google Calendar API] Auto-triggering Google Sync after config load...");
@@ -33310,7 +33310,7 @@ window.openResumableUrl = function(urlStr) {
       return;
     }
 
-    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
     const myName = state.currentUser ? (state.currentUser.name || state.currentUser.id) : '自分';
     const apiKey = state.googleApiKey || localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
 
@@ -33516,7 +33516,7 @@ window.openResumableUrl = function(urlStr) {
 
   // 6-C. Googleカレンダーに予定を書き込む (POST)
   async function addEventToGoogleCalendar(event) {
-    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
     const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
 
     const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?key=${apiKey}`;
@@ -33561,7 +33561,7 @@ window.openResumableUrl = function(urlStr) {
 
   // 6-D. Googleカレンダーの予定を削除する (DELETE)
   async function deleteEventFromGoogleCalendar(googleEventId) {
-    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
     const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
 
     const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}?key=${apiKey}`;
