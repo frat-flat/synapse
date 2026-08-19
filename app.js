@@ -31332,14 +31332,7 @@ window.openResumableUrl = function(urlStr) {
   let googleTokenClient = null;
   let googleAccessToken = null;
 
-  // カレンダーの所有者（表示・操作の主体となるアカウントID）を取得
-  // Google連携中は連携したGoogleアカウントのメールアドレス、未連携時はログインユーザーID
-  function getCalendarOwnerId() {
-    if (isGoogleLinked && googleLinkedEmail) {
-      return googleLinkedEmail;
-    }
-    return state.currentUser ? state.currentUser.id : 'guest';
-  }
+
   
   // 表示モード ('month' または 'week')
   state.calendarViewMode = 'month';
@@ -32036,7 +32029,7 @@ window.openResumableUrl = function(urlStr) {
   // 予定データをフェッチ
   async function fetchCalendarEvents() {
     let events = [];
-    const userId = getCalendarOwnerId();
+    const userId = state.currentUser ? state.currentUser.id : 'guest';
     
     if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
       try {
@@ -32684,7 +32677,7 @@ window.openResumableUrl = function(urlStr) {
   // 指定年月かつフィルターに合致する予定を取得（Google予定も含む）
   function getVisibleEventsForMonth(year, month) {
     let events = [];
-    const me = getCalendarOwnerId();
+    const me = state.currentUser ? state.currentUser.id : 'guest';
     const isMeAllowed = me === 'owner' || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(me));
     
     // 通常予定（ローカル/Supabase）のフィルタリング
@@ -32706,7 +32699,7 @@ window.openResumableUrl = function(urlStr) {
         // ログインユーザー自身がオーナーから共有許可されていない場合、他人の予定は一切見えない
         if (!isMeAllowed && !isOwner) return false;
 
-        // 作成者が表示対象のメンバーに含まれていること（自分自身の予定は常に表示）
+        // 作成者が表示対象 of メンバーに含まれていること（自分自身の予定は常に表示）
         if (!isOwner && !calendarFilteredMembers.includes(ev.user_id)) return false;
         
         // ログインユーザーの閲覧権限があるか（RLSと同様のフロントエンドでの検算）
@@ -32725,8 +32718,10 @@ window.openResumableUrl = function(urlStr) {
         // 日本の祝日は常に表示する
         if (ev.category === '祝日') return true;
 
-        // 自分自身のGoogle予定（祝日以外）は、表示フィルターの選択状況にかかわらず無条件で常に表示する
-        if (ev.user_id === me) return true;
+        // 連携中のGoogleアカウントの予定のみを無条件で常に描画する
+        if (isGoogleLinked && googleLinkedEmail && ev.user_name === googleLinkedEmail) {
+          return true;
+        }
 
         // 他人のGoogle予定は、表示フィルター（チェックボックス）でチェックが入っているメンバーのもののみを描画
         const isUserChecked = calendarFilteredMembers.includes(ev.user_id);
@@ -32950,7 +32945,7 @@ window.openResumableUrl = function(urlStr) {
       return;
     }
 
-    const me = getCalendarOwnerId();
+    const me = state.currentUser ? state.currentUser.id : 'guest';
     const myName = state.currentUser ? (state.currentUser.name || state.currentUser.id) : '自分';
 
     // 開始日時・終了日時のDateオブジェクト作成
@@ -33047,7 +33042,7 @@ window.openResumableUrl = function(urlStr) {
 
     if (!confirm('この予定を削除しますか？')) return;
 
-    const me = getCalendarOwnerId();
+    const me = state.currentUser ? state.currentUser.id : 'guest';
 
     // Googleカレンダー予定の場合、Google APIからも削除
     if (id.startsWith('google-')) {
@@ -33308,10 +33303,9 @@ window.openResumableUrl = function(urlStr) {
       return;
     }
 
-    const me = getCalendarOwnerId();
+    const me = state.currentUser ? state.currentUser.id : 'guest';
     const myName = state.currentUser ? (state.currentUser.name || state.currentUser.id) : '自分';
-    const loginMe = state.currentUser ? state.currentUser.id : 'guest';
-    const apiKey = state.googleApiKey || localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${loginMe}`);
+    const apiKey = state.googleApiKey || localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
 
     showToast('Googleカレンダーから予定を同期中...', 'info');
 
@@ -33406,7 +33400,7 @@ window.openResumableUrl = function(urlStr) {
               return {
                 id: `google-${event.id}`,
                 user_id: me,
-                user_name: myName,
+                user_name: googleLinkedEmail,
                 title: event.summary || '予定なし',
                 start_time: event.start.dateTime || event.start.date + 'T00:00:00Z',
                 end_time: event.end.dateTime || event.end.date + 'T23:59:59Z',
