@@ -32038,21 +32038,27 @@ window.openResumableUrl = function(urlStr) {
           .select('*');
         if (data && !error) {
           events = data;
+        } else if (error) {
+          console.error("Supabase fetch calendar events error:", error.message);
         }
       } catch (e) {
         console.warn("Supabase fetch calendar events failed, falling back to local storage:", e);
       }
     }
 
-    // Supabaseが未取得またはエラー時のローカルストレージからのロード
+    // ローカルストレージに保存されているGoogle予定（キャッシュ）をマージする
+    // DBに予定があっても、Google予定が含まれていない場合に備え、ローカルのGoogle予定をマージして耐障害性を担保
+    const localData = localStorage.getItem(`SYNAPSE_USER_CALENDAR_EVENTS_${userId}`);
+    const localEvents = localData ? JSON.parse(localData) : [];
+    
     if (events.length === 0) {
-      const localData = localStorage.getItem(`SYNAPSE_USER_CALENDAR_EVENTS_${userId}`);
-      events = localData ? JSON.parse(localData) : [];
-      
-      // デモ用ダミーデータを初回のみ自動投入（モックデータ廃止により空のままにする）
-      if (events.length === 0) {
-        events = [];
-        localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${userId}`, JSON.stringify(events));
+      events = localEvents;
+    } else {
+      // DBから取得した予定にGoogle予定が含まれていない場合、ローカルからGoogle予定のみをマージ
+      const dbHasGoogle = events.some(ev => ev.is_google_event);
+      if (!dbHasGoogle) {
+        const localGoogleEvents = localEvents.filter(ev => ev.is_google_event);
+        events = events.concat(localGoogleEvents);
       }
     }
 
@@ -32719,7 +32725,7 @@ window.openResumableUrl = function(urlStr) {
         if (ev.category === '祝日') return true;
 
         // 連携中のGoogleアカウントの予定のみを無条件で常に描画する
-        if (isGoogleLinked && googleLinkedEmail && ev.user_name === googleLinkedEmail) {
+        if (isGoogleLinked && googleLinkedEmail && ev.user_name && ev.user_name.toLowerCase() === googleLinkedEmail.toLowerCase()) {
           return true;
         }
 
@@ -33422,16 +33428,22 @@ window.openResumableUrl = function(urlStr) {
       // 3. Supabase DB へのキャッシュ保存とメモリ更新
       if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
         try {
-          await partnerSupabaseClient
+          const { error: delError } = await partnerSupabaseClient
             .from('synapse_calendar_events')
             .delete()
             .eq('user_id', me)
             .eq('is_google_event', true);
+          if (delError) {
+            console.error("Supabase DB Google cache delete error:", delError.message);
+          }
           
           if (allGoogleEvents.length > 0) {
-            await partnerSupabaseClient
+            const { error: insError } = await partnerSupabaseClient
               .from('synapse_calendar_events')
               .insert(allGoogleEvents);
+            if (insError) {
+              console.error("Supabase DB Google cache insert error:", insError.message, insError.details, insError.hint);
+            }
           }
         } catch (e) {
           console.error("Supabase DB Google cache sync failed:", e);
