@@ -31994,14 +31994,6 @@ window.openResumableUrl = function(urlStr) {
           .select('id, name, role');
         if (data && !error) {
           members = data;
-          // ログインユーザー自身がDBのユーザー一覧に含まれていない場合は強制的に先頭に追加
-          if (state.currentUser && !members.some(m => m.id === state.currentUser.id)) {
-            members.unshift({
-              id: state.currentUser.id,
-              name: state.currentUser.name || state.currentUser.id,
-              role: state.currentUser.role || 'sales'
-            });
-          }
         }
       } catch (e) {
         console.warn("Supabase fetch users failed, falling back to local list:", e);
@@ -32724,7 +32716,10 @@ window.openResumableUrl = function(urlStr) {
         // 日本の祝日は常に表示する
         if (ev.category === '祝日') return true;
 
-        // 表示フィルター（チェックボックス）でチェックが入っているメンバーのGoogle予定のみを描画
+        // 自分自身のGoogle予定（祝日以外）は、表示フィルターの選択状況にかかわらず無条件で常に表示する
+        if (ev.user_id === me) return true;
+
+        // 他人のGoogle予定は、表示フィルター（チェックボックス）でチェックが入っているメンバーのもののみを描画
         const isUserChecked = calendarFilteredMembers.includes(ev.user_id);
         return isUserChecked;
       });
@@ -32745,13 +32740,6 @@ window.openResumableUrl = function(urlStr) {
         events = events.concat(dummyGoogle);
       }
     });
-
-    // 🔬 レンダリング時のデバッグトースト（原因を画面に明示）
-    const googleEvs = state.calendarEvents ? state.calendarEvents.filter(e => e.is_google_event) : [];
-    console.log("[Calendar Render Debug] Total memory events:", state.calendarEvents ? state.calendarEvents.length : 0, "Google events:", googleEvs.length, "Final visible events:", events.length);
-    if (googleEvs.length > 0) {
-      showToast(`デバッグ: メモリ内Google予定 ${googleEvs.length}件 / 描画対象 ${events.length}件 (フィルター確認用)`, 'info');
-    }
 
     return events;
   }
