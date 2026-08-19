@@ -31331,6 +31331,15 @@ window.openResumableUrl = function(urlStr) {
   let googleLinkedEmail = '';
   let googleTokenClient = null;
   let googleAccessToken = null;
+
+  // カレンダーの所有者（表示・操作の主体となるアカウントID）を取得
+  // Google連携中は連携したGoogleアカウントのメールアドレス、未連携時はログインユーザーID
+  function getCalendarOwnerId() {
+    if (isGoogleLinked && googleLinkedEmail) {
+      return googleLinkedEmail;
+    }
+    return state.currentUser ? state.currentUser.id : 'guest';
+  }
   
   // 表示モード ('month' または 'week')
   state.calendarViewMode = 'month';
@@ -32027,7 +32036,7 @@ window.openResumableUrl = function(urlStr) {
   // 予定データをフェッチ
   async function fetchCalendarEvents() {
     let events = [];
-    const userId = state.currentUser ? state.currentUser.id : 'guest';
+    const userId = getCalendarOwnerId();
     
     if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
       try {
@@ -32675,7 +32684,7 @@ window.openResumableUrl = function(urlStr) {
   // 指定年月かつフィルターに合致する予定を取得（Google予定も含む）
   function getVisibleEventsForMonth(year, month) {
     let events = [];
-    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const me = getCalendarOwnerId();
     const isMeAllowed = me === 'owner' || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.includes(me));
     
     // 通常予定（ローカル/Supabase）のフィルタリング
@@ -32941,7 +32950,7 @@ window.openResumableUrl = function(urlStr) {
       return;
     }
 
-    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const me = getCalendarOwnerId();
     const myName = state.currentUser ? (state.currentUser.name || state.currentUser.id) : '自分';
 
     // 開始日時・終了日時のDateオブジェクト作成
@@ -33038,7 +33047,7 @@ window.openResumableUrl = function(urlStr) {
 
     if (!confirm('この予定を削除しますか？')) return;
 
-    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const me = getCalendarOwnerId();
 
     // Googleカレンダー予定の場合、Google APIからも削除
     if (id.startsWith('google-')) {
@@ -33299,9 +33308,10 @@ window.openResumableUrl = function(urlStr) {
       return;
     }
 
-    const me = state.currentUser ? state.currentUser.id : 'guest';
+    const me = getCalendarOwnerId();
     const myName = state.currentUser ? (state.currentUser.name || state.currentUser.id) : '自分';
-    const apiKey = state.googleApiKey || localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
+    const loginMe = state.currentUser ? state.currentUser.id : 'guest';
+    const apiKey = state.googleApiKey || localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${loginMe}`);
 
     showToast('Googleカレンダーから予定を同期中...', 'info');
 
