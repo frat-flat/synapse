@@ -33137,7 +33137,7 @@ window.openResumableUrl = function(urlStr) {
       if (!googleTokenClient) {
         googleTokenClient = google.accounts.oauth2.initTokenClient({
           client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email',
+          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/tasks.readonly',
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
               googleAccessToken = tokenResponse.access_token;
@@ -33269,7 +33269,7 @@ window.openResumableUrl = function(urlStr) {
         
         googleTokenClient = google.accounts.oauth2.initTokenClient({
           client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email',
+          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/tasks.readonly',
           prompt: 'none', // 画面にポップアップを出さずに裏で再取得
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
@@ -33424,6 +33424,53 @@ window.openResumableUrl = function(urlStr) {
         } catch (err) {
           console.error(`[Google Calendar API] Error fetching events for calendar ${calendarId}:`, err);
         }
+      }
+
+      // --- 2-B. Google Tasks (ToDo) の同期処理 ---
+      try {
+        console.log("[Google Tasks API] Fetching task lists...");
+        const taskListsUrl = `https://tasks.googleapis.com/v1/users/@default/lists`;
+        const listRes = await fetch(taskListsUrl, {
+          headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+        });
+        if (listRes.ok) {
+          const listData = await listRes.json();
+          if (listData && listData.items) {
+            for (const taskList of listData.items) {
+              const tasksUrl = `https://tasks.googleapis.com/v1/lists/${taskList.id}/tasks?showCompleted=true&showHidden=true`;
+              const tasksRes = await fetch(tasksUrl, {
+                headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+              });
+              if (tasksRes.ok) {
+                const tasksData = await tasksRes.json();
+                if (tasksData && tasksData.items) {
+                  const googleTasks = tasksData.items
+                    .filter(task => task.due) // 期日があるもののみ
+                    .map(task => {
+                      const isCompleted = task.status === 'completed';
+                      return {
+                        id: `google-task-${task.id}`,
+                        user_id: me,
+                        user_name: googleLinkedEmail,
+                        title: `[ToDo] ${task.title || '無題のタスク'}${isCompleted ? ' (完了)' : ''}`,
+                        start_time: task.due,
+                        end_time: task.due,
+                        location: '',
+                        description: task.notes || '',
+                        category: 'ToDo',
+                        color: isCompleted ? '#94a3b8' : '#10b981',
+                        shared_with: ['*'],
+                        is_google_event: true
+                      };
+                    });
+                  allGoogleEvents = allGoogleEvents.concat(googleTasks);
+                }
+              }
+            }
+          }
+        }
+      } catch (tasksErr) {
+        console.error("[Google Tasks API] Error fetching tasks:", tasksErr);
       }
 
       // 3. Supabase DB へのキャッシュ保存とメモリ更新
