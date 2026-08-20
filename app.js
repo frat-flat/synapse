@@ -32180,6 +32180,9 @@ window.openResumableUrl = function(urlStr) {
     const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
     const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
     
+    const defaultShareTypeSelect = document.getElementById('calendar-default-share-type');
+    const defaultShareMembersContainer = document.getElementById('calendar-default-share-members-list');
+    
     // Google連携状態の復元
     isGoogleLinked = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_LINKED', rawUserId) === 'true';
     googleLinkedEmail = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_EMAIL', rawUserId) || '';
@@ -33922,7 +33925,8 @@ window.openResumableUrl = function(urlStr) {
         }
       }
 
-      // --- 2-B. Google Tasks (ToDo) の同期処理 ---
+      // --- 2-B. Google Tasks (ToDo) の同期処理 (CORS制限のためクライアントサイドでは一旦スキップ) ---
+      /*
       try {
         console.log("[Google Tasks API] Fetching task lists...");
         const taskListsUrl = `https://tasks.googleapis.com/v1/users/@default/lists`;
@@ -33968,6 +33972,7 @@ window.openResumableUrl = function(urlStr) {
       } catch (tasksErr) {
         console.error("[Google Tasks API] Error fetching tasks:", tasksErr);
       }
+      */
 
       // 3. Supabase DB へのキャッシュ保存とメモリ更新
       if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
