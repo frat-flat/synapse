@@ -33155,7 +33155,7 @@ window.openResumableUrl = function(urlStr) {
         events = events.concat(dummyGoogle);
       }
     });
-
+    console.log(`[Calendar Debug] Total raw events: ${state.calendarEvents ? state.calendarEvents.length : 0}, filtered visible events for ${year}/${month + 1}: ${events.length}`);
     return events;
   }
 
