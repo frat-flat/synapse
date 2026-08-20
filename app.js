@@ -2173,9 +2173,16 @@ async function syncToSupabase(key, value) {
 
       if (error) throw error;
     } else {
+      let parsedValue;
+      try {
+        parsedValue = JSON.parse(valString);
+      } catch (_) {
+        parsedValue = valString;
+      }
+      
       const { error } = await supabaseClient
         .from('synapse_storage')
-        .upsert({ key: key, value: JSON.parse(valString), updated_at: new Date().toISOString() });
+        .upsert({ key: key, value: parsedValue, updated_at: new Date().toISOString() });
       
       if (error) {
         throw error;
@@ -33918,7 +33925,14 @@ window.openResumableUrl = function(urlStr) {
           
           const data = await response.json();
           if (data && data.items) {
-            const events = data.items.map(event => {
+            const validItems = data.items.filter(event => {
+              if (event.status === 'cancelled') return false;
+              if (!event.start || !event.end) return false;
+              if (!event.start.dateTime && !event.start.date) return false;
+              if (!event.end.dateTime && !event.end.date) return false;
+              return true;
+            });
+            const events = validItems.map(event => {
               return {
                 id: `google-${event.id}`,
                 user_id: me,
