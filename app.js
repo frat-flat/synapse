@@ -33880,11 +33880,12 @@ window.openResumableUrl = function(urlStr) {
       const savedCalId = localStorage.getItem(`SYNAPSE_GOOGLE_SELECTED_CALENDAR_ID_${me}`) || 'primary';
       let calendarIds = [savedCalId];
 
-      // 同期取得の期間制限をなくす (過去5年間、未来5年間の計10年分を対象にする)
+      // 過去の大量の予定で maxResults が埋め尽くされ、現在の予定が取得できなくなるのを防ぐため、
+      // 期間を「本日の3ヶ月前」から「本日の1年後」の計15ヶ月間に絞り、かつ最大取得件数を 1000 件に増やす
       const timeMin = new Date();
-      timeMin.setFullYear(timeMin.getFullYear() - 5);
+      timeMin.setMonth(timeMin.getMonth() - 3);
       const timeMax = new Date();
-      timeMax.setFullYear(timeMax.getFullYear() + 5);
+      timeMax.setMonth(timeMax.getMonth() + 12);
 
       let allGoogleEvents = [];
 
@@ -33894,7 +33895,7 @@ window.openResumableUrl = function(urlStr) {
         
         // 【二段構え】まずはAPIキーなし（推奨）で試行
         let url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` + 
-                  `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime`;
+                  `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime&maxResults=1000`;
         
         try {
           let response = await fetch(url, {
@@ -33904,7 +33905,7 @@ window.openResumableUrl = function(urlStr) {
           if (!response.ok && apiKey) {
             console.log(`[Google Calendar API] Fetch events for ${calendarId} without API Key failed. Retrying with API Key...`);
             url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` + 
-                  `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime&key=${apiKey}`;
+                  `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime&maxResults=1000&key=${apiKey}`;
             response = await fetch(url, {
               headers: { 'Authorization': `Bearer ${googleAccessToken}` }
             });
