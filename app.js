@@ -33957,53 +33957,48 @@ window.openResumableUrl = function(urlStr) {
       }
 
       // --- 2-B. Google Tasks (ToDo) の同期処理 (CORS制限のためクライアントサイドでは一旦スキップ) ---
-      /*
+      // 2.5 Google Tasks の同期取得 (CORSエラー回避のため、サーバーレスプロキシ経由で取得)
       try {
-        console.log("[Google Tasks API] Fetching task lists...");
-        const taskListsUrl = `https://tasks.googleapis.com/v1/users/@default/lists`;
-        const listRes = await fetch(taskListsUrl, {
-          headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+        console.log("[Google Tasks API] Fetching tasks via serverless proxy...");
+        const response = await fetch('/api/sync-google-tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ accessToken: googleAccessToken })
         });
-        if (listRes.ok) {
-          const listData = await listRes.json();
-          if (listData && listData.items) {
-            for (const taskList of listData.items) {
-              const tasksUrl = `https://tasks.googleapis.com/v1/lists/${taskList.id}/tasks?showCompleted=true&showHidden=true`;
-              const tasksRes = await fetch(tasksUrl, {
-                headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.items) {
+            const googleTasks = data.items
+              .filter(task => task.due)
+              .map(task => {
+                const isCompleted = task.status === 'completed';
+                return {
+                  id: `google-task-${task.id}`,
+                  user_id: me,
+                  user_name: googleLinkedEmail,
+                  title: `[ToDo] ${task.title || '無題のタスク'}${isCompleted ? ' (完了)' : ''}`,
+                  start_time: task.due,
+                  end_time: task.due,
+                  location: '',
+                  description: task.notes || '',
+                  category: 'ToDo',
+                  color: isCompleted ? '#94a3b8' : '#10b981',
+                  shared_with: ['*'],
+                  is_google_event: true
+                };
               });
-              if (tasksRes.ok) {
-                const tasksData = await tasksRes.json();
-                if (tasksData && tasksData.items) {
-                  const googleTasks = tasksData.items
-                    .filter(task => task.due) // 期日があるもののみ
-                    .map(task => {
-                      const isCompleted = task.status === 'completed';
-                      return {
-                        id: `google-task-${task.id}`,
-                        user_id: me,
-                        user_name: googleLinkedEmail,
-                        title: `[ToDo] ${task.title || '無題のタスク'}${isCompleted ? ' (完了)' : ''}`,
-                        start_time: task.due,
-                        end_time: task.due,
-                        location: '',
-                        description: task.notes || '',
-                        category: 'ToDo',
-                        color: isCompleted ? '#94a3b8' : '#10b981',
-                        shared_with: ['*'],
-                        is_google_event: true
-                      };
-                    });
-                  allGoogleEvents = allGoogleEvents.concat(googleTasks);
-                }
-              }
-            }
+            allGoogleEvents = allGoogleEvents.concat(googleTasks);
+            console.log(`[Google Tasks API] Mapped ${googleTasks.length} tasks from proxy.`);
           }
+        } else {
+          console.error("[Google Tasks API] Proxy response error status:", response.status);
         }
       } catch (tasksErr) {
-        console.error("[Google Tasks API] Error fetching tasks:", tasksErr);
+        console.error("[Google Tasks API] Error fetching tasks via proxy:", tasksErr);
       }
-      */
 
       // 3. Supabase DB へのキャッシュ保存とメモリ更新
       if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
