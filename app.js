@@ -33174,6 +33174,22 @@ window.openResumableUrl = function(urlStr) {
       }
     });
     console.log(`[Calendar Debug] Total raw events: ${state.calendarEvents ? state.calendarEvents.length : 0}, filtered visible events for ${year}/${month + 1}: ${events.length}`);
+    if (events.length > 0) {
+      console.log(`[Calendar Debug] Sample Event 0 details:`, {
+        id: events[0].id,
+        title: events[0].title,
+        start_time: events[0].start_time,
+        parsed_date: new Date(events[0].start_time).toString(),
+        is_google_event: events[0].is_google_event,
+        user_id: events[0].user_id,
+        user_name: events[0].user_name
+      });
+      const matches = events.filter(ev => {
+        const d = new Date(ev.start_time);
+        return d.getFullYear() === year && d.getMonth() === month;
+      });
+      console.log(`[Calendar Debug] Of the visible events, ${matches.length} matches the target month ${year}/${month + 1}`);
+    }
     return events;
   }
 
