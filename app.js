@@ -31619,7 +31619,7 @@ window.openResumableUrl = function(urlStr) {
     if (googleConnectBtn) {
       googleConnectBtn.onclick = () => {
         if (!isGoogleLinked) {
-          const me = state.currentUser ? state.currentUser.id : 'guest';
+          const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
           const clientId = state.googleClientId || localStorage.getItem(`SYNAPSE_GOOGLE_CLIENT_ID_${me}`);
           const apiKey = state.googleApiKey || localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`);
           
@@ -33573,6 +33573,10 @@ window.openResumableUrl = function(urlStr) {
               }
 
               linkGoogleCalendar(email);
+            } else {
+              const err = (tokenResponse && tokenResponse.error) ? tokenResponse.error : '認証が完了しなかったか、トークンを取得できませんでした。';
+              showToast(`Google認証エラー: ${err}`, 'error');
+              console.error("[Google Calendar API] GIS Token Callback error:", tokenResponse);
             }
           }
         });
