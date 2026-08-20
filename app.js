@@ -31489,6 +31489,47 @@ window.openResumableUrl = function(urlStr) {
       };
     }
 
+    // 連携用カレンダーの選択変更イベント
+    const googleCalendarSelect = document.getElementById('google-calendar-select');
+    if (googleCalendarSelect) {
+      googleCalendarSelect.onchange = async () => {
+        const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
+        const newCalId = googleCalendarSelect.value;
+        localStorage.setItem(`SYNAPSE_GOOGLE_SELECTED_CALENDAR_ID_${me}`, newCalId);
+        showToast('連携カレンダーを変更しました。再同期中...', 'info');
+        await syncWithGoogleCalendar();
+      };
+    }
+
+    // 共有権限の保存ボタン
+    const sharePermissionsSaveBtn = document.getElementById('calendar-share-permissions-save-btn');
+    if (sharePermissionsSaveBtn) {
+      sharePermissionsSaveBtn.onclick = () => {
+        saveSharePermissions();
+      };
+    }
+
+    // 新規カスタム共有カレンダー作成ボタン
+    const customCalendarCreateBtn = document.getElementById('calendar-custom-create-btn');
+    if (customCalendarCreateBtn) {
+      customCalendarCreateBtn.onclick = () => {
+        createCustomCalendar();
+      };
+    }
+
+    // 予約リンクコピーボタン
+    const bookingUrlCopyBtn = document.getElementById('calendar-booking-url-copy-btn');
+    if (bookingUrlCopyBtn) {
+      bookingUrlCopyBtn.onclick = () => {
+        const input = document.getElementById('calendar-booking-url-input');
+        if (input && input.value) {
+          navigator.clipboard.writeText(input.value)
+            .then(() => showToast('予約ページのURLをコピーしました！', 'success'))
+            .catch(() => showToast('コピーに失敗しました。直接選択してコピーしてください。', 'error'));
+        }
+      };
+    }
+
     // 共有タイプ変更イベント
     if (shareTypeSelect) {
       shareTypeSelect.onchange = () => {
@@ -31821,6 +31862,319 @@ window.openResumableUrl = function(urlStr) {
     return null;
   }
 
+  // 共有権限の読み込み
+  async function loadCalendarPermissions() {
+    state.allUsersCalendarPermissions = {};
+    state.calendarPermissions = {};
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
+    
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        const { data, error } = await partnerSupabaseClient
+          .from('synapse_storage')
+          .select('key, value')
+          .like('key', 'synapse_calendar_permissions_%');
+        if (data && !error) {
+          data.forEach(item => {
+            const userId = item.key.replace('synapse_calendar_permissions_', '');
+            try {
+              const perms = typeof item.value === 'string' ? JSON.parse(item.value) : item.value;
+              state.allUsersCalendarPermissions[userId.toLowerCase()] = perms || {};
+            } catch (jsonErr) {
+              console.warn("JSON parse error for permissions key", item.key, jsonErr);
+            }
+          });
+        }
+      } catch (e) {
+        console.warn("Failed to fetch calendar permissions from storage:", e);
+      }
+    }
+    
+    // 自分の権限設定を復元
+    state.calendarPermissions = state.allUsersCalendarPermissions[me] || {};
+  }
+
+  // カスタム共有カレンダーリストの読み込み
+  async function loadCustomCalendars() {
+    state.customCalendars = [];
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        const { data, error } = await partnerSupabaseClient
+          .from('synapse_storage')
+          .select('value')
+          .eq('key', 'synapse_shared_calendars')
+          .maybeSingle();
+        if (data && data.value && !error) {
+          state.customCalendars = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        }
+      } catch (e) {
+        console.warn("Failed to fetch custom calendars from storage:", e);
+      }
+    }
+    
+    if (state.customCalendars.length === 0) {
+      const cached = localStorage.getItem('SYNAPSE_CUSTOM_CALENDARS');
+      if (cached) {
+        state.customCalendars = JSON.parse(cached);
+      }
+    }
+  }
+
+  // 共有権限設定UIの描画
+  function renderSharePermissionsListUI() {
+    const listContainer = document.getElementById('calendar-share-permissions-list');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '';
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
+
+    synapseMembers.forEach(member => {
+      if (member.id === me) return;
+
+      const item = document.createElement('div');
+      item.style.display = 'flex';
+      item.style.justifyContent = 'space-between';
+      item.style.alignItems = 'center';
+      item.style.fontSize = '0.75rem';
+      item.style.padding = '0.25rem 0';
+      item.style.borderBottom = '1px solid #f1f5f9';
+
+      const label = document.createElement('span');
+      label.textContent = member.name;
+      label.style.fontWeight = '500';
+
+      const select = document.createElement('select');
+      select.className = 'calendar-form-control';
+      select.style.fontSize = '0.7rem';
+      select.style.padding = '0.15rem 0.3rem';
+      select.style.width = '120px';
+      select.style.height = 'auto';
+      select.style.cursor = 'pointer';
+      select.dataset.userId = member.id;
+
+      // 権限オプション
+      const optEdit = document.createElement('option');
+      optEdit.value = 'edit';
+      optEdit.textContent = '編集許可';
+
+      const optDetail = document.createElement('option');
+      optDetail.value = 'view_detail';
+      optDetail.textContent = '詳細表示';
+
+      const optFreeBusy = document.createElement('option');
+      optFreeBusy.value = 'view_freebusy';
+      optFreeBusy.textContent = '時間枠のみ';
+
+      select.appendChild(optEdit);
+      select.appendChild(optDetail);
+      select.appendChild(optFreeBusy);
+
+      // 保存値のセット（デフォルトは edit）
+      const currentPerm = state.calendarPermissions[member.id] || 'edit';
+      select.value = currentPerm;
+
+      item.appendChild(label);
+      item.appendChild(select);
+      listContainer.appendChild(item);
+    });
+  }
+
+  // 共有権限の保存
+  async function saveSharePermissions() {
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
+    if (me === 'guest') return;
+
+    const listContainer = document.getElementById('calendar-share-permissions-list');
+    if (!listContainer) return;
+
+    const selects = listContainer.querySelectorAll('select');
+    const newPerms = {};
+    selects.forEach(select => {
+      const userId = select.dataset.userId;
+      newPerms[userId] = select.value;
+    });
+
+    state.calendarPermissions = newPerms;
+
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        const { error } = await partnerSupabaseClient
+          .from('synapse_storage')
+          .upsert({
+            key: `synapse_calendar_permissions_${me}`,
+            value: newPerms
+          });
+        if (!error) {
+          showToast('共有権限を保存しました。', 'success');
+        } else {
+          console.error("Failed to save permissions to Supabase:", error.message);
+        }
+      } catch (e) {
+        console.error("Failed to save permissions:", e);
+      }
+    }
+    
+    // 他ユーザーの表示更新のため再描画
+    renderMypageCalendar();
+  }
+
+  // 共有サブカレンダーリストUIの描画
+  function renderCustomCalendarListUI() {
+    const listContainer = document.getElementById('calendar-custom-list');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '';
+    
+    if (!state.customCalendars || state.customCalendars.length === 0) {
+      listContainer.innerHTML = '<span style="font-size: 0.68rem; color: var(--text-secondary); text-align: center; padding: 0.5rem 0;">作成された共有カレンダーはありません</span>';
+      return;
+    }
+
+    state.customCalendars.forEach((cal, idx) => {
+      const item = document.createElement('div');
+      item.style.display = 'flex';
+      item.style.justifyContent = 'space-between';
+      item.style.alignItems = 'center';
+      item.style.background = '#ffffff';
+      item.style.border = '1px solid var(--border-color)';
+      item.style.borderRadius = '4px';
+      item.style.padding = '0.3rem 0.5rem';
+      item.style.fontSize = '0.72rem';
+
+      const left = document.createElement('div');
+      left.style.display = 'flex';
+      left.style.alignItems = 'center';
+      left.style.gap = '0.35rem';
+
+      const dot = document.createElement('span');
+      dot.style.width = '8px';
+      dot.style.height = '8px';
+      dot.style.borderRadius = '50%';
+      dot.style.backgroundColor = cal.color || '#10b981';
+      dot.style.display = 'inline-block';
+
+      const name = document.createElement('span');
+      name.textContent = cal.name;
+      name.style.fontWeight = '600';
+
+      left.appendChild(dot);
+      left.appendChild(name);
+
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '削除';
+      delBtn.className = 'btn btn-secondary';
+      delBtn.style.padding = '0.1rem 0.3rem';
+      delBtn.style.fontSize = '0.65rem';
+      delBtn.style.background = '#fef2f2';
+      delBtn.style.color = '#ef4444';
+      delBtn.style.borderColor = '#fee2e2';
+      delBtn.style.cursor = 'pointer';
+      delBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteCustomCalendar(cal.id);
+      };
+
+      item.appendChild(left);
+      item.appendChild(delBtn);
+      listContainer.appendChild(item);
+    });
+  }
+
+  // 新規カスタム共有カレンダーの作成
+  async function createCustomCalendar() {
+    const nameInput = document.getElementById('calendar-custom-name');
+    const colorInput = document.getElementById('calendar-custom-color');
+    if (!nameInput || !colorInput) return;
+
+    const name = nameInput.value.trim();
+    const color = colorInput.value;
+
+    if (!name) {
+      showToast('カレンダー名を入力してください。', 'error');
+      return;
+    }
+
+    const newCal = {
+      id: 'custom-cal-' + generateUUID(),
+      name: name,
+      color: color,
+      members: [] // 全員共有
+    };
+
+    if (!state.customCalendars) state.customCalendars = [];
+    state.customCalendars.push(newCal);
+    nameInput.value = '';
+
+    await saveCustomCalendarsToStorage();
+    renderCustomCalendarListUI();
+    updateTargetCalendarDropdown();
+    showToast(`共有カレンダー「${name}」を作成しました！`, 'success');
+  }
+
+  // カスタム共有カレンダーの削除
+  async function deleteCustomCalendar(id) {
+    if (!confirm('この共有カレンダーを削除しますか？紐付いている予定の登録先はマイカレンダーに戻ります。')) return;
+
+    state.customCalendars = state.customCalendars.filter(cal => cal.id !== id);
+    
+    // 予定の calendar_id が削除されたカレンダーを指している場合、personal にリセット
+    state.calendarEvents.forEach(ev => {
+      if (ev.calendar_id === id) {
+        ev.calendar_id = 'personal';
+      }
+    });
+
+    await saveCustomCalendarsToStorage();
+    renderCustomCalendarListUI();
+    updateTargetCalendarDropdown();
+    renderMypageCalendar();
+    showToast('共有カレンダーを削除しました。', 'info');
+  }
+
+  // 共有カレンダーリストの永続化
+  async function saveCustomCalendarsToStorage() {
+    localStorage.setItem('SYNAPSE_CUSTOM_CALENDARS', JSON.stringify(state.customCalendars));
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        await partnerSupabaseClient
+          .from('synapse_storage')
+          .upsert({
+            key: 'synapse_shared_calendars',
+            value: state.customCalendars
+          });
+      } catch (e) {
+        console.error("Failed to save custom calendars to Supabase:", e);
+      }
+    }
+  }
+
+  // 予定フォームの登録先カレンダー選択プルダウンを更新
+  function updateTargetCalendarDropdown() {
+    const select = document.getElementById('calendar-form-target-calendar');
+    if (!select) return;
+
+    select.innerHTML = '<option value="personal">マイカレンダー</option>';
+
+    if (state.customCalendars) {
+      state.customCalendars.forEach(cal => {
+        const opt = document.createElement('option');
+        opt.value = cal.id;
+        opt.textContent = cal.name;
+        select.appendChild(opt);
+      });
+    }
+  }
+
+  // 予約リンク入力欄の更新
+  function updateBookingUrlInput() {
+    const input = document.getElementById('calendar-booking-url-input');
+    if (!input) return;
+
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
+    const domain = window.location.origin + window.location.pathname;
+    input.value = `${domain}#book?user=${encodeURIComponent(me)}`;
+  }
+
   // 2. 初期データロード
   async function loadInitialData() {
     const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
@@ -31864,6 +32218,16 @@ window.openResumableUrl = function(urlStr) {
 
     // 管理者専用設定UIの描画
     renderAdminAllowedMemberList();
+
+    // 共有権限およびカスタムカレンダーのロード
+    await loadCalendarPermissions();
+    await loadCustomCalendars();
+    
+    // UIの描画
+    renderSharePermissionsListUI();
+    renderCustomCalendarListUI();
+    updateTargetCalendarDropdown();
+    updateBookingUrlInput();
 
     // 予定のフェッチ
     await fetchCalendarEvents();
@@ -32044,6 +32408,25 @@ window.openResumableUrl = function(urlStr) {
       ...m,
       color: MEMBER_COLORS[idx % MEMBER_COLORS.length]
     }));
+
+    // 全メンバーの Google 連携メールアドレスを一括取得・キャッシュする
+    state.memberGoogleEmails = {};
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        const { data, error } = await partnerSupabaseClient
+          .from('synapse_storage')
+          .select('key, value')
+          .like('key', 'synapse_google_linked_email_%');
+        if (data && !error) {
+          data.forEach(item => {
+            const memberId = item.key.replace('synapse_google_linked_email_', '');
+            state.memberGoogleEmails[memberId.toLowerCase()] = item.value;
+          });
+        }
+      } catch (e) {
+        console.warn("Failed to fetch member Google emails from storage:", e);
+      }
+    }
   }
 
   // 予定データをフェッチ
@@ -33203,7 +33586,7 @@ window.openResumableUrl = function(urlStr) {
     }
   }
 
-  function linkGoogleCalendar(email) {
+  async function linkGoogleCalendar(email) {
     const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
     
     isGoogleLinked = true;
@@ -33212,8 +33595,25 @@ window.openResumableUrl = function(urlStr) {
     localStorage.setItem(`SYNAPSE_GOOGLE_LINKED_${me}`, 'true');
     localStorage.setItem(`SYNAPSE_GOOGLE_EMAIL_${me}`, email);
     
+    // synapse_storage に連携メールアドレスを保存（他ユーザーから参照できるようにするため）
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient && me !== 'guest') {
+      try {
+        await partnerSupabaseClient
+          .from('synapse_storage')
+          .upsert({
+            key: `synapse_google_linked_email_${me}`,
+            value: email
+          });
+      } catch (e) {
+        console.warn("[Google Calendar API] Failed to share email on synapse_storage:", e);
+      }
+    }
+    
     updateGoogleStatusUI();
     showToast('Googleカレンダーと連携されました！', 'success');
+    
+    // カレンダー一覧を取得してセレクトボックスを初期化
+    await fetchAndRenderGoogleCalendars();
     
     syncWithGoogleCalendar();
   }
@@ -33228,8 +33628,16 @@ window.openResumableUrl = function(urlStr) {
           .delete()
           .eq('user_id', me)
           .eq('is_google_event', true);
+          
+        // synapse_storage から連携メールアドレス情報を削除
+        if (me !== 'guest') {
+          await partnerSupabaseClient
+            .from('synapse_storage')
+            .delete()
+            .eq('key', `synapse_google_linked_email_${me}`);
+        }
       } catch (e) {
-        console.warn("Failed to clear DB Google cache events:", e);
+        console.warn("Failed to clear DB Google cache events or storage:", e);
       }
     }
 
@@ -33245,13 +33653,80 @@ window.openResumableUrl = function(urlStr) {
     localStorage.setItem(`SYNAPSE_GOOGLE_EMAIL_${me}`, '');
     localStorage.removeItem(`SYNAPSE_GOOGLE_ACCESS_TOKEN_${me}`);
     localStorage.removeItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`);
+    localStorage.removeItem(`SYNAPSE_GOOGLE_SELECTED_CALENDAR_ID_${me}`);
     
     updateGoogleStatusUI();
     showToast('Googleカレンダーの連携を解除しました。', 'info');
     
+    // セレクトボックスを隠す
+    const selectContainer = document.getElementById('google-calendar-select-container');
+    if (selectContainer) selectContainer.style.display = 'none';
+    
     renderLeftSidebarMembers();
     renderMypageCalendar();
     loadEventsForSelectedDate();
+  }
+
+  // 連携中の Google カレンダー一覧を取得してセレクトボックスに描画
+  async function fetchAndRenderGoogleCalendars() {
+    const selectContainer = document.getElementById('google-calendar-select-container');
+    const select = document.getElementById('google-calendar-select');
+    if (!selectContainer || !select) return;
+
+    if (!isGoogleLinked || !googleAccessToken) {
+      selectContainer.style.display = 'none';
+      return;
+    }
+
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+    const apiKey = state.googleApiKey || getLocalStorageGoogleItem('SYNAPSE_GOOGLE_API_KEY', rawUserId);
+
+    try {
+      let calendarListUrl = `https://www.googleapis.com/calendar/v3/users/me/calendarList`;
+      let response = await fetch(calendarListUrl, {
+        headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+      });
+      
+      if (!response.ok && apiKey) {
+        calendarListUrl = `https://www.googleapis.com/calendar/v3/users/me/calendarList?key=${apiKey}`;
+        response = await fetch(calendarListUrl, {
+          headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+        });
+      }
+
+      if (response.ok) {
+        const listData = await response.json();
+        if (listData && listData.items) {
+          select.innerHTML = '';
+          
+          listData.items.forEach(cal => {
+            const opt = document.createElement('option');
+            opt.value = cal.id;
+            opt.textContent = cal.summary + (cal.primary ? ' (プライマリ)' : '');
+            select.appendChild(opt);
+          });
+
+          // 保存された選択の復元
+          const savedCalId = localStorage.getItem(`SYNAPSE_GOOGLE_SELECTED_CALENDAR_ID_${me}`) || 'primary';
+          select.value = savedCalId;
+          
+          // 選択されたものがなければプライマリ（または最初のもの）
+          if (!select.value && select.options.length > 0) {
+            select.selectedIndex = 0;
+            localStorage.setItem(`SYNAPSE_GOOGLE_SELECTED_CALENDAR_ID_${me}`, select.value);
+          }
+
+          selectContainer.style.display = 'flex';
+        }
+      } else {
+        console.warn("[Google Calendar API] Failed to fetch calendar list for select dropdown");
+        selectContainer.style.display = 'none';
+      }
+    } catch (e) {
+      console.warn("[Google Calendar API] Error fetching calendar list for select:", e);
+      selectContainer.style.display = 'none';
+    }
   }
 
   // 設定ロード完了後に外部から呼び出すためのブリッジ関数
@@ -33280,6 +33755,7 @@ window.openResumableUrl = function(urlStr) {
     if (cachedToken && expiresAt && (expiresAt - Date.now() > 5 * 60 * 1000)) {
       googleAccessToken = cachedToken;
       console.log("[Google Calendar API] Reusing valid cached access token.");
+      fetchAndRenderGoogleCalendars();
       syncWithGoogleCalendar();
       return;
     }
@@ -33302,6 +33778,7 @@ window.openResumableUrl = function(urlStr) {
               localStorage.setItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`, newExpiresAt.toString());
               
               console.log("[Google Calendar API] Silent token refresh success!");
+              fetchAndRenderGoogleCalendars();
               syncWithGoogleCalendar();
             } else {
               console.warn("[Google Calendar API] Silent token refresh returned empty token or error:", tokenResponse ? tokenResponse.error : 'unknown');
@@ -33354,31 +33831,9 @@ window.openResumableUrl = function(urlStr) {
         });
       }
 
-      let calendarIds = ['primary']; // デフォルトはプライマリ
-      
-      if (listResponse.ok) {
-        const listData = await listResponse.json();
-        if (listData && listData.items) {
-          const activeCalendars = listData.items.filter(cal => 
-            cal.id === 'primary' || 
-            cal.selected || 
-            (cal.accessRole === 'owner' || cal.accessRole === 'writer')
-          );
-          if (activeCalendars.length > 0) {
-            calendarIds = Array.from(new Set(['primary', ...activeCalendars.map(cal => cal.id)]));
-          }
-        }
-      } else {
-        let errMsg = "Unknown Error";
-        try {
-          const errData = await listResponse.json();
-          if (errData && errData.error) {
-            errMsg = `[Code: ${errData.error.code}] ${errData.error.message}`;
-          }
-        } catch (_) {}
-        console.error("[Google Calendar API] Failed to fetch calendar list:", errMsg);
-        showToast(`Google連携エラー (リスト取得失敗): ${errMsg}`, 'error');
-      }
+      // ドロップダウンで選択されている連携カレンダーIDを取得して適用
+      const savedCalId = localStorage.getItem(`SYNAPSE_GOOGLE_SELECTED_CALENDAR_ID_${me}`) || 'primary';
+      let calendarIds = [savedCalId];
 
       // 同期取得の期間制限をなくす (過去5年間、未来5年間の計10年分を対象にする)
       const timeMin = new Date();
@@ -33636,6 +34091,59 @@ window.openResumableUrl = function(urlStr) {
     }
   }
 
+  // Google連携のカレンダーリストを取得してドロップダウンにロードする
+  async function fetchAndRenderGoogleCalendars() {
+    const select = document.getElementById('google-calendar-select');
+    const container = document.getElementById('google-calendar-select-container');
+    if (!select || !container) return;
+
+    if (!isGoogleLinked || !googleAccessToken) {
+      container.style.display = 'none';
+      return;
+    }
+
+    const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
+    const savedCalId = localStorage.getItem(`SYNAPSE_GOOGLE_SELECTED_CALENDAR_ID_${me}`) || 'primary';
+
+    try {
+      const apiKey = state.googleApiKey || getLocalStorageGoogleItem('SYNAPSE_GOOGLE_API_KEY', me);
+      let url = `https://www.googleapis.com/calendar/v3/users/me/calendarList`;
+      let response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+      });
+      if (!response.ok && apiKey) {
+        url = `https://www.googleapis.com/calendar/v3/users/me/calendarList?key=${apiKey}`;
+        response = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+        });
+      }
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.items) {
+          const writeableCals = data.items.filter(cal => 
+            cal.id === 'primary' || 
+            cal.accessRole === 'owner' || 
+            cal.accessRole === 'writer'
+          );
+
+          select.innerHTML = '';
+          writeableCals.forEach(cal => {
+            const opt = document.createElement('option');
+            opt.value = cal.id;
+            opt.textContent = cal.summary + (cal.id === 'primary' ? ' (プライマリ)' : '');
+            if (cal.id === savedCalId) opt.selected = true;
+            select.appendChild(opt);
+          });
+
+          container.style.display = 'flex';
+        }
+      }
+    } catch (e) {
+      console.warn("[Google Calendar API] Failed to fetch calendar list for dropdown:", e);
+    }
+  }
+
   function updateGoogleStatusUI() {
     const dot = document.getElementById('google-calendar-status-dot');
     const text = document.getElementById('google-calendar-status-text');
@@ -33658,6 +34166,8 @@ window.openResumableUrl = function(urlStr) {
         if (titleSpan) titleSpan.innerText = 'カレンダーを開く';
         if (descSpan) descSpan.innerText = `連携中: ${googleLinkedEmail}`;
       }
+
+      fetchAndRenderGoogleCalendars();
     } else {
       dot.style.backgroundColor = '#ef4444';
       text.textContent = 'Google未連携';
@@ -33673,6 +34183,9 @@ window.openResumableUrl = function(urlStr) {
         if (titleSpan) titleSpan.innerText = 'カレンダー';
         if (descSpan) descSpan.innerText = '個人・共有の予定管理とGoogleカレンダーの同期連携を行います';
       }
+
+      const selectContainer = document.getElementById('google-calendar-select-container');
+      if (selectContainer) selectContainer.style.display = 'none';
     }
   }
 

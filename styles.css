@@ -4242,7 +4242,6 @@ h3 {
    ============================================================================ */
 .mypage-calendar-layout {
   display: flex;
-  gap: 1.25rem;
   height: calc(100vh - 160px);
   min-height: 550px;
   overflow: hidden;

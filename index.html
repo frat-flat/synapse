@@ -1204,9 +1204,13 @@
       </div>
       
       <!-- Googleカレンダー連携ステータス表示 -->
-      <div style="display: flex; align-items: center; gap: 0.75rem; background: var(--bg-surface-elevated); padding: 0.4rem 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+      <div style="display: flex; align-items: center; gap: 0.75rem; background: var(--bg-surface-elevated); padding: 0.4rem 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); flex-wrap: wrap;">
         <span id="google-calendar-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;"></span>
         <span id="google-calendar-status-text" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary);">Google未連携</span>
+        <div id="google-calendar-select-container" style="display: none; align-items: center; gap: 0.35rem;">
+          <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin-left: 0.5rem;">連携カレンダー:</span>
+          <select id="google-calendar-select" class="calendar-form-control" style="font-size: 0.75rem; padding: 0.2rem 0.4rem; height: auto; width: 160px; cursor: pointer; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm);"></select>
+        </div>
         <button id="google-calendar-connect-btn" class="btn btn-primary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; font-weight: 700; cursor: pointer; border-radius: var(--radius-sm); background: #4285F4; border: none; color: white;">連携する</button>
       </div>
     </div>
@@ -1288,6 +1292,14 @@
             </div>
           </div>
           
+          <div class="calendar-form-group">
+            <label for="calendar-form-target-calendar">登録先カレンダー</label>
+            <select id="calendar-form-target-calendar" class="calendar-form-control" style="cursor: pointer;">
+              <option value="personal">マイカレンダー</option>
+              <!-- 共有カレンダーがここに追加されます -->
+            </select>
+          </div>
+
           <div style="display: flex; gap: 0.5rem; width: 100%;">
             <div class="calendar-form-group" style="flex: 1;">
               <label for="calendar-form-category">カテゴリ</label>
@@ -1297,6 +1309,7 @@
                 <option value="面談">面談</option>
                 <option value="作業">作業</option>
                 <option value="プライベート">プライベート</option>
+                <option value="ToDo">ToDo</option>
               </select>
             </div>
             <div class="calendar-form-group" style="flex: 1;">
@@ -3424,6 +3437,48 @@
         </div>
         <button id="calendar-admin-allowed-save-btn" class="btn btn-primary" style="padding: 0.45rem; font-size: 0.75rem; font-weight: 700; width: 100%; border-radius: var(--radius-sm); background: #8b5cf6; border-color: #8b5cf6;">共有候補メンバー設定を保存</button>
       </div>
+
+      <!-- 🔐 カレンダーの共有権限設定 (自分が他人に与える権限) -->
+      <div style="border-top: 1px dashed var(--border-color); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.6rem;">
+        <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0; color: #334155;">🔐 他のメンバーへの共有権限設定</h4>
+        <p style="font-size: 0.68rem; color: var(--text-secondary); margin: 0; line-height: 1.3;">
+          他の各メンバーに自分の予定をどの範囲で公開・編集させるかを設定します。
+        </p>
+        <div id="calendar-share-permissions-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: var(--radius-sm); background: #f8fafc; display: flex; flex-direction: column; gap: 0.4rem;">
+          <!-- メンバーごとの権限設定ドロップダウンが動的に出力されます -->
+        </div>
+        <button id="calendar-share-permissions-save-btn" class="btn btn-primary" style="padding: 0.45rem; font-size: 0.75rem; font-weight: 700; width: 100%; border-radius: var(--radius-sm);">共有権限を保存</button>
+      </div>
+
+      <!-- 🛠️ 共有サブカレンダー作成・管理 -->
+      <div style="border-top: 1px dashed var(--border-color); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.6rem;">
+        <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0; color: #334155;">🛠️ 共有サブカレンダーの作成・管理</h4>
+        <div style="display: flex; flex-direction: column; gap: 0.4rem; background: #f8fafc; padding: 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <input type="text" id="calendar-custom-name" class="calendar-form-control" style="font-size: 0.72rem; padding: 0.35rem; width: 100%; box-sizing: border-box;" placeholder="カレンダー名（例: 第一会議室、営業共有...）">
+          <div style="display: flex; gap: 0.35rem; align-items: center; justify-content: space-between;">
+            <div style="display: flex; gap: 0.35rem; align-items: center;">
+              <label style="font-size: 0.68rem; color: var(--text-secondary);">カラー:</label>
+              <input type="color" id="calendar-custom-color" value="#10b981" style="width: 40px; height: 24px; padding: 0; cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-xs);">
+            </div>
+            <button id="calendar-custom-create-btn" class="btn btn-primary" style="padding: 0.25rem 0.6rem; font-size: 0.72rem; font-weight: 700;">新規作成</button>
+          </div>
+          <div id="calendar-custom-list" style="margin-top: 0.5rem; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.3rem; border-top: 1px solid var(--border-color); padding-top: 0.4rem;">
+            <!-- 作成したカスタム共有カレンダー一覧 -->
+          </div>
+        </div>
+      </div>
+      
+      <!-- 🔗 予約ページURL発行 -->
+      <div style="border-top: 1px dashed var(--border-color); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.6rem;">
+        <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0; color: #334155;">🔗 外部アポイント予約ページの公開</h4>
+        <p style="font-size: 0.68rem; color: var(--text-secondary); margin: 0; line-height: 1.3;">
+          外部の顧客に空き時間枠を公開し、直接予約を入れてもらうためのリンクを発行します。
+        </p>
+        <div style="display: flex; gap: 0.35rem; width: 100%;">
+          <input type="text" id="calendar-booking-url-input" class="calendar-form-control" style="font-size: 0.72rem; padding: 0.35rem; flex: 1; background: #f1f5f9; box-sizing: border-box;" readonly>
+          <button id="calendar-booking-url-copy-btn" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.72rem; font-weight: 600; cursor: pointer; white-space: nowrap;">コピー</button>
+        </div>
+      </div>
       
     </div>
   </div>
@@ -3531,6 +3586,82 @@
       <button id="edit-phone-cancel" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; cursor: pointer;">キャンセル</button>
       <button id="edit-phone-submit" class="btn btn-primary" style="padding: 0.4rem 1rem; font-size: 0.78rem; cursor: pointer;">認証SMSを送信</button>
     </div>
+  </div>
+</div>
+
+<!-- ================= 🌐 顧客公開用アポイント予約画面 (非ログイン) ================= -->
+<div id="public-booking-screen" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #f8fafc; z-index: 99999; overflow-y: auto; font-family: 'Inter', 'Noto Sans JP', sans-serif;">
+  <div style="max-width: 680px; margin: 2rem auto; padding: 2rem; background: white; border-radius: 12px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); box-sizing: border-box;">
+    
+    <!-- ヘッダー -->
+    <div style="text-align: center; border-bottom: 2px solid #3b82f6; padding-bottom: 1rem; margin-bottom: 1.5rem;">
+      <h2 style="margin: 0; font-size: 1.4rem; color: #1e293b;" id="booking-target-title">📅 アポイント予約スケジュール</h2>
+      <p style="margin: 0.4rem 0 0 0; font-size: 0.85rem; color: #64748b;" id="booking-target-desc">ご希望の日時を選択して予約を完了してください。</p>
+    </div>
+    
+    <!-- 1. スロット選択ビュー -->
+    <div id="booking-view-slots">
+      <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.8rem; color: #334155; display: flex; align-items: center; gap: 0.35rem;">
+        <span>🔍 予約可能な日時を選択してください</span>
+      </h3>
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; justify-content: center; align-items: center;">
+        <button id="booking-prev-week" class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; cursor: pointer;">◀ 前の週</button>
+        <span id="booking-week-label" style="font-size: 0.88rem; font-weight: 600; min-width: 150px; text-align: center;">-</span>
+        <button id="booking-next-week" class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; cursor: pointer;">次の週 ▶</button>
+      </div>
+      <div id="booking-slots-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.4rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.5rem; background: #f8fafc; min-height: 250px;">
+        <!-- 日付ごとの空き枠スロットが動的生成されます -->
+      </div>
+    </div>
+    
+    <!-- 2. 予約入力フォームビュー (初期非表示) -->
+    <div id="booking-view-form" style="display: none;">
+      <button id="booking-form-back-btn" class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-bottom: 1rem; cursor: pointer;">◀ 日時選択に戻る</button>
+      <h3 style="font-size: 1.05rem; font-weight: 700; color: #1e293b; margin-bottom: 1rem; border-left: 4px solid #3b82f6; padding-left: 0.5rem;">
+        📝 ご予約者情報の入力
+      </h3>
+      <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 0.8rem; border-radius: var(--radius-sm); font-size: 0.85rem; margin-bottom: 1.25rem;">
+        <strong>選択日時:</strong> <span id="booking-selected-slot-text" style="color: #3b82f6; font-weight: bold;">-</span>
+      </div>
+      <form id="booking-submit-form" style="display: flex; flex-direction: column; gap: 0.8rem; text-align: left;">
+        <div class="calendar-form-group">
+          <label style="font-weight: 600; font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">お名前 <span style="color: #ef4444;">*</span></label>
+          <input type="text" id="booking-customer-name" class="calendar-form-control" style="width: 100%; box-sizing: border-box;" placeholder="例: 鈴木 太郎" required>
+        </div>
+        <div class="calendar-form-group">
+          <label style="font-weight: 600; font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">フリガナ <span style="color: #ef4444;">*</span></label>
+          <input type="text" id="booking-customer-kana" class="calendar-form-control" style="width: 100%; box-sizing: border-box;" placeholder="例: スズキ タロウ" required>
+        </div>
+        <div class="calendar-form-group">
+          <label style="font-weight: 600; font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">電話番号 <span style="color: #ef4444;">*</span></label>
+          <input type="tel" id="booking-customer-phone" class="calendar-form-control" style="width: 100%; box-sizing: border-box;" placeholder="例: 09012345678 (ハイフン不要)" required>
+        </div>
+        <div class="calendar-form-group">
+          <label style="font-weight: 600; font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">メールアドレス <span style="color: #ef4444;">*</span></label>
+          <input type="email" id="booking-customer-email" class="calendar-form-control" style="width: 100%; box-sizing: border-box;" placeholder="例: suzuki@example.com" required>
+        </div>
+        <div class="calendar-form-group">
+          <label style="font-weight: 600; font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">ご用件・ご要望</label>
+          <textarea id="booking-customer-desc" class="calendar-form-control" style="width: 100%; box-sizing: border-box;" rows="3" placeholder="ご相談内容やご希望があればご記入ください..."></textarea>
+        </div>
+        <button type="submit" id="booking-submit-btn" class="btn btn-primary" style="padding: 0.6rem; font-size: 0.9rem; font-weight: 700; width: 100%; cursor: pointer; margin-top: 0.5rem; background: #3b82f6; border-color: #3b82f6; color: white;">予約を確定する</button>
+      </form>
+    </div>
+    
+    <!-- 3. 予約完了ビュー (初期非表示) -->
+    <div id="booking-view-success" style="display: none; text-align: center; padding: 2rem 1rem; flex-direction: column; align-items: center; gap: 1rem;">
+      <span style="font-size: 3rem;">🎉</span>
+      <h3 style="font-size: 1.3rem; font-weight: 700; color: #10b981; margin: 0;">アポイント予約が確定しました！</h3>
+      <p style="font-size: 0.88rem; color: #64748b; margin: 0; line-height: 1.5; text-align: center;">
+        ご登録いただいたメールアドレス宛に、予約確認のご連絡をお送りいたします。<br>
+        アポイントの日程が近づきましたら、担当者より改めてご連絡差し上げます。
+      </p>
+      <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 1rem; border-radius: var(--radius-md); font-size: 0.85rem; width: 100%; box-sizing: border-box; text-align: left; margin-top: 1rem;">
+        <strong>予約日時:</strong> <span id="booking-success-date" style="color: #3b82f6; font-weight: bold;">-</span><br>
+        <strong>担当者:</strong> <span id="booking-success-target">-</span>
+      </div>
+    </div>
+    
   </div>
 </div>
 
