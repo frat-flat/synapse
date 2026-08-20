@@ -32440,7 +32440,22 @@ window.openResumableUrl = function(urlStr) {
           .from('synapse_calendar_events')
           .select('*');
         if (data && !error) {
-          events = data;
+          events = data.map(ev => {
+            if (ev.is_google_event && ev.description) {
+              // description から Google ID / Task ID を復元する
+              const googleMatch = ev.description.match(/__GOOGLE_ID__:([^\s]+)/);
+              const taskMatch = ev.description.match(/__GOOGLE_TASK_ID__:([^\s]+)/);
+              
+              if (googleMatch) {
+                ev.id = `google-${googleMatch[1]}`;
+                ev.description = ev.description.replace(/\n\n__GOOGLE_ID__:[^\s]+/, '');
+              } else if (taskMatch) {
+                ev.id = `google-task-${taskMatch[1]}`;
+                ev.description = ev.description.replace(/\n\n__GOOGLE_TASK_ID__:[^\s]+/, '');
+              }
+            }
+            return ev;
+          });
         } else if (error) {
           console.error("Supabase fetch calendar events error:", error.message);
         }
@@ -33967,9 +33982,21 @@ window.openResumableUrl = function(urlStr) {
           }
           
           if (allGoogleEvents.length > 0) {
+            // DB用にIDを除外し、descriptionにGoogleIDを埋め込んだクローンを作成
+            const dbEvents = allGoogleEvents.map(ev => {
+              const clone = { ...ev };
+              delete clone.id; // UUID制約エラー回避のためIDを除外（Supabase側で自動生成）
+              
+              const rawGoogleId = ev.id.replace('google-task-', '').replace('google-', '');
+              const marker = ev.id.startsWith('google-task-') ? '__GOOGLE_TASK_ID__' : '__GOOGLE_ID__';
+              clone.description = (clone.description || '') + `\n\n${marker}:${rawGoogleId}`;
+              
+              return clone;
+            });
+
             const { error: insError } = await partnerSupabaseClient
               .from('synapse_calendar_events')
-              .insert(allGoogleEvents);
+              .insert(dbEvents);
             if (insError) {
               console.error("Supabase DB Google cache insert error:", insError.message, insError.details, insError.hint);
             }
