@@ -31420,30 +31420,37 @@ window.openResumableUrl = function(urlStr) {
       };
     }
 
-    // Google連携範囲オプションのバインドと警告連動
-    const optCalendarOnly = document.getElementById('google-link-range-calendar-only');
-    const optWithTasks = document.getElementById('google-link-range-with-tasks');
+    // Google連携範囲オプション (カレンダー・ToDoの個別チェックボックス) のバインドと警告連動
+    const chkLinkCalendar = document.getElementById('google-link-active-calendar');
+    const chkLinkTasks = document.getElementById('google-link-active-tasks');
     const tasksWarning = document.getElementById('google-link-tasks-warning');
-    const optionsContainer = document.getElementById('google-link-options-container');
 
-    if (optCalendarOnly && optWithTasks) {
-      if (state.googleLinkOption === 'with-tasks') {
-        optWithTasks.checked = true;
-        if (tasksWarning) tasksWarning.style.display = 'inline';
-      } else {
-        optCalendarOnly.checked = true;
-        if (tasksWarning) tasksWarning.style.display = 'none';
+    if (chkLinkCalendar && chkLinkTasks) {
+      // 状態の復元 (カレンダー連携: デフォルトON, Tasks連携: デフォルトOFF)
+      state.googleLinkCalendar = localStorage.getItem(`SYNAPSE_GOOGLE_LINK_CALENDAR_${me}`) !== 'false';
+      state.googleLinkTasks = localStorage.getItem(`SYNAPSE_GOOGLE_LINK_TASKS_${me}`) === 'true';
+
+      chkLinkCalendar.checked = state.googleLinkCalendar;
+      chkLinkTasks.checked = state.googleLinkTasks;
+
+      // どちらかのチェックが入っている時は同一アカウント警告を常に出しておく (仕様)
+      if (tasksWarning) {
+        tasksWarning.style.display = (state.googleLinkCalendar || state.googleLinkTasks) ? 'inline' : 'none';
       }
 
-      const handleOptionChange = (val) => {
-        state.googleLinkOption = val;
-        localStorage.setItem(`SYNAPSE_GOOGLE_LINK_OPTION_${me}`, val);
+      const handleOptionChange = () => {
+        state.googleLinkCalendar = chkLinkCalendar.checked;
+        state.googleLinkTasks = chkLinkTasks.checked;
+        localStorage.setItem(`SYNAPSE_GOOGLE_LINK_CALENDAR_${me}`, state.googleLinkCalendar ? 'true' : 'false');
+        localStorage.setItem(`SYNAPSE_GOOGLE_LINK_TASKS_${me}`, state.googleLinkTasks ? 'true' : 'false');
+
         if (tasksWarning) {
-          tasksWarning.style.display = val === 'with-tasks' ? 'inline' : 'none';
+          tasksWarning.style.display = (state.googleLinkCalendar || state.googleLinkTasks) ? 'inline' : 'none';
         }
+
         // Google連携中の場合は即時に再同期を実行
         if (isGoogleLinked) {
-          showToast('連携範囲が変更されました。再同期中...', 'info');
+          showToast('連携設定が変更されました。再同期中...', 'info');
           syncWithGoogleCalendar().then(() => {
             renderMypageCalendar();
             if (typeof renderTodoList === 'function') renderTodoList();
@@ -31451,8 +31458,8 @@ window.openResumableUrl = function(urlStr) {
         }
       };
 
-      optCalendarOnly.onchange = () => handleOptionChange('calendar-only');
-      optWithTasks.onchange = () => handleOptionChange('with-tasks');
+      chkLinkCalendar.onchange = handleOptionChange;
+      chkLinkTasks.onchange = handleOptionChange;
     }
 
     // 3分おきの自動同期処理タイマーをセット
@@ -34016,75 +34023,77 @@ window.openResumableUrl = function(urlStr) {
 
       let allGoogleEvents = [];
 
-      // 2. 各カレンダーから予定を取得してマージ
-      for (const calendarId of calendarIds) {
-        const isHolidayCal = calendarId.includes('holiday') || calendarId.includes('group.v.calendar.google.com');
-        
-        // 【二段構え】まずはAPIキーなし（推奨）で試行
-        let url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` + 
-                  `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime&maxResults=1000`;
-        
-        try {
-          let response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${googleAccessToken}` }
-          });
+      // 2. 各カレンダーから予定を取得してマージ (カレンダー連携がONの場合のみ)
+      if (state.googleLinkCalendar !== false) {
+        for (const calendarId of calendarIds) {
+          const isHolidayCal = calendarId.includes('holiday') || calendarId.includes('group.v.calendar.google.com');
           
-          if (!response.ok && apiKey) {
-            console.log(`[Google Calendar API] Fetch events for ${calendarId} without API Key failed. Retrying with API Key...`);
-            url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` + 
-                  `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime&maxResults=1000&key=${apiKey}`;
-            response = await fetch(url, {
+          // 【二段構え】まずはAPIキーなし（推奨）で試行
+          let url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` + 
+                    `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime&maxResults=1000`;
+          
+          try {
+            let response = await fetch(url, {
               headers: { 'Authorization': `Bearer ${googleAccessToken}` }
             });
+            
+            if (!response.ok && apiKey) {
+              console.log(`[Google Calendar API] Fetch events for ${calendarId} without API Key failed. Retrying with API Key...`);
+              url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` + 
+                    `?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime&maxResults=1000&key=${apiKey}`;
+              response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+              });
+            }
+            
+            if (!response.ok) {
+              let errMsg = "Unknown Error";
+              try {
+                const errData = await response.json();
+                if (errData && errData.error) {
+                  errMsg = `[Code: ${errData.error.code}] ${errData.error.message}`;
+                }
+              } catch (_) {}
+              console.error(`[Google Calendar API] Fetch failed for calendar ${calendarId}:`, errMsg);
+              showToast(`Google同期エラー: ${errMsg}`, 'error');
+              continue;
+            }
+            
+            const data = await response.json();
+            if (data && data.items) {
+              const validItems = data.items.filter(event => {
+                if (event.status === 'cancelled') return false;
+                if (!event.start || !event.end) return false;
+                if (!event.start.dateTime && !event.start.date) return false;
+                if (!event.end.dateTime && !event.end.date) return false;
+                return true;
+              });
+              const events = validItems.map(event => {
+                return {
+                  id: `google-${event.id}`,
+                  user_id: me,
+                  user_name: googleLinkedEmail,
+                  title: event.summary || '予定なし',
+                  start_time: event.start.dateTime || event.start.date + 'T00:00:00Z',
+                  end_time: event.end.dateTime || event.end.date + 'T23:59:59Z',
+                  location: event.location || '',
+                  description: event.description || '',
+                  category: isHolidayCal ? '祝日' : '一般',
+                  color: isHolidayCal ? '#f43f5e' : '#4285F4',
+                  shared_with: ['*'],
+                  is_google_event: true
+                };
+              });
+              allGoogleEvents = allGoogleEvents.concat(events);
+            }
+          } catch (err) {
+            console.error(`[Google Calendar API] Error fetching events for calendar ${calendarId}:`, err);
           }
-          
-          if (!response.ok) {
-            let errMsg = "Unknown Error";
-            try {
-              const errData = await response.json();
-              if (errData && errData.error) {
-                errMsg = `[Code: ${errData.error.code}] ${errData.error.message}`;
-              }
-            } catch (_) {}
-            console.error(`[Google Calendar API] Fetch failed for calendar ${calendarId}:`, errMsg);
-            showToast(`Google同期エラー: ${errMsg}`, 'error');
-            continue;
-          }
-          
-          const data = await response.json();
-          if (data && data.items) {
-            const validItems = data.items.filter(event => {
-              if (event.status === 'cancelled') return false;
-              if (!event.start || !event.end) return false;
-              if (!event.start.dateTime && !event.start.date) return false;
-              if (!event.end.dateTime && !event.end.date) return false;
-              return true;
-            });
-            const events = validItems.map(event => {
-              return {
-                id: `google-${event.id}`,
-                user_id: me,
-                user_name: googleLinkedEmail,
-                title: event.summary || '予定なし',
-                start_time: event.start.dateTime || event.start.date + 'T00:00:00Z',
-                end_time: event.end.dateTime || event.end.date + 'T23:59:59Z',
-                location: event.location || '',
-                description: event.description || '',
-                category: isHolidayCal ? '祝日' : '一般',
-                color: isHolidayCal ? '#f43f5e' : '#4285F4',
-                shared_with: ['*'],
-                is_google_event: true
-              };
-            });
-            allGoogleEvents = allGoogleEvents.concat(events);
-          }
-        } catch (err) {
-          console.error(`[Google Calendar API] Error fetching events for calendar ${calendarId}:`, err);
         }
       }
 
-      // --- 2-B. Google Tasks (ToDo) の同期処理 (連携範囲オプションが 'with-tasks' の場合のみ実行) ---
-      if (state.googleLinkOption === 'with-tasks') {
+      // --- 2-B. Google Tasks (ToDo) の同期処理 (ToDo連携がONの場合のみ実行) ---
+      if (state.googleLinkTasks) {
         try {
           console.log("[Google Tasks API] Fetching tasks via serverless proxy...");
           const response = await fetch('/api/sync-google-tasks', {
@@ -34631,6 +34640,31 @@ window.openResumableUrl = function(urlStr) {
     }
     localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
 
+    // ToDo連携がOFFかつ、カレンダー連携がONのとき、Googleカレンダーにタスク予定として同期する
+    if (isGoogleLinked && state.googleLinkCalendar !== false && !state.googleLinkTasks) {
+      if (showOnCalendar && due) {
+        const taskEvent = {
+          title: (taskData.status === 'completed' ? '✓ ' : '○ ') + taskData.title,
+          start_time: due,
+          end_time: due,
+          description: notes + `\n\n__SYNAPSE_TODO_ID__:${taskData.id}`
+        };
+
+        const existingEventId = taskData.google_event_id || localStorage.getItem(`SYNAPSE_TODO_GOOGLE_EVENT_ID_${taskData.id}`);
+        if (existingEventId) {
+          updateTodoEventOnGoogleCalendar(existingEventId, taskEvent);
+        } else {
+          addTodoEventToGoogleCalendar(taskData.id, taskEvent);
+        }
+      } else {
+        const existingEventId = taskData.google_event_id || localStorage.getItem(`SYNAPSE_TODO_GOOGLE_EVENT_ID_${taskData.id}`);
+        if (existingEventId) {
+          deleteTodoEventFromGoogleCalendar(existingEventId);
+          taskData.google_event_id = null;
+        }
+      }
+    }
+
     showToast(isNew ? "タスクを追加しました。" : "タスクを更新しました。", "success");
     renderTodoList();
     resetTodoForm();
@@ -34667,6 +34701,12 @@ window.openResumableUrl = function(urlStr) {
       } catch (err) {
         console.warn("[ToDo DB] Delete failed:", err);
       }
+    }
+
+    // もし Google カレンダーにイベントとして同期されていれば削除する
+    const existingEventId = existing.google_event_id || localStorage.getItem(`SYNAPSE_TODO_GOOGLE_EVENT_ID_${editingTodoId}`);
+    if (existingEventId && isGoogleLinked && state.googleLinkCalendar !== false && !state.googleLinkTasks) {
+      deleteTodoEventFromGoogleCalendar(existingEventId);
     }
 
     todoTasks = todoTasks.filter(t => t.id !== editingTodoId);
@@ -34706,6 +34746,26 @@ window.openResumableUrl = function(urlStr) {
     }
 
     localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
+
+    // ToDo連携がOFFかつ、カレンダー連携がONのとき、Googleカレンダーにタスク予定として同期する
+    if (isGoogleLinked && state.googleLinkCalendar !== false && !state.googleLinkTasks) {
+      if (task.show_on_calendar && task.due) {
+        const taskEvent = {
+          title: (task.status === 'completed' ? '✓ ' : '○ ') + task.title,
+          start_time: task.due,
+          end_time: task.due,
+          description: (task.notes || '') + `\n\n__SYNAPSE_TODO_ID__:${task.id}`
+        };
+
+        const existingEventId = task.google_event_id || localStorage.getItem(`SYNAPSE_TODO_GOOGLE_EVENT_ID_${task.id}`);
+        if (existingEventId) {
+          updateTodoEventOnGoogleCalendar(existingEventId, taskEvent);
+        } else {
+          addTodoEventToGoogleCalendar(task.id, taskEvent);
+        }
+      }
+    }
+
     renderTodoList();
 
     if (state.mypageCalendarInitialized) {
@@ -34873,6 +34933,95 @@ window.openResumableUrl = function(urlStr) {
     };
 
     return row;
+  }
+
+  // ToDoタスクをGoogleカレンダーのイベントに変換して同期するヘルパー
+  async function addTodoEventToGoogleCalendar(todoId, event) {
+    if (!isGoogleLinked || !googleAccessToken) return;
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+    const apiKey = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_API_KEY', rawUserId);
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?key=${apiKey}`;
+
+    const body = {
+      summary: event.title,
+      description: event.description,
+      start: { date: event.start_time }, // 終日予定
+      end: { date: event.end_time }
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${googleAccessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      const data = await response.json();
+      if (data && data.id) {
+        localStorage.setItem(`SYNAPSE_TODO_GOOGLE_EVENT_ID_${todoId}`, data.id);
+        const task = todoTasks.find(t => t.id === todoId);
+        if (task) {
+          task.google_event_id = data.id;
+          localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
+          if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+            await partnerSupabaseClient
+              .from('synapse_todo_tasks')
+              .update({ google_event_id: data.id })
+              .eq('id', todoId);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[Google Calendar Sync] Failed to add todo event:", e);
+    }
+  }
+
+  async function updateTodoEventOnGoogleCalendar(googleEventId, event) {
+    if (!isGoogleLinked || !googleAccessToken) return;
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const apiKey = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_API_KEY', rawUserId);
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}?key=${apiKey}`;
+
+    const body = {
+      summary: event.title,
+      description: event.description,
+      start: { date: event.start_time }, // 終日予定
+      end: { date: event.end_time }
+    };
+
+    try {
+      await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${googleAccessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+    } catch (e) {
+      console.warn("[Google Calendar Sync] Failed to update todo event:", e);
+    }
+  }
+
+  async function deleteTodoEventFromGoogleCalendar(googleEventId) {
+    if (!isGoogleLinked || !googleAccessToken) return;
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const apiKey = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_API_KEY', rawUserId);
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}?key=${apiKey}`;
+
+    try {
+      await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${googleAccessToken}`
+        }
+      });
+    } catch (e) {
+      console.warn("[Google Calendar Sync] Failed to delete todo event:", e);
+    }
   }
 
 })();
