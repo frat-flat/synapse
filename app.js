@@ -9400,7 +9400,7 @@ function renderCustomerDetailView(customerId) {
   container.appendChild(layout);
 }
 function openTab(id, type, title, appointData = null) {
-  if (type && type !== 'mypage-screen' && type !== 'mypage-account-info-screen' && type !== 'mypage-settings-screen' && type !== 'mypage-memo-screen' && type !== 'mypage-calendar-screen') {
+  if (type && type !== 'mypage-screen' && type !== 'mypage-account-info-screen' && type !== 'mypage-settings-screen' && type !== 'mypage-memo-screen' && type !== 'mypage-calendar-screen' && type !== 'mypage-todo-screen') {
     const access = checkTableAccess(type);
     if (!access.visible) {
       showToast(`「${title}」画面へのアクセス権限がありません。`, 'error');
@@ -9567,7 +9567,7 @@ function activateTab(id) {
   const tab = state.tabs.find(t => t.id === id);
   if (!tab) return;
 
-  if (tab.type && tab.type !== 'mypage-screen' && tab.type !== 'mypage-account-info-screen' && tab.type !== 'mypage-settings-screen' && tab.type !== 'mypage-memo-screen' && tab.type !== 'mypage-calendar-screen') {
+  if (tab.type && tab.type !== 'mypage-screen' && tab.type !== 'mypage-account-info-screen' && tab.type !== 'mypage-settings-screen' && tab.type !== 'mypage-memo-screen' && tab.type !== 'mypage-calendar-screen' && tab.type !== 'mypage-todo-screen') {
     const access = checkTableAccess(tab.type);
     if (!access.visible) {
       showToast(`「${tab.title}」画面へのアクセス権限がありません。`, 'error');
@@ -9623,6 +9623,8 @@ function activateTab(id) {
     if (typeof window.updateMypageMemoUI === 'function') window.updateMypageMemoUI();
   } else if (tab.type === 'mypage-calendar-screen') {
     if (typeof window.initMypageCalendar === 'function') window.initMypageCalendar();
+  } else if (tab.type === 'mypage-todo-screen') {
+    if (typeof window.initMypageTodo === 'function') window.initMypageTodo();
   } else if (tab.type === 'mypage-settings-screen') {
     if (typeof loadCurrentUserProfile === 'function') loadCurrentUserProfile();
     if (typeof renderMypageDeviceList === 'function') renderMypageDeviceList();
@@ -31358,8 +31360,21 @@ window.openResumableUrl = function(urlStr) {
     }
     state.mypageCalendarInitialized = true;
 
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+
+    // グローバル状態の初期化
+    if (state.calendarShowTasks === undefined) {
+      const savedToggle = localStorage.getItem(`SYNAPSE_CALENDAR_SHOW_TASKS_${me}`);
+      state.calendarShowTasks = savedToggle !== 'false';
+    }
+    if (state.googleLinkOption === undefined) {
+      state.googleLinkOption = localStorage.getItem(`SYNAPSE_GOOGLE_LINK_OPTION_${me}`) || 'calendar-only';
+    }
+
     // DOM要素のバインド
     const btnCalendar = document.getElementById('mypage-btn-calendar');
+    const btnTodo = document.getElementById('mypage-btn-todo');
     const backBtn = document.getElementById('mypage-calendar-back-btn');
     const prevMonthBtn = document.getElementById('calendar-prev-month');
     const nextMonthBtn = document.getElementById('calendar-next-month');
@@ -31394,7 +31409,66 @@ window.openResumableUrl = function(urlStr) {
     const defaultShareMembersContainer = document.getElementById('calendar-default-share-members-list');
     const defaultShareSaveBtn = document.getElementById('calendar-default-share-save-btn');
 
-    // カレンダーボタンクリックでタブ遷移 (常に今日の日付・今月にリセットして開くことで迷子を防止)
+    // タスク表示トグルのバインド
+    const showTasksToggle = document.getElementById('calendar-show-tasks-toggle');
+    if (showTasksToggle) {
+      showTasksToggle.checked = state.calendarShowTasks;
+      showTasksToggle.onchange = () => {
+        state.calendarShowTasks = showTasksToggle.checked;
+        localStorage.setItem(`SYNAPSE_CALENDAR_SHOW_TASKS_${me}`, state.calendarShowTasks ? 'true' : 'false');
+        renderMypageCalendar();
+      };
+    }
+
+    // Google連携範囲オプションのバインドと警告連動
+    const optCalendarOnly = document.getElementById('google-link-range-calendar-only');
+    const optWithTasks = document.getElementById('google-link-range-with-tasks');
+    const tasksWarning = document.getElementById('google-link-tasks-warning');
+    const optionsContainer = document.getElementById('google-link-options-container');
+
+    if (optCalendarOnly && optWithTasks) {
+      if (state.googleLinkOption === 'with-tasks') {
+        optWithTasks.checked = true;
+        if (tasksWarning) tasksWarning.style.display = 'inline';
+      } else {
+        optCalendarOnly.checked = true;
+        if (tasksWarning) tasksWarning.style.display = 'none';
+      }
+
+      const handleOptionChange = (val) => {
+        state.googleLinkOption = val;
+        localStorage.setItem(`SYNAPSE_GOOGLE_LINK_OPTION_${me}`, val);
+        if (tasksWarning) {
+          tasksWarning.style.display = val === 'with-tasks' ? 'inline' : 'none';
+        }
+        // Google連携中の場合は即時に再同期を実行
+        if (isGoogleLinked) {
+          showToast('連携範囲が変更されました。再同期中...', 'info');
+          syncWithGoogleCalendar().then(() => {
+            renderMypageCalendar();
+            if (typeof renderTodoList === 'function') renderTodoList();
+          });
+        }
+      };
+
+      optCalendarOnly.onchange = () => handleOptionChange('calendar-only');
+      optWithTasks.onchange = () => handleOptionChange('with-tasks');
+    }
+
+    // 3分おきの自動同期処理タイマーをセット
+    if (!state.googleSyncIntervalId) {
+      state.googleSyncIntervalId = setInterval(() => {
+        if (isGoogleLinked && googleAccessToken) {
+          console.log("[Google Calendar Sync] Running 3-minute auto-sync...");
+          syncWithGoogleCalendar().then(() => {
+            renderMypageCalendar();
+            if (typeof renderTodoList === 'function') renderTodoList();
+          });
+        }
+      }, 180000); // 3分 (180,000ms)
+    }
+
+    // カレンダーボタンクリックでタブ遷移
     if (btnCalendar) {
       btnCalendar.onclick = () => {
         calendarCurrentDate = new Date();
@@ -31403,6 +31477,13 @@ window.openResumableUrl = function(urlStr) {
         renderMypageCalendar();
         updateSelectedDateLabel();
         loadEventsForSelectedDate();
+      };
+    }
+
+    // ToDoリストボタンクリックでタブ遷移
+    if (btnTodo) {
+      btnTodo.onclick = () => {
+        openTab('mypage-todo-screen', 'mypage-todo-screen', '📋 ToDoリスト');
       };
     }
 
@@ -33123,6 +33204,9 @@ window.openResumableUrl = function(urlStr) {
         // Google予定ではないこと
         if (ev.is_google_event) return false;
         
+        // 独自タスク（ToDoカテゴリ）は以下の独立したマッピングで描画するため、ここからは一旦除外する
+        if (ev.category === 'ToDo' && ev.id && ev.id.startsWith('task-')) return false;
+        
         const isOwner = ev.user_id && ev.user_id.toLowerCase() === me;
         
         // 作成者がオーナーからカレンダー共有を許可されていること（本人は常に表示）
@@ -33180,6 +33264,49 @@ window.openResumableUrl = function(urlStr) {
         events = events.concat(dummyGoogle);
       }
     });
+
+    // --- 📋 ToDoタスク（Google Tasks ＆ 独自タスク）の制御・マージ ---
+    if (state.calendarShowTasks !== false) {
+      // 1. Synapse独自タスクの抽出とカレンダーイベントへのマッピング
+      if (typeof todoTasks !== 'undefined' && todoTasks.length > 0) {
+        todoTasks.forEach(task => {
+          if (!task.due || task.show_on_calendar === false) return;
+
+          // 共有権限チェック
+          const isOwner = task.user_id === me;
+          const isSharedAll = task.shared_with && task.shared_with.includes('*');
+          const isSharedMe = task.shared_with && task.shared_with.map(m => m.toLowerCase()).includes(me);
+
+          if (!isOwner && !isSharedAll && !isSharedMe) return;
+
+          // 表示フィルター（チェックボックス）のチェック状態を確認（他人のタスクの場合）
+          if (!isOwner && !calendarFilteredMembers.map(m => m.toLowerCase()).includes(task.user_id.toLowerCase())) return;
+
+          events.push({
+            id: task.id,
+            title: (task.status === 'completed' ? '✓ ' : '○ ') + task.title,
+            start_time: task.due + 'T00:00:00',
+            end_time: task.due + 'T23:59:59',
+            all_day: true,
+            category: 'ToDo',
+            notes: task.notes,
+            status: task.status,
+            user_id: task.user_id,
+            user_name: task.user_name || task.user_id,
+            is_todo_task: true,
+            color: task.status === 'completed' ? '#94a3b8' : '#f59e0b' // 完了はグレー、未完了はアンバー
+          });
+        });
+      }
+    } else {
+      // タスク非表示（トグルOFF）の場合：すべてのタスク（Google TasksおよびカテゴリToDo）をカレンダーから除外
+      events = events.filter(ev => {
+        const isGoogleTask = ev.id && ev.id.startsWith('google-task-');
+        const isTodoCategory = ev.category === 'ToDo';
+        return !isGoogleTask && !isTodoCategory;
+      });
+    }
+
     console.log(`[Calendar Debug] Total raw events: ${state.calendarEvents ? state.calendarEvents.length : 0}, filtered visible events for ${year}/${month + 1}: ${events.length}`);
     if (events.length > 0) {
       console.log(`[Calendar Debug] Sample Event 0 details:`, {
@@ -33956,48 +34083,49 @@ window.openResumableUrl = function(urlStr) {
         }
       }
 
-      // --- 2-B. Google Tasks (ToDo) の同期処理 (CORS制限のためクライアントサイドでは一旦スキップ) ---
-      // 2.5 Google Tasks の同期取得 (CORSエラー回避のため、サーバーレスプロキシ経由で取得)
-      try {
-        console.log("[Google Tasks API] Fetching tasks via serverless proxy...");
-        const response = await fetch('/api/sync-google-tasks', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ accessToken: googleAccessToken })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data && data.items) {
-            const googleTasks = data.items
-              .filter(task => task.due)
-              .map(task => {
-                const isCompleted = task.status === 'completed';
-                return {
-                  id: `google-task-${task.id}`,
-                  user_id: me,
-                  user_name: googleLinkedEmail,
-                  title: `[ToDo] ${task.title || '無題のタスク'}${isCompleted ? ' (完了)' : ''}`,
-                  start_time: task.due,
-                  end_time: task.due,
-                  location: '',
-                  description: task.notes || '',
-                  category: 'ToDo',
-                  color: isCompleted ? '#94a3b8' : '#10b981',
-                  shared_with: ['*'],
-                  is_google_event: true
-                };
-              });
-            allGoogleEvents = allGoogleEvents.concat(googleTasks);
-            console.log(`[Google Tasks API] Mapped ${googleTasks.length} tasks from proxy.`);
+      // --- 2-B. Google Tasks (ToDo) の同期処理 (連携範囲オプションが 'with-tasks' の場合のみ実行) ---
+      if (state.googleLinkOption === 'with-tasks') {
+        try {
+          console.log("[Google Tasks API] Fetching tasks via serverless proxy...");
+          const response = await fetch('/api/sync-google-tasks', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ accessToken: googleAccessToken })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.items) {
+              const googleTasks = data.items
+                .filter(task => task.due)
+                .map(task => {
+                  const isCompleted = task.status === 'completed';
+                  return {
+                    id: `google-task-${task.id}`,
+                    user_id: me,
+                    user_name: googleLinkedEmail,
+                    title: `[ToDo] ${task.title || '無題のタスク'}${isCompleted ? ' (完了)' : ''}`,
+                    start_time: task.due,
+                    end_time: task.due,
+                    location: '',
+                    description: task.notes || '',
+                    category: 'ToDo',
+                    color: isCompleted ? '#94a3b8' : '#10b981',
+                    shared_with: ['*'],
+                    is_google_event: true
+                  };
+                });
+              allGoogleEvents = allGoogleEvents.concat(googleTasks);
+              console.log(`[Google Tasks API] Mapped ${googleTasks.length} tasks from proxy.`);
+            }
+          } else {
+            console.error("[Google Tasks API] Proxy response error status:", response.status);
           }
-        } else {
-          console.error("[Google Tasks API] Proxy response error status:", response.status);
+        } catch (tasksErr) {
+          console.error("[Google Tasks API] Error fetching tasks via proxy:", tasksErr);
         }
-      } catch (tasksErr) {
-        console.error("[Google Tasks API] Error fetching tasks via proxy:", tasksErr);
       }
 
       // 3. Supabase DB へのキャッシュ保存とメモリ更新
@@ -34259,6 +34387,492 @@ window.openResumableUrl = function(urlStr) {
       loadEventsForSelectedDate();
       resetEventForm();
     });
+  }
+
+  // ============================================================================
+  // 📋 Synapse ToDoリスト (タスク管理) ロジック
+  // ============================================================================
+  let todoTasks = [];
+  let editingTodoId = null;
+
+  window.initMypageTodo = function() {
+    console.log("[ToDo App] Initializing ToDo Screen...");
+    editingTodoId = null;
+
+    // DOM要素
+    const todoBackBtn = document.getElementById('mypage-todo-back-btn');
+    const btnNewTodo = document.getElementById('todo-new-btn');
+    const todoFormTitleText = document.getElementById('todo-form-title-text');
+    const inputTitle = document.getElementById('todo-form-title');
+    const inputDue = document.getElementById('todo-form-due');
+    const inputNotes = document.getElementById('todo-form-notes');
+    const chkShowOnCalendar = document.getElementById('todo-form-show-on-calendar');
+    const chkShared = document.getElementById('todo-form-shared');
+    const shareMembersContainer = document.getElementById('todo-form-share-members-container');
+    const shareMembersList = document.getElementById('todo-form-share-members-list');
+    const saveTodoBtn = document.getElementById('todo-form-save-btn');
+    const deleteTodoBtn = document.getElementById('todo-form-delete-btn');
+
+    // 戻るボタン
+    if (todoBackBtn) {
+      todoBackBtn.onclick = () => {
+        const isSystemAdmin = isOwnerUser();
+        if (!isSystemAdmin) {
+          switchView('home-screen');
+        } else {
+          const menuView = document.getElementById('mypage-menu-view');
+          const todoScreen = document.getElementById('mypage-todo-screen');
+          if (menuView) menuView.style.display = 'flex';
+          if (todoScreen) todoScreen.style.display = 'none';
+        }
+      };
+    }
+
+    // 新規タスクボタン
+    if (btnNewTodo) {
+      btnNewTodo.onclick = () => {
+        resetTodoForm();
+      };
+    }
+
+    // 共有トグルの連動
+    if (chkShared) {
+      chkShared.onchange = () => {
+        if (chkShared.checked) {
+          shareMembersContainer.style.display = 'flex';
+          renderTodoShareMembersList();
+        } else {
+          shareMembersContainer.style.display = 'none';
+        }
+      };
+    }
+
+    // 保存ボタン
+    if (saveTodoBtn) {
+      saveTodoBtn.onclick = async () => {
+        await saveTodoItem();
+      };
+    }
+
+    // 削除ボタン
+    if (deleteTodoBtn) {
+      deleteTodoBtn.onclick = async () => {
+        await deleteTodoItem();
+      };
+    }
+
+    // 初期ロード
+    loadTodoTasks().then(() => {
+      renderTodoList();
+      resetTodoForm();
+    });
+  };
+
+  // フォームリセット
+  function resetTodoForm() {
+    editingTodoId = null;
+    document.getElementById('todo-form-title-text').textContent = '新規タスクの作成';
+    document.getElementById('todo-form-title').value = '';
+    document.getElementById('todo-form-due').value = '';
+    document.getElementById('todo-form-notes').value = '';
+    document.getElementById('todo-form-show-on-calendar').checked = true;
+    
+    const chkShared = document.getElementById('todo-form-shared');
+    chkShared.checked = false;
+    chkShared.disabled = false;
+    document.getElementById('todo-form-share-members-container').style.display = 'none';
+    
+    document.getElementById('todo-form-delete-btn').style.display = 'none';
+    
+    // 保存ボタンの有効化
+    const saveTodoBtn = document.getElementById('todo-form-save-btn');
+    if (saveTodoBtn) {
+      saveTodoBtn.disabled = false;
+      saveTodoBtn.textContent = '保存する';
+    }
+  }
+
+  // 共有メンバーリストの描画 (独自タスク用)
+  function renderTodoShareMembersList() {
+    const listEl = document.getElementById('todo-form-share-members-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    // システムに存在する他のメンバー一覧を取得 (カレンダー共有候補と同様)
+    const members = getCalendarAllowedMembers();
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+
+    members.forEach(member => {
+      const memberId = member.user_id.toLowerCase();
+      if (memberId === me) return; // 自分自身は除外
+
+      const label = document.createElement('label');
+      label.style.display = 'flex';
+      label.style.alignItems = 'center';
+      label.style.gap = '0.3rem';
+      label.style.fontSize = '0.72rem';
+      label.style.cursor = 'pointer';
+      label.style.userSelect = 'none';
+
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.value = member.user_id;
+      input.className = 'todo-share-member-checkbox';
+      input.style.width = '12px';
+      input.style.height = '12px';
+
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(member.full_name || member.user_id));
+      listEl.appendChild(label);
+    });
+  }
+
+  // ToDoタスクのロード (Supabase DB または localStorage)
+  async function loadTodoTasks() {
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        // 自分が作成したタスク、または自分と共有されているタスクを取得
+        const { data, error } = await partnerSupabaseClient
+          .from('synapse_todo_tasks')
+          .select('*')
+          .or(`user_id.eq.${me},shared_with.cs.{"${rawUserId}"},shared_with.cs.{"*"}`);
+
+        if (!error && data) {
+          todoTasks = data;
+          localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
+          return;
+        }
+      } catch (err) {
+        console.warn("[ToDo DB] Load failed, falling back to local storage:", err);
+      }
+    }
+
+    // フォールバック: ローカルストレージ
+    const saved = localStorage.getItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`);
+    todoTasks = saved ? JSON.parse(saved) : [];
+  }
+
+  // ToDoタスクの保存 (DB & localStorage)
+  async function saveTodoItem() {
+    const titleInput = document.getElementById('todo-form-title');
+    const title = titleInput.value.trim();
+    if (!title) {
+      showToast("タスク名を入力してください。", "error");
+      return;
+    }
+
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+    const myName = state.currentUser ? state.currentUser.full_name : 'Guest';
+
+    const due = document.getElementById('todo-form-due').value;
+    const notes = document.getElementById('todo-form-notes').value.trim();
+    const showOnCalendar = document.getElementById('todo-form-show-on-calendar').checked;
+    const isShared = document.getElementById('todo-form-shared').checked;
+
+    let sharedWith = [];
+    if (isShared) {
+      const checkedBoxes = document.querySelectorAll('.todo-share-member-checkbox:checked');
+      checkedBoxes.forEach(box => sharedWith.push(box.value));
+      if (sharedWith.length === 0) {
+        sharedWith = ['*']; // 指定なしの場合は全員共有
+      }
+    }
+
+    const isNew = !editingTodoId;
+    const taskId = isNew ? `task-${generate8DigitId()}` : editingTodoId;
+
+    // もし他人の共有タスクを編集しようとした場合はガード
+    if (!isNew) {
+      const existing = todoTasks.find(t => t.id === taskId);
+      if (existing && existing.user_id !== me) {
+        showToast("他人のタスクは編集できません。", "error");
+        return;
+      }
+    }
+
+    const taskData = {
+      id: taskId,
+      user_id: me,
+      user_name: myName,
+      title: title,
+      due: due || null,
+      notes: notes,
+      status: isNew ? 'needsAction' : (todoTasks.find(t => t.id === taskId)?.status || 'needsAction'),
+      show_on_calendar: showOnCalendar,
+      shared: isShared,
+      shared_with: sharedWith,
+      created_at: isNew ? new Date().toISOString() : (todoTasks.find(t => t.id === taskId)?.created_at || new Date().toISOString())
+    };
+
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        const { error } = await partnerSupabaseClient
+          .from('synapse_todo_tasks')
+          .upsert(taskData);
+
+        if (error) throw error;
+      } catch (err) {
+        console.warn("[ToDo DB] Save failed, saving to sync queue:", err);
+        pushToSyncQueue('synapse_todo_tasks', taskData);
+      }
+    }
+
+    // メモリ ＆ ローカルストレージ更新
+    const idx = todoTasks.findIndex(t => t.id === taskId);
+    if (idx !== -1) {
+      todoTasks[idx] = taskData;
+    } else {
+      todoTasks.push(taskData);
+    }
+    localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
+
+    showToast(isNew ? "タスクを追加しました。" : "タスクを更新しました。", "success");
+    renderTodoList();
+    resetTodoForm();
+
+    // カレンダーの再描画もトリガー
+    if (state.mypageCalendarInitialized) {
+      renderMypageCalendar();
+    }
+  }
+
+  // ToDoタスクの削除
+  async function deleteTodoItem() {
+    if (!editingTodoId) return;
+    if (!confirm("このタスクを削除しますか？")) return;
+
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+
+    // 他人の共有タスクは削除不可
+    const existing = todoTasks.find(t => t.id === editingTodoId);
+    if (existing && existing.user_id !== me) {
+      showToast("他人のタスクは削除できません。", "error");
+      return;
+    }
+
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        const { error } = await partnerSupabaseClient
+          .from('synapse_todo_tasks')
+          .delete()
+          .eq('id', editingTodoId);
+
+        if (error) throw error;
+      } catch (err) {
+        console.warn("[ToDo DB] Delete failed:", err);
+      }
+    }
+
+    todoTasks = todoTasks.filter(t => t.id !== editingTodoId);
+    localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
+
+    showToast("タスクを削除しました。", "success");
+    renderTodoList();
+    resetTodoForm();
+
+    if (state.mypageCalendarInitialized) {
+      renderMypageCalendar();
+    }
+  }
+
+  // 完了トグル（チェックボックス一発完了）
+  async function toggleTodoStatus(taskId, isCompleted) {
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+
+    const task = todoTasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const nextStatus = isCompleted ? 'completed' : 'needsAction';
+    task.status = nextStatus;
+
+    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+      try {
+        const { error } = await partnerSupabaseClient
+          .from('synapse_todo_tasks')
+          .update({ status: nextStatus })
+          .eq('id', taskId);
+
+        if (error) throw error;
+      } catch (err) {
+        console.warn("[ToDo DB] Status update failed:", err);
+      }
+    }
+
+    localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
+    renderTodoList();
+
+    if (state.mypageCalendarInitialized) {
+      renderMypageCalendar();
+    }
+  }
+
+  // タスク詳細の読み込み（編集フォームへ反映）
+  function loadTodoDetails(taskId) {
+    const task = todoTasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    editingTodoId = taskId;
+    
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+    const isOwner = task.user_id === me;
+
+    document.getElementById('todo-form-title-text').textContent = isOwner ? 'タスクの編集' : 'タスクの詳細 (共有)';
+    
+    const inputTitle = document.getElementById('todo-form-title');
+    const inputDue = document.getElementById('todo-form-due');
+    const inputNotes = document.getElementById('todo-form-notes');
+    const chkShowOnCalendar = document.getElementById('todo-form-show-on-calendar');
+    const chkShared = document.getElementById('todo-form-shared');
+    const saveTodoBtn = document.getElementById('todo-form-save-btn');
+    const deleteTodoBtn = document.getElementById('todo-form-delete-btn');
+    const shareMembersContainer = document.getElementById('todo-form-share-members-container');
+
+    // フォームへの値反映
+    inputTitle.value = task.title;
+    inputDue.value = task.due || '';
+    inputNotes.value = task.notes || '';
+    chkShowOnCalendar.checked = task.show_on_calendar !== false;
+    chkShared.checked = !!task.shared;
+
+    // 権限制御 (作成者以外は編集・削除不可の閲覧専用モード)
+    inputTitle.disabled = !isOwner;
+    inputDue.disabled = !isOwner;
+    inputNotes.disabled = !isOwner;
+    chkShowOnCalendar.disabled = !isOwner;
+    chkShared.disabled = !isOwner;
+
+    if (isOwner) {
+      deleteTodoBtn.style.display = 'block';
+      if (saveTodoBtn) {
+        saveTodoBtn.disabled = false;
+        saveTodoBtn.textContent = '変更を保存';
+      }
+    } else {
+      deleteTodoBtn.style.display = 'none';
+      if (saveTodoBtn) {
+        saveTodoBtn.disabled = true;
+        saveTodoBtn.textContent = '保存不可 (閲覧のみ)';
+      }
+    }
+
+    // 共有メンバーの描画と選択状態の復元
+    if (task.shared) {
+      shareMembersContainer.style.display = 'flex';
+      renderTodoShareMembersList();
+      
+      const boxes = document.querySelectorAll('.todo-share-member-checkbox');
+      boxes.forEach(box => {
+        box.checked = task.shared_with && task.shared_with.includes(box.value);
+        box.disabled = !isOwner;
+      });
+    } else {
+      shareMembersContainer.style.display = 'none';
+    }
+  }
+
+  // ToDoリスト一覧のレンダリング
+  function renderTodoList() {
+    const activeList = document.getElementById('todo-active-list');
+    const doneList = document.getElementById('todo-done-list');
+    const uncompletedCount = document.getElementById('todo-uncompleted-count');
+    const completedCount = document.getElementById('todo-completed-count');
+
+    if (!activeList || !doneList) return;
+
+    activeList.innerHTML = '';
+    doneList.innerHTML = '';
+
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+
+    // 期限日判定用の今日
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const activeTasks = todoTasks.filter(t => t.status !== 'completed');
+    const doneTasks = todoTasks.filter(t => t.status === 'completed');
+
+    if (uncompletedCount) uncompletedCount.textContent = activeTasks.length.toString();
+    if (completedCount) completedCount.textContent = doneTasks.length.toString();
+
+    // 未完了タスクの描画
+    if (activeTasks.length === 0) {
+      activeList.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; padding: 1rem 0;">未完了のタスクはありません</p>`;
+    } else {
+      activeTasks.forEach(task => {
+        const item = createTodoDomItem(task, todayStr, me);
+        activeList.appendChild(item);
+      });
+    }
+
+    // 完了済みタスクの描画
+    if (doneTasks.length === 0) {
+      doneList.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; padding: 0.5rem 0;">完了済みのタスクはありません</p>`;
+    } else {
+      doneTasks.forEach(task => {
+        const item = createTodoDomItem(task, todayStr, me);
+        doneList.appendChild(item);
+      });
+    }
+  }
+
+  // ToDo DOM要素生成のヘルパー
+  function createTodoDomItem(task, todayStr, me) {
+    const row = document.createElement('div');
+    row.className = `todo-item ${task.status === 'completed' ? 'completed' : ''}`;
+    
+    // チェックボックス
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'todo-item-checkbox';
+    checkbox.checked = task.status === 'completed';
+    checkbox.onclick = (e) => {
+      e.stopPropagation(); // 行全体のクリックと競合させない
+      toggleTodoStatus(task.id, checkbox.checked);
+    };
+
+    // タイトル
+    const title = document.createElement('span');
+    title.className = 'todo-item-title';
+    title.textContent = task.title;
+
+    row.appendChild(checkbox);
+    row.appendChild(title);
+
+    // 共有バッジ
+    if (task.user_id !== me) {
+      const shareBadge = document.createElement('span');
+      shareBadge.className = 'todo-shared-badge';
+      shareBadge.textContent = `${task.user_name || task.user_id} から共有`;
+      row.appendChild(shareBadge);
+    } else if (task.shared) {
+      const shareBadge = document.createElement('span');
+      shareBadge.className = 'todo-shared-badge';
+      shareBadge.textContent = `共有中`;
+      row.appendChild(shareBadge);
+    }
+
+    // 期日バッジ
+    if (task.due) {
+      const dueBadge = document.createElement('span');
+      dueBadge.className = `todo-due-badge ${task.status === 'completed' ? 'completed' : (task.due < todayStr ? 'overdue' : '')}`;
+      dueBadge.textContent = task.due.replace(/-/g, '/');
+      row.appendChild(dueBadge);
+    }
+
+    // クリックイベントで編集フォームへ詳細展開
+    row.onclick = () => {
+      loadTodoDetails(task.id);
+    };
+
+    return row;
   }
 
 })();

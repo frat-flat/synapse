@@ -723,6 +723,13 @@
           <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">個人・共有の予定管理とGoogleカレンダーの同期連携を行います</span>
         </div>
 
+        <!-- ToDoリスト -->
+        <div class="admin-app-icon" id="mypage-btn-todo" title="ToDoリスト" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+          <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">📋</div>
+          <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">ToDoリスト</span>
+          <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">個人・共有タスクの作成・管理、カレンダー連携を行います</span>
+        </div>
+
       </div>
 
       <!-- プロファイル ＆ 登録デバイス一覧 -->
@@ -1188,6 +1195,107 @@
     </div>
 </section>
 
+<!-- ================= ToDoリスト (タスク管理) 画面 ================= -->
+<section id="mypage-todo-screen" class="screen-view" style="display: none; padding: 1.25rem;">
+  <div style="display: flex; flex-direction: column; gap: 1rem; height: calc(100vh - 120px);">
+    
+    <!-- ヘッダー -->
+    <div style="border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <button id="mypage-todo-back-btn" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem;">
+          <span>← メニューに戻る</span>
+        </button>
+        <div>
+          <h1 style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+            📋 ToDoリスト
+          </h1>
+          <p style="margin: 0.2rem 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">個人用・共有用のタスクを登録して管理できます。</p>
+        </div>
+      </div>
+      <button id="todo-new-btn" class="btn btn-primary" style="padding: 0.45rem 0.9rem; font-size: 0.82rem; font-weight: 700; border-radius: var(--radius-sm);">➕ 新規タスク</button>
+    </div>
+
+    <!-- コンテンツエリア -->
+    <div class="mypage-todo-layout" style="display: flex; gap: 1.25rem; flex: 1; overflow: hidden; height: 100%;">
+      
+      <!-- 左カラム: タスク一覧 -->
+      <div class="todo-list-panel" style="flex: 1.2; display: flex; flex-direction: column; gap: 1rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; box-shadow: var(--shadow-sm); overflow-y: auto;">
+        
+        <!-- 未完了タスクセクション -->
+        <div>
+          <h2 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.35rem;">
+            ⏳ 未完了のタスク <span id="todo-uncompleted-count" class="badge" style="background: var(--primary); font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; color: white;">0</span>
+          </h2>
+          <div id="todo-active-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <!-- 動的生成 -->
+            <p style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; padding: 1rem 0;">タスクはありません</p>
+          </div>
+        </div>
+
+        <!-- 完了済みタスクセクション -->
+        <div style="border-top: 1px dashed var(--border-color); padding-top: 1rem; margin-top: 0.5rem;">
+          <details open>
+            <summary style="cursor: pointer; font-size: 0.95rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.5rem; user-select: none;">
+              ✓ 完了済みのタスク <span id="todo-completed-count" class="badge" style="background: var(--text-muted); font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; color: white;">0</span>
+            </summary>
+            <div id="todo-done-list" style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">
+              <!-- 動的生成 -->
+            </div>
+          </details>
+        </div>
+
+      </div>
+
+      <!-- 右カラム: 作成・編集フォーム -->
+      <div class="todo-form-panel" style="flex: 0.8; display: flex; flex-direction: column; gap: 1rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; box-shadow: var(--shadow-sm); height: fit-content;">
+        <h2 id="todo-form-title-text" style="font-size: 1rem; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin: 0;">新規タスクの作成</h2>
+        
+        <div style="display: flex; flex-direction: column; gap: 0.75rem; text-align: left;">
+          <div>
+            <label style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.25rem;">タスク名 <span style="color: red;">*</span></label>
+            <input type="text" id="todo-form-title" class="calendar-form-control" placeholder="例: 会議の議事録作成" style="width: 100%; box-sizing: border-box;">
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.25rem;">期日 (期限日)</label>
+            <input type="date" id="todo-form-due" class="calendar-form-control" style="width: 100%; box-sizing: border-box;">
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.25rem;">メモ / 説明</label>
+            <textarea id="todo-form-notes" class="calendar-form-control" rows="3" placeholder="タスクの詳細やURLなどを入力" style="width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+          </div>
+
+          <div style="border-top: 1px dashed var(--border-color); padding-top: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; font-weight: 600; color: var(--text-primary); cursor: pointer; user-select: none;">
+              <input type="checkbox" id="todo-form-show-on-calendar" checked style="width: 15px; height: 15px;"> 📅 カレンダー上に表示する
+            </label>
+            
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; font-weight: 600; color: var(--text-primary); cursor: pointer; user-select: none;">
+              <input type="checkbox" id="todo-form-shared" style="width: 15px; height: 15px;"> 👥 他のメンバーと共有する
+            </label>
+
+            <!-- 共有先メンバー選択リスト -->
+            <div id="todo-form-share-members-container" style="display: none; flex-direction: column; gap: 0.3rem; margin-left: 1.5rem; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: var(--radius-sm); max-height: 120px; overflow-y: auto; background: var(--bg-surface-elevated);">
+              <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600;">共有するメンバーを選択:</span>
+              <div id="todo-form-share-members-list" style="display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
+                <!-- 動的生成 -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+          <button id="todo-form-save-btn" class="btn btn-primary" style="flex: 1; padding: 0.5rem; font-size: 0.82rem; font-weight: 700;">保存する</button>
+          <button id="todo-form-delete-btn" class="btn btn-danger" style="display: none; padding: 0.5rem; font-size: 0.82rem; font-weight: 700;">削除</button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
 <!-- ================= 個人・共有カレンダー画面 ================= -->
 <section id="mypage-calendar-screen" class="screen-view" style="display: none; padding: 1.25rem;">
   <div style="display: flex; flex-direction: column; gap: 1rem; height: calc(100vh - 120px);">
@@ -1207,6 +1315,18 @@
       <div style="display: flex; align-items: center; gap: 0.75rem; background: var(--bg-surface-elevated); padding: 0.4rem 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); flex-wrap: wrap;">
         <span id="google-calendar-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block;"></span>
         <span id="google-calendar-status-text" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary);">Google未連携</span>
+        
+        <!-- Google 連携範囲選択オプション -->
+        <div id="google-link-options-container" style="display: flex; align-items: center; gap: 0.6rem; border-left: 1px solid var(--border-color); padding-left: 0.6rem; flex-wrap: wrap;">
+          <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; display: flex; align-items: center; gap: 0.25rem; cursor: pointer; user-select: none;">
+            <input type="radio" name="google-link-range" id="google-link-range-calendar-only" value="calendar-only" checked style="width: 14px; height: 14px; cursor: pointer;"> カレンダーのみ連携
+          </label>
+          <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; display: flex; align-items: center; gap: 0.25rem; cursor: pointer; user-select: none;">
+            <input type="radio" name="google-link-range" id="google-link-range-with-tasks" value="with-tasks" style="width: 14px; height: 14px; cursor: pointer;"> カレンダーとToDoタスクを連携
+          </label>
+          <span id="google-link-tasks-warning" style="display: none; font-size: 0.68rem; color: #e11d48; font-weight: 700; background: #ffe4e6; padding: 2px 6px; border-radius: 4px; border: 1px solid #fecdd3;">⚠️ 同一のアカウントしか連携できません</span>
+        </div>
+
         <div id="google-calendar-select-container" style="display: none; align-items: center; gap: 0.35rem;">
           <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin-left: 0.5rem;">連携カレンダー:</span>
           <select id="google-calendar-select" class="calendar-form-control" style="font-size: 0.75rem; padding: 0.2rem 0.4rem; height: auto; width: 160px; cursor: pointer; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm);"></select>
@@ -1236,6 +1356,11 @@
               <button id="calendar-view-week" class="btn" style="font-size: 0.72rem; padding: 0.35rem 0.6rem; border: none; border-radius: 0; cursor: pointer; background: transparent; color: var(--text-secondary); font-weight: 600;">週</button>
               <button id="calendar-view-day" class="btn" style="font-size: 0.72rem; padding: 0.35rem 0.6rem; border: none; border-radius: 0; cursor: pointer; background: transparent; color: var(--text-secondary); font-weight: 600;">日</button>
             </div>
+            
+            <!-- タスク表示切り替え -->
+            <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none; margin-left: 0.25rem; margin-right: 0.25rem;">
+              <input type="checkbox" id="calendar-show-tasks-toggle" checked style="width: 14px; height: 14px; cursor: pointer;"> タスク表示
+            </label>
             
             <!-- 共有メンバー設定用（三点リーダー）ボタン -->
             <button id="calendar-share-menu-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.35rem 0.6rem; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer;" title="共有メンバー設定">⋮</button>
