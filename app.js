@@ -34217,6 +34217,7 @@ window.openResumableUrl = function(urlStr) {
 
       renderMypageCalendar();
       loadEventsForSelectedDate();
+      if (typeof renderTodoList === 'function') renderTodoList();
     } catch (error) {
       console.error("[Google Calendar API] Sync error:", error);
       showToast('Googleカレンダーの同期中にエラーが発生しました。', 'error');
@@ -34526,6 +34527,13 @@ window.openResumableUrl = function(urlStr) {
 
     // 🔌 タスク外部連携設定のバインド
     initTaskSyncSettings(me);
+
+    // Google連携中の場合、トークンのサイレント復元・更新を走らせて自動同期を実行
+    const clientId = localStorage.getItem(`SYNAPSE_GOOGLE_CLIENT_ID_${me}`) || '';
+    const apiKey = localStorage.getItem(`SYNAPSE_GOOGLE_API_KEY_${me}`) || '';
+    if (isGoogleLinked && clientId && apiKey) {
+      silentGoogleSync(clientId, apiKey);
+    }
 
     // 初期ロード
     loadTodoTasks().then(() => {
@@ -35120,37 +35128,62 @@ window.openResumableUrl = function(urlStr) {
       const currentGoogleTaskIds = new Set(googleTasksList.map(t => `google-task-${t.id}`));
 
       // 1. APIから消えた古いGoogleタスクを削除する
+      const deletedIds = todoTasks.filter(t => t.id.startsWith('google-task-') && !currentGoogleTaskIds.has(t.id)).map(t => t.id);
       todoTasks = todoTasks.filter(t => !t.id.startsWith('google-task-') || currentGoogleTaskIds.has(t.id));
 
+      if (deletedIds.length > 0 && typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+        try {
+          await partnerSupabaseClient
+            .from('synapse_todo_tasks')
+            .delete()
+            .in('id', deletedIds);
+        } catch (delErr) {
+          console.warn("[Google Tasks Sync] Failed to delete old tasks from DB:", delErr);
+        }
+      }
+
       // 2. APIから取得した最新のタスクをマージインポート
+      const upsertTasks = [];
       googleTasksList.forEach(task => {
         const taskId = `google-task-${task.id}`;
         const isCompleted = task.status === 'completed';
         const nextStatus = isCompleted ? 'completed' : 'needsAction';
         const due = task.due ? task.due.substring(0, 10) : null; // YYYY-MM-DD
 
+        const taskObj = {
+          id: taskId,
+          title: task.title || '無題のタスク',
+          due: due,
+          notes: task.notes || '',
+          status: nextStatus,
+          show_on_calendar: true,
+          user_id: me,
+          user_name: googleLinkedEmail || 'Google Tasks Sync',
+          google_event_id: null,
+          shared: false,
+          shared_with: []
+        };
+
+        upsertTasks.push(taskObj);
+
         const existing = todoTasks.find(t => t.id === taskId);
         if (existing) {
-          existing.title = task.title || '無題のタスク';
-          existing.due = due;
-          existing.notes = task.notes || '';
-          existing.status = nextStatus;
+          Object.assign(existing, taskObj);
         } else {
-          todoTasks.push({
-            id: taskId,
-            title: task.title || '無題のタスク',
-            due: due,
-            notes: task.notes || '',
-            status: nextStatus,
-            show_on_calendar: true,
-            user_id: me,
-            user_name: googleLinkedEmail || 'Google Tasks Sync',
-            google_event_id: null,
-            shared: false,
-            shared_with: []
-          });
+          todoTasks.push(taskObj);
         }
       });
+
+      if (upsertTasks.length > 0 && typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+        try {
+          const { error: upsertErr } = await partnerSupabaseClient
+            .from('synapse_todo_tasks')
+            .upsert(upsertTasks);
+          if (upsertErr) throw upsertErr;
+        } catch (dbErr) {
+          console.warn("[Google Tasks Sync] Failed to upsert tasks to DB:", dbErr);
+        }
+      }
 
       localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
       console.log(`[Google Tasks Sync] Synced ${googleTasksList.length} tasks successfully.`);
@@ -35181,36 +35214,61 @@ window.openResumableUrl = function(urlStr) {
       const currentAsanaTaskIds = new Set(asanaTasksList.map(t => `asana-${t.gid}`));
 
       // 1. APIから消えた古いAsanaタスクを削除する
+      const deletedIds = todoTasks.filter(t => t.id.startsWith('asana-') && !currentAsanaTaskIds.has(t.id)).map(t => t.id);
       todoTasks = todoTasks.filter(t => !t.id.startsWith('asana-') || currentAsanaTaskIds.has(t.id));
 
+      if (deletedIds.length > 0 && typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+        try {
+          await partnerSupabaseClient
+            .from('synapse_todo_tasks')
+            .delete()
+            .in('id', deletedIds);
+        } catch (delErr) {
+          console.warn("[Asana Tasks Sync] Failed to delete old tasks from DB:", delErr);
+        }
+      }
+
       // 2. APIから取得した最新のタスクをマージインポート
+      const upsertTasks = [];
       asanaTasksList.forEach(task => {
         const taskId = `asana-${task.gid}`;
         const nextStatus = task.completed ? 'completed' : 'needsAction';
         const due = task.due_on || null; // YYYY-MM-DD
 
+        const taskObj = {
+          id: taskId,
+          title: task.name || '無題のタスク',
+          due: due,
+          notes: task.notes || '',
+          status: nextStatus,
+          show_on_calendar: true,
+          user_id: me,
+          user_name: 'Asana Sync',
+          google_event_id: null,
+          shared: false,
+          shared_with: []
+        };
+
+        upsertTasks.push(taskObj);
+
         const existing = todoTasks.find(t => t.id === taskId);
         if (existing) {
-          existing.title = task.name || '無題のタスク';
-          existing.due = due;
-          existing.notes = task.notes || '';
-          existing.status = nextStatus;
+          Object.assign(existing, taskObj);
         } else {
-          todoTasks.push({
-            id: taskId,
-            title: task.name || '無題のタスク',
-            due: due,
-            notes: task.notes || '',
-            status: nextStatus,
-            show_on_calendar: true,
-            user_id: me,
-            user_name: 'Asana Sync',
-            google_event_id: null,
-            shared: false,
-            shared_with: []
-          });
+          todoTasks.push(taskObj);
         }
       });
+
+      if (upsertTasks.length > 0 && typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+        try {
+          const { error: upsertErr } = await partnerSupabaseClient
+            .from('synapse_todo_tasks')
+            .upsert(upsertTasks);
+          if (upsertErr) throw upsertErr;
+        } catch (dbErr) {
+          console.warn("[Asana Tasks Sync] Failed to upsert tasks to DB:", dbErr);
+        }
+      }
 
       localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
       console.log(`[Asana Tasks Sync] Synced ${asanaTasksList.length} tasks successfully.`);
