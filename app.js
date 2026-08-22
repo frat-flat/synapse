@@ -35107,7 +35107,11 @@ window.openResumableUrl = function(urlStr) {
         body: JSON.stringify({ accessToken: googleAccessToken })
       });
 
-      if (!response.ok) throw new Error(`Google Tasks Proxy response error: ${response.status}`);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const details = errData.details || errData.error || '';
+        throw new Error(`Google Tasks Proxy response error: ${response.status} - ${details}`);
+      }
 
       const data = await response.json();
       const googleTasksList = data.items || [];
@@ -35194,7 +35198,11 @@ window.openResumableUrl = function(urlStr) {
         body: JSON.stringify({ asanaToken: token })
       });
 
-      if (!res.ok) throw new Error('Asana API sync failed');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const details = errData.details || errData.error || '';
+        throw new Error(`Asana API sync failed: ${res.status} - ${details}`);
+      }
 
       const data = await res.json();
       const asanaTasksList = data.items || [];
