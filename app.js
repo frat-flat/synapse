@@ -33859,6 +33859,13 @@ window.openResumableUrl = function(urlStr) {
           .delete()
           .eq('user_id', me)
           .eq('is_google_event', true);
+
+        // synapse_todo_tasks テーブルからもGoogle同期タスクを完全に削除
+        await partnerSupabaseClient
+          .from('synapse_todo_tasks')
+          .delete()
+          .eq('user_id', me)
+          .like('id', 'google-task-%');
           
         // synapse_storage から連携メールアドレス情報を削除
         if (me !== 'guest') {
@@ -33874,6 +33881,10 @@ window.openResumableUrl = function(urlStr) {
 
     state.calendarEvents = state.calendarEvents.filter(ev => !(ev.user_id === me && ev.is_google_event));
     localStorage.setItem(`SYNAPSE_USER_CALENDAR_EVENTS_${me}`, JSON.stringify(state.calendarEvents));
+
+    // メモリおよびローカルストレージからもGoogle同期タスクを即時削除
+    todoTasks = todoTasks.filter(t => !t.id.startsWith('google-task-'));
+    localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
 
     isGoogleLinked = false;
     googleLinkedEmail = '';
@@ -35411,6 +35422,18 @@ window.openResumableUrl = function(urlStr) {
           
           warningText.style.display = 'none';
           showToast('Asana連携を解除しました', 'success');
+
+          if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+            try {
+              await partnerSupabaseClient
+                .from('synapse_todo_tasks')
+                .delete()
+                .eq('user_id', me)
+                .like('id', 'asana-%');
+            } catch (dbErr) {
+              console.warn("Failed to delete Asana tasks from DB:", dbErr);
+            }
+          }
 
           todoTasks = todoTasks.filter(t => !t.id.startsWith('asana-'));
           localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
