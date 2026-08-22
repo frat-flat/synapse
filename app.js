@@ -31365,10 +31365,7 @@ window.openResumableUrl = function(urlStr) {
 
     // グローバル状態の初期化
     state.googleLinkCalendar = true;
-    if (state.calendarShowTasks === undefined) {
-      const savedToggle = localStorage.getItem(`SYNAPSE_CALENDAR_SHOW_TASKS_${me}`);
-      state.calendarShowTasks = savedToggle !== 'false';
-    }
+    state.calendarShowTasks = true;
     if (state.googleLinkOption === undefined) {
       state.googleLinkOption = localStorage.getItem(`SYNAPSE_GOOGLE_LINK_OPTION_${me}`) || 'calendar-only';
     }
@@ -31413,16 +31410,7 @@ window.openResumableUrl = function(urlStr) {
     const defaultShareMembersContainer = document.getElementById('calendar-default-share-members-list');
     const defaultShareSaveBtn = document.getElementById('calendar-default-share-save-btn');
 
-    // タスク表示トグルのバインド
-    const showTasksToggle = document.getElementById('calendar-show-tasks-toggle');
-    if (showTasksToggle) {
-      showTasksToggle.checked = state.calendarShowTasks;
-      showTasksToggle.onchange = () => {
-        state.calendarShowTasks = showTasksToggle.checked;
-        localStorage.setItem(`SYNAPSE_CALENDAR_SHOW_TASKS_${me}`, state.calendarShowTasks ? 'true' : 'false');
-        renderMypageCalendar();
-      };
-    }
+
 
     // 表示対象フィルターのバインド
     const displayFilterSelect = document.getElementById('calendar-display-filter');
@@ -35189,6 +35177,7 @@ window.openResumableUrl = function(urlStr) {
       console.log(`[Google Tasks Sync] Synced ${googleTasksList.length} tasks successfully.`);
     } catch (e) {
       console.warn("[Google Tasks Sync] Failed to sync tasks:", e);
+      showToast(`Google To-Doの同期に失敗しました: ${e.message}`, 'error');
     }
   }
 
@@ -35274,6 +35263,7 @@ window.openResumableUrl = function(urlStr) {
       console.log(`[Asana Tasks Sync] Synced ${asanaTasksList.length} tasks successfully.`);
     } catch (e) {
       console.warn("[Asana Tasks Sync] Failed to sync tasks:", e);
+      showToast(`Asanaの同期に失敗しました: ${e.message}`, 'error');
     }
   }
 
