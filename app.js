@@ -31364,6 +31364,7 @@ window.openResumableUrl = function(urlStr) {
     const me = rawUserId.toLowerCase();
 
     // グローバル状態の初期化
+    state.googleLinkCalendar = true;
     if (state.calendarShowTasks === undefined) {
       const savedToggle = localStorage.getItem(`SYNAPSE_CALENDAR_SHOW_TASKS_${me}`);
       state.calendarShowTasks = savedToggle !== 'false';
@@ -31434,28 +31435,7 @@ window.openResumableUrl = function(urlStr) {
       };
     }
 
-    // Googleカレンダー連携同期有効チェックのバインド
-    const chkLinkCalendar = document.getElementById('google-link-active-calendar');
 
-    if (chkLinkCalendar) {
-      // 状態の復元 (カレンダー同期: デフォルトON)
-      state.googleLinkCalendar = localStorage.getItem(`SYNAPSE_GOOGLE_LINK_CALENDAR_${me}`) !== 'false';
-      chkLinkCalendar.checked = state.googleLinkCalendar;
-
-      chkLinkCalendar.onchange = () => {
-        state.googleLinkCalendar = chkLinkCalendar.checked;
-        localStorage.setItem(`SYNAPSE_GOOGLE_LINK_CALENDAR_${me}`, state.googleLinkCalendar ? 'true' : 'false');
-
-        // Google連携中の場合は即時に再同期を実行
-        if (isGoogleLinked) {
-          showToast('連携設定が変更されました。再同期中...', 'info');
-          syncWithGoogleCalendar().then(() => {
-            renderMypageCalendar();
-            if (typeof renderTodoList === 'function') renderTodoList();
-          });
-        }
-      };
-    }
 
     // 3分おきの自動同期処理タイマーをセット
     if (!state.googleSyncIntervalId) {
