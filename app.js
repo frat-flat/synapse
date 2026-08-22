@@ -34482,6 +34482,22 @@ window.openResumableUrl = function(urlStr) {
     const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
     const me = rawUserId.toLowerCase();
 
+    // Google連携情報の初期復元（カレンダー画面をロードする前にタスク画面を開いた場合のケア）
+    if (!isGoogleLinked) {
+      isGoogleLinked = localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${me}`) === 'true';
+    }
+    if (!googleLinkedEmail) {
+      googleLinkedEmail = localStorage.getItem(`SYNAPSE_GOOGLE_EMAIL_${me}`) || '';
+    }
+    if (!googleAccessToken) {
+      const cachedToken = localStorage.getItem(`SYNAPSE_GOOGLE_ACCESS_TOKEN_${me}`);
+      const expiresStr = localStorage.getItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`);
+      const expiresAt = expiresStr ? parseInt(expiresStr, 10) : 0;
+      if (cachedToken && expiresAt && (expiresAt - Date.now() > 5 * 60 * 1000)) {
+        googleAccessToken = cachedToken;
+      }
+    }
+
     // DOM要素
     const btnNewTodo = document.getElementById('task-new-btn');
     const todoFormTitleText = document.getElementById('todo-form-title-text');
@@ -35253,7 +35269,7 @@ window.openResumableUrl = function(urlStr) {
     panelAsanaConfig.style.display = state.asanaLinkTasks ? 'flex' : 'none';
 
     // Google接続状態の反映
-    if (isGoogleLinked && googleAccessToken && googleLinkedEmail) {
+    if (isGoogleLinked && googleLinkedEmail) {
       labelGoogleEmail.textContent = googleLinkedEmail;
       btnGoogleConnect.textContent = '連携解除';
       btnGoogleConnect.className = 'btn btn-danger';
@@ -35301,11 +35317,11 @@ window.openResumableUrl = function(urlStr) {
 
     // Google 接続ボタン
     btnGoogleConnect.onclick = () => {
-      if (isGoogleLinked && googleAccessToken) {
+      if (isGoogleLinked) {
         const confirmDisconnect = confirm('Google連携（カレンダー同期含む）をすべて解除しますか？');
         if (confirmDisconnect) {
           const disconnectBtn = document.getElementById('google-calendar-connect-btn');
-          if (disconnectBtn && disconnectBtn.textContent === '連携を解除') {
+          if (disconnectBtn && (disconnectBtn.textContent.includes('解除') || disconnectBtn.textContent.includes('接続解除'))) {
             disconnectBtn.click();
           }
           chkGoogleEnable.checked = false;
