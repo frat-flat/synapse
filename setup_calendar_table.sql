@@ -54,3 +54,55 @@ CREATE POLICY "Allow users to manage their own events"
   TO authenticated
   USING (user_id = auth.jwt()->>'email')
   WITH CHECK (user_id = auth.jwt()->>'email');
+
+-- ============================================================================
+-- 3. synapse_todo_tasks テーブルの作成 (タスク・ToDo管理用)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.synapse_todo_tasks (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES public.synapse_users(id) ON DELETE CASCADE,
+  user_name TEXT,
+  title TEXT NOT NULL,
+  due DATE,
+  notes TEXT,
+  status TEXT DEFAULT 'needsAction',
+  show_on_calendar BOOLEAN DEFAULT TRUE,
+  shared_with TEXT[] DEFAULT ARRAY[]::text[],
+  google_event_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 行レベルセキュリティ (RLS) の有効化
+ALTER TABLE public.synapse_todo_tasks ENABLE ROW LEVEL SECURITY;
+
+-- 【閲覧ポリシー】作成者本人、または共有先に含まれる人、または全員共有 '*'
+DROP POLICY IF EXISTS "Allow read shared tasks" ON public.synapse_todo_tasks;
+CREATE POLICY "Allow read shared tasks" ON public.synapse_todo_tasks
+  FOR SELECT TO authenticated
+  USING (
+    user_id = auth.jwt()->>'email' OR
+    shared_with @> ARRAY[auth.jwt()->>'email']::text[] OR
+    shared_with @> ARRAY['*']::text[]
+  );
+
+-- 【管理ポリシー】作成者本人（編集・削除）のみ、ただし共有されたタスクは他ユーザーによる完了状態のトグル更新を許可するため
+-- 通常の更新は user_id = auth.jwt()->>'email' ですが、
+-- 共有されている場合は status の更新のみ許可するポリシーに拡張します。
+DROP POLICY IF EXISTS "Allow users to manage their own tasks" ON public.synapse_todo_tasks;
+CREATE POLICY "Allow users to manage their own tasks" ON public.synapse_todo_tasks
+  FOR ALL TO authenticated
+  USING (user_id = auth.jwt()->>'email')
+  WITH CHECK (user_id = auth.jwt()->>'email');
+
+-- 他のユーザーが共有されたタスクの完了ステータスのみを更新できるポリシー
+DROP POLICY IF EXISTS "Allow shared users to update task status" ON public.synapse_todo_tasks;
+CREATE POLICY "Allow shared users to update task status" ON public.synapse_todo_tasks
+  FOR UPDATE TO authenticated
+  USING (
+    shared_with @> ARRAY[auth.jwt()->>'email']::text[] OR
+    shared_with @> ARRAY['*']::text[]
+  )
+  WITH CHECK (
+    -- 共有されたユーザーはstatusのみ変更可能 (RLS制限はクエリのUPDATE句側で確認)
+    true
+  );

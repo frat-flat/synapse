@@ -4945,8 +4945,8 @@ h3 {
   white-space: nowrap;
 }
 
-/* --- ToDoリスト アコーディオン & 画面追加スタイル --- */
-#mypage-todo-screen details {
+/* --- タスクリスト アコーディオン & 画面追加スタイル --- */
+#mypage-task-screen details {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -4954,14 +4954,14 @@ h3 {
   overflow: hidden;
 }
 
-#mypage-todo-screen details > div {
+#mypage-task-screen details > div {
   padding: 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-#mypage-todo-screen summary {
+#mypage-task-screen summary {
   padding: 0.65rem 1rem;
   font-size: 0.8rem;
   font-weight: 700;
@@ -4975,19 +4975,30 @@ h3 {
   user-select: none;
 }
 
-#mypage-todo-screen summary::-webkit-details-marker {
+#mypage-task-screen summary::-webkit-details-marker {
   display: none;
 }
 
-#mypage-todo-screen summary::after {
+#mypage-task-screen summary::after {
   content: "▼";
   font-size: 0.6rem;
   color: var(--text-muted);
   transition: transform 0.2s ease;
 }
 
-#mypage-todo-screen details[open] summary::after {
+#mypage-task-screen details[open] summary::after {
   transform: rotate(180deg);
+}
+
+/* 完了タスクのスタイル（取り消し線 & 不透明度減衰） */
+.todo-item.completed {
+  opacity: 0.5;
+  background: var(--bg-surface-elevated);
+}
+
+.todo-item.completed .todo-item-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
 }
 
 /* メンバー選択コンテナのスクロール */
@@ -5024,6 +5035,27 @@ h3 {
   width: 14px;
   height: 14px;
   margin: 0;
+}
+
+/* タスク外部連携設定プロバイダーカード */
+.task-sync-provider-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  border-radius: var(--radius-sm);
+}
+
+.task-sync-provider-card:hover {
+  border-color: var(--primary) !important;
+  background-color: var(--bg-surface) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+#task-sync-warning-text {
+  animation: taskWarningFadeIn 0.2s ease-out forwards;
+}
+
+@keyframes taskWarningFadeIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 
