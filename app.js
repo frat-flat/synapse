@@ -33933,20 +33933,23 @@ window.openResumableUrl = function(urlStr) {
     const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
     
     // ★ 同一アカウント制限のバリデーション ★
-    // Asana連携中の場合、同一メールアドレスであることを確認
-    const asanaEmail = localStorage.getItem(`SYNAPSE_ASANA_EMAIL_${me}`) || '';
-    if (asanaEmail && email.toLowerCase() !== asanaEmail.toLowerCase()) {
-      showToast(`Asanaと異なるアカウント (${email}) は連携できません。`, 'error');
-      setGoogleLinkState(false, '');
-      localStorage.removeItem(`SYNAPSE_GOOGLE_LINKED_${me}`);
-      localStorage.removeItem(`SYNAPSE_GOOGLE_EMAIL_${me}`);
-      updateGoogleStatusUI();
-      const warningText = document.getElementById('task-sync-warning-text');
-      if (warningText) {
-        warningText.textContent = `⚠️ Asanaと異なるアカウント (${email}) とはカレンダー連携できません。同一アカウントをご利用ください。`;
-        warningText.style.display = 'block';
+    // GoogleカレンダーとGoogle Tasks (ToDo) は、どちらか先に連携している場合のみ、同一アカウントであることを確認
+    const isCalendarLinked = isGoogleLinked || (localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${me}`) === 'true');
+    const isTasksLinked = state.googleLinkTasks === true;
+    const existingGoogleEmail = localStorage.getItem(`SYNAPSE_GOOGLE_EMAIL_${me}`) || '';
+
+    if ((isCalendarLinked || isTasksLinked) && existingGoogleEmail) {
+      if (email.toLowerCase() !== existingGoogleEmail.toLowerCase()) {
+        showToast(`既に連携されているGoogleアカウント (${existingGoogleEmail}) と異なるアカウント (${email}) は連携できません。`, 'error');
+        setGoogleLinkState(isCalendarLinked, existingGoogleEmail);
+        updateGoogleStatusUI();
+        const warningText = document.getElementById('task-sync-warning-text');
+        if (warningText) {
+          warningText.textContent = `⚠️ 既に連携されているGoogleアカウント (${existingGoogleEmail}) と同一のアカウントをご利用ください。`;
+          warningText.style.display = 'block';
+        }
+        return;
       }
-      return;
     }
 
     setGoogleLinkState(true, email);
@@ -35765,15 +35768,7 @@ window.openResumableUrl = function(urlStr) {
             throw new Error('ユーザー情報の取得に失敗しました');
           }
 
-          if (isGoogleLinked && googleLinkedEmail) {
-            if (email.toLowerCase() !== googleLinkedEmail.toLowerCase()) {
-              warningText.textContent = `⚠️ カレンダーと同一のアカウント (${googleLinkedEmail}) でしかログインできません。`;
-              warningText.style.display = 'block';
-              btnAsanaConnect.disabled = false;
-              btnAsanaConnect.textContent = '接続する';
-              return;
-            }
-          }
+
 
           localStorage.setItem(`SYNAPSE_ASANA_PAT_${me}`, token);
           localStorage.setItem(`SYNAPSE_ASANA_EMAIL_${me}`, email);
