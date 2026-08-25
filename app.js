@@ -35340,72 +35340,72 @@ window.openResumableUrl = function(urlStr) {
       saveTodoBtn.textContent = '保存中...';
     }
 
-    const due = document.getElementById('todo-form-due').value;
-    const notes = document.getElementById('todo-form-notes').value.trim();
-    const showOnCalendar = document.getElementById('todo-form-show-on-calendar').checked;
-    const isShared = document.getElementById('todo-form-shared').checked;
+    try {
+      const due = document.getElementById('todo-form-due').value;
+      const notes = document.getElementById('todo-form-notes').value.trim();
+      const showOnCalendar = document.getElementById('todo-form-show-on-calendar').checked;
+      const isShared = document.getElementById('todo-form-shared').checked;
 
-    let sharedWith = [];
-    if (isShared) {
-      const checkedBoxes = document.querySelectorAll('.todo-share-member-checkbox:checked');
-      checkedBoxes.forEach(box => sharedWith.push(box.value));
-      if (sharedWith.length === 0) {
-        sharedWith = ['*']; // 指定なしの場合は全員共有
-      }
-    }
-
-    const isNew = !editingTodoId;
-    let taskId = isNew ? `task-${generate8DigitId()}` : editingTodoId;
-
-    // もし他人の共有タスクを編集しようとした場合はガード
-    if (!isNew) {
-      const existing = todoTasks.find(t => t.id === taskId);
-      if (existing && existing.user_id !== me) {
-        showToast("他人のタスクは編集できません。", "error");
-        if (saveTodoBtn) {
-          saveTodoBtn.disabled = false;
-          saveTodoBtn.textContent = '変更を保存';
+      let sharedWith = [];
+      if (isShared) {
+        const checkedBoxes = document.querySelectorAll('.todo-share-member-checkbox:checked');
+        checkedBoxes.forEach(box => sharedWith.push(box.value));
+        if (sharedWith.length === 0) {
+          sharedWith = ['*']; // 指定なしの場合は全員共有
         }
-        return;
       }
-    }
 
-    // Asana 同期関連の処理
-    const asanaSyncCheckbox = document.getElementById('todo-form-asana-sync');
-    const asanaLinked = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
-    const asanaToken = localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`) || '';
+      const isNew = !editingTodoId;
+      let taskId = isNew ? `task-${generate8DigitId()}` : editingTodoId;
 
-    const selectAsanaWorkspace = document.getElementById('todo-form-asana-workspace');
-    const selectAsanaProject = document.getElementById('todo-form-asana-project');
-    const selectAsanaSection = document.getElementById('todo-form-asana-section');
-    const selectAsanaAssignee = document.getElementById('todo-form-asana-assignee');
-
-    let workspaceName = '';
-    let projectName = '';
-    let sectionName = '';
-
-    if (asanaSyncCheckbox && asanaSyncCheckbox.checked && asanaLinked && asanaToken) {
-      const workspaceGid = selectAsanaWorkspace ? selectAsanaWorkspace.value : '';
-      const projectGid = selectAsanaProject ? selectAsanaProject.value : '';
-      const sectionGid = selectAsanaSection ? selectAsanaSection.value : '';
-      const assigneeGid = selectAsanaAssignee ? selectAsanaAssignee.value : '';
-
-      if (!workspaceGid) {
-        showToast("Asanaのワークスペースを選択してください。", "error");
-        if (saveTodoBtn) {
-          saveTodoBtn.disabled = false;
-          saveTodoBtn.textContent = isNew ? '保存する' : '変更を保存';
+      // もし他人の共有タスクを編集しようとした場合はガード
+      if (!isNew) {
+        const existing = todoTasks.find(t => t.id === taskId);
+        if (existing && existing.user_id !== me) {
+          showToast("他人のタスクは編集できません。", "error");
+          if (saveTodoBtn) {
+            saveTodoBtn.disabled = false;
+            saveTodoBtn.textContent = '変更を保存';
+          }
+          return;
         }
-        return;
       }
 
-      workspaceName = selectAsanaWorkspace.options[selectAsanaWorkspace.selectedIndex]?.text || '';
-      projectName = (selectAsanaProject && selectAsanaProject.selectedIndex >= 0) ? selectAsanaProject.options[selectAsanaProject.selectedIndex].text : '';
-      if (projectName === '(プロジェクトなし)') projectName = '';
-      sectionName = (selectAsanaSection && selectAsanaSection.selectedIndex >= 0) ? selectAsanaSection.options[selectAsanaSection.selectedIndex].text : '';
-      if (sectionName === '(セクションなし)') sectionName = '';
+      // Asana 同期関連の処理
+      const asanaSyncCheckbox = document.getElementById('todo-form-asana-sync');
+      const asanaLinked = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
+      const asanaToken = localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`) || '';
 
-      try {
+      const selectAsanaWorkspace = document.getElementById('todo-form-asana-workspace');
+      const selectAsanaProject = document.getElementById('todo-form-asana-project');
+      const selectAsanaSection = document.getElementById('todo-form-asana-section');
+      const selectAsanaAssignee = document.getElementById('todo-form-asana-assignee');
+
+      let workspaceName = '';
+      let projectName = '';
+      let sectionName = '';
+
+      if (asanaSyncCheckbox && asanaSyncCheckbox.checked && asanaLinked && asanaToken) {
+        const workspaceGid = selectAsanaWorkspace ? selectAsanaWorkspace.value : '';
+        const projectGid = selectAsanaProject ? selectAsanaProject.value : '';
+        const sectionGid = selectAsanaSection ? selectAsanaSection.value : '';
+        const assigneeGid = selectAsanaAssignee ? selectAsanaAssignee.value : '';
+
+        if (!workspaceGid) {
+          showToast("Asanaのワークスペースを選択してください。", "error");
+          if (saveTodoBtn) {
+            saveTodoBtn.disabled = false;
+            saveTodoBtn.textContent = isNew ? '保存する' : '変更を保存';
+          }
+          return;
+        }
+
+        workspaceName = selectAsanaWorkspace.options[selectAsanaWorkspace.selectedIndex]?.text || '';
+        projectName = (selectAsanaProject && selectAsanaProject.selectedIndex >= 0) ? selectAsanaProject.options[selectAsanaProject.selectedIndex].text : '';
+        if (projectName === '(プロジェクトなし)') projectName = '';
+        sectionName = (selectAsanaSection && selectAsanaSection.selectedIndex >= 0) ? selectAsanaSection.options[selectAsanaSection.selectedIndex].text : '';
+        if (sectionName === '(セクションなし)') sectionName = '';
+
         if (isNew) {
           // Asana に新規タスク作成
           const asanaReqBody = {
@@ -35490,37 +35490,28 @@ window.openResumableUrl = function(urlStr) {
             });
           }
         }
-      } catch (err) {
-        showToast("Asanaとの同期に失敗しました: " + err.message, "error");
-        if (saveTodoBtn) {
-          saveTodoBtn.disabled = false;
-          saveTodoBtn.textContent = isNew ? '保存する' : '変更を保存';
-        }
-        return;
-      }
-    }
-
-    // Google Tasks 同期関連の処理
-    const googleSyncCheckbox = document.getElementById('todo-form-google-sync');
-    const selectGoogleList = document.getElementById('todo-form-google-list');
-    const googleLinked = isGoogleLinked && (localStorage.getItem(`SYNAPSE_GOOGLE_LINK_TASKS_${me}`) === 'true');
-
-    let googleListName = '';
-
-    if (googleSyncCheckbox && googleSyncCheckbox.checked && googleLinked && googleAccessToken) {
-      const googleListId = selectGoogleList ? selectGoogleList.value : '';
-      if (!googleListId) {
-        showToast("Google To-Doの保存先リストを選択してください。", "error");
-        if (saveTodoBtn) {
-          saveTodoBtn.disabled = false;
-          saveTodoBtn.textContent = isNew ? '保存する' : '変更を保存';
-        }
-        return;
       }
 
-      googleListName = selectGoogleList.options[selectGoogleList.selectedIndex]?.text || '';
+      // Google Tasks 同期関連の処理
+      const googleSyncCheckbox = document.getElementById('todo-form-google-sync');
+      const selectGoogleList = document.getElementById('todo-form-google-list');
+      const googleLinked = isGoogleLinked && (localStorage.getItem(`SYNAPSE_GOOGLE_LINK_TASKS_${me}`) === 'true');
 
-      try {
+      let googleListName = '';
+
+      if (googleSyncCheckbox && googleSyncCheckbox.checked && googleLinked && googleAccessToken) {
+        const googleListId = selectGoogleList ? selectGoogleList.value : '';
+        if (!googleListId) {
+          showToast("Google To-Doの保存先リストを選択してください。", "error");
+          if (saveTodoBtn) {
+            saveTodoBtn.disabled = false;
+            saveTodoBtn.textContent = isNew ? '保存する' : '変更を保存';
+          }
+          return;
+        }
+
+        googleListName = selectGoogleList.options[selectGoogleList.selectedIndex]?.text || '';
+
         if (isNew) {
           // Google に新規タスク作成
           const googleTask = await createGoogleTask(googleListId, {
@@ -35575,113 +35566,115 @@ window.openResumableUrl = function(urlStr) {
             });
           }
         }
-      } catch (err) {
-        let errorMsg = err.message || '';
-        if (errorMsg.includes('ACCESS_TOKEN_SCOPE_INSUFFICIENT') || 
-            errorMsg.includes('insufficient authentication scopes') || 
-            errorMsg.includes('403') || 
-            errorMsg.includes('Insufficient Permission')) {
-          
-          // キャッシュされた Google トークンをクリアして、次回サインイン時に再取得・ポップアップを強制する
-          localStorage.removeItem(`SYNAPSE_GOOGLE_ACCESS_TOKEN_${me}`);
-          localStorage.removeItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`);
-          googleAccessToken = null;
-          
-          errorMsg = "Googleのアクセス権限が不足しています。一度Google連携を解除し、再度連携する際、Google公式画面で『Google To-Doのすべてのタスクの表示・編集・作成・削除』という項目に必ずチェック（ON）を入れてください。";
-        }
-        showToast("Google To-Doとの同期に失敗しました: " + errorMsg, "error", 12000);
-        if (saveTodoBtn) {
-          saveTodoBtn.disabled = false;
-          saveTodoBtn.textContent = isNew ? '保存する' : '変更を保存';
-        }
-        return;
       }
-    }
 
-    // 連携タスクの場合、notesにアソシエーションの情報をプレフィックスとして追加
-    let updatedNotes = notes;
-    if (taskId.startsWith('asana-') && workspaceName) {
-      const belongStr = `【Asana帰属: ${workspaceName}${projectName ? ` ＞ ${projectName}` : ''}${sectionName ? ` (${sectionName})` : ''}】`;
-      const lines = notes.split('\n');
-      const filteredLines = lines.filter(line => !line.startsWith('【Asana帰属:'));
-      filteredLines.unshift(belongStr);
-      updatedNotes = filteredLines.join('\n');
-    } else if (taskId.startsWith('google-task-') && googleListName) {
-      const belongStr = `【Google To-Do帰属: ${googleListName}】`;
-      const lines = notes.split('\n');
-      const filteredLines = lines.filter(line => !line.startsWith('【Google To-Do帰属:'));
-      filteredLines.unshift(belongStr);
-      updatedNotes = filteredLines.join('\n');
-    }
-
-    const taskData = {
-      id: taskId,
-      user_id: me,
-      user_name: myName,
-      title: title,
-      due: due || null,
-      notes: updatedNotes,
-      status: isNew ? 'needsAction' : (todoTasks.find(t => t.id === taskId)?.status || 'needsAction'),
-      show_on_calendar: showOnCalendar,
-      shared: isShared,
-      shared_with: sharedWith,
-      created_at: isNew ? new Date().toISOString() : (todoTasks.find(t => t.id === taskId)?.created_at || new Date().toISOString())
-    };
-
-    if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
-      try {
-        const { error } = await partnerSupabaseClient
-          .from('synapse_todo_tasks')
-          .upsert(taskData);
-
-        if (error) throw error;
-      } catch (err) {
-        console.warn("[ToDo DB] Save failed, saving to sync queue:", err);
-        pushToSyncQueue('synapse_todo_tasks', taskData);
+      // 連携タスクの場合、notesにアソシエーションの情報をプレフィックスとして追加
+      let updatedNotes = notes;
+      if (taskId.startsWith('asana-') && workspaceName) {
+        const belongStr = `【Asana帰属: ${workspaceName}${projectName ? ` ＞ ${projectName}` : ''}${sectionName ? ` (${sectionName})` : ''}】`;
+        const lines = notes.split('\n');
+        const filteredLines = lines.filter(line => !line.startsWith('【Asana帰属:'));
+        filteredLines.unshift(belongStr);
+        updatedNotes = filteredLines.join('\n');
+      } else if (taskId.startsWith('google-task-') && googleListName) {
+        const belongStr = `【Google To-Do帰属: ${googleListName}】`;
+        const lines = notes.split('\n');
+        const filteredLines = lines.filter(line => !line.startsWith('【Google To-Do帰属:'));
+        filteredLines.unshift(belongStr);
+        updatedNotes = filteredLines.join('\n');
       }
-    }
 
-    // メモリ ＆ ローカルストレージ更新
-    const idx = todoTasks.findIndex(t => t.id === taskId);
-    if (idx !== -1) {
-      todoTasks[idx] = taskData;
-    } else {
-      todoTasks.push(taskData);
-    }
-    localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
+      const taskData = {
+        id: taskId,
+        user_id: me,
+        user_name: myName,
+        title: title,
+        due: due || null,
+        notes: updatedNotes,
+        status: isNew ? 'needsAction' : (todoTasks.find(t => t.id === taskId)?.status || 'needsAction'),
+        show_on_calendar: showOnCalendar,
+        shared: isShared,
+        shared_with: sharedWith,
+        created_at: isNew ? new Date().toISOString() : (todoTasks.find(t => t.id === taskId)?.created_at || new Date().toISOString())
+      };
 
-    // ToDo連携がOFFかつ、カレンダー連携がONのとき、Googleカレンダーにタスク予定として同期する
-    if (isGoogleLinked && state.googleLinkCalendar !== false && !state.googleLinkTasks) {
-      if (showOnCalendar && due) {
-        const taskEvent = {
-          title: (taskData.status === 'completed' ? '✓ ' : '○ ') + taskData.title,
-          start_time: due,
-          end_time: due,
-          description: updatedNotes + `\n\n__SYNAPSE_TODO_ID__:${taskData.id}`
-        };
+      if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+        try {
+          const { error } = await partnerSupabaseClient
+            .from('synapse_todo_tasks')
+            .upsert(taskData);
 
-        const existingEventId = taskData.google_event_id || localStorage.getItem(`SYNAPSE_TODO_GOOGLE_EVENT_ID_${taskData.id}`);
-        if (existingEventId) {
-          updateTodoEventOnGoogleCalendar(existingEventId, taskEvent);
-        } else {
-          addTodoEventToGoogleCalendar(taskData.id, taskEvent);
+          if (error) throw error;
+        } catch (err) {
+          console.warn("[ToDo DB] Save failed, saving to sync queue:", err);
+          pushToSyncQueue('synapse_todo_tasks', taskData);
         }
+      }
+
+      // メモリ ＆ ローカルストレージ更新
+      const idx = todoTasks.findIndex(t => t.id === taskId);
+      if (idx !== -1) {
+        todoTasks[idx] = taskData;
       } else {
-        const existingEventId = taskData.google_event_id || localStorage.getItem(`SYNAPSE_TODO_GOOGLE_EVENT_ID_${taskData.id}`);
-        if (existingEventId) {
-          deleteTodoEventFromGoogleCalendar(existingEventId);
-          taskData.google_event_id = null;
+        todoTasks.push(taskData);
+      }
+      localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
+
+      // ToDo連携がOFFかつ、カレンダー連携がONのとき、Googleカレンダーにタスク予定として同期する
+      if (isGoogleLinked && state.googleLinkCalendar !== false && !state.googleLinkTasks) {
+        if (showOnCalendar && due) {
+          const taskEvent = {
+            title: (taskData.status === 'completed' ? '✓ ' : '○ ') + taskData.title,
+            start_time: due,
+            end_time: due,
+            description: updatedNotes + `\n\n__SYNAPSE_TODO_ID__:${taskData.id}`
+          };
+
+          const existingEventId = taskData.google_event_id || localStorage.getItem(`SYNAPSE_TODO_GOOGLE_EVENT_ID_${taskData.id}`);
+          if (existingEventId) {
+            updateTodoEventOnGoogleCalendar(existingEventId, taskEvent);
+          } else {
+            addTodoEventToGoogleCalendar(taskData.id, taskEvent);
+          }
+        } else {
+          const existingEventId = taskData.google_event_id || localStorage.getItem(`SYNAPSE_TODO_GOOGLE_EVENT_ID_${taskData.id}`);
+          if (existingEventId) {
+            deleteTodoEventFromGoogleCalendar(existingEventId);
+            taskData.google_event_id = null;
+          }
         }
       }
-    }
 
-    showToast(isNew ? "タスクを追加しました。" : "タスクを更新しました。", "success");
-    renderTodoList();
-    resetTodoForm();
+      showToast(isNew ? "タスクを追加しました。" : "タスクを更新しました。", "success");
+      renderTodoList();
+      resetTodoForm();
 
-    // カレンダーの再描画もトリガー
-    if (state.mypageCalendarInitialized) {
-      renderMypageCalendar();
+      // カレンダーの再描画もトリガー
+      if (state.mypageCalendarInitialized) {
+        renderMypageCalendar();
+      }
+    } catch (globalErr) {
+      console.error("[ToDo Save Error] Global error caught:", globalErr);
+      
+      let errorMsg = globalErr.message || '';
+      if (errorMsg.includes('ACCESS_TOKEN_SCOPE_INSUFFICIENT') || 
+          errorMsg.includes('insufficient authentication scopes') || 
+          errorMsg.includes('403') || 
+          errorMsg.includes('Insufficient Permission')) {
+        
+        // キャッシュされた Google トークンをクリア
+        localStorage.removeItem(`SYNAPSE_GOOGLE_ACCESS_TOKEN_${me}`);
+        localStorage.removeItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`);
+        googleAccessToken = null;
+        
+        errorMsg = "Googleのアクセス権限が不足しています。一度Google連携を解除し、再度連携する際、Google公式画面で『Google To-Doのすべてのタスクの表示・編集・作成・削除』という項目に必ずチェック（ON）を入れてください。";
+      }
+      
+      showToast("タスクの保存に失敗しました: " + errorMsg, "error", 12000);
+      if (saveTodoBtn) {
+        saveTodoBtn.disabled = false;
+        saveTodoBtn.textContent = isNew ? '保存する' : '変更を保存';
+      }
     }
   }
 
@@ -36524,6 +36517,26 @@ window.openResumableUrl = function(urlStr) {
     }
   }
 
+  // タイムアウト付きの fetch ヘルパー (ミリ秒指定、デフォルト12秒)
+  async function fetchWithTimeout(resource, options = {}, timeout = 12000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      if (error.name === 'AbortError') {
+        throw new Error("通信がタイムアウトしました。しばらく経ってからもう一度お試しください。");
+      }
+      throw error;
+    }
+  }
+
   // Google Tasksのタスクリスト一覧を取得する
   async function fetchGoogleTaskLists() {
     if (!isGoogleLinked || !googleAccessToken) return [];
@@ -36531,7 +36544,7 @@ window.openResumableUrl = function(urlStr) {
       return state.googleTaskLists;
     }
     try {
-      const listsRes = await fetch('https://tasks.googleapis.com/tasks/v1/users/@me/lists', {
+      const listsRes = await fetchWithTimeout('https://tasks.googleapis.com/tasks/v1/users/@me/lists', {
         headers: {
           'Authorization': `Bearer ${googleAccessToken}`,
           'Accept': 'application/json'
@@ -36578,7 +36591,7 @@ window.openResumableUrl = function(urlStr) {
       dueStr = new Date(taskData.due).toISOString();
     }
 
-    const response = await fetch(`https://tasks.googleapis.com/tasks/v1/lists/${listId}/tasks`, {
+    const response = await fetchWithTimeout(`https://tasks.googleapis.com/tasks/v1/lists/${listId}/tasks`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${googleAccessToken}`,
@@ -36611,7 +36624,7 @@ window.openResumableUrl = function(urlStr) {
       dueStr = new Date(taskData.due).toISOString();
     }
 
-    const response = await fetch(`https://tasks.googleapis.com/tasks/v1/lists/${listId}/tasks/${taskId}`, {
+    const response = await fetchWithTimeout(`https://tasks.googleapis.com/tasks/v1/lists/${listId}/tasks/${taskId}`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${googleAccessToken}`,
@@ -36640,7 +36653,7 @@ window.openResumableUrl = function(urlStr) {
   async function deleteGoogleTask(listId, taskId) {
     if (!isGoogleLinked || !googleAccessToken) throw new Error("Google連携が無効です。");
 
-    const response = await fetch(`https://tasks.googleapis.com/tasks/v1/lists/${listId}/tasks/${taskId}`, {
+    const response = await fetchWithTimeout(`https://tasks.googleapis.com/tasks/v1/lists/${listId}/tasks/${taskId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${googleAccessToken}`
@@ -36664,7 +36677,7 @@ window.openResumableUrl = function(urlStr) {
       console.log("[Google Tasks Sync] Fetching tasks directly from Google Tasks API...");
       
       // 1. タスクリスト一覧を取得
-      const listsRes = await fetch('https://tasks.googleapis.com/tasks/v1/users/@me/lists', {
+      const listsRes = await fetchWithTimeout('https://tasks.googleapis.com/tasks/v1/users/@me/lists', {
         headers: {
           'Authorization': `Bearer ${googleAccessToken}`,
           'Accept': 'application/json'
@@ -36684,7 +36697,7 @@ window.openResumableUrl = function(urlStr) {
       // 2. 各タスクリストからタスクを取得
       for (const list of taskLists) {
         const tasksUrl = `https://tasks.googleapis.com/tasks/v1/lists/${list.id}/tasks?showCompleted=true&showHidden=true`;
-        const tasksRes = await fetch(tasksUrl, {
+        const tasksRes = await fetchWithTimeout(tasksUrl, {
           headers: {
             'Authorization': `Bearer ${googleAccessToken}`,
             'Accept': 'application/json'
