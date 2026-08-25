@@ -36591,6 +36591,17 @@ window.openResumableUrl = function(urlStr) {
       dueStr = new Date(taskData.due).toISOString();
     }
 
+    const reqBody = {
+      title: taskData.title,
+      status: taskData.status || 'needsAction'
+    };
+    if (taskData.notes !== undefined && taskData.notes !== null) {
+      reqBody.notes = taskData.notes.trim() === "" ? " " : taskData.notes;
+    }
+    if (dueStr) {
+      reqBody.due = dueStr;
+    }
+
     const response = await fetchWithTimeout(`https://tasks.googleapis.com/tasks/v1/lists/${listId}/tasks`, {
       method: 'POST',
       headers: {
@@ -36598,12 +36609,7 @@ window.openResumableUrl = function(urlStr) {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      body: JSON.stringify({
-        title: taskData.title,
-        notes: taskData.notes,
-        due: dueStr,
-        status: taskData.status || 'needsAction'
-      })
+      body: JSON.stringify(reqBody)
     });
 
     if (!response.ok) {
@@ -36624,6 +36630,18 @@ window.openResumableUrl = function(urlStr) {
       dueStr = new Date(taskData.due).toISOString();
     }
 
+    const reqBody = {
+      id: taskId,
+      title: taskData.title,
+      status: taskData.status || 'needsAction'
+    };
+    if (taskData.notes !== undefined && taskData.notes !== null) {
+      reqBody.notes = taskData.notes.trim() === "" ? " " : taskData.notes;
+    }
+    if (dueStr) {
+      reqBody.due = dueStr;
+    }
+
     const response = await fetchWithTimeout(`https://tasks.googleapis.com/tasks/v1/lists/${listId}/tasks/${taskId}`, {
       method: 'PUT',
       headers: {
@@ -36631,13 +36649,7 @@ window.openResumableUrl = function(urlStr) {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      body: JSON.stringify({
-        id: taskId,
-        title: taskData.title,
-        notes: taskData.notes,
-        due: dueStr,
-        status: taskData.status || 'needsAction'
-      })
+      body: JSON.stringify(reqBody)
     });
 
     if (!response.ok) {
