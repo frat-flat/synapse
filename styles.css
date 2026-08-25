@@ -4959,6 +4959,26 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  container-type: inline-size;
+}
+
+/* 📋 タスク幅のレスポンシブ縮小制御（優先順位: タスク名 > 日付 > 所属先） */
+@container (max-width: 480px) {
+  .todo-asana-belong-badge {
+    display: none !important;
+  }
+}
+
+@container (max-width: 350px) {
+  .todo-asana-belong-badge {
+    display: none !important;
+  }
+  .todo-shared-badge {
+    display: none !important;
+  }
+  .todo-due-badge {
+    display: none !important;
+  }
 }
 
 #mypage-task-screen summary {

@@ -35457,6 +35457,40 @@ window.openResumableUrl = function(urlStr) {
       row.appendChild(dueBadge);
     }
 
+    // ツールチップ用テキストの組み立て
+    let tooltip = `タスク名: ${task.title}`;
+    if (task.user_id !== me) {
+      tooltip += `\n共有元: ${task.user_name || task.user_id}`;
+    } else if (task.shared) {
+      tooltip += `\n状態: 共有中`;
+    }
+    if (task.due) {
+      tooltip += `\n期日: ${task.due.replace(/-/g, '/')}`;
+    }
+    if (task.id.startsWith('asana-')) {
+      let wsName = task.workspace_name || '';
+      let prjName = task.project_name || '';
+      let secName = task.section_name || '';
+      if (!wsName && !prjName && task.notes) {
+        const match = task.notes.match(/^【Asana帰属: ([^＞】]+)(?: ＞ ([^】\()]+))?(?:\s*\(([^)]+)\))?】/);
+        if (match) {
+          wsName = match[1] ? match[1].trim() : '';
+          prjName = match[2] ? match[2].trim() : '';
+          secName = match[3] ? match[3].trim() : '';
+        }
+      }
+      if (wsName || prjName) {
+        let belongText = 'Asana: ';
+        if (wsName) belongText += wsName;
+        if (prjName) belongText += ` ＞ ${prjName}`;
+        if (secName && secName !== 'Untitled section' && secName !== '無題のセクション') {
+          belongText += ` (${secName})`;
+        }
+        tooltip += `\n所属: ${belongText}`;
+      }
+    }
+    row.title = tooltip;
+
     // クリックイベントで編集フォームへ詳細展開
     row.onclick = () => {
       loadTodoDetails(task.id);
