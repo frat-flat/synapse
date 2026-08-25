@@ -5161,4 +5161,25 @@ h3 {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* --- プロジェクトグループアコーディオン（details） --- */
+.todo-project-details {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+  background: var(--bg-surface);
+  transition: all 0.2s ease;
+}
+
+/* summary のデフォルト矢印と既存 ::after 矢印の干渉を完全防止 */
+.todo-project-summary::-webkit-details-marker {
+  display: none !important;
+}
+.todo-project-summary {
+  list-style: none !important;
+}
+.todo-project-summary::after {
+  content: none !important;
+}
+
 
