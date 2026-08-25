@@ -33925,6 +33925,219 @@ window.openResumableUrl = function(urlStr) {
     label.textContent = `選択日: ${month}月${day}日(${dayName})`;
   }
 
+  function renderTodoList() {
+    try {
+      const activeList = document.getElementById('todo-active-list');
+      const doneList = document.getElementById('todo-done-list');
+      const uncompletedCount = document.getElementById('todo-uncompleted-count');
+      const completedCount = document.getElementById('todo-completed-count');
+
+      if (!activeList || !doneList) return;
+
+      activeList.innerHTML = '';
+      doneList.innerHTML = '';
+
+      const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+      const me = rawUserId.toLowerCase();
+
+      // 期限日判定用の今日
+      const todayStr = new Date().toISOString().slice(0, 10);
+
+      // サービスフィルターの適用
+      const currentServiceFilter = state.todoServiceFilter || 'all';
+      let filteredTasks = Array.isArray(todoTasks) ? [...todoTasks] : [];
+
+      if (currentServiceFilter === 'google') {
+        filteredTasks = filteredTasks.filter(t => t && t.id && t.id.startsWith('google-task-'));
+      } else if (currentServiceFilter === 'asana') {
+        filteredTasks = filteredTasks.filter(t => t && t.id && t.id.startsWith('asana-'));
+      }
+
+      // ソート順の適用
+      const currentSortMode = state.todoSortMode || 'due';
+      if (currentSortMode === 'due') {
+        // 日付順（期限日 due 順）にソート (期限があるものを昇順で先に並べ、期限なしは最後に)
+        filteredTasks.sort((a, b) => {
+          const dueA = a.due || '';
+          const dueB = b.due || '';
+          if (dueA && dueB) {
+            return dueA.localeCompare(dueB);
+          }
+          if (dueA) return -1;
+          if (dueB) return 1;
+          return 0;
+        });
+      } else {
+        // 登録順（作成日時 created_at の降順：新しいものが上）
+        filteredTasks.sort((a, b) => {
+          const timeA = (a && a.created_at) ? new Date(a.created_at).getTime() : 0;
+          const timeB = (b && b.created_at) ? new Date(b.created_at).getTime() : 0;
+          if (timeA !== timeB) {
+            return timeB - timeA;
+          }
+          const idA = (a && a.id) || '';
+          const idB = (b && b.id) || '';
+          return idB.localeCompare(idA);
+        });
+      }
+
+      const activeTasks = filteredTasks.filter(t => t.status !== 'completed');
+      const doneTasks = filteredTasks.filter(t => t.status === 'completed');
+
+      if (uncompletedCount) uncompletedCount.textContent = activeTasks.length.toString();
+      if (completedCount) completedCount.textContent = doneTasks.length.toString();
+
+      // 未完了タスクの描画
+      function renderGroupedTasks(tasks, listContainer, isCompletedList) {
+        if (!tasks || tasks.length === 0) {
+          listContainer.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; padding: 1rem 0;">${isCompletedList ? '完了済みのタスクはありません' : '未完了のタスクはありません'}</p>`;
+          return;
+        }
+
+        if (state.todoGroupMode === 'project') {
+          // プロジェクトごとにグループ分け
+          const groups = {};
+          tasks.forEach(task => {
+            let projName = 'Synapse タスク';
+            const tid = (task && task.id) || '';
+            if (tid.startsWith('asana-')) {
+              let wsName = task.workspace_name || '';
+              let prjName = task.project_name || '';
+              if (!wsName && !prjName && task.notes) {
+                const match = task.notes.match(/^【Asana帰属: ([^＞】]+)(?: ＞ ([^】\()]+))?/);
+                if (match) {
+                  prjName = match[2] ? match[2].trim() : '';
+                }
+              }
+              projName = prjName ? `Asana: ${prjName}` : 'Asana (プロジェクトなし)';
+            } else if (tid.startsWith('google-')) {
+              let listName = '';
+              if (task.notes) {
+                const match = task.notes.match(/^【Google To-Do帰属: ([^】]+)】/);
+                if (match) {
+                  listName = match[1] ? match[1].trim() : '';
+                }
+              }
+              projName = listName ? `Google To-Do: ${listName}` : 'Google To-Do (リストなし)';
+            }
+
+            if (!groups[projName]) {
+              groups[projName] = [];
+            }
+            groups[projName].push(task);
+          });
+
+          // グループごとにアコーディオン (details/summary) を作成して描画
+          Object.keys(groups).sort().forEach(groupKey => {
+            const groupTasks = groups[groupKey];
+            
+            const details = document.createElement('details');
+            details.className = 'todo-project-details';
+            details.open = true; // デフォルトで展開
+            details.style.marginBottom = '0.75rem';
+            details.style.border = '1px solid var(--border-color)';
+            details.style.borderRadius = 'var(--radius-md)';
+            details.style.background = 'var(--bg-surface)';
+            details.style.overflow = 'hidden';
+            details.style.boxShadow = 'var(--shadow-sm)';
+
+            const summary = document.createElement('summary');
+            summary.className = 'todo-project-summary';
+            summary.style.display = 'flex';
+            summary.style.alignItems = 'center';
+            summary.style.justifyContent = 'space-between';
+            summary.style.padding = '0.65rem 0.85rem';
+            summary.style.fontSize = '0.8rem';
+            summary.style.fontWeight = '700';
+            summary.style.color = 'var(--text-primary)';
+            summary.style.background = 'var(--bg-surface-elevated)';
+            summary.style.cursor = 'pointer';
+            summary.style.userSelect = 'none';
+
+            // summary の左側（タイトルとアイコン）
+            const leftArea = document.createElement('div');
+            leftArea.style.display = 'flex';
+            leftArea.style.alignItems = 'center';
+            leftArea.style.gap = '0.45rem';
+            
+            // アイコン色の判定 (▲マーク)
+            let iconColor = 'var(--primary)';
+            if (groupKey.startsWith('Asana:')) {
+              iconColor = '#e04f5f'; // Asanaカラー
+            } else if (groupKey.startsWith('Google To-Do')) {
+              iconColor = '#3b82f6'; // Googleカラー
+            }
+            
+            leftArea.innerHTML = `<span style="color: ${iconColor}; font-size: 0.65rem; display: inline-flex; align-items: center; justify-content: center; margin-right: 0.2rem;">▲</span> <span>${groupKey}</span>`;
+
+            // summary の右側（件数バッジと矢印）
+            const rightArea = document.createElement('div');
+            rightArea.style.display = 'flex';
+            rightArea.style.alignItems = 'center';
+            rightArea.style.gap = '0.5rem';
+
+            const countBadge = document.createElement('span');
+            countBadge.style.fontSize = '0.7rem';
+            countBadge.style.background = 'rgba(0, 0, 0, 0.04)';
+            countBadge.style.border = '1px solid var(--border-color)';
+            countBadge.style.color = 'var(--text-secondary)';
+            countBadge.style.padding = '2px 8px';
+            countBadge.style.borderRadius = '12px';
+            countBadge.textContent = groupTasks.length;
+
+            // アコーディオンの矢印アイコン
+            const arrowIcon = document.createElement('span');
+            arrowIcon.className = 'details-arrow-icon';
+            arrowIcon.innerHTML = '▼';
+            arrowIcon.style.fontSize = '0.6rem';
+            arrowIcon.style.transition = 'transform 0.2s';
+            arrowIcon.style.color = 'var(--text-secondary)';
+
+            rightArea.appendChild(countBadge);
+            rightArea.appendChild(arrowIcon);
+
+            summary.appendChild(leftArea);
+            summary.appendChild(rightArea);
+
+            // 開閉に合わせて矢印を回転させる処理
+            details.ontoggle = () => {
+              arrowIcon.style.transform = details.open ? 'rotate(0deg)' : 'rotate(-90deg)';
+            };
+
+            const contentDiv = document.createElement('div');
+            contentDiv.style.display = 'flex';
+            contentDiv.style.flexDirection = 'column';
+            contentDiv.style.gap = '0.5rem';
+            contentDiv.style.padding = '0.5rem';
+            contentDiv.style.background = 'var(--bg-surface)';
+            contentDiv.style.borderTop = '1px solid var(--border-color)';
+
+            groupTasks.forEach(task => {
+              const item = createTodoDomItem(task, todayStr, me);
+              contentDiv.appendChild(item);
+            });
+
+            details.appendChild(summary);
+            details.appendChild(contentDiv);
+            listContainer.appendChild(details);
+          });
+
+        } else {
+          // 通常のフラット描画
+          tasks.forEach(task => {
+            const item = createTodoDomItem(task, todayStr, me);
+            listContainer.appendChild(item);
+          });
+        }
+      }
+
+      renderGroupedTasks(activeTasks, activeList, false);
+      renderGroupedTasks(doneTasks, doneList, true);
+    } catch (renderErr) {
+      console.error("[ToDo Render Error] Failed to render todo list:", renderErr);
+    }
+  }
+
   // 6. 本物の Google Calendar API 連携処理
 
   // 6-A. ポップアップ起動による Google OAuth 認証
@@ -36052,210 +36265,7 @@ window.openResumableUrl = function(urlStr) {
     }
   }
 
-  // ToDoリスト一覧のレンダリング
-  function renderTodoList() {
-    const activeList = document.getElementById('todo-active-list');
-    const doneList = document.getElementById('todo-done-list');
-    const uncompletedCount = document.getElementById('todo-uncompleted-count');
-    const completedCount = document.getElementById('todo-completed-count');
 
-    if (!activeList || !doneList) return;
-
-    activeList.innerHTML = '';
-    doneList.innerHTML = '';
-
-    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
-    const me = rawUserId.toLowerCase();
-
-    // 期限日判定用の今日
-    const todayStr = new Date().toISOString().slice(0, 10);
-
-    // サービスフィルターの適用
-    const currentServiceFilter = state.todoServiceFilter || 'all';
-    let filteredTasks = todoTasks;
-
-    if (currentServiceFilter === 'google') {
-      filteredTasks = todoTasks.filter(t => t.id.startsWith('google-task-'));
-    } else if (currentServiceFilter === 'asana') {
-      filteredTasks = todoTasks.filter(t => t.id.startsWith('asana-'));
-    }
-
-    // ソート順の適用
-    const currentSortMode = state.todoSortMode || 'due';
-    if (currentSortMode === 'due') {
-      // 日付順（期限日 due 順）にソート (期限があるものを昇順で先に並べ、期限なしは最後に)
-      filteredTasks.sort((a, b) => {
-        if (a.due && b.due) {
-          return a.due.localeCompare(b.due);
-        }
-        if (a.due) return -1; // a のみ期限ありなら a が先
-        if (b.due) return 1;  // b のみ期限ありなら b が先
-        return 0;             // 両方期限なし
-      });
-    } else {
-      // 登録順（作成日時 created_at の降順：新しいものが上）
-      filteredTasks.sort((a, b) => {
-        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-        if (timeA !== timeB) {
-          return timeB - timeA;
-        }
-        return b.id.localeCompare(a.id);
-      });
-    }
-
-    const activeTasks = filteredTasks.filter(t => t.status !== 'completed');
-    const doneTasks = filteredTasks.filter(t => t.status === 'completed');
-
-    if (uncompletedCount) uncompletedCount.textContent = activeTasks.length.toString();
-    if (completedCount) completedCount.textContent = doneTasks.length.toString();
-
-    // 未完了タスクの描画
-    function renderGroupedTasks(tasks, listContainer, isCompletedList) {
-      if (tasks.length === 0) {
-        listContainer.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; padding: 1rem 0;">${isCompletedList ? '完了済みのタスクはありません' : '未完了のタスクはありません'}</p>`;
-        return;
-      }
-
-      if (state.todoGroupMode === 'project') {
-        // プロジェクトごとにグループ分け
-        const groups = {};
-        tasks.forEach(task => {
-          let projName = 'Synapse タスク';
-          if (task.id.startsWith('asana-')) {
-            let wsName = task.workspace_name || '';
-            let prjName = task.project_name || '';
-            if (!wsName && !prjName && task.notes) {
-              const match = task.notes.match(/^【Asana帰属: ([^＞】]+)(?: ＞ ([^】\()]+))?/);
-              if (match) {
-                prjName = match[2] ? match[2].trim() : '';
-              }
-            }
-            projName = prjName ? `Asana: ${prjName}` : 'Asana (プロジェクトなし)';
-          } else if (task.id.startsWith('google-')) {
-            let listName = '';
-            if (task.notes) {
-              const match = task.notes.match(/^【Google To-Do帰属: ([^】]+)】/);
-              if (match) {
-                listName = match[1] ? match[1].trim() : '';
-              }
-            }
-            projName = listName ? `Google To-Do: ${listName}` : 'Google To-Do (リストなし)';
-          }
-
-          if (!groups[projName]) {
-            groups[projName] = [];
-          }
-          groups[projName].push(task);
-        });
-
-        // グループごとにアコーディオン (details/summary) を作成して描画
-        Object.keys(groups).sort().forEach(groupKey => {
-          const groupTasks = groups[groupKey];
-          
-          const details = document.createElement('details');
-          details.className = 'todo-project-details';
-          details.open = true; // デフォルトで展開
-          details.style.marginBottom = '0.75rem';
-          details.style.border = '1px solid var(--border-color)';
-          details.style.borderRadius = 'var(--radius-md)';
-          details.style.background = 'var(--bg-surface)';
-          details.style.overflow = 'hidden';
-          details.style.boxShadow = 'var(--shadow-sm)';
-
-          const summary = document.createElement('summary');
-          summary.className = 'todo-project-summary';
-          summary.style.display = 'flex';
-          summary.style.alignItems = 'center';
-          summary.style.justifyContent = 'space-between';
-          summary.style.padding = '0.65rem 0.85rem';
-          summary.style.fontSize = '0.8rem';
-          summary.style.fontWeight = '700';
-          summary.style.color = 'var(--text-primary)';
-          summary.style.background = 'var(--bg-surface-elevated)';
-          summary.style.cursor = 'pointer';
-          summary.style.userSelect = 'none';
-
-          // summary の左側（タイトルとアイコン）
-          const leftArea = document.createElement('div');
-          leftArea.style.display = 'flex';
-          leftArea.style.alignItems = 'center';
-          leftArea.style.gap = '0.45rem';
-          
-          // アイコン色の判定 (▲マーク)
-          let iconColor = 'var(--primary)';
-          if (groupKey.startsWith('Asana:')) {
-            iconColor = '#e04f5f'; // Asanaカラー
-          } else if (groupKey.startsWith('Google To-Do')) {
-            iconColor = '#3b82f6'; // Googleカラー
-          }
-          
-          leftArea.innerHTML = `<span style="color: ${iconColor}; font-size: 0.65rem; display: inline-flex; align-items: center; justify-content: center; margin-right: 0.2rem;">▲</span> <span>${groupKey}</span>`;
-
-          // summary の右側（件数バッジと矢印）
-          const rightArea = document.createElement('div');
-          rightArea.style.display = 'flex';
-          rightArea.style.alignItems = 'center';
-          rightArea.style.gap = '0.5rem';
-
-          const countBadge = document.createElement('span');
-          countBadge.style.fontSize = '0.7rem';
-          countBadge.style.background = 'rgba(0, 0, 0, 0.04)';
-          countBadge.style.border = '1px solid var(--border-color)';
-          countBadge.style.color = 'var(--text-secondary)';
-          countBadge.style.padding = '2px 8px';
-          countBadge.style.borderRadius = '12px';
-          countBadge.textContent = groupTasks.length;
-
-          // アコーディオンの矢印アイコン
-          const arrowIcon = document.createElement('span');
-          arrowIcon.className = 'details-arrow-icon';
-          arrowIcon.innerHTML = '▼';
-          arrowIcon.style.fontSize = '0.6rem';
-          arrowIcon.style.transition = 'transform 0.2s';
-          arrowIcon.style.color = 'var(--text-secondary)';
-
-          rightArea.appendChild(countBadge);
-          rightArea.appendChild(arrowIcon);
-
-          summary.appendChild(leftArea);
-          summary.appendChild(rightArea);
-
-          // 開閉に合わせて矢印を回転させる処理
-          details.ontoggle = () => {
-            arrowIcon.style.transform = details.open ? 'rotate(0deg)' : 'rotate(-90deg)';
-          };
-
-          const contentDiv = document.createElement('div');
-          contentDiv.style.display = 'flex';
-          contentDiv.style.flexDirection = 'column';
-          contentDiv.style.gap = '0.5rem';
-          contentDiv.style.padding = '0.5rem';
-          contentDiv.style.background = 'var(--bg-surface)';
-          contentDiv.style.borderTop = '1px solid var(--border-color)';
-
-          groupTasks.forEach(task => {
-            const item = createTodoDomItem(task, todayStr, me);
-            contentDiv.appendChild(item);
-          });
-
-          details.appendChild(summary);
-          details.appendChild(contentDiv);
-          listContainer.appendChild(details);
-        });
-
-      } else {
-        // 通常のフラット描画
-        tasks.forEach(task => {
-          const item = createTodoDomItem(task, todayStr, me);
-          listContainer.appendChild(item);
-        });
-      }
-    }
-
-    renderGroupedTasks(activeTasks, activeList, false);
-    renderGroupedTasks(doneTasks, doneList, true);
-  }
 
   // ToDo DOM要素生成のヘルパー
   function createTodoDomItem(task, todayStr, me) {
