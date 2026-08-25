@@ -5206,4 +5206,68 @@ h3 {
   content: none !important;
 }
 
+/* --- タスクフィルターのアコーディオンとプルダウンのレスポンシブ制御 --- */
+.todo-filters-accordion {
+  border: none !important;
+  background: transparent !important;
+  width: 100%;
+}
+
+.todo-filters-accordion summary {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 700;
+  user-select: none;
+  padding: 0.2rem 0;
+  transition: color 0.2s ease;
+}
+
+.todo-filters-accordion summary:hover {
+  color: var(--text-primary);
+}
+
+.todo-filters-accordion summary::-webkit-details-marker {
+  display: none !important;
+}
+
+/* 開閉時に矢印を回転させる */
+.todo-filters-accordion[open] summary .accordion-icon {
+  transform: rotate(90deg);
+}
+
+.todo-filters-accordion .accordion-icon {
+  transition: transform 0.2s ease;
+  display: inline-block;
+  font-size: 0.5rem;
+  line-height: 1;
+}
+
+/* スマホ表示でのフィルター縦並び配置 */
+@media (max-width: 576px) {
+  .todo-filter-controls-container {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.6rem !important;
+    margin-top: 0.4rem !important;
+  }
+  
+  .todo-filter-controls-container > div {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+  }
+  
+  .todo-filter-controls-container select {
+    width: 60% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+}
+
 
