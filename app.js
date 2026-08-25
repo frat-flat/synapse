@@ -35216,6 +35216,48 @@ window.openResumableUrl = function(urlStr) {
     row.appendChild(checkbox);
     row.appendChild(title);
 
+    // Asana の帰属先情報バッジの追加
+    if (task.id.startsWith('asana-')) {
+      // workspace_name や project_name がない場合は、notesの先頭に埋め込んだテキストからパースを試みる
+      let wsName = task.workspace_name || '';
+      let prjName = task.project_name || '';
+      let secName = task.section_name || '';
+      
+      if (!wsName && !prjName && task.notes) {
+        const match = task.notes.match(/^【Asana帰属: ([^＞】]+)(?: ＞ ([^】\()]+))?(?:\s*\(([^)]+)\))?】/);
+        if (match) {
+          wsName = match[1] ? match[1].trim() : '';
+          prjName = match[2] ? match[2].trim() : '';
+          secName = match[3] ? match[3].trim() : '';
+        }
+      }
+
+      if (wsName || prjName) {
+        const belongBadge = document.createElement('span');
+        belongBadge.className = 'todo-asana-belong-badge';
+        belongBadge.style.fontSize = '0.65rem';
+        belongBadge.style.color = '#e04f5f'; // Asanaのブランドカラー風（レッドピンク）
+        belongBadge.style.background = 'rgba(224, 79, 95, 0.08)';
+        belongBadge.style.border = '1px solid rgba(224, 79, 95, 0.2)';
+        belongBadge.style.padding = '1px 5px';
+        belongBadge.style.borderRadius = '3px';
+        belongBadge.style.marginLeft = '0.5rem';
+        belongBadge.style.fontWeight = '600';
+        belongBadge.style.display = 'inline-flex';
+        belongBadge.style.alignItems = 'center';
+        belongBadge.style.gap = '2px';
+        
+        let badgeText = 'Asana: ';
+        if (wsName) badgeText += wsName;
+        if (prjName) badgeText += ` ＞ ${prjName}`;
+        if (secName && secName !== 'Untitled section' && secName !== '無題のセクション') {
+          badgeText += ` (${secName})`;
+        }
+        belongBadge.textContent = badgeText;
+        row.appendChild(belongBadge);
+      }
+    }
+
     // 共有バッジ
     if (task.user_id !== me) {
       const shareBadge = document.createElement('span');
@@ -35483,7 +35525,7 @@ window.openResumableUrl = function(urlStr) {
       if (workspaces && workspaces.length > 0) {
         for (const ws of workspaces) {
           const workspaceGid = ws.gid;
-          const tasksUrl = `https://app.asana.com/api/1.0/tasks?assignee=me&workspace=${workspaceGid}&opt_fields=name,due_on,completed,notes`;
+          const tasksUrl = `https://app.asana.com/api/1.0/tasks?assignee=me&workspace=${workspaceGid}&opt_fields=name,due_on,completed,notes,workspace.name,projects.name,memberships.project.name,memberships.section.name`;
           const tasksRes = await fetch(tasksUrl, {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -35529,18 +35571,51 @@ window.openResumableUrl = function(urlStr) {
         const nextStatus = task.completed ? 'completed' : 'needsAction';
         const due = task.due_on || null; // YYYY-MM-DD
 
+        // 帰属先情報の抽出
+        let prjName = '';
+        let secName = '';
+        if (task.projects && task.projects.length > 0) {
+          prjName = task.projects[0].name || '';
+        }
+        if (task.memberships && task.memberships.length > 0) {
+          const firstM = task.memberships[0];
+          if (firstM.project) prjName = prjName || firstM.project.name || '';
+          if (firstM.section) secName = firstM.section.name || '';
+        }
+        const wsName = task.workspace ? task.workspace.name : '';
+
+        // 帰属先ラベルを作成してメモ（notes）の先頭に埋め込む
+        let belongInfo = '';
+        if (wsName || prjName) {
+          belongInfo = `【Asana帰属: ${wsName}`;
+          if (prjName) belongInfo += ` ＞ ${prjName}`;
+          if (secName && secName !== 'Untitled section' && secName !== '無題のセクション') {
+            belongInfo += ` (${secName})`;
+          }
+          belongInfo += `】\n`;
+        }
+
+        let baseNotes = task.notes || '';
+        // 過去の同期処理で埋め込んだ帰属先ラベルを一旦削除して重複を防ぐ
+        baseNotes = baseNotes.replace(/^【Asana帰属: [^】]+】\n?/, '');
+        const finalNotes = belongInfo + baseNotes;
+
         const taskObj = {
           id: taskId,
           title: task.name || '無題のタスク',
           due: due,
-          notes: task.notes || '',
+          notes: finalNotes,
           status: nextStatus,
           show_on_calendar: true,
           user_id: me,
           user_name: 'Asana Sync',
           google_event_id: null,
           shared: false,
-          shared_with: []
+          shared_with: [],
+          // ローカルキャッシュでバッジとして描画するためにプロパティを保持
+          workspace_name: wsName,
+          project_name: prjName,
+          section_name: secName
         };
 
         upsertTasks.push(taskObj);
@@ -35555,9 +35630,23 @@ window.openResumableUrl = function(urlStr) {
 
       if (upsertTasks.length > 0 && typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
         try {
+          // DB側のスキーマカラムに存在しないカスタムプロパティ（workspace_nameなど）を除外して送信
+          const dbUpsertTasks = upsertTasks.map(t => ({
+            id: t.id,
+            user_id: t.user_id,
+            user_name: t.user_name,
+            title: t.title,
+            due: t.due,
+            notes: t.notes,
+            status: t.status,
+            show_on_calendar: t.show_on_calendar,
+            shared_with: t.shared_with,
+            google_event_id: t.google_event_id
+          }));
+
           const { error: upsertErr } = await partnerSupabaseClient
             .from('synapse_todo_tasks')
-            .upsert(upsertTasks);
+            .upsert(dbUpsertTasks);
           if (upsertErr) throw upsertErr;
         } catch (dbErr) {
           console.warn("[Asana Tasks Sync] Failed to upsert tasks to DB:", dbErr);
