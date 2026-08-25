@@ -34686,6 +34686,32 @@ window.openResumableUrl = function(urlStr) {
     console.log("[Tasks App] Initializing Tasks Screen...");
     editingTodoId = null;
 
+    // 画面ビューの初期状態リセットおよび遷移イベントバインド
+    const todoMainView = document.getElementById('todo-main-view');
+    const todoSyncSettingsView = document.getElementById('todo-sync-settings-view');
+    const toggleSettingsBtn = document.getElementById('task-sync-settings-toggle-btn');
+    const backToTasksBtn = document.getElementById('task-sync-settings-back-btn');
+
+    if (todoMainView) todoMainView.style.display = 'flex';
+    if (todoSyncSettingsView) todoSyncSettingsView.style.display = 'none';
+    if (toggleSettingsBtn) toggleSettingsBtn.style.display = 'inline-flex';
+
+    if (toggleSettingsBtn) {
+      toggleSettingsBtn.onclick = () => {
+        if (todoMainView) todoMainView.style.display = 'none';
+        if (todoSyncSettingsView) todoSyncSettingsView.style.display = 'flex';
+        toggleSettingsBtn.style.display = 'none';
+      };
+    }
+
+    if (backToTasksBtn) {
+      backToTasksBtn.onclick = () => {
+        if (todoSyncSettingsView) todoSyncSettingsView.style.display = 'none';
+        if (todoMainView) todoMainView.style.display = 'flex';
+        if (toggleSettingsBtn) toggleSettingsBtn.style.display = 'inline-flex';
+      };
+    }
+
     const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
     const me = rawUserId.toLowerCase();
 
