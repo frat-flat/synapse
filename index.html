@@ -670,17 +670,17 @@
       </div>
 
       <!-- コントロールパネル風のアイコンメニュー -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
+      <div id="mypage-icon-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
         
         <!-- お気に入り -->
-        <div class="admin-app-icon" id="mypage-btn-favorites" title="お気に入り" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+        <div class="admin-app-icon" id="mypage-btn-favorites" data-id="favorites" draggable="true" title="お気に入り" style="cursor: grab; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s; box-shadow: var(--shadow-sm);">
           <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">⭐</div>
           <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">お気に入り</span>
           <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">登録されたよく使うフォルダやテーブルを表示します</span>
         </div>
 
         <!-- メモ帳 -->
-        <div class="admin-app-icon" id="mypage-btn-memo" title="メモ帳" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+        <div class="admin-app-icon" id="mypage-btn-memo" data-id="memo" draggable="true" title="メモ帳" style="cursor: grab; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s; box-shadow: var(--shadow-sm);">
           <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">📝</div>
           <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">メモ帳</span>
           <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">通常のメモと暗証番号付きのシークレットメモを使い分けられます</span>
@@ -688,14 +688,14 @@
 
 
         <!-- 設定 -->
-        <div class="admin-app-icon" id="mypage-btn-settings" title="設定" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+        <div class="admin-app-icon" id="mypage-btn-settings" data-id="settings" draggable="true" title="設定" style="cursor: grab; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s; box-shadow: var(--shadow-sm);">
           <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">⚙️</div>
           <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">設定</span>
           <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">テーマ、フォントサイズ、その他の設定を変更します</span>
         </div>
 
         <!-- Zoom連携 (外部連携) -->
-        <div class="admin-app-icon" id="mypage-btn-zoom-connect" title="Zoomと連携" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm); position: relative;">
+        <div class="admin-app-icon" id="mypage-btn-zoom-connect" data-id="zoom-connect" draggable="true" title="Zoomと連携" style="cursor: grab; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s; box-shadow: var(--shadow-sm); position: relative;">
           <!-- 🌟 三点リーダーメニューのボタン -->
           <div id="zoom-card-menu-trigger" style="position: absolute; top: 6px; right: 8px; width: 22px; height: 22px; display: none; align-items: center; justify-content: center; font-size: 1.1rem; color: var(--text-secondary); cursor: pointer; border-radius: 50%; z-index: 15;" onclick="event.stopPropagation();">︙</div>
           
@@ -717,14 +717,14 @@
         </div>
 
         <!-- カレンダー -->
-        <div class="admin-app-icon" id="mypage-btn-calendar" title="カレンダー" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+        <div class="admin-app-icon" id="mypage-btn-calendar" data-id="calendar" draggable="true" title="カレンダー" style="cursor: grab; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s; box-shadow: var(--shadow-sm);">
           <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">📅</div>
           <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">カレンダー</span>
           <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">個人・共有の予定管理とGoogleカレンダーの同期連携を行います</span>
         </div>
 
         <!-- タスク -->
-        <div class="admin-app-icon" id="mypage-btn-tasks" title="タスク" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+        <div class="admin-app-icon" id="mypage-btn-tasks" data-id="tasks" draggable="true" title="タスク" style="cursor: grab; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; width: 150px; height: 180px; box-sizing: border-box; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s; box-shadow: var(--shadow-sm);">
           <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">📋</div>
           <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">タスク</span>
           <span style="font-size: 0.65rem; color: var(--text-secondary); line-height: 1.2;">個人・共有タスクの作成・管理、カレンダー連携を行います</span>

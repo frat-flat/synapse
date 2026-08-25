@@ -2109,6 +2109,8 @@ async function loadUserSettingsFromCloud() {
         localStorage.setItem(`SYNAPSE_HUE_${userId}`, hue);
         localStorage.setItem(`SYNAPSE_SATURATION_${userId}`, sat);
         applyColorTone(hue, sat);
+        localStorage.setItem(`SYNAPSE_BG_SETTINGS_${userId}`, JSON.stringify(data.background_settings));
+        applyMypageIconOrder();
       }
     }
   } catch (e) {
@@ -2169,7 +2171,7 @@ async function syncToSupabase(key, value) {
           }
         }
       }
-    } else if (key.startsWith('SYNAPSE_ZOOM_DEFAULT_') || key.startsWith('SYNAPSE_THEME_') || key.startsWith('SYNAPSE_HUE_') || key.startsWith('SYNAPSE_SATURATION_')) {
+    } else if (key.startsWith('SYNAPSE_ZOOM_DEFAULT_') || key.startsWith('SYNAPSE_THEME_') || key.startsWith('SYNAPSE_HUE_') || key.startsWith('SYNAPSE_SATURATION_') || key.startsWith('SYNAPSE_BG_SETTINGS_')) {
       // ユーザー設定の同期
       const userId = state.currentUser ? state.currentUser.id : 'guest';
       const zoom = localStorage.getItem(`SYNAPSE_ZOOM_DEFAULT_${userId}`) || '100';
@@ -2177,13 +2179,25 @@ async function syncToSupabase(key, value) {
       const hue = localStorage.getItem(`SYNAPSE_HUE_${userId}`) || '0';
       const sat = localStorage.getItem(`SYNAPSE_SATURATION_${userId}`) || '100';
 
+      // 既存の background_settings (iconOrder 等を含む) をマージ
+      let bgSettings = { hue: parseInt(hue, 10), saturation: parseInt(sat, 10) };
+      try {
+        const raw = localStorage.getItem(`SYNAPSE_BG_SETTINGS_${userId}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          bgSettings = { ...parsed, ...bgSettings };
+        }
+      } catch (e) {
+        console.error("[Supabase] Failed to merge background_settings:", e);
+      }
+
       const { error } = await supabaseClient
         .from('user_profiles')
         .upsert({
           user_id: userId,
           zoom_level: parseInt(zoom, 10),
           ui_theme: theme,
-          background_settings: { hue: parseInt(hue, 10), saturation: parseInt(sat, 10) },
+          background_settings: bgSettings,
           updated_at: new Date().toISOString()
         });
 
@@ -28858,6 +28872,118 @@ function setupValidationSidebarEvents() {
   });
 }
 
+// マイページアイコンのドラッグ＆ドロップ制御
+function setupMypageDragAndDrop() {
+  const container = document.getElementById('mypage-icon-container');
+  if (!container) return;
+
+  let dragSource = null;
+  const cards = container.querySelectorAll('.admin-app-icon');
+
+  cards.forEach(card => {
+    card.addEventListener('dragstart', (e) => {
+      dragSource = card;
+      card.style.opacity = '0.4';
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', card.getAttribute('data-id'));
+    });
+
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+
+      if (dragSource !== card) {
+        const rect = card.getBoundingClientRect();
+        const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5 ||
+                     (e.clientX - rect.left) / (rect.right - rect.left) > 0.5;
+        
+        container.insertBefore(dragSource, next ? card.nextSibling : card);
+      }
+    });
+
+    card.addEventListener('dragend', () => {
+      card.style.opacity = '1';
+      saveMypageIconOrder();
+    });
+  });
+}
+
+// マイページの現在のアイコン順序をローカルおよびクラウドへ保存
+function saveMypageIconOrder() {
+  const container = document.getElementById('mypage-icon-container');
+  if (!container) return;
+
+  const currentOrder = Array.from(container.querySelectorAll('.admin-app-icon')).map(card => {
+    return card.getAttribute('data-id');
+  });
+
+  const userId = state.currentUser ? state.currentUser.id : 'guest';
+  const storageKey = `SYNAPSE_MYPAGE_ICON_ORDER_${userId}`;
+  localStorage.setItem(storageKey, JSON.stringify(currentOrder));
+
+  // 既存の background_settings とマージして保存
+  const settingsKey = `SYNAPSE_BG_SETTINGS_${userId}`;
+  let bgSettings = {};
+  try {
+    const raw = localStorage.getItem(settingsKey);
+    if (raw) bgSettings = JSON.parse(raw);
+  } catch (e) {
+    console.error("[Settings] Failed to parse existing bg settings:", e);
+  }
+
+  bgSettings.iconOrder = currentOrder;
+  localStorage.setItem(settingsKey, JSON.stringify(bgSettings));
+  console.log("[Mypage] Saved icon order:", currentOrder);
+}
+
+// マイページのアイコン順序を適用（DOM要素の再配置）
+function applyMypageIconOrder() {
+  const container = document.getElementById('mypage-icon-container');
+  if (!container) return;
+
+  const userId = state.currentUser ? state.currentUser.id : 'guest';
+  let order = null;
+  const orderKey = `SYNAPSE_MYPAGE_ICON_ORDER_${userId}`;
+  const settingsKey = `SYNAPSE_BG_SETTINGS_${userId}`;
+  
+  try {
+    const bgRaw = localStorage.getItem(settingsKey);
+    if (bgRaw) {
+      const bgSettings = JSON.parse(bgRaw);
+      if (bgSettings && bgSettings.iconOrder) {
+        order = bgSettings.iconOrder;
+      }
+    }
+    if (!order) {
+      const orderRaw = localStorage.getItem(orderKey);
+      if (orderRaw) order = JSON.parse(orderRaw);
+    }
+  } catch (e) {
+    console.error("[Mypage] Failed to load icon order settings:", e);
+  }
+
+  if (!order || !Array.isArray(order)) return;
+
+  const cardMap = {};
+  const cards = container.querySelectorAll('.admin-app-icon');
+  cards.forEach(card => {
+    const id = card.getAttribute('data-id');
+    if (id) cardMap[id] = card;
+  });
+
+  order.forEach(id => {
+    const card = cardMap[id];
+    if (card) {
+      container.appendChild(card);
+      delete cardMap[id];
+    }
+  });
+
+  Object.values(cardMap).forEach(card => {
+    container.appendChild(card);
+  });
+}
+
 // ==========================================
 // 👤 マイページ ＆ 暗号化メモ帳機能
 // ==========================================
@@ -28867,12 +28993,15 @@ let activeMemoId = null;
 if (state.memoUnlockedSecure === undefined) state.memoUnlockedSecure = false;
 
 function initMypageMemo() {
+  applyMypageIconOrder();
+
   if (state.mypageMemoInitialized) return;
 
   const currentUser = state.currentUser;
   if (!currentUser) return;
 
   state.mypageMemoInitialized = true;
+  setupMypageDragAndDrop();
 
 
   const userId = currentUser.id;
