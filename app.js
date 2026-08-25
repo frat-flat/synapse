@@ -34736,6 +34736,50 @@ window.openResumableUrl = function(urlStr) {
     const savedTab = localStorage.getItem(`SYNAPSE_TODO_ACTIVE_TAB_${me}`) || 'active';
     switchTodoTab(savedTab);
 
+    // === 📋 ToDo サービス別フィルター切り替えロジック ===
+    const filterAll = document.getElementById('todo-filter-service-all');
+    const filterGoogle = document.getElementById('todo-filter-service-google');
+    const filterAsana = document.getElementById('todo-filter-service-asana');
+
+    function switchTodoServiceFilter(filterType) {
+      state.todoServiceFilter = filterType;
+      localStorage.setItem(`SYNAPSE_TODO_SERVICE_FILTER_${me}`, filterType);
+
+      // ボタンのクラス（アクティブ表示）を更新
+      const buttons = [
+        { el: filterAll, type: 'all' },
+        { el: filterGoogle, type: 'google' },
+        { el: filterAsana, type: 'asana' }
+      ];
+
+      buttons.forEach(btn => {
+        if (!btn.el) return;
+        if (btn.type === filterType) {
+          btn.el.classList.add('active');
+          btn.el.style.border = '1px solid var(--primary)';
+          btn.el.style.background = 'rgba(59, 130, 246, 0.08)';
+          btn.el.style.color = 'var(--primary)';
+        } else {
+          btn.el.classList.remove('active');
+          btn.el.style.border = '1px solid var(--border-color)';
+          btn.el.style.background = 'transparent';
+          btn.el.style.color = 'var(--text-secondary)';
+        }
+      });
+
+      // 再描画
+      renderTodoList();
+    }
+
+    if (filterAll) filterAll.onclick = () => switchTodoServiceFilter('all');
+    if (filterGoogle) filterGoogle.onclick = () => switchTodoServiceFilter('google');
+    if (filterAsana) filterAsana.onclick = () => switchTodoServiceFilter('asana');
+
+    // サービスフィルターの初期復元
+    const savedServiceFilter = localStorage.getItem(`SYNAPSE_TODO_SERVICE_FILTER_${me}`) || 'all';
+    state.todoServiceFilter = savedServiceFilter;
+    switchTodoServiceFilter(savedServiceFilter);
+
     // 🔌 タスク外部連携設定のバインド
     initTaskSyncSettings(me);
 
@@ -35166,8 +35210,28 @@ window.openResumableUrl = function(urlStr) {
     // 期限日判定用の今日
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    const activeTasks = todoTasks.filter(t => t.status !== 'completed');
-    const doneTasks = todoTasks.filter(t => t.status === 'completed');
+    // サービスフィルターの適用
+    const currentServiceFilter = state.todoServiceFilter || 'all';
+    let filteredTasks = todoTasks;
+
+    if (currentServiceFilter === 'google') {
+      filteredTasks = todoTasks.filter(t => t.id.startsWith('google-task-'));
+    } else if (currentServiceFilter === 'asana') {
+      filteredTasks = todoTasks.filter(t => t.id.startsWith('asana-'));
+    }
+
+    // 日付順（期限日 due 順）にソート (期限があるものを昇順で先に並べ、期限なしは最後に)
+    filteredTasks.sort((a, b) => {
+      if (a.due && b.due) {
+        return a.due.localeCompare(b.due);
+      }
+      if (a.due) return -1; // a のみ期限ありなら a が先
+      if (b.due) return 1;  // b のみ期限ありなら b が先
+      return 0;             // 両方期限なし
+    });
+
+    const activeTasks = filteredTasks.filter(t => t.status !== 'completed');
+    const doneTasks = filteredTasks.filter(t => t.status === 'completed');
 
     if (uncompletedCount) uncompletedCount.textContent = activeTasks.length.toString();
     if (completedCount) completedCount.textContent = doneTasks.length.toString();

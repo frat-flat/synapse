@@ -1221,12 +1221,22 @@
         <!-- タスク一覧カード -->
         <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 1rem;">
           <!-- タスク表示切り替えタブ -->
-          <div class="todo-tabs" style="display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 0.25rem; gap: 1.5rem;">
-            <div id="todo-tab-active" class="todo-tab active" style="font-size: 0.9rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 0.5rem; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.35rem; transition: all 0.2s ease;">
-              ⏳ 未完了 <span id="todo-uncompleted-count" class="badge" style="background: var(--primary); font-size: 0.65rem; padding: 1px 5px; border-radius: 10px; color: white;">0</span>
+          <div class="todo-tabs-container" style="display: flex; flex-direction: column; gap: 0.75rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.25rem;">
+            <div class="todo-tabs" style="display: flex; gap: 1.5rem;">
+              <div id="todo-tab-active" class="todo-tab active" style="font-size: 0.9rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 0.3rem; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.35rem; transition: all 0.2s ease;">
+                ⏳ 未完了 <span id="todo-uncompleted-count" class="badge" style="background: var(--primary); font-size: 0.65rem; padding: 1px 5px; border-radius: 10px; color: white;">0</span>
+              </div>
+              <div id="todo-tab-done" class="todo-tab" style="font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); border-bottom: 2px solid transparent; padding-bottom: 0.3rem; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.35rem; transition: all 0.2s ease;">
+                ✓ 完了済み <span id="todo-completed-count" class="badge" style="background: var(--text-muted); font-size: 0.65rem; padding: 1px 5px; border-radius: 10px; color: white;">0</span>
+              </div>
             </div>
-            <div id="todo-tab-done" class="todo-tab" style="font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); border-bottom: 2px solid transparent; padding-bottom: 0.5rem; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.35rem; transition: all 0.2s ease;">
-              ✓ 完了済み <span id="todo-completed-count" class="badge" style="background: var(--text-muted); font-size: 0.65rem; padding: 1px 5px; border-radius: 10px; color: white;">0</span>
+            
+            <!-- サービス別フィルター -->
+            <div class="todo-service-filters" style="display: flex; gap: 0.4rem; align-items: center;">
+              <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; margin-right: 0.25rem;">サービス:</span>
+              <button id="todo-filter-service-all" class="todo-filter-btn active" style="font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--primary); background: rgba(59, 130, 246, 0.08); color: var(--primary); cursor: pointer; font-weight: 600; transition: all 0.2s;">すべて</button>
+              <button id="todo-filter-service-google" class="todo-filter-btn" style="font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); cursor: pointer; font-weight: 600; transition: all 0.2s;">Google To-Do</button>
+              <button id="todo-filter-service-asana" class="todo-filter-btn" style="font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); cursor: pointer; font-weight: 600; transition: all 0.2s;">Asana</button>
             </div>
           </div>
 
