@@ -4875,6 +4875,7 @@ h3 {
   transition: all 0.15s ease;
   user-select: none;
   text-align: left;
+  min-width: 0;
 }
 
 .todo-item:hover {
@@ -4903,7 +4904,8 @@ h3 {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-primary);
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 50px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4919,7 +4921,10 @@ h3 {
   color: #d97706;
   border: 1px solid rgba(245, 158, 11, 0.2);
   white-space: nowrap;
-  flex-shrink: 0;
+  flex-shrink: 2; /* タスク名より優先して縮む */
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .todo-due-badge.overdue {
@@ -4944,11 +4949,20 @@ h3 {
   color: #7c3aed;
   border: 1px solid rgba(139, 92, 246, 0.2);
   white-space: nowrap;
+  flex-shrink: 2.5; /* 所属先と日付の間で縮む */
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Asana所属先バッジ（ツールチップにのみ格納されるため、行内では常時非表示） */
+/* Asana所属先バッジ */
 .todo-asana-belong-badge {
-  display: none !important;
+  flex-shrink: 3; /* 最も優先して縮小する */
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-flex !important; /* display: none を無効化 */
 }
 
 /* --- タスクリスト アコーディオン & 画面追加スタイル --- */
