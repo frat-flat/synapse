@@ -32966,8 +32966,27 @@ window.openResumableUrl = function(urlStr) {
           card.className = 'timeline-event-card';
           if (ev.is_google_event) {
             card.classList.add('google-event');
+          } else if (ev.id && ev.id.startsWith('google-task-')) {
+            // Google To-Do スタイル
+            card.style.backgroundColor = ev.status === 'completed' ? 'var(--bg-hover)' : 'rgba(59, 130, 246, 0.08)';
+            card.style.color = ev.status === 'completed' ? 'var(--text-muted)' : 'var(--primary)';
+            card.style.borderLeft = `4px solid var(--primary)`;
+            card.style.borderTop = '1px solid rgba(59, 130, 246, 0.15)';
+            card.style.borderRight = '1px solid rgba(59, 130, 246, 0.15)';
+            card.style.borderBottom = '1px solid rgba(59, 130, 246, 0.15)';
+            if (ev.status === 'completed') card.style.textDecoration = 'line-through';
+          } else if (ev.id && ev.id.startsWith('asana-')) {
+            // Asana スタイル
+            card.style.backgroundColor = ev.status === 'completed' ? 'var(--bg-hover)' : 'rgba(224, 79, 95, 0.08)';
+            card.style.color = ev.status === 'completed' ? 'var(--text-muted)' : '#e04f5f';
+            card.style.borderLeft = `4px solid #e04f5f`;
+            card.style.borderTop = '1px solid rgba(224, 79, 95, 0.15)';
+            card.style.borderRight = '1px solid rgba(224, 79, 95, 0.15)';
+            card.style.borderBottom = '1px solid rgba(224, 79, 95, 0.15)';
+            if (ev.status === 'completed') card.style.textDecoration = 'line-through';
           } else {
             card.style.backgroundColor = ev.color || '#3b82f6';
+            card.style.color = 'white';
           }
           
           const top = p.start;
@@ -33247,9 +33266,43 @@ window.openResumableUrl = function(urlStr) {
           evMicro.textContent = `G: ${ev.title}`;
           evMicro.title = `[Google] ${ev.title}`;
         } else {
-          evMicro.style.backgroundColor = ev.color || '#3b82f6';
           evMicro.textContent = ev.title;
-          evMicro.title = `[${ev.category}] ${ev.title} (${ev.user_name || '不明'})`;
+          
+          if (ev.id && ev.id.startsWith('google-task-')) {
+            // Google To-Do スタイル (薄い青背景、濃い青文字、左端太い青線)
+            if (ev.status === 'completed') {
+              evMicro.style.backgroundColor = 'var(--bg-hover)';
+              evMicro.style.color = 'var(--text-muted)';
+              evMicro.style.borderLeft = '3px solid var(--text-muted)';
+              evMicro.style.textDecoration = 'line-through';
+            } else {
+              evMicro.style.backgroundColor = 'rgba(59, 130, 246, 0.08)';
+              evMicro.style.color = 'var(--primary)';
+              evMicro.style.border = '1px solid rgba(59, 130, 246, 0.15)';
+              evMicro.style.borderLeft = '3px solid var(--primary)';
+            }
+            evMicro.title = `[Google To-Do] ${ev.title}`;
+          } else if (ev.id && ev.id.startsWith('asana-')) {
+            // Asana スタイル (薄い赤背景、濃い赤文字、左端太い赤線)
+            if (ev.status === 'completed') {
+              evMicro.style.backgroundColor = 'var(--bg-hover)';
+              evMicro.style.color = 'var(--text-muted)';
+              evMicro.style.borderLeft = '3px solid var(--text-muted)';
+              evMicro.style.textDecoration = 'line-through';
+            } else {
+              evMicro.style.backgroundColor = 'rgba(224, 79, 95, 0.08)';
+              evMicro.style.color = '#e04f5f';
+              evMicro.style.border = '1px solid rgba(224, 79, 95, 0.15)';
+              evMicro.style.borderLeft = '3px solid #e04f5f';
+            }
+            evMicro.title = `[Asana] ${ev.title}`;
+          } else {
+            // 通常予定
+            evMicro.style.backgroundColor = ev.color || '#3b82f6';
+            evMicro.style.color = 'white';
+            evMicro.style.borderLeft = 'none';
+            evMicro.title = `[${ev.category}] ${ev.title} (${ev.user_name || '不明'})`;
+          }
         }
         
         // クリック時に予定編集フォームを開く
@@ -33399,9 +33452,16 @@ window.openResumableUrl = function(urlStr) {
           // 表示フィルター（チェックボックス）のチェック状態を確認（他人のタスクの場合）
           if (!isOwner && !calendarFilteredMembers.map(m => m.toLowerCase()).includes(task.user_id.toLowerCase())) return;
 
+          let label = task.status === 'completed' ? '✓ ' : '○ ';
+          if (task.id.startsWith('google-task-')) {
+            label += '🔹 ';
+          } else if (task.id.startsWith('asana-')) {
+            label += '🔺 ';
+          }
+
           events.push({
             id: task.id,
-            title: (task.status === 'completed' ? '✓ ' : '○ ') + task.title,
+            title: label + task.title,
             start_time: task.due + 'T00:00:00',
             end_time: task.due + 'T23:59:59',
             all_day: true,
