@@ -50,7 +50,9 @@
   (function initSanitize() {
     try {
       localStorage.setItem('form_customize_is_template_mode', 'false');
-      initTemplates(); // テンプレートマスタ初期化
+      setTimeout(() => {
+        initTemplates(); // テンプレートマスタ初期化
+      }, 0);
       
       const key = 'form_customize_all_forms';
       const raw = localStorage.getItem(key);
