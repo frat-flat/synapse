@@ -33943,7 +33943,7 @@ window.openResumableUrl = function(urlStr) {
       if (!googleTokenClient) {
         googleTokenClient = google.accounts.oauth2.initTokenClient({
           client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/tasks.readonly',
+          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/tasks',
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
               googleAccessToken = tokenResponse.access_token;
@@ -34242,7 +34242,7 @@ window.openResumableUrl = function(urlStr) {
         
         googleTokenClient = google.accounts.oauth2.initTokenClient({
           client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/tasks.readonly',
+          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/tasks',
           prompt: 'none', // 画面にポップアップを出さずに裏で再取得
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
