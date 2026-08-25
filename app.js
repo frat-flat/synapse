@@ -36517,8 +36517,8 @@ window.openResumableUrl = function(urlStr) {
     }
   }
 
-  // タイムアウト付きの fetch ヘルパー (ミリ秒指定、デフォルト12秒)
-  async function fetchWithTimeout(resource, options = {}, timeout = 12000) {
+  // タイムアウト付きの fetch ヘルパー (ミリ秒指定、デフォルト6秒)
+  async function fetchWithTimeout(resource, options = {}, timeout = 6000) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     try {
@@ -36531,7 +36531,7 @@ window.openResumableUrl = function(urlStr) {
     } catch (error) {
       clearTimeout(id);
       if (error.name === 'AbortError') {
-        throw new Error("通信がタイムアウトしました。しばらく経ってからもう一度お試しください。");
+        throw new Error("通信がタイムアウトしました。Google Tasksサーバーへの一時的な接続エラーか、ネットワーク環境（プロキシ、VPN、CORS制限など）をご確認のうえ、Google連携の解除・再連携もお試しください。");
       }
       throw error;
     }
