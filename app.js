@@ -34799,9 +34799,15 @@ window.openResumableUrl = function(urlStr) {
     const btnAsanaNewProject = document.getElementById('todo-form-asana-new-project-btn');
     const btnAsanaNewSection = document.getElementById('todo-form-asana-new-section-btn');
 
-    // Asana連携が有効化されているかどうか
+    // Google Tasks 連携フォーム要素
+    const googleSyncToggleContainer = document.getElementById('todo-form-google-sync-toggle-container');
+    const googleSyncCheckbox = document.getElementById('todo-form-google-sync');
+    const googleFieldsContainer = document.getElementById('todo-form-google-fields');
+
+    // Google/Asana連携が有効化されているかどうか
     const asanaLinked = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
     const asanaToken = localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`) || '';
+    const googleLinked = isGoogleLinked && (localStorage.getItem(`SYNAPSE_GOOGLE_LINK_TASKS_${me}`) === 'true');
 
     if (asanaLinked && asanaToken) {
       if (asanaSyncToggleContainer) asanaSyncToggleContainer.style.display = 'flex';
@@ -34809,11 +34815,36 @@ window.openResumableUrl = function(urlStr) {
       if (asanaSyncToggleContainer) asanaSyncToggleContainer.style.display = 'none';
     }
 
-    // トグルの連動
+    if (googleLinked) {
+      if (googleSyncToggleContainer) googleSyncToggleContainer.style.display = 'flex';
+    } else {
+      if (googleSyncToggleContainer) googleSyncToggleContainer.style.display = 'none';
+    }
+
+    // トグルの連動（排他制御）
+    if (googleSyncCheckbox) {
+      googleSyncCheckbox.onchange = async () => {
+        if (googleSyncCheckbox.checked) {
+          if (googleFieldsContainer) googleFieldsContainer.style.display = 'flex';
+          if (asanaSyncCheckbox) {
+            asanaSyncCheckbox.checked = false;
+            if (asanaFieldsContainer) asanaFieldsContainer.style.display = 'none';
+          }
+          await updateGoogleTaskListDropdown();
+        } else {
+          if (googleFieldsContainer) googleFieldsContainer.style.display = 'none';
+        }
+      };
+    }
+
     if (asanaSyncCheckbox) {
       asanaSyncCheckbox.onchange = async () => {
         if (asanaSyncCheckbox.checked) {
           if (asanaFieldsContainer) asanaFieldsContainer.style.display = 'flex';
+          if (googleSyncCheckbox) {
+            googleSyncCheckbox.checked = false;
+            if (googleFieldsContainer) googleFieldsContainer.style.display = 'none';
+          }
           // ワークスペース一覧のロード
           await populateAsanaWorkspaces();
         } else {
@@ -35163,7 +35194,7 @@ window.openResumableUrl = function(urlStr) {
       saveTodoBtn.textContent = '保存する';
     }
 
-    // Asana 連携フォーム状態のリセット
+    // Asana/Google 連携フォーム状態のリセット
     const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
     const me = rawUserId.toLowerCase();
     const asanaSyncToggleContainer = document.getElementById('todo-form-asana-sync-toggle-container');
@@ -35174,6 +35205,11 @@ window.openResumableUrl = function(urlStr) {
     const selectAsanaProject = document.getElementById('todo-form-asana-project');
     const selectAsanaSection = document.getElementById('todo-form-asana-section');
     const selectAsanaAssignee = document.getElementById('todo-form-asana-assignee');
+
+    const googleSyncToggleContainer = document.getElementById('todo-form-google-sync-toggle-container');
+    const googleSyncCheckbox = document.getElementById('todo-form-google-sync');
+    const googleFieldsContainer = document.getElementById('todo-form-google-fields');
+    const selectGoogleList = document.getElementById('todo-form-google-list');
 
     const asanaLinked = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
     if (asanaSyncCheckbox) {
@@ -35192,6 +35228,20 @@ window.openResumableUrl = function(urlStr) {
     if (selectAsanaProject) selectAsanaProject.innerHTML = '<option value="">(プロジェクトなし)</option>';
     if (selectAsanaSection) selectAsanaSection.innerHTML = '<option value="">(セクションなし)</option>';
     if (selectAsanaAssignee) selectAsanaAssignee.innerHTML = '<option value="">(未割り当て)</option>';
+
+    const googleLinked = isGoogleLinked && (localStorage.getItem(`SYNAPSE_GOOGLE_LINK_TASKS_${me}`) === 'true');
+    if (googleSyncCheckbox) {
+      googleSyncCheckbox.checked = false;
+      googleSyncCheckbox.disabled = false;
+    }
+    if (googleFieldsContainer) googleFieldsContainer.style.display = 'none';
+
+    if (googleLinked) {
+      if (googleSyncToggleContainer) googleSyncToggleContainer.style.display = 'flex';
+      updateGoogleTaskListDropdown();
+    } else {
+      if (googleSyncToggleContainer) googleSyncToggleContainer.style.display = 'none';
+    }
   }
 
   // 共有メンバーリストの描画 (独自タスク用)
@@ -35452,14 +35502,103 @@ window.openResumableUrl = function(urlStr) {
       }
     }
 
-    // 連携タスクの場合、notesにAsanaプロジェクトなどの詳細情報をパース用プレフィックスと共に追加してDBに格納しておくことで、
-    // 同期を実行する前でも表示を最新化できます。
+    // Google Tasks 同期関連の処理
+    const googleSyncCheckbox = document.getElementById('todo-form-google-sync');
+    const selectGoogleList = document.getElementById('todo-form-google-list');
+    const googleLinked = isGoogleLinked && (localStorage.getItem(`SYNAPSE_GOOGLE_LINK_TASKS_${me}`) === 'true');
+
+    let googleListName = '';
+
+    if (googleSyncCheckbox && googleSyncCheckbox.checked && googleLinked && googleAccessToken) {
+      const googleListId = selectGoogleList ? selectGoogleList.value : '';
+      if (!googleListId) {
+        showToast("Google To-Doの保存先リストを選択してください。", "error");
+        if (saveTodoBtn) {
+          saveTodoBtn.disabled = false;
+          saveTodoBtn.textContent = isNew ? '保存する' : '変更を保存';
+        }
+        return;
+      }
+
+      googleListName = selectGoogleList.options[selectGoogleList.selectedIndex]?.text || '';
+
+      try {
+        if (isNew) {
+          // Google に新規タスク作成
+          const googleTask = await createGoogleTask(googleListId, {
+            title: title,
+            notes: notes,
+            due: due,
+            status: 'needsAction'
+          });
+          taskId = `google-task-${googleTask.id}`;
+        } else if (taskId.startsWith('google-task-')) {
+          const googleTaskId = taskId.replace('google-task-', '');
+          let oldListName = '';
+          const existing = todoTasks.find(t => t.id === taskId);
+          if (existing && existing.notes) {
+            const match = existing.notes.match(/^【Google To-Do帰属: ([^】]+)】/);
+            if (match) {
+              oldListName = match[1] ? match[1].trim() : '';
+            }
+          }
+
+          if (oldListName && oldListName !== googleListName) {
+            // リスト移動が発生した場合：元のリストからタスクを削除し、新しいリストに再作成
+            const oldList = (state.googleTaskLists || []).find(l => l.title === oldListName);
+            if (oldList) {
+              await deleteGoogleTask(oldList.id, googleTaskId);
+            }
+            const googleTask = await createGoogleTask(googleListId, {
+              title: title,
+              notes: notes,
+              due: due,
+              status: existing ? existing.status : 'needsAction'
+            });
+            // DBにある古いIDを削除しておく
+            if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
+              try {
+                await partnerSupabaseClient
+                  .from('synapse_todo_tasks')
+                  .delete()
+                  .eq('id', taskId);
+              } catch (delErr) {
+                console.warn("[Google Tasks Sync] Failed to delete old task row on list move:", delErr);
+              }
+            }
+            taskId = `google-task-${googleTask.id}`;
+          } else {
+            // 通常の更新
+            await updateGoogleTask(googleListId, googleTaskId, {
+              title: title,
+              notes: notes,
+              due: due,
+              status: existing ? existing.status : 'needsAction'
+            });
+          }
+        }
+      } catch (err) {
+        showToast("Google To-Doとの同期に失敗しました: " + err.message, "error");
+        if (saveTodoBtn) {
+          saveTodoBtn.disabled = false;
+          saveTodoBtn.textContent = isNew ? '保存する' : '変更を保存';
+        }
+        return;
+      }
+    }
+
+    // 連携タスクの場合、notesにアソシエーションの情報をプレフィックスとして追加
     let updatedNotes = notes;
     if (taskId.startsWith('asana-') && workspaceName) {
-      // 既存の notes 内の 【Asana帰属: ...】 プレフィックス行があれば置換するか、無ければ先頭に追加
       const belongStr = `【Asana帰属: ${workspaceName}${projectName ? ` ＞ ${projectName}` : ''}${sectionName ? ` (${sectionName})` : ''}】`;
       const lines = notes.split('\n');
       const filteredLines = lines.filter(line => !line.startsWith('【Asana帰属:'));
+      filteredLines.unshift(belongStr);
+      updatedNotes = filteredLines.join('\n');
+    } else if (taskId.startsWith('google-task-') && googleListName) {
+      const belongStr = `【Google To-Do帰属: ${googleListName}】`;
+      const lines = notes.split('\n');
+      const filteredLines = lines.filter(line => !line.startsWith('【Google To-Do帰属:'));
       filteredLines.unshift(belongStr);
       updatedNotes = filteredLines.join('\n');
     }
@@ -35570,6 +35709,31 @@ window.openResumableUrl = function(urlStr) {
       }
     }
 
+    // Google タスクであれば Google 側も削除
+    if (editingTodoId.startsWith('google-task-')) {
+      const googleLinked = isGoogleLinked && (localStorage.getItem(`SYNAPSE_GOOGLE_LINK_TASKS_${me}`) === 'true');
+      if (googleLinked && googleAccessToken) {
+        const googleTaskId = editingTodoId.replace('google-task-', '');
+        let listName = '';
+        if (existing && existing.notes) {
+          const match = existing.notes.match(/^【Google To-Do帰属: ([^】]+)】/);
+          if (match) {
+            listName = match[1] ? match[1].trim() : '';
+          }
+        }
+        if (listName) {
+          const list = (state.googleTaskLists || []).find(l => l.title === listName);
+          if (list) {
+            try {
+              await deleteGoogleTask(list.id, googleTaskId);
+            } catch (err) {
+              console.warn("[Google Tasks API] Failed to delete task on Google To-Do:", err);
+            }
+          }
+        }
+      }
+    }
+
     if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
       try {
         const { error } = await partnerSupabaseClient
@@ -35644,6 +35808,32 @@ window.openResumableUrl = function(urlStr) {
             data: { completed: !!isCompleted }
           })
         }).catch(err => console.warn("[Asana Sync] Task status update failed:", err));
+      }
+    }
+
+    // Google のタスク連携がONのとき、Google側の完了状態も同期する
+    if (taskId.startsWith('google-task-')) {
+      const googleLinked = isGoogleLinked && (localStorage.getItem(`SYNAPSE_GOOGLE_LINK_TASKS_${me}`) === 'true');
+      if (googleLinked && googleAccessToken) {
+        const googleTaskId = taskId.replace('google-task-', '');
+        let listName = '';
+        if (task.notes) {
+          const match = task.notes.match(/^【Google To-Do帰属: ([^】]+)】/);
+          if (match) {
+            listName = match[1] ? match[1].trim() : '';
+          }
+        }
+        if (listName) {
+          const list = (state.googleTaskLists || []).find(l => l.title === listName);
+          if (list) {
+            updateGoogleTask(list.id, googleTaskId, {
+              title: task.title,
+              notes: task.notes,
+              due: task.due,
+              status: isCompleted ? 'completed' : 'needsAction'
+            }).catch(err => console.warn("[Google Tasks Sync] Task status update failed:", err));
+          }
+        }
       }
     }
 
@@ -35737,7 +35927,7 @@ window.openResumableUrl = function(urlStr) {
       shareMembersContainer.style.display = 'none';
     }
 
-    // Asana 連携情報の復元とロード
+    // Asana / Google 連携情報の復元とロード
     const asanaSyncToggleContainer = document.getElementById('todo-form-asana-sync-toggle-container');
     const asanaSyncCheckbox = document.getElementById('todo-form-asana-sync');
     const asanaFieldsContainer = document.getElementById('todo-form-asana-fields');
@@ -35747,28 +35937,38 @@ window.openResumableUrl = function(urlStr) {
     const selectAsanaSection = document.getElementById('todo-form-asana-section');
     const selectAsanaAssignee = document.getElementById('todo-form-asana-assignee');
 
+    const googleSyncToggleContainer = document.getElementById('todo-form-google-sync-toggle-container');
+    const googleSyncCheckbox = document.getElementById('todo-form-google-sync');
+    const googleFieldsContainer = document.getElementById('todo-form-google-fields');
+    const selectGoogleList = document.getElementById('todo-form-google-list');
+
     const asanaLinked = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
     const asanaToken = localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`) || '';
+    const googleLinked = isGoogleLinked && (localStorage.getItem(`SYNAPSE_GOOGLE_LINK_TASKS_${me}`) === 'true');
 
     if (asanaSyncCheckbox) {
       asanaSyncCheckbox.checked = false;
-      asanaSyncCheckbox.disabled = false;
+      asanaSyncCheckbox.disabled = !isOwner;
     }
     if (asanaFieldsContainer) asanaFieldsContainer.style.display = 'none';
+
+    if (googleSyncCheckbox) {
+      googleSyncCheckbox.checked = false;
+      googleSyncCheckbox.disabled = !isOwner;
+    }
+    if (googleFieldsContainer) googleFieldsContainer.style.display = 'none';
+    if (selectGoogleList) selectGoogleList.disabled = !isOwner;
 
     if (task.id.startsWith('asana-')) {
       if (asanaSyncCheckbox) {
         asanaSyncCheckbox.checked = true;
-        // AsanaタスクはAsana同期解除不可にする（編集の安全のため）
         asanaSyncCheckbox.disabled = true;
       }
       if (asanaFieldsContainer) asanaFieldsContainer.style.display = 'flex';
+      if (googleSyncToggleContainer) googleSyncToggleContainer.style.display = 'none';
 
-      // Asana APIから詳細をリアルタイムに引いて、現在のアソシエーションを再現
       if (asanaLinked && asanaToken) {
         const taskGid = task.id.replace('asana-', '');
-        
-        // プレースホルダーで読み込み中を明示
         if (selectAsanaWorkspace) selectAsanaWorkspace.innerHTML = '<option value="">読み込み中...</option>';
         if (selectAsanaProject) selectAsanaProject.innerHTML = '<option value="">読み込み中...</option>';
         if (selectAsanaSection) selectAsanaSection.innerHTML = '<option value="">読み込み中...</option>';
@@ -35809,12 +36009,41 @@ window.openResumableUrl = function(urlStr) {
           showToast("Asanaの所属先詳細の読み込みに失敗しました。", "error");
         });
       }
+    } else if (task.id.startsWith('google-task-')) {
+      if (googleSyncCheckbox) {
+        googleSyncCheckbox.checked = true;
+        googleSyncCheckbox.disabled = true;
+      }
+      if (googleFieldsContainer) googleFieldsContainer.style.display = 'flex';
+      if (asanaSyncToggleContainer) asanaSyncToggleContainer.style.display = 'none';
+
+      let listName = '';
+      if (task.notes) {
+        const match = task.notes.match(/^【Google To-Do帰属: ([^】]+)】/);
+        if (match) {
+          listName = match[1] ? match[1].trim() : '';
+        }
+      }
+
+      updateGoogleTaskListDropdown().then(() => {
+        if (listName && selectGoogleList) {
+          const list = (state.googleTaskLists || []).find(l => l.title === listName);
+          if (list) {
+            selectGoogleList.value = list.id;
+          }
+        }
+      });
     } else {
       // 通常のタスク
       if (asanaLinked && asanaToken) {
         if (asanaSyncToggleContainer) asanaSyncToggleContainer.style.display = 'flex';
       } else {
         if (asanaSyncToggleContainer) asanaSyncToggleContainer.style.display = 'none';
+      }
+      if (googleLinked) {
+        if (googleSyncToggleContainer) googleSyncToggleContainer.style.display = 'flex';
+      } else {
+        if (googleSyncToggleContainer) googleSyncToggleContainer.style.display = 'none';
       }
     }
   }
@@ -36284,6 +36513,135 @@ window.openResumableUrl = function(urlStr) {
     }
   }
 
+  // Google Tasksのタスクリスト一覧を取得する
+  async function fetchGoogleTaskLists() {
+    if (!isGoogleLinked || !googleAccessToken) return [];
+    if (state.googleTaskLists && state.googleTaskLists.length > 0) {
+      return state.googleTaskLists;
+    }
+    try {
+      const listsRes = await fetch('https://tasks.googleapis.com/tasks/v1/users/@me/lists', {
+        headers: {
+          'Authorization': `Bearer ${googleAccessToken}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (listsRes.ok) {
+        const listsData = await listsRes.json();
+        state.googleTaskLists = listsData.items || [];
+        return state.googleTaskLists;
+      }
+    } catch (e) {
+      console.warn("[Google Tasks API] Failed to fetch lists:", e);
+    }
+    return [];
+  }
+
+  // Google To-Doリスト選択プルダウンのバインド
+  async function updateGoogleTaskListDropdown() {
+    const selectGoogleList = document.getElementById('todo-form-google-list');
+    if (!selectGoogleList) return;
+    
+    // リストの取得
+    const lists = await fetchGoogleTaskLists();
+    
+    selectGoogleList.innerHTML = '';
+    if (lists.length === 0) {
+      selectGoogleList.innerHTML = '<option value="">(リストがありません)</option>';
+      return;
+    }
+    lists.forEach(list => {
+      const opt = document.createElement('option');
+      opt.value = list.id;
+      opt.textContent = list.title;
+      selectGoogleList.appendChild(opt);
+    });
+  }
+
+  // 🔹 Google Tasks 新規作成
+  async function createGoogleTask(listId, taskData) {
+    if (!isGoogleLinked || !googleAccessToken) throw new Error("Google連携が無効です。");
+    
+    let dueStr = null;
+    if (taskData.due) {
+      dueStr = new Date(taskData.due).toISOString();
+    }
+
+    const response = await fetch(`https://tasks.googleapis.com/tasks/v1/lists/${listId}/tasks`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${googleAccessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        title: taskData.title,
+        notes: taskData.notes,
+        due: dueStr,
+        status: taskData.status || 'needsAction'
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Googleタスク作成失敗: ${response.status} - ${errText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  }
+
+  // 🔹 Google Tasks 更新
+  async function updateGoogleTask(listId, taskId, taskData) {
+    if (!isGoogleLinked || !googleAccessToken) throw new Error("Google連携が無効です。");
+
+    let dueStr = null;
+    if (taskData.due) {
+      dueStr = new Date(taskData.due).toISOString();
+    }
+
+    const response = await fetch(`https://tasks.googleapis.com/tasks/v1/lists/${listId}/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${googleAccessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        id: taskId,
+        title: taskData.title,
+        notes: taskData.notes,
+        due: dueStr,
+        status: taskData.status || 'needsAction'
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Googleタスク更新失敗: ${response.status} - ${errText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  }
+
+  // 🔹 Google Tasks 削除
+  async function deleteGoogleTask(listId, taskId) {
+    if (!isGoogleLinked || !googleAccessToken) throw new Error("Google連携が無効です。");
+
+    const response = await fetch(`https://tasks.googleapis.com/tasks/v1/lists/${listId}/tasks/${taskId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${googleAccessToken}`
+      }
+    });
+
+    if (!response.ok && response.status !== 404) {
+      const errText = await response.text();
+      throw new Error(`Googleタスク削除失敗: ${response.status} - ${errText}`);
+    }
+  }
+
   // 📋 Google Tasks マージ同期処理
   async function syncWithGoogleTasks(me) {
     if (state.googleLinkTasks === undefined) {
@@ -36309,6 +36667,7 @@ window.openResumableUrl = function(urlStr) {
 
       const listsData = await listsRes.json();
       const taskLists = listsData.items || [];
+      state.googleTaskLists = taskLists; // メモリに保存
       let googleTasksList = [];
 
       // 2. 各タスクリストからタスクを取得
