@@ -171,3 +171,83 @@ ALTER TABLE public.synapse_users ALTER COLUMN password DROP NOT NULL;
 INSERT INTO public.synapse_users (id, name, password, role, email, code)
 VALUES ('owner@synapse.management', 'オーナー', 'temporary_password_please_change', 'owner', 'owner@synapse.management', 'OWNER_SEED_INIT_CODE')
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================================
+-- 9. Party ID 発行用 RPC 関数の作成 (generate_party_id)
+-- 競合のない一意の8桁のParty IDをシーケンスベースで安全に生成します。
+-- SECURITY DEFINER を指定し、非特権ユーザー（anonなど）からの呼び出しでも synapse_storage の更新を行えるようにします。
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.generate_party_id(
+  source_system text,
+  is_temporary boolean
+)
+RETURNS text AS $$
+DECLARE
+  current_seq bigint;
+  next_seq bigint;
+  chars text := 'ACEFGHJKMNPQRSTWXY345679';
+  M bigint := 331776; -- 24^4
+  l bigint;
+  r bigint;
+  next_l bigint;
+  next_r bigint;
+  round int;
+  keys bigint[] := ARRAY[1518500249, 1859775393, 2400959708, 3395469782];
+  hash_val bigint;
+  fnv_prime bigint := 16777619;
+  Y bigint;
+  temp bigint;
+  id text := '';
+  idx int;
+BEGIN
+  -- synapse_storage から現在のシーケンス番号を取得し、行をロックする
+  SELECT COALESCE((value#>>'{}')::bigint, 300)
+  INTO current_seq
+  FROM public.synapse_storage
+  WHERE key = 'synapse_id_sequence'
+  FOR UPDATE;
+
+  -- レコードが存在しない場合は初期値を設定する
+  IF NOT FOUND THEN
+    current_seq := 300;
+  END IF;
+
+  -- シーケンス番号をインクリメント
+  next_seq := current_seq + 1;
+
+  -- インクリメントしたシーケンス番号を synapse_storage に書き戻す
+  INSERT INTO public.synapse_storage (key, value, updated_at)
+  VALUES ('synapse_id_sequence', to_jsonb(next_seq), now())
+  ON CONFLICT (key) DO UPDATE
+  SET value = to_jsonb(next_seq), updated_at = now();
+
+  -- 8桁の英数字IDを生成 (Format-Preserving Encryption)
+  l := (next_seq / M) % M;
+  r := next_seq % M;
+
+  FOR round IN 0..3 LOOP
+    -- R ^ key
+    hash_val := (r # keys[round + 1]) & 4294967295;
+    -- hash * 16777619 (double precision での乗算とキャストによる丸め込み)
+    hash_val := (hash_val::double precision * fnv_prime::double precision)::bigint & 4294967295;
+    -- hash ^ (hash >>> 16)
+    hash_val := (hash_val # (hash_val >> 16)) & 4294967295;
+    
+    next_l := r;
+    next_r := (l + hash_val) % M;
+    l := next_l;
+    r := next_r;
+  END LOOP;
+
+  Y := l * M + r;
+  temp := Y;
+  FOR round IN 1..8 LOOP
+    idx := (temp % 24) + 1;
+    id := id || substr(chars, idx, 1);
+    temp := temp / 24;
+  END LOOP;
+
+  RETURN id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+

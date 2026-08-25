@@ -854,6 +854,7 @@ let state = {
   isFormDirty: false, // フォームが変更されたかどうかのフラグ
   draggingTabId: null
 };
+window.state = state;
 
 // アカウントごとに設定キーを分けて保存・取得するためのヘルパー
 function getUserIdSuffix() {
@@ -3961,7 +3962,7 @@ function getPreviewCellBgColor(tableId, colId) {
   const colAccess = checkColumnAccess(tableId, colId);
   const isReadOnly = !checkColumnEditAccess(tableId, colId);
 
-  if (state.previewMode === 'simulate') {
+  if (state.previewMode === 'simulate' || state.previewMode === 'grayout') {
     if (colAccess.grayout || !colAccess.visible) {
       return '#f1f5f9'; // 非表示: グレー
     }
@@ -3969,7 +3970,7 @@ function getPreviewCellBgColor(tableId, colId) {
       return '#fefaf0'; // 閲覧のみ: アイボリー
     }
     return '#edf7ed'; // 編集可: 緑
-  } else if (state.previewMode === 'actual') {
+  } else if (state.previewMode === 'actual' || state.previewMode === 'strict') {
     if (isReadOnly) {
       return '#fefaf0'; // 閲覧のみ: アイボリー
     }
@@ -4017,7 +4018,7 @@ function checkRowAccess(tableId, row) {
     return { visible: true, grayout: false };
   }
 
-  if (state.previewUserId && state.previewMode === 'grayout' && isAdminReal) {
+  if (state.previewUserId && (state.previewMode === 'grayout' || state.previewMode === 'simulate') && isOwner) {
     return { visible: true, grayout: true };
   }
 
@@ -17989,7 +17990,10 @@ function renderJoInfo() {
         
         applyInlineStylesToCell(td, styleObj);
         
-        if (styleObj['background-color']) {
+        const previewBg = getPreviewCellBgColor('jo-info-screen', col.id);
+        if (previewBg) {
+          td.style.backgroundColor = previewBg;
+        } else if (styleObj['background-color']) {
           td.style.backgroundColor = styleObj['background-color'];
         } else if (isSticky) {
           td.style.backgroundColor = 'var(--bg-surface)';
@@ -18712,7 +18716,10 @@ function renderApplicantInfo() {
 
         applyInlineStylesToCell(td, styleObj);
 
-        if (styleObj['background-color']) {
+        const previewBg = getPreviewCellBgColor('applicant-info-screen', col.id);
+        if (previewBg) {
+          td.style.backgroundColor = previewBg;
+        } else if (styleObj['background-color']) {
           td.style.backgroundColor = styleObj['background-color'];
         } else if (isSticky) {
           td.style.backgroundColor = 'var(--bg-surface)';
@@ -22476,6 +22483,20 @@ document.addEventListener('DOMContentLoaded', () => {
       selector.dataset.listenerAttached = 'true';
       selector.addEventListener('change', (e) => {
         renderUserPermissionViewer(e.target.value);
+      });
+    }
+
+    // 👁️ ユーザビューを起動ボタンのバインド
+    const btnStartUserView = document.getElementById('btn-start-user-view');
+    if (btnStartUserView && !btnStartUserView.dataset.listenerAttached) {
+      btnStartUserView.dataset.listenerAttached = 'true';
+      btnStartUserView.addEventListener('click', () => {
+        const targetUser = selector.value;
+        if (!targetUser) {
+          showToast('対象ユーザーを選択してください。', 'warning');
+          return;
+        }
+        startImpersonationPreview(targetUser, 'strict');
       });
     }
 
@@ -27762,13 +27783,18 @@ function startImpersonationPreview(targetUserId, mode) {
   const bar = document.getElementById('impersonate-preview-bar');
   if (bar) {
     const userLabel = ALL_ACCOUNTS.find(a => a.id === targetUserId)?.name || targetUserId;
-    const modeLabel = mode === 'grayout' ? 'デバッグ（グレー表示）' : '完全再現（非表示）';
+    const modeLabel = (mode === 'grayout' || mode === 'simulate') ? 'デバッグ（グレー表示）' : '完全再現（非表示）';
     
     const userEl = document.getElementById('previewing-user-name');
     if (userEl) userEl.textContent = userLabel;
     
     const modeEl = document.getElementById('previewing-mode-name');
     if (modeEl) modeEl.textContent = modeLabel;
+    
+    const modeSelect = document.getElementById('preview-mode-select');
+    if (modeSelect) {
+      modeSelect.value = (mode === 'grayout' || mode === 'simulate') ? 'simulate' : 'actual';
+    }
     
     bar.style.display = 'flex';
   }
@@ -27830,6 +27856,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const modeSelect = document.getElementById('preview-mode-select');
   if (modeSelect) {
     modeSelect.addEventListener('change', () => {
+      state.previewMode = modeSelect.value;
+      const modeLabel = state.previewMode === 'simulate' ? 'デバッグ（グレー表示）' : '完全再現（非表示）';
+      const modeEl = document.getElementById('previewing-mode-name');
+      if (modeEl) modeEl.textContent = modeLabel;
+
+      if (typeof renderCustomTableList === 'function') renderCustomTableList();
+
       if (state.currentView === 'jo-info-screen') renderJoInfo();
       else if (state.currentView === 'applicant-info-screen') renderApplicantInfo();
       else if (state.currentView === 'agency-info-screen') renderAgencyInfo();
