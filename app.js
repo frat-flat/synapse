@@ -35673,7 +35673,7 @@ window.openResumableUrl = function(urlStr) {
       showToast("タスクの保存に失敗しました: " + errorMsg, "error", 12000);
       if (saveTodoBtn) {
         saveTodoBtn.disabled = false;
-        saveTodoBtn.textContent = isNew ? '保存する' : '変更を保存';
+        saveTodoBtn.textContent = (!editingTodoId) ? '保存する' : '変更を保存';
       }
     }
   }
