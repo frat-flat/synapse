@@ -33939,50 +33939,48 @@ window.openResumableUrl = function(urlStr) {
     try {
       const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
       
-      // Google GIS token client の初期化（無ければ生成）
-      if (!googleTokenClient) {
-        googleTokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/tasks',
-          callback: async (tokenResponse) => {
-            if (tokenResponse && tokenResponse.access_token) {
-              googleAccessToken = tokenResponse.access_token;
-              
-              // 有効期限 (ミリ秒) を計算して保存
-              const expiresAt = Date.now() + (tokenResponse.expires_in || 3600) * 1000;
-              localStorage.setItem(`SYNAPSE_GOOGLE_ACCESS_TOKEN_${me}`, googleAccessToken);
-              localStorage.setItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`, expiresAt.toString());
-              
-              console.log("[Google Calendar API] Token client callback success!");
-              
-              let email = me; // ログイン中ユーザーIDを初期値
-              try {
-                // userinfo エンドポイントからメールアドレスを取得
-                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                  headers: { 'Authorization': `Bearer ${googleAccessToken}` }
-                });
-                const info = await res.json();
-                if (info && info.email) {
-                  email = info.email;
-                } else {
-                  // userinfo がダメな場合は tokeninfo から取得を試みる
-                  const tokenRes = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${googleAccessToken}`);
-                  const tokenInfo = await tokenRes.json();
-                  if (tokenInfo && tokenInfo.email) email = tokenInfo.email;
-                }
-              } catch (e) {
-                console.warn("OAuth email resolution failed, using active user id instead.", e);
+      // Google GIS token client の初期化（毎回生成して最新のスコープ設定を確実に反映）
+      googleTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/tasks',
+        callback: async (tokenResponse) => {
+          if (tokenResponse && tokenResponse.access_token) {
+            googleAccessToken = tokenResponse.access_token;
+            
+            // 有効期限 (ミリ秒) を計算して保存
+            const expiresAt = Date.now() + (tokenResponse.expires_in || 3600) * 1000;
+            localStorage.setItem(`SYNAPSE_GOOGLE_ACCESS_TOKEN_${me}`, googleAccessToken);
+            localStorage.setItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`, expiresAt.toString());
+            
+            console.log("[Google Calendar API] Token client callback success!");
+            
+            let email = me; // ログイン中ユーザーIDを初期値
+            try {
+              // userinfo エンドポイントからメールアドレスを取得
+              const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+              });
+              const info = await res.json();
+              if (info && info.email) {
+                email = info.email;
+              } else {
+                // userinfo がダメな場合は tokeninfo から取得を試みる
+                const tokenRes = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${googleAccessToken}`);
+                const tokenInfo = await tokenRes.json();
+                if (tokenInfo && tokenInfo.email) email = tokenInfo.email;
               }
-
-              linkGoogleCalendar(email);
-            } else {
-              const err = (tokenResponse && tokenResponse.error) ? tokenResponse.error : '認証が完了しなかったか、トークンを取得できませんでした。';
-              showToast(`Google認証エラー: ${err}`, 'error');
-              console.error("[Google Calendar API] GIS Token Callback error:", tokenResponse);
+            } catch (e) {
+              console.warn("OAuth email resolution failed, using active user id instead.", e);
             }
+
+            linkGoogleCalendar(email);
+          } else {
+            const err = (tokenResponse && tokenResponse.error) ? tokenResponse.error : '認証が完了しなかったか、トークンを取得できませんでした。';
+            showToast(`Google認証エラー: ${err}`, 'error');
+            console.error("[Google Calendar API] GIS Token Callback error:", tokenResponse);
           }
-        });
-      }
+        }
+      });
       
       // 初回はプロンプトを表示してユーザーの承認とトークン取得を行う
       googleTokenClient.requestAccessToken();
