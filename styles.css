@@ -4967,7 +4967,7 @@ h3 {
 }
 
 /* --- タスクリスト アコーディオン & 画面追加スタイル --- */
-#mypage-task-screen details {
+#mypage-task-screen details.todo-project-details {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -4975,7 +4975,7 @@ h3 {
   overflow: hidden;
 }
 
-#mypage-task-screen details > div {
+#mypage-task-screen details.todo-project-details > div {
   padding: 0.75rem;
   display: flex;
   flex-direction: column;
