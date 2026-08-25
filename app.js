@@ -35933,37 +35933,38 @@ window.openResumableUrl = function(urlStr) {
           details.style.borderRadius = 'var(--radius-md)';
           details.style.background = 'var(--bg-surface)';
           details.style.overflow = 'hidden';
+          details.style.boxShadow = 'var(--shadow-sm)';
 
           const summary = document.createElement('summary');
           summary.className = 'todo-project-summary';
           summary.style.display = 'flex';
           summary.style.alignItems = 'center';
           summary.style.justifyContent = 'space-between';
-          summary.style.padding = '0.6rem 0.8rem';
+          summary.style.padding = '0.65rem 0.85rem';
           summary.style.fontSize = '0.8rem';
           summary.style.fontWeight = '700';
           summary.style.color = 'var(--text-primary)';
           summary.style.background = 'var(--bg-surface-elevated)';
           summary.style.cursor = 'pointer';
           summary.style.userSelect = 'none';
-          summary.style.borderBottom = '1px solid var(--border-color)';
 
           // summary の左側（タイトルとアイコン）
           const leftArea = document.createElement('div');
           leftArea.style.display = 'flex';
           leftArea.style.alignItems = 'center';
-          leftArea.style.gap = '0.4rem';
+          leftArea.style.gap = '0.45rem';
           
-          // アイコンの判定
-          let icon = '📋';
+          // アイコン色の判定 (▲マーク)
+          let iconColor = 'var(--primary)';
           if (groupKey.startsWith('Asana:')) {
-            icon = '🔺';
+            iconColor = '#e04f5f'; // Asanaカラー
           } else if (groupKey === 'Google To-Do') {
-            icon = '🔹';
+            iconColor = '#3b82f6'; // Googleカラー
           }
-          leftArea.innerHTML = `<span>${icon}</span> <span>${groupKey}</span>`;
+          
+          leftArea.innerHTML = `<span style="color: ${iconColor}; font-size: 0.65rem; display: inline-flex; align-items: center; justify-content: center; margin-right: 0.2rem;">▲</span> <span>${groupKey}</span>`;
 
-          // summary の右側（件数バッジ）
+          // summary の右側（件数バッジと矢印）
           const rightArea = document.createElement('div');
           rightArea.style.display = 'flex';
           rightArea.style.alignItems = 'center';
@@ -35971,13 +35972,14 @@ window.openResumableUrl = function(urlStr) {
 
           const countBadge = document.createElement('span');
           countBadge.style.fontSize = '0.7rem';
-          countBadge.style.background = 'var(--border-color)';
+          countBadge.style.background = 'rgba(0, 0, 0, 0.04)';
+          countBadge.style.border = '1px solid var(--border-color)';
           countBadge.style.color = 'var(--text-secondary)';
-          countBadge.style.padding = '1px 6px';
-          countBadge.style.borderRadius = '10px';
+          countBadge.style.padding = '2px 8px';
+          countBadge.style.borderRadius = '12px';
           countBadge.textContent = groupTasks.length;
 
-          // アコーディオンの矢印アイコン（details の標準矢印を消してカスタム）
+          // アコーディオンの矢印アイコン
           const arrowIcon = document.createElement('span');
           arrowIcon.className = 'details-arrow-icon';
           arrowIcon.innerHTML = '▼';
@@ -35999,8 +36001,10 @@ window.openResumableUrl = function(urlStr) {
           const contentDiv = document.createElement('div');
           contentDiv.style.display = 'flex';
           contentDiv.style.flexDirection = 'column';
-          contentDiv.style.padding = '0.25rem';
+          contentDiv.style.gap = '0.5rem';
+          contentDiv.style.padding = '0.5rem';
           contentDiv.style.background = 'var(--bg-surface)';
+          contentDiv.style.borderTop = '1px solid var(--border-color)';
 
           groupTasks.forEach(task => {
             const item = createTodoDomItem(task, todayStr, me);
