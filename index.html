@@ -1220,11 +1220,18 @@
         
         <!-- タスク一覧カード -->
         <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 1rem;">
+          <!-- タスク表示切り替えタブ -->
+          <div class="todo-tabs" style="display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 0.25rem; gap: 1.5rem;">
+            <div id="todo-tab-active" class="todo-tab active" style="font-size: 0.9rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 0.5rem; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.35rem; transition: all 0.2s ease;">
+              ⏳ 未完了 <span id="todo-uncompleted-count" class="badge" style="background: var(--primary); font-size: 0.65rem; padding: 1px 5px; border-radius: 10px; color: white;">0</span>
+            </div>
+            <div id="todo-tab-done" class="todo-tab" style="font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); border-bottom: 2px solid transparent; padding-bottom: 0.5rem; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.35rem; transition: all 0.2s ease;">
+              ✓ 完了済み <span id="todo-completed-count" class="badge" style="background: var(--text-muted); font-size: 0.65rem; padding: 1px 5px; border-radius: 10px; color: white;">0</span>
+            </div>
+          </div>
+
           <!-- 未完了タスクセクション -->
-          <div>
-            <h2 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.35rem;">
-              ⏳ 未完了のタスク <span id="todo-uncompleted-count" class="badge" style="background: var(--primary); font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; color: white;">0</span>
-            </h2>
+          <div id="todo-active-list-container" style="display: block;">
             <div id="todo-active-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
               <!-- 動的生成 -->
               <p style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; padding: 1rem 0;">タスクはありません</p>
@@ -1232,15 +1239,10 @@
           </div>
 
           <!-- 完了済みタスクセクション -->
-          <div style="border-top: 1px dashed var(--border-color); padding-top: 1rem; margin-top: 0.5rem;">
-            <details open>
-              <summary style="cursor: pointer; font-size: 0.95rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.5rem; user-select: none;">
-                ✓ 完了済みのタスク <span id="todo-completed-count" class="badge" style="background: var(--text-muted); font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; color: white;">0</span>
-              </summary>
-              <div id="todo-done-list" style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">
-                <!-- 動的生成 -->
-              </div>
-            </details>
+          <div id="todo-done-list-container" style="display: none;">
+            <div id="todo-done-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <!-- 動的生成 -->
+            </div>
           </div>
         </div>
 

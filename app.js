@@ -34685,6 +34685,57 @@ window.openResumableUrl = function(urlStr) {
       };
     }
 
+    // === 📋 ToDo タブ切り替えロジック ===
+    const tabActive = document.getElementById('todo-tab-active');
+    const tabDone = document.getElementById('todo-tab-done');
+    const containerActive = document.getElementById('todo-active-list-container');
+    const containerDone = document.getElementById('todo-done-list-container');
+
+    function switchTodoTab(tabType) {
+      if (tabType === 'done') {
+        // 完了済みタブを有効化
+        if (tabActive) {
+          tabActive.style.color = 'var(--text-secondary)';
+          tabActive.style.borderBottomColor = 'transparent';
+          tabActive.classList.remove('active');
+        }
+        if (tabDone) {
+          tabDone.style.color = 'var(--primary)';
+          tabDone.style.borderBottomColor = 'var(--primary)';
+          tabDone.classList.add('active');
+        }
+        if (containerActive) containerActive.style.display = 'none';
+        if (containerDone) containerDone.style.display = 'block';
+        localStorage.setItem(`SYNAPSE_TODO_ACTIVE_TAB_${me}`, 'done');
+      } else {
+        // 未完了タブを有効化 (デフォルト)
+        if (tabActive) {
+          tabActive.style.color = 'var(--primary)';
+          tabActive.style.borderBottomColor = 'var(--primary)';
+          tabActive.classList.add('active');
+        }
+        if (tabDone) {
+          tabDone.style.color = 'var(--text-secondary)';
+          tabDone.style.borderBottomColor = 'transparent';
+          tabDone.classList.remove('active');
+        }
+        if (containerActive) containerActive.style.display = 'block';
+        if (containerDone) containerDone.style.display = 'none';
+        localStorage.setItem(`SYNAPSE_TODO_ACTIVE_TAB_${me}`, 'active');
+      }
+    }
+
+    if (tabActive) {
+      tabActive.onclick = () => switchTodoTab('active');
+    }
+    if (tabDone) {
+      tabDone.onclick = () => switchTodoTab('done');
+    }
+
+    // 初回ロード時のタブ状態の復元
+    const savedTab = localStorage.getItem(`SYNAPSE_TODO_ACTIVE_TAB_${me}`) || 'active';
+    switchTodoTab(savedTab);
+
     // 🔌 タスク外部連携設定のバインド
     initTaskSyncSettings(me);
 
