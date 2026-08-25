@@ -5098,4 +5098,67 @@ h3 {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* --- タスク グループ表示（プロジェクト別）スタイル --- */
+.todo-group-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  animation: todoGroupFadeIn 0.2s ease-out;
+}
+
+.todo-group-header {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: var(--bg-surface-elevated);
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+  user-select: none;
+}
+
+.todo-group-header-count {
+  font-size: 0.65rem;
+  background: var(--border-color);
+  color: var(--text-muted);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.todo-group-header.asana-project {
+  border-left-color: #e04f5f; /* Asanaカラー */
+  background: rgba(224, 79, 95, 0.03);
+}
+
+.todo-group-header.google-list {
+  border-left-color: #3b82f6; /* Googleカラー */
+  background: rgba(59, 130, 246, 0.03);
+}
+
+/* グループ切り替えボタン */
+.todo-group-btn {
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.todo-group-btn.active {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.08);
+  color: var(--primary);
+}
+
+@keyframes todoGroupFadeIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 

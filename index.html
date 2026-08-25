@@ -1243,6 +1243,13 @@
               <button id="todo-filter-service-google" class="todo-filter-btn" style="font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); cursor: pointer; font-weight: 600; transition: all 0.2s;">Google To-Do</button>
               <button id="todo-filter-service-asana" class="todo-filter-btn" style="font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); cursor: pointer; font-weight: 600; transition: all 0.2s;">Asana</button>
             </div>
+            
+            <!-- グループ分けオプション -->
+            <div class="todo-group-filters" style="display: flex; gap: 0.4rem; align-items: center; margin-top: 0.1rem;">
+              <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; margin-right: 0.25rem;">グループ分け:</span>
+              <button id="todo-group-none" class="todo-group-btn active" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; border: 1px solid var(--primary); background: rgba(59, 130, 246, 0.08); color: var(--primary); cursor: pointer; font-weight: 600; transition: all 0.2s;">なし</button>
+              <button id="todo-group-project" class="todo-group-btn" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); cursor: pointer; font-weight: 600; transition: all 0.2s;">プロジェクト別</button>
+            </div>
           </div>
 
           <!-- 未完了タスクセクション -->
@@ -1297,6 +1304,54 @@
               <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600;">共有するメンバーを選択:</span>
               <div id="todo-form-share-members-list" style="display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
                 <!-- 動的生成 -->
+              </div>
+            </div>
+
+            <!-- 🔺 Asana 連携用トグル（Asana連携中のみ表示） -->
+            <div id="todo-form-asana-sync-toggle-container" style="display: none; flex-direction: column; gap: 0.5rem; margin-top: 0.25rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; font-weight: 600; color: var(--text-primary); cursor: pointer; user-select: none;">
+                <input type="checkbox" id="todo-form-asana-sync" style="width: 15px; height: 15px;"> 🔺 Asanaタスクとして登録・同期
+              </label>
+
+              <!-- Asana詳細設定エリア（Workspace, Project, Section, Assignee） -->
+              <div id="todo-form-asana-fields" style="display: none; flex-direction: column; gap: 0.6rem; margin-left: 1.5rem; border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius-sm); background: var(--bg-surface-elevated);">
+                
+                <!-- ワークスペース -->
+                <div>
+                  <label style="display: block; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.2rem;">ワークスペース</label>
+                  <select id="todo-form-asana-workspace" class="calendar-form-control" style="width: 100%; box-sizing: border-box; height: 30px; font-size: 0.75rem;"></select>
+                </div>
+
+                <!-- プロジェクト (フォルダ) -->
+                <div>
+                  <label style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.2rem;">
+                    <span>プロジェクト (フォルダ)</span>
+                    <button type="button" id="todo-form-asana-new-project-btn" style="padding: 1px 4px; font-size: 0.65rem; font-weight: 700; cursor: pointer; border-radius: 3px; border: 1px solid var(--border-color); background: var(--bg-surface);">📁 新規作成</button>
+                  </label>
+                  <select id="todo-form-asana-project" class="calendar-form-control" style="width: 100%; box-sizing: border-box; height: 30px; font-size: 0.75rem;">
+                    <option value="">(プロジェクトなし)</option>
+                  </select>
+                </div>
+
+                <!-- セクション (サブフォルダ) -->
+                <div>
+                  <label style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.2rem;">
+                    <span>セクション</span>
+                    <button type="button" id="todo-form-asana-new-section-btn" style="padding: 1px 4px; font-size: 0.65rem; font-weight: 700; cursor: pointer; border-radius: 3px; border: 1px solid var(--border-color); background: var(--bg-surface);">📂 新規作成</button>
+                  </label>
+                  <select id="todo-form-asana-section" class="calendar-form-control" style="width: 100%; box-sizing: border-box; height: 30px; font-size: 0.75rem;">
+                    <option value="">(セクションなし)</option>
+                  </select>
+                </div>
+
+                <!-- 担当者 (アサイン先) -->
+                <div>
+                  <label style="display: block; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.2rem;">担当者 (アサイン制限)</label>
+                  <select id="todo-form-asana-assignee" class="calendar-form-control" style="width: 100%; box-sizing: border-box; height: 30px; font-size: 0.75rem;">
+                    <option value="">(未割り当て)</option>
+                  </select>
+                </div>
+
               </div>
             </div>
           </div>

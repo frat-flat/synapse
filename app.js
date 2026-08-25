@@ -34748,6 +34748,235 @@ window.openResumableUrl = function(urlStr) {
       };
     }
 
+    // グループ分けオプションの復元とバインド
+    const groupNoneBtn = document.getElementById('todo-group-none');
+    const groupProjectBtn = document.getElementById('todo-group-project');
+    state.todoGroupMode = localStorage.getItem(`SYNAPSE_TODO_GROUP_MODE_${me}`) || 'none';
+
+    function updateGroupFilterButtonsState() {
+      if (!groupNoneBtn || !groupProjectBtn) return;
+      [groupNoneBtn, groupProjectBtn].forEach(btn => btn.classList.remove('active'));
+      if (state.todoGroupMode === 'project') {
+        groupProjectBtn.classList.add('active');
+      } else {
+        groupNoneBtn.classList.add('active');
+      }
+    }
+
+    if (groupNoneBtn) {
+      groupNoneBtn.onclick = () => {
+        state.todoGroupMode = 'none';
+        localStorage.setItem(`SYNAPSE_TODO_GROUP_MODE_${me}`, 'none');
+        updateGroupFilterButtonsState();
+        renderTodoList();
+      };
+    }
+
+    if (groupProjectBtn) {
+      groupProjectBtn.onclick = () => {
+        state.todoGroupMode = 'project';
+        localStorage.setItem(`SYNAPSE_TODO_GROUP_MODE_${me}`, 'project');
+        updateGroupFilterButtonsState();
+        renderTodoList();
+      };
+    }
+
+    updateGroupFilterButtonsState();
+
+    // Asana フォーム要素
+    const asanaSyncToggleContainer = document.getElementById('todo-form-asana-sync-toggle-container');
+    const asanaSyncCheckbox = document.getElementById('todo-form-asana-sync');
+    const asanaFieldsContainer = document.getElementById('todo-form-asana-fields');
+    
+    const selectAsanaWorkspace = document.getElementById('todo-form-asana-workspace');
+    const selectAsanaProject = document.getElementById('todo-form-asana-project');
+    const selectAsanaSection = document.getElementById('todo-form-asana-section');
+    const selectAsanaAssignee = document.getElementById('todo-form-asana-assignee');
+
+    const btnAsanaNewProject = document.getElementById('todo-form-asana-new-project-btn');
+    const btnAsanaNewSection = document.getElementById('todo-form-asana-new-section-btn');
+
+    // Asana連携が有効化されているかどうか
+    const asanaLinked = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
+    const asanaToken = localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`) || '';
+
+    if (asanaLinked && asanaToken) {
+      if (asanaSyncToggleContainer) asanaSyncToggleContainer.style.display = 'flex';
+    } else {
+      if (asanaSyncToggleContainer) asanaSyncToggleContainer.style.display = 'none';
+    }
+
+    // トグルの連動
+    if (asanaSyncCheckbox) {
+      asanaSyncCheckbox.onchange = async () => {
+        if (asanaSyncCheckbox.checked) {
+          if (asanaFieldsContainer) asanaFieldsContainer.style.display = 'flex';
+          // ワークスペース一覧のロード
+          await populateAsanaWorkspaces();
+        } else {
+          if (asanaFieldsContainer) asanaFieldsContainer.style.display = 'none';
+        }
+      };
+    }
+
+    // ワークスペース変更時の連動
+    if (selectAsanaWorkspace) {
+      selectAsanaWorkspace.onchange = async () => {
+        const workspaceGid = selectAsanaWorkspace.value;
+        if (workspaceGid) {
+          await populateAsanaProjects(workspaceGid);
+          await populateAsanaAssignees(workspaceGid);
+        }
+      };
+    }
+
+    // プロジェクト変更時の連動
+    if (selectAsanaProject) {
+      selectAsanaProject.onchange = async () => {
+        const projectGid = selectAsanaProject.value;
+        await populateAsanaSections(projectGid);
+      };
+    }
+
+    // 新規プロジェクト（フォルダ）作成
+    if (btnAsanaNewProject) {
+      btnAsanaNewProject.onclick = async (e) => {
+        e.preventDefault();
+        const workspaceGid = selectAsanaWorkspace.value;
+        if (!workspaceGid) {
+          showToast("ワークスペースを選択してください。", "error");
+          return;
+        }
+        const name = prompt("新規プロジェクト（フォルダ）の名前を入力してください:");
+        if (!name || !name.trim()) return;
+
+        try {
+          btnAsanaNewProject.disabled = true;
+          btnAsanaNewProject.textContent = "作成中...";
+          const prj = await createAsanaProject(asanaToken, workspaceGid, name.trim());
+          showToast(`プロジェクト「${prj.name}」を作成しました。`, "success");
+          
+          // 再読み込み＆自動選択
+          await populateAsanaProjects(workspaceGid, prj.gid);
+        } catch (err) {
+          showToast("プロジェクトの作成に失敗しました: " + err.message, "error");
+        } finally {
+          btnAsanaNewProject.disabled = false;
+          btnAsanaNewProject.textContent = "📁 新規作成";
+        }
+      };
+    }
+
+    // 新規セクション作成
+    if (btnAsanaNewSection) {
+      btnAsanaNewSection.onclick = async (e) => {
+        e.preventDefault();
+        const projectGid = selectAsanaProject.value;
+        if (!projectGid) {
+          showToast("プロジェクトを選択してください。", "error");
+          return;
+        }
+        const name = prompt("新規セクションの名前を入力してください:");
+        if (!name || !name.trim()) return;
+
+        try {
+          btnAsanaNewSection.disabled = true;
+          btnAsanaNewSection.textContent = "作成中...";
+          const sec = await createAsanaSection(asanaToken, projectGid, name.trim());
+          showToast(`セクション「${sec.name}」を作成しました。`, "success");
+          
+          // 再読み込み＆自動選択
+          await populateAsanaSections(projectGid, sec.gid);
+        } catch (err) {
+          showToast("セクションの作成に失敗しました: " + err.message, "error");
+        } finally {
+          btnAsanaNewSection.disabled = false;
+          btnAsanaNewSection.textContent = "📂 新規作成";
+        }
+      };
+    }
+
+    // 各種セレクトボックスの読み込み補助関数群
+    window.populateAsanaWorkspaces = async function(selectedGid = '') {
+      if (!selectAsanaWorkspace) return;
+      selectAsanaWorkspace.innerHTML = '<option value="">読み込み中...</option>';
+      const workspaces = await fetchAsanaWorkspaces(asanaToken);
+      selectAsanaWorkspace.innerHTML = '';
+      
+      if (workspaces.length === 0) {
+        selectAsanaWorkspace.innerHTML = '<option value="">(ワークスペースがありません)</option>';
+        return;
+      }
+
+      workspaces.forEach(ws => {
+        const opt = document.createElement('option');
+        opt.value = ws.gid;
+        opt.textContent = ws.name;
+        if (selectedGid && ws.gid === selectedGid) opt.selected = true;
+        selectAsanaWorkspace.appendChild(opt);
+      });
+
+      // 最初のワークスペースに基づきプロジェクトとメンバーを自動ロード
+      const activeWsGid = selectAsanaWorkspace.value;
+      if (activeWsGid) {
+        await populateAsanaProjects(activeWsGid);
+        await populateAsanaAssignees(activeWsGid);
+      }
+    };
+
+    window.populateAsanaProjects = async function(workspaceGid, selectedGid = '') {
+      if (!selectAsanaProject) return;
+      selectAsanaProject.innerHTML = '<option value="">読み込み中...</option>';
+      const projects = await fetchAsanaProjects(asanaToken, workspaceGid);
+      selectAsanaProject.innerHTML = '<option value="">(プロジェクトなし)</option>';
+
+      projects.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.gid;
+        opt.textContent = p.name;
+        if (selectedGid && p.gid === selectedGid) opt.selected = true;
+        selectAsanaProject.appendChild(opt);
+      });
+
+      // セクションも連動ロード
+      const activePrjGid = selectAsanaProject.value;
+      await populateAsanaSections(activePrjGid);
+    };
+
+    window.populateAsanaSections = async function(projectGid, selectedGid = '') {
+      if (!selectAsanaSection) return;
+      if (!projectGid) {
+        selectAsanaSection.innerHTML = '<option value="">(プロジェクトが未選択です)</option>';
+        return;
+      }
+      selectAsanaSection.innerHTML = '<option value="">読み込み中...</option>';
+      const sections = await fetchAsanaSections(asanaToken, projectGid);
+      selectAsanaSection.innerHTML = '<option value="">(セクションなし)</option>';
+
+      sections.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.gid;
+        opt.textContent = s.name;
+        if (selectedGid && s.gid === selectedGid) opt.selected = true;
+        selectAsanaSection.appendChild(opt);
+      });
+    };
+
+    window.populateAsanaAssignees = async function(workspaceGid, selectedGid = '') {
+      if (!selectAsanaAssignee) return;
+      selectAsanaAssignee.innerHTML = '<option value="">読み込み中...</option>';
+      const users = await fetchAsanaWorkspaceUsers(asanaToken, workspaceGid);
+      selectAsanaAssignee.innerHTML = '<option value="">(未割り当て)</option>';
+
+      users.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.gid;
+        opt.textContent = u.name + (u.email ? ` (${u.email})` : '');
+        if (selectedGid && u.gid === selectedGid) opt.selected = true;
+        selectAsanaAssignee.appendChild(opt);
+      });
+    };
+
     // 共有トグルの連動
     if (chkShared) {
       chkShared.onchange = () => {
@@ -34959,6 +35188,36 @@ window.openResumableUrl = function(urlStr) {
       saveTodoBtn.disabled = false;
       saveTodoBtn.textContent = '保存する';
     }
+
+    // Asana 連携フォーム状態のリセット
+    const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+    const me = rawUserId.toLowerCase();
+    const asanaSyncToggleContainer = document.getElementById('todo-form-asana-sync-toggle-container');
+    const asanaSyncCheckbox = document.getElementById('todo-form-asana-sync');
+    const asanaFieldsContainer = document.getElementById('todo-form-asana-fields');
+    
+    const selectAsanaWorkspace = document.getElementById('todo-form-asana-workspace');
+    const selectAsanaProject = document.getElementById('todo-form-asana-project');
+    const selectAsanaSection = document.getElementById('todo-form-asana-section');
+    const selectAsanaAssignee = document.getElementById('todo-form-asana-assignee');
+
+    const asanaLinked = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
+    if (asanaSyncCheckbox) {
+      asanaSyncCheckbox.checked = false;
+      asanaSyncCheckbox.disabled = false;
+    }
+    if (asanaFieldsContainer) asanaFieldsContainer.style.display = 'none';
+    
+    if (asanaLinked) {
+      if (asanaSyncToggleContainer) asanaSyncToggleContainer.style.display = 'flex';
+    } else {
+      if (asanaSyncToggleContainer) asanaSyncToggleContainer.style.display = 'none';
+    }
+
+    if (selectAsanaWorkspace) selectAsanaWorkspace.innerHTML = '';
+    if (selectAsanaProject) selectAsanaProject.innerHTML = '<option value="">(プロジェクトなし)</option>';
+    if (selectAsanaSection) selectAsanaSection.innerHTML = '<option value="">(セクションなし)</option>';
+    if (selectAsanaAssignee) selectAsanaAssignee.innerHTML = '<option value="">(未割り当て)</option>';
   }
 
   // 共有メンバーリストの描画 (独自タスク用)
@@ -35040,7 +35299,7 @@ window.openResumableUrl = function(urlStr) {
     todoTasks = saved ? JSON.parse(saved) : [];
   }
 
-  // ToDoタスクの保存 (DB & localStorage)
+  // ToDoタスクの保存 (DB & localStorage & Asana)
   async function saveTodoItem() {
     const titleInput = document.getElementById('todo-form-title');
     const title = titleInput.value.trim();
@@ -35052,6 +35311,12 @@ window.openResumableUrl = function(urlStr) {
     const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
     const me = rawUserId.toLowerCase();
     const myName = state.currentUser ? state.currentUser.full_name : 'Guest';
+
+    const saveTodoBtn = document.getElementById('todo-form-save-btn');
+    if (saveTodoBtn) {
+      saveTodoBtn.disabled = true;
+      saveTodoBtn.textContent = '保存中...';
+    }
 
     const due = document.getElementById('todo-form-due').value;
     const notes = document.getElementById('todo-form-notes').value.trim();
@@ -35068,15 +35333,161 @@ window.openResumableUrl = function(urlStr) {
     }
 
     const isNew = !editingTodoId;
-    const taskId = isNew ? `task-${generate8DigitId()}` : editingTodoId;
+    let taskId = isNew ? `task-${generate8DigitId()}` : editingTodoId;
 
     // もし他人の共有タスクを編集しようとした場合はガード
     if (!isNew) {
       const existing = todoTasks.find(t => t.id === taskId);
       if (existing && existing.user_id !== me) {
         showToast("他人のタスクは編集できません。", "error");
+        if (saveTodoBtn) {
+          saveTodoBtn.disabled = false;
+          saveTodoBtn.textContent = '変更を保存';
+        }
         return;
       }
+    }
+
+    // Asana 同期関連の処理
+    const asanaSyncCheckbox = document.getElementById('todo-form-asana-sync');
+    const asanaLinked = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
+    const asanaToken = localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`) || '';
+
+    const selectAsanaWorkspace = document.getElementById('todo-form-asana-workspace');
+    const selectAsanaProject = document.getElementById('todo-form-asana-project');
+    const selectAsanaSection = document.getElementById('todo-form-asana-section');
+    const selectAsanaAssignee = document.getElementById('todo-form-asana-assignee');
+
+    let workspaceName = '';
+    let projectName = '';
+    let sectionName = '';
+
+    if (asanaSyncCheckbox && asanaSyncCheckbox.checked && asanaLinked && asanaToken) {
+      const workspaceGid = selectAsanaWorkspace ? selectAsanaWorkspace.value : '';
+      const projectGid = selectAsanaProject ? selectAsanaProject.value : '';
+      const sectionGid = selectAsanaSection ? selectAsanaSection.value : '';
+      const assigneeGid = selectAsanaAssignee ? selectAsanaAssignee.value : '';
+
+      if (!workspaceGid) {
+        showToast("Asanaのワークスペースを選択してください。", "error");
+        if (saveTodoBtn) {
+          saveTodoBtn.disabled = false;
+          saveTodoBtn.textContent = isNew ? '保存する' : '変更を保存';
+        }
+        return;
+      }
+
+      workspaceName = selectAsanaWorkspace.options[selectAsanaWorkspace.selectedIndex]?.text || '';
+      projectName = (selectAsanaProject && selectAsanaProject.selectedIndex >= 0) ? selectAsanaProject.options[selectAsanaProject.selectedIndex].text : '';
+      if (projectName === '(プロジェクトなし)') projectName = '';
+      sectionName = (selectAsanaSection && selectAsanaSection.selectedIndex >= 0) ? selectAsanaSection.options[selectAsanaSection.selectedIndex].text : '';
+      if (sectionName === '(セクションなし)') sectionName = '';
+
+      try {
+        if (isNew) {
+          // Asana に新規タスク作成
+          const asanaReqBody = {
+            data: {
+              name: title,
+              notes: notes,
+              workspace: workspaceGid,
+              projects: projectGid ? [projectGid] : [],
+              assignee: assigneeGid || null
+            }
+          };
+          if (due) {
+            asanaReqBody.data.due_on = due;
+          }
+          const asanaRes = await fetch('https://app.asana.com/api/1.0/tasks', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${asanaToken}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(asanaReqBody)
+          });
+          if (!asanaRes.ok) throw new Error("Asanaタスクの作成に失敗しました。");
+          const asanaResJson = await asanaRes.json();
+          const newAsanaTask = asanaResJson.data;
+          
+          taskId = `asana-${newAsanaTask.gid}`;
+
+          // セクションがある場合は、そのセクションへ移動
+          if (projectGid && sectionGid) {
+            await fetch(`https://app.asana.com/api/1.0/sections/${sectionGid}/addTask`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${asanaToken}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({ data: { task: newAsanaTask.gid } })
+            });
+          }
+        } else if (taskId.startsWith('asana-')) {
+          // Asanaの既存タスク更新
+          const taskGid = taskId.replace('asana-', '');
+          const asanaReqBody = {
+            data: {
+              name: title,
+              notes: notes,
+              assignee: assigneeGid || null,
+              due_on: due || null
+            }
+          };
+          const asanaRes = await fetch(`https://app.asana.com/api/1.0/tasks/${taskGid}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${asanaToken}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(asanaReqBody)
+          });
+          if (!asanaRes.ok) throw new Error("Asanaタスクの更新に失敗しました。");
+
+          // プロジェクト・セクションの移動
+          if (projectGid) {
+            const addProjectBody = {
+              data: {
+                project: projectGid
+              }
+            };
+            if (sectionGid) {
+              addProjectBody.data.section = sectionGid;
+            }
+            await fetch(`https://app.asana.com/api/1.0/tasks/${taskGid}/addProject`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${asanaToken}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify(addProjectBody)
+            });
+          }
+        }
+      } catch (err) {
+        showToast("Asanaとの同期に失敗しました: " + err.message, "error");
+        if (saveTodoBtn) {
+          saveTodoBtn.disabled = false;
+          saveTodoBtn.textContent = isNew ? '保存する' : '変更を保存';
+        }
+        return;
+      }
+    }
+
+    // 連携タスクの場合、notesにAsanaプロジェクトなどの詳細情報をパース用プレフィックスと共に追加してDBに格納しておくことで、
+    // 同期を実行する前でも表示を最新化できます。
+    let updatedNotes = notes;
+    if (taskId.startsWith('asana-') && workspaceName) {
+      // 既存の notes 内の 【Asana帰属: ...】 プレフィックス行があれば置換するか、無ければ先頭に追加
+      const belongStr = `【Asana帰属: ${workspaceName}${projectName ? ` ＞ ${projectName}` : ''}${sectionName ? ` (${sectionName})` : ''}】`;
+      const lines = notes.split('\n');
+      const filteredLines = lines.filter(line => !line.startsWith('【Asana帰属:'));
+      filteredLines.unshift(belongStr);
+      updatedNotes = filteredLines.join('\n');
     }
 
     const taskData = {
@@ -35085,7 +35496,7 @@ window.openResumableUrl = function(urlStr) {
       user_name: myName,
       title: title,
       due: due || null,
-      notes: notes,
+      notes: updatedNotes,
       status: isNew ? 'needsAction' : (todoTasks.find(t => t.id === taskId)?.status || 'needsAction'),
       show_on_calendar: showOnCalendar,
       shared: isShared,
@@ -35122,7 +35533,7 @@ window.openResumableUrl = function(urlStr) {
           title: (taskData.status === 'completed' ? '✓ ' : '○ ') + taskData.title,
           start_time: due,
           end_time: due,
-          description: notes + `\n\n__SYNAPSE_TODO_ID__:${taskData.id}`
+          description: updatedNotes + `\n\n__SYNAPSE_TODO_ID__:${taskData.id}`
         };
 
         const existingEventId = taskData.google_event_id || localStorage.getItem(`SYNAPSE_TODO_GOOGLE_EVENT_ID_${taskData.id}`);
@@ -35163,6 +35574,26 @@ window.openResumableUrl = function(urlStr) {
     if (existing && existing.user_id !== me) {
       showToast("他人のタスクは削除できません。", "error");
       return;
+    }
+
+    // Asana タスクであれば Asana 側も削除
+    if (editingTodoId.startsWith('asana-')) {
+      const asanaLinked = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
+      const asanaToken = localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`) || '';
+      if (asanaLinked && asanaToken) {
+        const taskGid = editingTodoId.replace('asana-', '');
+        try {
+          await fetch(`https://app.asana.com/api/1.0/tasks/${taskGid}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${asanaToken}`,
+              'Accept': 'application/json'
+            }
+          });
+        } catch (err) {
+          console.warn("[Asana API] Failed to delete task on Asana:", err);
+        }
+      }
     }
 
     if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
@@ -35223,10 +35654,11 @@ window.openResumableUrl = function(urlStr) {
     localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
 
     // Asanaのタスク連携がONのとき、Asana側の完了状態も同期する
-    if (taskId.startsWith('asana-') && state.asanaLinkTasks) {
-      const taskGid = taskId.replace('asana-', '');
+    if (taskId.startsWith('asana-')) {
+      const asanaLinked = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
       const asanaPat = localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`);
-      if (asanaPat) {
+      if (asanaLinked && asanaPat) {
+        const taskGid = taskId.replace('asana-', '');
         fetch(`https://app.asana.com/api/1.0/tasks/${taskGid}`, {
           method: 'PUT',
           headers: {
@@ -35329,6 +35761,87 @@ window.openResumableUrl = function(urlStr) {
       });
     } else {
       shareMembersContainer.style.display = 'none';
+    }
+
+    // Asana 連携情報の復元とロード
+    const asanaSyncToggleContainer = document.getElementById('todo-form-asana-sync-toggle-container');
+    const asanaSyncCheckbox = document.getElementById('todo-form-asana-sync');
+    const asanaFieldsContainer = document.getElementById('todo-form-asana-fields');
+
+    const selectAsanaWorkspace = document.getElementById('todo-form-asana-workspace');
+    const selectAsanaProject = document.getElementById('todo-form-asana-project');
+    const selectAsanaSection = document.getElementById('todo-form-asana-section');
+    const selectAsanaAssignee = document.getElementById('todo-form-asana-assignee');
+
+    const asanaLinked = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
+    const asanaToken = localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`) || '';
+
+    if (asanaSyncCheckbox) {
+      asanaSyncCheckbox.checked = false;
+      asanaSyncCheckbox.disabled = false;
+    }
+    if (asanaFieldsContainer) asanaFieldsContainer.style.display = 'none';
+
+    if (task.id.startsWith('asana-')) {
+      if (asanaSyncCheckbox) {
+        asanaSyncCheckbox.checked = true;
+        // AsanaタスクはAsana同期解除不可にする（編集の安全のため）
+        asanaSyncCheckbox.disabled = true;
+      }
+      if (asanaFieldsContainer) asanaFieldsContainer.style.display = 'flex';
+
+      // Asana APIから詳細をリアルタイムに引いて、現在のアソシエーションを再現
+      if (asanaLinked && asanaToken) {
+        const taskGid = task.id.replace('asana-', '');
+        
+        // プレースホルダーで読み込み中を明示
+        if (selectAsanaWorkspace) selectAsanaWorkspace.innerHTML = '<option value="">読み込み中...</option>';
+        if (selectAsanaProject) selectAsanaProject.innerHTML = '<option value="">読み込み中...</option>';
+        if (selectAsanaSection) selectAsanaSection.innerHTML = '<option value="">読み込み中...</option>';
+        if (selectAsanaAssignee) selectAsanaAssignee.innerHTML = '<option value="">読み込み中...</option>';
+
+        fetch(`https://app.asana.com/api/1.0/tasks/${taskGid}?opt_fields=workspace.gid,projects.gid,memberships.project.gid,memberships.section.gid,assignee.gid`, {
+          headers: { 'Authorization': `Bearer ${asanaToken}`, 'Accept': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(async (resJson) => {
+          const detail = resJson.data;
+          if (!detail) return;
+
+          const wsGid = detail.workspace ? detail.workspace.gid : '';
+          const prjGid = (detail.projects && detail.projects.length > 0) ? detail.projects[0].gid : '';
+          const assigneeGid = detail.assignee ? detail.assignee.gid : '';
+          let secGid = '';
+          if (detail.memberships && detail.memberships.length > 0) {
+            const firstM = detail.memberships.find(m => m.project && m.project.gid === prjGid);
+            if (firstM && firstM.section) secGid = firstM.section.gid;
+          }
+
+          if (wsGid && typeof window.populateAsanaWorkspaces === 'function') {
+            await window.populateAsanaWorkspaces(wsGid);
+            if (prjGid && typeof window.populateAsanaProjects === 'function') {
+              await window.populateAsanaProjects(wsGid, prjGid);
+              if (secGid && typeof window.populateAsanaSections === 'function') {
+                await window.populateAsanaSections(prjGid, secGid);
+              }
+            }
+            if (assigneeGid && typeof window.populateAsanaAssignees === 'function') {
+              await window.populateAsanaAssignees(wsGid, assigneeGid);
+            }
+          }
+        })
+        .catch(err => {
+          console.warn("[Asana API] Failed to load task details for editing:", err);
+          showToast("Asanaの所属先詳細の読み込みに失敗しました。", "error");
+        });
+      }
+    } else {
+      // 通常のタスク
+      if (asanaLinked && asanaToken) {
+        if (asanaSyncToggleContainer) asanaSyncToggleContainer.style.display = 'flex';
+      } else {
+        if (asanaSyncToggleContainer) asanaSyncToggleContainer.style.display = 'none';
+      }
     }
   }
 
@@ -35902,6 +36415,109 @@ window.openResumableUrl = function(urlStr) {
     } catch (e) {
       console.warn("[Asana Tasks Sync] Failed to sync tasks:", e);
       showToast(`Asanaの同期に失敗しました: ${e.message}`, 'error');
+    }
+  }
+
+  // 📋 Asana ワークスペース / プロジェクト / セクション / アサイン 取得・操作用 API 連携関数群
+  async function fetchAsanaWorkspaces(token) {
+    try {
+      const res = await fetch('https://app.asana.com/api/1.0/workspaces', {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      return json.data || [];
+    } catch (e) {
+      console.warn("[Asana API] Failed to fetch workspaces:", e);
+      return [];
+    }
+  }
+
+  async function fetchAsanaProjects(token, workspaceGid) {
+    try {
+      const res = await fetch(`https://app.asana.com/api/1.0/projects?workspace=${workspaceGid}&opt_fields=name,gid`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      return json.data || [];
+    } catch (e) {
+      console.warn("[Asana API] Failed to fetch projects:", e);
+      return [];
+    }
+  }
+
+  async function fetchAsanaSections(token, projectGid) {
+    try {
+      const res = await fetch(`https://app.asana.com/api/1.0/projects/${projectGid}/sections?opt_fields=name,gid`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      return json.data || [];
+    } catch (e) {
+      console.warn("[Asana API] Failed to fetch sections:", e);
+      return [];
+    }
+  }
+
+  async function fetchAsanaWorkspaceUsers(token, workspaceGid) {
+    try {
+      const res = await fetch(`https://app.asana.com/api/1.0/users?workspace=${workspaceGid}&opt_fields=name,email,gid`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      return json.data || [];
+    } catch (e) {
+      console.warn("[Asana API] Failed to fetch users:", e);
+      return [];
+    }
+  }
+
+  async function createAsanaProject(token, workspaceGid, name) {
+    try {
+      const res = await fetch('https://app.asana.com/api/1.0/projects', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ data: { name, workspace: workspaceGid } })
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`HTTP ${res.status} - ${errText}`);
+      }
+      const json = await res.json();
+      return json.data;
+    } catch (e) {
+      console.error("[Asana API] Failed to create project:", e);
+      throw e;
+    }
+  }
+
+  async function createAsanaSection(token, projectGid, name) {
+    try {
+      const res = await fetch(`https://app.asana.com/api/1.0/projects/${projectGid}/sections`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ data: { name } })
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`HTTP ${res.status} - ${errText}`);
+      }
+      const json = await res.json();
+      return json.data;
+    } catch (e) {
+      console.error("[Asana API] Failed to create section:", e);
+      throw e;
     }
   }
 
