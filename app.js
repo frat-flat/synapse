@@ -28872,7 +28872,7 @@ function setupValidationSidebarEvents() {
   });
 }
 
-// マイページアイコンのドラッグ＆ドロップ制御
+// マイページアイコンのドラッグ＆ドロップ制御（PCマウス・スマホタッチ両対応）
 function setupMypageDragAndDrop() {
   const container = document.getElementById('mypage-icon-container');
   if (!container) return;
@@ -28881,6 +28881,7 @@ function setupMypageDragAndDrop() {
   const cards = container.querySelectorAll('.admin-app-icon');
 
   cards.forEach(card => {
+    // --- PCマウスドラッグ用 ---
     card.addEventListener('dragstart', (e) => {
       dragSource = card;
       card.style.opacity = '0.4';
@@ -28904,6 +28905,42 @@ function setupMypageDragAndDrop() {
     card.addEventListener('dragend', () => {
       card.style.opacity = '1';
       saveMypageIconOrder();
+    });
+
+    // --- スマホ・タブレットタッチ用 ---
+    let touchStartEl = null;
+
+    card.addEventListener('touchstart', (e) => {
+      touchStartEl = card;
+      card.style.opacity = '0.5';
+    }, { passive: true });
+
+    card.addEventListener('touchmove', (e) => {
+      if (!touchStartEl) return;
+
+      const touch = e.touches[0];
+      const x = touch.clientX;
+      const y = touch.clientY;
+
+      const elementNode = document.elementFromPoint(x, y);
+      if (!elementNode) return;
+
+      const targetCard = elementNode.closest('.admin-app-icon');
+      if (targetCard && targetCard !== touchStartEl && targetCard.parentNode === container) {
+        const rect = targetCard.getBoundingClientRect();
+        const next = (y - rect.top) / (rect.bottom - rect.top) > 0.5 ||
+                     (x - rect.left) / (rect.right - rect.left) > 0.5;
+        
+        container.insertBefore(touchStartEl, next ? targetCard.nextSibling : targetCard);
+      }
+    });
+
+    card.addEventListener('touchend', () => {
+      if (touchStartEl) {
+        touchStartEl.style.opacity = '1';
+        touchStartEl = null;
+        saveMypageIconOrder();
+      }
     });
   });
 }
