@@ -36064,7 +36064,7 @@ window.openResumableUrl = function(urlStr) {
     metaContainer.style.minWidth = '0';
 
     // Asana の帰属先情報バッジの追加
-    if (task.id.startsWith('asana-')) {
+    if (task.id.startsWith('asana-') && state.todoGroupMode !== 'project') {
       let wsName = task.workspace_name || '';
       let prjName = task.project_name || '';
       let secName = task.section_name || '';
@@ -36103,7 +36103,7 @@ window.openResumableUrl = function(urlStr) {
       }
     }
     // Google の帰属先リスト情報バッジの追加
-    if (task.id.startsWith('google-')) {
+    if (task.id.startsWith('google-') && state.todoGroupMode !== 'project') {
       let listName = '';
       if (task.notes) {
         const match = task.notes.match(/^【Google To-Do帰属: ([^】]+)】/);
