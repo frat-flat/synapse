@@ -2526,11 +2526,12 @@ function loadStateFromLocalStorage(keys) {
 function ensureInitialUsersExist() {
   const defaultUsers = [
     { 
-      id: 'owner', 
+      id: 'owner@synapse.management', 
       name: 'オーナー', 
+      email: 'owner@synapse.management',
       password: 'password', 
       role: 'owner',
-      code: '4X9N3K75',
+      code: 'OWNER_SEED_INIT_CODE',
       createdAt: '2025-01-01T10:00:00Z',
       lastLoginAt: new Date().toISOString(),
       pwdChangedAt: '2025-01-01T10:00:00Z' // 半年以上前
@@ -2545,19 +2546,42 @@ function ensureInitialUsersExist() {
       let users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
       let updated = false;
       
-      // admin ID が残っていた場合は owner へ置換する移行ロジック
+      let hasOwnerEmail = users.some(u => u.id === 'owner@synapse.management');
+
+      // admin ID が残っていた場合は owner@synapse.management へ移行するロジック
       const adminIdx = users.findIndex(u => u.id === 'admin');
       if (adminIdx !== -1) {
-        users[adminIdx].id = 'owner';
-        users[adminIdx].name = 'オーナー';
-        users[adminIdx].role = 'owner';
-        users[adminIdx].code = '4X9N3K75';
+        if (!hasOwnerEmail) {
+          users[adminIdx].id = 'owner@synapse.management';
+          users[adminIdx].email = 'owner@synapse.management';
+          users[adminIdx].name = 'オーナー';
+          users[adminIdx].role = 'owner';
+          users[adminIdx].code = 'OWNER_SEED_INIT_CODE';
+          hasOwnerEmail = true;
+        } else {
+          users.splice(adminIdx, 1);
+        }
         updated = true;
       }
       
-      // もし owner アカウント自体が存在しない場合は追加する
-      const ownerExists = users.some(u => u.id === 'owner');
-      if (!ownerExists) {
+      // 旧ID 'owner' の重複アカウントがあった場合は削除・移行して一本化！
+      const oldOwnerIdx = users.findIndex(u => u.id === 'owner');
+      if (oldOwnerIdx !== -1) {
+        if (!hasOwnerEmail) {
+          users[oldOwnerIdx].id = 'owner@synapse.management';
+          users[oldOwnerIdx].email = 'owner@synapse.management';
+          users[oldOwnerIdx].name = 'オーナー';
+          users[oldOwnerIdx].role = 'owner';
+          users[oldOwnerIdx].code = 'OWNER_SEED_INIT_CODE';
+          hasOwnerEmail = true;
+        } else {
+          users.splice(oldOwnerIdx, 1);
+        }
+        updated = true;
+      }
+      
+      // もし owner@synapse.management アカウント自体が存在しない場合は追加する
+      if (!hasOwnerEmail) {
         users.unshift(defaultUsers[0]);
         updated = true;
       }
@@ -2566,7 +2590,7 @@ function ensureInitialUsersExist() {
         if (!u.createdAt) { u.createdAt = '2025-01-01T10:00:00Z'; updated = true; }
         if (!u.lastLoginAt) { u.lastLoginAt = new Date().toISOString(); updated = true; }
         if (!u.pwdChangedAt) { u.pwdChangedAt = u.createdAt; updated = true; }
-        if (!u.code) { u.code = (u.id === 'owner' ? '4X9N3K75' : generate8DigitId()); updated = true; }
+        if (!u.code) { u.code = (u.id === 'owner@synapse.management' ? 'OWNER_SEED_INIT_CODE' : generate8DigitId()); updated = true; }
         return u;
       });
       if (updated) {
