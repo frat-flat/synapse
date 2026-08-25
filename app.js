@@ -35389,7 +35389,13 @@ window.openResumableUrl = function(urlStr) {
     // タイトル
     const title = document.createElement('span');
     title.className = 'todo-item-title';
-    title.textContent = task.title;
+    let prefix = '';
+    if (task.id.startsWith('google-')) {
+      prefix = '🔹 ';
+    } else if (task.id.startsWith('asana-')) {
+      prefix = '🔺 ';
+    }
+    title.textContent = prefix + task.title;
 
     row.appendChild(checkbox);
     row.appendChild(title);
