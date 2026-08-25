@@ -69,23 +69,32 @@ export default async function handler(req, res) {
     const userEmail = userData.data ? userData.data.email : null;
     const userName = userData.data ? userData.data.name : 'Asana User';
 
-    // 3. 担当しているタスク一覧を取得
-    // 1回のリクエストで必要フィールドを取得するため opt_fields を指定
-    const tasksUrl = 'https://app.asana.com/api/1.0/tasks?assignee=me&opt_fields=name,due_on,completed,notes';
-    const tasksRes = await fetch(tasksUrl, {
-      headers: {
-        'Authorization': `Bearer ${asanaToken}`,
-        'Accept': 'application/json'
-      }
-    });
-
+    // ユーザーが所属する全ワークスペースから自分にアサインされたタスクを取得する
+    const workspaces = userData.data ? userData.data.workspaces : [];
     let allTasks = [];
-    if (tasksRes.ok) {
-      const tasksData = await tasksRes.json();
-      allTasks = tasksData.data || [];
+
+    if (workspaces && workspaces.length > 0) {
+      for (const ws of workspaces) {
+        const workspaceGid = ws.gid;
+        const tasksUrl = `https://app.asana.com/api/1.0/tasks?assignee=me&workspace=${workspaceGid}&opt_fields=name,due_on,completed,notes`;
+        const tasksRes = await fetch(tasksUrl, {
+          headers: {
+            'Authorization': `Bearer ${asanaToken}`,
+            'Accept': 'application/json'
+          }
+        });
+
+        if (tasksRes.ok) {
+          const tasksData = await tasksRes.json();
+          const wsTasks = tasksData.data || [];
+          allTasks = allTasks.concat(wsTasks);
+        } else {
+          const errText = await tasksRes.text();
+          console.error(`Failed to fetch Asana tasks for workspace ${workspaceGid}:`, errText);
+        }
+      }
     } else {
-      const errText = await tasksRes.text();
-      console.error('Failed to fetch Asana tasks details:', errText);
+      console.error('No workspaces found for the user in Asana.');
     }
 
     return res.status(200).json({

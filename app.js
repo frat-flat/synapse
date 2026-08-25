@@ -7,6 +7,12 @@
 // ==========================================
 window.logToDebugPanel = function() {};
 
+console.warn("[DEBUG-SYNAPSE] app.js loaded. Setting localStorage keys...");
+localStorage.setItem('synapse_supabase_url', 'https://uefiuhywfsnrepiouofq.supabase.co');
+localStorage.setItem('synapse_supabase_anon_key', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ');
+localStorage.setItem('synapse_partner_supabase_url', 'https://uefiuhywfsnrepiouofq.supabase.co');
+localStorage.setItem('synapse_partner_supabase_anon_key', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ');
+
 // ============================================================================
 // 🔒 AES-256 クライアントサイド暗号化コア (Web Crypto API)
 // ============================================================================
@@ -1440,8 +1446,16 @@ function setupSupabaseAuthListener() {
 }
 
 function initSupabase() {
-  const url = localStorage.getItem(STORAGE_KEYS.SUPABASE_URL);
-  const key = localStorage.getItem(STORAGE_KEYS.SUPABASE_ANON_KEY);
+  // 自動バックグラウンド設定 (最新の kikan-system-mvp データベースに接続)
+  localStorage.setItem(STORAGE_KEYS.SUPABASE_URL, 'https://uefiuhywfsnrepiouofq.supabase.co');
+  localStorage.setItem(STORAGE_KEYS.SUPABASE_ANON_KEY, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ');
+  localStorage.setItem(STORAGE_KEYS.PARTNER_SUPABASE_URL, 'https://uefiuhywfsnrepiouofq.supabase.co');
+  localStorage.setItem(STORAGE_KEYS.PARTNER_SUPABASE_ANON_KEY, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ');
+
+  // 強制的に新しい接続先情報を適用 (localStorage の遅延や別プロセス上書きバグを回避)
+  const url = 'https://uefiuhywfsnrepiouofq.supabase.co';
+  const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+  console.warn("[DEBUG-SYNAPSE] initSupabase executing. Forced URL:", url);
   
   if (url && key && window.supabase) {
     try {
@@ -1471,8 +1485,10 @@ function initSupabase() {
 }
 
 function initPartnerSupabase() {
-  const url = localStorage.getItem(STORAGE_KEYS.PARTNER_SUPABASE_URL);
-  const key = localStorage.getItem(STORAGE_KEYS.PARTNER_SUPABASE_ANON_KEY);
+  // 強制的に新しい接続先情報を適用 (localStorage の遅延や別プロセス上書きバグを回避)
+  const url = 'https://uefiuhywfsnrepiouofq.supabase.co';
+  const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+  console.warn("[DEBUG-SYNAPSE] initPartnerSupabase executing. Forced URL:", url);
   
   if (url && key && window.supabase) {
     try {
@@ -31338,6 +31354,16 @@ window.openResumableUrl = function(urlStr) {
   let synapseMembers = []; // synapse_usersテーブルから取得した全メンバー
   let isGoogleLinked = false;
   let googleLinkedEmail = '';
+  window.isGoogleLinked = false;
+  window.googleLinkedEmail = '';
+
+  function setGoogleLinkState(linked, email) {
+    isGoogleLinked = linked;
+    googleLinkedEmail = email || '';
+    window.isGoogleLinked = linked;
+    window.googleLinkedEmail = email || '';
+  }
+
   let googleTokenClient = null;
   let googleAccessToken = null;
 
@@ -31351,6 +31377,87 @@ window.openResumableUrl = function(urlStr) {
     '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', 
     '#06b6d4', '#14b8a6', '#6366f1', '#a855f7', '#f43f5e'
   ];
+
+  // 表示フィルターオプションを動的に切り替える関数
+  window.updateCalendarDisplayFilterOptions = function(customMe) {
+    const rawUserId = customMe || (state.currentUser ? state.currentUser.id : 'guest');
+    const targetMe = rawUserId.toLowerCase();
+    
+    // 状態が未ロードの場合は直接localStorageから読み込んで初期化する
+    if (state.googleLinkTasks === undefined) {
+      state.googleLinkTasks = localStorage.getItem(`SYNAPSE_GOOGLE_LINK_TASKS_${targetMe}`) === 'true';
+    }
+    if (state.googleTasksShowOnCalendar === undefined) {
+      state.googleTasksShowOnCalendar = localStorage.getItem(`SYNAPSE_GOOGLE_TASKS_SHOW_ON_CALENDAR_${targetMe}`) !== 'false';
+    }
+    if (state.asanaLinkTasks === undefined) {
+      state.asanaLinkTasks = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${targetMe}`) === 'true';
+    }
+    if (state.asanaTasksShowOnCalendar === undefined) {
+      state.asanaTasksShowOnCalendar = localStorage.getItem(`SYNAPSE_ASANA_TASKS_SHOW_ON_CALENDAR_${targetMe}`) !== 'false';
+    }
+
+    const isGoogleLinkedState = isGoogleLinked || (localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${targetMe}`) === 'true');
+    if (isGoogleLinkedState && !isGoogleLinked) {
+      setGoogleLinkState(true, localStorage.getItem(`SYNAPSE_GOOGLE_EMAIL_${targetMe}`) || '');
+    }
+
+    const isGoogleTasksActive = isGoogleLinkedState &&
+      (state.googleLinkTasks === true) &&
+      (state.googleTasksShowOnCalendar === true);
+
+    const isAsanaTasksActive = (state.asanaLinkTasks === true) &&
+      (localStorage.getItem(`SYNAPSE_ASANA_PAT_${targetMe}`) ? true : false) &&
+      (state.asanaTasksShowOnCalendar === true);
+
+    const select = document.getElementById('calendar-display-filter');
+    if (!select) return;
+
+    const currentValue = select.value || localStorage.getItem(`SYNAPSE_CALENDAR_DISPLAY_FILTER_${targetMe}`) || 'all-events';
+    
+    // 全オプションのリスト定義（value, text, requireGoogle, requireAsana）
+    const allOptions = [
+      { value: 'all-events', text: 'すべての予定とToDo/Asana（デフォルト）', reqGoogle: false, reqAsana: false },
+      { value: 'my-events-only', text: '自分の予定のみ反映', reqGoogle: false, reqAsana: false },
+      { value: 'shared-members-only', text: '共有しているメンバーのみ反映', reqGoogle: false, reqAsana: false },
+      { value: 'shared-with-me', text: '自分と共有しているメンバーの反映', reqGoogle: false, reqAsana: false },
+      { value: 'todo-only', text: 'ToDo リストのみ反映', reqGoogle: true, reqAsana: false },
+      { value: 'my-events-and-todo', text: '自分の予定と自分のToDoリストの反映', reqGoogle: true, reqAsana: false },
+      { value: 'asana-only', text: 'Asana のみ反映', reqGoogle: false, reqAsana: true },
+      { value: 'my-events-and-asana', text: '自分の予定とAsanaの反映', reqGoogle: false, reqAsana: true },
+      { value: 'asana-and-todo', text: 'AsanaとTodoの反映', reqGoogle: true, reqAsana: true },
+      { value: 'my-events-asana-todo', text: '自分の予定とAsanaとTodoの反映', reqGoogle: true, reqAsana: true },
+      { value: 'shared-members-asana', text: '共有しているメンバーのAsanaの反映', reqGoogle: false, reqAsana: true }
+    ];
+
+    // オプションを一旦クリア
+    select.innerHTML = '';
+
+    let activeOptionExists = false;
+
+    allOptions.forEach(opt => {
+      const gPass = !opt.reqGoogle || isGoogleTasksActive;
+      const aPass = !opt.reqAsana || isAsanaTasksActive;
+      if (gPass && aPass) {
+        const optionEl = document.createElement('option');
+        optionEl.value = opt.value;
+        optionEl.textContent = opt.text;
+        select.appendChild(optionEl);
+        if (opt.value === currentValue) {
+          activeOptionExists = true;
+        }
+      }
+    });
+
+    // 現在の値が有効な選択肢として残っていればそれを維持、そうでなければ「自分の予定のみ反映」へ
+    if (activeOptionExists) {
+      select.value = currentValue;
+    } else {
+      select.value = 'my-events-only';
+      state.calendarDisplayFilter = 'my-events-only';
+      localStorage.setItem(`SYNAPSE_CALENDAR_DISPLAY_FILTER_${targetMe}`, 'my-events-only');
+    }
+  };
 
   // 1. カレンダー初期化
   window.initMypageCalendar = function() {
@@ -31371,6 +31478,18 @@ window.openResumableUrl = function(urlStr) {
     }
     if (state.calendarDisplayFilter === undefined) {
       state.calendarDisplayFilter = localStorage.getItem(`SYNAPSE_CALENDAR_DISPLAY_FILTER_${me}`) || 'all-events';
+    }
+    if (state.googleTasksShowOnCalendar === undefined) {
+      state.googleTasksShowOnCalendar = localStorage.getItem(`SYNAPSE_GOOGLE_TASKS_SHOW_ON_CALENDAR_${me}`) !== 'false';
+    }
+    if (state.asanaTasksShowOnCalendar === undefined) {
+      state.asanaTasksShowOnCalendar = localStorage.getItem(`SYNAPSE_ASANA_TASKS_SHOW_ON_CALENDAR_${me}`) !== 'false';
+    }
+    if (state.googleLinkTasks === undefined) {
+      state.googleLinkTasks = localStorage.getItem(`SYNAPSE_GOOGLE_LINK_TASKS_${me}`) === 'true';
+    }
+    if (state.asanaLinkTasks === undefined) {
+      state.asanaLinkTasks = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
     }
 
     // DOM要素のバインド
@@ -31415,6 +31534,7 @@ window.openResumableUrl = function(urlStr) {
     // 表示対象フィルターのバインド
     const displayFilterSelect = document.getElementById('calendar-display-filter');
     if (displayFilterSelect) {
+      updateCalendarDisplayFilterOptions(me);
       displayFilterSelect.value = state.calendarDisplayFilter;
       displayFilterSelect.onchange = () => {
         state.calendarDisplayFilter = displayFilterSelect.value;
@@ -31427,13 +31547,37 @@ window.openResumableUrl = function(urlStr) {
 
     // 3分おきの自動同期処理タイマーをセット
     if (!state.googleSyncIntervalId) {
-      state.googleSyncIntervalId = setInterval(() => {
+      state.googleSyncIntervalId = setInterval(async () => {
+        let needRefresh = false;
+
+        // 1. Googleカレンダー連携中の自動同期
         if (isGoogleLinked && googleAccessToken) {
           console.log("[Google Calendar Sync] Running 3-minute auto-sync...");
-          syncWithGoogleCalendar().then(() => {
-            renderMypageCalendar();
-            if (typeof renderTodoList === 'function') renderTodoList();
-          });
+          try {
+            await syncWithGoogleCalendar();
+            needRefresh = true;
+          } catch (err) {
+            console.error("[Auto Sync] Google sync failed:", err);
+          }
+        }
+
+        // 2. Asana連携中の自動同期
+        const asanaPat = localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`) || '';
+        if (state.asanaLinkTasks && asanaPat) {
+          console.log("[Asana Sync] Running 3-minute auto-sync...");
+          try {
+            if (typeof syncWithAsanaTasks === 'function') {
+              await syncWithAsanaTasks(me);
+              needRefresh = true;
+            }
+          } catch (err) {
+            console.error("[Auto Sync] Asana sync failed:", err);
+          }
+        }
+
+        if (needRefresh) {
+          renderMypageCalendar();
+          if (typeof renderTodoList === 'function') renderTodoList();
         }
       }, 180000); // 3分 (180,000ms)
     }
@@ -32244,9 +32388,9 @@ window.openResumableUrl = function(urlStr) {
     const defaultShareTypeSelect = document.getElementById('calendar-default-share-type');
     const defaultShareMembersContainer = document.getElementById('calendar-default-share-members-list');
     
-    // Google連携状態の復元
-    isGoogleLinked = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_LINKED', rawUserId) === 'true';
-    googleLinkedEmail = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_EMAIL', rawUserId) || '';
+    const isLinkedVal = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_LINKED', rawUserId) === 'true';
+    const linkedEmailVal = getLocalStorageGoogleItem('SYNAPSE_GOOGLE_EMAIL', rawUserId) || '';
+    setGoogleLinkState(isLinkedVal, linkedEmailVal);
     
     // Google API設定の復元 (サーバー環境変数があればそれを優先キャッシュ)
     if (state.googleClientId && state.googleApiKey) {
@@ -33793,8 +33937,7 @@ window.openResumableUrl = function(urlStr) {
     const asanaEmail = localStorage.getItem(`SYNAPSE_ASANA_EMAIL_${me}`) || '';
     if (asanaEmail && email.toLowerCase() !== asanaEmail.toLowerCase()) {
       showToast(`Asanaと異なるアカウント (${email}) は連携できません。`, 'error');
-      isGoogleLinked = false;
-      googleLinkedEmail = '';
+      setGoogleLinkState(false, '');
       localStorage.removeItem(`SYNAPSE_GOOGLE_LINKED_${me}`);
       localStorage.removeItem(`SYNAPSE_GOOGLE_EMAIL_${me}`);
       updateGoogleStatusUI();
@@ -33806,8 +33949,7 @@ window.openResumableUrl = function(urlStr) {
       return;
     }
 
-    isGoogleLinked = true;
-    googleLinkedEmail = email;
+    setGoogleLinkState(true, email);
     
     localStorage.setItem(`SYNAPSE_GOOGLE_LINKED_${me}`, 'true');
     localStorage.setItem(`SYNAPSE_GOOGLE_EMAIL_${me}`, email);
@@ -33831,10 +33973,17 @@ window.openResumableUrl = function(urlStr) {
     // タスク画面側のUI更新
     const labelGoogleEmail = document.getElementById('task-sync-google-email');
     const btnGoogleConnect = document.getElementById('task-sync-google-btn');
+    const labelGoogleReflect = document.getElementById('task-sync-google-calendar-reflect-label');
     if (labelGoogleEmail && btnGoogleConnect) {
       labelGoogleEmail.textContent = email;
       btnGoogleConnect.textContent = '連携解除';
       btnGoogleConnect.className = 'btn btn-danger';
+    }
+    if (labelGoogleReflect) {
+      labelGoogleReflect.style.display = 'flex';
+    }
+    if (typeof updateCalendarDisplayFilterOptions === 'function') {
+      updateCalendarDisplayFilterOptions();
     }
 
     // 警告をクリア
@@ -33886,8 +34035,7 @@ window.openResumableUrl = function(urlStr) {
     todoTasks = todoTasks.filter(t => !t.id.startsWith('google-task-'));
     localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
 
-    isGoogleLinked = false;
-    googleLinkedEmail = '';
+    setGoogleLinkState(false, '');
     googleAccessToken = null;
     googleTokenClient = null;
     
@@ -33898,6 +34046,19 @@ window.openResumableUrl = function(urlStr) {
     localStorage.removeItem(`SYNAPSE_GOOGLE_SELECTED_CALENDAR_ID_${me}`);
     
     updateGoogleStatusUI();
+    
+    // Google Tasks カレンダー反映トグルの表示リセット
+    state.googleTasksShowOnCalendar = true;
+    localStorage.setItem(`SYNAPSE_GOOGLE_TASKS_SHOW_ON_CALENDAR_${me}`, 'true');
+    const chkGoogleReflect = document.getElementById('task-sync-google-calendar-reflect');
+    const labelGoogleReflect = document.getElementById('task-sync-google-calendar-reflect-label');
+    if (chkGoogleReflect) chkGoogleReflect.checked = true;
+    if (labelGoogleReflect) labelGoogleReflect.style.display = 'none';
+
+    if (typeof updateCalendarDisplayFilterOptions === 'function') {
+      updateCalendarDisplayFilterOptions();
+    }
+
     showToast('Googleカレンダーの連携を解除しました。', 'info');
     
     // セレクトボックスを隠す
@@ -34463,12 +34624,9 @@ window.openResumableUrl = function(urlStr) {
     const me = rawUserId.toLowerCase();
 
     // Google連携情報の初期復元（カレンダー画面をロードする前にタスク画面を開いた場合のケア）
-    if (!isGoogleLinked) {
-      isGoogleLinked = localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${me}`) === 'true';
-    }
-    if (!googleLinkedEmail) {
-      googleLinkedEmail = localStorage.getItem(`SYNAPSE_GOOGLE_EMAIL_${me}`) || '';
-    }
+    const isLinkedVal = localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${me}`) === 'true';
+    const emailVal = localStorage.getItem(`SYNAPSE_GOOGLE_EMAIL_${me}`) || '';
+    setGoogleLinkState(isLinkedVal, emailVal);
     if (!googleAccessToken) {
       const cachedToken = localStorage.getItem(`SYNAPSE_GOOGLE_ACCESS_TOKEN_${me}`);
       const expiresStr = localStorage.getItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`);
@@ -34608,14 +34766,29 @@ window.openResumableUrl = function(urlStr) {
 
     if (typeof partnerSupabaseClient !== 'undefined' && partnerSupabaseClient) {
       try {
-        // 自分が作成したタスク、または自分と共有されているタスクを取得
+        // supabase-jsのURL生成バグを回避するため、.contains() や .or() などの
+        // 記号を含む配列フィルタを避け、DBから全件取得してクライアント側でフィルタリングする
         const { data, error } = await partnerSupabaseClient
           .from('synapse_todo_tasks')
-          .select('*')
-          .or(`user_id.eq.${me},shared_with.cs.{"${rawUserId}"},shared_with.cs.{"*"}`);
+          .select('*');
 
-        if (!error && data) {
-          todoTasks = data;
+        if (error) throw error;
+
+        if (data) {
+          const rawUserIdLower = rawUserId.toLowerCase();
+          todoTasks = data.filter(t => {
+            // 自分のタスク
+            if (t.user_id && t.user_id.toLowerCase() === me) return true;
+            // 共有メンバーに自分が含まれているか、全員共有('*')か
+            if (t.shared_with && Array.isArray(t.shared_with)) {
+              const sharedLower = t.shared_with.map(s => s.toLowerCase());
+              if (sharedLower.includes(rawUserIdLower) || sharedLower.includes('*')) {
+                return true;
+              }
+            }
+            return false;
+          });
+
           localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
           return;
         }
@@ -34816,14 +34989,15 @@ window.openResumableUrl = function(urlStr) {
       const taskGid = taskId.replace('asana-', '');
       const asanaPat = localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`);
       if (asanaPat) {
-        fetch('/api/sync-asana-tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        fetch(`https://app.asana.com/api/1.0/tasks/${taskGid}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${asanaPat}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: JSON.stringify({
-            asanaToken: asanaPat,
-            action: 'update',
-            taskGid: taskGid,
-            completed: isCompleted
+            data: { completed: !!isCompleted }
           })
         }).catch(err => console.warn("[Asana Sync] Task status update failed:", err));
       }
@@ -35108,24 +35282,52 @@ window.openResumableUrl = function(urlStr) {
 
   // 📋 Google Tasks マージ同期処理
   async function syncWithGoogleTasks(me) {
+    if (state.googleLinkTasks === undefined) {
+      state.googleLinkTasks = localStorage.getItem(`SYNAPSE_GOOGLE_LINK_TASKS_${me}`) === 'true';
+    }
     if (!isGoogleLinked || !googleAccessToken || !state.googleLinkTasks) return;
 
     try {
-      console.log("[Google Tasks Sync] Fetching tasks via serverless proxy...");
-      const response = await fetch('/api/sync-google-tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken: googleAccessToken })
+      console.log("[Google Tasks Sync] Fetching tasks directly from Google Tasks API...");
+      
+      // 1. タスクリスト一覧を取得
+      const listsRes = await fetch('https://tasks.googleapis.com/tasks/v1/users/@me/lists', {
+        headers: {
+          'Authorization': `Bearer ${googleAccessToken}`,
+          'Accept': 'application/json'
+        }
       });
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        const details = errData.details || errData.error || '';
-        throw new Error(`Google Tasks Proxy response error: ${response.status} - ${details}`);
+      if (!listsRes.ok) {
+        const errText = await listsRes.text();
+        throw new Error(`Failed to fetch Google task lists: ${listsRes.status} - ${errText}`);
       }
 
-      const data = await response.json();
-      const googleTasksList = data.items || [];
+      const listsData = await listsRes.json();
+      const taskLists = listsData.items || [];
+      let googleTasksList = [];
+
+      // 2. 各タスクリストからタスクを取得
+      for (const list of taskLists) {
+        const tasksUrl = `https://tasks.googleapis.com/tasks/v1/lists/${list.id}/tasks?showCompleted=true&showHidden=true`;
+        const tasksRes = await fetch(tasksUrl, {
+          headers: {
+            'Authorization': `Bearer ${googleAccessToken}`,
+            'Accept': 'application/json'
+          }
+        });
+
+        if (tasksRes.ok) {
+          const tasksData = await tasksRes.json();
+          if (tasksData.items) {
+            const mapped = tasksData.items.map(t => ({
+              ...t,
+              listName: list.title
+            }));
+            googleTasksList = googleTasksList.concat(mapped);
+          }
+        }
+      }
 
       // マージ用の既存IDマップ作成
       const currentGoogleTaskIds = new Set(googleTasksList.map(t => `google-task-${t.id}`));
@@ -35198,25 +35400,55 @@ window.openResumableUrl = function(urlStr) {
 
   // 📋 Asana Tasks マージ同期処理
   async function syncWithAsanaTasks(me) {
+    if (state.asanaLinkTasks === undefined) {
+      state.asanaLinkTasks = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
+    }
     const token = localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`);
     if (!token || !state.asanaLinkTasks) return;
 
     try {
-      console.log("[Asana Tasks Sync] Fetching tasks via serverless proxy...");
-      const res = await fetch('/api/sync-asana-tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ asanaToken: token })
+      console.log("[Asana Tasks Sync] Fetching tasks directly from Asana API...");
+      // 1. ユーザー情報から所属ワークスペースを取得
+      const userRes = await fetch('https://app.asana.com/api/1.0/users/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        const details = errData.details || errData.error || '';
-        throw new Error(`Asana API sync failed: ${res.status} - ${details}`);
+      if (!userRes.ok) {
+        const errText = await userRes.text();
+        throw new Error(`Failed to fetch Asana user info: ${userRes.status} - ${errText}`);
       }
 
-      const data = await res.json();
-      const asanaTasksList = data.items || [];
+      const userData = await userRes.json();
+      const workspaces = userData.data ? userData.data.workspaces : [];
+      let asanaTasksList = [];
+
+      // 2. 各ワークスペースからタスクを取得
+      if (workspaces && workspaces.length > 0) {
+        for (const ws of workspaces) {
+          const workspaceGid = ws.gid;
+          const tasksUrl = `https://app.asana.com/api/1.0/tasks?assignee=me&workspace=${workspaceGid}&opt_fields=name,due_on,completed,notes`;
+          const tasksRes = await fetch(tasksUrl, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json'
+            }
+          });
+
+          if (tasksRes.ok) {
+            const tasksData = await tasksRes.json();
+            const wsTasks = tasksData.data || [];
+            asanaTasksList = asanaTasksList.concat(wsTasks);
+          } else {
+            const errText = await tasksRes.text();
+            console.error(`Failed to fetch Asana tasks for workspace ${workspaceGid}:`, errText);
+          }
+        }
+      } else {
+        console.warn('No workspaces found for the user in Asana.');
+      }
 
       // マージ用の既存IDマップ作成
       const currentAsanaTaskIds = new Set(asanaTasksList.map(t => `asana-${t.gid}`));
@@ -35292,38 +35524,64 @@ window.openResumableUrl = function(urlStr) {
     const panelGoogleConfig = document.getElementById('task-sync-google-config');
     const labelGoogleEmail = document.getElementById('task-sync-google-email');
     const btnGoogleConnect = document.getElementById('task-sync-google-btn');
+    const chkGoogleReflect = document.getElementById('task-sync-google-calendar-reflect');
+    const labelGoogleReflect = document.getElementById('task-sync-google-calendar-reflect-label');
 
     const chkAsanaEnable = document.getElementById('task-sync-asana-enable');
     const panelAsanaConfig = document.getElementById('task-sync-asana-config');
     const labelAsanaEmail = document.getElementById('task-sync-asana-email');
     const inputAsanaToken = document.getElementById('task-sync-asana-token');
     const btnAsanaConnect = document.getElementById('task-sync-asana-connect-btn');
+    const chkAsanaReflect = document.getElementById('task-sync-asana-calendar-reflect');
+    const labelAsanaReflect = document.getElementById('task-sync-asana-calendar-reflect-label');
 
     const warningText = document.getElementById('task-sync-warning-text');
 
     if (!chkGoogleEnable || !chkAsanaEnable) return;
 
+    console.log("[Tasks Sync Init] DOM & Storage status:", {
+      chkGoogleReflect: !!chkGoogleReflect,
+      labelGoogleReflect: !!labelGoogleReflect,
+      chkAsanaReflect: !!chkAsanaReflect,
+      labelAsanaReflect: !!labelAsanaReflect,
+      googleLinkedEmail: typeof googleLinkedEmail !== 'undefined' ? googleLinkedEmail : 'undefined',
+      isGoogleLinked: typeof isGoogleLinked !== 'undefined' ? isGoogleLinked : 'undefined',
+      asanaPatExists: !!localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`),
+      asanaEmail: localStorage.getItem(`SYNAPSE_ASANA_EMAIL_${me}`)
+    });
+
     // 1. 状態の復元
     state.googleLinkTasks = localStorage.getItem(`SYNAPSE_GOOGLE_LINK_TASKS_${me}`) === 'true';
     state.asanaLinkTasks = localStorage.getItem(`SYNAPSE_ASANA_LINK_TASKS_${me}`) === 'true';
+    state.googleTasksShowOnCalendar = localStorage.getItem(`SYNAPSE_GOOGLE_TASKS_SHOW_ON_CALENDAR_${me}`) !== 'false';
+    state.asanaTasksShowOnCalendar = localStorage.getItem(`SYNAPSE_ASANA_TASKS_SHOW_ON_CALENDAR_${me}`) !== 'false';
     const asanaPat = localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`) || '';
     const asanaEmail = localStorage.getItem(`SYNAPSE_ASANA_EMAIL_${me}`) || '';
 
     chkGoogleEnable.checked = state.googleLinkTasks;
     chkAsanaEnable.checked = state.asanaLinkTasks;
+    if (chkGoogleReflect) chkGoogleReflect.checked = state.googleTasksShowOnCalendar;
+    if (chkAsanaReflect) chkAsanaReflect.checked = state.asanaTasksShowOnCalendar;
 
     panelGoogleConfig.style.display = state.googleLinkTasks ? 'flex' : 'none';
     panelAsanaConfig.style.display = state.asanaLinkTasks ? 'flex' : 'none';
 
     // Google接続状態の反映
-    if (isGoogleLinked && googleLinkedEmail) {
-      labelGoogleEmail.textContent = googleLinkedEmail;
+    const isGoogleLinkedState = isGoogleLinked || (localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${me}`) === 'true');
+    const googleLinkedEmailState = googleLinkedEmail || localStorage.getItem(`SYNAPSE_GOOGLE_EMAIL_${me}`) || '';
+    if (isGoogleLinkedState && (!isGoogleLinked || !googleLinkedEmail)) {
+      setGoogleLinkState(isGoogleLinkedState, googleLinkedEmailState);
+    }
+    if (isGoogleLinkedState && googleLinkedEmailState) {
+      labelGoogleEmail.textContent = googleLinkedEmailState;
       btnGoogleConnect.textContent = '連携解除';
       btnGoogleConnect.className = 'btn btn-danger';
+      if (labelGoogleReflect) labelGoogleReflect.style.display = 'flex';
     } else {
       labelGoogleEmail.textContent = '未接続';
       btnGoogleConnect.textContent = 'アカウント接続';
       btnGoogleConnect.className = 'btn btn-secondary';
+      if (labelGoogleReflect) labelGoogleReflect.style.display = 'none';
     }
 
     // Asana接続状態の反映
@@ -35333,15 +35591,41 @@ window.openResumableUrl = function(urlStr) {
       inputAsanaToken.disabled = true;
       btnAsanaConnect.textContent = '連携解除';
       btnAsanaConnect.className = 'btn btn-danger';
+      if (labelAsanaReflect) labelAsanaReflect.style.display = 'flex';
     } else {
       labelAsanaEmail.textContent = '未接続';
       inputAsanaToken.value = '';
       inputAsanaToken.disabled = false;
       btnAsanaConnect.textContent = '接続する';
       btnAsanaConnect.className = 'btn btn-secondary';
+      if (labelAsanaReflect) labelAsanaReflect.style.display = 'none';
     }
 
     // 2. イベントハンドラーの登録
+
+    // Google Tasks カレンダー反映トグル
+    if (chkGoogleReflect) {
+      chkGoogleReflect.onchange = () => {
+        state.googleTasksShowOnCalendar = chkGoogleReflect.checked;
+        localStorage.setItem(`SYNAPSE_GOOGLE_TASKS_SHOW_ON_CALENDAR_${me}`, state.googleTasksShowOnCalendar ? 'true' : 'false');
+        if (state.mypageCalendarInitialized) renderMypageCalendar();
+        if (typeof updateCalendarDisplayFilterOptions === 'function') {
+          updateCalendarDisplayFilterOptions();
+        }
+      };
+    }
+
+    // Asana カレンダー反映トグル
+    if (chkAsanaReflect) {
+      chkAsanaReflect.onchange = () => {
+        state.asanaTasksShowOnCalendar = chkAsanaReflect.checked;
+        localStorage.setItem(`SYNAPSE_ASANA_TASKS_SHOW_ON_CALENDAR_${me}`, state.asanaTasksShowOnCalendar ? 'true' : 'false');
+        if (state.mypageCalendarInitialized) renderMypageCalendar();
+        if (typeof updateCalendarDisplayFilterOptions === 'function') {
+          updateCalendarDisplayFilterOptions();
+        }
+      };
+    }
 
     // Google Tasks 連携有効トグル
     chkGoogleEnable.onchange = () => {
@@ -35419,6 +35703,16 @@ window.openResumableUrl = function(urlStr) {
           inputAsanaToken.disabled = false;
           btnAsanaConnect.textContent = '接続する';
           btnAsanaConnect.className = 'btn btn-secondary';
+
+          // Asanaカレンダー反映トグルの表示リセット
+          state.asanaTasksShowOnCalendar = true;
+          localStorage.setItem(`SYNAPSE_ASANA_TASKS_SHOW_ON_CALENDAR_${me}`, 'true');
+          if (chkAsanaReflect) chkAsanaReflect.checked = true;
+          if (labelAsanaReflect) labelAsanaReflect.style.display = 'none';
+
+          if (typeof updateCalendarDisplayFilterOptions === 'function') {
+            updateCalendarDisplayFilterOptions();
+          }
           
           warningText.style.display = 'none';
           showToast('Asana連携を解除しました', 'success');
@@ -35452,19 +35746,20 @@ window.openResumableUrl = function(urlStr) {
         warningText.style.display = 'none';
 
         try {
-          const res = await fetch('/api/sync-asana-tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ asanaToken: token })
+          const userRes = await fetch('https://app.asana.com/api/1.0/users/me', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json'
+            }
           });
 
-          if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || '接続に失敗しました');
+          if (!userRes.ok) {
+            const errText = await userRes.text();
+            throw new Error(`接続に失敗しました: ${userRes.status} - ${errText}`);
           }
 
-          const data = await res.json();
-          const email = data.user ? data.user.email : '';
+          const userData = await userRes.json();
+          const email = userData.data ? userData.data.email : '';
 
           if (!email) {
             throw new Error('ユーザー情報の取得に失敗しました');
@@ -35489,6 +35784,13 @@ window.openResumableUrl = function(urlStr) {
           btnAsanaConnect.textContent = '連携解除';
           btnAsanaConnect.className = 'btn btn-danger';
           btnAsanaConnect.disabled = false;
+
+          // Asanaカレンダー反映トグルの表示
+          if (labelAsanaReflect) labelAsanaReflect.style.display = 'flex';
+
+          if (typeof updateCalendarDisplayFilterOptions === 'function') {
+            updateCalendarDisplayFilterOptions();
+          }
 
           showToast('Asanaと正常に接続されました！', 'success');
 

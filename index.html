@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Synapse</title>
+<title>Synapse [DEBUG-TEST]</title>
 <link rel="icon" type="image/png" href="logo.png">
 
 <link rel="stylesheet" href="styles.css?v=2.1">
@@ -1267,6 +1267,9 @@
                 <div id="task-sync-google-status" style="font-size: 0.72rem; color: var(--text-secondary);">
                   状態: <span id="task-sync-google-email" style="font-weight: 700; color: var(--text-primary);">未接続</span>
                 </div>
+                <label id="task-sync-google-calendar-reflect-label" style="cursor: pointer; display: none; align-items: center; gap: 0.25rem; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); user-select: none; margin-top: 0.15rem;">
+                  <input type="checkbox" id="task-sync-google-calendar-reflect" checked style="width: 14px; height: 14px; cursor: pointer;"> 📅 カレンダーに反映する
+                </label>
                 <div style="display: flex; gap: 0.4rem;">
                   <button id="task-sync-google-btn" class="btn btn-secondary" style="flex: 1; padding: 0.2rem 0.4rem; font-size: 0.7rem; font-weight: 700; cursor: pointer;">アカウント接続</button>
                 </div>
@@ -1287,6 +1290,9 @@
                 <div id="task-sync-asana-status" style="font-size: 0.72rem; color: var(--text-secondary);">
                   状態: <span id="task-sync-asana-email" style="font-weight: 700; color: var(--text-primary);">未接続</span>
                 </div>
+                <label id="task-sync-asana-calendar-reflect-label" style="cursor: pointer; display: none; align-items: center; gap: 0.25rem; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); user-select: none; margin-top: 0.15rem;">
+                  <input type="checkbox" id="task-sync-asana-calendar-reflect" checked style="width: 14px; height: 14px; cursor: pointer;"> 📅 カレンダーに反映する
+                </label>
                 <div style="display: flex; flex-direction: column; gap: 0.35rem;">
                   <input type="password" id="task-sync-asana-token" class="calendar-form-control" placeholder="アクセストークン (PAT)" style="width: 100%; font-size: 0.7rem; padding: 0.2rem 0.4rem; box-sizing: border-box; height: 26px;">
                   <button id="task-sync-asana-connect-btn" class="btn btn-secondary" style="width: 100%; padding: 0.2rem 0.4rem; font-size: 0.7rem; font-weight: 700; cursor: pointer;">接続する</button>

@@ -165,6 +165,9 @@ CREATE POLICY "Allow owner to manage all devices" ON public.synapse_user_devices
 -- 8. 初期のオーナーアカウント用シード（DBに最初の管理者を作成するための安全弁）
 -- ※認証用のメールアドレス owner@synapse.management などを登録する前に、
 -- public.synapse_users 側に最初のownerを定義しておくことで、RLSでエラーになるのを防ぎます。
-INSERT INTO public.synapse_users (id, name, role, email, code)
-VALUES ('owner@synapse.management', 'オーナー', 'owner', 'owner@synapse.management', '4X9N3K75')
+-- 既存のテーブルがある場合に備えて password カラムの NOT NULL 制約を解除する
+ALTER TABLE public.synapse_users ALTER COLUMN password DROP NOT NULL;
+
+INSERT INTO public.synapse_users (id, name, password, role, email, code)
+VALUES ('owner@synapse.management', 'オーナー', 'temporary_password_please_change', 'owner', 'owner@synapse.management', 'OWNER_SEED_INIT_CODE')
 ON CONFLICT (id) DO NOTHING;
