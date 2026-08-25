@@ -35961,7 +35961,14 @@ window.openResumableUrl = function(urlStr) {
             }
             projName = prjName ? `Asana: ${prjName}` : 'Asana (プロジェクトなし)';
           } else if (task.id.startsWith('google-')) {
-            projName = 'Google To-Do';
+            let listName = '';
+            if (task.notes) {
+              const match = task.notes.match(/^【Google To-Do帰属: ([^】]+)】/);
+              if (match) {
+                listName = match[1] ? match[1].trim() : '';
+              }
+            }
+            projName = listName ? `Google To-Do: ${listName}` : 'Google To-Do (リストなし)';
           }
 
           if (!groups[projName]) {
@@ -36007,7 +36014,7 @@ window.openResumableUrl = function(urlStr) {
           let iconColor = 'var(--primary)';
           if (groupKey.startsWith('Asana:')) {
             iconColor = '#e04f5f'; // Asanaカラー
-          } else if (groupKey === 'Google To-Do') {
+          } else if (groupKey.startsWith('Google To-Do')) {
             iconColor = '#3b82f6'; // Googleカラー
           }
           
@@ -36153,6 +36160,32 @@ window.openResumableUrl = function(urlStr) {
           badgeText += ` (${secName})`;
         }
         belongBadge.textContent = badgeText;
+        metaContainer.appendChild(belongBadge);
+      }
+    // Google の帰属先リスト情報バッジの追加
+    if (task.id.startsWith('google-')) {
+      let listName = '';
+      if (task.notes) {
+        const match = task.notes.match(/^【Google To-Do帰属: ([^】]+)】/);
+        if (match) {
+          listName = match[1] ? match[1].trim() : '';
+        }
+      }
+
+      if (listName) {
+        const belongBadge = document.createElement('span');
+        belongBadge.className = 'todo-google-belong-badge';
+        belongBadge.style.fontSize = '0.65rem';
+        belongBadge.style.color = '#3b82f6'; // Googleのブランドカラー（ブルー）
+        belongBadge.style.background = 'rgba(59, 130, 246, 0.08)';
+        belongBadge.style.border = '1px solid rgba(59, 130, 246, 0.2)';
+        belongBadge.style.padding = '1px 5px';
+        belongBadge.style.borderRadius = '3px';
+        belongBadge.style.fontWeight = '600';
+        belongBadge.style.display = 'inline-flex';
+        belongBadge.style.alignItems = 'center';
+        belongBadge.style.gap = '2px';
+        belongBadge.textContent = `Google: ${listName}`;
         metaContainer.appendChild(belongBadge);
       }
     }
@@ -36386,11 +36419,18 @@ window.openResumableUrl = function(urlStr) {
         const nextStatus = isCompleted ? 'completed' : 'needsAction';
         const due = task.due ? task.due.substring(0, 10) : null; // YYYY-MM-DD
 
+        let notesText = task.notes || '';
+        // 既存の 【Google To-Do帰属】 ラベルがあれば取り除く
+        notesText = notesText.replace(/^【Google To-Do帰属: [^】]+】\s*/, '');
+        // リスト名を先頭に付与
+        const listName = task.listName || 'My Tasks';
+        notesText = `【Google To-Do帰属: ${listName}】\n${notesText}`.trim();
+
         const taskObj = {
           id: taskId,
           title: task.title || '無題のタスク',
           due: due,
-          notes: task.notes || '',
+          notes: notesText,
           status: nextStatus,
           show_on_calendar: true,
           user_id: me,

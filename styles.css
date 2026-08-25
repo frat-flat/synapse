@@ -4955,8 +4955,9 @@ h3 {
   text-overflow: ellipsis;
 }
 
-/* Asana所属先バッジ */
-.todo-asana-belong-badge {
+/* Asana/Google所属先バッジ */
+.todo-asana-belong-badge,
+.todo-google-belong-badge {
   flex-shrink: 3; /* 最も優先して縮小する */
   max-width: 150px;
   overflow: hidden;
@@ -4984,13 +4985,15 @@ h3 {
 
 /* 📋 タスク幅のレスポンシブ縮小制御（優先順位: タスク名 > 日付 > 所属先） */
 @container (max-width: 480px) {
-  .todo-asana-belong-badge {
+  .todo-asana-belong-badge,
+  .todo-google-belong-badge {
     display: none !important;
   }
 }
 
 @container (max-width: 350px) {
-  .todo-asana-belong-badge {
+  .todo-asana-belong-badge,
+  .todo-google-belong-badge {
     display: none !important;
   }
   .todo-shared-badge {
