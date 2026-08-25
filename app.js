@@ -2085,9 +2085,9 @@ async function loadUserSettingsFromCloud() {
       .from('user_profiles')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       console.error("[Supabase] Failed to load user profiles:", error);
       return;
     }
@@ -32663,7 +32663,7 @@ window.openResumableUrl = function(urlStr) {
           .from('synapse_storage')
           .select('value')
           .eq('key', 'calendar_allowed_share_members')
-          .single();
+          .maybeSingle();
         if (data && !error && data.value && Array.isArray(data.value.allowed_ids)) {
           allowedIds = data.value.allowed_ids;
         }
