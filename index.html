@@ -1239,16 +1239,23 @@
             <!-- サービス別フィルター -->
             <div class="todo-service-filters" style="display: flex; gap: 0.4rem; align-items: center;">
               <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; margin-right: 0.25rem;">サービス:</span>
-              <button id="todo-filter-service-all" class="todo-filter-btn active" style="font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--primary); background: rgba(59, 130, 246, 0.08); color: var(--primary); cursor: pointer; font-weight: 600; transition: all 0.2s;">すべて</button>
-              <button id="todo-filter-service-google" class="todo-filter-btn" style="font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); cursor: pointer; font-weight: 600; transition: all 0.2s;">Google To-Do</button>
-              <button id="todo-filter-service-asana" class="todo-filter-btn" style="font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); cursor: pointer; font-weight: 600; transition: all 0.2s;">Asana</button>
+              <button id="todo-filter-service-all" class="todo-filter-btn active">すべて</button>
+              <button id="todo-filter-service-google" class="todo-filter-btn">Google To-Do</button>
+              <button id="todo-filter-service-asana" class="todo-filter-btn">Asana</button>
             </div>
             
             <!-- グループ分けオプション -->
             <div class="todo-group-filters" style="display: flex; gap: 0.4rem; align-items: center; margin-top: 0.1rem;">
               <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; margin-right: 0.25rem;">グループ分け:</span>
-              <button id="todo-group-none" class="todo-group-btn active" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; border: 1px solid var(--primary); background: rgba(59, 130, 246, 0.08); color: var(--primary); cursor: pointer; font-weight: 600; transition: all 0.2s;">なし</button>
-              <button id="todo-group-project" class="todo-group-btn" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); cursor: pointer; font-weight: 600; transition: all 0.2s;">プロジェクト別</button>
+              <button id="todo-group-none" class="todo-group-btn">なし</button>
+              <button id="todo-group-project" class="todo-group-btn">プロジェクト別</button>
+            </div>
+
+            <!-- 並び順オプション -->
+            <div class="todo-sort-filters" style="display: flex; gap: 0.4rem; align-items: center; margin-top: 0.1rem;">
+              <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; margin-right: 0.25rem;">並び順:</span>
+              <button id="todo-sort-due" class="todo-sort-btn active">期日順</button>
+              <button id="todo-sort-created" class="todo-sort-btn">登録順</button>
             </div>
           </div>
 

@@ -34748,10 +34748,10 @@ window.openResumableUrl = function(urlStr) {
       };
     }
 
-    // グループ分けオプションの復元とバインド
+    // グループ分けオプションの復元とバインド（デフォルト: project）
     const groupNoneBtn = document.getElementById('todo-group-none');
     const groupProjectBtn = document.getElementById('todo-group-project');
-    state.todoGroupMode = localStorage.getItem(`SYNAPSE_TODO_GROUP_MODE_${me}`) || 'none';
+    state.todoGroupMode = localStorage.getItem(`SYNAPSE_TODO_GROUP_MODE_${me}`) || 'project';
 
     function updateGroupFilterButtonsState() {
       if (!groupNoneBtn || !groupProjectBtn) return;
@@ -34782,6 +34782,41 @@ window.openResumableUrl = function(urlStr) {
     }
 
     updateGroupFilterButtonsState();
+
+    // 並び順オプションの復元とバインド
+    const sortDueBtn = document.getElementById('todo-sort-due');
+    const sortCreatedBtn = document.getElementById('todo-sort-created');
+    state.todoSortMode = localStorage.getItem(`SYNAPSE_TODO_SORT_MODE_${me}`) || 'due';
+
+    function updateSortFilterButtonsState() {
+      if (!sortDueBtn || !sortCreatedBtn) return;
+      [sortDueBtn, sortCreatedBtn].forEach(btn => btn.classList.remove('active'));
+      if (state.todoSortMode === 'created') {
+        sortCreatedBtn.classList.add('active');
+      } else {
+        sortDueBtn.classList.add('active');
+      }
+    }
+
+    if (sortDueBtn) {
+      sortDueBtn.onclick = () => {
+        state.todoSortMode = 'due';
+        localStorage.setItem(`SYNAPSE_TODO_SORT_MODE_${me}`, 'due');
+        updateSortFilterButtonsState();
+        renderTodoList();
+      };
+    }
+
+    if (sortCreatedBtn) {
+      sortCreatedBtn.onclick = () => {
+        state.todoSortMode = 'created';
+        localStorage.setItem(`SYNAPSE_TODO_SORT_MODE_${me}`, 'created');
+        updateSortFilterButtonsState();
+        renderTodoList();
+      };
+    }
+
+    updateSortFilterButtonsState();
 
     // Asana フォーム要素
     const asanaSyncToggleContainer = document.getElementById('todo-form-asana-sync-toggle-container');
@@ -35873,15 +35908,29 @@ window.openResumableUrl = function(urlStr) {
       filteredTasks = todoTasks.filter(t => t.id.startsWith('asana-'));
     }
 
-    // 日付順（期限日 due 順）にソート (期限があるものを昇順で先に並べ、期限なしは最後に)
-    filteredTasks.sort((a, b) => {
-      if (a.due && b.due) {
-        return a.due.localeCompare(b.due);
-      }
-      if (a.due) return -1; // a のみ期限ありなら a が先
-      if (b.due) return 1;  // b のみ期限ありなら b が先
-      return 0;             // 両方期限なし
-    });
+    // ソート順の適用
+    const currentSortMode = state.todoSortMode || 'due';
+    if (currentSortMode === 'due') {
+      // 日付順（期限日 due 順）にソート (期限があるものを昇順で先に並べ、期限なしは最後に)
+      filteredTasks.sort((a, b) => {
+        if (a.due && b.due) {
+          return a.due.localeCompare(b.due);
+        }
+        if (a.due) return -1; // a のみ期限ありなら a が先
+        if (b.due) return 1;  // b のみ期限ありなら b が先
+        return 0;             // 両方期限なし
+      });
+    } else {
+      // 登録順（作成日時 created_at の降順：新しいものが上）
+      filteredTasks.sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (timeA !== timeB) {
+          return timeB - timeA;
+        }
+        return b.id.localeCompare(a.id);
+      });
+    }
 
     const activeTasks = filteredTasks.filter(t => t.status !== 'completed');
     const doneTasks = filteredTasks.filter(t => t.status === 'completed');
@@ -36058,9 +36107,18 @@ window.openResumableUrl = function(urlStr) {
     row.appendChild(checkbox);
     row.appendChild(title);
 
+    // メタ情報（バッジ類）を右側に寄せるためのコンテナ
+    const metaContainer = document.createElement('div');
+    metaContainer.className = 'todo-item-meta';
+    metaContainer.style.marginLeft = 'auto';
+    metaContainer.style.display = 'flex';
+    metaContainer.style.alignItems = 'center';
+    metaContainer.style.gap = '0.5rem';
+    metaContainer.style.flexShrink = '0';
+    metaContainer.style.minWidth = '0';
+
     // Asana の帰属先情報バッジの追加
     if (task.id.startsWith('asana-')) {
-      // workspace_name や project_name がない場合は、notesの先頭に埋め込んだテキストからパースを試みる
       let wsName = task.workspace_name || '';
       let prjName = task.project_name || '';
       let secName = task.section_name || '';
@@ -36083,7 +36141,6 @@ window.openResumableUrl = function(urlStr) {
         belongBadge.style.border = '1px solid rgba(224, 79, 95, 0.2)';
         belongBadge.style.padding = '1px 5px';
         belongBadge.style.borderRadius = '3px';
-        belongBadge.style.marginLeft = '0.5rem';
         belongBadge.style.fontWeight = '600';
         belongBadge.style.display = 'inline-flex';
         belongBadge.style.alignItems = 'center';
@@ -36096,7 +36153,7 @@ window.openResumableUrl = function(urlStr) {
           badgeText += ` (${secName})`;
         }
         belongBadge.textContent = badgeText;
-        row.appendChild(belongBadge);
+        metaContainer.appendChild(belongBadge);
       }
     }
 
@@ -36105,12 +36162,12 @@ window.openResumableUrl = function(urlStr) {
       const shareBadge = document.createElement('span');
       shareBadge.className = 'todo-shared-badge';
       shareBadge.textContent = `${task.user_name || task.user_id} から共有`;
-      row.appendChild(shareBadge);
+      metaContainer.appendChild(shareBadge);
     } else if (task.shared) {
       const shareBadge = document.createElement('span');
       shareBadge.className = 'todo-shared-badge';
       shareBadge.textContent = `共有中`;
-      row.appendChild(shareBadge);
+      metaContainer.appendChild(shareBadge);
     }
 
     // 期日バッジ
@@ -36118,8 +36175,10 @@ window.openResumableUrl = function(urlStr) {
       const dueBadge = document.createElement('span');
       dueBadge.className = `todo-due-badge ${task.status === 'completed' ? 'completed' : (task.due < todayStr ? 'overdue' : '')}`;
       dueBadge.textContent = task.due.replace(/-/g, '/');
-      row.appendChild(dueBadge);
+      metaContainer.appendChild(dueBadge);
     }
+
+    row.appendChild(metaContainer);
 
     // ツールチップ用テキストの組み立て
     let tooltip = `タスク名: ${task.title}`;
