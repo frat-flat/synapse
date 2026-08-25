@@ -34749,34 +34749,18 @@ window.openResumableUrl = function(urlStr) {
     }
 
     // グループ分けオプションの復元とバインド（デフォルト: project）
-    const groupNoneBtn = document.getElementById('todo-group-none');
-    const groupProjectBtn = document.getElementById('todo-group-project');
+    const groupSelect = document.getElementById('todo-group-select');
     state.todoGroupMode = localStorage.getItem(`SYNAPSE_TODO_GROUP_MODE_${me}`) || 'project';
 
     function updateGroupFilterButtonsState() {
-      if (!groupNoneBtn || !groupProjectBtn) return;
-      [groupNoneBtn, groupProjectBtn].forEach(btn => btn.classList.remove('active'));
-      if (state.todoGroupMode === 'project') {
-        groupProjectBtn.classList.add('active');
-      } else {
-        groupNoneBtn.classList.add('active');
-      }
+      if (!groupSelect) return;
+      groupSelect.value = state.todoGroupMode;
     }
 
-    if (groupNoneBtn) {
-      groupNoneBtn.onclick = () => {
-        state.todoGroupMode = 'none';
-        localStorage.setItem(`SYNAPSE_TODO_GROUP_MODE_${me}`, 'none');
-        updateGroupFilterButtonsState();
-        renderTodoList();
-      };
-    }
-
-    if (groupProjectBtn) {
-      groupProjectBtn.onclick = () => {
-        state.todoGroupMode = 'project';
-        localStorage.setItem(`SYNAPSE_TODO_GROUP_MODE_${me}`, 'project');
-        updateGroupFilterButtonsState();
+    if (groupSelect) {
+      groupSelect.onchange = (e) => {
+        state.todoGroupMode = e.target.value;
+        localStorage.setItem(`SYNAPSE_TODO_GROUP_MODE_${me}`, e.target.value);
         renderTodoList();
       };
     }
@@ -34784,34 +34768,18 @@ window.openResumableUrl = function(urlStr) {
     updateGroupFilterButtonsState();
 
     // 並び順オプションの復元とバインド
-    const sortDueBtn = document.getElementById('todo-sort-due');
-    const sortCreatedBtn = document.getElementById('todo-sort-created');
+    const sortSelect = document.getElementById('todo-sort-select');
     state.todoSortMode = localStorage.getItem(`SYNAPSE_TODO_SORT_MODE_${me}`) || 'due';
 
     function updateSortFilterButtonsState() {
-      if (!sortDueBtn || !sortCreatedBtn) return;
-      [sortDueBtn, sortCreatedBtn].forEach(btn => btn.classList.remove('active'));
-      if (state.todoSortMode === 'created') {
-        sortCreatedBtn.classList.add('active');
-      } else {
-        sortDueBtn.classList.add('active');
-      }
+      if (!sortSelect) return;
+      sortSelect.value = state.todoSortMode;
     }
 
-    if (sortDueBtn) {
-      sortDueBtn.onclick = () => {
-        state.todoSortMode = 'due';
-        localStorage.setItem(`SYNAPSE_TODO_SORT_MODE_${me}`, 'due');
-        updateSortFilterButtonsState();
-        renderTodoList();
-      };
-    }
-
-    if (sortCreatedBtn) {
-      sortCreatedBtn.onclick = () => {
-        state.todoSortMode = 'created';
-        localStorage.setItem(`SYNAPSE_TODO_SORT_MODE_${me}`, 'created');
-        updateSortFilterButtonsState();
+    if (sortSelect) {
+      sortSelect.onchange = (e) => {
+        state.todoSortMode = e.target.value;
+        localStorage.setItem(`SYNAPSE_TODO_SORT_MODE_${me}`, e.target.value);
         renderTodoList();
       };
     }
@@ -35090,35 +35058,17 @@ window.openResumableUrl = function(urlStr) {
     switchTodoTab(savedTab);
 
     // === 📋 ToDo サービス別フィルター切り替えロジック ===
-    const filterAll = document.getElementById('todo-filter-service-all');
-    const filterGoogle = document.getElementById('todo-filter-service-google');
-    const filterAsana = document.getElementById('todo-filter-service-asana');
+    const filterServiceSelect = document.getElementById('todo-filter-service-select');
+    const filterGoogleOpt = document.getElementById('todo-filter-service-google-opt');
+    const filterAsanaOpt = document.getElementById('todo-filter-service-asana-opt');
 
     function switchTodoServiceFilter(filterType) {
       state.todoServiceFilter = filterType;
       localStorage.setItem(`SYNAPSE_TODO_SERVICE_FILTER_${me}`, filterType);
 
-      // ボタンのクラス（アクティブ表示）を更新
-      const buttons = [
-        { el: filterAll, type: 'all' },
-        { el: filterGoogle, type: 'google' },
-        { el: filterAsana, type: 'asana' }
-      ];
-
-      buttons.forEach(btn => {
-        if (!btn.el) return;
-        if (btn.type === filterType) {
-          btn.el.classList.add('active');
-          btn.el.style.border = '1px solid var(--primary)';
-          btn.el.style.background = 'rgba(59, 130, 246, 0.08)';
-          btn.el.style.color = 'var(--primary)';
-        } else {
-          btn.el.classList.remove('active');
-          btn.el.style.border = '1px solid var(--border-color)';
-          btn.el.style.background = 'transparent';
-          btn.el.style.color = 'var(--text-secondary)';
-        }
-      });
+      if (filterServiceSelect) {
+        filterServiceSelect.value = filterType;
+      }
 
       // 再描画
       renderTodoList();
@@ -35128,53 +35078,42 @@ window.openResumableUrl = function(urlStr) {
       const isGoogleLinkedState = isGoogleLinked || (localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${me}`) === 'true');
       const hasAsanaPat = !!localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`);
 
-      if (filterGoogle) {
+      if (filterGoogleOpt) {
         if (!isGoogleLinkedState) {
-          filterGoogle.disabled = true;
-          filterGoogle.style.opacity = '0.4';
-          filterGoogle.style.cursor = 'not-allowed';
-          filterGoogle.style.pointerEvents = 'none';
+          filterGoogleOpt.disabled = true;
           if (state.todoServiceFilter === 'google') {
             switchTodoServiceFilter('all');
           }
         } else {
-          filterGoogle.disabled = false;
-          filterGoogle.style.opacity = '1';
-          filterGoogle.style.cursor = 'pointer';
-          filterGoogle.style.pointerEvents = 'auto';
+          filterGoogleOpt.disabled = false;
         }
       }
 
-      if (filterAsana) {
+      if (filterAsanaOpt) {
         if (!hasAsanaPat) {
-          filterAsana.disabled = true;
-          filterAsana.style.opacity = '0.4';
-          filterAsana.style.cursor = 'not-allowed';
-          filterAsana.style.pointerEvents = 'none';
+          filterAsanaOpt.disabled = true;
           if (state.todoServiceFilter === 'asana') {
             switchTodoServiceFilter('all');
           }
         } else {
-          filterAsana.disabled = false;
-          filterAsana.style.opacity = '1';
-          filterAsana.style.cursor = 'pointer';
-          filterAsana.style.pointerEvents = 'auto';
+          filterAsanaOpt.disabled = false;
         }
       }
     }
     window.updateTodoServiceFilterButtonsState = updateTodoServiceFilterButtonsState;
 
-    if (filterAll) filterAll.onclick = () => switchTodoServiceFilter('all');
-    if (filterGoogle) {
-      filterGoogle.onclick = () => {
-        if (filterGoogle.disabled) return;
-        switchTodoServiceFilter('google');
-      };
-    }
-    if (filterAsana) {
-      filterAsana.onclick = () => {
-        if (filterAsana.disabled) return;
-        switchTodoServiceFilter('asana');
+    if (filterServiceSelect) {
+      filterServiceSelect.onchange = (e) => {
+        const val = e.target.value;
+        if (val === 'google' && filterGoogleOpt && filterGoogleOpt.disabled) {
+          filterServiceSelect.value = state.todoServiceFilter;
+          return;
+        }
+        if (val === 'asana' && filterAsanaOpt && filterAsanaOpt.disabled) {
+          filterServiceSelect.value = state.todoServiceFilter;
+          return;
+        }
+        switchTodoServiceFilter(val);
       };
     }
 
@@ -36162,6 +36101,7 @@ window.openResumableUrl = function(urlStr) {
         belongBadge.textContent = badgeText;
         metaContainer.appendChild(belongBadge);
       }
+    }
     // Google の帰属先リスト情報バッジの追加
     if (task.id.startsWith('google-')) {
       let listName = '';
