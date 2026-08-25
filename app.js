@@ -35576,7 +35576,20 @@ window.openResumableUrl = function(urlStr) {
           }
         }
       } catch (err) {
-        showToast("Google To-Doとの同期に失敗しました: " + err.message, "error");
+        let errorMsg = err.message || '';
+        if (errorMsg.includes('ACCESS_TOKEN_SCOPE_INSUFFICIENT') || 
+            errorMsg.includes('insufficient authentication scopes') || 
+            errorMsg.includes('403') || 
+            errorMsg.includes('Insufficient Permission')) {
+          
+          // キャッシュされた Google トークンをクリアして、次回サインイン時に再取得・ポップアップを強制する
+          localStorage.removeItem(`SYNAPSE_GOOGLE_ACCESS_TOKEN_${me}`);
+          localStorage.removeItem(`SYNAPSE_GOOGLE_TOKEN_EXPIRES_${me}`);
+          googleAccessToken = null;
+          
+          errorMsg = "Googleのアクセス権限が不足しています。一度Google連携を解除し、再度連携する際、Google公式画面で『Google To-Doのすべてのタスクの表示・編集・作成・削除』という項目に必ずチェック（ON）を入れてください。";
+        }
+        showToast("Google To-Doとの同期に失敗しました: " + errorMsg, "error", 12000);
         if (saveTodoBtn) {
           saveTodoBtn.disabled = false;
           saveTodoBtn.textContent = isNew ? '保存する' : '変更を保存';
