@@ -31362,6 +31362,9 @@ window.openResumableUrl = function(urlStr) {
     googleLinkedEmail = email || '';
     window.isGoogleLinked = linked;
     window.googleLinkedEmail = email || '';
+    if (typeof window.updateTodoServiceFilterButtonsState === 'function') {
+      window.updateTodoServiceFilterButtonsState();
+    }
   }
 
   let googleTokenClient = null;
@@ -34831,14 +34834,65 @@ window.openResumableUrl = function(urlStr) {
       renderTodoList();
     }
 
+    function updateTodoServiceFilterButtonsState() {
+      const isGoogleLinkedState = isGoogleLinked || (localStorage.getItem(`SYNAPSE_GOOGLE_LINKED_${me}`) === 'true');
+      const hasAsanaPat = !!localStorage.getItem(`SYNAPSE_ASANA_PAT_${me}`);
+
+      if (filterGoogle) {
+        if (!isGoogleLinkedState) {
+          filterGoogle.disabled = true;
+          filterGoogle.style.opacity = '0.4';
+          filterGoogle.style.cursor = 'not-allowed';
+          filterGoogle.style.pointerEvents = 'none';
+          if (state.todoServiceFilter === 'google') {
+            switchTodoServiceFilter('all');
+          }
+        } else {
+          filterGoogle.disabled = false;
+          filterGoogle.style.opacity = '1';
+          filterGoogle.style.cursor = 'pointer';
+          filterGoogle.style.pointerEvents = 'auto';
+        }
+      }
+
+      if (filterAsana) {
+        if (!hasAsanaPat) {
+          filterAsana.disabled = true;
+          filterAsana.style.opacity = '0.4';
+          filterAsana.style.cursor = 'not-allowed';
+          filterAsana.style.pointerEvents = 'none';
+          if (state.todoServiceFilter === 'asana') {
+            switchTodoServiceFilter('all');
+          }
+        } else {
+          filterAsana.disabled = false;
+          filterAsana.style.opacity = '1';
+          filterAsana.style.cursor = 'pointer';
+          filterAsana.style.pointerEvents = 'auto';
+        }
+      }
+    }
+    window.updateTodoServiceFilterButtonsState = updateTodoServiceFilterButtonsState;
+
     if (filterAll) filterAll.onclick = () => switchTodoServiceFilter('all');
-    if (filterGoogle) filterGoogle.onclick = () => switchTodoServiceFilter('google');
-    if (filterAsana) filterAsana.onclick = () => switchTodoServiceFilter('asana');
+    if (filterGoogle) {
+      filterGoogle.onclick = () => {
+        if (filterGoogle.disabled) return;
+        switchTodoServiceFilter('google');
+      };
+    }
+    if (filterAsana) {
+      filterAsana.onclick = () => {
+        if (filterAsana.disabled) return;
+        switchTodoServiceFilter('asana');
+      };
+    }
 
     // サービスフィルターの初期復元
     const savedServiceFilter = localStorage.getItem(`SYNAPSE_TODO_SERVICE_FILTER_${me}`) || 'all';
     state.todoServiceFilter = savedServiceFilter;
     switchTodoServiceFilter(savedServiceFilter);
+    updateTodoServiceFilterButtonsState();
 
     // 🔌 タスク外部連携設定のバインド
     initTaskSyncSettings(me);
@@ -36000,6 +36054,9 @@ window.openResumableUrl = function(urlStr) {
           localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(todoTasks));
           renderTodoList();
           if (state.mypageCalendarInitialized) renderMypageCalendar();
+          if (typeof window.updateTodoServiceFilterButtonsState === 'function') {
+            window.updateTodoServiceFilterButtonsState();
+          }
         }
       } else {
         const token = inputAsanaToken.value.trim();
@@ -36057,6 +36114,9 @@ window.openResumableUrl = function(urlStr) {
           await syncWithAsanaTasks(me);
           renderTodoList();
           if (state.mypageCalendarInitialized) renderMypageCalendar();
+          if (typeof window.updateTodoServiceFilterButtonsState === 'function') {
+            window.updateTodoServiceFilterButtonsState();
+          }
         } catch (err) {
           console.error('[Asana Sync] Connection failed:', err);
           warningText.textContent = `⚠️ 接続エラー: ${err.message}`;
