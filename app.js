@@ -2187,6 +2187,12 @@ async function syncToSupabase(key, value) {
           updated_at: new Date().toISOString()
         });
 
+    } else if (key.startsWith('todo-task-') || key.startsWith('google-task-') || key.startsWith('asana-task-')) {
+      // ToDoタスクの同期
+      const taskData = typeof value === 'string' ? JSON.parse(value) : value;
+      const { error } = await supabaseClient
+        .from('synapse_todo_tasks')
+        .upsert(taskData);
       if (error) throw error;
     } else {
       let parsedValue;
@@ -2215,6 +2221,13 @@ async function syncToSupabase(key, value) {
     task.status = 'error';
     saveSyncQueueToStorage();
     updateSyncStatusUI();
+  }
+}
+
+// ToDo専用のオフライン同期キューへの追加ヘルパー
+function pushToSyncQueue(table, data) {
+  if (table === 'synapse_todo_tasks') {
+    syncToSupabase(`todo-task-${data.id}`, data);
   }
 }
 
