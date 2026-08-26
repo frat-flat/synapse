@@ -26594,27 +26594,29 @@ function initSignupEvents() {
               to: email,
               subject: '【Synapse】アカウント仮登録とパスワード設定のご案内',
               html: `
-                <div style="font-family: sans-serif; line-height: 1.6; padding: 1.5rem; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 500px; margin: 0 auto; color: #1e293b;">
-                  <h2 style="color: #4f46e5; margin-top: 0; border-bottom: 2px solid #f0fdf4; padding-bottom: 0.5rem;">Synapseへようこそ！</h2>
-                  <p>「${fullName}」様のアカウントを仮登録いたしました。</p>
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 1.5rem; max-width: 520px; margin: 0 auto; color: #1e293b;">
+                  <p>「${fullName}」様</p>
+                  <p>この度は「Synapse」に仮登録いただきありがとうございます。</p>
+                  <p style="font-weight: bold; color: #ef4444;">まだ登録は完了していません。</p>
+                  <p>以下のリンクから必要情報を入力し、本登録を完了してください。</p>
                   
-                  <div style="background: #f8fafc; border-radius: 6px; padding: 1rem; margin: 1.25rem 0; border-left: 4px solid #4f46e5;">
-                    <p style="margin: 0 0 0.5rem 0; font-weight: bold; color: #4f46e5;">🔑 アカウント本登録時にご入力いただく情報：</p>
-                    <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.95rem; line-height: 1.7;">
+                  <p style="margin: 1.5rem 0;">
+                    <a href="${setupUrl}" style="background: #4f46e5; color: #ffffff; padding: 0.6rem 1.2rem; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block;">本登録を完了する</a>
+                  </p>
+
+                  <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; font-size: 0.9rem; color: #64748b;">
+                    <p style="margin: 0 0 0.5rem 0; font-weight: bold;">■ 本登録時に必要な入力項目</p>
+                    <ul style="margin: 0; padding-left: 1.2rem; line-height: 1.6;">
                       <li>お名前（姓・名）</li>
-                      <li>生年月日（西暦表記 例: 1990/01/01）</li>
-                      <li>ログインID（半角英数字6文字以上、大文字不可、記号は - _ . のみ）</li>
-                      <li>電話番号（半角数字、ハイフンなし、SMS認証用）</li>
-                      <li>新しいパスワード（半角英数字8文字以上、大文字・小文字・数字必須）</li>
+                      <li>生年月日（西暦表記）</li>
+                      <li>ログインID（半角英数字6文字以上）</li>
+                      <li>電話番号（ハイフンなし）</li>
+                      <li>新しいパスワード</li>
                     </ul>
                   </div>
 
-                  <p>以下のボタンをクリックして、上記情報の設定を行い、本登録を完了させてください。</p>
-                  <p style="margin: 1.75rem 0; text-align: center;">
-                    <a href="${setupUrl}" style="background: #4f46e5; color: #ffffff; padding: 0.7rem 1.5rem; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);">アカウントの本登録を完了する</a>
-                  </p>
-                  <p style="font-size: 0.85rem; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 1rem; margin-top: 1.5rem;">
-                    ※ボタンがクリックできない場合は、以下のURLをブラウザのアドレスバーに直接貼り付けてください：<br>
+                  <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 2rem;">
+                    ※ボタンがクリックできない場合は、以下のURLをコピーしてブラウザのアドレスバーに貼り付けてください：<br>
                     <a href="${setupUrl}" style="color: #4f46e5; word-break: break-all;">${setupUrl}</a>
                   </p>
                 </div>
