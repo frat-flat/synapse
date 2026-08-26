@@ -25,50 +25,51 @@ module.exports = async (req, res) => {
     return res.status(400).json({ success: false, error: 'Missing required fields (to, subject, text/html)' });
   }
 
-  const host = process.env.SMTP_HOST;
-  const port = process.env.SMTP_PORT;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const secure = process.env.SMTP_SECURE === 'true';
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const fromName = process.env.SMTP_FROM_NAME || 'Synapse';
+  const fromEmail = process.env.SMTP_FROM || 'onboarding@resend.dev';
 
   // Fallback for development / unconfigured state
-  if (!host || !port || !user || !pass) {
-    console.warn('[SMTP Warning] SMTP environment variables are not fully configured. Simulated mail sending.');
+  if (!resendApiKey) {
+    console.warn('[Resend Warning] RESEND_API_KEY is not configured. Simulated mail sending.');
     return res.status(200).json({
       success: true,
       simulated: true,
-      message: 'SMTP settings not configured. Simulated sending successfully to: ' + to
+      message: 'Resend API key not configured. Simulated sending successfully to: ' + to
     });
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      host: host,
-      port: parseInt(port, 10),
-      secure: secure,
-      auth: {
-        user: user,
-        pass: pass
-      }
+    // Standard Node.js fetch implementation for serverless compatibility without external SDK dependencies
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${resendApiKey}`
+      },
+      body: JSON.stringify({
+        from: `"${fromName}" <${fromEmail}>`,
+        to: [to],
+        subject: subject,
+        html: html,
+        text: text
+      })
     });
 
-    const mailOptions = {
-      from: `"${process.env.SMTP_FROM_NAME || 'Synapse'}" <${process.env.SMTP_FROM || user}>`,
-      to: to,
-      subject: subject,
-      text: text,
-      html: html
-    };
+    const data = await response.json();
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('[SMTP Success] Mail sent successfully:', info.messageId);
+    if (!response.ok) {
+      throw new Error(data.message || `Resend API Error (Status: ${response.status})`);
+    }
+
+    console.log('[Resend Success] Mail sent successfully:', data.id);
     
     return res.status(200).json({
       success: true,
-      messageId: info.messageId
+      messageId: data.id
     });
   } catch (error) {
-    console.error('[SMTP Error] Failed to send email:', error);
+    console.error('[Resend Error] Failed to send email:', error);
     return res.status(500).json({
       success: false,
       error: error.message
