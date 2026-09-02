@@ -1141,69 +1141,72 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 📧 メールからのパスワード設定・再設定リンク検知
-  const urlParams = new URLSearchParams(window.location.search);
-  const action = urlParams.get('action');
-  const actionEmail = urlParams.get('email');
-  const paramLastName = urlParams.get('lastName') || '';
-  const paramFirstName = urlParams.get('firstName') || '';
-  const paramPhone = urlParams.get('phone') || '';
+  // 📧 メールからのアカウント本登録・パスワード再設定リンク検知
+  window.checkUrlAuthActions = function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const action = urlParams.get('action');
+    const actionEmail = urlParams.get('email');
+    const paramLastName = urlParams.get('lastName') || '';
+    const paramFirstName = urlParams.get('firstName') || '';
+    const paramPhone = urlParams.get('phone') || '';
 
-  if ((action === 'set-password' || action === 'reset-password') && actionEmail) {
-    showLoginScreen(true);
-    const modal = document.getElementById('set-password-modal');
-    const emailHidden = document.getElementById('set-pwd-email');
-    if (modal && emailHidden) {
-      emailHidden.value = actionEmail;
-      
-      const lastNameInput = document.getElementById('set-pwd-lastname');
-      const firstNameInput = document.getElementById('set-pwd-firstname');
-      const birthdayInput = document.getElementById('set-pwd-birthday');
-      const genderSelect = document.getElementById('set-pwd-gender');
-      const loginIdInput = document.getElementById('set-pwd-loginid');
-      const phoneInput = document.getElementById('set-pwd-phone');
-      const pwdInput = document.getElementById('set-pwd-input');
-      const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
+    if ((action === 'set-password' || action === 'reset-password') && actionEmail) {
+      showLoginScreen(true);
+      const modal = document.getElementById('set-password-modal');
+      const emailHidden = document.getElementById('set-pwd-email');
+      if (modal && emailHidden) {
+        emailHidden.value = actionEmail;
+        
+        const lastNameInput = document.getElementById('set-pwd-lastname');
+        const firstNameInput = document.getElementById('set-pwd-firstname');
+        const birthdayInput = document.getElementById('set-pwd-birthday');
+        const genderSelect = document.getElementById('set-pwd-gender');
+        const loginIdInput = document.getElementById('set-pwd-loginid');
+        const phoneInput = document.getElementById('set-pwd-phone');
+        const pwdInput = document.getElementById('set-pwd-input');
+        const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
 
-      if (action === 'reset-password') {
-        // パスワード再設定時は追加プロフィール項目を非表示
-        if (birthdayInput && birthdayInput.parentElement && birthdayInput.parentElement.parentElement) birthdayInput.parentElement.parentElement.style.display = 'none';
-        if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'none';
-        if (phoneInput && phoneInput.parentElement) phoneInput.parentElement.style.display = 'none';
-        if (lastNameInput && lastNameInput.parentElement && lastNameInput.parentElement.parentElement) {
-          lastNameInput.parentElement.parentElement.style.display = 'none';
+        if (action === 'reset-password') {
+          // パスワード再設定時は追加プロフィール項目を非表示
+          if (birthdayInput && birthdayInput.parentElement && birthdayInput.parentElement.parentElement) birthdayInput.parentElement.parentElement.style.display = 'none';
+          if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'none';
+          if (phoneInput && phoneInput.parentElement) phoneInput.parentElement.style.display = 'none';
+          if (lastNameInput && lastNameInput.parentElement && lastNameInput.parentElement.parentElement) {
+            lastNameInput.parentElement.parentElement.style.display = 'none';
+          }
+          const titleEl = modal.querySelector('h3');
+          if (titleEl) titleEl.innerHTML = '🔑 パスワードの再設定';
+        } else {
+          // 本登録時は全項目を表示し、初期値をセット
+          if (birthdayInput && birthdayInput.parentElement && birthdayInput.parentElement.parentElement) birthdayInput.parentElement.parentElement.style.display = 'flex';
+          if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'flex';
+          if (phoneInput && phoneInput.parentElement) phoneInput.parentElement.style.display = 'flex';
+          if (lastNameInput && lastNameInput.parentElement && lastNameInput.parentElement.parentElement) {
+            lastNameInput.parentElement.parentElement.style.display = 'flex';
+          }
+          const titleEl = modal.querySelector('h3');
+          if (titleEl) titleEl.innerHTML = '🔑 アカウントの本登録';
+
+          if (lastNameInput && paramLastName) lastNameInput.value = paramLastName;
+          if (firstNameInput && paramFirstName) firstNameInput.value = paramFirstName;
+          if (phoneInput && paramPhone) phoneInput.value = paramPhone;
+          if (genderSelect) genderSelect.value = '';
+          if (birthdayInput) birthdayInput.value = '';
+          if (loginIdInput) loginIdInput.value = '';
         }
-        const titleEl = modal.querySelector('h3');
-        if (titleEl) titleEl.innerHTML = '🔑 パスワードの再設定';
-      } else {
-        // 本登録時は全項目を表示し、初期値をセット
-        if (birthdayInput && birthdayInput.parentElement && birthdayInput.parentElement.parentElement) birthdayInput.parentElement.parentElement.style.display = 'flex';
-        if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'flex';
-        if (phoneInput && phoneInput.parentElement) phoneInput.parentElement.style.display = 'flex';
-        if (lastNameInput && lastNameInput.parentElement && lastNameInput.parentElement.parentElement) {
-          lastNameInput.parentElement.parentElement.style.display = 'flex';
-        }
-        const titleEl = modal.querySelector('h3');
-        if (titleEl) titleEl.innerHTML = '🔑 アカウントの本登録';
 
-        if (lastNameInput && paramLastName) lastNameInput.value = paramLastName;
-        if (firstNameInput && paramFirstName) firstNameInput.value = paramFirstName;
-        if (phoneInput && paramPhone) phoneInput.value = paramPhone;
-        if (genderSelect) genderSelect.value = '';
-        if (birthdayInput) birthdayInput.value = '';
-        if (loginIdInput) loginIdInput.value = '';
+        if (pwdInput) pwdInput.value = '';
+        if (pwdConfirmInput) pwdConfirmInput.value = '';
+        modal.style.display = 'flex';
+        modal.style.zIndex = '10020'; // 最前面に明示
+
+        showToast(`メールアドレス「${actionEmail}」の本登録画面を開きました。`, 'info');
       }
-
-      if (pwdInput) pwdInput.value = '';
-      if (pwdConfirmInput) pwdConfirmInput.value = '';
-      modal.style.display = 'flex';
-      
-      const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-      window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
-
-      showToast(`メールアドレス「${actionEmail}」のパスワード設定画面を開きました。`, 'info');
     }
-  }
+  };
+
+  // 即時実行
+  window.checkUrlAuthActions();
 
   // トップバーの「📌 付箋を追加」ボタンイベント
   const addStickyBtn = document.getElementById('header-add-sticky-btn');
@@ -9034,9 +9037,11 @@ function showLoginScreen(show) {
     }
     state.currentView = 'login-screen';
 
-    // URLを /login に同期 (初期パスが /signup の場合は維持、file:プロトコル時はスキップ)
+    // URLを /login に同期 (初期パスが /signup の場合は維持、actionパラメータ等がある場合は上書きせず維持)
     if (window.location.protocol !== 'file:') {
-      if (window.location.pathname.toLowerCase() !== '/signup' && window.location.pathname.toLowerCase() !== '/login') {
+      const search = window.location.search || '';
+      const hasAction = search.includes('action=');
+      if (!hasAction && window.location.pathname.toLowerCase() !== '/signup' && window.location.pathname.toLowerCase() !== '/login') {
         try { history.replaceState(null, '', '/login'); } catch (e) {}
       }
     }
