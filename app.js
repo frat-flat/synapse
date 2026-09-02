@@ -7038,6 +7038,154 @@ function closeAllFilterMenus() {
   document.querySelectorAll('.filter-menu-backdrop').forEach(el => el.remove());
 }
 
+// フィルターメニュー用色フィルターセクション生成ヘルパー（共通グローバル関数）
+function createColorFilterSection(col, onColorClick) {
+  if (!col || col.type !== 'select' || !col.choices || col.choices.length === 0) {
+    return null;
+  }
+
+  const section = document.createElement('div');
+  section.className = 'color-filter-section';
+  section.style.marginBottom = '6px';
+  section.style.borderBottom = '1px solid var(--border-color)';
+  section.style.paddingBottom = '6px';
+
+  const title = document.createElement('div');
+  title.textContent = '色でフィルタ';
+  title.style.fontSize = '0.7rem';
+  title.style.color = 'var(--text-muted)';
+  title.style.marginBottom = '4px';
+  title.style.fontWeight = '500';
+  section.appendChild(title);
+
+  const chipsContainer = document.createElement('div');
+  chipsContainer.style.display = 'flex';
+  chipsContainer.style.gap = '6px';
+  chipsContainer.style.flexWrap = 'wrap';
+
+  col.choices.forEach(choice => {
+    const chip = document.createElement('div');
+    chip.style.width = '18px';
+    chip.style.height = '18px';
+    chip.style.borderRadius = '50%';
+    chip.style.backgroundColor = choice.color || '#6366f1';
+    chip.style.border = `1px solid ${choice.textColor || '#ffffff'}`;
+    chip.style.cursor = 'pointer';
+    chip.style.boxShadow = '0 1px 3px rgba(0,0,0,0.15)';
+    chip.title = choice.value;
+
+    chip.style.display = 'flex';
+    chip.style.alignItems = 'center';
+    chip.style.justifyContent = 'center';
+    chip.style.fontSize = '8px';
+    chip.style.color = choice.textColor || '#ffffff';
+    chip.style.fontWeight = 'bold';
+    chip.textContent = String(choice.value).charAt(0);
+
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onColorClick(choice.value);
+    });
+
+    chipsContainer.appendChild(chip);
+  });
+
+  section.appendChild(chipsContainer);
+  return section;
+}
+
+// フィルターメニュー内：行閲覧制限（権限付与）セクション生成ヘルパー
+function createFilterPermissionSection(tableId, colId, colLabel, getCurrentSelection, uniqueValues) {
+  const isOwner = isOwnerUser();
+  const targetUserId = state.previewUserId;
+  
+  // プレビューシミュレーション中、かつ管理者（オーナー）の場合にのみ表示
+  if (!targetUserId || !isOwner) {
+    return null;
+  }
+
+  const userLabel = ALL_ACCOUNTS.find(a => a.id === targetUserId)?.name || targetUserId;
+  const currentFilterSetting = (state.permissions.rowFilters?.[tableId] || {})[targetUserId];
+  const hasExistingLimit = !!(currentFilterSetting && currentFilterSetting.rules && currentFilterSetting.rules.length > 0);
+
+  const container = document.createElement('div');
+  container.className = 'filter-permission-section';
+  container.style.cssText = 'margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--border-color); display: flex; flex-direction: column; gap: 0.35rem;';
+
+  const titleRow = document.createElement('div');
+  titleRow.style.cssText = 'font-size: 0.72rem; font-weight: bold; color: var(--primary); display: flex; align-items: center; justify-content: space-between;';
+  titleRow.innerHTML = `<span>🛡️ 行閲覧制限（権限付与）</span><span style="font-size: 0.65rem; font-weight: normal; color: var(--text-muted);">対象: ${userLabel}</span>`;
+  container.appendChild(titleRow);
+
+  const desc = document.createElement('div');
+  desc.style.cssText = 'font-size: 0.65rem; color: var(--text-muted); line-height: 1.3;';
+  desc.textContent = '現在チェックされている値のみ閲覧可能な権限を設定します。';
+  container.appendChild(desc);
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display: flex; gap: 0.35rem; align-items: center; margin-top: 0.15rem; flex-wrap: wrap;';
+
+  const grantBtn = document.createElement('button');
+  grantBtn.className = 'btn-grant-row-filter';
+  grantBtn.style.cssText = 'flex: 1; min-width: 120px; padding: 0.3rem 0.45rem; font-size: 0.72rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.2rem; background: var(--primary); color: #fff; border: none; border-radius: var(--radius-sm); transition: transform 0.1s;';
+  grantBtn.innerHTML = '🎯 選択条件で行権限を付与';
+  grantBtn.title = `選択した値のみを「${userLabel}」に閲覧許可します`;
+
+  grantBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const selection = getCurrentSelection();
+    if (!selection || selection.length === 0) {
+      showToast('1つ以上のチェックボックスを選択してください。', 'warning');
+      return;
+    }
+
+    recordPermissionHistory();
+
+    if (!state.permissions.rowFilters) state.permissions.rowFilters = {};
+    if (!state.permissions.rowFilters[tableId]) state.permissions.rowFilters[tableId] = {};
+
+    const rules = selection.map(val => ({
+      columnId: colId,
+      word: val
+    }));
+
+    state.permissions.rowFilters[tableId][targetUserId] = {
+      matchType: 'OR',
+      rules: rules
+    };
+
+    savePermissions();
+    closeAllFilterMenus();
+    refreshCurrentViewPermissions();
+
+    showToast(`ユーザー「${userLabel}」に、${colLabel}（${selection.length}件）の行閲覧権限を付与しました。（「↩️ 元に戻す」で取り消し可能）`, 'success');
+  });
+  btnRow.appendChild(grantBtn);
+
+  if (hasExistingLimit) {
+    const revokeBtn = document.createElement('button');
+    revokeBtn.className = 'btn-revoke-row-filter';
+    revokeBtn.style.cssText = 'padding: 0.3rem 0.45rem; font-size: 0.72rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.2rem; background: #ef4444; color: #fff; border: none; border-radius: var(--radius-sm);';
+    revokeBtn.innerHTML = '🔓 制限解除';
+    revokeBtn.title = '行閲覧制限を解除し、全行閲覧可能に戻します';
+    revokeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      recordPermissionHistory();
+      if (state.permissions.rowFilters && state.permissions.rowFilters[tableId]) {
+        delete state.permissions.rowFilters[tableId][targetUserId];
+      }
+      savePermissions();
+      closeAllFilterMenus();
+      refreshCurrentViewPermissions();
+      showToast(`行閲覧制限を解除し、全行閲覧可能に戻しました。`, 'info');
+    });
+    btnRow.appendChild(revokeBtn);
+  }
+
+  container.appendChild(btnRow);
+  return container;
+}
+
 // フィルタメニューの生成と配置
 function openCtFilterMenu(tbl, colId, colLabel, anchorElement) {
   const container = document.getElementById('ct-filter-dropdown-container');
@@ -7192,6 +7340,11 @@ function openCtFilterMenu(tbl, colId, colLabel, anchorElement) {
     closeAllFilterMenus();
     renderCustomTable(tbl.id);
   });
+
+  const permSection = createFilterPermissionSection(tbl.id, colId, colLabel, () => currentSelection, uniqueValues);
+  if (permSection) {
+    dropdown.appendChild(permSection);
+  }
 
   const onScrollAction = (e) => {
     if (!dropdown.contains(e.target)) {
@@ -7515,61 +7668,7 @@ function setupCtButtonsEvents() {
     closeSingleAddModal();
     showToast('新しいレコードを登録しました。', 'success');
   });
-  // フィルターメニュー用色フィルターセクション生成ヘルパー
-  function createColorFilterSection(col, onColorClick) {
-    if (!col || col.type !== 'select' || !col.choices || col.choices.length === 0) {
-      return null;
-    }
 
-    const section = document.createElement('div');
-    section.className = 'color-filter-section';
-    section.style.marginBottom = '6px';
-    section.style.borderBottom = '1px solid var(--border-color)';
-    section.style.paddingBottom = '6px';
-
-    const title = document.createElement('div');
-    title.textContent = '色でフィルタ';
-    title.style.fontSize = '0.7rem';
-    title.style.color = 'var(--text-muted)';
-    title.style.marginBottom = '4px';
-    title.style.fontWeight = '500';
-    section.appendChild(title);
-
-    const chipsContainer = document.createElement('div');
-    chipsContainer.style.display = 'flex';
-    chipsContainer.style.gap = '6px';
-    chipsContainer.style.flexWrap = 'wrap';
-
-    col.choices.forEach(choice => {
-      const chip = document.createElement('div');
-      chip.style.width = '18px';
-      chip.style.height = '18px';
-      chip.style.borderRadius = '50%';
-      chip.style.backgroundColor = choice.color || '#6366f1';
-      chip.style.border = `1px solid ${choice.textColor || '#ffffff'}`;
-      chip.style.cursor = 'pointer';
-      chip.style.boxShadow = '0 1px 3px rgba(0,0,0,0.15)';
-      chip.title = choice.value;
-
-      chip.style.display = 'flex';
-      chip.style.alignItems = 'center';
-      chip.style.justifyContent = 'center';
-      chip.style.fontSize = '8px';
-      chip.style.color = choice.textColor || '#ffffff';
-      chip.style.fontWeight = 'bold';
-      chip.textContent = String(choice.value).charAt(0);
-
-      chip.addEventListener('click', (e) => {
-        e.stopPropagation();
-        onColorClick(choice.value);
-      });
-
-      chipsContainer.appendChild(chip);
-    });
-
-    section.appendChild(chipsContainer);
-    return section;
-  }
 
   // マスタの特定のセル値を更新して保存するヘルパー
   function saveMasterCellValue(masterType, contract, colId, newVal, rowIndex) {
@@ -17253,6 +17352,11 @@ function openApFilterMenu(colId, colLabel, anchorElement, allContracts) {
     renderApplicantInfo();
   });
 
+  const permSection = createFilterPermissionSection('applicant-info-screen', colId, colLabel, () => currentSelection, uniqueValues);
+  if (permSection) {
+    dropdown.appendChild(permSection);
+  }
+
   const onScrollAction = (e) => {
     if (!dropdown.contains(e.target)) {
       closeAllFilterMenus();
@@ -17701,6 +17805,11 @@ function openAgFilterMenu(colId, colLabel, anchorElement, allContracts) {
     renderAgencyInfo();
   });
 
+  const permSection = createFilterPermissionSection('agency-info-screen', colId, colLabel, () => currentSelection, uniqueValues);
+  if (permSection) {
+    dropdown.appendChild(permSection);
+  }
+
   const onScrollAction = (e) => {
     if (!dropdown.contains(e.target)) {
       closeAllFilterMenus();
@@ -17993,6 +18102,11 @@ function openJoFilterMenu(colId, colLabel, anchorElement, allContracts) {
     closeAllFilterMenus();
     renderJoInfo();
   });
+
+  const permSection = createFilterPermissionSection('jo-info-screen', colId, colLabel, () => currentSelection, uniqueValues);
+  if (permSection) {
+    dropdown.appendChild(permSection);
+  }
 
   const onScrollAction = (e) => {
     if (!dropdown.contains(e.target)) {
@@ -28891,6 +29005,7 @@ function startImpersonationPreview(targetUserId, mode) {
     
     bar.style.display = 'flex';
   }
+  document.body.classList.add('in-preview-mode');
 
   renderCustomTableList();
   
@@ -28920,6 +29035,7 @@ function endImpersonationPreview() {
   if (bar) {
     bar.style.display = 'none';
   }
+  document.body.classList.remove('in-preview-mode');
 
   renderCustomTableList();
   updateUIForCurrentMode();

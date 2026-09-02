@@ -1772,6 +1772,11 @@ textarea {
   transform: scale(1.25);
 }
 
+/* プレビューバー表示時にサイドバートグルボタンが隠れないよう位置をシフト */
+body.in-preview-mode .sidebar-toggle-arrow {
+  top: calc(1.5rem + 42px);
+}
+
 /* When sidebar is collapsed, move toggle arrow outside sidebar edge (64px) so it never overlaps logo/icons */
 #app-sidebar.collapsed + .sidebar-toggle-arrow {
   left: 64px;
@@ -3274,6 +3279,16 @@ tr.grayed-out-access td {
 .revoke-access-inline-btn:hover {
   transform: scale(1.05);
   background: #dc2626 !important;
+}
+
+/* テーブルヘッダー内でのボタンをコンパクト化してカラム名の視認性を向上 */
+th .grant-access-inline-btn,
+th .revoke-access-inline-btn {
+  padding: 0.1rem 0.25rem;
+  font-size: 0.65rem;
+  margin-left: 0.2rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* フローティングプレビュー警告バー */
