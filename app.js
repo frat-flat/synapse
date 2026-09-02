@@ -11504,11 +11504,10 @@ async function handleLogin(e) {
             return;
           }
 
-          // 3. 初めてログインする未登録端末では、必ず電話番号宛てのSMS 2段階認証を要求
-          showToast('新しい端末を検知しました。ご登録の電話番号宛てにSMS 2段階認証を実行します。', 'info');
-          const isVerified = await triggerSmsMfa(phoneNumber, 'オーナー用端末の追加');
-          
-          if (isVerified) {
+          // 3. オーナーの初期端末（未登録時・仮番号時）は自動信頼登録
+          const isPlaceholderPhone = !phoneNumber || phoneNumber === '09000000000';
+          if (existingDevices.length === 0 || isPlaceholderPhone) {
+            console.log('[Device Auth] Auto-registering primary device for owner.');
             try {
               const newDeviceToken = crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).substring(2, 15) + '-' + Math.random().toString(36).substring(2, 15));
               const newDeviceName = getDeviceName();
@@ -11523,13 +11522,37 @@ async function handleLogin(e) {
               });
 
               localStorage.setItem('synapse_device_token', newDeviceToken);
-              showToast('この端末が信頼されたデバイスとして登録されました。', 'success');
             } catch (err) {
-              console.error('[Device Auth] Owner registration error:', err);
+              console.error('[Device Auth] Owner auto registration error:', err);
             }
           } else {
-            showToast('SMS認証が完了しなかったため、ログインを中止しました。', 'warning');
-            return;
+            // 本物の電話番号が登録されている場合のみSMS 2段階認証を要求
+            showToast('新しい端末を検知しました。ご登録の電話番号宛てにSMS 2段階認証を実行します。', 'info');
+            const isVerified = await triggerSmsMfa(phoneNumber, 'オーナー用端末の追加');
+            
+            if (isVerified) {
+              try {
+                const newDeviceToken = crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).substring(2, 15) + '-' + Math.random().toString(36).substring(2, 15));
+                const newDeviceName = getDeviceName();
+
+                await supabaseClient.from('synapse_user_devices').insert({
+                  user_id: ownerEmail,
+                  device_token: newDeviceToken,
+                  device_name: newDeviceName,
+                  device_type: currentType,
+                  last_used_at: new Date().toISOString(),
+                  created_at: new Date().toISOString()
+                });
+
+                localStorage.setItem('synapse_device_token', newDeviceToken);
+                showToast('この端末が信頼されたデバイスとして登録されました。', 'success');
+              } catch (err) {
+                console.error('[Device Auth] Owner registration error:', err);
+              }
+            } else {
+              showToast('SMS認証が完了しなかったため、ログインを中止しました。', 'warning');
+              return;
+            }
           }
         }
       }
