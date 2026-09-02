@@ -243,9 +243,11 @@ function isValidDeviceComposition(existingDevices, newType) {
 }
 
 // 💬 SMS 2段階認証 (MFA) モーダルを起動し、完了を待つPromiseを返す
-function triggerSmsMfa(phoneNumber) {
+function triggerSmsMfa(phoneNumber, purpose = '端末認証') {
   return new Promise((resolve, reject) => {
     const modal = document.getElementById('sms-mfa-modal');
+    const titleEl = document.getElementById('sms-mfa-modal-title');
+    const descEl = document.getElementById('sms-mfa-modal-desc');
     const phoneSpan = document.getElementById('sms-mfa-masked-phone');
     const simDiv = document.getElementById('sms-mfa-simulated-notification');
     const simPhone = document.getElementById('sms-sim-phone-display');
@@ -259,6 +261,8 @@ function triggerSmsMfa(phoneNumber) {
       return;
     }
 
+    if (titleEl) titleEl.innerHTML = `💬 SMS 2段階認証 (${purpose})`;
+
     // 6桁のコードをランダム生成
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -269,18 +273,51 @@ function triggerSmsMfa(phoneNumber) {
     }
     phoneSpan.textContent = masked;
 
-    // モックシミュレータの表示
-    if (simDiv && simPhone && simCode) {
-      simPhone.textContent = phoneNumber;
-      simCode.textContent = generatedOtp;
-      simDiv.style.display = 'block';
+    // SMS送信APIを非同期で呼び出し
+    const isLocal = window.location.protocol === 'file:';
+    if (!isLocal) {
+      fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: phoneNumber,
+          code: generatedOtp,
+          message: `【Synapse】${purpose}の認証コードは [ ${generatedOtp} ] です。5分以内に入力してください。`
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.simulated) {
+          if (simDiv && simPhone && simCode) {
+            simPhone.textContent = phoneNumber;
+            simCode.textContent = generatedOtp;
+            simDiv.style.display = 'block';
+          }
+        } else {
+          if (simDiv) simDiv.style.display = 'none';
+        }
+      })
+      .catch(err => {
+        console.error('[SMS MFA] Failed to call send-sms API:', err);
+        // エラー時でもシミュレータを表示して継続可能にする
+        if (simDiv && simPhone && simCode) {
+          simPhone.textContent = phoneNumber;
+          simCode.textContent = generatedOtp;
+          simDiv.style.display = 'block';
+        }
+      });
+    } else {
+      if (simDiv && simPhone && simCode) {
+        simPhone.textContent = phoneNumber;
+        simCode.textContent = generatedOtp;
+        simDiv.style.display = 'block';
+      }
     }
 
     codeInput.value = '';
     modal.style.display = 'flex';
     codeInput.focus();
 
-    // イベントリスナーのクリーンアップ用
     let cleanUp = () => {};
 
     const onCancel = () => {
@@ -304,7 +341,108 @@ function triggerSmsMfa(phoneNumber) {
       }
     };
 
-    // keydown Enterキーでのサブミット処理
+    const onKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        onSubmit();
+      }
+    };
+
+    cleanUp = () => {
+      cancelBtn.removeEventListener('click', onCancel);
+      submitBtn.removeEventListener('click', onSubmit);
+      codeInput.removeEventListener('keydown', onKeyDown);
+    };
+
+    cancelBtn.addEventListener('click', onCancel);
+    submitBtn.addEventListener('click', onSubmit);
+    codeInput.addEventListener('keydown', onKeyDown);
+  });
+}
+
+// ✉️ メール 2段階認証 (PC初回ログイン用) モーダルを起動し、完了を待つPromiseを返す
+function triggerEmailMfa(email, purpose = '端末追加認証') {
+  return new Promise((resolve, reject) => {
+    const modal = document.getElementById('email-mfa-modal');
+    const emailSpan = document.getElementById('email-mfa-masked-email');
+    const codeInput = document.getElementById('email-mfa-code');
+    const cancelBtn = document.getElementById('email-mfa-cancel-btn');
+    const submitBtn = document.getElementById('email-mfa-submit-btn');
+
+    if (!modal || !emailSpan || !codeInput || !submitBtn) {
+      reject(new Error('メール認証画面の初期化に失敗しました。'));
+      return;
+    }
+
+    // 6桁のコードをランダム生成
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // メールアドレスのマスク表示
+    let masked = email;
+    if (email && email.includes('@')) {
+      const [local, domain] = email.split('@');
+      masked = (local.length > 2 ? local.substring(0, 2) + '****' : local) + '@' + domain;
+    }
+    emailSpan.textContent = masked;
+
+    // Resend API で本物のメールを送信
+    const isLocal = window.location.protocol === 'file:';
+    if (!isLocal) {
+      fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: email,
+          subject: `【Synapse】${purpose}の認証コード`,
+          html: `
+            <div style="font-family: sans-serif; line-height: 1.6; padding: 1.5rem; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 480px; margin: 0 auto; color: #1e293b;">
+              <h2 style="color: #4f46e5; margin-top: 0;">🔐 ${purpose}</h2>
+              <p>新しい端末（PC）からのアクセスを検知しました。以下の6桁の認証コードを画面に入力してください：</p>
+              <div style="text-align: center; margin: 2rem 0;">
+                <span style="font-size: 2rem; font-weight: 700; letter-spacing: 0.35rem; color: #4f46e5; background: #eef2ff; padding: 0.6rem 1.5rem; border-radius: 6px; display: inline-block;">
+                  ${generatedOtp}
+                </span>
+              </div>
+              <p style="font-size: 0.8rem; color: #64748b;">※有効期限は5分間です。心当たりがない場合はこのメールを破棄してください。</p>
+            </div>
+          `
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        showToast('登録メールアドレスに認証コードを送信しました。', 'info');
+      })
+      .catch(err => {
+        console.error('[Email MFA] Failed to send MFA email:', err);
+      });
+    }
+
+    codeInput.value = '';
+    modal.style.display = 'flex';
+    codeInput.focus();
+
+    let cleanUp = () => {};
+
+    const onCancel = () => {
+      cleanUp();
+      modal.style.display = 'none';
+      resolve(false);
+    };
+
+    const onSubmit = () => {
+      const enteredCode = codeInput.value.trim();
+      if (!enteredCode) {
+        showToast('認証コードを入力してください。', 'warning');
+        return;
+      }
+      if (enteredCode === generatedOtp) {
+        cleanUp();
+        modal.style.display = 'none';
+        resolve(true);
+      } else {
+        showToast('認証コードが正しくありません。', 'error');
+      }
+    };
+
     const onKeyDown = (e) => {
       if (e.key === 'Enter') {
         onSubmit();
@@ -367,7 +505,7 @@ async function renderMypageSecurityInfo() {
       const typeIcon = { smartphone: '📱', tablet: '📟', desktop: '💻' }[dev.device_type] || '💻';
       
       return `
-        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; font-size: 0.8rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; font-size: 0.8rem; margin-bottom: 0.4rem;">
           <div style="text-align: left;">
             <div style="font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
               <span>${typeIcon}</span>
@@ -378,9 +516,56 @@ async function renderMypageSecurityInfo() {
               最終利用: ${lastUsed}
             </div>
           </div>
+          <button type="button" class="btn-secondary delete-user-device-btn" data-device-id="${dev.id}" data-device-name="${dev.device_name || '端末'}" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; color: #ef4444; border-color: rgba(239, 68, 68, 0.3); cursor: pointer;">
+            🗑️ 解除
+          </button>
         </div>
       `;
     }).join('');
+
+    // 端末解除ボタンイベントの登録 (SMS認証必須)
+    deviceListEl.querySelectorAll('.delete-user-device-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const devId = e.currentTarget.getAttribute('data-device-id');
+        const devName = e.currentTarget.getAttribute('data-device-name');
+        const phone = state.currentUser.phone_number;
+
+        if (!phone) {
+          showToast('電話番号が登録されていないため、SMS認証を実行できません。管理者に連絡してください。', 'error');
+          return;
+        }
+
+        showAppConfirm(
+          '⚠️ 端末登録の解除',
+          `端末「${devName}」の登録を解除しますか？\n本人確認のため、ご登録の電話番号（${phone}）へSMS認証コードを送信します。`,
+          async () => {
+            showToast('SMS認証コードを送信中...', 'info');
+            const isVerified = await triggerSmsMfa(phone, '端末登録の解除');
+            if (isVerified) {
+              const { error: delError } = await supabaseClient
+                .from('synapse_user_devices')
+                .delete()
+                .eq('id', devId);
+
+              if (delError) {
+                console.error('[Device Auth] Delete device error:', delError);
+                showToast('端末の削除に失敗しました: ' + delError.message, 'error');
+              } else {
+                // もし削除した端末が現在の端末だった場合、ローカルのトークンも破棄
+                const targetDev = devices.find(d => d.id === devId);
+                if (targetDev && targetDev.device_token === currentToken) {
+                  localStorage.removeItem('synapse_device_token');
+                }
+                showToast(`端末「${devName}」の登録を解除しました。`, 'success');
+                renderMypageSecurityInfo();
+              }
+            } else {
+              showToast('SMS認証がキャンセルされたため、解除を中止しました。', 'warning');
+            }
+          }
+        );
+      });
+    });
   } catch (err) {
     console.error('[Device Auth] Render user devices error:', err);
     deviceListEl.innerHTML = '<div style="text-align: center; color: #ef4444; font-size: 0.8rem; padding: 1rem 0;">エラーが発生しました。</div>';
@@ -1332,17 +1517,22 @@ function setupSupabaseAuthListener() {
             return;
           }
 
-          // 3. SMS 2要素認証を要求
-          if (!phoneNumber) {
-            showToast('ご登録電話番号が見つからないため、SMS認証を実行できません。管理者に連絡してください。', 'error');
-            await supabaseClient.auth.signOut();
-            return;
+          // 3. 端末種別に応じた2段階認証を要求 (スマホならSMS認証、PCならメール認証)
+          let isVerified = false;
+          if (currentType === 'smartphone') {
+            if (!phoneNumber) {
+              showToast('ご登録電話番号が見つからないため、SMS認証を実行できません。管理者に連絡してください。', 'error');
+              await supabaseClient.auth.signOut();
+              return;
+            }
+            showToast('新しいスマホを検知しました。SMS 2段階認証を実行します。', 'info');
+            isVerified = await triggerSmsMfa(phoneNumber, 'スマホ端末の追加');
+          } else {
+            showToast('新しいPCを検知しました。メール 2段階認証を実行します。', 'info');
+            isVerified = await triggerEmailMfa(email, 'PC端末の追加');
           }
-
-          showToast('新しい端末を検知しました。SMS 2要素認証を実行します。', 'info');
-          const isSmsVerified = await triggerSmsMfa(phoneNumber);
           
-          if (isSmsVerified) {
+          if (isVerified) {
             // SMS認証に成功：新規デバイスとしてDBに登録
             try {
               const newDeviceToken = crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).substring(2, 15) + '-' + Math.random().toString(36).substring(2, 15));
@@ -11312,11 +11502,17 @@ async function handleLogin(e) {
             return;
           }
 
-          // 3. SMS 2要素認証を要求
-          showToast('新しい端末を検知しました。SMS 2要素認証を実行します。', 'info');
-          const isSmsVerified = await triggerSmsMfa(phoneNumber);
+          // 3. 端末種別に応じた2段階認証を要求 (スマホならSMS認証、PCならメール認証)
+          let isVerified = false;
+          if (currentType === 'smartphone') {
+            showToast('新しいスマホを検知しました。SMS 2段階認証を実行します。', 'info');
+            isVerified = await triggerSmsMfa(phoneNumber, 'オーナー用スマホ端末の追加');
+          } else {
+            showToast('新しいPCを検知しました。メール 2段階認証を実行します。', 'info');
+            isVerified = await triggerEmailMfa(ownerEmail, 'オーナー用PC端末の追加');
+          }
           
-          if (isSmsVerified) {
+          if (isVerified) {
             try {
               const newDeviceToken = crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).substring(2, 15) + '-' + Math.random().toString(36).substring(2, 15));
               const newDeviceName = getDeviceName();
