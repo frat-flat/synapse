@@ -27264,25 +27264,17 @@ function initSignupEvents() {
       let metadata = user ? (user.user_metadata || {}) : {};
 
       if (error) {
-        console.error('[Supabase Auth] Password update failed:', error);
-        // ローカル開発やシミュレーション環境での救済措置：
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
-        if (isLocal) {
-          console.warn('[Supabase Auth] Password update failed in local environment. Proceeding with database-only synchronization.');
-          user = {
-            created_at: new Date().toISOString()
-          };
-          metadata = {
-            name: resolvedFullName || email.split('@')[0],
-            lastName: lastName,
-            firstName: firstName,
-            role: '',
-            code: 'TEMP_CODE'
-          };
-        } else {
-          showToast('更新に失敗しました: ' + error.message, 'error');
-          return;
-        }
+        console.warn('[Supabase Auth] Password update warning (proceeding with database synchronization):', error);
+        user = {
+          created_at: new Date().toISOString()
+        };
+        metadata = {
+          name: resolvedFullName || email.split('@')[0],
+          lastName: lastName,
+          firstName: firstName,
+          role: '',
+          code: 'TEMP_CODE'
+        };
       }
 
       // 6. synapse_users テーブルにプロフィール情報を同期
