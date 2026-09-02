@@ -26984,8 +26984,18 @@ function initSignupEvents() {
     str = str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
     str = str.replace(/[／．－ー―]/g, '/');
 
-    // 和暦 (令和/平成/昭和/大正/明治, R/H/S/T/M) の変換
-    const eraMatch = str.match(/^(令和|平成|昭和|大正|明治|[RHSTM])\s*([0-9元]+)[\/年\.\-]?\s*([0-9]+)[\/月\.\-]?\s*([0-9]+)日?$/i);
+    // 実在するカレンダー日付かどうかの検証関数
+    const isValidCalendarDate = (y, m, d) => {
+      const year = parseInt(y, 10);
+      const month = parseInt(m, 10);
+      const day = parseInt(d, 10);
+      if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) return false;
+      const date = new Date(year, month - 1, day);
+      return date.getFullYear() === year && (date.getMonth() + 1) === month && date.getDate() === day;
+    };
+
+    // 和暦 (令和/平成/昭和/大正/明治, R/H/S/T/M) の変換 (区切り文字必須)
+    const eraMatch = str.match(/^(令和|平成|昭和|大正|明治|[RHSTM])\s*([0-9元]+)[\/年\.\-]\s*([0-9]+)[\/月\.\-]?\s*([0-9]+)日?$/i);
     if (eraMatch) {
       const era = eraMatch[1].toUpperCase();
       let eraYear = eraMatch[2] === '元' ? 1 : parseInt(eraMatch[2], 10);
@@ -26999,7 +27009,7 @@ function initSignupEvents() {
       else if (era === '明治' || era === 'M') baseYear = 1867;
 
       const fullYear = baseYear + eraYear;
-      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      if (isValidCalendarDate(fullYear, month, day)) {
         return `${fullYear}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
       }
     }
@@ -27008,33 +27018,36 @@ function initSignupEvents() {
     const kanjiMatch = str.match(/^(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日?$/);
     if (kanjiMatch) {
       const y = kanjiMatch[1];
-      const m = String(parseInt(kanjiMatch[2], 10)).padStart(2, '0');
-      const d = String(parseInt(kanjiMatch[3], 10)).padStart(2, '0');
-      return `${y}/${m}/${d}`;
+      const m = kanjiMatch[2];
+      const d = kanjiMatch[3];
+      if (isValidCalendarDate(y, m, d)) {
+        return `${y}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
+      }
     }
 
     // 記号区切り (1990/1/1, 1990-1-1, 1990.1.1)
     const splitMatch = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
     if (splitMatch) {
       const y = splitMatch[1];
-      const m = String(parseInt(splitMatch[2], 10)).padStart(2, '0');
-      const d = String(parseInt(splitMatch[3], 10)).padStart(2, '0');
-      return `${y}/${m}/${d}`;
+      const m = splitMatch[2];
+      const d = splitMatch[3];
+      if (isValidCalendarDate(y, m, d)) {
+        return `${y}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
+      }
     }
 
-    // 数字8桁連続 (19900101)
+    // 連続数字は厳格に【8桁 (YYYYMMDD)】のみ許可 (6桁 199111 や 7桁 1990111 など曖昧なものは変換せず除外)
     const num8Match = str.match(/^(\d{4})(\d{2})(\d{2})$/);
     if (num8Match) {
       const y = num8Match[1];
       const m = num8Match[2];
       const d = num8Match[3];
-      const month = parseInt(m, 10);
-      const day = parseInt(d, 10);
-      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      if (isValidCalendarDate(y, m, d)) {
         return `${y}/${m}/${d}`;
       }
     }
 
+    // 曖昧な連続数字（6桁や7桁など）や不完全な形式は絶対に推測変換せず弾く
     return null;
   };
 
