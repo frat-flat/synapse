@@ -9045,6 +9045,13 @@ function showLoginScreen(show) {
       login.style.display = 'flex'; // インラインで明示的に表示
     }
     state.currentView = 'login-screen';
+
+    // URLを /login に同期 (初期パスが /signup の場合は維持、file:プロトコル時はスキップ)
+    if (window.location.protocol !== 'file:') {
+      if (window.location.pathname.toLowerCase() !== '/signup' && window.location.pathname.toLowerCase() !== '/login') {
+        try { history.replaceState(null, '', '/login'); } catch (e) {}
+      }
+    }
   } else {
     if (sidebar) sidebar.style.display = 'flex';
     if (toggleBtn) toggleBtn.style.display = 'flex';
@@ -9052,6 +9059,13 @@ function showLoginScreen(show) {
     if (login) {
       login.classList.remove('active');
       login.style.display = 'none'; // インラインで明示的に非表示
+    }
+
+    // ログイン成功時はURLを / に更新
+    if (window.location.protocol !== 'file:') {
+      if (window.location.pathname.toLowerCase() === '/login' || window.location.pathname.toLowerCase() === '/signup') {
+        try { history.replaceState(null, '', '/'); } catch (e) {}
+      }
     }
 
     const userId = state.currentUser ? state.currentUser.id : 'guest';
@@ -26693,26 +26707,62 @@ function initSignupEvents() {
     });
   }
 
-  if (goToSignup && loginScreen && signupScreen) {
-    goToSignup.addEventListener('click', (e) => {
-      e.preventDefault();
+  // 画面遷移・URL同期ヘルパー関数
+  const navigateToAuthView = (view, updateHistory = true) => {
+    if (!loginScreen || !signupScreen) return;
+    if (view === 'signup') {
       loginScreen.style.display = 'none';
       loginScreen.classList.remove('active');
       signupScreen.style.display = 'flex';
       signupScreen.classList.add('active');
       if (signupForm) signupForm.reset();
-    });
-  }
-
-  if (goToLogin && loginScreen && signupScreen) {
-    goToLogin.addEventListener('click', (e) => {
-      e.preventDefault();
+      if (updateHistory && window.location.protocol !== 'file:' && window.location.pathname.toLowerCase() !== '/signup') {
+        try { history.pushState({ authView: 'signup' }, '', '/signup'); } catch (e) {}
+      }
+    } else {
       signupScreen.style.display = 'none';
       signupScreen.classList.remove('active');
       loginScreen.style.display = 'flex';
       loginScreen.classList.add('active');
+      if (updateHistory && window.location.protocol !== 'file:' && window.location.pathname.toLowerCase() !== '/login' && window.location.pathname !== '/') {
+        try { history.pushState({ authView: 'login' }, '', '/login'); } catch (e) {}
+      }
+    }
+  };
+
+  if (goToSignup) {
+    goToSignup.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigateToAuthView('signup');
     });
   }
+
+  if (goToLogin) {
+    goToLogin.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigateToAuthView('login');
+    });
+  }
+
+  // 初期ロード時のURLパス判定
+  const initialPath = window.location.pathname.toLowerCase();
+  if (initialPath === '/signup') {
+    navigateToAuthView('signup', false);
+  } else if (initialPath === '/login') {
+    navigateToAuthView('login', false);
+  }
+
+  // ブラウザの「戻る」「進む」ボタン操作（popstate）対応
+  window.addEventListener('popstate', () => {
+    const path = window.location.pathname.toLowerCase();
+    if (path === '/signup') {
+      navigateToAuthView('signup', false);
+    } else if (path === '/login' || path === '/') {
+      if (!state.currentUser) {
+        navigateToAuthView('login', false);
+      }
+    }
+  });
 
   if (signupForm) {
     signupForm.addEventListener('submit', async (e) => {
