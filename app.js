@@ -26976,6 +26976,100 @@ function initSignupEvents() {
     });
   }
 
+  // 🎂 生年月日の自動変換・フォーマット関数
+  const parseAndFormatBirthday = (input) => {
+    if (!input) return null;
+    let str = input.trim();
+    // 全角英数記号を半角に変換
+    str = str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+    str = str.replace(/[／．－ー―]/g, '/');
+
+    // 和暦 (令和/平成/昭和/大正/明治, R/H/S/T/M) の変換
+    const eraMatch = str.match(/^(令和|平成|昭和|大正|明治|[RHSTM])\s*([0-9元]+)[\/年\.\-]?\s*([0-9]+)[\/月\.\-]?\s*([0-9]+)日?$/i);
+    if (eraMatch) {
+      const era = eraMatch[1].toUpperCase();
+      let eraYear = eraMatch[2] === '元' ? 1 : parseInt(eraMatch[2], 10);
+      const month = parseInt(eraMatch[3], 10);
+      const day = parseInt(eraMatch[4], 10);
+      let baseYear = 1988;
+      if (era === '令和' || era === 'R') baseYear = 2018;
+      else if (era === '平成' || era === 'H') baseYear = 1988;
+      else if (era === '昭和' || era === 'S') baseYear = 1925;
+      else if (era === '大正' || era === 'T') baseYear = 1911;
+      else if (era === '明治' || era === 'M') baseYear = 1867;
+
+      const fullYear = baseYear + eraYear;
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return `${fullYear}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
+      }
+    }
+
+    // 漢字区切り (1990年1月1日)
+    const kanjiMatch = str.match(/^(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日?$/);
+    if (kanjiMatch) {
+      const y = kanjiMatch[1];
+      const m = String(parseInt(kanjiMatch[2], 10)).padStart(2, '0');
+      const d = String(parseInt(kanjiMatch[3], 10)).padStart(2, '0');
+      return `${y}/${m}/${d}`;
+    }
+
+    // 記号区切り (1990/1/1, 1990-1-1, 1990.1.1)
+    const splitMatch = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+    if (splitMatch) {
+      const y = splitMatch[1];
+      const m = String(parseInt(splitMatch[2], 10)).padStart(2, '0');
+      const d = String(parseInt(splitMatch[3], 10)).padStart(2, '0');
+      return `${y}/${m}/${d}`;
+    }
+
+    // 数字8桁連続 (19900101)
+    const num8Match = str.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (num8Match) {
+      const y = num8Match[1];
+      const m = num8Match[2];
+      const d = num8Match[3];
+      const month = parseInt(m, 10);
+      const day = parseInt(d, 10);
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return `${y}/${m}/${d}`;
+      }
+    }
+
+    return null;
+  };
+
+  // 📱 電話番号の自動変換・正規化関数
+  const parseAndFormatPhone = (input) => {
+    if (!input) return '';
+    let str = input.trim();
+    // 全角数字を半角に変換
+    str = str.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+    // ハイフンやカッコ、スペースを除去
+    str = str.replace(/[-\s\(\)ー－]/g, '');
+    return str;
+  };
+
+  // 入力フィールドの blur 時に自動変換を適用
+  const birthdayInputEl = document.getElementById('set-pwd-birthday');
+  if (birthdayInputEl) {
+    birthdayInputEl.addEventListener('blur', () => {
+      const formatted = parseAndFormatBirthday(birthdayInputEl.value);
+      if (formatted) {
+        birthdayInputEl.value = formatted;
+      }
+    });
+  }
+
+  const phoneInputEl = document.getElementById('set-pwd-phone');
+  if (phoneInputEl) {
+    phoneInputEl.addEventListener('blur', () => {
+      const normalized = parseAndFormatPhone(phoneInputEl.value);
+      if (normalized) {
+        phoneInputEl.value = normalized;
+      }
+    });
+  }
+
   if (setPwdSubmit && setPwdModal) {
     setPwdSubmit.addEventListener('click', async () => {
       const email = document.getElementById('set-pwd-email').value;
@@ -27039,15 +27133,14 @@ function initSignupEvents() {
         }
         resolvedFullName = `${lastName} ${firstName}`;
 
-        // 1. 生年月日バリデーション
-        if (!birthday) {
-          showToast('生年月日を入力してください。', 'error');
+        // 1. 生年月日バリデーション (自動変換)
+        const formattedBirthday = parseAndFormatBirthday(birthday);
+        if (!formattedBirthday) {
+          showToast('有効な生年月日を入力してください（例: 1990/01/01, 19900101, 平成2年1月1日）。', 'error');
           return;
         }
-        if (!/^\d{4}[\/\-\.](0?[1-9]|1[0-2])[\/\-\.](0?[1-9]|[12]\d|3[01])$/.test(birthday)) {
-          showToast('生年月日は西暦表記（例: 1990/01/01）で入力してください。', 'error');
-          return;
-        }
+        resolvedBirthday = formattedBirthday;
+        if (birthdayInput) birthdayInput.value = formattedBirthday;
 
         // 2. ログインIDバリデーション
         if (!loginId) {
@@ -27060,15 +27153,15 @@ function initSignupEvents() {
           return;
         }
 
-        // 2.5 電話番号バリデーション
-        if (!phone) {
-          showToast('電話番号を入力してください。', 'error');
+        // 2.5 電話番号バリデーション (自動正規化)
+        const normalizedPhone = parseAndFormatPhone(phone);
+        if (!normalizedPhone || !/^0\d{9,10}$/.test(normalizedPhone)) {
+          showToast('有効な電話番号（例: 090-1234-5678）を入力してください。', 'error');
           return;
         }
-        if (!/^0\d{9,10}$/.test(phone)) {
-          showToast('有効な電話番号（半角数字、ハイフンなし10〜11桁）を入力してください。', 'error');
-          return;
-        }
+        resolvedPhone = normalizedPhone;
+        const phoneInputField = document.getElementById('set-pwd-phone');
+        if (phoneInputField) phoneInputField.value = normalizedPhone;
 
         // 3. パスワードバリデーション
         if (!pwd) {
