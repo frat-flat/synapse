@@ -3496,17 +3496,29 @@
       <div style="display: flex; gap: 0.5rem;">
         <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1;">
           <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">姓:</label>
-          <input type="text" id="set-pwd-lastname" readonly style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-muted); outline: none; cursor: not-allowed;">
+          <input type="text" id="set-pwd-lastname" required placeholder="例: 山田" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
         </div>
         <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1;">
           <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">名:</label>
-          <input type="text" id="set-pwd-firstname" readonly style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-muted); outline: none; cursor: not-allowed;">
+          <input type="text" id="set-pwd-firstname" required placeholder="例: 太郎" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
         </div>
       </div>
       
-      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">生年月日 (西暦表記):</label>
-        <input type="text" id="set-pwd-birthday" required placeholder="例: 1990/01/01" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+      <div style="display: flex; gap: 0.5rem;">
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1;">
+          <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">生年月日 (西暦表記):</label>
+          <input type="text" id="set-pwd-birthday" required placeholder="例: 1990/01/01" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; width: 120px;">
+          <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">性別:</label>
+          <select id="set-pwd-gender" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+            <option value="">選択してください</option>
+            <option value="male">男性</option>
+            <option value="female">女性</option>
+            <option value="other">その他</option>
+            <option value="unspecified">回答しない</option>
+          </select>
+        </div>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 0.25rem;">

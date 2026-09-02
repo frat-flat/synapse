@@ -960,6 +960,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   const action = urlParams.get('action');
   const actionEmail = urlParams.get('email');
+  const paramLastName = urlParams.get('lastName') || '';
+  const paramFirstName = urlParams.get('firstName') || '';
+  const paramPhone = urlParams.get('phone') || '';
 
   if ((action === 'set-password' || action === 'reset-password') && actionEmail) {
     showLoginScreen(true);
@@ -967,8 +970,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const emailHidden = document.getElementById('set-pwd-email');
     if (modal && emailHidden) {
       emailHidden.value = actionEmail;
+      
+      const lastNameInput = document.getElementById('set-pwd-lastname');
+      const firstNameInput = document.getElementById('set-pwd-firstname');
+      const birthdayInput = document.getElementById('set-pwd-birthday');
+      const genderSelect = document.getElementById('set-pwd-gender');
+      const loginIdInput = document.getElementById('set-pwd-loginid');
+      const phoneInput = document.getElementById('set-pwd-phone');
       const pwdInput = document.getElementById('set-pwd-input');
       const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
+
+      if (action === 'reset-password') {
+        // パスワード再設定時は追加プロフィール項目を非表示
+        if (birthdayInput && birthdayInput.parentElement && birthdayInput.parentElement.parentElement) birthdayInput.parentElement.parentElement.style.display = 'none';
+        if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'none';
+        if (phoneInput && phoneInput.parentElement) phoneInput.parentElement.style.display = 'none';
+        if (lastNameInput && lastNameInput.parentElement && lastNameInput.parentElement.parentElement) {
+          lastNameInput.parentElement.parentElement.style.display = 'none';
+        }
+        const titleEl = modal.querySelector('h3');
+        if (titleEl) titleEl.innerHTML = '🔑 パスワードの再設定';
+      } else {
+        // 本登録時は全項目を表示し、初期値をセット
+        if (birthdayInput && birthdayInput.parentElement && birthdayInput.parentElement.parentElement) birthdayInput.parentElement.parentElement.style.display = 'flex';
+        if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'flex';
+        if (phoneInput && phoneInput.parentElement) phoneInput.parentElement.style.display = 'flex';
+        if (lastNameInput && lastNameInput.parentElement && lastNameInput.parentElement.parentElement) {
+          lastNameInput.parentElement.parentElement.style.display = 'flex';
+        }
+        const titleEl = modal.querySelector('h3');
+        if (titleEl) titleEl.innerHTML = '🔑 アカウントの本登録';
+
+        if (lastNameInput && paramLastName) lastNameInput.value = paramLastName;
+        if (firstNameInput && paramFirstName) firstNameInput.value = paramFirstName;
+        if (phoneInput && paramPhone) phoneInput.value = paramPhone;
+        if (genderSelect) genderSelect.value = '';
+        if (birthdayInput) birthdayInput.value = '';
+        if (loginIdInput) loginIdInput.value = '';
+      }
+
       if (pwdInput) pwdInput.value = '';
       if (pwdConfirmInput) pwdConfirmInput.value = '';
       modal.style.display = 'flex';
@@ -1360,13 +1400,14 @@ function setupSupabaseAuthListener() {
           const lastNameInput = document.getElementById('set-pwd-lastname');
           const firstNameInput = document.getElementById('set-pwd-firstname');
           const birthdayInput = document.getElementById('set-pwd-birthday');
+          const genderSelect = document.getElementById('set-pwd-gender');
           const loginIdInput = document.getElementById('set-pwd-loginid');
           const phoneInput = document.getElementById('set-pwd-phone');
           const pwdInput = document.getElementById('set-pwd-input');
           const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
           
-          // 生年月日、ログインID、名前、電話番号入力を非表示にする
-          if (birthdayInput && birthdayInput.parentElement) birthdayInput.parentElement.style.display = 'none';
+          // 生年月日、性別、ログインID、名前、電話番号入力を非表示にする
+          if (birthdayInput && birthdayInput.parentElement && birthdayInput.parentElement.parentElement) birthdayInput.parentElement.parentElement.style.display = 'none';
           if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'none';
           if (phoneInput && phoneInput.parentElement) phoneInput.parentElement.style.display = 'none';
           if (lastNameInput && lastNameInput.parentElement && lastNameInput.parentElement.parentElement) {
@@ -1392,13 +1433,14 @@ function setupSupabaseAuthListener() {
           const lastNameInput = document.getElementById('set-pwd-lastname');
           const firstNameInput = document.getElementById('set-pwd-firstname');
           const birthdayInput = document.getElementById('set-pwd-birthday');
+          const genderSelect = document.getElementById('set-pwd-gender');
           const loginIdInput = document.getElementById('set-pwd-loginid');
           const phoneInput = document.getElementById('set-pwd-phone');
           const pwdInput = document.getElementById('set-pwd-input');
           const pwdConfirmInput = document.getElementById('set-pwd-confirm-input');
           
           // 本登録時は全入力項目を表示する
-          if (birthdayInput && birthdayInput.parentElement) birthdayInput.parentElement.style.display = 'flex';
+          if (birthdayInput && birthdayInput.parentElement && birthdayInput.parentElement.parentElement) birthdayInput.parentElement.parentElement.style.display = 'flex';
           if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'flex';
           if (phoneInput && phoneInput.parentElement) phoneInput.parentElement.style.display = 'flex';
           if (lastNameInput && lastNameInput.parentElement && lastNameInput.parentElement.parentElement) {
@@ -1410,8 +1452,9 @@ function setupSupabaseAuthListener() {
           
           if (lastNameInput) lastNameInput.value = metadata.lastName || '';
           if (firstNameInput) firstNameInput.value = metadata.firstName || '';
-          if (birthdayInput) birthdayInput.value = '';
-          if (loginIdInput) loginIdInput.value = '';
+          if (birthdayInput) birthdayInput.value = metadata.birthday || '';
+          if (genderSelect) genderSelect.value = metadata.gender || '';
+          if (loginIdInput) loginIdInput.value = metadata.loginId || '';
           if (phoneInput) phoneInput.value = metadata.phone || metadata.phone_number || '';
           if (pwdInput) pwdInput.value = '';
           if (pwdConfirmInput) pwdConfirmInput.value = '';
@@ -26579,7 +26622,7 @@ function initSignupEvents() {
       }
 
       const origin = window.location.origin;
-      const setupUrl = `${origin}/?action=set-password&email=${encodeURIComponent(email)}`;
+      const setupUrl = `${origin}/?action=set-password&email=${encodeURIComponent(email)}&lastName=${encodeURIComponent(lastName)}&firstName=${encodeURIComponent(firstName)}&phone=${encodeURIComponent(phone)}`;
 
       showToast(`アカウント「${fullName}」を仮登録しました。メール送信中...`, 'info');
 
@@ -26707,18 +26750,22 @@ function initSignupEvents() {
   if (setPwdSubmit && setPwdModal) {
     setPwdSubmit.addEventListener('click', async () => {
       const email = document.getElementById('set-pwd-email').value;
-      const birthday = document.getElementById('set-pwd-birthday').value.trim();
-      const loginId = document.getElementById('set-pwd-loginid').value.trim();
-      const phone = document.getElementById('set-pwd-phone').value.trim();
+      const lastName = document.getElementById('set-pwd-lastname') ? document.getElementById('set-pwd-lastname').value.trim() : '';
+      const firstName = document.getElementById('set-pwd-firstname') ? document.getElementById('set-pwd-firstname').value.trim() : '';
+      const birthday = document.getElementById('set-pwd-birthday') ? document.getElementById('set-pwd-birthday').value.trim() : '';
+      const gender = document.getElementById('set-pwd-gender') ? document.getElementById('set-pwd-gender').value : '';
+      const loginId = document.getElementById('set-pwd-loginid') ? document.getElementById('set-pwd-loginid').value.trim() : '';
+      const phone = document.getElementById('set-pwd-phone') ? document.getElementById('set-pwd-phone').value.trim() : '';
       const pwd = document.getElementById('set-pwd-input').value.trim();
       const pwdConfirm = document.getElementById('set-pwd-confirm-input').value.trim();
 
       const birthdayInput = document.getElementById('set-pwd-birthday');
-      const isRecovery = birthdayInput && birthdayInput.parentElement && birthdayInput.parentElement.style.display === 'none';
+      const isRecovery = birthdayInput && birthdayInput.parentElement && birthdayInput.parentElement.parentElement && birthdayInput.parentElement.parentElement.style.display === 'none';
 
       let resolvedLoginId = loginId;
       let resolvedBirthday = birthday;
       let resolvedPhone = phone;
+      let resolvedFullName = (lastName && firstName) ? `${lastName} ${firstName}` : '';
 
       if (isRecovery) {
         // パスワードバリデーションのみ実行 (8文字以上、大・小・数字必須)
@@ -26745,16 +26792,24 @@ function initSignupEvents() {
         // 既存のユーザー情報をDBから取得してマージする
         const { data: existingUser } = await supabaseClient
           .from('synapse_users')
-          .select('login_id, birthday, phone_number')
+          .select('name, login_id, birthday, phone_number, gender')
           .eq('id', email)
           .maybeSingle();
         
         if (existingUser) {
+          resolvedFullName = existingUser.name || email;
           resolvedLoginId = existingUser.login_id || '';
           resolvedBirthday = existingUser.birthday || '';
           resolvedPhone = existingUser.phone_number || '';
         }
       } else {
+        // 0. 姓名バリデーション
+        if (!lastName || !firstName) {
+          showToast('姓と名を入力してください。', 'error');
+          return;
+        }
+        resolvedFullName = `${lastName} ${firstName}`;
+
         // 1. 生年月日バリデーション
         if (!birthday) {
           showToast('生年月日を入力してください。', 'error');
@@ -26819,7 +26874,7 @@ function initSignupEvents() {
         if (dupError) {
           console.error('[Supabase DB] Duplicate login ID check failed:', dupError);
         }
-        if (duplicateUser) {
+        if (duplicateUser && duplicateUser.id !== email) {
           showToast('入力されたログインIDは既に登録されています。別のログインIDを使用してください。', 'error');
           return;
         }
@@ -26828,6 +26883,11 @@ function initSignupEvents() {
       // 5. Supabase Auth でパスワードを更新し、メタデータを更新
       const updateData = { needs_password_setup: false };
       if (!isRecovery) {
+        updateData.lastName = lastName;
+        updateData.firstName = firstName;
+        updateData.name = resolvedFullName;
+        updateData.gender = gender;
+        updateData.birthday = resolvedBirthday;
         updateData.loginId = resolvedLoginId;
         updateData.phone = resolvedPhone;
         updateData.phone_number = resolvedPhone;
@@ -26843,8 +26903,6 @@ function initSignupEvents() {
       if (error) {
         console.error('[Supabase Auth] Password update failed:', error);
         // ローカル開発やシミュレーション環境での救済措置：
-        // エラーが発生しても、ローカルホスト環境、またはメールシミュレーションが有効だった場合は
-        // 警告ログを出した上で、モックデータで処理を続行する
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
         if (isLocal) {
           console.warn('[Supabase Auth] Password update failed in local environment. Proceeding with database-only synchronization.');
@@ -26852,7 +26910,9 @@ function initSignupEvents() {
             created_at: new Date().toISOString()
           };
           metadata = {
-            name: email.split('@')[0],
+            name: resolvedFullName || email.split('@')[0],
+            lastName: lastName,
+            firstName: firstName,
             role: '',
             code: 'TEMP_CODE'
           };
@@ -26871,15 +26931,16 @@ function initSignupEvents() {
       } else {
         const { error } = await supabaseClient.from('synapse_users').upsert({
           id: email,
-          name: metadata.name || email,
+          name: resolvedFullName || metadata.name || email,
           password: pwd,
           role: metadata.role || 'sales',
           email: email,
           code: metadata.code || '',
           login_id: resolvedLoginId,
           birthday: resolvedBirthday,
+          gender: gender || null,
           phone_number: resolvedPhone,
-          created_at: user.created_at || new Date().toISOString(),
+          created_at: (user && user.created_at) ? user.created_at : new Date().toISOString(),
           last_login_at: new Date().toISOString(),
           pwd_changed_at: new Date().toISOString()
         });
@@ -26896,7 +26957,11 @@ function initSignupEvents() {
       state.currentUser = {
         id: email,
         role: metadata.role || '',
-        name: metadata.name || email,
+        name: resolvedFullName || metadata.name || email,
+        lastName: lastName,
+        firstName: firstName,
+        gender: gender,
+        birthday: resolvedBirthday,
         loginId: resolvedLoginId,
         password: pwd,
         code: metadata.code || '',
