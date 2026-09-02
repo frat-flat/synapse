@@ -27062,15 +27062,43 @@ function initSignupEvents() {
     return str;
   };
 
-  // 入力フィールドの blur 時に自動変換を適用
+  // 入力フィールドの blur 時に自動変換を適用＆カレンダーピッカー同期
   const birthdayInputEl = document.getElementById('set-pwd-birthday');
+  const birthdayPickerEl = document.getElementById('set-pwd-birthday-picker');
+  const birthdayCalBtnEl = document.getElementById('set-pwd-birthday-cal-btn');
+
   if (birthdayInputEl) {
     birthdayInputEl.addEventListener('blur', () => {
       const formatted = parseAndFormatBirthday(birthdayInputEl.value);
       if (formatted) {
         birthdayInputEl.value = formatted;
+        if (birthdayPickerEl) {
+          try { birthdayPickerEl.value = formatted.replace(/\//g, '-'); } catch (e) {}
+        }
       }
     });
+  }
+
+  if (birthdayPickerEl && birthdayInputEl) {
+    birthdayPickerEl.addEventListener('change', () => {
+      if (birthdayPickerEl.value) {
+        const [y, m, d] = birthdayPickerEl.value.split('-');
+        birthdayInputEl.value = `${y}/${m}/${d}`;
+      }
+    });
+
+    if (birthdayCalBtnEl) {
+      birthdayCalBtnEl.style.pointerEvents = 'auto';
+      birthdayCalBtnEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof birthdayPickerEl.showPicker === 'function') {
+          birthdayPickerEl.showPicker();
+        } else {
+          birthdayPickerEl.click();
+        }
+      });
+    }
   }
 
   const phoneInputEl = document.getElementById('set-pwd-phone');

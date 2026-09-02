@@ -3503,8 +3503,14 @@
       
       <div style="display: flex; gap: 0.5rem;">
         <div style="display: flex; flex-direction: column; gap: 0.25rem; flex: 1;">
-          <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">生年月日 (西暦表記):</label>
-          <input type="text" id="set-pwd-birthday" required placeholder="例: 1990/01/01" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+          <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">生年月日 (西暦表記 / 📅選択可):</label>
+          <div style="position: relative; display: flex; align-items: center; width: 100%;">
+            <input type="text" id="set-pwd-birthday" required placeholder="例: 1990/01/01" style="width: 100%; padding: 0.45rem 2.2rem 0.45rem 0.65rem; font-size: 0.82rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+            <input type="date" id="set-pwd-birthday-picker" style="position: absolute; right: 4px; width: 26px; height: 26px; opacity: 0; cursor: pointer; z-index: 2;" title="カレンダーから選択">
+            <button type="button" id="set-pwd-birthday-cal-btn" style="position: absolute; right: 4px; background: none; border: none; font-size: 1.05rem; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; z-index: 1; pointer-events: none;" title="カレンダーから選択">
+              📅
+            </button>
+          </div>
         </div>
         <div style="display: flex; flex-direction: column; gap: 0.25rem; width: 120px;">
           <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">性別:</label>
