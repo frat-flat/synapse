@@ -1517,20 +1517,15 @@ function setupSupabaseAuthListener() {
             return;
           }
 
-          // 3. 端末種別に応じた2段階認証を要求 (スマホならSMS認証、PCならメール認証)
-          let isVerified = false;
-          if (currentType === 'smartphone') {
-            if (!phoneNumber) {
-              showToast('ご登録電話番号が見つからないため、SMS認証を実行できません。管理者に連絡してください。', 'error');
-              await supabaseClient.auth.signOut();
-              return;
-            }
-            showToast('新しいスマホを検知しました。SMS 2段階認証を実行します。', 'info');
-            isVerified = await triggerSmsMfa(phoneNumber, 'スマホ端末の追加');
-          } else {
-            showToast('新しいPCを検知しました。メール 2段階認証を実行します。', 'info');
-            isVerified = await triggerEmailMfa(email, 'PC端末の追加');
+          // 3. 初めてログインする未登録端末では、必ず電話番号宛てのSMS 2段階認証を要求
+          if (!phoneNumber) {
+            showToast('ご登録電話番号が見つからないため、SMS認証を実行できません。管理者に連絡してください。', 'error');
+            await supabaseClient.auth.signOut();
+            return;
           }
+
+          showToast('新しい端末を検知しました。ご登録の電話番号宛てにSMS 2段階認証を実行します。', 'info');
+          const isVerified = await triggerSmsMfa(phoneNumber, '新しい端末の初回登録');
           
           if (isVerified) {
             // SMS認証に成功：新規デバイスとしてDBに登録
@@ -11502,15 +11497,9 @@ async function handleLogin(e) {
             return;
           }
 
-          // 3. 端末種別に応じた2段階認証を要求 (スマホならSMS認証、PCならメール認証)
-          let isVerified = false;
-          if (currentType === 'smartphone') {
-            showToast('新しいスマホを検知しました。SMS 2段階認証を実行します。', 'info');
-            isVerified = await triggerSmsMfa(phoneNumber, 'オーナー用スマホ端末の追加');
-          } else {
-            showToast('新しいPCを検知しました。メール 2段階認証を実行します。', 'info');
-            isVerified = await triggerEmailMfa(ownerEmail, 'オーナー用PC端末の追加');
-          }
+          // 3. 初めてログインする未登録端末では、必ず電話番号宛てのSMS 2段階認証を要求
+          showToast('新しい端末を検知しました。ご登録の電話番号宛てにSMS 2段階認証を実行します。', 'info');
+          const isVerified = await triggerSmsMfa(phoneNumber, 'オーナー用端末の追加');
           
           if (isVerified) {
             try {
