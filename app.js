@@ -26536,7 +26536,6 @@ function initSignupEvents() {
       const lastName = document.getElementById('signup-lastname').value.trim();
       const firstName = document.getElementById('signup-firstname').value.trim();
       const email = document.getElementById('signup-email').value.trim();
-      const phone = document.getElementById('signup-phone').value.trim();
 
       if (!lastName || !firstName) {
         showToast('姓と名を入力してください。', 'error');
@@ -26545,11 +26544,6 @@ function initSignupEvents() {
 
       if (!email) {
         showToast('メールアドレスを入力してください。', 'error');
-        return;
-      }
-
-      if (!phone || !/^0\d{9,10}$/.test(phone)) {
-        showToast('有効な電話番号（半角数字、ハイフンなし10〜11桁）を入力してください。', 'error');
         return;
       }
 
@@ -26583,8 +26577,6 @@ function initSignupEvents() {
               firstName: firstName,
               code: userCode,
               role: 'sales',
-              phone: phone,
-              phone_number: phone,
               needs_password_setup: true
             }
           }
@@ -26601,8 +26593,6 @@ function initSignupEvents() {
                 firstName: firstName,
                 code: userCode,
                 role: 'sales',
-                phone: phone,
-                phone_number: phone,
                 needs_password_setup: true
               },
               emailRedirectTo: window.location.origin
@@ -26622,7 +26612,7 @@ function initSignupEvents() {
       }
 
       const origin = window.location.origin;
-      const setupUrl = `${origin}/?action=set-password&email=${encodeURIComponent(email)}&lastName=${encodeURIComponent(lastName)}&firstName=${encodeURIComponent(firstName)}&phone=${encodeURIComponent(phone)}`;
+      const setupUrl = `${origin}/?action=set-password&email=${encodeURIComponent(email)}&lastName=${encodeURIComponent(lastName)}&firstName=${encodeURIComponent(firstName)}`;
 
       showToast(`アカウント「${fullName}」を仮登録しました。メール送信中...`, 'info');
 
@@ -26683,13 +26673,17 @@ function initSignupEvents() {
                   
                   if (lastNameInput) lastNameInput.value = lastName || '';
                   if (firstNameInput) firstNameInput.value = firstName || '';
-                  if (phoneInput) phoneInput.value = phone || '';
+                  if (phoneInput) phoneInput.value = '';
                   if (birthdayInput) birthdayInput.value = '';
+                  const genderSelect = document.getElementById('set-pwd-gender');
+                  if (genderSelect) genderSelect.value = '';
                   if (loginIdInput) loginIdInput.value = '';
                   
-                  if (birthdayInput && birthdayInput.parentElement) birthdayInput.parentElement.style.display = 'block';
-                  if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'block';
-                  if (phoneInput && phoneInput.parentElement) phoneInput.parentElement.style.display = 'block';
+                  if (birthdayInput && birthdayInput.parentElement && birthdayInput.parentElement.parentElement) {
+                    birthdayInput.parentElement.parentElement.style.display = 'flex';
+                  }
+                  if (loginIdInput && loginIdInput.parentElement) loginIdInput.parentElement.style.display = 'flex';
+                  if (phoneInput && phoneInput.parentElement) phoneInput.parentElement.style.display = 'flex';
                   if (lastNameInput && lastNameInput.parentElement && lastNameInput.parentElement.parentElement) {
                     lastNameInput.parentElement.parentElement.style.display = 'flex';
                   }
