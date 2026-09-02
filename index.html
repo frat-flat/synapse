@@ -2897,12 +2897,21 @@
 
   <!-- ペイン: 🔑 ユーザー権限設定 -->
   <div id="presence-pane-permissions" style="background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); padding: 1.25rem; display: block; box-sizing: border-box;">
-    <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1.25rem; background: var(--bg-surface-elevated); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); flex-wrap: wrap;">
-      <label style="font-size: 0.88rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap;">対象のユーザーを選択:</label>
-      <select id="presence-user-selector" style="padding: 0.4rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; font-size: 0.88rem; min-width: 200px; cursor: pointer;">
-        <!-- 登録ユーザーが動的に入ります -->
-      </select>
+    <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; background: var(--bg-surface-elevated); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); flex-wrap: wrap; position: sticky; top: 0; z-index: 20; box-shadow: var(--shadow-sm);">
+      <div style="display: flex; align-items: center; gap: 0.4rem; flex: 1; min-width: 220px;">
+        <label for="presence-user-search-input" style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap;">🔍 ユーザー検索:</label>
+        <input type="text" id="presence-user-search-input" placeholder="名前・メール・ID・ロールで検索..." style="flex: 1; padding: 0.4rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); font-size: 0.85rem; outline: none;">
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.4rem; flex: 1.5; min-width: 260px;">
+        <label for="presence-user-selector" style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap;">対象ユーザー:</label>
+        <select id="presence-user-selector" style="flex: 1; padding: 0.4rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; font-size: 0.85rem; cursor: pointer;">
+          <!-- 登録ユーザーが動的に入ります -->
+        </select>
+      </div>
       
+      <!-- 🔄 最新ユーザー同期ボタン -->
+      <button id="btn-refresh-presence-users" class="btn btn-text" title="データベースから最新ユーザーを再取得" style="padding: 0.4rem 0.6rem; font-size: 0.8rem; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; gap: 0.2rem;">🔄 同期</button>
+
       <!-- 👁️ ユーザヴュー起動ボタン -->
       <button id="btn-start-user-view" class="btn btn-secondary" style="padding: 0.4rem 0.85rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem; white-space: nowrap; margin-left: auto;">👁️ ユーザヴューを起動</button>
     </div>

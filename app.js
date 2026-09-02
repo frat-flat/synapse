@@ -2593,55 +2593,40 @@ async function syncFromSupabase(showNotification = false) {
     try {
       // ユーザーデータの同期 (synapse_users からマッピング)
       if (usersData && Array.isArray(usersData)) {
-        // [マイグレーション自動修復] Supabase上に admin アカウントがある場合は owner に変更する
-        const dbAdmin = usersData.find(u => u.id === 'admin');
-        if (dbAdmin) {
-          console.warn("[Supabase Migration] Found admin record in Supabase. Migrating to owner...");
-          dbAdmin.id = 'owner';
-          dbAdmin.name = 'オーナー';
-          dbAdmin.role = 'owner';
-          
-          // Supabase側で非同期に admin を削除し、owner を upsert する
+        // [マイグレーション自動修復] Supabase上に admin または 旧 owner (id === 'owner') が残っている場合はクリーンアップ
+        const legacyAdminIdx = usersData.findIndex(u => u.id === 'admin');
+        if (legacyAdminIdx !== -1) {
+          usersData.splice(legacyAdminIdx, 1);
           supabaseClient.from('synapse_users').delete().eq('id', 'admin').then(() => {
-            console.log("[Supabase Migration] Deleted orphaned admin from synapse_users.");
-            // owner を upsert
-            supabaseClient.from('synapse_users').upsert({
-              id: 'owner',
-              name: 'オーナー',
-              password: dbAdmin.password || 'password',
-              role: 'owner',
-              email: dbAdmin.email || 'owner@synapse.management',
-              code: '4X9N3K75',
-              created_at: dbAdmin.created_at || new Date().toISOString()
-            }).then(({error}) => {
-              if (error) console.error("[Supabase Migration] Failed to upsert restored owner:", error);
-              else console.log("[Supabase Migration] Successfully upserted restored owner.");
-            });
+            console.log("[Supabase Migration] Cleaned up legacy admin (id: admin).");
           });
         }
 
-        // もし owner レコード自体がデータベースにない場合は、デフォルト owner レコードを強制挿入する
-        const dbOwner = usersData.find(u => u.id === 'owner');
+        // 旧 owner (id === 'owner') が残っている場合は確実にSupabaseおよび配列から削除
+        for (let i = usersData.length - 1; i >= 0; i--) {
+          if (usersData[i].id === 'owner') {
+            usersData.splice(i, 1);
+          }
+        }
+        supabaseClient.from('synapse_users').delete().eq('id', 'owner').then(() => {
+          console.log("[Supabase Migration] Cleaned up legacy owner (id: owner).");
+        });
+
+        // もし owner レコード自体がデータベースにない場合は、owner@synapse.management を強制挿入する
+        const dbOwner = usersData.find(u => u.id === 'owner@synapse.management' || u.role === 'owner');
         if (!dbOwner) {
-          usersData.unshift({
-            id: 'owner',
+          const newOwner = {
+            id: 'owner@synapse.management',
             name: 'オーナー',
             password: 'password',
             role: 'owner',
             email: 'owner@synapse.management',
-            code: '4X9N3K75',
+            code: 'OWNER_SEED_INIT_CODE',
             created_at: new Date().toISOString()
-          });
+          };
+          usersData.unshift(newOwner);
           // 非同期で Supabase に owner を追加しておく
-          supabaseClient.from('synapse_users').upsert({
-            id: 'owner',
-            name: 'オーナー',
-            password: 'password',
-            role: 'owner',
-            email: 'owner@synapse.management',
-            code: '4X9N3K75',
-            created_at: new Date().toISOString()
-          });
+          supabaseClient.from('synapse_users').upsert(newOwner);
         }
 
         const mappedUsers = usersData.map(user => {
@@ -3914,12 +3899,18 @@ function logCellEdit(tableId, rowId, colId, oldValue, newValue) {
 // 💡 コントロールパネルの各アイコン（ボタン）の権限レベルを解決する
 function getAdminIconPermissionLevel(userId, iconId) {
   // 実ログインのユーザー情報またはプレビュー中の情報を取得
+  const isTargetOwner = (userId === 'owner' || userId === 'owner@synapse.management');
+  const isSessionOwner = isOwnerUser();
+  if ((isSessionOwner && !state.previewUserId) || (isTargetOwner && !state.previewUserId)) {
+    return 'write';
+  }
+
   const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
   const user = users.find(u => u.id === userId) || { id: userId, name: userId, role: userId };
   const userRole = user.role || user.id;
 
   // owner（ECオーナー）は常にフルアクセス（write）
-  if (userRole === 'owner' || userId === 'owner') return 'write';
+  if (userRole === 'owner' || isTargetOwner) return 'write';
 
   if (!state.permissions) state.permissions = {};
   if (!state.permissions.tables) state.permissions.tables = {};
@@ -3977,20 +3968,27 @@ function checkAdminIconAccess(iconId) {
 // ログイン中のユーザーがECオーナー（role: owner）かを判定するヘルパー
 function isOwnerUser() {
   if (!state.currentUser) return false;
-  return state.currentUser.role === 'owner';
+  return state.currentUser.role === 'owner' ||
+         state.currentUser.id === 'owner' ||
+         state.currentUser.id === 'owner@synapse.management' ||
+         state.currentUser.loginId === 'owner' ||
+         state.currentUser.loginId === 'owner@synapse.management';
 }
 
 // ホーム画面（コントロールパネル）にアクセス可能かを判定するヘルパー
 function canAccessHomeScreen() {
   if (!state.currentUser) return false;
 
+  // 1. オーナーであれば常にアクセス可能（プレビューシミュレーション中を除く）
+  if (isOwnerUser() && !state.previewUserId) return true;
+
   // 通常判定用のユーザーIDを決定
   const userId = getCurrentUserId();
+  if (userId === 'owner' || userId === 'owner@synapse.management') return true;
 
-  // 1. オーナーであれば常にアクセス可能
   const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
   const user = users.find(u => u.id === userId);
-  const isOwner = (userId === 'owner' || (user && user.role === 'owner'));
+  const isOwner = (user && (user.role === 'owner' || user.id === 'owner@synapse.management'));
   if (isOwner) return true;
 
   // 2. 一般ユーザー（adminロールを含む）であっても、いずれかのコントロールパネルアイコンの権限を持っていればアクセス可能
@@ -4031,16 +4029,17 @@ function getCurrentUserId() {
 // フォルダ（アコーディオン）の閲覧可否判定
 // 戻り値: { visible: boolean, grayout: boolean }
 function checkFolderAccess(folderId) {
-  // 承認待ちユーザーはマイページ関連以外のフォルダをすべて非表示にする
-  if (state.currentUser && state.currentUser.status === 'pending') {
-    return { visible: false, grayout: false };
-  }
-
   const userId = getCurrentUserId();
   const isOwner = isOwnerUser();
   
+  // オーナーかつプレビュー中でない場合は無条件でフルアクセス
   if (isOwner && !state.previewUserId) {
     return { visible: true, grayout: false };
+  }
+
+  // 承認待ちユーザーはマイページ関連以外のフォルダをすべて非表示にする
+  if (state.currentUser && state.currentUser.status === 'pending' && !isOwner) {
+    return { visible: false, grayout: false };
   }
 
   // 1. 権限設定（folders）に該当のフォルダIDがセットアップされている場合、
@@ -4075,6 +4074,11 @@ function checkFolderAccess(folderId) {
 }
 
 function shouldShowFolder(folderId) {
+  // オーナーかつプレビュー中でない場合は常に表示
+  if (isOwnerUser() && !state.previewUserId) {
+    return true;
+  }
+
   if (state.currentUser && state.currentUser.status === 'pending') {
     return false;
   }
@@ -4114,16 +4118,17 @@ function shouldShowFolder(folderId) {
 
 // テーブル（シート）の閲覧可否判定
 function checkTableAccess(tableId) {
-  // 承認待ちユーザーはマイページ関連以外のテーブルをすべて非表示にする
-  if (state.currentUser && state.currentUser.status === 'pending') {
-    return { visible: false, grayout: false };
-  }
-
   const userId = getCurrentUserId();
   const isOwner = isOwnerUser();
 
+  // オーナーかつプレビュー中でない場合は無条件でフルアクセス
   if (isOwner && !state.previewUserId) {
     return { visible: true, grayout: false };
+  }
+
+  // 承認待ちユーザーはマイページ関連以外のテーブルをすべて非表示にする
+  if (state.currentUser && state.currentUser.status === 'pending' && !isOwner) {
+    return { visible: false, grayout: false };
   }
 
   // 1. 権限設定（tables）に該当のテーブルIDがセットアップされている場合、
@@ -8764,7 +8769,7 @@ function updateUIForCurrentMode() {
   const adminHomePanel = document.getElementById('admin-home-panel');
   if (adminHomePanel) {
     // canAccessHomeScreen() を参照して、オーナーまたはプレビュー中のオーナー・管理者にのみ表示する (ただし表示可能アイコンが1つもない場合は非表示)
-    const shouldShowPanel = canAccessHomeScreen() && hasAnyVisibleIcon && !pendingUser;
+    const shouldShowPanel = (isOwnerUser() && !state.previewUserId) || (canAccessHomeScreen() && hasAnyVisibleIcon && (!pendingUser || isOwnerUser()));
     adminHomePanel.style.display = shouldShowPanel ? 'flex' : 'none';
   }
 
@@ -11588,6 +11593,8 @@ async function handleLogin(e) {
       }
 
       showLoginScreen(false);
+      updateUIForCurrentMode();
+      removeRestrictedTabsForRole(state.currentUser.role);
       switchView('home-screen');
       showToast('管理者としてログインしました。', 'success');
       return;
@@ -11689,6 +11696,8 @@ async function handleLogin(e) {
         }
 
         showLoginScreen(false);
+        updateUIForCurrentMode();
+        removeRestrictedTabsForRole(state.currentUser.role);
         
         if (resolvedUser.role === 'owner') {
           switchView('home-screen');
@@ -12138,7 +12147,7 @@ function getTargetCellKeysForScreen(screenType) {
 
 // 編集権限に応じた適用対象スタイルオブジェクトの取得
 function getTargetStyles(screenType) {
-  const isMasterAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
+  const isMasterAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
   if (screenType === 'jo') {
     return isMasterAdmin ? state.joMasterCellStyles : state.joCellStyles;
   } else if (screenType === 'ap') {
@@ -12159,7 +12168,7 @@ function getTargetStyles(screenType) {
 // スタイル変更の永続化
 function saveCellStyles(screenType) {
   const userId = state.currentUser ? state.currentUser.id : 'guest';
-  const isMasterAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
+  const isMasterAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
   
   if (screenType === 'jo') {
     if (isMasterAdmin) {
@@ -12189,7 +12198,7 @@ function saveCellStyles(screenType) {
 // 個別書式のリセット処理
 function resetUserStyles(screenType, cellKeys) {
   if (!cellKeys || cellKeys.length === 0) return;
-  const isMasterAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
+  const isMasterAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
   
   cellKeys.forEach(cellKey => {
     if (isMasterAdmin) {
@@ -12275,7 +12284,7 @@ function setupResetRangePopup(screenType, btnId, popupId, inputId, confirmId, co
   // シート全体をリセット (オールリセット)
   confirmAllBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const isMasterAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
+    const isMasterAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
     if (confirm('シートのすべての個別書式を初期化します。よろしいですか？')) {
       if (isMasterAdmin) {
         if (screenType === 'jo') state.joMasterCellStyles = {};
@@ -16109,7 +16118,7 @@ function renderAgencyInfo() {
     return rowAccess.visible;
   });
   
-  const isAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
+  const isAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
   const baseVisibleColumnIds = isAdmin ? columns.map(c => c.id) : state.agVisibleColumns;
   const visibleColumnIds = [];
   columns.forEach(col => {
@@ -17917,7 +17926,7 @@ function renderJoInfo() {
     return rowAccess.visible;
   });
   
-  const isAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
+  const isAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
   const baseVisibleColumnIds = isAdmin ? columns.map(c => c.id) : state.joVisibleColumns;
   const visibleColumnIds = [];
   columns.forEach(col => {
@@ -18602,7 +18611,7 @@ function renderApplicantInfo() {
     return rowAccess.visible;
   });
   
-  const isAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
+  const isAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
   const baseVisibleColumnIds = isAdmin ? columns.map(c => c.id) : state.apVisibleColumns;
   const visibleColumnIds = [];
   columns.forEach(col => {
@@ -19406,7 +19415,7 @@ function syncApFormatToolbar() {
 function setupApFormatToolbarEvents() {
   const getTargetCellKeys = () => {
     const keys = [];
-    const isAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
+    const isAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
     const visibleColumnIds = isAdmin ? state.apColumns.map(c => c.id) : state.apVisibleColumns;
 
     if (state.apSelectedRows && state.apSelectedRows.size > 0) {
@@ -19809,7 +19818,7 @@ function syncAgFormatToolbar() {
 function setupAgFormatToolbarEvents() {
   const getTargetCellKeys = () => {
     const keys = [];
-    const isAdmin = state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner');
+    const isAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
     const visibleColumnIds = isAdmin ? state.agColumns.map(c => c.id) : state.agVisibleColumns;
 
     if (state.agSelectedRows && state.agSelectedRows.size > 0) {
@@ -21415,7 +21424,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       deviceListEl.innerHTML = devices.map(dev => {
-        const isCurrent = dev.device_token === currentToken || (devices.length === 1 && state.currentUser.id === 'owner');
+        const isCurrent = dev.device_token === currentToken || (devices.length === 1 && (state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || isOwnerUser()));
         const badge = isCurrent ? '<span style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 0.1rem 0.35rem; border-radius: var(--radius-xs); font-weight: 700; margin-left: 0.5rem;">現在の端末</span>' : '';
         const lastUsed = new Date(dev.last_used_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
         const typeIcon = { smartphone: '📱', tablet: '📟', desktop: '💻' }[dev.device_type] || '💻';
@@ -22314,7 +22323,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   window.getPermBadgeAndEditBtnHtml = function(currentLevel, isReadOnlySystem, onClickCallbackName, tableId, colId, userId) {
-    const isOwner = (userId === 'owner');
+    const isOwner = (userId === 'owner' || userId === 'owner@synapse.management');
     const uniqueId = `perm_${tableId}_${colId || ''}`.replace(/[^a-zA-Z0-9_]/g, '_');
 
     let badgeText = '🚫 非表示';
@@ -22348,7 +22357,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById(`ctrl-container-${uniqueId}`);
     if (!container) return;
 
-    const isSystemAdmin = (userId === 'owner');
+    const isSystemAdmin = (userId === 'owner' || userId === 'owner@synapse.management');
 
     const optHidden = `<button class="btn-perm-toggle ${currentLevel === 'hidden' ? 'active-hidden' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="event.stopPropagation(); window.${onClickCallbackName}('${userId}', '${tableId}', '${colId || ''}', 'hidden')">🚫 非表示</button>`;
     const optRead = `<button class="btn-perm-toggle ${currentLevel === 'readonly' ? 'active-read' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="event.stopPropagation(); window.${onClickCallbackName}('${userId}', '${tableId}', '${colId || ''}', 'readonly')">👁️ 閲覧のみ</button>`;
@@ -22383,7 +22392,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3ステート用のスイッチグループを描画するヘルパー
     const getThreeStateToggleHtml = (currentLevel, isReadOnlySystem, onClickCallbackName, tableId, colId) => {
-      const isSystemAdmin = (user.id === 'owner' || user.role === 'owner');
+      const isSystemAdmin = (user.id === 'owner' || user.id === 'owner@synapse.management' || user.role === 'owner');
 
       const optHidden = `<button class="btn-perm-toggle ${currentLevel === 'hidden' ? 'active-hidden' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="window.${onClickCallbackName}('${user.id}', '${tableId}', '${colId || ''}', 'hidden')">🚫 非表示</button>`;
       const optRead = `<button class="btn-perm-toggle ${currentLevel === 'readonly' ? 'active-read' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="window.${onClickCallbackName}('${user.id}', '${tableId}', '${colId || ''}', 'readonly')">👁️ 閲覧のみ</button>`;
@@ -22399,7 +22408,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let warningBanner = '';
-    if (user.id === 'owner' || user.role === 'owner') {
+    if (user.id === 'owner' || user.id === 'owner@synapse.management' || user.role === 'owner') {
       warningBanner = `
         <div style="background: #fef3c7; border: 1px solid #f59e0b; color: #b45309; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
           ⚠️ <strong>オーナーの権限は変更できません。</strong> 他の一般ユーザーや管理者を選択して個別に権限をカスタマイズしてください。
@@ -22446,7 +22455,7 @@ document.addEventListener('DOMContentLoaded', () => {
     adminPanelIcons.forEach(p => {
       const currentLevel = getAdminIconPermissionLevel(user.id, p.id);
       const isGrayedOut = currentLevel === 'hidden';
-      const isSystemAdmin = (user.id === 'owner' || user.role === 'owner');
+      const isSystemAdmin = (user.id === 'owner' || user.id === 'owner@synapse.management' || user.role === 'owner');
 
       const optHidden = `<button class="btn-perm-toggle ${currentLevel === 'hidden' ? 'active-hidden' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="window.setAdminIconPermissionLevel('${user.id}', '${p.id}', 'hidden')">🚫 非表示</button>`;
       const optWrite = `<button class="btn-perm-toggle ${currentLevel === 'write' ? 'active-write' : ''}" ${isSystemAdmin ? 'disabled' : ''} onclick="window.setAdminIconPermissionLevel('${user.id}', '${p.id}', 'write')">✏️ 編集許可</button>`;
@@ -22816,66 +22825,155 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ユーザー選択セレクトボックスの同期構築
-  window.initPresenceUserSelector = function() {
+  // ユーザー選択セレクトボックスの同期構築（検索フィルタリング機能対応）
+  window.initPresenceUserSelector = async function(searchQuery = '') {
     const selector = document.getElementById('presence-user-selector');
     if (!selector) return;
-    
-    selector.innerHTML = '';
+
+    ensureInitialUsersExist();
+
+    // Supabaseから最新ユーザーをオンデマンド同期（未取得時または明示更新時）
+    if (supabaseClient && !window._presenceUsersFetched) {
+      try {
+        const { data: remoteUsers, error } = await supabaseClient.from('synapse_users').select('*');
+        if (!error && Array.isArray(remoteUsers)) {
+          // 旧 owner / admin がDBに残っていれば非同期で削除
+          supabaseClient.from('synapse_users').delete().eq('id', 'owner');
+          supabaseClient.from('synapse_users').delete().eq('id', 'admin');
+
+          const cleanRemote = remoteUsers
+            .filter(u => u.id !== 'owner' && u.id !== 'admin')
+            .map(u => ({
+              id: u.id,
+              name: u.name,
+              password: u.password,
+              role: (u.role || 'sales').replace('pending_', ''),
+              status: (u.role || '').startsWith('pending_') ? 'pending' : 'active',
+              email: u.email,
+              code: u.code,
+              createdAt: u.created_at,
+              lastLoginAt: u.last_login_at,
+              pwdChangedAt: u.pwd_changed_at
+            }));
+
+          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(cleanRemote));
+          window._presenceUsersFetched = true;
+        }
+      } catch (e) {
+        console.error('[Presence] Failed to fetch latest users from Supabase:', e);
+      }
+    }
     
     const usersStr = localStorage.getItem(STORAGE_KEYS.USERS) || '[]';
     let users = [];
     try {
       users = JSON.parse(usersStr);
     } catch (e) {}
+
+    // 旧 owner (id === 'owner') および admin を完全に除外
+    users = users.filter(u => u.id !== 'owner' && u.id !== 'admin');
     
     if (users.length === 0) {
       users = [
-        { id: 'owner', name: 'オーナー', role: 'owner' },
-        { id: 'sales_01', name: '営業担当A' },
-        { id: 'sales_02', name: '営業担当B' },
-        { id: 'support_01', name: '開設サポートA' }
+        { id: 'owner@synapse.management', name: 'オーナー', role: 'owner', email: 'owner@synapse.management' },
+        { id: 'sales_01', name: '営業担当A', role: 'sales' },
+        { id: 'sales_02', name: '営業担当B', role: 'sales' },
+        { id: 'support_01', name: '開設サポートA', role: 'setup-support' }
       ];
     }
-    
-    users.forEach(u => {
-      const opt = document.createElement('option');
-      opt.value = u.id;
-      let roleLabel = '';
-      if (u.status === 'pending') {
-        roleLabel = ` [申請中:${getRoleJpName(u.role)}]`;
-      } else if (u.role === 'owner') {
-        roleLabel = ' [オーナー]';
-      } else if (u.role === 'admin') {
-        roleLabel = ' [管理者]';
-      } else if (u.role === 'sales') {
-        roleLabel = ' [営業]';
-      } else if (u.role === 'setup-support') {
-        roleLabel = ' [開設サポート]';
-      } else if (u.role === 'store-patrol') {
-        roleLabel = ' [店舗パトロール]';
-      } else if (u.role === 'back-office') {
-        roleLabel = ' [バックオフィス]';
-      } else {
-        roleLabel = ' [未設定]';
-      }
-      opt.textContent = `${u.name || u.id} (${u.id})${roleLabel}`;
-      selector.appendChild(opt);
-    });
 
-    // adminおよびowner以外の最初のユーザーをデフォルト選択にする（いなければ先頭のユーザー）
-    const firstNonAdmin = users.find(u => u.id !== 'admin' && u.id !== 'owner');
-    if (firstNonAdmin) {
-      selector.value = firstNonAdmin.id;
+    // 検索クエリによる絞り込み（名前、メール、ID、ロール名）
+    const query = (searchQuery || '').trim().toLowerCase();
+    const filteredUsers = query ? users.filter(u => {
+      const name = (u.name || '').toLowerCase();
+      const id = (u.id || '').toLowerCase();
+      const email = (u.email || '').toLowerCase();
+      const role = (u.role || '').toLowerCase();
+      const roleJp = getRoleJpName(u.role).toLowerCase();
+      return name.includes(query) || id.includes(query) || email.includes(query) || role.includes(query) || roleJp.includes(query);
+    }) : users;
+
+    const previousValue = selector.value;
+    selector.innerHTML = '';
+    
+    if (filteredUsers.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = '該当するユーザーはいません';
+      selector.appendChild(opt);
+    } else {
+      filteredUsers.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        let roleLabel = '';
+        if (u.status === 'pending') {
+          roleLabel = ` [申請中:${getRoleJpName(u.role)}]`;
+        } else if (u.role === 'owner') {
+          roleLabel = ' [オーナー]';
+        } else if (u.role === 'admin') {
+          roleLabel = ' [管理者]';
+        } else if (u.role === 'sales') {
+          roleLabel = ' [営業]';
+        } else if (u.role === 'setup-support') {
+          roleLabel = ' [開設サポート]';
+        } else if (u.role === 'store-patrol') {
+          roleLabel = ' [店舗パトロール]';
+        } else if (u.role === 'back-office') {
+          roleLabel = ' [バックオフィス]';
+        } else {
+          roleLabel = ' [未設定]';
+        }
+        opt.textContent = `${u.name || u.id} (${u.email || u.id})${roleLabel}`;
+        selector.appendChild(opt);
+      });
+    }
+
+    // 以前選択されていたユーザーが残っていればそれを維持、なければ先頭を選択
+    if (previousValue && filteredUsers.some(u => u.id === previousValue)) {
+      selector.value = previousValue;
+    } else if (filteredUsers.length > 0) {
+      // オーナー以外の一般ユーザーを優先的にデフォルト選択
+      const firstNonOwner = filteredUsers.find(u => u.id !== 'owner@synapse.management' && u.role !== 'owner');
+      selector.value = firstNonOwner ? firstNonOwner.id : filteredUsers[0].id;
     }
 
     if (selector.value) {
       renderUserPermissionViewer(selector.value);
+    } else {
+      const container = document.getElementById('presence-permission-tree-container');
+      if (container) container.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">該当するユーザーがありません。</div>';
+    }
+
+    // 検索入力欄のイベントバインド
+    const searchInput = document.getElementById('presence-user-search-input');
+    if (searchInput && !searchInput.dataset.listenerAttached) {
+      searchInput.dataset.listenerAttached = 'true';
+      searchInput.addEventListener('input', (e) => {
+        initPresenceUserSelector(e.target.value);
+      });
+    }
+
+    // 🔄 最新ユーザー同期ボタンのイベントバインド
+    const refreshBtn = document.getElementById('btn-refresh-presence-users');
+    if (refreshBtn && !refreshBtn.dataset.listenerAttached) {
+      refreshBtn.dataset.listenerAttached = 'true';
+      refreshBtn.addEventListener('click', async () => {
+        window._presenceUsersFetched = false;
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = '同期中...';
+        await initPresenceUserSelector(searchInput ? searchInput.value : '');
+        refreshBtn.disabled = false;
+        refreshBtn.innerHTML = '🔄 同期';
+        showToast('最新のユーザーデータを同期しました。', 'success');
+      });
     }
 
     if (!selector.dataset.listenerAttached) {
       selector.dataset.listenerAttached = 'true';
       selector.addEventListener('change', (e) => {
-        renderUserPermissionViewer(e.target.value);
+        if (e.target.value) {
+          renderUserPermissionViewer(e.target.value);
+        }
       });
     }
 
@@ -22914,6 +23012,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       openTab('presence-tab', 'presence-settings-screen', '🔑 ユーザー権限設定');
+      window._presenceUsersFetched = false;
       initPresenceUserSelector();
     });
   }
@@ -26084,6 +26183,10 @@ function setupPermissionFeatures() {
   if (tabBtnUserPerms) {
     tabBtnUserPerms.addEventListener('click', () => {
       switchPresenceSubTab(tabBtnUserPerms, panePermissions);
+      if (typeof window.initPresenceUserSelector === 'function') {
+        window._presenceUsersFetched = false;
+        window.initPresenceUserSelector();
+      }
     });
   }
   if (tabBtnPkgReg) {
@@ -27590,6 +27693,10 @@ function initUserManagerEvents() {
 
       // 2. クラウドデータを再同期してUIを最新化
       await syncFromSupabase(false);
+      window._presenceUsersFetched = false;
+      if (typeof window.initPresenceUserSelector === 'function') {
+        window.initPresenceUserSelector();
+      }
 
       showToast(`ユーザー「${regFullName}」を正常に登録しました。`, 'success');
       newForm.reset();
@@ -27773,6 +27880,10 @@ function renderUserManagerList() {
 
           // クラウドデータを再同期してUIを最新化
           await syncFromSupabase(false);
+          window._presenceUsersFetched = false;
+          if (typeof window.initPresenceUserSelector === 'function') {
+            window.initPresenceUserSelector();
+          }
           showToast(`ユーザー「${user.name}」を削除しました。`, 'success');
           renderUserManagerList();
         });
@@ -34398,7 +34509,7 @@ window.openResumableUrl = function(urlStr) {
   function getVisibleEventsForMonth(year, month) {
     let events = [];
     const me = state.currentUser ? state.currentUser.id.toLowerCase() : 'guest';
-    const isMeAllowed = me === 'owner' || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.map(m => m.toLowerCase()).includes(me));
+    const isMeAllowed = isOwnerUser() || me === 'owner' || me === 'owner@synapse.management' || (state.calendarAllowedShareMembers && state.calendarAllowedShareMembers.map(m => m.toLowerCase()).includes(me));
     
     // 通常予定（ローカル/Supabase）のフィルタリング
     if (state.calendarEvents) {
