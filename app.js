@@ -26848,20 +26848,23 @@ function initSignupEvents() {
             },
             body: JSON.stringify({
               to: email,
-              subject: '【Synapse】アカウント仮登録とパスワード設定のご案内',
+              subject: '【Synapse】アカウント本登録のご案内',
               html: `
-                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 1.5rem; max-width: 520px; margin: 0 auto; color: #1e293b;">
-                  <p>「${fullName}」様</p>
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 2rem; max-width: 540px; margin: 0 auto; color: #1e293b; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
+                  <div style="text-align: center; margin-bottom: 1.5rem;">
+                    <h2 style="color: #4f46e5; margin: 0; font-size: 1.4rem;">Synapse アカウント本登録のご案内</h2>
+                  </div>
+                  <p><strong>${fullName}</strong> 様</p>
                   <p>この度は「Synapse」に仮登録いただきありがとうございます。</p>
-                  <p style="font-weight: bold; color: #ef4444; margin-top: 1.5rem;">まだ登録は完了していません。</p>
-                  <p>以下のリンクから必要情報を入力し、本登録を完了してください。</p>
-                  
-                  <p style="margin: 2rem 0;">
-                    <a href="${setupUrl}" style="background: #4f46e5; color: #ffffff; padding: 0.65rem 1.25rem; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block;">本登録を完了する</a>
+                  <p style="background: #f8fafc; border-left: 4px solid #4f46e5; padding: 0.75rem 1rem; margin: 1.5rem 0; font-size: 0.9rem; color: #334155;">
+                    ⚠️ まだアカウント登録は完了しておりません。<br>
+                    以下のボタンをクリックしてプロフィール・パスワードを設定し、本登録を完了してください。
                   </p>
-
-                  <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 3rem; border-top: 1px solid #e2e8f0; padding-top: 1rem;">
-                    ※ボタンがクリックできない場合は、以下のURLをコピーしてブラウザのアドレスバーに貼り付けてください：<br>
+                  <div style="text-align: center; margin: 2rem 0;">
+                    <a href="${setupUrl}" style="background: #4f46e5; color: #ffffff; padding: 0.75rem 1.75rem; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 1rem; display: inline-block; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">本登録を完了する</a>
+                  </div>
+                  <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 2.5rem; border-top: 1px solid #e2e8f0; padding-top: 1rem; line-height: 1.5;">
+                    ※ボタンがクリックできない場合は、以下のURLをコピーしてブラウザのアドレスバーに直接貼り付けてアクセスしてください：<br>
                     <a href="${setupUrl}" style="color: #4f46e5; word-break: break-all;">${setupUrl}</a>
                   </p>
                 </div>
@@ -26875,8 +26878,8 @@ function initSignupEvents() {
           if (data.simulated) {
             showToast('メール送信をシミュレートしました。', 'success');
             showAppConfirm(
-              '📧 パスワード設定メール（シミュレーション）',
-              `（SMTP設定未完了のためシミュレート送信しました）\n「${email}」宛てのパスワード設定画面に進みますか？`,
+              '📧 アカウント本登録メール（シミュレーション）',
+              `（SMTP設定未完了のためシミュレート送信しました）\n「${email}」宛てのアカウント本登録画面に進みますか？`,
               () => {
                 const modal = document.getElementById('set-password-modal');
                 const emailHidden = document.getElementById('set-pwd-email');
