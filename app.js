@@ -27280,7 +27280,7 @@ function initSignupEvents() {
       if (isLocalEnv) {
         console.warn('[Supabase DB] Simulating profile upsert in local/file environment.');
       } else {
-        const { error } = await supabaseClient.from('synapse_users').upsert({
+        const payload = {
           id: email,
           name: resolvedFullName || metadata.name || email,
           password: pwd,
@@ -27289,13 +27289,23 @@ function initSignupEvents() {
           code: metadata.code || '',
           login_id: resolvedLoginId,
           birthday: resolvedBirthday,
-          gender: gender || null,
           phone_number: resolvedPhone,
           created_at: (user && user.created_at) ? user.created_at : new Date().toISOString(),
           last_login_at: new Date().toISOString(),
           pwd_changed_at: new Date().toISOString()
-        });
-        dbError = error;
+        };
+
+        if (gender) {
+          payload.gender = gender;
+        }
+
+        let res = await supabaseClient.from('synapse_users').upsert(payload);
+        if (res.error && res.error.message && res.error.message.includes('gender')) {
+          console.warn('[Supabase DB] gender column does not exist in synapse_users. Retrying without gender column.');
+          delete payload.gender;
+          res = await supabaseClient.from('synapse_users').upsert(payload);
+        }
+        dbError = res.error;
       }
 
       if (dbError) {
