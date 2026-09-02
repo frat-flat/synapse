@@ -8824,18 +8824,6 @@ function updateUIForCurrentMode() {
 
 // ログインステータスのチェック
 function checkLoginStatus() {
-  // 💡 デモ用に未ログインの場合は自動的に owner アカウントでログインする
-  if (!localStorage.getItem(STORAGE_KEYS.LOGGED_USER)) {
-    const defaultOwner = {
-      id: 'owner@synapse.management',
-      loginId: 'owner@synapse.management',
-      name: 'オーナー',
-      role: 'owner',
-      code: 'OWNER_SEED_INIT_CODE'
-    };
-    localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(defaultOwner));
-  }
-
   const loggedUser = localStorage.getItem(STORAGE_KEYS.LOGGED_USER);
   if (loggedUser) {
     state.currentUser = JSON.parse(loggedUser);
