@@ -3253,6 +3253,29 @@ tr.grayed-out-access td {
   background: var(--primary-hover) !important;
 }
 
+/* インライン権限解除 🔒 アイコンボタン（元に戻す） */
+.revoke-access-inline-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.15rem 0.35rem;
+  font-size: 0.7rem;
+  margin-left: 0.4rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s;
+  pointer-events: auto !important;
+  z-index: 100;
+}
+.revoke-access-inline-btn:hover {
+  transform: scale(1.05);
+  background: #dc2626 !important;
+}
+
 /* フローティングプレビュー警告バー */
 .preview-warning-bar {
   animation: slideDownPreviewBar 0.3s ease-out;

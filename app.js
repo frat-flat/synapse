@@ -4320,9 +4320,73 @@ function checkRowAccess(tableId, row) {
   return { visible: false, grayout: false };
 }
 
-// インライン権限付与ヘルパー
+// インライン権限付与・解除ヘルパーおよび履歴管理
+function recordPermissionHistory() {
+  if (!state.permissionHistory) state.permissionHistory = [];
+  state.permissionHistory.push(JSON.parse(JSON.stringify(state.permissions || {})));
+  updatePreviewUndoButtons();
+}
+
+function updatePreviewUndoButtons() {
+  const undoBtn = document.getElementById('preview-undo-btn');
+  const undoCountEl = document.getElementById('preview-undo-count');
+  const resetBtn = document.getElementById('preview-reset-all-btn');
+  const historyLen = (state.permissionHistory || []).length;
+
+  if (undoBtn && undoCountEl) {
+    if (historyLen > 0) {
+      undoBtn.style.display = 'inline-flex';
+      undoCountEl.textContent = historyLen;
+    } else {
+      undoBtn.style.display = 'none';
+    }
+  }
+
+  if (resetBtn) {
+    if (historyLen > 0) {
+      resetBtn.style.display = 'inline-flex';
+    } else {
+      resetBtn.style.display = 'none';
+    }
+  }
+}
+
+function undoLastPermissionChange() {
+  if (!state.permissionHistory || state.permissionHistory.length === 0) return;
+  const prevPerms = state.permissionHistory.pop();
+  state.permissions = JSON.parse(JSON.stringify(prevPerms));
+  savePermissions();
+  updatePreviewUndoButtons();
+  refreshCurrentViewPermissions();
+  showToast('直前の権限変更を元に戻しました。', 'info');
+}
+
+function resetPreviewPermissions() {
+  if (!state.initialPreviewPermissions) return;
+  showAppConfirm('権限の全復元', 'プレビュー開始前の初期権限状態にすべて復元しますか？（シミュレーション中の付与・解除がすべて取り消されます）', () => {
+    state.permissions = JSON.parse(JSON.stringify(state.initialPreviewPermissions));
+    state.permissionHistory = [];
+    savePermissions();
+    updatePreviewUndoButtons();
+    refreshCurrentViewPermissions();
+    showToast('プレビュー開始前の初期権限にすべて復元しました。', 'success');
+  });
+}
+
+function refreshCurrentViewPermissions() {
+  renderCustomTableList();
+  if (state.currentView === 'jo-info-screen') renderJoInfo();
+  else if (state.currentView === 'applicant-info-screen') renderApplicantInfo();
+  else if (state.currentView === 'agency-info-screen') renderAgencyInfo();
+  else if (state.currentView === 'custom-table-screen' && state.activeCustomTableId) {
+    renderCustomTable(state.activeCustomTableId);
+  }
+}
+
+// インライン権限付与 🔓 ボタン
 function appendInlineGrantBtn(parentEl, onClick) {
   if (!parentEl) return;
+  removeInlineRevokeBtn(parentEl);
   if (parentEl.querySelector('.grant-access-inline-btn')) return;
   const btn = document.createElement('button');
   btn.className = 'grant-access-inline-btn';
@@ -4341,38 +4405,87 @@ function removeInlineGrantBtn(parentEl) {
   if (btn) btn.remove();
 }
 
+// インライン権限解除 🔒 ボタン（元に戻す）
+function appendInlineRevokeBtn(parentEl, onClick) {
+  if (!parentEl) return;
+  removeInlineGrantBtn(parentEl);
+  if (parentEl.querySelector('.revoke-access-inline-btn')) return;
+  const btn = document.createElement('button');
+  btn.className = 'revoke-access-inline-btn';
+  btn.innerHTML = '🔒 権限解除';
+  btn.title = 'プレビュー中のユーザーからこの閲覧権限を解除（非表示に戻す）します';
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onClick();
+  });
+  parentEl.appendChild(btn);
+}
+
+function removeInlineRevokeBtn(parentEl) {
+  if (!parentEl) return;
+  const btn = parentEl.querySelector('.revoke-access-inline-btn');
+  if (btn) btn.remove();
+}
+
 function grantPermission(type, targetId) {
   const userId = getCurrentUserId();
-  if (!userId || userId === 'admin') return;
+  if (!userId || userId === 'admin' || userId === 'owner' || userId === 'owner@synapse.management') return;
+
+  recordPermissionHistory();
 
   if (type === 'folder') {
+    if (!state.permissions.folders) state.permissions.folders = {};
     if (!state.permissions.folders[targetId]) state.permissions.folders[targetId] = [];
     if (!state.permissions.folders[targetId].includes(userId)) {
       state.permissions.folders[targetId].push(userId);
     }
   } else if (type === 'table') {
+    if (!state.permissions.tables) state.permissions.tables = {};
     if (!state.permissions.tables[targetId]) state.permissions.tables[targetId] = [];
     if (!state.permissions.tables[targetId].includes(userId)) {
       state.permissions.tables[targetId].push(userId);
     }
   }
   savePermissions();
-  renderCustomTableList();
-  
-  if (state.currentView === 'jo-info-screen') renderJoInfo();
-  else if (state.currentView === 'applicant-info-screen') renderApplicantInfo();
-  else if (state.currentView === 'agency-info-screen') renderAgencyInfo();
-  else if (state.currentView === 'custom-table-screen' && state.activeCustomTableId) {
-    renderCustomTable(state.activeCustomTableId);
+  refreshCurrentViewPermissions();
+  showToast('権限を即時追加しました。（「↩️ 元に戻す」で取り消し可能）', 'success');
+}
+
+function revokePermission(type, targetId) {
+  const userId = getCurrentUserId();
+  if (!userId || userId === 'admin' || userId === 'owner' || userId === 'owner@synapse.management') return;
+
+  recordPermissionHistory();
+
+  if (type === 'folder') {
+    if (!state.permissions.folders) state.permissions.folders = {};
+    if (state.permissions.folders[targetId]) {
+      state.permissions.folders[targetId] = state.permissions.folders[targetId].filter(id => id !== userId);
+    } else {
+      const allUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+      state.permissions.folders[targetId] = allUsers.map(u => u.id).filter(id => id !== userId);
+    }
+  } else if (type === 'table') {
+    if (!state.permissions.tables) state.permissions.tables = {};
+    if (state.permissions.tables[targetId]) {
+      state.permissions.tables[targetId] = state.permissions.tables[targetId].filter(id => id !== userId);
+    } else {
+      const allUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+      state.permissions.tables[targetId] = allUsers.map(u => u.id).filter(id => id !== userId);
+    }
   }
-  
-  showToast('権限を即時追加しました。', 'success');
+  savePermissions();
+  refreshCurrentViewPermissions();
+  showToast('権限を解除（非表示）に戻しました。', 'info');
 }
 
 function grantColumnPermissionDirect(tableId, colId) {
   const userId = getCurrentUserId();
-  if (!userId || userId === 'admin') return;
+  if (!userId || userId === 'admin' || userId === 'owner' || userId === 'owner@synapse.management') return;
 
+  recordPermissionHistory();
+
+  if (!state.permissions.columns) state.permissions.columns = {};
   if (!state.permissions.columns[tableId]) state.permissions.columns[tableId] = {};
   if (!state.permissions.columns[tableId][colId]) state.permissions.columns[tableId][colId] = [];
   if (!state.permissions.columns[tableId][colId].includes(userId)) {
@@ -4380,35 +4493,43 @@ function grantColumnPermissionDirect(tableId, colId) {
   }
   
   savePermissions();
-  renderCustomTableList();
+  refreshCurrentViewPermissions();
+  showToast('カラムの閲覧権限を追加しました。（「↩️ 元に戻す」で取り消し可能）', 'success');
+}
+
+function revokeColumnPermissionDirect(tableId, colId) {
+  const userId = getCurrentUserId();
+  if (!userId || userId === 'admin' || userId === 'owner' || userId === 'owner@synapse.management') return;
+
+  recordPermissionHistory();
+
+  if (!state.permissions.columns) state.permissions.columns = {};
+  if (!state.permissions.columns[tableId]) state.permissions.columns[tableId] = {};
   
-  if (state.currentView === 'jo-info-screen') renderJoInfo();
-  else if (state.currentView === 'applicant-info-screen') renderApplicantInfo();
-  else if (state.currentView === 'agency-info-screen') renderAgencyInfo();
-  else if (state.currentView === 'custom-table-screen' && state.activeCustomTableId) {
-    renderCustomTable(state.activeCustomTableId);
+  if (state.permissions.columns[tableId][colId]) {
+    state.permissions.columns[tableId][colId] = state.permissions.columns[tableId][colId].filter(id => id !== userId);
+  } else {
+    const allUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+    state.permissions.columns[tableId][colId] = allUsers.map(u => u.id).filter(id => id !== userId);
   }
   
-  showToast('カラムの閲覧権限を追加しました。', 'success');
+  savePermissions();
+  refreshCurrentViewPermissions();
+  showToast('カラムの閲覧権限を解除（非表示）に戻しました。', 'info');
 }
 
 function grantRowPermission(tableId) {
   const userId = getCurrentUserId();
-  if (!userId || userId === 'admin') return;
+  if (!userId || userId === 'admin' || userId === 'owner' || userId === 'owner@synapse.management') return;
 
-  if (state.permissions.rowFilters[tableId]) {
+  recordPermissionHistory();
+
+  if (state.permissions.rowFilters && state.permissions.rowFilters[tableId]) {
     delete state.permissions.rowFilters[tableId][userId];
   }
   savePermissions();
-  renderCustomTableList();
-  
-  if (state.currentView === 'jo-info-screen') renderJoInfo();
-  else if (state.currentView === 'applicant-info-screen') renderApplicantInfo();
-  else if (state.currentView === 'agency-info-screen') renderAgencyInfo();
-  else if (state.currentView === 'custom-table-screen' && state.activeCustomTableId) {
-    renderCustomTable(state.activeCustomTableId);
-  }
-  showToast('行表示制限（フィルタ）を解除しました。', 'success');
+  refreshCurrentViewPermissions();
+  showToast('行表示制限（フィルタ）を解除しました。（「↩️ 元に戻す」で取り消し可能）', 'success');
 }
 
 function deleteCustomAccordion(accId) {
@@ -4763,7 +4884,16 @@ function renderCustomTableList() {
         }
       } else {
         folderDiv.classList.remove('grayed-out-access');
-        if (headerEl) removeInlineGrantBtn(headerEl);
+        if (headerEl) {
+          if (state.previewUserId && (state.previewMode === 'simulate' || state.previewMode === 'grayout') && isOwnerUser()) {
+            appendInlineRevokeBtn(headerEl, () => {
+              revokePermission('folder', acc.id);
+            });
+          } else {
+            removeInlineGrantBtn(headerEl);
+            removeInlineRevokeBtn(headerEl);
+          }
+        }
       }
 
       // DOMツリーに挿入
@@ -4875,7 +5005,14 @@ function renderCustomTableList() {
         });
       } else {
         btn.classList.remove('grayed-out-access');
-        removeInlineGrantBtn(btn);
+        if (state.previewUserId && (state.previewMode === 'simulate' || state.previewMode === 'grayout') && isOwnerUser()) {
+          appendInlineRevokeBtn(btn, () => {
+            revokePermission('table', tbl.id);
+          });
+        } else {
+          removeInlineGrantBtn(btn);
+          removeInlineRevokeBtn(btn);
+        }
       }
 
       // DOMツリーに挿入
@@ -5995,6 +6132,16 @@ function renderCustomTable(tableId) {
       appendInlineGrantBtn(headerWrapper, () => {
         grantColumnPermissionDirect(`custom-table-${tbl.id}`, col.id);
       });
+    } else {
+      th.classList.remove('grayed-out-access');
+      if (state.previewUserId && (state.previewMode === 'simulate' || state.previewMode === 'grayout') && isOwnerUser()) {
+        appendInlineRevokeBtn(headerWrapper, () => {
+          revokeColumnPermissionDirect(`custom-table-${tbl.id}`, col.id);
+        });
+      } else {
+        removeInlineGrantBtn(headerWrapper);
+        removeInlineRevokeBtn(headerWrapper);
+      }
     }
 
     if (fixedColIds.includes(col.id)) {
@@ -16400,12 +16547,22 @@ function renderAgencyInfo() {
         `;
 
         const colAccess = checkColumnAccess('agency-info-screen', col.id);
+        const filterContainer = th.querySelector('.th-filter-container');
         if (colAccess.grayout) {
           th.classList.add('grayed-out-access');
-          const filterContainer = th.querySelector('.th-filter-container');
           appendInlineGrantBtn(filterContainer, () => {
             grantColumnPermissionDirect('agency-info-screen', col.id);
           });
+        } else {
+          th.classList.remove('grayed-out-access');
+          if (state.previewUserId && (state.previewMode === 'simulate' || state.previewMode === 'grayout') && isOwnerUser()) {
+            appendInlineRevokeBtn(filterContainer, () => {
+              revokeColumnPermissionDirect('agency-info-screen', col.id);
+            });
+          } else {
+            removeInlineGrantBtn(filterContainer);
+            removeInlineRevokeBtn(filterContainer);
+          }
         }
 
         const btn = th.querySelector('.btn-filter-toggle');
@@ -18209,12 +18366,22 @@ function renderJoInfo() {
         `;
 
         const colAccess = checkColumnAccess('jo-info-screen', col.id);
+        const filterContainer = th.querySelector('.th-filter-container');
         if (colAccess.grayout) {
           th.classList.add('grayed-out-access');
-          const filterContainer = th.querySelector('.th-filter-container');
           appendInlineGrantBtn(filterContainer, () => {
             grantColumnPermissionDirect('jo-info-screen', col.id);
           });
+        } else {
+          th.classList.remove('grayed-out-access');
+          if (state.previewUserId && (state.previewMode === 'simulate' || state.previewMode === 'grayout') && isOwnerUser()) {
+            appendInlineRevokeBtn(filterContainer, () => {
+              revokeColumnPermissionDirect('jo-info-screen', col.id);
+            });
+          } else {
+            removeInlineGrantBtn(filterContainer);
+            removeInlineRevokeBtn(filterContainer);
+          }
         }
 
         const btn = th.querySelector('.btn-filter-toggle');
@@ -18885,12 +19052,22 @@ function renderApplicantInfo() {
         `;
 
         const colAccess = checkColumnAccess('applicant-info-screen', col.id);
+        const filterContainer = th.querySelector('.th-filter-container');
         if (colAccess.grayout) {
           th.classList.add('grayed-out-access');
-          const filterContainer = th.querySelector('.th-filter-container');
           appendInlineGrantBtn(filterContainer, () => {
             grantColumnPermissionDirect('applicant-info-screen', col.id);
           });
+        } else {
+          th.classList.remove('grayed-out-access');
+          if (state.previewUserId && (state.previewMode === 'simulate' || state.previewMode === 'grayout') && isOwnerUser()) {
+            appendInlineRevokeBtn(filterContainer, () => {
+              revokeColumnPermissionDirect('applicant-info-screen', col.id);
+            });
+          } else {
+            removeInlineGrantBtn(filterContainer);
+            removeInlineRevokeBtn(filterContainer);
+          }
         }
 
         const btn = th.querySelector('.btn-filter-toggle');
@@ -28690,6 +28867,11 @@ function startImpersonationPreview(targetUserId, mode) {
   state.prePreviewView = state.currentView;
   state.previewUserId = targetUserId;
   state.previewMode = mode;
+
+  // プレビュー開始時の権限スナップショットを記録（元に戻す・全復元用）
+  state.initialPreviewPermissions = JSON.parse(JSON.stringify(state.permissions || {}));
+  state.permissionHistory = [];
+  updatePreviewUndoButtons();
   
   const bar = document.getElementById('impersonate-preview-bar');
   if (bar) {
@@ -28730,6 +28912,9 @@ function startImpersonationPreview(targetUserId, mode) {
 function endImpersonationPreview() {
   state.previewUserId = null;
   state.previewMode = null;
+  state.initialPreviewPermissions = null;
+  state.permissionHistory = [];
+  updatePreviewUndoButtons();
 
   const bar = document.getElementById('impersonate-preview-bar');
   if (bar) {
@@ -28761,6 +28946,20 @@ document.addEventListener('DOMContentLoaded', () => {
   if (quitBtn) {
     quitBtn.addEventListener('click', () => {
       endImpersonationPreview();
+    });
+  }
+
+  const undoBtn = document.getElementById('preview-undo-btn');
+  if (undoBtn) {
+    undoBtn.addEventListener('click', () => {
+      undoLastPermissionChange();
+    });
+  }
+
+  const resetAllBtn = document.getElementById('preview-reset-all-btn');
+  if (resetAllBtn) {
+    resetAllBtn.addEventListener('click', () => {
+      resetPreviewPermissions();
     });
   }
 
