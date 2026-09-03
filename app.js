@@ -4375,6 +4375,7 @@ function resetPreviewPermissions() {
 
 function refreshCurrentViewPermissions() {
   renderCustomTableList();
+  updatePreviewUndoButtons();
   if (state.currentView === 'jo-info-screen') renderJoInfo();
   else if (state.currentView === 'applicant-info-screen') renderApplicantInfo();
   else if (state.currentView === 'agency-info-screen') renderAgencyInfo();
@@ -4391,7 +4392,7 @@ function appendInlineGrantBtn(parentEl, onClick) {
   const btn = document.createElement('button');
   btn.className = 'grant-access-inline-btn';
   btn.innerHTML = '🔓 権限付与';
-  btn.title = 'プレビュー中のユーザーにこの閲覧権限を付与します';
+  btn.title = '【権限未付与】クリックしてプレビュー中のユーザーに閲覧権限を付与します';
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     onClick();
@@ -4413,7 +4414,7 @@ function appendInlineRevokeBtn(parentEl, onClick) {
   const btn = document.createElement('button');
   btn.className = 'revoke-access-inline-btn';
   btn.innerHTML = '🔒 権限解除';
-  btn.title = 'プレビュー中のユーザーからこの閲覧権限を解除（非表示に戻す）します';
+  btn.title = '【権限付与済】クリックしてプレビュー中のユーザーから閲覧権限を解除（非表示に戻す）します';
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     onClick();
@@ -4530,6 +4531,119 @@ function grantRowPermission(tableId) {
   savePermissions();
   refreshCurrentViewPermissions();
   showToast('行表示制限（フィルタ）を解除しました。（「↩️ 元に戻す」で取り消し可能）', 'success');
+}
+
+// シート（テーブル）画面全体の権限状態（グレーアウト・バナー・権限付与/解除ボタン）の同期ヘルパー
+function updateTableScreenAccessUI(tableId, screenElement, tableAccess, tableName) {
+  if (!screenElement) return;
+
+  // 既存のバナー・ボタン・オーバーレイをクリーンアップ
+  screenElement.querySelectorAll('.table-access-banner').forEach(el => el.remove());
+  screenElement.querySelectorAll('.table-screen-revoke-btn').forEach(el => el.remove());
+
+  const isOwner = isOwnerUser();
+  const isPreview = !!state.previewUserId;
+  const isSimulate = (state.previewMode === 'simulate' || state.previewMode === 'grayout');
+
+  const tableContainer = screenElement.querySelector('.spreadsheet-table') || screenElement.querySelector('table');
+  const toolbarContainer = screenElement.querySelector('.format-toolbar') || screenElement.querySelector('.list-section > div:first-child');
+  const h1El = screenElement.querySelector('h1');
+  const titleContainer = h1El ? h1El.parentElement : (screenElement.querySelector('.header-title-section') || screenElement.querySelector('h2') || screenElement.firstElementChild);
+  const headerRow = screenElement.firstElementChild;
+
+  // 1. 完全再現（非表示）モードで権限がない場合
+  if (!tableAccess.visible) {
+    if (tableContainer) tableContainer.style.display = 'none';
+    if (toolbarContainer) toolbarContainer.style.display = 'none';
+
+    let blockedOverlay = screenElement.querySelector('.table-access-blocked-overlay');
+    if (!blockedOverlay) {
+      blockedOverlay = document.createElement('div');
+      blockedOverlay.className = 'table-access-blocked-overlay';
+      blockedOverlay.style.cssText = 'padding: 3.5rem 1.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface); border: 1px dashed var(--border-color); border-radius: var(--radius-md); margin: 2rem 0;';
+      blockedOverlay.innerHTML = `
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔒</div>
+        <div style="font-size: 1.15rem; font-weight: bold; color: var(--text-primary); margin-bottom: 0.5rem;">このシートへのアクセス権限がありません</div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">プレビュー中のユーザーには、このテーブル（シート）の閲覧権限が付与されていません。</div>
+        <button class="btn btn-primary btn-grant-table-from-screen" style="padding: 0.45rem 1.1rem; font-size: 0.85rem; font-weight: bold; cursor: pointer;">
+          🔓 このシートの閲覧権限を付与する
+        </button>
+      `;
+      blockedOverlay.querySelector('.btn-grant-table-from-screen').addEventListener('click', () => {
+        grantPermission('table', tableId);
+      });
+      screenElement.appendChild(blockedOverlay);
+    } else {
+      blockedOverlay.style.display = 'block';
+    }
+    return;
+  }
+
+  // 完全再現ブロックオーバーレイがあれば解除
+  const blockedOverlay = screenElement.querySelector('.table-access-blocked-overlay');
+  if (blockedOverlay) blockedOverlay.style.display = 'none';
+  if (tableContainer) tableContainer.style.display = '';
+  if (toolbarContainer) toolbarContainer.style.display = '';
+
+  // 2. シミュレーションモードでテーブル権限がない（grayout: true）場合
+  if (tableAccess.grayout) {
+    // テーブル本体全体に grayed-out-access を付与（半透明、グレーアウト表示）
+    if (tableContainer) tableContainer.classList.add('grayed-out-access');
+    if (toolbarContainer) toolbarContainer.classList.add('grayed-out-access');
+
+    // 画面上部に目立つ権限バナーを表示
+    const banner = document.createElement('div');
+    banner.className = 'table-access-banner';
+    banner.style.cssText = 'background: #fffbeb; border: 1px solid #fde68a; border-left: 5px solid #f59e0b; color: #92400e; padding: 0.65rem 1rem; border-radius: var(--radius-sm); margin: 0.5rem 0 1rem 0; display: flex; align-items: center; justify-content: space-between; gap: 1rem; box-shadow: var(--shadow-sm); z-index: 10; position: relative;';
+    banner.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.85rem; font-weight: bold;">
+        <span style="font-size: 1.2rem;">🔒</span>
+        <span>【権限未付与】現在、このシート（${tableName || '基本マスタ'}）のアクセス権限は付与されていません（未許可デバッグ表示中）</span>
+      </div>
+      <button class="btn btn-primary btn-grant-table-from-banner" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; font-weight: bold; background: var(--primary); color: #fff; border: none; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; box-shadow: var(--shadow-sm);">
+        🔓 このシートの権限を付与
+      </button>
+    `;
+
+    banner.querySelector('.btn-grant-table-from-banner').addEventListener('click', () => {
+      grantPermission('table', tableId);
+    });
+
+    if (headerRow && headerRow.parentNode === screenElement) {
+      headerRow.insertAdjacentElement('afterend', banner);
+    } else {
+      screenElement.insertBefore(banner, screenElement.firstChild);
+    }
+
+    // テーブル自体が未許可なので、カラムヘッダー内の権限ボタンは混乱防止のため非表示
+    screenElement.querySelectorAll('th .revoke-access-inline-btn, th .grant-access-inline-btn').forEach(btn => {
+      btn.style.display = 'none';
+    });
+
+  } else {
+    // 3. 権限が付与されている（通常表示）場合
+    if (tableContainer) tableContainer.classList.remove('grayed-out-access');
+    if (toolbarContainer) toolbarContainer.classList.remove('grayed-out-access');
+
+    // プレビューシミュレーション中であれば、タイトル横に「🔒 シート権限解除」ボタンを配置！
+    if (isPreview && isSimulate && isOwner) {
+      const revokeBtn = document.createElement('button');
+      revokeBtn.className = 'table-screen-revoke-btn btn btn-danger';
+      revokeBtn.style.cssText = 'margin-left: 0.75rem; padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: bold; background: #ef4444; color: #fff; border: none; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; vertical-align: middle; box-shadow: var(--shadow-sm);';
+      revokeBtn.innerHTML = '🔒 このシートの権限を解除';
+      revokeBtn.title = '【権限付与済】クリックしてプレビュー中のユーザーからこのシートの閲覧権限を解除（非表示に戻す）します';
+      revokeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        revokePermission('table', tableId);
+      });
+
+      if (h1El) {
+        h1El.insertAdjacentElement('afterend', revokeBtn);
+      } else if (titleContainer) {
+        titleContainer.appendChild(revokeBtn);
+      }
+    }
+  }
 }
 
 function deleteCustomAccordion(accId) {
@@ -5796,6 +5910,11 @@ function renderCustomTable(tableId) {
   const tbl = state.customTables.find(t => t.id === tableId);
   if (!tbl) return;
 
+  const tableAccess = checkTableAccess(tableId);
+  const screenEl = document.getElementById('custom-table-screen');
+  updateTableScreenAccessUI(tableId, screenEl, tableAccess, tbl.name);
+  if (!tableAccess.visible) return;
+
   const listSection = document.querySelector('#custom-table-screen .list-section');
   if (listSection) {
     renderTableControlBar(tableId, listSection);
@@ -6518,6 +6637,7 @@ function renderCustomTable(tableId) {
 
   updateCtSelectionHighlight();
   adjustOverflowCells(document.querySelector('#custom-table-screen .spreadsheet-table'));
+  updateTableScreenAccessUI(tableId, screenEl, tableAccess, tbl.name);
 }
 
 // --- カスタムテーブル用書式イベント ＆ セル選択 ＆ カラーピッカー ---
@@ -16336,8 +16456,12 @@ function renderLinkedIdsList() {
 }
 
 // 代理店情報の描画
-// 代理店情報の描画
 function renderAgencyInfo() {
+  const tableAccess = checkTableAccess('agency-info-screen');
+  const screenEl = document.getElementById('agency-info-screen');
+  updateTableScreenAccessUI('agency-info-screen', screenEl, tableAccess, '代理店基本マスタ');
+  if (!tableAccess.visible) return;
+
   const listSection = document.querySelector('#agency-info-screen .list-section');
   if (listSection) {
     renderTableControlBar('ag', listSection);
@@ -17056,6 +17180,7 @@ function renderAgencyInfo() {
   
   updateSelectionStatsWidget();
   adjustOverflowCells(document.querySelector('#agency-info-screen .spreadsheet-table'));
+  updateTableScreenAccessUI('agency-info-screen', screenEl, tableAccess, '代理店基本マスタ');
 }
 
 // 表示項目の選択ドロップダウンの制御
@@ -18171,6 +18296,11 @@ function initJoColumnResize(th, colId) {
 
 // JO情報の描画
 function renderJoInfo() {
+  const tableAccess = checkTableAccess('jo-info-screen');
+  const screenEl = document.getElementById('jo-info-screen');
+  updateTableScreenAccessUI('jo-info-screen', screenEl, tableAccess, 'JO基本マスタ');
+  if (!tableAccess.visible) return;
+
   const listSection = document.querySelector('#jo-info-screen .list-section');
   if (listSection) {
     renderTableControlBar('jo', listSection);
@@ -18862,10 +18992,16 @@ function renderJoInfo() {
   
   updateSelectionStatsWidget();
   adjustOverflowCells(document.querySelector('#jo-info-screen .spreadsheet-table'));
+  updateTableScreenAccessUI('jo-info-screen', screenEl, tableAccess, 'JO基本マスタ');
 }
 
 // 申込者情報の描画
 function renderApplicantInfo() {
+  const tableAccess = checkTableAccess('applicant-info-screen');
+  const screenEl = document.getElementById('applicant-info-screen');
+  updateTableScreenAccessUI('applicant-info-screen', screenEl, tableAccess, '申込者基本マスタ');
+  if (!tableAccess.visible) return;
+
   const listSection = document.querySelector('#applicant-info-screen .list-section');
   if (listSection) {
     renderTableControlBar('ap', listSection);
@@ -19575,6 +19711,7 @@ function renderApplicantInfo() {
   
   updateSelectionStatsWidget();
   adjustOverflowCells(document.querySelector('#applicant-info-screen .spreadsheet-table'));
+  updateTableScreenAccessUI('applicant-info-screen', screenEl, tableAccess, '申込者基本マスタ');
 }
 
 // 選択されているセルの書式情報を取得して、ツールバーのUI表示と同期する（申込者）
