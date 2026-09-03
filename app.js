@@ -4642,8 +4642,8 @@ const OUTLINE_ICONS = {
   // 色なし線画：ロック（閉じた南京錠・グレー）
   lock: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; pointer-events:none;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`,
   
-  // 色なし線画：アンロック（開いた南京錠・グレー）
-  unlock: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; pointer-events:none;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>`,
+  // 色なし線画：アンロック（開いた南京錠・逆U字が反対側を向いて明確に開いている状態）
+  unlock: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; pointer-events:none;"><rect x="3" y="11" width="13" height="11" rx="2" ry="2"></rect><path d="M9 11V6a4.5 4.5 0 0 1 9 0v4"></path></svg>`,
   
   // カラー線画：編集可（鉛筆・グリーン）※テーブルやフォームなど編集ができる箇所はカラー
   edit: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block; pointer-events:none;"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>`,
@@ -11403,6 +11403,9 @@ function setupEventListeners() {
         } else if (btn.tab === 'form-customize-screen') {
           title = 'フォーム作成';
           type = 'form-customize-screen';
+        } else if (btn.tab === 'table-creator-screen') {
+          title = '📊 テーブル作成';
+          type = 'table-creator-screen';
         }
         openTab(btn.tab, type, title);
       });
@@ -27004,7 +27007,7 @@ function setupPermissionFeatures() {
         showToast('この機能を利用する権限がありません。', 'error');
         return;
       }
-      openTab('table-creator-tab', 'table-creator-screen', '📊 テーブル作成');
+      openTab('table-creator-screen', 'table-creator-screen', '📊 テーブル作成');
     });
   }
 
