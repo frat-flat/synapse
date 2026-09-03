@@ -3235,7 +3235,7 @@ tr.grayed-out-access td {
   color: var(--text-muted) !important;
 }
 
-/* コンパクト権限アイコンボタン（カラムヘッダー用） */
+/* コンパクト権限アイコンボタン（カラムヘッダー用：線画・背景枠なし） */
 .col-perm-icon-btn {
   width: 20px;
   height: 20px;
@@ -3245,35 +3245,32 @@ tr.grayed-out-access td {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
-  border-radius: var(--radius-sm);
-  border: none;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   cursor: pointer;
   flex-shrink: 0;
   line-height: 1;
-  margin-left: 2px;
-  box-shadow: var(--shadow-sm);
-  transition: all 0.15s ease;
+  margin-left: 3px;
+  transition: transform 0.15s ease, opacity 0.15s ease;
   pointer-events: auto !important;
   z-index: 20;
 }
 .col-perm-icon-btn:hover {
-  transform: scale(1.15);
+  transform: scale(1.25);
+  opacity: 0.8;
 }
 .col-perm-icon-btn.state-none {
-  background: #64748b !important;
-  color: #ffffff !important;
+  color: #94a3b8 !important; /* 色なし線画（ロック） */
 }
 .col-perm-icon-btn.state-view {
-  background: #3b82f6 !important;
-  color: #ffffff !important;
+  color: #64748b !important; /* 色なし線画（アンロック） */
 }
 .col-perm-icon-btn.state-edit {
-  background: #10b981 !important;
-  color: #ffffff !important;
+  color: #10b981 !important; /* 編集ができる箇所はカラー（グリーン） */
 }
 
-/* コンパクト権限アイコンボタン（サイドバー用：文字折り返し防止） */
+/* コンパクト権限アイコンボタン（サイドバー用：線画・背景枠なし・文字折り返し防止） */
 .sidebar-perm-icon-btn {
   width: 20px;
   height: 20px;
@@ -3283,35 +3280,32 @@ tr.grayed-out-access td {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
-  border-radius: var(--radius-sm);
-  border: none;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   cursor: pointer;
   flex-shrink: 0;
   line-height: 1;
   margin-left: auto;
-  box-shadow: var(--shadow-sm);
-  transition: all 0.15s ease;
+  transition: transform 0.15s ease, opacity 0.15s ease;
   pointer-events: auto !important;
   z-index: 20;
 }
 .sidebar-perm-icon-btn:hover {
-  transform: scale(1.15);
+  transform: scale(1.25);
+  opacity: 0.8;
 }
 .sidebar-perm-icon-btn.state-none {
-  background: #64748b !important;
-  color: #ffffff !important;
+  color: #94a3b8 !important; /* 色なし線画（ロック） */
 }
 .sidebar-perm-icon-btn.state-view {
-  background: #3b82f6 !important;
-  color: #ffffff !important;
+  color: #64748b !important; /* 色なし線画（アンロック） */
 }
 .sidebar-perm-icon-btn.state-edit {
-  background: #10b981 !important;
-  color: #ffffff !important;
+  color: #10b981 !important; /* 編集ができる箇所はカラー（グリーン） */
 }
 
-/* 互換用インラインボタン（アイコンのみ・極小化） */
+/* 互換用インラインボタン（線画・背景枠なし・極小化） */
 .grant-access-inline-btn,
 .revoke-access-inline-btn {
   width: 20px;
@@ -3322,30 +3316,22 @@ tr.grayed-out-access td {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
-  border-radius: var(--radius-sm);
-  border: none;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: all 0.15s ease;
+  transition: transform 0.15s ease, opacity 0.15s ease;
   pointer-events: auto !important;
   z-index: 20;
   flex-shrink: 0;
   margin-left: auto;
   overflow: hidden;
-  white-space: nowrap;
-}
-.grant-access-inline-btn {
-  background: #64748b !important;
-  color: #ffffff !important;
-}
-.revoke-access-inline-btn {
-  background: #3b82f6 !important;
-  color: #ffffff !important;
+  color: #94a3b8 !important;
 }
 .grant-access-inline-btn:hover,
 .revoke-access-inline-btn:hover {
-  transform: scale(1.15);
+  transform: scale(1.25);
+  opacity: 0.8;
 }
 
 /* サイドバー項目の文字縦折れ防止・横並び保護 */

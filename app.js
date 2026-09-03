@@ -4637,7 +4637,25 @@ function cycleColumnPermission(tableId, colId) {
   refreshCurrentViewPermissions();
 }
 
-// カラムヘッダー用コンパクトアイコンボタン描画（🔒 / 🔓 / ✏️ アイコンのみ・文字なし）
+// --- 🎨 権限・UIアイコン用インライン線画SVG ---
+const OUTLINE_ICONS = {
+  // 色なし線画：ロック（閉じた南京錠・グレー）
+  lock: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; pointer-events:none;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`,
+  
+  // 色なし線画：アンロック（開いた南京錠・グレー）
+  unlock: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; pointer-events:none;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>`,
+  
+  // カラー線画：編集可（鉛筆・グリーン）※テーブルやフォームなど編集ができる箇所はカラー
+  edit: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block; pointer-events:none;"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>`,
+
+  // 色なし線画：目（閲覧）
+  eye: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; pointer-events:none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`,
+
+  // 色なし線画：同期（回転矢印）
+  refresh: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; pointer-events:none;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>`
+};
+
+// カラムヘッダー用コンパクトアイコンボタン描画（線画・背景枠なし・編集可のみカラー）
 function renderColumnPermissionIconBtn(parentEl, tableId, colId) {
   if (!parentEl) return;
   parentEl.querySelectorAll('.col-perm-icon-btn, .grant-access-inline-btn, .revoke-access-inline-btn').forEach(el => el.remove());
@@ -4649,14 +4667,14 @@ function renderColumnPermissionIconBtn(parentEl, tableId, colId) {
   btn.className = `col-perm-icon-btn state-${level}`;
 
   if (level === 'none') {
-    btn.innerHTML = '🔒';
-    btn.title = '【🔒 権限なし】クリックで「🔓 閲覧可」に変更';
+    btn.innerHTML = OUTLINE_ICONS.lock;
+    btn.title = '【権限なし】クリックで「閲覧可」に変更';
   } else if (level === 'view') {
-    btn.innerHTML = '🔓';
-    btn.title = '【🔓 閲覧可 (読取専用)】クリックで「✏️ 編集可」に変更';
+    btn.innerHTML = OUTLINE_ICONS.unlock;
+    btn.title = '【閲覧可 (読取専用)】クリックで「編集可」に変更';
   } else {
-    btn.innerHTML = '✏️';
-    btn.title = '【✏️ 編集可】クリックで「🔒 権限なし」に変更';
+    btn.innerHTML = OUTLINE_ICONS.edit;
+    btn.title = '【編集可】クリックで「権限なし」に変更';
   }
 
   btn.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -4670,7 +4688,7 @@ function renderColumnPermissionIconBtn(parentEl, tableId, colId) {
   parentEl.appendChild(btn);
 }
 
-// サイドバー用コンパクトアイコンボタン描画（🔒 / 🔓 / ✏️ アイコンのみ・文字縦折れ防止）
+// サイドバー用コンパクトアイコンボタン描画（線画・背景枠なし・文字縦折れ防止）
 function renderSidebarPermissionIconBtn(parentEl, type, id) {
   if (!parentEl) return;
   parentEl.querySelectorAll('.sidebar-perm-icon-btn, .grant-access-inline-btn, .revoke-access-inline-btn').forEach(el => el.remove());
@@ -4690,14 +4708,14 @@ function renderSidebarPermissionIconBtn(parentEl, type, id) {
   btn.className = `sidebar-perm-icon-btn state-${level}`;
 
   if (level === 'none') {
-    btn.innerHTML = '🔒';
-    btn.title = '【🔒 権限なし】クリックで「🔓 閲覧可」に変更';
+    btn.innerHTML = OUTLINE_ICONS.lock;
+    btn.title = '【権限なし】クリックで「閲覧可」に変更';
   } else if (level === 'edit') {
-    btn.innerHTML = '✏️';
-    btn.title = '【✏️ 編集可】クリックで「🔒 権限なし」に変更';
+    btn.innerHTML = OUTLINE_ICONS.edit;
+    btn.title = '【編集可】クリックで「権限なし」に変更';
   } else {
-    btn.innerHTML = '🔓';
-    btn.title = type === 'table' ? '【🔓 閲覧可】クリックで「✏️ 編集可」に変更' : '【🔓 閲覧可】クリックで「🔒 権限なし」に変更';
+    btn.innerHTML = OUTLINE_ICONS.unlock;
+    btn.title = type === 'table' ? '【閲覧可】クリックで「編集可」に変更' : '【閲覧可】クリックで「権限なし」に変更';
   }
 
   btn.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -4717,15 +4735,15 @@ function renderSidebarPermissionIconBtn(parentEl, type, id) {
         if (state.tableEditLocks === undefined) state.tableEditLocks = {};
         state.tableEditLocks[id] = true; // 閲覧のみ
         localStorage.setItem('synapse_table_edit_locks', JSON.stringify(state.tableEditLocks));
-        showToast('このシートの【🔓 閲覧権限】を付与しました（読取専用）。', 'info');
+        showToast('このシートの【閲覧権限】を付与しました（読取専用）。', 'info');
       } else if (!isEditable) {
         if (state.tableEditLocks === undefined) state.tableEditLocks = {};
         state.tableEditLocks[id] = false; // 編集可
         localStorage.setItem('synapse_table_edit_locks', JSON.stringify(state.tableEditLocks));
-        showToast('このシートの【✏️ 編集権限】を許可しました。', 'success');
+        showToast('このシートの【編集権限】を許可しました。', 'success');
       } else {
         revokePermission('table', id);
-        showToast('このシートの権限を解除（🔒 権限なし）に設定しました。', 'warning');
+        showToast('このシートの権限を解除（権限なし）に設定しました。', 'warning');
       }
     }
     savePermissions();
@@ -4735,15 +4753,15 @@ function renderSidebarPermissionIconBtn(parentEl, type, id) {
   parentEl.appendChild(btn);
 }
 
-// 互換用インライン権限付与ボタン（未付与：🔒 鍵が閉じている＝ロック中・アイコンのみ）
+// 互換用インライン権限付与ボタン（未付与：線画ロック・背景枠なし）
 function appendInlineGrantBtn(parentEl, onClick) {
   if (!parentEl) return;
   removeInlineRevokeBtn(parentEl);
   if (parentEl.querySelector('.grant-access-inline-btn')) return;
   const btn = document.createElement('button');
   btn.className = 'grant-access-inline-btn';
-  btn.innerHTML = '🔒';
-  btn.title = '【🔒 権限なし】クリックして閲覧を許可します';
+  btn.innerHTML = OUTLINE_ICONS.lock;
+  btn.title = '【権限なし】クリックして閲覧を許可します';
   btn.addEventListener('mousedown', (e) => e.stopPropagation());
   btn.addEventListener('mouseup', (e) => e.stopPropagation());
   btn.addEventListener('click', (e) => {
@@ -4760,15 +4778,15 @@ function removeInlineGrantBtn(parentEl) {
   if (btn) btn.remove();
 }
 
-// 互換用インライン権限解除ボタン（付与済：🔓 鍵が開いている＝閲覧中・アイコンのみ）
+// 互換用インライン権限解除ボタン（付与済：線画アンロック・背景枠なし）
 function appendInlineRevokeBtn(parentEl, onClick) {
   if (!parentEl) return;
   removeInlineGrantBtn(parentEl);
   if (parentEl.querySelector('.revoke-access-inline-btn')) return;
   const btn = document.createElement('button');
   btn.className = 'revoke-access-inline-btn';
-  btn.innerHTML = '🔓';
-  btn.title = '【🔓 閲覧可】クリックして権限を解除（非表示に戻す）します';
+  btn.innerHTML = OUTLINE_ICONS.unlock;
+  btn.title = '【閲覧可】クリックすると非表示に戻します';
   btn.addEventListener('mousedown', (e) => e.stopPropagation());
   btn.addEventListener('mouseup', (e) => e.stopPropagation());
   btn.addEventListener('click', (e) => {
@@ -9500,16 +9518,16 @@ function renderTableControlBar(tableId, parentContainerEl) {
       rightDiv.appendChild(clearFilterPermBtn);
     }
 
-    // 3. 権限ステータスバッジ（閲覧 vs 編集の見分け）
+    // 3. 権限ステータスバッジ（線画・背景枠なし）
     const tableAccess = checkTableAccess(screenId);
     const permBadgesDiv = document.createElement('div');
-    permBadgesDiv.style.cssText = 'display: flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; margin-left: 0.25rem;';
+    permBadgesDiv.style.cssText = 'display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; margin-left: 0.25rem;';
     permBadgesDiv.innerHTML = `
-      <span style="background: #e0e7ff; color: #3730a3; padding: 3px 6px; border-radius: 4px; font-weight: bold; border: 1px solid #c7d2fe;" title="シート全体の閲覧権限">
-        👁️ 閲覧: ${tableAccess.grayout ? '🔒 未付与' : '🔓 閲覧可'}
+      <span style="display: flex; align-items: center; gap: 0.25rem; color: var(--text-secondary);" title="シート全体の閲覧権限">
+        ${OUTLINE_ICONS.eye} 閲覧: ${tableAccess.grayout ? '未付与' : '可'}
       </span>
-      <span style="background: ${isLocked ? '#fee2e2' : '#dcfce7'}; color: ${isLocked ? '#991b1b' : '#166534'}; padding: 3px 6px; border-radius: 4px; font-weight: bold; border: 1px solid ${isLocked ? '#fecaca' : '#bbf7d0'};" title="シート全体の編集ロック">
-        ✏️ 編集: ${isLocked ? '🔒 ロック中' : '🔓 編集可'}
+      <span style="display: flex; align-items: center; gap: 0.25rem; color: ${isLocked ? 'var(--text-muted)' : '#10b981'}; font-weight: 600;" title="シート全体の編集ロック">
+        ${isLocked ? OUTLINE_ICONS.lock : OUTLINE_ICONS.edit} 編集: ${isLocked ? '不可' : '可'}
       </span>
     `;
     rightDiv.appendChild(permBadgesDiv);

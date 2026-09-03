@@ -2911,11 +2911,17 @@
         </select>
       </div>
       
-      <!-- 🔄 最新ユーザー同期ボタン -->
-      <button id="btn-refresh-presence-users" class="btn btn-text" title="データベースから最新ユーザーを再取得" style="padding: 0.4rem 0.6rem; font-size: 0.8rem; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; gap: 0.2rem;">🔄 同期</button>
+      <!-- 🔄 最新ユーザー同期ボタン（色なし線画） -->
+      <button id="btn-refresh-presence-users" class="btn btn-text" title="データベースから最新ユーザーを再取得" style="padding: 0.4rem 0.6rem; font-size: 0.8rem; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; gap: 0.35rem; background: transparent; border: none; box-shadow: none;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; pointer-events:none;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        同期
+      </button>
 
-      <!-- 👁️ ユーザヴュー起動ボタン -->
-      <button id="btn-start-user-view" class="btn btn-secondary" style="padding: 0.4rem 0.85rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem; white-space: nowrap; margin-left: auto;">👁️ ユーザヴューを起動</button>
+      <!-- 👁️ ユーザヴュー起動ボタン（色なし線画） -->
+      <button id="btn-start-user-view" class="btn btn-secondary" style="padding: 0.4rem 0.85rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; margin-left: auto;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; pointer-events:none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        ユーザヴューを起動
+      </button>
     </div>
 
     <!-- 権限ツリー/グリッド表示エリア -->
