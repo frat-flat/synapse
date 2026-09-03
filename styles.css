@@ -3235,30 +3235,32 @@ tr.grayed-out-access td {
   color: var(--text-muted) !important;
 }
 
-/* インライン権限付与 🔓 アイコンボタン */
+/* インライン権限付与 🔒 ボタン（未付与・ロック中） */
 .grant-access-inline-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--primary) !important;
+  background: #64748b !important;
   color: #ffffff !important;
   border: none;
   border-radius: var(--radius-sm);
   padding: 0.15rem 0.35rem;
-  font-size: 0.7rem;
-  margin-left: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: bold;
+  margin-left: 0.35rem;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
-  transition: transform 0.2s;
+  transition: all 0.15s ease;
   pointer-events: auto !important;
   z-index: 100;
+  white-space: nowrap;
 }
 .grant-access-inline-btn:hover {
-  transform: scale(1.05);
-  background: var(--primary-hover) !important;
+  transform: translateY(-1px);
+  background: #475569 !important;
 }
 
-/* インライン権限解除 🔒 アイコンボタン（元に戻す） */
+/* インライン権限解除 🔓 ボタン（付与済・閲覧中） */
 .revoke-access-inline-btn {
   display: inline-flex;
   align-items: center;
@@ -3268,24 +3270,26 @@ tr.grayed-out-access td {
   border: none;
   border-radius: var(--radius-sm);
   padding: 0.15rem 0.35rem;
-  font-size: 0.7rem;
-  margin-left: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: bold;
+  margin-left: 0.35rem;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
-  transition: transform 0.2s;
+  transition: all 0.15s ease;
   pointer-events: auto !important;
   z-index: 100;
+  white-space: nowrap;
 }
 .revoke-access-inline-btn:hover {
-  transform: scale(1.05);
+  transform: translateY(-1px);
   background: #dc2626 !important;
 }
 
 /* テーブルヘッダー内でのボタンをコンパクト化してカラム名の視認性を向上 */
 th .grant-access-inline-btn,
 th .revoke-access-inline-btn {
-  padding: 0.1rem 0.25rem;
-  font-size: 0.65rem;
+  padding: 0.08rem 0.25rem;
+  font-size: 0.62rem;
   margin-left: 0.2rem;
   white-space: nowrap;
   flex-shrink: 0;

@@ -4384,17 +4384,20 @@ function refreshCurrentViewPermissions() {
   }
 }
 
-// インライン権限付与 🔓 ボタン
+// インライン権限付与ボタン（未付与：🔒 鍵が閉じている＝ロック中）
 function appendInlineGrantBtn(parentEl, onClick) {
   if (!parentEl) return;
   removeInlineRevokeBtn(parentEl);
   if (parentEl.querySelector('.grant-access-inline-btn')) return;
   const btn = document.createElement('button');
   btn.className = 'grant-access-inline-btn';
-  btn.innerHTML = '🔓 権限付与';
-  btn.title = '【権限未付与】クリックしてプレビュー中のユーザーに閲覧権限を付与します';
+  btn.innerHTML = '🔒 権限なし (許可)';
+  btn.title = '【閲覧不可】現在はこの項目にアクセス権限がありません（ロック中）。クリックすると閲覧を許可します。';
+  btn.addEventListener('mousedown', (e) => e.stopPropagation());
+  btn.addEventListener('mouseup', (e) => e.stopPropagation());
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
+    e.preventDefault();
     onClick();
   });
   parentEl.appendChild(btn);
@@ -4406,17 +4409,20 @@ function removeInlineGrantBtn(parentEl) {
   if (btn) btn.remove();
 }
 
-// インライン権限解除 🔒 ボタン（元に戻す）
+// インライン権限解除ボタン（付与済：🔓 鍵が開いている＝閲覧中）
 function appendInlineRevokeBtn(parentEl, onClick) {
   if (!parentEl) return;
   removeInlineGrantBtn(parentEl);
   if (parentEl.querySelector('.revoke-access-inline-btn')) return;
   const btn = document.createElement('button');
   btn.className = 'revoke-access-inline-btn';
-  btn.innerHTML = '🔒 権限解除';
-  btn.title = '【権限付与済】クリックしてプレビュー中のユーザーから閲覧権限を解除（非表示に戻す）します';
+  btn.innerHTML = '🔓 閲覧可 (解除)';
+  btn.title = '【閲覧可能】現在はこの項目にアクセス権限が付与されています。クリックすると権限を解除（非表示に戻す）します。';
+  btn.addEventListener('mousedown', (e) => e.stopPropagation());
+  btn.addEventListener('mouseup', (e) => e.stopPropagation());
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
+    e.preventDefault();
     onClick();
   });
   parentEl.appendChild(btn);
@@ -4510,7 +4516,10 @@ function revokeColumnPermissionDirect(tableId, colId) {
   if (state.permissions.columns[tableId][colId]) {
     state.permissions.columns[tableId][colId] = state.permissions.columns[tableId][colId].filter(id => id !== userId);
   } else {
-    const allUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+    let allUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+    if (!allUsers || allUsers.length === 0) {
+      allUsers = typeof ALL_ACCOUNTS !== 'undefined' ? ALL_ACCOUNTS : [];
+    }
     state.permissions.columns[tableId][colId] = allUsers.map(u => u.id).filter(id => id !== userId);
   }
   
@@ -4598,10 +4607,10 @@ function updateTableScreenAccessUI(tableId, screenElement, tableAccess, tableNam
     banner.innerHTML = `
       <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.85rem; font-weight: bold;">
         <span style="font-size: 1.2rem;">🔒</span>
-        <span>【権限未付与】現在、このシート（${tableName || '基本マスタ'}）のアクセス権限は付与されていません（未許可デバッグ表示中）</span>
+        <span>【閲覧不可】現在、このシート（${tableName || '基本マスタ'}）のアクセス権限はありません（ロック中）</span>
       </div>
       <button class="btn btn-primary btn-grant-table-from-banner" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; font-weight: bold; background: var(--primary); color: #fff; border: none; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; box-shadow: var(--shadow-sm);">
-        🔓 このシートの権限を付与
+        🔓 閲覧を許可する
       </button>
     `;
 
@@ -4625,15 +4634,18 @@ function updateTableScreenAccessUI(tableId, screenElement, tableAccess, tableNam
     if (tableContainer) tableContainer.classList.remove('grayed-out-access');
     if (toolbarContainer) toolbarContainer.classList.remove('grayed-out-access');
 
-    // プレビューシミュレーション中であれば、タイトル横に「🔒 シート権限解除」ボタンを配置！
+    // プレビューシミュレーション中であれば、タイトル横に「🔓 閲覧中 (非許可に戻す)」ボタンを配置！
     if (isPreview && isSimulate && isOwner) {
       const revokeBtn = document.createElement('button');
       revokeBtn.className = 'table-screen-revoke-btn btn btn-danger';
       revokeBtn.style.cssText = 'margin-left: 0.75rem; padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: bold; background: #ef4444; color: #fff; border: none; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; vertical-align: middle; box-shadow: var(--shadow-sm);';
-      revokeBtn.innerHTML = '🔒 このシートの権限を解除';
-      revokeBtn.title = '【権限付与済】クリックしてプレビュー中のユーザーからこのシートの閲覧権限を解除（非表示に戻す）します';
+      revokeBtn.innerHTML = '🔓 閲覧中 (非許可に戻す)';
+      revokeBtn.title = '【閲覧可能】現在はこのユーザーに閲覧権限が付与されています。クリックすると非許可（閲覧不可）に戻します。';
+      revokeBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+      revokeBtn.addEventListener('mouseup', (e) => e.stopPropagation());
       revokeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        e.preventDefault();
         revokePermission('table', tableId);
       });
 
@@ -6202,7 +6214,12 @@ function renderCustomTable(tableId) {
 
     th.addEventListener('click', (e) => {
       if (e.button !== 0) return;
-      if (e.target.classList.contains('filter-icon-btn') || e.target.classList.contains('col-resize-handle')) return;
+      if (
+        e.target.closest('.filter-icon-btn') ||
+        e.target.closest('.col-resize-handle') ||
+        e.target.closest('.grant-access-inline-btn') ||
+        e.target.closest('.revoke-access-inline-btn')
+      ) return;
       
       const visibleCols = tbl.columns.filter(c => tbl.visibleColumns.includes(c.id));
       
@@ -7214,7 +7231,124 @@ function createColorFilterSection(col, onColorClick) {
   return section;
 }
 
-// フィルターメニュー内：行閲覧制限（権限付与）セクション生成ヘルパー
+// カラム（列）の編集権限トグル（編集可 ⇔ 読取専用）
+function toggleColumnEditPermissionDirect(tableId, colId) {
+  const targetUserId = state.previewUserId;
+  if (!targetUserId || !isOwnerUser()) return;
+
+  recordPermissionHistory();
+
+  if (!state.permissions.writeColumns) state.permissions.writeColumns = {};
+  if (!state.permissions.writeColumns[tableId]) state.permissions.writeColumns[tableId] = {};
+
+  const currentAllowed = state.permissions.writeColumns[tableId][colId];
+  let newAllowed;
+  if (!currentAllowed) {
+    // デフォルトは全許可なので、読取専用（targetUserIdを除外）にする
+    newAllowed = ['owner'];
+  } else if (currentAllowed.includes(targetUserId)) {
+    // 除外して読取専用にする
+    newAllowed = currentAllowed.filter(id => id !== targetUserId);
+  } else {
+    // 追加して編集可能にする
+    newAllowed = [...currentAllowed, targetUserId];
+  }
+
+  state.permissions.writeColumns[tableId][colId] = newAllowed;
+  savePermissions();
+  refreshCurrentViewPermissions();
+
+  const isNowEditable = checkColumnEditAccess(tableId, colId);
+  const userLabel = ALL_ACCOUNTS.find(a => a.id === targetUserId)?.name || targetUserId;
+  showToast(`ユーザー「${userLabel}」のこの列の編集権限を【${isNowEditable ? '🔓 編集可能' : '🔒 読取専用'}】に変更しました。`, 'success');
+}
+
+// テーブル全体で現在かかっているフィルターを行閲覧権限として適用するヘルパー
+function applyCurrentTableFiltersAsRowFilter(tableId) {
+  const targetUserId = state.previewUserId;
+  if (!targetUserId || !isOwnerUser()) {
+    showToast('プレビューシミュレーション中のみ実行可能です。', 'warning');
+    return;
+  }
+
+  let tableFilters = {};
+  let screenId = tableId;
+  if (tableId === 'ap' || tableId === 'applicant-info-screen') {
+    tableFilters = state.apFilters;
+    screenId = 'applicant-info-screen';
+  } else if (tableId === 'jo' || tableId === 'jo-info-screen') {
+    tableFilters = state.joFilters;
+    screenId = 'jo-info-screen';
+  } else if (tableId === 'ag' || tableId === 'agency-info-screen') {
+    tableFilters = state.agFilters;
+    screenId = 'agency-info-screen';
+  } else {
+    tableFilters = state.ctFilters[tableId] || {};
+    screenId = tableId;
+  }
+
+  const filterKeys = Object.keys(tableFilters).filter(k => {
+    const v = tableFilters[k];
+    if (v instanceof Set) return v.size > 0;
+    if (Array.isArray(v)) return v.length > 0;
+    return !!v;
+  });
+
+  if (filterKeys.length === 0) {
+    showToast('現在フィルターが設定されていません。各列の「▼」からフィルターを設定してください。', 'warning');
+    return;
+  }
+
+  recordPermissionHistory();
+
+  if (!state.permissions.rowFilters) state.permissions.rowFilters = {};
+  if (!state.permissions.rowFilters[screenId]) state.permissions.rowFilters[screenId] = {};
+
+  const rules = [];
+  filterKeys.forEach(colId => {
+    let vals = tableFilters[colId];
+    if (vals instanceof Set) vals = Array.from(vals);
+    if (!Array.isArray(vals)) vals = [vals];
+    vals.forEach(val => {
+      rules.push({
+        columnId: colId,
+        word: String(val)
+      });
+    });
+  });
+
+  state.permissions.rowFilters[screenId][targetUserId] = {
+    matchType: 'OR',
+    rules: rules
+  };
+
+  savePermissions();
+  refreshCurrentViewPermissions();
+
+  const userLabel = ALL_ACCOUNTS.find(a => a.id === targetUserId)?.name || targetUserId;
+  showToast(`ユーザー「${userLabel}」に、現在の絞り込み条件（${rules.length}件）で行閲覧権限を付与しました。（「↩️ 元に戻す」で取り消し可能）`, 'success');
+}
+
+// 行閲覧権限の解除ヘルパー
+function clearTableRowFilter(tableId) {
+  const targetUserId = state.previewUserId;
+  if (!targetUserId || !isOwnerUser()) return;
+
+  let screenId = tableId;
+  if (tableId === 'ap' || tableId === 'applicant-info-screen') screenId = 'applicant-info-screen';
+  else if (tableId === 'jo' || tableId === 'jo-info-screen') screenId = 'jo-info-screen';
+  else if (tableId === 'ag' || tableId === 'agency-info-screen') screenId = 'agency-info-screen';
+
+  recordPermissionHistory();
+  if (state.permissions.rowFilters && state.permissions.rowFilters[screenId]) {
+    delete state.permissions.rowFilters[screenId][targetUserId];
+  }
+  savePermissions();
+  refreshCurrentViewPermissions();
+  showToast('行閲覧制限を解除し、全行表示に戻しました。', 'info');
+}
+
+// フィルターメニュー内：権限（閲覧・編集・行絞り込み）操作セクション生成ヘルパー
 function createFilterPermissionSection(tableId, colId, colLabel, getCurrentSelection, uniqueValues) {
   const isOwner = isOwnerUser();
   const targetUserId = state.previewUserId;
@@ -7228,27 +7362,71 @@ function createFilterPermissionSection(tableId, colId, colLabel, getCurrentSelec
   const currentFilterSetting = (state.permissions.rowFilters?.[tableId] || {})[targetUserId];
   const hasExistingLimit = !!(currentFilterSetting && currentFilterSetting.rules && currentFilterSetting.rules.length > 0);
 
+  const colAccess = checkColumnAccess(tableId, colId);
+  const isColVisible = colAccess.visible && !colAccess.grayout;
+  const isColEditable = checkColumnEditAccess(tableId, colId);
+
   const container = document.createElement('div');
   container.className = 'filter-permission-section';
-  container.style.cssText = 'margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--border-color); display: flex; flex-direction: column; gap: 0.35rem;';
+  container.style.cssText = 'margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--border-color); display: flex; flex-direction: column; gap: 0.45rem;';
 
   const titleRow = document.createElement('div');
   titleRow.style.cssText = 'font-size: 0.72rem; font-weight: bold; color: var(--primary); display: flex; align-items: center; justify-content: space-between;';
-  titleRow.innerHTML = `<span>🛡️ 行閲覧制限（権限付与）</span><span style="font-size: 0.65rem; font-weight: normal; color: var(--text-muted);">対象: ${userLabel}</span>`;
+  titleRow.innerHTML = `<span>🛡️ 権限設定（対象: ${userLabel}）</span>`;
   container.appendChild(titleRow);
 
+  // 1. 列の閲覧権限（見えるか隠すか）
+  const viewRow = document.createElement('div');
+  viewRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; font-size: 0.7rem; background: var(--bg-surface); padding: 0.25rem 0.4rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);';
+  viewRow.innerHTML = `<span>👁️ 列の閲覧:</span>`;
+  const viewBtn = document.createElement('button');
+  viewBtn.style.cssText = `padding: 0.2rem 0.5rem; font-size: 0.68rem; font-weight: bold; cursor: pointer; border-radius: var(--radius-sm); border: none; color: #fff; background: ${isColVisible ? '#ef4444' : '#64748b'};`;
+  viewBtn.innerHTML = isColVisible ? '🔓 閲覧中 (非表示にする)' : '🔒 閲覧不可 (表示を許可)';
+  viewBtn.title = isColVisible ? 'この列を非表示（閲覧不可）にします' : 'この列の閲覧を許可します';
+  viewBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (isColVisible) {
+      revokeColumnPermissionDirect(tableId, colId);
+    } else {
+      grantColumnPermissionDirect(tableId, colId);
+    }
+    closeAllFilterMenus();
+  });
+  viewRow.appendChild(viewBtn);
+  container.appendChild(viewRow);
+
+  // 2. 列の編集権限（書き込めるか読取専用か）
+  const editRow = document.createElement('div');
+  editRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; font-size: 0.7rem; background: var(--bg-surface); padding: 0.25rem 0.4rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);';
+  editRow.innerHTML = `<span>✏️ 列の編集:</span>`;
+  const editBtn = document.createElement('button');
+  editBtn.style.cssText = `padding: 0.2rem 0.5rem; font-size: 0.68rem; font-weight: bold; cursor: pointer; border-radius: var(--radius-sm); border: none; color: #fff; background: ${isColEditable ? '#ef4444' : '#10b981'};`;
+  editBtn.innerHTML = isColEditable ? '🔓 編集可 (読取専用にする)' : '🔒 読取専用 (編集を許可)';
+  editBtn.title = isColEditable ? 'この列を編集不可（読取専用）にします' : 'この列のセル編集を許可します';
+  editBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleColumnEditPermissionDirect(tableId, colId);
+    closeAllFilterMenus();
+  });
+  editRow.appendChild(editBtn);
+  container.appendChild(editRow);
+
+  // 3. 行の閲覧制限（チェックした値だけ見せる）
+  const rowLimitSection = document.createElement('div');
+  rowLimitSection.style.cssText = 'display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.1rem;';
+  
   const desc = document.createElement('div');
   desc.style.cssText = 'font-size: 0.65rem; color: var(--text-muted); line-height: 1.3;';
-  desc.textContent = '現在チェックされている値のみ閲覧可能な権限を設定します。';
-  container.appendChild(desc);
+  desc.textContent = '現在チェックされている値のみ閲覧可能な行権限を設定します。';
+  rowLimitSection.appendChild(desc);
 
   const btnRow = document.createElement('div');
-  btnRow.style.cssText = 'display: flex; gap: 0.35rem; align-items: center; margin-top: 0.15rem; flex-wrap: wrap;';
+  btnRow.style.cssText = 'display: flex; gap: 0.35rem; align-items: center;';
 
   const grantBtn = document.createElement('button');
   grantBtn.className = 'btn-grant-row-filter';
-  grantBtn.style.cssText = 'flex: 1; min-width: 120px; padding: 0.3rem 0.45rem; font-size: 0.72rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.2rem; background: var(--primary); color: #fff; border: none; border-radius: var(--radius-sm); transition: transform 0.1s;';
-  grantBtn.innerHTML = '🎯 選択条件で行権限を付与';
+  grantBtn.style.cssText = 'flex: 1; padding: 0.3rem 0.45rem; font-size: 0.72rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.2rem; background: var(--primary); color: #fff; border: none; border-radius: var(--radius-sm);';
+  grantBtn.innerHTML = '🎯 選択条件で行閲覧権限を付与';
   grantBtn.title = `選択した値のみを「${userLabel}」に閲覧許可します`;
 
   grantBtn.addEventListener('click', (e) => {
@@ -7285,8 +7463,8 @@ function createFilterPermissionSection(tableId, colId, colLabel, getCurrentSelec
   if (hasExistingLimit) {
     const revokeBtn = document.createElement('button');
     revokeBtn.className = 'btn-revoke-row-filter';
-    revokeBtn.style.cssText = 'padding: 0.3rem 0.45rem; font-size: 0.72rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.2rem; background: #ef4444; color: #fff; border: none; border-radius: var(--radius-sm);';
-    revokeBtn.innerHTML = '🔓 制限解除';
+    revokeBtn.style.cssText = 'padding: 0.3rem 0.45rem; font-size: 0.72rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.2rem; background: #64748b; color: #fff; border: none; border-radius: var(--radius-sm);';
+    revokeBtn.innerHTML = '🔓 行制限解除';
     revokeBtn.title = '行閲覧制限を解除し、全行閲覧可能に戻します';
     revokeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -7302,7 +7480,9 @@ function createFilterPermissionSection(tableId, colId, colLabel, getCurrentSelec
     btnRow.appendChild(revokeBtn);
   }
 
-  container.appendChild(btnRow);
+  rowLimitSection.appendChild(btnRow);
+  container.appendChild(rowLimitSection);
+
   return container;
 }
 
@@ -8936,6 +9116,75 @@ function renderTableControlBar(tableId, parentContainerEl) {
     }
   });
   rightDiv.appendChild(editBtn);
+
+  // プレビューシミュレーション中の場合、行閲覧制限（フィルター連携）ボタンと権限バッジを追加
+  if (state.previewUserId && isOwnerUser()) {
+    let screenId = tableId;
+    let tableFilters = {};
+    if (tableId === 'ap' || tableId === 'applicant-info-screen') {
+      screenId = 'applicant-info-screen';
+      tableFilters = state.apFilters;
+    } else if (tableId === 'jo' || tableId === 'jo-info-screen') {
+      screenId = 'jo-info-screen';
+      tableFilters = state.joFilters;
+    } else if (tableId === 'ag' || tableId === 'agency-info-screen') {
+      screenId = 'agency-info-screen';
+      tableFilters = state.agFilters;
+    } else {
+      screenId = tableId;
+      tableFilters = state.ctFilters[tableId] || {};
+    }
+
+    const filterKeys = Object.keys(tableFilters).filter(k => {
+      const v = tableFilters[k];
+      if (v instanceof Set) return v.size > 0;
+      if (Array.isArray(v)) return v.length > 0;
+      return !!v;
+    });
+
+    const currentFilterSetting = (state.permissions.rowFilters?.[screenId] || {})[state.previewUserId];
+    const hasExistingLimit = !!(currentFilterSetting && currentFilterSetting.rules && currentFilterSetting.rules.length > 0);
+
+    // 1. 現在のフィルター条件を行権限として付与するボタン
+    if (filterKeys.length > 0) {
+      const applyFilterPermBtn = document.createElement('button');
+      applyFilterPermBtn.className = 'btn btn-warning';
+      applyFilterPermBtn.style.cssText = 'padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: bold; background: #f59e0b; color: #fff; border: none; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; gap: 0.3rem; box-shadow: var(--shadow-sm);';
+      applyFilterPermBtn.innerHTML = '<span>🎯</span> 絞り込み条件で行権限を付与';
+      applyFilterPermBtn.title = '現在表で絞り込まれている条件を、プレビュー中ユーザーの行閲覧権限として保存します';
+      applyFilterPermBtn.addEventListener('click', () => {
+        applyCurrentTableFiltersAsRowFilter(tableId);
+      });
+      rightDiv.appendChild(applyFilterPermBtn);
+    }
+
+    // 2. すでに行制限がかかっている場合の解除ボタン
+    if (hasExistingLimit) {
+      const clearFilterPermBtn = document.createElement('button');
+      clearFilterPermBtn.className = 'btn btn-secondary';
+      clearFilterPermBtn.style.cssText = 'padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: bold; background: #64748b; color: #fff; border: none; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; gap: 0.3rem;';
+      clearFilterPermBtn.innerHTML = '<span>🔓</span> 行制限中 (全行表示に戻す)';
+      clearFilterPermBtn.title = 'プレビュー中ユーザーの行閲覧制限を解除し、全行表示に戻します';
+      clearFilterPermBtn.addEventListener('click', () => {
+        clearTableRowFilter(tableId);
+      });
+      rightDiv.appendChild(clearFilterPermBtn);
+    }
+
+    // 3. 権限ステータスバッジ（閲覧 vs 編集の見分け）
+    const tableAccess = checkTableAccess(screenId);
+    const permBadgesDiv = document.createElement('div');
+    permBadgesDiv.style.cssText = 'display: flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; margin-left: 0.25rem;';
+    permBadgesDiv.innerHTML = `
+      <span style="background: #e0e7ff; color: #3730a3; padding: 3px 6px; border-radius: 4px; font-weight: bold; border: 1px solid #c7d2fe;" title="シート全体の閲覧権限">
+        👁️ 閲覧: ${tableAccess.grayout ? '🔒 未付与' : '🔓 閲覧可'}
+      </span>
+      <span style="background: ${isLocked ? '#fee2e2' : '#dcfce7'}; color: ${isLocked ? '#991b1b' : '#166534'}; padding: 3px 6px; border-radius: 4px; font-weight: bold; border: 1px solid ${isLocked ? '#fecaca' : '#bbf7d0'};" title="シート全体の編集ロック">
+        ✏️ 編集: ${isLocked ? '🔒 ロック中' : '🔓 編集可'}
+      </span>
+    `;
+    rightDiv.appendChild(permBadgesDiv);
+  }
 
   controlBar.appendChild(leftDiv);
   controlBar.appendChild(rightDiv);
@@ -16795,7 +17044,12 @@ function renderAgencyInfo() {
         });
 
         th.addEventListener('mousedown', (e) => {
-          if (e.target.classList.contains('btn-filter-toggle') || e.target.closest('.btn-filter-toggle')) return;
+          if (
+            e.target.closest('.btn-filter-toggle') ||
+            e.target.closest('.grant-access-inline-btn') ||
+            e.target.closest('.revoke-access-inline-btn') ||
+            e.target.closest('.column-resizer')
+          ) return;
           if (e.button !== 0) return; // 左クリックのみ
           e.stopPropagation();
           state.isSelectingCols = true;
@@ -19327,7 +19581,12 @@ function renderApplicantInfo() {
         });
 
         th.addEventListener('mousedown', (e) => {
-          if (e.target.classList.contains('btn-filter-toggle') || e.target.closest('.btn-filter-toggle')) return;
+          if (
+            e.target.closest('.btn-filter-toggle') ||
+            e.target.closest('.grant-access-inline-btn') ||
+            e.target.closest('.revoke-access-inline-btn') ||
+            e.target.closest('.column-resizer')
+          ) return;
           if (e.button !== 0) return; // 左クリックのみ
           e.stopPropagation();
           state.isSelectingCols = true;
