@@ -3235,64 +3235,137 @@ tr.grayed-out-access td {
   color: var(--text-muted) !important;
 }
 
-/* インライン権限付与 🔒 ボタン（未付与・ロック中） */
-.grant-access-inline-btn {
+/* コンパクト権限アイコンボタン（カラムヘッダー用） */
+.col-perm-icon-btn {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  max-width: 20px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-size: 0.72rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-left: 2px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.15s ease;
+  pointer-events: auto !important;
+  z-index: 20;
+}
+.col-perm-icon-btn:hover {
+  transform: scale(1.15);
+}
+.col-perm-icon-btn.state-none {
   background: #64748b !important;
   color: #ffffff !important;
-  border: none;
-  border-radius: var(--radius-sm);
-  padding: 0.15rem 0.35rem;
-  font-size: 0.68rem;
-  font-weight: bold;
-  margin-left: 0.35rem;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: all 0.15s ease;
-  pointer-events: auto !important;
-  z-index: 100;
-  white-space: nowrap;
 }
-.grant-access-inline-btn:hover {
-  transform: translateY(-1px);
-  background: #475569 !important;
+.col-perm-icon-btn.state-view {
+  background: #3b82f6 !important;
+  color: #ffffff !important;
+}
+.col-perm-icon-btn.state-edit {
+  background: #10b981 !important;
+  color: #ffffff !important;
 }
 
-/* インライン権限解除 🔓 ボタン（付与済・閲覧中） */
-.revoke-access-inline-btn {
+/* コンパクト権限アイコンボタン（サイドバー用：文字折り返し防止） */
+.sidebar-perm-icon-btn {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  max-width: 20px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #ef4444 !important;
-  color: #ffffff !important;
-  border: none;
+  font-size: 0.72rem;
   border-radius: var(--radius-sm);
-  padding: 0.15rem 0.35rem;
-  font-size: 0.68rem;
-  font-weight: bold;
-  margin-left: 0.35rem;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-left: auto;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.15s ease;
+  pointer-events: auto !important;
+  z-index: 20;
+}
+.sidebar-perm-icon-btn:hover {
+  transform: scale(1.15);
+}
+.sidebar-perm-icon-btn.state-none {
+  background: #64748b !important;
+  color: #ffffff !important;
+}
+.sidebar-perm-icon-btn.state-view {
+  background: #3b82f6 !important;
+  color: #ffffff !important;
+}
+.sidebar-perm-icon-btn.state-edit {
+  background: #10b981 !important;
+  color: #ffffff !important;
+}
+
+/* 互換用インラインボタン（アイコンのみ・極小化） */
+.grant-access-inline-btn,
+.revoke-access-inline-btn {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  max-width: 20px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  border-radius: var(--radius-sm);
+  border: none;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition: all 0.15s ease;
   pointer-events: auto !important;
-  z-index: 100;
+  z-index: 20;
+  flex-shrink: 0;
+  margin-left: auto;
+  overflow: hidden;
   white-space: nowrap;
 }
+.grant-access-inline-btn {
+  background: #64748b !important;
+  color: #ffffff !important;
+}
+.revoke-access-inline-btn {
+  background: #3b82f6 !important;
+  color: #ffffff !important;
+}
+.grant-access-inline-btn:hover,
 .revoke-access-inline-btn:hover {
-  transform: translateY(-1px);
-  background: #dc2626 !important;
+  transform: scale(1.15);
 }
 
-/* テーブルヘッダー内でのボタンをコンパクト化してカラム名の視認性を向上 */
-th .grant-access-inline-btn,
-th .revoke-access-inline-btn {
-  padding: 0.08rem 0.25rem;
-  font-size: 0.62rem;
-  margin-left: 0.2rem;
-  white-space: nowrap;
-  flex-shrink: 0;
+/* サイドバー項目の文字縦折れ防止・横並び保護 */
+.sidebar-menu .accordion-header,
+.sidebar-menu .nav-item,
+.sidebar-accordion .accordion-header,
+.sidebar-nav .nav-item {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.accordion-header-text,
+.nav-item-text {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  flex: 1 1 auto;
 }
 
 /* フローティングプレビュー警告バー */

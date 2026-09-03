@@ -4073,6 +4073,28 @@ function checkFolderAccess(folderId) {
   return { visible: false, grayout: false };
 }
 
+// テーブル（シート・画面）の親フォルダIDを取得するヘルパー
+function getParentFolderIdForTable(tableId) {
+  const systemItemsMap = {
+    'appoint-accordion': [
+      'appoint-screen', 'appointment-new', 'appointment-existing',
+      'drafts-view-screen', 'history-view-screen', 'official-id-link', 'link-official-screen'
+    ],
+    'agency-accordion': ['agency-info-screen'],
+    'jo-accordion': ['jo-info-screen'],
+    'applicant-accordion': ['applicant-info-screen']
+  };
+  for (const [folderId, items] of Object.entries(systemItemsMap)) {
+    if (items.includes(tableId)) return folderId;
+  }
+  const customTables = state.customTables || [];
+  const tbl = customTables.find(t => t.id === tableId);
+  if (tbl && tbl.parentMenuId && tbl.parentMenuId !== 'root') {
+    return normalizeFolderId(tbl.parentMenuId);
+  }
+  return null;
+}
+
 function shouldShowFolder(folderId) {
   // オーナーかつプレビュー中でない場合は常に表示
   if (isOwnerUser() && !state.previewUserId) {
@@ -4083,37 +4105,16 @@ function shouldShowFolder(folderId) {
     return false;
   }
 
-  if (checkFolderAccess(folderId).visible) {
-    return true;
+  // 💡 フォルダ自体のアクセス権限判定
+  const access = checkFolderAccess(folderId);
+
+  // 完全再現モード（actual / strict）または通常ユーザー時：
+  // フォルダの閲覧権限がない（!access.visible）場合は絶対に非表示！
+  if (!access.visible) {
+    return false;
   }
 
-  const systemItemsMap = {
-    'appoint-accordion': ['appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link', 'link-official-screen'],
-    'agency-accordion': ['agency-info-screen'],
-    'jo-accordion': ['jo-info-screen'],
-    'applicant-accordion': ['applicant-info-screen']
-  };
-
-  const stdItems = systemItemsMap[folderId];
-  if (stdItems) {
-    for (const itemId of stdItems) {
-      if (checkTableAccess(itemId).visible) {
-        return true;
-      }
-    }
-  }
-
-  const customTables = state.customTables || [];
-  for (const tbl of customTables) {
-    const parentId = normalizeFolderId(tbl.parentMenuId);
-    if (parentId === folderId) {
-      if (checkTableAccess(tbl.id).visible) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+  return true;
 }
 
 // テーブル（シート）の閲覧可否判定
@@ -4129,6 +4130,18 @@ function checkTableAccess(tableId) {
   // 承認待ちユーザーはマイページ関連以外のテーブルをすべて非表示にする
   if (state.currentUser && state.currentUser.status === 'pending' && !isOwner) {
     return { visible: false, grayout: false };
+  }
+
+  // 💡 親フォルダが存在する場合、親フォルダへのアクセス権がなければ子テーブルもアクセス不可！
+  const parentFolderId = getParentFolderIdForTable(tableId);
+  if (parentFolderId) {
+    const parentAccess = checkFolderAccess(parentFolderId);
+    if (!parentAccess.visible) {
+      return { visible: false, grayout: false };
+    }
+    if (parentAccess.grayout) {
+      return { visible: true, grayout: true };
+    }
   }
 
   // 1. 権限設定（tables）に該当のテーブルIDがセットアップされている場合、
@@ -4250,21 +4263,53 @@ function checkColumnEditAccess(tableId, colId) {
   return true;
 }
 
+// 個別セル（特定範囲）の編集可否判定
+function checkCellEditAccess(tableId, rowIdx, colId) {
+  // まずカラム全体の編集権限をチェック
+  const colEditable = checkColumnEditAccess(tableId, colId);
+  if (!colEditable) return false;
+
+  const targetUserId = getCurrentUserId();
+  if (!targetUserId || (isOwnerUser() && !state.previewUserId)) {
+    return true;
+  }
+
+  let screenId = tableId;
+  if (tableId === 'ap' || tableId === 'applicant-info-screen') screenId = 'applicant-info-screen';
+  else if (tableId === 'jo' || tableId === 'jo-info-screen') screenId = 'jo-info-screen';
+  else if (tableId === 'ag' || tableId === 'agency-info-screen') screenId = 'agency-info-screen';
+
+  const cellSettings = state.permissions.cellEdits?.[screenId]?.[targetUserId];
+  if (!cellSettings) return true;
+
+  const cellKey = `${rowIdx}:${colId}`;
+  if (cellSettings.readOnlyCells && cellSettings.readOnlyCells.includes(cellKey)) {
+    return false;
+  }
+  if (cellSettings.editableCells && cellSettings.editableCells.includes(cellKey)) {
+    return true;
+  }
+
+  return true;
+}
+window.checkCellEditAccess = checkCellEditAccess;
+
 // 💡 プレビュー（ユーザービュー）時のセルの背景色を解決するヘルパー
-function getPreviewCellBgColor(tableId, colId) {
+function getPreviewCellBgColor(tableId, colId, rowIdx) {
   if (!state.previewUserId) return null; // プレビュー中でなければ通常背景
 
   const colAccess = checkColumnAccess(tableId, colId);
-  const isReadOnly = !checkColumnEditAccess(tableId, colId);
+  if (colAccess.grayout || !colAccess.visible) {
+    return '#f1f5f9'; // 非表示: グレー
+  }
+
+  const isReadOnly = rowIdx !== undefined ? !checkCellEditAccess(tableId, rowIdx, colId) : !checkColumnEditAccess(tableId, colId);
 
   if (state.previewMode === 'simulate' || state.previewMode === 'grayout') {
-    if (colAccess.grayout || !colAccess.visible) {
-      return '#f1f5f9'; // 非表示: グレー
-    }
     if (isReadOnly) {
       return '#fefaf0'; // 閲覧のみ: アイボリー
     }
-    return '#edf7ed'; // 編集可: 緑
+    return '#edf7ed'; // 編集可: 薄緑
   } else if (state.previewMode === 'actual' || state.previewMode === 'strict') {
     if (isReadOnly) {
       return '#fefaf0'; // 閲覧のみ: アイボリー
@@ -4273,6 +4318,147 @@ function getPreviewCellBgColor(tableId, colId) {
   return null;
 }
 window.getPreviewCellBgColor = getPreviewCellBgColor;
+
+// 現在選択されているセルキー配列を取得するヘルパー
+function getCurrentlySelectedCellKeys(tableId) {
+  const result = [];
+  if (tableId === 'ap' || tableId === 'applicant-info-screen') {
+    if (state.apSelectedRange) {
+      const { startRow, endRow, startCol, endCol } = state.apSelectedRange;
+      const minRow = Math.min(startRow, endRow);
+      const maxRow = Math.max(startRow, endRow);
+      const cols = typeof getApVisibleColumns === 'function' ? getApVisibleColumns() : [];
+      const startColIdx = cols.findIndex(c => c.id === startCol);
+      const endColIdx = cols.findIndex(c => c.id === endCol);
+      if (startColIdx !== -1 && endColIdx !== -1) {
+        const minColIdx = Math.min(startColIdx, endColIdx);
+        const maxColIdx = Math.max(startColIdx, endColIdx);
+        for (let r = minRow; r <= maxRow; r++) {
+          for (let c = minColIdx; c <= maxColIdx; c++) {
+            if (cols[c]) result.push(`${r}:${cols[c].id}`);
+          }
+        }
+      }
+    } else if (state.apSelectedCell) {
+      result.push(`${state.apSelectedCell.row}:${state.apSelectedCell.col}`);
+    }
+  } else if (tableId === 'jo' || tableId === 'jo-info-screen') {
+    if (state.joSelectedRange) {
+      const { startRow, endRow, startCol, endCol } = state.joSelectedRange;
+      const minRow = Math.min(startRow, endRow);
+      const maxRow = Math.max(startRow, endRow);
+      const cols = typeof getJoVisibleColumns === 'function' ? getJoVisibleColumns() : [];
+      const startColIdx = cols.findIndex(c => c.id === startCol);
+      const endColIdx = cols.findIndex(c => c.id === endCol);
+      if (startColIdx !== -1 && endColIdx !== -1) {
+        const minColIdx = Math.min(startColIdx, endColIdx);
+        const maxColIdx = Math.max(startColIdx, endColIdx);
+        for (let r = minRow; r <= maxRow; r++) {
+          for (let c = minColIdx; c <= maxColIdx; c++) {
+            if (cols[c]) result.push(`${r}:${cols[c].id}`);
+          }
+        }
+      }
+    } else if (state.joSelectedCell) {
+      result.push(`${state.joSelectedCell.row}:${state.joSelectedCell.col}`);
+    }
+  } else if (tableId === 'ag' || tableId === 'agency-info-screen') {
+    if (state.agSelectedRange) {
+      const { startRow, endRow, startCol, endCol } = state.agSelectedRange;
+      const minRow = Math.min(startRow, endRow);
+      const maxRow = Math.max(startRow, endRow);
+      const cols = typeof getAgVisibleColumns === 'function' ? getAgVisibleColumns() : [];
+      const startColIdx = cols.findIndex(c => c.id === startCol);
+      const endColIdx = cols.findIndex(c => c.id === endCol);
+      if (startColIdx !== -1 && endColIdx !== -1) {
+        const minColIdx = Math.min(startColIdx, endColIdx);
+        const maxColIdx = Math.max(startColIdx, endColIdx);
+        for (let r = minRow; r <= maxRow; r++) {
+          for (let c = minColIdx; c <= maxColIdx; c++) {
+            if (cols[c]) result.push(`${r}:${cols[c].id}`);
+          }
+        }
+      }
+    } else if (state.agSelectedCell) {
+      result.push(`${state.agSelectedCell.row}:${state.agSelectedCell.col}`);
+    }
+  } else {
+    // カスタムテーブル
+    const tblId = tableId.replace('custom-table-', '');
+    const tbl = state.customTables.find(t => t.id === tblId);
+    if (tbl) {
+      if (state.ctSelectedRange) {
+        const { startRow, endRow, startCol, endCol } = state.ctSelectedRange;
+        const minRow = Math.min(startRow, endRow);
+        const maxRow = Math.max(startRow, endRow);
+        const cols = tbl.columns.filter(c => tbl.visibleColumns.includes(c.id));
+        const startColIdx = cols.findIndex(c => c.id === startCol);
+        const endColIdx = cols.findIndex(c => c.id === endCol);
+        if (startColIdx !== -1 && endColIdx !== -1) {
+          const minColIdx = Math.min(startColIdx, endColIdx);
+          const maxColIdx = Math.max(startColIdx, endColIdx);
+          for (let r = minRow; r <= maxRow; r++) {
+            for (let c = minColIdx; c <= maxColIdx; c++) {
+              if (cols[c]) result.push(`${r}:${cols[c].id}`);
+            }
+          }
+        }
+      } else if (state.ctSelectedCell) {
+        result.push(`${state.ctSelectedCell.row}:${state.ctSelectedCell.col}`);
+      }
+    }
+  }
+  return result;
+}
+
+// 選択セル範囲の編集権限を設定する関数
+function setSelectedCellsEditPermission(tableId, allowEdit) {
+  const targetUserId = state.previewUserId;
+  if (!targetUserId || !isOwnerUser()) {
+    showToast('プレビューシミュレーション中のみ設定可能です。', 'warning');
+    return;
+  }
+
+  const selectedCells = getCurrentlySelectedCellKeys(tableId);
+  if (!selectedCells || selectedCells.length === 0) {
+    showToast('セルまたは範囲を選択してください。', 'warning');
+    return;
+  }
+
+  let screenId = tableId;
+  if (tableId === 'ap' || tableId === 'applicant-info-screen') screenId = 'applicant-info-screen';
+  else if (tableId === 'jo' || tableId === 'jo-info-screen') screenId = 'jo-info-screen';
+  else if (tableId === 'ag' || tableId === 'agency-info-screen') screenId = 'agency-info-screen';
+
+  recordPermissionHistory();
+
+  if (!state.permissions.cellEdits) state.permissions.cellEdits = {};
+  if (!state.permissions.cellEdits[screenId]) state.permissions.cellEdits[screenId] = {};
+  if (!state.permissions.cellEdits[screenId][targetUserId]) {
+    state.permissions.cellEdits[screenId][targetUserId] = { readOnlyCells: [], editableCells: [] };
+  }
+
+  const userSettings = state.permissions.cellEdits[screenId][targetUserId];
+  if (!userSettings.readOnlyCells) userSettings.readOnlyCells = [];
+  if (!userSettings.editableCells) userSettings.editableCells = [];
+
+  selectedCells.forEach(cellKey => {
+    if (allowEdit) {
+      if (!userSettings.editableCells.includes(cellKey)) userSettings.editableCells.push(cellKey);
+      userSettings.readOnlyCells = userSettings.readOnlyCells.filter(k => k !== cellKey);
+    } else {
+      if (!userSettings.readOnlyCells.includes(cellKey)) userSettings.readOnlyCells.push(cellKey);
+      userSettings.editableCells = userSettings.editableCells.filter(k => k !== cellKey);
+    }
+  });
+
+  savePermissions();
+  refreshCurrentViewPermissions();
+
+  const userLabel = ALL_ACCOUNTS.find(a => a.id === targetUserId)?.name || targetUserId;
+  showToast(`ユーザー「${userLabel}」の選択セル（${selectedCells.length}件）を【${allowEdit ? '✏️ 編集可' : '🔒 読取専用'}】に設定しました。`, 'success');
+}
+window.setSelectedCellsEditPermission = setSelectedCellsEditPermission;
 
 // 行（データ行）の閲覧可否判定
 function checkRowAccess(tableId, row) {
@@ -4384,15 +4570,180 @@ function refreshCurrentViewPermissions() {
   }
 }
 
-// インライン権限付与ボタン（未付与：🔒 鍵が閉じている＝ロック中）
+// カラムの権限レベル取得: 'none' (🔒 権限なし) | 'view' (🔓 閲覧可) | 'edit' (✏️ 編集可)
+function getColumnPermissionLevel(tableId, colId) {
+  const colAccess = checkColumnAccess(tableId, colId);
+  if (colAccess.grayout || !colAccess.visible) {
+    return 'none';
+  }
+  const canEdit = checkColumnEditAccess(tableId, colId);
+  return canEdit ? 'edit' : 'view';
+}
+
+// カラムの編集権限を設定するヘルパー
+function setColumnEditPermission(tableId, colId, allowEdit) {
+  const targetUserId = state.previewUserId;
+  if (!targetUserId || !isOwnerUser()) return;
+
+  if (!state.permissions.writeColumns) state.permissions.writeColumns = {};
+  if (!state.permissions.writeColumns[tableId]) state.permissions.writeColumns[tableId] = {};
+
+  let allUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+  if (!allUsers || allUsers.length === 0) {
+    allUsers = typeof ALL_ACCOUNTS !== 'undefined' ? ALL_ACCOUNTS : [];
+  }
+  const allUserIds = allUsers.map(u => u.id);
+
+  let currentAllowed = state.permissions.writeColumns[tableId][colId];
+  if (!currentAllowed) {
+    currentAllowed = [...allUserIds];
+  }
+
+  if (allowEdit) {
+    if (!currentAllowed.includes(targetUserId)) {
+      currentAllowed.push(targetUserId);
+    }
+  } else {
+    currentAllowed = currentAllowed.filter(id => id !== targetUserId);
+  }
+
+  state.permissions.writeColumns[tableId][colId] = currentAllowed;
+}
+
+// カラムの権限を 🔒 (なし) → 🔓 (閲覧可) → ✏️ (編集可) → 🔒 (なし) にサイクル切り替え
+function cycleColumnPermission(tableId, colId) {
+  const targetUserId = state.previewUserId;
+  if (!targetUserId || !isOwnerUser()) return;
+
+  const currentLevel = getColumnPermissionLevel(tableId, colId);
+  recordPermissionHistory();
+
+  if (currentLevel === 'none') {
+    // 🔒 なし → 🔓 閲覧可（読取専用）
+    grantColumnPermissionDirect(tableId, colId);
+    setColumnEditPermission(tableId, colId, false);
+    showToast('この列の権限を【🔓 閲覧可（読取専用）】に設定しました。', 'info');
+  } else if (currentLevel === 'view') {
+    // 🔓 閲覧可 → ✏️ 編集可
+    setColumnEditPermission(tableId, colId, true);
+    showToast('この列の権限を【✏️ 編集可】に設定しました。', 'success');
+  } else {
+    // ✏️ 編集可 → 🔒 権限なし（非表示）
+    revokeColumnPermissionDirect(tableId, colId);
+    showToast('この列の権限を【🔒 権限なし（非表示）】に設定しました。', 'warning');
+  }
+
+  savePermissions();
+  refreshCurrentViewPermissions();
+}
+
+// カラムヘッダー用コンパクトアイコンボタン描画（🔒 / 🔓 / ✏️ アイコンのみ・文字なし）
+function renderColumnPermissionIconBtn(parentEl, tableId, colId) {
+  if (!parentEl) return;
+  parentEl.querySelectorAll('.col-perm-icon-btn, .grant-access-inline-btn, .revoke-access-inline-btn').forEach(el => el.remove());
+
+  if (!state.previewUserId || !isOwnerUser()) return;
+
+  const level = getColumnPermissionLevel(tableId, colId);
+  const btn = document.createElement('button');
+  btn.className = `col-perm-icon-btn state-${level}`;
+
+  if (level === 'none') {
+    btn.innerHTML = '🔒';
+    btn.title = '【🔒 権限なし】クリックで「🔓 閲覧可」に変更';
+  } else if (level === 'view') {
+    btn.innerHTML = '🔓';
+    btn.title = '【🔓 閲覧可 (読取専用)】クリックで「✏️ 編集可」に変更';
+  } else {
+    btn.innerHTML = '✏️';
+    btn.title = '【✏️ 編集可】クリックで「🔒 権限なし」に変更';
+  }
+
+  btn.addEventListener('mousedown', (e) => e.stopPropagation());
+  btn.addEventListener('mouseup', (e) => e.stopPropagation());
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    cycleColumnPermission(tableId, colId);
+  });
+
+  parentEl.appendChild(btn);
+}
+
+// サイドバー用コンパクトアイコンボタン描画（🔒 / 🔓 / ✏️ アイコンのみ・文字縦折れ防止）
+function renderSidebarPermissionIconBtn(parentEl, type, id) {
+  if (!parentEl) return;
+  parentEl.querySelectorAll('.sidebar-perm-icon-btn, .grant-access-inline-btn, .revoke-access-inline-btn').forEach(el => el.remove());
+
+  if (!state.previewUserId || !isOwnerUser()) return;
+
+  const access = (type === 'folder') ? checkFolderAccess(id) : checkTableAccess(id);
+  const isGranted = access.visible && !access.grayout;
+
+  let isEditable = false;
+  if (type === 'table') {
+    isEditable = isGranted && !isTableLocked(id);
+  }
+
+  const level = !isGranted ? 'none' : ((type === 'table' && isEditable) ? 'edit' : 'view');
+  const btn = document.createElement('button');
+  btn.className = `sidebar-perm-icon-btn state-${level}`;
+
+  if (level === 'none') {
+    btn.innerHTML = '🔒';
+    btn.title = '【🔒 権限なし】クリックで「🔓 閲覧可」に変更';
+  } else if (level === 'edit') {
+    btn.innerHTML = '✏️';
+    btn.title = '【✏️ 編集可】クリックで「🔒 権限なし」に変更';
+  } else {
+    btn.innerHTML = '🔓';
+    btn.title = type === 'table' ? '【🔓 閲覧可】クリックで「✏️ 編集可」に変更' : '【🔓 閲覧可】クリックで「🔒 権限なし」に変更';
+  }
+
+  btn.addEventListener('mousedown', (e) => e.stopPropagation());
+  btn.addEventListener('mouseup', (e) => e.stopPropagation());
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    recordPermissionHistory();
+
+    if (type === 'folder') {
+      if (isGranted) revokePermission('folder', id);
+      else grantPermission('folder', id);
+    } else {
+      // テーブル: none -> view -> edit -> none
+      if (!isGranted) {
+        grantPermission('table', id);
+        if (state.tableEditLocks === undefined) state.tableEditLocks = {};
+        state.tableEditLocks[id] = true; // 閲覧のみ
+        localStorage.setItem('synapse_table_edit_locks', JSON.stringify(state.tableEditLocks));
+        showToast('このシートの【🔓 閲覧権限】を付与しました（読取専用）。', 'info');
+      } else if (!isEditable) {
+        if (state.tableEditLocks === undefined) state.tableEditLocks = {};
+        state.tableEditLocks[id] = false; // 編集可
+        localStorage.setItem('synapse_table_edit_locks', JSON.stringify(state.tableEditLocks));
+        showToast('このシートの【✏️ 編集権限】を許可しました。', 'success');
+      } else {
+        revokePermission('table', id);
+        showToast('このシートの権限を解除（🔒 権限なし）に設定しました。', 'warning');
+      }
+    }
+    savePermissions();
+    refreshCurrentViewPermissions();
+  });
+
+  parentEl.appendChild(btn);
+}
+
+// 互換用インライン権限付与ボタン（未付与：🔒 鍵が閉じている＝ロック中・アイコンのみ）
 function appendInlineGrantBtn(parentEl, onClick) {
   if (!parentEl) return;
   removeInlineRevokeBtn(parentEl);
   if (parentEl.querySelector('.grant-access-inline-btn')) return;
   const btn = document.createElement('button');
   btn.className = 'grant-access-inline-btn';
-  btn.innerHTML = '🔒 権限なし (許可)';
-  btn.title = '【閲覧不可】現在はこの項目にアクセス権限がありません（ロック中）。クリックすると閲覧を許可します。';
+  btn.innerHTML = '🔒';
+  btn.title = '【🔒 権限なし】クリックして閲覧を許可します';
   btn.addEventListener('mousedown', (e) => e.stopPropagation());
   btn.addEventListener('mouseup', (e) => e.stopPropagation());
   btn.addEventListener('click', (e) => {
@@ -4409,15 +4760,15 @@ function removeInlineGrantBtn(parentEl) {
   if (btn) btn.remove();
 }
 
-// インライン権限解除ボタン（付与済：🔓 鍵が開いている＝閲覧中）
+// 互換用インライン権限解除ボタン（付与済：🔓 鍵が開いている＝閲覧中・アイコンのみ）
 function appendInlineRevokeBtn(parentEl, onClick) {
   if (!parentEl) return;
   removeInlineGrantBtn(parentEl);
   if (parentEl.querySelector('.revoke-access-inline-btn')) return;
   const btn = document.createElement('button');
   btn.className = 'revoke-access-inline-btn';
-  btn.innerHTML = '🔓 閲覧可 (解除)';
-  btn.title = '【閲覧可能】現在はこの項目にアクセス権限が付与されています。クリックすると権限を解除（非表示に戻す）します。';
+  btn.innerHTML = '🔓';
+  btn.title = '【🔓 閲覧可】クリックして権限を解除（非表示に戻す）します';
   btn.addEventListener('mousedown', (e) => e.stopPropagation());
   btn.addEventListener('mouseup', (e) => e.stopPropagation());
   btn.addEventListener('click', (e) => {
@@ -4999,27 +5350,15 @@ function renderCustomTableList() {
 
       folderDiv.draggable = false;
 
-      // グレーアウト制御
+      // グレーアウト制御＆権限アイコン（🔒/🔓/✏️・文字折り返し防止）
       const headerEl = folderDiv.querySelector('.accordion-header');
       if (access.grayout) {
         folderDiv.classList.add('grayed-out-access');
-        if (headerEl) {
-          appendInlineGrantBtn(headerEl, () => {
-            grantPermission('folder', acc.id);
-          });
-        }
       } else {
         folderDiv.classList.remove('grayed-out-access');
-        if (headerEl) {
-          if (state.previewUserId && (state.previewMode === 'simulate' || state.previewMode === 'grayout') && isOwnerUser()) {
-            appendInlineRevokeBtn(headerEl, () => {
-              revokePermission('folder', acc.id);
-            });
-          } else {
-            removeInlineGrantBtn(headerEl);
-            removeInlineRevokeBtn(headerEl);
-          }
-        }
+      }
+      if (headerEl) {
+        renderSidebarPermissionIconBtn(headerEl, 'folder', acc.id);
       }
 
       // DOMツリーに挿入
@@ -5049,6 +5388,16 @@ function renderCustomTableList() {
               else if (el.id === 'menu-link-official') { itemId = 'official-id-link'; itemName = '本登録ID紐付け'; }
               
               if (itemId) {
+                const subAccess = checkTableAccess(itemId);
+                if (!subAccess.visible) {
+                  el.style.display = 'none';
+                  return;
+                }
+                if (subAccess.grayout) {
+                  el.classList.add('grayed-out-access');
+                } else {
+                  el.classList.remove('grayed-out-access');
+                }
                 el.style.display = 'flex';
                 el.style.alignItems = 'center';
                 el.style.width = '100%';
@@ -5123,23 +5472,13 @@ function renderCustomTableList() {
 
       btn.draggable = false;
 
-      // テーブルのグレーアウト制御
+      // テーブルのグレーアウト制御＆権限アイコン（🔒/🔓/✏️・文字折り返し防止）
       if (access.grayout) {
         btn.classList.add('grayed-out-access');
-        appendInlineGrantBtn(btn, () => {
-          grantPermission('table', tbl.id);
-        });
       } else {
         btn.classList.remove('grayed-out-access');
-        if (state.previewUserId && (state.previewMode === 'simulate' || state.previewMode === 'grayout') && isOwnerUser()) {
-          appendInlineRevokeBtn(btn, () => {
-            revokePermission('table', tbl.id);
-          });
-        } else {
-          removeInlineGrantBtn(btn);
-          removeInlineRevokeBtn(btn);
-        }
       }
+      renderSidebarPermissionIconBtn(btn, 'table', tbl.id);
 
       // DOMツリーに挿入
       if (parentId === 'root') {
@@ -6265,20 +6604,10 @@ function renderCustomTable(tableId) {
     const colAccess = checkColumnAccess(`custom-table-${tbl.id}`, col.id);
     if (colAccess.grayout) {
       th.classList.add('grayed-out-access');
-      appendInlineGrantBtn(headerWrapper, () => {
-        grantColumnPermissionDirect(`custom-table-${tbl.id}`, col.id);
-      });
     } else {
       th.classList.remove('grayed-out-access');
-      if (state.previewUserId && (state.previewMode === 'simulate' || state.previewMode === 'grayout') && isOwnerUser()) {
-        appendInlineRevokeBtn(headerWrapper, () => {
-          revokeColumnPermissionDirect(`custom-table-${tbl.id}`, col.id);
-        });
-      } else {
-        removeInlineGrantBtn(headerWrapper);
-        removeInlineRevokeBtn(headerWrapper);
-      }
     }
+    renderColumnPermissionIconBtn(headerWrapper, `custom-table-${tbl.id}`, col.id);
 
     if (fixedColIds.includes(col.id)) {
       th.classList.add('fixed-col-header');
@@ -6450,7 +6779,7 @@ function renderCustomTable(tableId) {
       const style = tbl.cellStyles[cellKey] || {};
       applyInlineStylesToCell(td, style);
 
-      const previewBg = getPreviewCellBgColor(`custom-table-${tbl.id}`, col.id);
+      const previewBg = getPreviewCellBgColor(`custom-table-${tbl.id}`, col.id, rowIdx);
       if (previewBg) {
         td.style.backgroundColor = previewBg;
       }
@@ -6561,8 +6890,8 @@ function renderCustomTable(tableId) {
         if (col.type === 'select') {
           e.stopPropagation();
           if (isTableLocked(tableId)) return;
-          if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess(`custom-table-${tbl.id}`, col.id)) {
-            showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+          if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess(`custom-table-${tbl.id}`, rowIdx, col.id)) {
+            showToast('このセルの編集権限がありません（読取専用）。', 'warning');
             return;
           }
           if (td.querySelector('select')) return;
@@ -6572,8 +6901,8 @@ function renderCustomTable(tableId) {
 
       td.addEventListener('dblclick', () => {
         if (isTableLocked(tableId)) return;
-        if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess(`custom-table-${tbl.id}`, col.id)) {
-          showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+        if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess(`custom-table-${tbl.id}`, rowIdx, col.id)) {
+          showToast('このセルの編集権限がありません（読取専用）。', 'warning');
           return;
         }
         if (td.querySelector('input') || td.querySelector('select')) return;
@@ -9184,6 +9513,32 @@ function renderTableControlBar(tableId, parentContainerEl) {
       </span>
     `;
     rightDiv.appendChild(permBadgesDiv);
+
+    // 4. セル範囲の編集権限クイック設定ボタン（範囲限定機能）
+    const cellPermGroup = document.createElement('div');
+    cellPermGroup.style.cssText = 'display: flex; align-items: center; gap: 0.25rem; margin-left: 0.25rem;';
+
+    const grantCellsBtn = document.createElement('button');
+    grantCellsBtn.className = 'btn btn-sm';
+    grantCellsBtn.style.cssText = 'padding: 0.35rem 0.55rem; font-size: 0.75rem; font-weight: bold; background: #10b981; color: #fff; border: none; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; gap: 0.2rem; box-shadow: var(--shadow-sm);';
+    grantCellsBtn.innerHTML = '<span>✏️</span> 選択セルを編集可に';
+    grantCellsBtn.title = '選択中のセル・範囲をプレビュー中ユーザーの編集可能範囲に設定します';
+    grantCellsBtn.addEventListener('click', () => {
+      setSelectedCellsEditPermission(tableId, true);
+    });
+    cellPermGroup.appendChild(grantCellsBtn);
+
+    const lockCellsBtn = document.createElement('button');
+    lockCellsBtn.className = 'btn btn-sm';
+    lockCellsBtn.style.cssText = 'padding: 0.35rem 0.55rem; font-size: 0.75rem; font-weight: bold; background: #64748b; color: #fff; border: none; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; gap: 0.2rem; box-shadow: var(--shadow-sm);';
+    lockCellsBtn.innerHTML = '<span>🔒</span> 選択セルを読取専用に';
+    lockCellsBtn.title = '選択中のセル・範囲をプレビュー中ユーザーに対して読取専用（編集不可）に限定します';
+    lockCellsBtn.addEventListener('click', () => {
+      setSelectedCellsEditPermission(tableId, false);
+    });
+    cellPermGroup.appendChild(lockCellsBtn);
+
+    rightDiv.appendChild(cellPermGroup);
   }
 
   controlBar.appendChild(leftDiv);
@@ -17022,20 +17377,10 @@ function renderAgencyInfo() {
         const filterContainer = th.querySelector('.th-filter-container');
         if (colAccess.grayout) {
           th.classList.add('grayed-out-access');
-          appendInlineGrantBtn(filterContainer, () => {
-            grantColumnPermissionDirect('agency-info-screen', col.id);
-          });
         } else {
           th.classList.remove('grayed-out-access');
-          if (state.previewUserId && (state.previewMode === 'simulate' || state.previewMode === 'grayout') && isOwnerUser()) {
-            appendInlineRevokeBtn(filterContainer, () => {
-              revokeColumnPermissionDirect('agency-info-screen', col.id);
-            });
-          } else {
-            removeInlineGrantBtn(filterContainer);
-            removeInlineRevokeBtn(filterContainer);
-          }
         }
+        renderColumnPermissionIconBtn(filterContainer, 'agency-info-screen', col.id);
 
         const btn = th.querySelector('.btn-filter-toggle');
         btn.addEventListener('click', (e) => {
@@ -17046,6 +17391,7 @@ function renderAgencyInfo() {
         th.addEventListener('mousedown', (e) => {
           if (
             e.target.closest('.btn-filter-toggle') ||
+            e.target.closest('.col-perm-icon-btn') ||
             e.target.closest('.grant-access-inline-btn') ||
             e.target.closest('.revoke-access-inline-btn') ||
             e.target.closest('.column-resizer')
@@ -17265,7 +17611,7 @@ function renderAgencyInfo() {
 
         applyInlineStylesToCell(td, styleObj);
 
-        const previewBg = getPreviewCellBgColor('agency-info-screen', col.id);
+        const previewBg = getPreviewCellBgColor('agency-info-screen', col.id, index);
         if (previewBg) {
           td.style.backgroundColor = previewBg;
         } else if (styleObj['background-color']) {
@@ -17405,8 +17751,8 @@ function renderAgencyInfo() {
           const isSelect = col.type === 'select' || (col.choices && col.choices.length > 0);
           if (isSelect) {
             if (isTableLocked('ag')) return;
-            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('agency-info-screen', col.id)) {
-              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+            if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess('agency-info-screen', index, col.id)) {
+              showToast('このセルの編集権限がありません（読取専用）。', 'warning');
               return;
             }
             startMasterDropdownEdit(td, val, col, contract, index, 'ag');
@@ -17415,8 +17761,8 @@ function renderAgencyInfo() {
 
         td.addEventListener('dblclick', (e) => {
           if (!isTableLocked('ag')) {
-            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('agency-info-screen', col.id)) {
-              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+            if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess('agency-info-screen', index, col.id)) {
+              showToast('このセルの編集権限がありません（読取専用）。', 'warning');
               return;
             }
             startMasterCellEdit(td, val, col, contract, index, 'ag');
@@ -18867,20 +19213,10 @@ function renderJoInfo() {
         const filterContainer = th.querySelector('.th-filter-container');
         if (colAccess.grayout) {
           th.classList.add('grayed-out-access');
-          appendInlineGrantBtn(filterContainer, () => {
-            grantColumnPermissionDirect('jo-info-screen', col.id);
-          });
         } else {
           th.classList.remove('grayed-out-access');
-          if (state.previewUserId && (state.previewMode === 'simulate' || state.previewMode === 'grayout') && isOwnerUser()) {
-            appendInlineRevokeBtn(filterContainer, () => {
-              revokeColumnPermissionDirect('jo-info-screen', col.id);
-            });
-          } else {
-            removeInlineGrantBtn(filterContainer);
-            removeInlineRevokeBtn(filterContainer);
-          }
         }
+        renderColumnPermissionIconBtn(filterContainer, 'jo-info-screen', col.id);
 
         const btn = th.querySelector('.btn-filter-toggle');
         btn.addEventListener('click', (e) => {
@@ -19057,7 +19393,7 @@ function renderJoInfo() {
         
         applyInlineStylesToCell(td, styleObj);
         
-        const previewBg = getPreviewCellBgColor('jo-info-screen', col.id);
+        const previewBg = getPreviewCellBgColor('jo-info-screen', col.id, index);
         if (previewBg) {
           td.style.backgroundColor = previewBg;
         } else if (styleObj['background-color']) {
@@ -19216,8 +19552,8 @@ function renderJoInfo() {
           const isSelect = col.type === 'select' || (col.choices && col.choices.length > 0);
           if (isSelect) {
             if (isTableLocked('jo')) return;
-            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('jo-info-screen', col.id)) {
-              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+            if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess('jo-info-screen', index, col.id)) {
+              showToast('このセルの編集権限がありません（読取専用）。', 'warning');
               return;
             }
             startMasterDropdownEdit(td, val, col, contract, index, 'jo');
@@ -19227,8 +19563,8 @@ function renderJoInfo() {
         td.addEventListener('dblclick', (e) => {
           if (e.target.tagName === 'A') return;
           if (!isTableLocked('jo')) {
-            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('jo-info-screen', col.id)) {
-              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+            if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess('jo-info-screen', index, col.id)) {
+              showToast('このセルの編集権限がありません（読取専用）。', 'warning');
               return;
             }
             startMasterCellEdit(td, val, col, contract, index, 'jo');
@@ -19559,20 +19895,10 @@ function renderApplicantInfo() {
         const filterContainer = th.querySelector('.th-filter-container');
         if (colAccess.grayout) {
           th.classList.add('grayed-out-access');
-          appendInlineGrantBtn(filterContainer, () => {
-            grantColumnPermissionDirect('applicant-info-screen', col.id);
-          });
         } else {
           th.classList.remove('grayed-out-access');
-          if (state.previewUserId && (state.previewMode === 'simulate' || state.previewMode === 'grayout') && isOwnerUser()) {
-            appendInlineRevokeBtn(filterContainer, () => {
-              revokeColumnPermissionDirect('applicant-info-screen', col.id);
-            });
-          } else {
-            removeInlineGrantBtn(filterContainer);
-            removeInlineRevokeBtn(filterContainer);
-          }
         }
+        renderColumnPermissionIconBtn(filterContainer, 'applicant-info-screen', col.id);
 
         const btn = th.querySelector('.btn-filter-toggle');
         btn.addEventListener('click', (e) => {
@@ -19583,6 +19909,7 @@ function renderApplicantInfo() {
         th.addEventListener('mousedown', (e) => {
           if (
             e.target.closest('.btn-filter-toggle') ||
+            e.target.closest('.col-perm-icon-btn') ||
             e.target.closest('.grant-access-inline-btn') ||
             e.target.closest('.revoke-access-inline-btn') ||
             e.target.closest('.column-resizer')
@@ -19804,7 +20131,7 @@ function renderApplicantInfo() {
 
         applyInlineStylesToCell(td, styleObj);
 
-        const previewBg = getPreviewCellBgColor('applicant-info-screen', col.id);
+        const previewBg = getPreviewCellBgColor('applicant-info-screen', col.id, index);
         if (previewBg) {
           td.style.backgroundColor = previewBg;
         } else if (styleObj['background-color']) {
@@ -19941,8 +20268,8 @@ function renderApplicantInfo() {
           const isSelect = col.type === 'select' || (col.choices && col.choices.length > 0);
           if (isSelect) {
             if (isTableLocked('ap')) return;
-            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('applicant-info-screen', col.id)) {
-              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+            if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess('applicant-info-screen', index, col.id)) {
+              showToast('このセルの編集権限がありません（読取専用）。', 'warning');
               return;
             }
             startMasterDropdownEdit(td, val, col, contract, index, 'ap');
@@ -19951,8 +20278,8 @@ function renderApplicantInfo() {
 
         td.addEventListener('dblclick', (e) => {
           if (!isTableLocked('ap')) {
-            if (typeof checkColumnEditAccess === 'function' && !checkColumnEditAccess('applicant-info-screen', col.id)) {
-              showToast('このカラムの編集権限がありません（読取専用）。', 'warning');
+            if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess('applicant-info-screen', index, col.id)) {
+              showToast('このセルの編集権限がありません（読取専用）。', 'warning');
               return;
             }
             startMasterCellEdit(td, val, col, contract, index, 'ap');
