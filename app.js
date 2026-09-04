@@ -793,6 +793,7 @@ const STORAGE_KEYS = {
   ID_SEQUENCE: 'synapse_id_sequence',
   CUSTOM_TABLES: 'synapse_custom_tables',
   PERMISSIONS: 'synapse_permissions',
+  TABLE_EDIT_LOCKS: 'synapse_table_edit_locks',
   AUDIT_LOGS: 'synapse_audit_logs',
   CUSTOM_ACCORDIONS: 'synapse_custom_accordions',
   USER_CUSTOM_ICONS: 'synapse_user_custom_icons',
@@ -2367,8 +2368,46 @@ async function loadUserSettingsFromCloud() {
   }
 }
 
+// ストレージキーから対応するテーブル画面IDを特定するヘルパー
+function getTableIdFromStorageKey(key) {
+  if (!key) return null;
+  if (key === STORAGE_KEYS.JO_CONTRACTS || key === STORAGE_KEYS.JO_COLUMNS) return 'jo-info-screen';
+  if (key === STORAGE_KEYS.AP_CONTRACTS || key === STORAGE_KEYS.AP_COLUMNS) return 'applicant-info-screen';
+  if (key === STORAGE_KEYS.AG_CONTRACTS || key === STORAGE_KEYS.AG_COLUMNS) return 'agency-info-screen';
+  if (key === 'synapse_dbmake_partners' || key === STORAGE_KEYS.DBMAKE_COLUMNS) return 'dbmake-screen';
+  if (typeof key === 'string' && key.startsWith('custom-table-')) return key;
+  return null;
+}
+
 // Supabaseへのデータ送信 (プッシュ)
 async function syncToSupabase(key, value) {
+  // 🛡️ サーバー通信時の編集保護（WRITEガード）
+  // オーナー以外の一般ユーザーがテーブルデータを同期しようとした場合、編集ロックおよびアクセス権限を厳格検証
+  const targetTableId = getTableIdFromStorageKey(key);
+  if (targetTableId && !isOwnerUser()) {
+    // 1. テーブル編集ロックの検証（ロック中はサーバーへの書き込みを拒否）
+    if (typeof isTableLocked === 'function' && isTableLocked(targetTableId)) {
+      console.warn(`[Security/WRITE] Sync blocked for key ${key} (table ${targetTableId}). Table is edit-locked.`);
+      state.syncQueue = state.syncQueue.filter(t => t.key !== key);
+      saveSyncQueueToStorage();
+      updateSyncStatusUI();
+      showToast(`【権限制限】シート「${targetTableId}」の編集がロックされているため、サーバーへの保存はブロックされました。`, 'warning');
+      return;
+    }
+    // 2. テーブル自体のアクセス権限の検証（権限なしユーザーの書き込みを拒否）
+    if (typeof checkTableAccess === 'function') {
+      const tableAccess = checkTableAccess(targetTableId);
+      if (!tableAccess.visible) {
+        console.warn(`[Security/WRITE] Sync blocked for key ${key} (table ${targetTableId}). User has no access permission.`);
+        state.syncQueue = state.syncQueue.filter(t => t.key !== key);
+        saveSyncQueueToStorage();
+        updateSyncStatusUI();
+        showToast(`【権限制限】シート「${targetTableId}」へのアクセス権限がないため、サーバーへの書き込みはブロックされました。`, 'warning');
+        return;
+      }
+    }
+  }
+
   // 同期がオンフライトでない場合はキューを制御
   let task = state.syncQueue.find(t => t.key === key);
   if (!task) {
@@ -2511,6 +2550,20 @@ function showLoadingIndicator(show) {
 // クラウド（Supabase）から特定のキーのデータのみをオンデマンド取得してローカルに同期する
 async function loadDataFromCloud(key, showSpinner = true) {
   if (!supabaseClient) return null;
+
+  // 🛡️ サーバー通信時の閲覧保護（READガード）
+  // 一般ユーザー（またはプレビュー中ユーザー）に該当テーブルの閲覧権限がない場合は、
+  // クラウドからのデータ取得・ローカル展開をブロック
+  const targetTableId = getTableIdFromStorageKey(key);
+  if (targetTableId && !isOwnerUser()) {
+    if (typeof checkTableAccess === 'function') {
+      const access = checkTableAccess(targetTableId);
+      if (!access.visible) {
+        console.warn(`[Security/READ] Load blocked for key ${key} (table ${targetTableId}). User has no read permission.`);
+        return null;
+      }
+    }
+  }
   
   if (showSpinner) {
     showLoadingIndicator(true);
@@ -2573,7 +2626,30 @@ async function syncFromSupabase(showNotification = false) {
       const remoteValStr = JSON.stringify(permData.value);
       if (localVal !== remoteValStr) {
         localStorage.setItem(STORAGE_KEYS.PERMISSIONS, remoteValStr);
+        state.permissions = permData.value || {};
+        if (state.permissions.tableEditLocks) {
+          if (!state.tableEditLocks) state.tableEditLocks = {};
+          Object.assign(state.tableEditLocks, state.permissions.tableEditLocks);
+          localStorage.setItem(STORAGE_KEYS.TABLE_EDIT_LOCKS, JSON.stringify(state.tableEditLocks));
+        }
         updatedKeys.push(STORAGE_KEYS.PERMISSIONS);
+      }
+    }
+
+    // 1-2. synapse_table_edit_locks（テーブル編集ロック）もプル
+    const { data: lockData, error: lockError } = await supabaseClient
+      .from('synapse_storage')
+      .select('*')
+      .eq('key', STORAGE_KEYS.TABLE_EDIT_LOCKS)
+      .maybeSingle();
+
+    if (!lockError && lockData && lockData.value) {
+      const localLockStr = localStorage.getItem(STORAGE_KEYS.TABLE_EDIT_LOCKS);
+      const remoteLockStr = JSON.stringify(lockData.value);
+      if (localLockStr !== remoteLockStr) {
+        localStorage.setItem(STORAGE_KEYS.TABLE_EDIT_LOCKS, remoteLockStr);
+        if (!state.tableEditLocks) state.tableEditLocks = {};
+        Object.assign(state.tableEditLocks, lockData.value);
       }
     }
 
@@ -3834,12 +3910,28 @@ function setupSidebarToggleBtnEvent() {
 }
 
 function savePermissions() {
-  if (!state.currentUser || state.currentUser.role !== 'owner') {
+  if (!isOwnerUser()) {
     console.warn('[Security] Unauthorized attempt to save permissions. Action blocked.');
     showToast('権限設定の保存に失敗しました：管理者（owner）権限が必要です。', 'error');
     return;
   }
-  localStorage.setItem(STORAGE_KEYS.PERMISSIONS, JSON.stringify(state.permissions));
+
+  // 1. 各テーブルの編集ロック（state.tableEditLocks）を権限オブジェクト内にも統合保持
+  if (state.tableEditLocks) {
+    if (!state.permissions.tableEditLocks) state.permissions.tableEditLocks = {};
+    Object.assign(state.permissions.tableEditLocks, state.tableEditLocks);
+  }
+
+  const permStr = JSON.stringify(state.permissions);
+  const locksStr = JSON.stringify(state.tableEditLocks || {});
+  localStorage.setItem(STORAGE_KEYS.PERMISSIONS, permStr);
+  localStorage.setItem(STORAGE_KEYS.TABLE_EDIT_LOCKS, locksStr);
+
+  // 2. サーバー（Supabase）へ即時プッシュ・同期
+  if (typeof syncToSupabase === 'function') {
+    syncToSupabase(STORAGE_KEYS.PERMISSIONS, state.permissions);
+    syncToSupabase(STORAGE_KEYS.TABLE_EDIT_LOCKS, state.tableEditLocks || {});
+  }
 }
 
 function saveAuditLogs() {
@@ -4823,6 +4915,17 @@ function grantPermission(type, targetId) {
     }
   }
   savePermissions();
+  if (type === 'table') {
+    const keyMap = {
+      'jo-info-screen': [STORAGE_KEYS.JO_CONTRACTS, STORAGE_KEYS.JO_COLUMNS],
+      'applicant-info-screen': [STORAGE_KEYS.AP_CONTRACTS, STORAGE_KEYS.AP_COLUMNS],
+      'agency-info-screen': [STORAGE_KEYS.AG_CONTRACTS, STORAGE_KEYS.AG_COLUMNS],
+      'dbmake-screen': ['synapse_dbmake_partners', STORAGE_KEYS.DBMAKE_COLUMNS]
+    };
+    if (keyMap[targetId]) {
+      keyMap[targetId].forEach(k => loadDataFromCloud(k, false));
+    }
+  }
   refreshCurrentViewPermissions();
   showToast('権限を即時追加しました。（「↩️ 元に戻す」で取り消し可能）', 'success');
 }
@@ -9442,7 +9545,7 @@ function renderTableControlBar(tableId, parentContainerEl) {
       state.tableEditLocks = {};
     }
     state.tableEditLocks[tableId] = newLock;
-    localStorage.setItem('synapse_table_edit_locks', JSON.stringify(state.tableEditLocks));
+    savePermissions();
 
     editBtn.className = `btn ${newLock ? 'btn-secondary' : 'btn-primary'}`;
     editBtn.innerHTML = `<span>${newLock ? '🔒' : '🔓'}</span> ${newLock ? '編集をロック中' : '編集ロック解除中'}`;
