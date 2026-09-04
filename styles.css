@@ -5389,6 +5389,11 @@ h3 {
     display: none !important;
   }
 
+  /* ログイン画面自体にはボトム余白を一切つけない */
+  #login-screen {
+    padding-bottom: 0 !important;
+  }
+
   /* 2. アプリ全体のレイアウトを画面幅100%に */
   .app-layout {
     display: flex !important;
@@ -5400,9 +5405,9 @@ h3 {
     overflow-x: hidden !important;
   }
 
-  /* 3. 各画面コンテンツの下部にボトムバーの高さ分の余白を確保 */
+  /* 3. 各画面コンテンツ（ログイン画面以外）の下部にボトムバーの高さ分の余白を確保 */
   .main-content,
-  .screen-view,
+  .screen-view:not(#login-screen),
   #home-screen,
   #mypage-screen,
   #dashboard-screen,
@@ -5421,8 +5426,8 @@ h3 {
     padding-bottom: calc(72px + env(safe-area-inset-bottom, 16px)) !important;
   }
 
-  /* 4. アプリ風ボトムナビゲーションバー（固定表示） */
-  .mobile-bottom-nav {
+  /* 4. アプリ風ボトムナビゲーションバー（ログイン完了時かつスマホ表示時のみ固定表示） */
+  .mobile-bottom-nav.is-visible {
     display: flex !important;
     position: fixed !important;
     bottom: 0 !important;

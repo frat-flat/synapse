@@ -10112,11 +10112,21 @@ function showLoginScreen(show) {
     v.style.display = 'none';
   });
 
+  const mobileNav = document.getElementById('mobile-bottom-nav');
+
   if (show) {
     if (tabsOuter) tabsOuter.style.display = 'none';
     if (sidebar) sidebar.style.display = 'none';
     if (toggleBtn) toggleBtn.style.display = 'none';
     if (mainHeader) mainHeader.style.display = 'none';
+
+    // 📱 スマホボトムバーを未ログイン時・ログイン画面では完全に非表示
+    if (mobileNav) {
+      mobileNav.classList.remove('is-visible');
+      mobileNav.style.setProperty('display', 'none', 'important');
+    }
+    document.body.classList.remove('logged-in');
+    document.body.classList.add('login-active');
 
     // ポップアップ類を確実に非表示
     const userPopover = document.getElementById('user-profile-popover');
@@ -10148,12 +10158,20 @@ function showLoginScreen(show) {
       }
     }
   } else {
+    document.body.classList.remove('login-active');
+    document.body.classList.add('logged-in');
+
     if (sidebar) sidebar.style.display = 'flex';
     if (toggleBtn) toggleBtn.style.display = 'flex';
     if (mainHeader) mainHeader.style.display = 'flex';
     if (login) {
       login.classList.remove('active');
       login.style.display = 'none'; // インラインで明示的に非表示
+    }
+
+    // 📱 ログイン後にスマホボトムバーを描画
+    if (typeof renderMobileBottomNav === 'function') {
+      renderMobileBottomNav();
     }
 
     // ログイン成功時はURLを / に更新
@@ -39782,21 +39800,20 @@ function renderMobileBottomNav() {
   const navEl = document.getElementById('mobile-bottom-nav');
   if (!navEl) return;
 
-  // ログインしていない、またはログイン画面表示中は非表示
+  // ログインしていない、またはログイン画面表示中は絶対に非表示
   const loginScreen = document.getElementById('login-screen');
-  const isLoginActive = loginScreen && loginScreen.classList.contains('active') && loginScreen.style.display !== 'none';
-  if (!state.currentUser || isLoginActive) {
-    navEl.style.display = 'none';
+  const isLoginActive = !state.currentUser || (loginScreen && (loginScreen.classList.contains('active') || loginScreen.style.display === 'flex' || window.getComputedStyle(loginScreen).display !== 'none'));
+
+  if (isLoginActive || window.innerWidth > 768) {
+    navEl.classList.remove('is-visible');
+    navEl.style.setProperty('display', 'none', 'important');
     return;
   }
 
-  // スマホ画面幅（<= 768px）判定
-  if (window.innerWidth <= 768) {
-    navEl.style.display = 'flex';
-  } else {
-    navEl.style.display = 'none';
-    return;
-  }
+  // ログイン完了済みかつスマホ画面幅（<= 768px）時のみ表示
+  navEl.classList.add('is-visible');
+  navEl.style.removeProperty('display');
+  navEl.style.setProperty('display', 'flex', 'important');
 
   const config = getMobileNavConfigForCurrentUser();
   const opt1 = ALL_SELECTABLE_NAV_OPTIONS.find(o => o.id === config.role1) || ALL_SELECTABLE_NAV_OPTIONS[0];
