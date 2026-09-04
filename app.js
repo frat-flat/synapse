@@ -9749,11 +9749,13 @@ function updateUIForCurrentMode() {
     }
   }
 
-  if (isSystemAdmin) {
-    if (menuMypage) menuMypage.style.display = 'flex';
-    if (userMypageContainer) userMypageContainer.style.display = 'none';
+  const isMobile = window.innerWidth <= 768;
 
-    // システム管理者の場合は元の位置に戻す
+  if (isSystemAdmin || isMobile) {
+    if (menuMypage) menuMypage.style.display = 'flex';
+    if (userMypageContainer) userMypageContainer.style.display = isMobile ? 'none' : 'none';
+
+    // システム管理者またはモバイル表示の場合はマイページ画面内にメニューを配置
     if (menuView && origMenuParent && menuView.parentNode !== origMenuParent) {
       origMenuParent.insertBefore(menuView, origMenuParent.firstChild);
     }
@@ -9763,11 +9765,12 @@ function updateUIForCurrentMode() {
     if (mypageMemoWrapper && origMemoParent && mypageMemoWrapper.parentNode !== origMemoParent) {
       origMemoParent.appendChild(mypageMemoWrapper);
     }
+    if (menuView) menuView.style.display = (pendingUser && !isSystemAdmin) ? 'none' : 'flex';
   } else {
     if (menuMypage) menuMypage.style.display = 'none';
     if (userMypageContainer) userMypageContainer.style.display = 'flex';
 
-    // 一般ユーザーの場合はホーム画面のメニューコンテナへ移動
+    // 一般ユーザー（PC表示時）の場合はホーム画面のメニューコンテナへ移動
     if (menuView && userMypageContainer && menuView.parentNode !== userMypageContainer) {
       userMypageContainer.appendChild(menuView);
     }
@@ -9793,13 +9796,13 @@ function updateUIForCurrentMode() {
         origMemoParent.appendChild(mypageMemoWrapper);
       }
     }
-
-    // 一般ユーザー用のプロフィール情報
-    const mypageFullnameEl = document.getElementById('mypage-user-fullname');
-    const mypageCodeEl = document.getElementById('mypage-user-code');
-    if (mypageFullnameEl) mypageFullnameEl.textContent = state.currentUser.name || 'ゲスト';
-    if (mypageCodeEl) mypageCodeEl.textContent = 'Code: ' + (state.currentUser.code || 'N/A');
   }
+
+  // ユーザープロフィールの更新
+  const mypageFullnameEl = document.getElementById('mypage-user-fullname');
+  const mypageCodeEl = document.getElementById('mypage-user-code');
+  if (mypageFullnameEl) mypageFullnameEl.textContent = state.currentUser ? (state.currentUser.name || 'ゲスト') : 'ゲスト';
+  if (mypageCodeEl) mypageCodeEl.textContent = 'Code: ' + (state.currentUser ? (state.currentUser.code || 'N/A') : 'N/A');
 
 
   
@@ -9919,6 +9922,9 @@ function updateUIForCurrentMode() {
     window.syncMasterTableNamesWithFolders();
   }
   renderMypageSecurityInfo();
+  if (typeof renderMobileBottomNav === 'function') {
+    renderMobileBottomNav();
+  }
 }
 
 // ログインステータスのチェック
@@ -10018,11 +10024,6 @@ function checkLoginStatus() {
 
 // ビュー（画面）切り替え
 async function switchView(viewId) {
-  // 💡 オーナー以外はホーム画面（home-screen）へのアクセスを拒否し、マイページへリダイレクト
-  if (viewId === 'home-screen' && !canAccessHomeScreen()) {
-    viewId = 'mypage-screen';
-  }
-
   state.currentView = viewId;
   state.activeTabId = viewId;
 
@@ -10037,6 +10038,11 @@ async function switchView(viewId) {
       v.style.display = 'none';
     }
   });
+
+  // 📱 スマホ用ボトムナビゲーションバーのアクティブ状態を同期
+  if (typeof updateMobileBottomNavActiveState === 'function') {
+    updateMobileBottomNavActiveState(viewId);
+  }
 
   // サイドメニューのハイライト状態の更新
   const sidebarNavItems = document.querySelectorAll('.sidebar-nav .nav-item');
@@ -11024,6 +11030,11 @@ function activateTab(id) {
   }
 
   state.activeTabId = id;
+
+  // 📱 スマホ用ボトムナビゲーションバーのアクティブ状態を同期
+  if (typeof updateMobileBottomNavActiveState === 'function') {
+    updateMobileBottomNavActiveState(tab.type || id);
+  }
 
   const tabsOuter = document.getElementById('tabs-outer-wrapper');
   if (tabsOuter) tabsOuter.style.display = 'block';
@@ -39678,8 +39689,316 @@ window.openResumableUrl = function(urlStr) {
       }
     };
   }
-
 })();
+
+// ==========================================================
+// 📱 スマホ用ボトムナビゲーションバー（ロール別カスタマイズ対応）
+// ==========================================================
+
+const MOBILE_BOTTOM_NAV_DEFAULTS = {
+  sales: {
+    role1: 'appointment-new',
+    role2: 'agency-info-screen'
+  },
+  support: {
+    role1: 'jo-info-screen',
+    role2: 'applicant-info-screen'
+  },
+  'setup-support': {
+    role1: 'jo-info-screen',
+    role2: 'applicant-info-screen'
+  },
+  admin: {
+    role1: 'form-customize-screen',
+    role2: 'user-manager-screen'
+  },
+  owner: {
+    role1: 'form-customize-screen',
+    role2: 'user-manager-screen'
+  },
+  backoffice: {
+    role1: 'applicant-info-screen',
+    role2: 'party-id-mgmt-screen'
+  },
+  pending: {
+    role1: 'mypage-memo-screen',
+    role2: 'mypage-screen'
+  }
+};
+
+const ALL_SELECTABLE_NAV_OPTIONS = [
+  { id: 'appointment-new', icon: '📅', label: '新規アポ', type: 'tab', tabId: 'appointment-new', tabType: 'appointment-new', tabTitle: '📅 新規アポイント' },
+  { id: 'history-view-screen', icon: '🕒', label: 'アポ履歴', type: 'tab', tabId: 'history-view-screen', tabType: 'history-view-screen', tabTitle: '🕒 アポイント履歴' },
+  { id: 'drafts-view-screen', icon: '💾', label: '一時保存', type: 'tab', tabId: 'drafts-view-screen', tabType: 'drafts-view-screen', tabTitle: '💾 一時保存一覧' },
+  { id: 'agency-info-screen', icon: '💼', label: '代理店情報', type: 'tab', tabId: 'agency-info-screen', tabType: 'agency-info-screen', tabTitle: '💼 代理店 基本マスタ' },
+  { id: 'jo-info-screen', icon: '📑', label: 'JO情報', type: 'tab', tabId: 'jo-info-screen', tabType: 'jo-info-screen', tabTitle: '📑 JO 基本マスタ' },
+  { id: 'applicant-info-screen', icon: '📋', label: '申込者情報', type: 'tab', tabId: 'applicant-info-screen', tabType: 'applicant-info-screen', tabTitle: '📋 申込者 基本マスタ' },
+  { id: 'form-customize-screen', icon: '📄', label: 'フォーム作成', type: 'tab', tabId: 'form-customize-screen', tabType: 'form-customize-screen', tabTitle: '📋 フォーム作成' },
+  { id: 'table-creator-screen', icon: '📊', label: 'テーブル作成', type: 'tab', tabId: 'table-creator-screen', tabType: 'table-creator-screen', tabTitle: '📊 テーブル作成' },
+  { id: 'user-manager-screen', icon: '👥', label: 'ユーザー管理', type: 'tab', tabId: 'user-manager-screen', tabType: 'user-manager-screen', tabTitle: '👥 ユーザー登録' },
+  { id: 'party-id-mgmt-screen', icon: '🪪', label: 'ID管理', type: 'tab', tabId: 'party-id-mgmt-screen', tabType: 'party-id-mgmt-screen', tabTitle: '🪪 ID管理' },
+  { id: 'mypage-memo-screen', icon: '📝', label: 'メモ帳', type: 'view', viewId: 'mypage-memo-screen' },
+  { id: 'mypage-task-screen', icon: '✅', label: 'タスク', type: 'view', viewId: 'mypage-task-screen' },
+  { id: 'mypage-calendar-screen', icon: '📆', label: 'カレンダー', type: 'view', viewId: 'mypage-calendar-screen' },
+  { id: 'mypage-screen', icon: '⭐', label: 'お気に入り', type: 'view', viewId: 'mypage-screen' }
+];
+
+function getMobileNavConfigForCurrentUser() {
+  const user = state.currentUser;
+  const role = (user && user.role) ? user.role : 'sales';
+  const userId = user ? user.id : 'default';
+  
+  // 1. 保存されたカスタム設定を優先
+  const saved = localStorage.getItem(`SYNAPSE_MOBILE_NAV_${userId}`);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.role1 && parsed.role2) {
+        return parsed;
+      }
+    } catch (e) {}
+  }
+  
+  // 2. ロール別デフォルト設定
+  const defaults = MOBILE_BOTTOM_NAV_DEFAULTS[role] || MOBILE_BOTTOM_NAV_DEFAULTS.sales;
+  return {
+    role1: defaults.role1,
+    role2: defaults.role2
+  };
+}
+
+function saveMobileNavConfigForCurrentUser(role1Id, role2Id) {
+  const user = state.currentUser;
+  const userId = user ? user.id : 'default';
+  const config = { role1: role1Id, role2: role2Id };
+  localStorage.setItem(`SYNAPSE_MOBILE_NAV_${userId}`, JSON.stringify(config));
+  renderMobileBottomNav();
+  if (typeof showToast === 'function') {
+    showToast('スマホ下部バーの設定を保存しました！', 'success');
+  }
+}
+
+function renderMobileBottomNav() {
+  const navEl = document.getElementById('mobile-bottom-nav');
+  if (!navEl) return;
+
+  // ログインしていない、またはログイン画面表示中は非表示
+  const loginScreen = document.getElementById('login-screen');
+  const isLoginActive = loginScreen && loginScreen.classList.contains('active') && loginScreen.style.display !== 'none';
+  if (!state.currentUser || isLoginActive) {
+    navEl.style.display = 'none';
+    return;
+  }
+
+  // スマホ画面幅（<= 768px）判定
+  if (window.innerWidth <= 768) {
+    navEl.style.display = 'flex';
+  } else {
+    navEl.style.display = 'none';
+    return;
+  }
+
+  const config = getMobileNavConfigForCurrentUser();
+  const opt1 = ALL_SELECTABLE_NAV_OPTIONS.find(o => o.id === config.role1) || ALL_SELECTABLE_NAV_OPTIONS[0];
+  const opt2 = ALL_SELECTABLE_NAV_OPTIONS.find(o => o.id === config.role2) || ALL_SELECTABLE_NAV_OPTIONS[3];
+
+  const role1IconEl = document.getElementById('mob-nav-role1-icon');
+  const role1LabelEl = document.getElementById('mob-nav-role1-label');
+  const role2IconEl = document.getElementById('mob-nav-role2-icon');
+  const role2LabelEl = document.getElementById('mob-nav-role2-label');
+
+  if (role1IconEl) role1IconEl.textContent = opt1.icon;
+  if (role1LabelEl) role1LabelEl.textContent = opt1.label;
+  if (role2IconEl) role2IconEl.textContent = opt2.icon;
+  if (role2LabelEl) role2LabelEl.textContent = opt2.label;
+
+  const btnRole1 = document.getElementById('mob-nav-role1');
+  const btnRole2 = document.getElementById('mob-nav-role2');
+  if (btnRole1) btnRole1.dataset.targetId = opt1.id;
+  if (btnRole2) btnRole2.dataset.targetId = opt2.id;
+
+  // 現在のアクティブ状態を反映
+  updateMobileBottomNavActiveState(state.currentView || state.activeTabId);
+
+  // マイページ設定画面が開かれていれば設定UIも注入
+  if (typeof injectMobileNavSettingsUI === 'function') {
+    injectMobileNavSettingsUI();
+  }
+}
+
+function updateMobileBottomNavActiveState(targetId) {
+  const navEl = document.getElementById('mobile-bottom-nav');
+  if (!navEl) return;
+
+  const items = navEl.querySelectorAll('.mobile-nav-item');
+  items.forEach(el => el.classList.remove('active'));
+
+  const homeBtn = document.getElementById('mob-nav-home');
+  const searchBtn = document.getElementById('mob-nav-search');
+  const role1Btn = document.getElementById('mob-nav-role1');
+  const role2Btn = document.getElementById('mob-nav-role2');
+  const mypageBtn = document.getElementById('mob-nav-mypage');
+
+  const config = getMobileNavConfigForCurrentUser();
+
+  if (targetId === 'home-screen' || targetId === 'home') {
+    if (homeBtn) homeBtn.classList.add('active');
+  } else if (targetId === 'search') {
+    if (searchBtn) searchBtn.classList.add('active');
+  } else if (targetId === config.role1 || (role1Btn && role1Btn.dataset.targetId === targetId)) {
+    if (role1Btn) role1Btn.classList.add('active');
+  } else if (targetId === config.role2 || (role2Btn && role2Btn.dataset.targetId === targetId)) {
+    if (role2Btn) role2Btn.classList.add('active');
+  } else if (targetId && (targetId.startsWith('mypage') || targetId === 'user-manager-screen' && !['role1', 'role2'].includes(targetId))) {
+    if (mypageBtn) mypageBtn.classList.add('active');
+  }
+}
+
+function initMobileBottomNavEvents() {
+  const homeBtn = document.getElementById('mob-nav-home');
+  const searchBtn = document.getElementById('mob-nav-search');
+  const role1Btn = document.getElementById('mob-nav-role1');
+  const role2Btn = document.getElementById('mob-nav-role2');
+  const mypageBtn = document.getElementById('mob-nav-mypage');
+
+  if (homeBtn) {
+    homeBtn.addEventListener('click', () => {
+      switchView('home-screen');
+      updateMobileBottomNavActiveState('home-screen');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  if (searchBtn) {
+    searchBtn.addEventListener('click', () => {
+      switchView('home-screen');
+      updateMobileBottomNavActiveState('search');
+      setTimeout(() => {
+        const searchInput = document.getElementById('global-search-input');
+        if (searchInput) {
+          searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          searchInput.focus();
+        }
+      }, 150);
+    });
+  }
+
+  function executeNavOption(optId) {
+    const opt = ALL_SELECTABLE_NAV_OPTIONS.find(o => o.id === optId);
+    if (!opt) return;
+
+    if (opt.type === 'tab') {
+      openTab(opt.tabId, opt.tabType, opt.tabTitle);
+    } else if (opt.type === 'view') {
+      switchView(opt.viewId);
+    }
+    updateMobileBottomNavActiveState(opt.id);
+  }
+
+  if (role1Btn) {
+    role1Btn.addEventListener('click', () => {
+      const config = getMobileNavConfigForCurrentUser();
+      executeNavOption(config.role1);
+    });
+  }
+
+  if (role2Btn) {
+    role2Btn.addEventListener('click', () => {
+      const config = getMobileNavConfigForCurrentUser();
+      executeNavOption(config.role2);
+    });
+  }
+
+  if (mypageBtn) {
+    mypageBtn.addEventListener('click', () => {
+      switchView('mypage-screen');
+      updateMobileBottomNavActiveState('mypage-screen');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  // 画面リサイズ検知
+  window.addEventListener('resize', () => {
+    renderMobileBottomNav();
+  });
+}
+
+// ユーザー設定画面（#mypage-settings-screen）にカスタマイズUIを追加する関数
+function injectMobileNavSettingsUI() {
+  const container = document.getElementById('mypage-settings-screen');
+  if (!container) return;
+
+  if (document.getElementById('mobile-nav-settings-section')) return;
+
+  const section = document.createElement('div');
+  section.id = 'mobile-nav-settings-section';
+  section.style.cssText = 'background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; margin-top: 1.25rem; text-align: left; box-shadow: var(--shadow-sm);';
+  
+  const config = getMobileNavConfigForCurrentUser();
+  
+  const optionsHtml = ALL_SELECTABLE_NAV_OPTIONS.map(opt => {
+    return `<option value="${opt.id}">${opt.icon} ${opt.label}</option>`;
+  }).join('');
+
+  section.innerHTML = `
+    <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+      📱 スマホ下部ナビゲーションバー設定
+    </h3>
+    <p style="margin: 0 0 1rem 0; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">
+      スマホ表示時に画面下部に並ぶ5つのボタンのうち、<strong>真ん中（3番目）</strong>と<strong>右から2番目（4番目）</strong>の機能を自由に選べます。<br>
+      ※ 1番左は「🏠 ホーム」、2番目は「🔍 顧客検索」、1番右は「👤 マイページ」で固定です。
+    </p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+      <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">真ん中（3番目）の機能</label>
+        <select id="mobile-nav-select-role1" style="padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); font-size: 0.85rem; outline: none; cursor: pointer;">
+          ${optionsHtml}
+        </select>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">右から2番目（4番目）の機能</label>
+        <select id="mobile-nav-select-role2" style="padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); font-size: 0.85rem; outline: none; cursor: pointer;">
+          ${optionsHtml}
+        </select>
+      </div>
+    </div>
+    <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
+      <button id="mobile-nav-save-settings-btn" class="btn btn-primary" style="padding: 0.45rem 1.25rem; font-size: 0.82rem; font-weight: 700; cursor: pointer; border-radius: var(--radius-sm);">設定を保存</button>
+    </div>
+  `;
+
+  const targetParent = container.querySelector('div') || container;
+  targetParent.appendChild(section);
+
+  const sel1 = document.getElementById('mobile-nav-select-role1');
+  const sel2 = document.getElementById('mobile-nav-select-role2');
+  if (sel1) sel1.value = config.role1;
+  if (sel2) sel2.value = config.role2;
+
+  const saveBtn = document.getElementById('mobile-nav-save-settings-btn');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      saveMobileNavConfigForCurrentUser(sel1.value, sel2.value);
+    });
+  }
+}
+
+// グローバル公開と初期化
+window.renderMobileBottomNav = renderMobileBottomNav;
+window.updateMobileBottomNavActiveState = updateMobileBottomNavActiveState;
+window.injectMobileNavSettingsUI = injectMobileNavSettingsUI;
+
+// DOMContentLoaded または実行時初期化
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    initMobileBottomNavEvents();
+    renderMobileBottomNav();
+  });
+} else {
+  initMobileBottomNavEvents();
+  renderMobileBottomNav();
+}
+
 
 
 

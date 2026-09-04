@@ -4,18 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Synapse</title>
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=20260904_7">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon.png?v=20260904_7">
-<link rel="shortcut icon" href="favicon.ico?v=20260904_7">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=20260904_7">
-<link rel="apple-touch-icon-precomposed" sizes="180x180" href="apple-touch-icon-precomposed.png?v=20260904_7">
-<link rel="manifest" href="manifest.json?v=20260904_7">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=20260904_8">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon.png?v=20260904_8">
+<link rel="shortcut icon" href="favicon.ico?v=20260904_8">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=20260904_8">
+<link rel="apple-touch-icon-precomposed" sizes="180x180" href="apple-touch-icon-precomposed.png?v=20260904_8">
+<link rel="manifest" href="manifest.json?v=20260904_8">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Synapse">
 <meta name="theme-color" content="#ffffff">
 
-<link rel="stylesheet" href="styles.css?v=2.1">
+<link rel="stylesheet" href="styles.css?v=2.2">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script id="session-safety-patch">
   (function() {
@@ -4021,6 +4021,30 @@
     
   </div>
 </div>
+
+<!-- 📱 スマホ専用 ボトムナビゲーションバー -->
+<nav id="mobile-bottom-nav" class="mobile-bottom-nav" style="display: none;" aria-label="モバイルナビゲーション">
+  <button type="button" class="mobile-nav-item active" id="mob-nav-home" data-action="home">
+    <span class="mobile-nav-icon">🏠</span>
+    <span class="mobile-nav-label">ホーム</span>
+  </button>
+  <button type="button" class="mobile-nav-item" id="mob-nav-search" data-action="search">
+    <span class="mobile-nav-icon">🔍</span>
+    <span class="mobile-nav-label">顧客検索</span>
+  </button>
+  <button type="button" class="mobile-nav-item" id="mob-nav-role1" data-action="role1">
+    <span class="mobile-nav-icon" id="mob-nav-role1-icon">📅</span>
+    <span class="mobile-nav-label" id="mob-nav-role1-label">アポ管理</span>
+  </button>
+  <button type="button" class="mobile-nav-item" id="mob-nav-role2" data-action="role2">
+    <span class="mobile-nav-icon" id="mob-nav-role2-icon">💼</span>
+    <span class="mobile-nav-label" id="mob-nav-role2-label">代理店</span>
+  </button>
+  <button type="button" class="mobile-nav-item" id="mob-nav-mypage" data-action="mypage">
+    <span class="mobile-nav-icon">👤</span>
+    <span class="mobile-nav-label">マイページ</span>
+  </button>
+</nav>
 
 <script>
   console.log('[DEBUG] HTML inline test script loaded.');
