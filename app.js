@@ -11093,19 +11093,19 @@ function renderTableControlBar(tableId, parentContainerEl) {
   controlBar.style.display = 'flex';
   controlBar.style.justifyContent = 'space-between';
   controlBar.style.alignItems = 'center';
-  controlBar.style.marginBottom = '0.75rem';
-  controlBar.style.gap = '0.5rem';
+  controlBar.style.marginBottom = '0.25rem';
+  controlBar.style.gap = '0.4rem';
 
   const leftDiv = document.createElement('div');
   leftDiv.style.display = 'flex';
   leftDiv.style.alignItems = 'center';
-  leftDiv.style.gap = '0.5rem';
+  leftDiv.style.gap = '0.4rem';
 
   // 1件登録ボタン
   const addSingleBtn = document.createElement('button');
   addSingleBtn.className = 'btn btn-primary ct-add-single-row-btn';
-  addSingleBtn.style.padding = '0.4rem 0.75rem';
-  addSingleBtn.style.fontSize = '0.8rem';
+  addSingleBtn.style.padding = '0.22rem 0.6rem';
+  addSingleBtn.style.fontSize = '0.78rem';
   addSingleBtn.style.display = 'flex';
   addSingleBtn.style.alignItems = 'center';
   addSingleBtn.style.gap = '0.25rem';
@@ -11122,8 +11122,8 @@ function renderTableControlBar(tableId, parentContainerEl) {
   if (meta) {
     const importBtn = document.createElement('button');
     importBtn.className = 'btn btn-secondary';
-    importBtn.style.padding = '0.4rem 0.75rem';
-    importBtn.style.fontSize = '0.8rem';
+    importBtn.style.padding = '0.22rem 0.55rem';
+    importBtn.style.fontSize = '0.78rem';
     importBtn.style.display = 'flex';
     importBtn.style.alignItems = 'center';
     importBtn.style.gap = '0.25rem';
@@ -11251,8 +11251,8 @@ function renderTableControlBar(tableId, parentContainerEl) {
     // 📤 CSVエクスポートボタン
     const exportBtn = document.createElement('button');
     exportBtn.className = 'btn btn-secondary';
-    exportBtn.style.padding = '0.4rem 0.75rem';
-    exportBtn.style.fontSize = '0.8rem';
+    exportBtn.style.padding = '0.22rem 0.55rem';
+    exportBtn.style.fontSize = '0.78rem';
     exportBtn.style.display = 'flex';
     exportBtn.style.alignItems = 'center';
     exportBtn.style.gap = '0.25rem';
@@ -11290,8 +11290,8 @@ function renderTableControlBar(tableId, parentContainerEl) {
     // 👁️ 列の表示設定ボタン (非表示・統合)
     const colDisplayBtn = document.createElement('button');
     colDisplayBtn.className = 'btn btn-secondary';
-    colDisplayBtn.style.padding = '0.4rem 0.75rem';
-    colDisplayBtn.style.fontSize = '0.8rem';
+    colDisplayBtn.style.padding = '0.22rem 0.55rem';
+    colDisplayBtn.style.fontSize = '0.78rem';
     colDisplayBtn.style.display = 'flex';
     colDisplayBtn.style.alignItems = 'center';
     colDisplayBtn.style.gap = '0.35rem';
@@ -11319,14 +11319,14 @@ function renderTableControlBar(tableId, parentContainerEl) {
   const rightDiv = document.createElement('div');
   rightDiv.style.display = 'flex';
   rightDiv.style.alignItems = 'center';
-  rightDiv.style.gap = '0.5rem';
+  rightDiv.style.gap = '0.4rem';
 
   // ロックアイコン
   const isLocked = isTableLocked(tableId);
   const editBtn = document.createElement('button');
   editBtn.className = `btn ${isLocked ? 'btn-secondary' : 'btn-primary'}`;
-  editBtn.style.padding = '0.4rem 0.75rem';
-  editBtn.style.fontSize = '0.8rem';
+  editBtn.style.padding = '0.22rem 0.55rem';
+  editBtn.style.fontSize = '0.78rem';
   editBtn.style.display = 'flex';
   editBtn.style.alignItems = 'center';
   editBtn.style.gap = '0.25rem';

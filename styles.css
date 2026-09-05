@@ -1090,13 +1090,14 @@ textarea {
 .tabs-outer-wrapper {
   position: relative;
   width: 100%;
-  margin-top: 1rem;
-  margin-bottom: 1.5rem;
-  transition: margin-bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 0.1rem;
+  margin-bottom: 0.25rem;
+  transition: margin-bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .tabs-outer-wrapper.tabs-collapsed {
-  margin-bottom: 0.5rem;
+  margin-top: 0;
+  margin-bottom: 0.1rem;
 }
 
 .tabs-container {
@@ -1106,8 +1107,8 @@ textarea {
   display: flex;
   align-items: flex-end;
   border-bottom: 1px solid var(--border-color);
-  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, border-bottom-color 0.3s ease;
-  height: 48px;
+  transition: height 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, border-bottom-color 0.2s ease;
+  height: 32px;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -1122,19 +1123,19 @@ textarea {
 /* Tabs toggle arrow styles (frameless, smart arrow) */
 .tabs-toggle-arrow {
   position: absolute;
-  bottom: -16px;
+  bottom: -11px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
-  width: 24px;
-  height: 16px;
+  width: 20px;
+  height: 11px;
   background: transparent !important;
   border: none !important;
   color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.62rem;
   font-weight: bold;
   cursor: pointer;
   transition: color 0.2s, transform 0.2s;
@@ -1153,7 +1154,7 @@ textarea {
 }
 
 .tabs-outer-wrapper.tabs-collapsed .tabs-toggle-arrow {
-  bottom: -16px;
+  bottom: -11px;
 }
 
 .tabs-bar {
@@ -1180,20 +1181,22 @@ textarea {
   backdrop-filter: blur(10px);
   border: 1px solid var(--border-color);
   border-bottom: none;
-  padding: 0.35rem 0.75rem;
+  padding: 0.15rem 0.55rem;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 500;
   user-select: none;
   position: relative;
   top: 1px; /* 下部ボーダーと重ねる */
   z-index: 1;
+  height: 28px;
+  box-sizing: border-box;
 }
 
 .tab-item:hover {
@@ -1433,7 +1436,7 @@ textarea {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 1rem 1.5rem;
+  padding: 0.35rem 0.75rem;
   height: 100vh;
   overflow: hidden;
   background: var(--bg-main);
@@ -2030,16 +2033,17 @@ body.in-preview-mode .sidebar-toggle-arrow {
   display: flex;
 }
 
-/* 書式設定ツールバー */
+/* 書式設定ツールバー (省スペース・コンパクト化) */
 .format-toolbar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem !important;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 0.4rem 0.75rem;
-  margin-bottom: 1rem;
+  border-radius: var(--radius-sm) !important;
+  padding: 0.12rem 0.4rem !important;
+  margin-bottom: 0.25rem !important;
+  min-height: 26px !important;
   box-shadow: var(--shadow-sm);
   flex-wrap: wrap;
 }
@@ -2047,26 +2051,27 @@ body.in-preview-mode .sidebar-toggle-arrow {
 .toolbar-group {
   display: flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: 0.15rem;
 }
 
 .toolbar-separator {
   width: 1px;
-  height: 20px;
+  height: 14px;
   background-color: var(--border-color);
-  margin: 0 0.25rem;
+  margin: 0 0.15rem;
 }
 
 .toolbar-btn {
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-primary);
-  width: 28px;
-  height: 28px;
+  min-width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.25rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -2218,33 +2223,106 @@ body.in-preview-mode .sidebar-toggle-arrow {
   background: var(--bg-surface);
 }
 
-/* どのウィンドウサイズ・ズーム率でも主要テーブルが下端までぴったり収まるようにする伸縮設定 */
+/* どのウィンドウサイズ・ズーム率でも主要テーブルが下端までぴったり収まるようにする伸縮設定 & 省スペース化 */
 #jo-info-screen,
 #applicant-info-screen,
 #agency-info-screen,
-#custom-table-screen {
+#custom-table-screen,
+#dbmake-screen {
   height: 100%;
+  padding: 0.15rem 0.4rem !important;
+  overflow: hidden !important;
+  min-height: 0;
+  margin-bottom: 0;
 }
 
+#jo-info-screen.active,
+#applicant-info-screen.active,
+#agency-info-screen.active,
+#custom-table-screen.active,
+#dbmake-screen.active {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+}
+
+/* テーブル画面ヘッダー（タイトル・表示項目・枠固定）のコンパクト化 */
+.table-screen-header,
+#jo-info-screen > div:first-child,
+#applicant-info-screen > div:first-child,
+#agency-info-screen > div:first-child,
+#custom-table-screen > div:first-child,
+#dbmake-screen > div:first-child {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 0.2rem !important;
+  flex-wrap: wrap !important;
+  gap: 0.4rem !important;
+}
+
+.table-screen-header h1,
+#jo-info-screen > div:first-child h1,
+#applicant-info-screen > div:first-child h1,
+#agency-info-screen > div:first-child h1,
+#custom-table-screen > div:first-child h1,
+#dbmake-screen > div:first-child h1 {
+  font-size: 1.05rem !important;
+  margin-bottom: 0 !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+.table-screen-header h1 input,
+#custom-table-screen > div:first-child h1 input {
+  font-size: 1.05rem !important;
+}
+
+.table-screen-header .btn-secondary,
+#jo-info-screen > div:first-child .btn-secondary,
+#applicant-info-screen > div:first-child .btn-secondary,
+#agency-info-screen > div:first-child .btn-secondary,
+#custom-table-screen > div:first-child .btn-secondary,
+#dbmake-screen > div:first-child .btn-secondary {
+  padding: 0.18rem 0.5rem !important;
+  font-size: 0.78rem !important;
+  height: 24px !important;
+  gap: 0.2rem !important;
+}
+
+/* テーブル操作バー（1件登録・CSV・列設定・ロック）のコンパクト化 */
+.table-control-bar {
+  margin-bottom: 0.2rem !important;
+  padding: 0.05rem 0 !important;
+  gap: 0.35rem !important;
+}
+
+/* テーブル表示領域の最外枠カード余白を完全に排除してテーブル専有面積を最大化 */
 #jo-info-screen .list-section,
 #applicant-info-screen .list-section,
 #agency-info-screen .list-section,
-#custom-table-screen .list-section {
+#custom-table-screen .list-section,
+#dbmake-screen .list-section {
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  margin-bottom: 0 !important;
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin-bottom: 0; /* 下部の余分な余白を排除して下端まで引き伸ばす */
 }
 
 #jo-info-screen .sticky-table-wrapper,
 #applicant-info-screen .sticky-table-wrapper,
 #agency-info-screen .sticky-table-wrapper,
-#custom-table-screen .sticky-table-wrapper {
+#custom-table-screen .sticky-table-wrapper,
+#dbmake-screen .sticky-table-wrapper {
   flex: 1;
   min-height: 0;
   max-height: none !important; /* 固定最大高さの制限（550px）を解除し、フレックスで自動伸縮させる */
-  overflow-y: auto; /* 縦スクロールを有効化 */
+  overflow: scroll !important; /* 縦横スクロールバーを常に表示 */
 }
 
 /* 行・列全体の選択用ハイライト */
@@ -2826,13 +2904,14 @@ body.in-preview-mode .sidebar-toggle-arrow {
   box-shadow: var(--shadow-sm);
 }
 
-/* メインヘッダー自体の微調整 */
+/* メインヘッダー自体の微調整 (省スペース・コンパクト化) */
 .main-header {
-  padding: 0.75rem 1.25rem;
+  padding: 0.2rem 0.65rem !important;
   background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.25rem !important;
+  min-height: 32px;
 }
 
 /* ================= DBmake (パートナーDB管理) 移植用スタイル ================= */
