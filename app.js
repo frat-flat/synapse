@@ -9134,7 +9134,8 @@ function setupCtButtonsEvents() {
 
   // 共通テーブル・マスタ検索ヘルパー
   function findCustomOrMasterTable(tableId) {
-    if (tableId === 'jo-info-screen') {
+    const norm = typeof normalizeTableId === 'function' ? normalizeTableId(tableId) : tableId;
+    if (norm === 'jo' || tableId === 'jo-info-screen') {
       return {
         id: 'jo-info-screen',
         name: getDynamicMasterTableName('jo-info-screen'),
@@ -9143,7 +9144,7 @@ function setupCtButtonsEvents() {
         rows: state.joContracts || [],
         isMaster: true
       };
-    } else if (tableId === 'applicant-info-screen') {
+    } else if (norm === 'ap' || tableId === 'applicant-info-screen') {
       return {
         id: 'applicant-info-screen',
         name: getDynamicMasterTableName('applicant-info-screen'),
@@ -9152,7 +9153,7 @@ function setupCtButtonsEvents() {
         rows: state.apContracts || [],
         isMaster: true
       };
-    } else if (tableId === 'agency-info-screen') {
+    } else if (norm === 'ag' || tableId === 'agency-info-screen') {
       return {
         id: 'agency-info-screen',
         name: getDynamicMasterTableName('agency-info-screen'),
@@ -9161,7 +9162,7 @@ function setupCtButtonsEvents() {
         rows: state.agContracts || [],
         isMaster: true
       };
-    } else if (tableId === 'dbmake') {
+    } else if (norm === 'dbmake' || tableId === 'dbmake-screen') {
       return {
         id: 'dbmake',
         name: getDynamicMasterTableName('dbmake'),
@@ -9171,7 +9172,7 @@ function setupCtButtonsEvents() {
         isMaster: true
       };
     } else {
-      return state.customTables.find(t => t.id === tableId);
+      return state.customTables.find(t => t.id === tableId || t.id === norm);
     }
   }
 
@@ -43669,11 +43670,30 @@ function handleSpreadsheetMenuAction(action, label) {
     }
 
     case 'data-validation': {
-      const valSidebar = document.getElementById('validation-sidebar');
-      if (valSidebar) {
-        valSidebar.style.display = valSidebar.style.display === 'none' ? 'block' : 'none';
+      const activeTblId = typeof normalizeTableId === 'function' ? normalizeTableId(tableId || getActiveSpreadsheetTableId()) : (tableId || 'dbmake');
+      const tbl = typeof findCustomOrMasterTable === 'function' ? findCustomOrMasterTable(activeTblId) : null;
+      let targetColId = null;
+      if (tbl && tbl.columns && tbl.columns.length > 0) {
+        if (activeTblId === 'dbmake' && state.dbmakeSelectedCell) targetColId = state.dbmakeSelectedCell.colId;
+        else if (activeTblId === 'jo' && state.joSelectedCell) targetColId = state.joSelectedCell.colId;
+        else if (activeTblId === 'ap' && state.apSelectedCell) targetColId = state.apSelectedCell.colId;
+        else if (activeTblId === 'ag' && state.agSelectedCell) targetColId = state.agSelectedCell.colId;
+        else if (ctResizeState && ctResizeState.targetId) targetColId = ctResizeState.targetId;
+
+        if (!targetColId) {
+          const selectedKeys = typeof getCurrentlySelectedCellKeys === 'function' ? getCurrentlySelectedCellKeys(activeTblId) : [];
+          if (selectedKeys && selectedKeys.length > 0 && typeof parseCellKey === 'function') {
+            const p = parseCellKey(selectedKeys[0], tbl);
+            if (p && p.colId) targetColId = p.colId;
+          }
+        }
+        if (!targetColId) targetColId = tbl.columns[0].id;
+        openValidationSidebar(tbl, targetColId);
       } else {
-        showToast('データの入力規則サイドバーを開きます。', 'info');
+        const valSidebar = document.getElementById('validation-sidebar');
+        if (valSidebar) {
+          valSidebar.style.display = valSidebar.style.display === 'none' ? 'block' : 'none';
+        }
       }
       break;
     }
