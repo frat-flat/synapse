@@ -4065,8 +4065,18 @@
     // 1. HTMLエスケープ（XSS対策）
     let escaped = escapeHtml(text);
 
-    // 2. Markdown形式リンク: [ラベル](URL)
-    escaped = escaped.replace(/\[([^\]\n\r]+)\]\(((?:https?:\/\/|\/|mailto:|tel:)[^\s\)\<\>"]+)\)/g, (match, label, url) => {
+    // 2. Markdown形式リンク: [ラベル](URL) および全角 ［ラベル］（URL）
+    escaped = escaped.replace(/[\[［]([^\]］\n\r]+)[\]］][\(（]([^\s\)\<\>"）]+)[\)）]/g, (match, label, rawUrl) => {
+      // URLの全角文字を半角に正規化
+      let url = rawUrl.replace(/[！-～]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).trim();
+      // http/https等のスキームがない場合補完
+      if (!/^(https?:\/\/|\/|mailto:|tel:)/i.test(url)) {
+        if (/^[\w.-]+\.[a-z]{2,}/i.test(url)) {
+          url = 'https://' + url;
+        } else {
+          return match;
+        }
+      }
       return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="rich-embedded-link" style="color:var(--color-primary, #0056b3); text-decoration:underline; font-weight:500; cursor:pointer;" onclick="event.stopPropagation();">${label}</a>`;
     });
 
@@ -4140,6 +4150,149 @@
     }, true);
   }
   setupSmartLinkPaste();
+
+  // 🔗 文字リンク挿入モーダルダイアログ
+  function setupInsertLinkModal() {
+    let modal = document.getElementById('dialog-insert-link-helper');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'dialog-insert-link-helper';
+      modal.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:99999; display:none; align-items:center; justify-content:center; padding:16px; box-sizing:border-box; font-family:Inter, "Noto Sans JP", sans-serif;';
+      modal.innerHTML = `
+        <div style="background:#fff; border-radius:12px; max-width:460px; width:100%; box-shadow:0 12px 36px rgba(0,0,0,0.25); padding:24px; box-sizing:border-box;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3 style="margin:0; font-size:1.15rem; font-weight:700; color:#202124; display:flex; align-items:center; gap:8px;">
+              <span>🔗</span> 文字にリンクを設定
+            </h3>
+            <button type="button" id="btn-close-link-dialog-x" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:#5f6368; padding:4px 8px; border-radius:4px;">✕</button>
+          </div>
+          <p style="margin:0 0 16px 0; font-size:0.83rem; color:#5f6368; line-height:1.5;">
+            指定した文字をクリックしたときに、入力したURLへ移動するリンクを作成します。
+          </p>
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            <div>
+              <label for="input-link-dialog-text" style="display:block; font-size:0.82rem; font-weight:600; color:#3c4043; margin-bottom:6px;">表示する文字 <span style="color:#d93025;">*</span></label>
+              <input type="text" id="input-link-dialog-text" placeholder="例: 紹介代理店契約書、利用規約、こちら など" style="width:100%; box-sizing:border-box; padding:8px 12px; border:1px solid #dadce0; border-radius:6px; font-size:0.9rem; outline:none;">
+            </div>
+            <div>
+              <label for="input-link-dialog-url" style="display:block; font-size:0.82rem; font-weight:600; color:#3c4043; margin-bottom:6px;">リンク先URL <span style="color:#d93025;">*</span></label>
+              <input type="text" id="input-link-dialog-url" placeholder="例: https://example.com/contract" style="width:100%; box-sizing:border-box; padding:8px 12px; border:1px solid #dadce0; border-radius:6px; font-size:0.9rem; outline:none;">
+            </div>
+            <div style="font-size:0.75rem; color:#5f6368; background:#f8f9fa; padding:8px 10px; border-radius:6px; border:1px solid #e8eaed;">
+              💡 リンクは新しいタブ（別ウィンドウ）で安全に開きます。
+            </div>
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <button type="button" id="btn-cancel-link-dialog" style="background:#fff; border:1px solid #dadce0; padding:8px 16px; border-radius:6px; font-size:0.85rem; font-weight:600; color:#5f6368; cursor:pointer;">キャンセル</button>
+            <button type="button" id="btn-submit-link-dialog" style="background:#1a73e8; border:none; padding:8px 18px; border-radius:6px; font-size:0.85rem; font-weight:600; color:#fff; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.1);">リンクを挿入</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      let currentTargetInput = null;
+      let selectionInfo = null;
+
+      function openLinkModal(targetElement) {
+        currentTargetInput = targetElement;
+        const textInput = document.getElementById('input-link-dialog-text');
+        const urlInput = document.getElementById('input-link-dialog-url');
+
+        let selectedText = '';
+        if (targetElement && targetElement.selectionStart !== undefined && targetElement.selectionEnd !== undefined) {
+          const start = targetElement.selectionStart;
+          const end = targetElement.selectionEnd;
+          selectionInfo = { start, end };
+          selectedText = targetElement.value.substring(start, end).trim();
+        } else {
+          selectionInfo = null;
+        }
+
+        textInput.value = selectedText;
+        urlInput.value = '';
+        modal.style.display = 'flex';
+
+        setTimeout(() => {
+          if (selectedText) {
+            urlInput.focus();
+          } else {
+            textInput.focus();
+          }
+        }, 50);
+      }
+
+      function closeLinkModal() {
+        modal.style.display = 'none';
+        currentTargetInput = null;
+        selectionInfo = null;
+      }
+
+      document.getElementById('btn-close-link-dialog-x').addEventListener('click', closeLinkModal);
+      document.getElementById('btn-cancel-link-dialog').addEventListener('click', closeLinkModal);
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeLinkModal();
+      });
+
+      document.getElementById('btn-submit-link-dialog').addEventListener('click', () => {
+        const textInput = document.getElementById('input-link-dialog-text');
+        const urlInput = document.getElementById('input-link-dialog-url');
+        const text = textInput.value.trim();
+        let url = urlInput.value.trim();
+
+        if (!text) {
+          alert('表示する文字を入力してください。');
+          textInput.focus();
+          return;
+        }
+        if (!url) {
+          alert('リンク先URLを入力してください。');
+          urlInput.focus();
+          return;
+        }
+
+        url = url.replace(/[！-～]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).trim();
+        if (!/^(https?:\/\/|\/|mailto:|tel:)/i.test(url)) {
+          url = 'https://' + url;
+        }
+
+        const mdLink = `[${text}](${url})`;
+
+        if (currentTargetInput) {
+          const val = currentTargetInput.value || '';
+          let start = currentTargetInput.value.length;
+          let end = start;
+
+          if (selectionInfo) {
+            start = selectionInfo.start;
+            end = selectionInfo.end;
+          } else if (currentTargetInput.selectionStart !== undefined) {
+            start = currentTargetInput.selectionStart;
+            end = currentTargetInput.selectionEnd;
+          }
+
+          currentTargetInput.value = val.substring(0, start) + mdLink + val.substring(end);
+          currentTargetInput.selectionStart = currentTargetInput.selectionEnd = start + mdLink.length;
+          currentTargetInput.dispatchEvent(new Event('input', { bubbles: true }));
+          currentTargetInput.dispatchEvent(new Event('change', { bubbles: true }));
+          currentTargetInput.focus();
+        }
+
+        closeLinkModal();
+      });
+
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-insert-link-modal');
+        if (btn) {
+          e.preventDefault();
+          e.stopPropagation();
+          const targetId = btn.dataset.target;
+          const targetEl = targetId ? document.getElementById(targetId) : null;
+          openLinkModal(targetEl || document.activeElement);
+        }
+      });
+    }
+  }
+  setupInsertLinkModal();
 
 
   function setupLiveAutocompleteEvents() {
