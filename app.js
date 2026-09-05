@@ -10425,12 +10425,17 @@ function showMergedCellChip(targetCell, tableId, rowData, group, columns, matche
   const cellRect = targetCell.getBoundingClientRect();
   const chipRect = chip.getBoundingClientRect();
 
-  let top = cellRect.bottom + 6;
+  // 写真2枚目と同様のセルに対する位置：
+  // セルの下半分（テキスト直下〜境界線付近）に重ねて表示
+  let top = cellRect.top + 14;
+  let left = cellRect.left + 16;
+
+  // 画面下端にはみ出る場合のフォールバック
   if (top + chipRect.height > window.innerHeight - 10) {
-    top = Math.max(10, cellRect.top - chipRect.height - 6);
+    top = Math.max(10, cellRect.top - chipRect.height - 2);
   }
 
-  let left = cellRect.left;
+  // 画面右端にはみ出る場合のフォールバック
   if (left + chipRect.width > window.innerWidth - 15) {
     left = Math.max(10, window.innerWidth - chipRect.width - 15);
   }

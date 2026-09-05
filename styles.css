@@ -5641,16 +5641,16 @@ h3 {
 .synapse-merged-chip {
   position: fixed;
   z-index: 999999;
-  min-width: 140px;
-  max-width: 420px;
+  min-width: 80px;
+  max-width: 360px;
   background: #ffffff !important;
-  border: 1px solid #cbd5e1 !important;
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06);
+  border: 1px solid #333333 !important;
+  border-radius: 2px !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25) !important;
   font-family: inherit;
   overflow: hidden;
-  padding: 4px 0;
-  animation: synapseChipFadeIn 0.12s ease-out;
+  padding: 2px 0 !important;
+  animation: synapseChipFadeIn 0.1s ease-out;
   pointer-events: auto !important;
 }
 
@@ -5661,19 +5661,20 @@ h3 {
 .synapse-chip-rows {
   display: flex;
   flex-direction: column;
-  padding: 4px 0;
-  max-height: 280px;
+  padding: 0;
+  max-height: 240px;
   overflow-y: auto;
 }
 
 .synapse-chip-row {
   display: flex;
   align-items: center;
-  padding: 6px 12px;
-  font-size: 0.82rem;
-  color: #0f172a;
+  padding: 2px 6px !important;
+  font-size: 0.75rem !important; /* 写真2枚目と同様のフォントサイズ (12px) */
+  line-height: 1.35 !important;
+  color: #000000 !important;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 0.1s ease;
   user-select: text !important;
   border-bottom: 1px solid #f1f5f9;
 }
@@ -5685,30 +5686,21 @@ h3 {
 .synapse-chip-row:hover,
 .synapse-chip-row.is-hovered {
   background: #eff6ff !important;
-  border-left-color: #3b82f6 !important;
+  color: #1d4ed8 !important;
 }
 
 .synapse-chip-row.is-selected {
   background: #dbeafe !important;
-  border-left-color: #2563eb !important;
+  color: #1e40af !important;
 }
 
 .synapse-chip-row.is-match-highlight {
   background: rgba(234, 179, 8, 0.3) !important;
-  border-left-color: #eab308 !important;
-}
-
-.synapse-chip-row-label {
-  color: #64748b;
-  font-size: 0.74rem;
-  font-weight: 600;
-  flex-shrink: 0;
-  min-width: 75px;
-  user-select: none;
 }
 
 .synapse-chip-row-val {
-  color: #0f172a;
+  color: #000000 !important;
+  font-size: 0.75rem !important; /* 写真2枚目と同様の文字サイズ */
   font-weight: 500;
   flex: 1;
   overflow: hidden;
