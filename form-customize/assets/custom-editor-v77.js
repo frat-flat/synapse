@@ -6002,6 +6002,22 @@
             ]
           },
           {
+            id: `q_account_number_${baseTime}`,
+            type: "text",
+            title: "口座番号",
+            description: "7桁の半角数字で入力してください（例: 1234567）",
+            required: true,
+            validation: {
+              category: "regex",
+              condition: "matches",
+              value: "^[0-9]{7}$",
+              presetKey: "custom",
+              value2: "",
+              errorMessage: "正しい口座番号（7桁の半角数字）を入力してください。"
+            },
+            options: []
+          },
+          {
             id: `q_account_holder_${baseTime}`,
             type: "text",
             title: "口座名義（カナ）",
