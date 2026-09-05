@@ -1870,3 +1870,18 @@ input:-webkit-autofill:active {
   word-break: break-word !important;
 }
 
+/* リッチテキスト埋め込みリンクスタイル */
+.rich-embedded-link {
+  color: #1a73e8 !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.rich-embedded-link:hover {
+  color: #1557b0 !important;
+  opacity: 0.85;
+}
+

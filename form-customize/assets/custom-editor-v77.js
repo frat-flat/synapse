@@ -3732,7 +3732,8 @@
       previewTitle.textContent = isPro ? ((g.header ? g.header.title : null) || g.title || "セクション") : (g.title || "セクション");
     }
     if (previewDesc) {
-      previewDesc.textContent = isPro ? ((g.header ? g.header.disclaimer : null) || g.description || "") : (g.description || "");
+      const pDescVal = isPro ? ((g.header ? g.header.disclaimer : null) || g.description || "") : (g.description || "");
+      previewDesc.innerHTML = renderRichTextWithLinks(pDescVal);
     }
 
     // 全体プレビューのヘッダー画像表示制御
@@ -4058,6 +4059,87 @@
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   }
+
+  function renderRichTextWithLinks(text) {
+    if (!text) return '';
+    // 1. HTMLエスケープ（XSS対策）
+    let escaped = escapeHtml(text);
+
+    // 2. Markdown形式リンク: [ラベル](URL)
+    escaped = escaped.replace(/\[([^\]\n\r]+)\]\(((?:https?:\/\/|\/|mailto:|tel:)[^\s\)\<\>"]+)\)/g, (match, label, url) => {
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="rich-embedded-link" style="color:var(--color-primary, #0056b3); text-decoration:underline; font-weight:500; cursor:pointer;" onclick="event.stopPropagation();">${label}</a>`;
+    });
+
+    // 3. 既存の <a> タグを一時保護
+    const aTags = [];
+    escaped = escaped.replace(/<a\b[^>]*>(.*?)<\/a>/gi, (match) => {
+      aTags.push(match);
+      return `___A_TAG_PLACEHOLDER_${aTags.length - 1}___`;
+    });
+
+    // 4. 生URL（http/https）の自動リンク化
+    escaped = escaped.replace(/(https?:\/\/[^\s<]+)/gi, (match) => {
+      let cleanUrl = match.replace(/([.,!?:;)\]]+)$/, '');
+      let trail = match.slice(cleanUrl.length);
+      return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="rich-embedded-link" style="color:var(--color-primary, #0056b3); text-decoration:underline; font-weight:500; cursor:pointer;" onclick="event.stopPropagation();">${cleanUrl}</a>${trail}`;
+    });
+
+    // 5. 保護した <a> タグを復元
+    escaped = escaped.replace(/___A_TAG_PLACEHOLDER_(\d+)___/g, (match, idx) => {
+      return aTags[parseInt(idx, 10)];
+    });
+
+    // 6. 改行を <br> に変換
+    escaped = escaped.replace(/\r\n|\r|\n/g, '<br>');
+
+    return escaped;
+  }
+  window.renderRichTextWithLinks = renderRichTextWithLinks;
+
+  function setupSmartLinkPaste() {
+    document.addEventListener('paste', (e) => {
+      const target = e.target;
+      if (!target || !target.matches || (!target.matches('textarea, input[type="text"]'))) {
+        return;
+      }
+      const html = e.clipboardData ? e.clipboardData.getData('text/html') : '';
+      if (!html || (!html.includes('<a ') && !html.includes('<a\n') && !html.includes('<a\r') && !html.includes('<A '))) {
+        return;
+      }
+
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const anchors = doc.querySelectorAll('a[href]');
+        if (anchors.length === 0) return;
+
+        e.preventDefault();
+
+        anchors.forEach(a => {
+          const text = (a.textContent || '').trim() || a.getAttribute('href') || '';
+          const href = a.getAttribute('href') || '';
+          if (href) {
+            const md = doc.createTextNode(`[${text}](${href})`);
+            a.parentNode.replaceChild(md, a);
+          }
+        });
+
+        const textWithMd = doc.body.innerText || doc.body.textContent || '';
+        if (!textWithMd) return;
+
+        const start = target.selectionStart !== undefined ? target.selectionStart : target.value.length;
+        const end = target.selectionEnd !== undefined ? target.selectionEnd : target.value.length;
+        const val = target.value || '';
+        target.value = val.substring(0, start) + textWithMd + val.substring(end);
+        target.selectionStart = target.selectionEnd = start + textWithMd.length;
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        target.dispatchEvent(new Event('change', { bubbles: true }));
+      } catch (err) {
+        console.warn('Smart link paste error:', err);
+      }
+    }, true);
+  }
+  setupSmartLinkPaste();
 
 
   function setupLiveAutocompleteEvents() {
@@ -5133,7 +5215,7 @@
     const proDescVal = (g.header && g.header.disclaimer) ? g.header.disclaimer : currentFormDesc;
 
     if (liveTitleH) liveTitleH.textContent = isPro ? (proTitleVal || "フォーム") : (currentFormTitle || "フォーム");
-    if (liveDescP) liveDescP.textContent = isPro ? proDescVal : currentFormDesc;
+    if (liveDescP) liveDescP.innerHTML = renderRichTextWithLinks(isPro ? proDescVal : currentFormDesc);
 
     // ライブプレビューのヘッダー画像表示制御
     const liveHeaderImgContainer = document.getElementById('live-preview-header-image-container');
@@ -5352,7 +5434,7 @@
       secHeader.style.cssText = 'margin-bottom: 20px; border-bottom: 1.5px solid var(--color-primary); padding-bottom: 8px;';
       secHeader.innerHTML = `
         <h3 style="font-size:var(--preview-section-title-size, 1rem); font-weight:700; margin:0; color:var(--color-primary);">${escapeHtml(secTitle) || 'セクションタイトル'}</h3>
-        ${secDesc ? `<p style="font-size:0.75rem; color:var(--color-text-muted); margin:4px 0 0 0; white-space:pre-wrap;">${escapeHtml(secDesc)}</p>` : ''}
+        ${secDesc ? `<p style="font-size:0.75rem; color:var(--color-text-muted); margin:4px 0 0 0; line-height:1.5;">${renderRichTextWithLinks(secDesc)}</p>` : ''}
         ${secMediaHtml}
       `;
       liveContainer.appendChild(secHeader);
@@ -5440,14 +5522,14 @@
 
       let scrollHtml = "";
       if (q.scrollRequired && q.scrollText) {
-        scrollHtml = `<div style="max-height:80px; overflow-y:auto; font-size:0.7rem; padding:6px; border:1px solid var(--color-border); border-radius:4px; background:rgba(0,0,0,0.02); margin-top:4px; line-height:1.4; white-space:pre-wrap;">${escapeHtml(q.scrollText)}</div>`;
+        scrollHtml = `<div style="max-height:80px; overflow-y:auto; font-size:0.7rem; padding:6px; border:1px solid var(--color-border); border-radius:4px; background:rgba(0,0,0,0.02); margin-top:4px; line-height:1.4;">${renderRichTextWithLinks(q.scrollText)}</div>`;
       }
 
       qCard.innerHTML = `
         <div class="preview-q-title" style="font-size:var(--preview-label-size, 0.85rem); font-weight:600; color:var(--color-text); margin:0;">
           ${reqAsterisk}${escapeHtml(qTitle)}
         </div>
-        ${qDesc ? `<div style="font-size:0.7rem; color:var(--color-text-muted); margin-top:-2px; white-space:pre-wrap;">${escapeHtml(qDesc)}</div>` : ''}
+        ${qDesc ? `<div style="font-size:0.7rem; color:var(--color-text-muted); margin-top:-2px; line-height:1.4;">${renderRichTextWithLinks(qDesc)}</div>` : ''}
         ${mediaHtml}
         ${scrollHtml}
         <div class="preview-q-input-wrap" style="margin-top:4px;">
