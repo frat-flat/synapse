@@ -10022,7 +10022,6 @@ function handleSaveHiddenColumns(tableId) {
   if (meta && typeof meta.render === 'function') meta.render();
 
   showToast(`非表示設定を保存しました (非表示: ${hiddenColIds.length}列)。`, 'success');
-  closeColumnDisplaySettingsModal();
 }
 
 function renderExistingMergeGroupsList(tableId) {
@@ -10327,8 +10326,11 @@ function handleSaveMergedColumns() {
     meta.render();
   }
 
-  showToast(`列の表示設定を保存しました。`, 'success');
-  closeColumnDisplaySettingsModal();
+  // 既存グループ一覧を再描画し、エディタを「新規グループ作成」へ復帰
+  renderExistingMergeGroupsList(normId);
+  resetMergeGroupEditor(normId);
+
+  showToast(`統合グループ「${groupName || '名称未設定'}」の設定を保存しました。`, 'success');
 }
 
 function setupMergedColumnsModalEvents() {
