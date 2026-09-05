@@ -11533,9 +11533,19 @@ function renderTableControlBar(tableId, parentContainerEl) {
     chartBtn.style.gap = '0.3rem';
     chartBtn.innerHTML = `<span>📊</span> <span>グラフ</span>`;
     chartBtn.title = '選択した項目またはテーブルデータからグラフを作成します';
-    chartBtn.addEventListener('click', () => {
-      if (typeof createNewChartFromTable === 'function') {
-        createNewChartFromTable(tableId);
+    chartBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      try {
+        const fn = typeof createNewChartFromTable === 'function' ? createNewChartFromTable : (window.createNewChartFromTable || null);
+        if (fn) {
+          fn(tableId);
+        } else {
+          console.error('[Chart] createNewChartFromTable function not found');
+          showToast('グラフ作成モジュールが準備できていません。画面を再読み込みしてください。', 'error');
+        }
+      } catch (err) {
+        console.error('[Chart] Exception in chartBtn click:', err);
+        showToast('グラフ作成時にエラーが発生しました: ' + (err.message || err), 'error');
       }
     });
     leftDiv.appendChild(chartBtn);
@@ -43773,7 +43783,7 @@ function parseChartDateOrNum(val) {
 function getColumnDisplayName(meta, colId) {
   if (!meta || !meta.columns) return colId;
   const col = meta.columns.find(c => c.id === colId);
-  return col ? (col.name || col.id) : colId;
+  return col ? (col.label || col.name || col.id) : colId;
 }
 
 // グラフ新規作成
@@ -43801,13 +43811,18 @@ function createNewChartFromTable(tableId, options = {}) {
   if (!xCol) {
     if (userColId) {
       const uCol = cols.find(c => c.id === userColId);
-      const isDateOrName = uCol && (uCol.id.toLowerCase().includes('date') || uCol.name.includes('日') || uCol.name.includes('名') || uCol.type === 'date' || uCol.type === 'text');
+      const uColText = uCol ? (uCol.label || uCol.name || '') : '';
+      const isDateOrName = uCol && (uCol.id.toLowerCase().includes('date') || uColText.includes('日') || uColText.includes('名') || uCol.type === 'date' || uCol.type === 'text');
       if (isDateOrName) xCol = userColId;
     }
     if (!xCol) {
-      const candidateX = cols.find(c => (c.id.toLowerCase().includes('date') || c.name.includes('日') || c.id.includes('time') || c.type === 'date')) ||
-                         cols.find(c => (c.name.includes('店') || c.name.includes('名') || c.id.includes('name'))) ||
-                         cols[1] || cols[0];
+      const candidateX = cols.find(c => {
+        const t = c.label || c.name || '';
+        return c.id.toLowerCase().includes('date') || t.includes('日') || c.id.includes('time') || c.type === 'date';
+      }) || cols.find(c => {
+        const t = c.label || c.name || '';
+        return t.includes('店') || t.includes('名') || c.id.includes('name');
+      }) || cols[1] || cols[0];
       xCol = candidateX ? candidateX.id : cols[0].id;
     }
   }
@@ -43818,9 +43833,10 @@ function createNewChartFromTable(tableId, options = {}) {
     if (userColId && userColId !== xCol) {
       yCols = [userColId];
     } else {
-      const candidateY = cols.find(c => c.id !== xCol && (c.type === 'number' || c.id.toLowerCase().includes('id') || c.name.includes('番号') || c.name.includes('額') || c.name.includes('金'))) ||
-                         cols.find(c => c.id !== xCol) ||
-                         cols[0];
+      const candidateY = cols.find(c => {
+        const t = c.label || c.name || '';
+        return c.id !== xCol && (c.type === 'number' || c.id.toLowerCase().includes('id') || t.includes('番号') || t.includes('額') || t.includes('金'));
+      }) || cols.find(c => c.id !== xCol) || cols[0];
       yCols = [candidateY ? candidateY.id : cols[0].id];
     }
   }
@@ -44026,7 +44042,12 @@ function renderFloatingChart(chartId) {
   const chart = state.activeCharts[chartId];
   if (!chart) return;
 
-  const targetScreen = document.querySelector('.screen-view.active') || document.querySelector('.main-content');
+  const normId = typeof normalizeTableId === 'function' ? normalizeTableId(chart.tableId) : chart.tableId;
+  const screenId = typeof getTableScreenId === 'function' ? getTableScreenId(normId) : null;
+  const targetScreen = document.querySelector('.screen-view.active') || 
+                       (screenId ? document.getElementById(screenId) : null) || 
+                       document.querySelector('.main-content') || 
+                       document.body;
   if (!targetScreen) return;
 
   // 既存カードがあれば削除
@@ -44296,7 +44317,7 @@ function openChartEditor(chartId) {
   // X軸セレクト構築
   const xSelect = document.getElementById('chart-xaxis-select');
   if (xSelect) {
-    xSelect.innerHTML = cols.map(c => `<option value="${c.id}" ${c.id === chart.xAxisCol ? 'selected' : ''}>${c.name || c.id}</option>`).join('');
+    xSelect.innerHTML = cols.map(c => `<option value="${c.id}" ${c.id === chart.xAxisCol ? 'selected' : ''}>${c.label || c.name || c.id}</option>`).join('');
   }
 
   // 集計チェックボックス
@@ -44323,7 +44344,7 @@ function renderChartSeriesList(chart, cols) {
 
   container.innerHTML = '';
   chart.yAxisCols.forEach((yColId, index) => {
-    const colObj = cols.find(c => c.id === yColId) || { id: yColId, name: yColId };
+    const colObj = cols.find(c => c.id === yColId) || { id: yColId, name: yColId, label: yColId };
     const row = document.createElement('div');
     row.style.display = 'flex';
     row.style.alignItems = 'center';
@@ -44337,7 +44358,7 @@ function renderChartSeriesList(chart, cols) {
     row.innerHTML = `
       <div style="display: flex; align-items: center; gap: 0.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
         <span style="font-size: 0.75rem; color: #2563eb;">123</span>
-        <span style="font-weight: 600; color: var(--text-primary);">${colObj.name || colObj.id}</span>
+        <span style="font-weight: 600; color: var(--text-primary);">${colObj.label || colObj.name || colObj.id}</span>
       </div>
       ${chart.yAxisCols.length > 1 ? `<button type="button" class="btn-remove-series" data-idx="${index}" style="background: none; border: none; color: #ef4444; font-size: 0.9rem; cursor: pointer; padding: 0 0.2rem;">✕</button>` : ''}
     `;
