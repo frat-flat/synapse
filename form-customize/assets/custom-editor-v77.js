@@ -4596,6 +4596,8 @@
 
         const qTitleEl = card.querySelector('.preview-q-title');
         if (qTitleEl) {
+          const trailingStars = qTitleEl.querySelectorAll('.required-star');
+          trailingStars.forEach(s => s.remove());
           const asterisks = qTitleEl.querySelectorAll('.red-asterisk');
           if (asterisks.length > 1) {
             for (let i = 1; i < asterisks.length; i++) {
@@ -4691,7 +4693,7 @@
           const telInput = card.querySelector('input');
           if (telInput && !telInput.dataset.telBound) {
             telInput.dataset.telBound = "1";
-            setupTelInputHyphenToggle(card, telInput);
+            setupTelInputHyphenToggle(card, telInput, qDef);
           }
         }
 
@@ -4817,21 +4819,25 @@
     return bankName;
   }
 
-  function setupTelInputHyphenToggle(card, input) {
+  function setupTelInputHyphenToggle(card, input, qDef) {
     const existing = card.querySelector('.hyphen-toggle-container');
     if (existing) existing.remove();
+
+    const isFlexible = qDef && qDef.validation && (qDef.validation.presetKey === 'tel_both_flexible' || (qDef.validation.value && qDef.validation.value.includes('-?')));
+    const isNoHyphen = qDef && qDef.validation && (qDef.validation.presetKey === 'tel_both_nohyphen' || qDef.validation.presetKey === 'tel_nohyphen' || qDef.validation.presetKey === 'phone_nohyphen');
+
+    let formatMode = isFlexible ? "either" : (isNoHyphen ? "without" : "with");
 
     const toggleWrapper = document.createElement('div');
     toggleWrapper.className = 'hyphen-toggle-container';
     toggleWrapper.innerHTML = `
       <span style="color:var(--color-text-muted);">ハイフン形式:</span>
-      <button type="button" class="hyphen-toggle-btn active" data-type="with">あり (例: 090-1234-5678)</button>
-      <button type="button" class="hyphen-toggle-btn" data-type="without">なし (例: 09012345678)</button>
+      <button type="button" class="hyphen-toggle-btn ${formatMode === 'with' ? 'active' : ''}" data-type="with">あり (例: 03-1234-5678 / 090-1234-5678)</button>
+      <button type="button" class="hyphen-toggle-btn ${formatMode === 'without' ? 'active' : ''}" data-type="without">なし (例: 0312345678 / 09012345678)</button>
+      <button type="button" class="hyphen-toggle-btn ${formatMode === 'either' ? 'active' : ''}" data-type="either">どちらでも可</button>
     `;
 
     input.parentNode.insertBefore(toggleWrapper, input.nextSibling);
-
-    let formatMode = "with";
 
     toggleWrapper.querySelectorAll('.hyphen-toggle-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -4849,19 +4855,38 @@
         return;
       }
 
+      if (qDef && qDef.validation && qDef.validation.category === 'regex' && qDef.validation.value && formatMode === 'either') {
+        try {
+          const reg = new RegExp(qDef.validation.value);
+          if (!reg.test(val)) {
+            showIntegrityError(card, qDef.validation.errorMessage || '正しい電話番号の形式で入力してください。');
+          } else {
+            clearIntegrityError(card);
+          }
+          return;
+        } catch(e) {}
+      }
+
       if (formatMode === "with") {
         const hasHyphen = val.includes('-');
-        const phoneRegex = /^(0\d{1,4}-\d{1,4}-\d{4})$/;
+        const phoneRegex = /^(0\d{1,4}-\d{1,4}-\d{3,4})$/;
         if (!hasHyphen || !phoneRegex.test(val)) {
-          showIntegrityError(card, 'ハイフン「あり」の形式で入力してください。');
+          showIntegrityError(card, 'ハイフン「あり」の形式で入力してください。（例: 03-1234-5678 または 090-1234-5678）');
+        } else {
+          clearIntegrityError(card);
+        }
+      } else if (formatMode === "without") {
+        const hasHyphen = val.includes('-');
+        const noHyphenRegex = /^(0\d{9,10})$/;
+        if (hasHyphen || !noHyphenRegex.test(val)) {
+          showIntegrityError(card, 'ハイフン「なし」の形式で入力してください。（例: 0312345678 または 09012345678）');
         } else {
           clearIntegrityError(card);
         }
       } else {
-        const hasHyphen = val.includes('-');
-        const noHyphenRegex = /^(0\d{9,10})$/;
-        if (hasHyphen || !noHyphenRegex.test(val)) {
-          showIntegrityError(card, 'ハイフン「なし」の形式で入力してください。');
+        const flexibleRegex = /^(0\d{1,4}-?\d{1,4}-?\d{3,4}|0\d{9,10})$/;
+        if (!flexibleRegex.test(val)) {
+          showIntegrityError(card, '正しい電話番号の形式で入力してください。（固定電話・携帯電話のいずれも可）');
         } else {
           clearIntegrityError(card);
         }
@@ -7596,3 +7621,54 @@
     debugDiv.innerHTML += `<div>⚠️ ${event.message} (${event.filename ? event.filename.split('/').pop() : 'unknown'}:${event.lineno})</div>`;
   });
 })();
+
+  // 常用パターン（正規表現プリセット）に固定・携帯両用オプションを動的保証
+  const REGEX_PRESET_DEFINITIONS = {
+    custom: { label: "カスタム（式を直接入力）", pattern: "" },
+    zip: { label: "郵便番号 (例: 123-4567)", pattern: "^\\d{3}-\\d{4}$" },
+    zip_nohyphen: { label: "郵便番号（-無） (例: 1234567)", pattern: "^\\d{7}$" },
+    tel_both: { label: "電話番号（固定・携帯 共通） (例: 03-1234-5678 / 090-1234-5678)", pattern: "^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$" },
+    tel_both_nohyphen: { label: "電話番号（固定・携帯・-無） (例: 0312345678 / 09012345678)", pattern: "^0\\d{9,10}$" },
+    tel_both_flexible: { label: "電話番号（固定・携帯・ハイフン問わず） (例: 03-1234-5678 / 09012345678)", pattern: "^(0\\d{1,4}-?\\d{1,4}-?\\d{3,4}|0\\d{9,10})$" },
+    tel: { label: "固定電話のみ (例: 03-1234-5678)", pattern: "^\\d{2,5}-\\d{1,4}-\\d{4}$" },
+    tel_nohyphen: { label: "固定電話のみ（-無） (例: 0312345678)", pattern: "^\\d{10}$" },
+    phone: { label: "携帯電話のみ (例: 090-1234-5678)", pattern: "^(070|080|090)-\\d{4}-\\d{4}$" },
+    phone_nohyphen: { label: "携帯電話のみ（-無） (例: 09012345678)", pattern: "^(070|080|090)\\d{8}$" }
+  };
+
+  if (window.ie) {
+    Object.keys(REGEX_PRESET_DEFINITIONS).forEach(k => {
+      window.ie[k] = REGEX_PRESET_DEFINITIONS[k];
+    });
+  }
+
+  function patchRegexPresetDropdowns() {
+    const selects = document.querySelectorAll('.val-inputs-container select');
+    selects.forEach(sel => {
+      // Check if this select is the regex preset select
+      const hasZip = Array.from(sel.options).some(opt => opt.value === 'zip');
+      if (!hasZip) return;
+
+      const curVal = sel.value;
+      const currentKeys = Array.from(sel.options).map(o => o.value);
+      if (!currentKeys.includes('tel_both')) {
+        sel.innerHTML = "";
+        Object.keys(REGEX_PRESET_DEFINITIONS).forEach(k => {
+          const opt = document.createElement('option');
+          opt.value = k;
+          opt.textContent = REGEX_PRESET_DEFINITIONS[k].label;
+          sel.appendChild(opt);
+        });
+        sel.value = curVal || 'custom';
+      }
+    });
+  }
+
+  // Observe question container for regex dropdown appearance
+  const questionsContainer = document.getElementById('questions-container');
+  if (questionsContainer) {
+    const qObserver = new MutationObserver(() => {
+      patchRegexPresetDropdowns();
+    });
+    qObserver.observe(questionsContainer, { childList: true, subtree: true });
+  }
