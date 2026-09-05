@@ -9323,6 +9323,79 @@ function renderMasterDropdownCellMarkup(td, val, col, styleObj = {}) {
 }
 window.renderMasterDropdownCellMarkup = renderMasterDropdownCellMarkup;
 
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+window.escapeHtml = escapeHtml;
+
+// =======================================================
+// 🎨 Synapse 統一モノクロ線画アイコン (SVGシルエット)
+// =======================================================
+const SYNAPSE_LINE_ICONS = {
+  plus: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`,
+  import: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`,
+  export: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>`,
+  columns: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>`,
+  eye: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`,
+  eyeOff: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`,
+  lock: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`,
+  unlock: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>`,
+  search: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`,
+  close: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+  rotate: (s = 13) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; display: inline-block;"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>`,
+  merge: (s = 14) => `<svg class="synapse-merge-line-icon" width="${s}" height="${s}" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><rect x="2.5" y="3" width="5" height="14" rx="1"></rect><rect x="12.5" y="3" width="5" height="14" rx="1"></rect><path d="M7.5 10h5"></path><path d="M9.5 8.5l-1.5 1.5 1.5 1.5"></path><path d="M10.5 8.5l1.5 1.5-1.5 1.5"></path></svg>`
+};
+window.SYNAPSE_LINE_ICONS = SYNAPSE_LINE_ICONS;
+
+function buildMergedTableHeaderMarkup(tableId, col, group) {
+  const normId = normalizeTableId(tableId);
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+  const cols = meta ? meta.columns : [];
+
+  const allLabels = (group.columnIds || []).map(cId => {
+    const c = cols.find(colDef => colDef.id === cId);
+    return c ? (c.label || c.name || cId) : cId;
+  });
+
+  const primaryColDef = cols.find(c => c.id === group.primaryColumnId);
+  const primaryLabel = primaryColDef ? (primaryColDef.label || primaryColDef.name || group.primaryColumnId) : (col.label || col.name || col.id);
+
+  const otherLabels = (group.columnIds || [])
+    .filter(cId => cId !== group.primaryColumnId)
+    .map(cId => {
+      const c = cols.find(colDef => colDef.id === cId);
+      return c ? (c.label || c.name || cId) : cId;
+    });
+
+  let mainName = primaryLabel;
+  if (group.name && !group.name.includes('項目') && group.name.trim()) {
+    mainName = group.name.trim();
+  }
+
+  const allLabelsText = allLabels.join(' / ');
+  const otherLabelsText = otherLabels.join('・');
+
+  return {
+    mainName,
+    otherLabelsText,
+    allLabelsText,
+    html: `
+      <div class="synapse-merged-th-box" style="display: flex; flex-direction: column; min-width: 0; flex: 1; text-align: left; line-height: 1.2; padding: 2px 0;">
+        <div style="display: flex; align-items: center; gap: 4px; min-width: 0;">
+          <span style="font-weight: 700; font-size: 0.75rem; color: #1e40af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${mainName}">${mainName}</span>
+          <span class="synapse-sheets-group-tag" style="font-size: 0.62rem; color: #2563eb; background: #dbeafe; border: 1px solid #bfdbfe; padding: 0 4px; border-radius: 3px; font-weight: 600; flex-shrink: 0; line-height: 1.3;">グループ</span>
+        </div>
+        <div style="font-size: 0.68rem; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="統合カラム内訳: ${allLabelsText}">
+          ＋ ${otherLabelsText || '統合'}
+        </div>
+      </div>
+    `,
+    tooltip: `統合グループ「${mainName}」: ${allLabelsText}`
+  };
+}
+
 function getMergeLineIconSvg(size = 14, color = 'currentColor') {
   return `<svg class="synapse-merge-line-icon" viewBox="0 0 20 20" width="${size}" height="${size}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;">
     <rect x="2.5" y="3" width="5" height="14" rx="1"></rect>
@@ -9745,9 +9818,7 @@ function openColumnDisplaySettingsModal(tableId, initialTab = 'hidden', preselec
   if (!modal) return;
 
   const titleEl = modal.querySelector('.modal-header h3');
-  if (titleEl) {
-    titleEl.innerHTML = `<span>👁️</span> 列の表示設定 (${meta.name || normId})`;
-  }
+  // No chip header (photo 5)
 
   // タブ切り替え
   switchColumnDisplayTab(initialTab);
@@ -10320,48 +10391,31 @@ function showMergedCellChip(targetCell, tableId, rowData, group, columns, matche
     rowEl.dataset.fieldId = colId;
     rowEl.dataset.fieldValue = val;
 
-    rowEl.innerHTML = `
-      <span class="synapse-chip-row-label">${colDef.label || colDef.name || colId}:</span>
-      <span class="synapse-chip-row-val" title="${val}">${val || '—'}</span>
-      ${isPrimary ? '<span class="synapse-chip-main-badge">メイン</span>' : ''}
-      <button type="button" class="synapse-chip-copy-btn" title="この行の値をコピー">📋</button>
-    `;
+    // 写真5対応：最小限のデータ値のみ表示（ラベルなし、コピーアイコンなし、native tooltipなし）
+    rowEl.innerHTML = `<span class="synapse-chip-row-val">${escapeHtml(val || '—')}</span>`;
 
     rowEl.addEventListener('mouseenter', () => {
       cancelChipClose();
       rowsContainer.querySelectorAll('.synapse-chip-row').forEach(r => r.classList.remove('is-hovered'));
       rowEl.classList.add('is-hovered');
       activeChipHoveredRow = rowEl;
-
-      if (isDraggingChip) {
-        selectedChipRowEls.add(rowEl);
-        rowEl.classList.add('is-selected');
-      }
-    });
-
-    rowEl.addEventListener('mousedown', (e) => {
-      if (e.target.closest('.synapse-chip-copy-btn')) return;
-      isDraggingChip = true;
-      if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
-        selectedChipRowEls.clear();
-        rowsContainer.querySelectorAll('.synapse-chip-row').forEach(r => r.classList.remove('is-selected'));
-      }
-      selectedChipRowEls.add(rowEl);
-      rowEl.classList.add('is-selected');
     });
 
     rowEl.addEventListener('click', (e) => {
-      if (e.target.closest('.synapse-chip-copy-btn')) return;
-      rowEl.classList.toggle('is-expanded');
+      e.stopPropagation();
+      const textToCopy = val;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          showChipCopyFeedback('✓ コピーしました');
+        }).catch(() => {
+          copyTextFallback(textToCopy);
+          showChipCopyFeedback('✓ コピーしました');
+        });
+      } else {
+        copyTextFallback(textToCopy);
+        showChipCopyFeedback('✓ コピーしました');
+      }
     });
-
-    const copyBtn = rowEl.querySelector('.synapse-chip-copy-btn');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        copyChipRowValue(val, colDef.label || colDef.name || colId);
-      });
-    }
 
     rowsContainer.appendChild(rowEl);
   });
@@ -10464,7 +10518,12 @@ function openSynapseFindWidget() {
   const input = document.getElementById('synapse-find-input');
   if (!widget || !input) return;
 
-  widget.style.display = 'block';
+  widget.classList.remove('is-hidden');
+  if (widget.style && widget.style.setProperty) {
+    widget.style.setProperty('display', 'flex', 'important');
+  } else {
+    widget.style.display = 'flex';
+  }
   input.focus();
   input.select();
 
@@ -10475,7 +10534,14 @@ function openSynapseFindWidget() {
 
 function closeSynapseFindWidget() {
   const widget = document.getElementById('synapse-find-widget');
-  if (widget) widget.style.display = 'none';
+  if (widget) {
+    widget.classList.add('is-hidden');
+    if (widget.style && widget.style.setProperty) {
+      widget.style.setProperty('display', 'none', 'important');
+    } else {
+      widget.style.display = 'none';
+    }
+  }
   clearSynapseSearchHighlights();
   hideMergedCellChip();
 }
@@ -10772,7 +10838,11 @@ function setupSynapseFindWidgetEvents() {
 
   nextBtn?.addEventListener('click', goToNextSynapseMatch);
   prevBtn?.addEventListener('click', goToPrevSynapseMatch);
-  closeBtn?.addEventListener('click', closeSynapseFindWidget);
+  closeBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeSynapseFindWidget();
+  });
 
   includeChipCb?.addEventListener('change', () => {
     executeSynapseSearch();
@@ -10822,7 +10892,7 @@ function renderTableControlBar(tableId, parentContainerEl) {
   addSingleBtn.style.display = 'flex';
   addSingleBtn.style.alignItems = 'center';
   addSingleBtn.style.gap = '0.25rem';
-  addSingleBtn.innerHTML = '<span>➕</span> 1件登録';
+  addSingleBtn.innerHTML = `${SYNAPSE_LINE_ICONS.plus(14)} <span>1件登録</span>`;
   addSingleBtn.addEventListener('click', () => {
     if (window.openSingleRegisterModal) {
       window.openSingleRegisterModal(tableId);
@@ -10840,7 +10910,7 @@ function renderTableControlBar(tableId, parentContainerEl) {
     importBtn.style.display = 'flex';
     importBtn.style.alignItems = 'center';
     importBtn.style.gap = '0.25rem';
-    importBtn.innerHTML = '<span>📥</span> CSVインポート';
+    importBtn.innerHTML = `${SYNAPSE_LINE_ICONS.import(14)} <span>CSVインポート</span>`;
 
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
@@ -10969,7 +11039,7 @@ function renderTableControlBar(tableId, parentContainerEl) {
     exportBtn.style.display = 'flex';
     exportBtn.style.alignItems = 'center';
     exportBtn.style.gap = '0.25rem';
-    exportBtn.innerHTML = '<span>📤</span> CSVエクスポート';
+    exportBtn.innerHTML = `${SYNAPSE_LINE_ICONS.export(14)} <span>CSVエクスポート</span>`;
 
     exportBtn.addEventListener('click', () => {
       const csvRows = [];
@@ -11015,9 +11085,9 @@ function renderTableControlBar(tableId, parentContainerEl) {
     if (currentHiddenCols.length > 0) badgeParts.push(`非表示:${currentHiddenCols.length}`);
 
     if (badgeParts.length > 0) {
-      colDisplayBtn.innerHTML = `<span>👁️</span> 列の表示設定 <span style="background: rgba(37,99,235,0.12); color: #2563eb; padding: 1px 6px; border-radius: 10px; font-size: 0.7rem; font-weight: 700;">${badgeParts.join(' ')}</span>`;
+      colDisplayBtn.innerHTML = `${SYNAPSE_LINE_ICONS.columns(14)} <span>列の表示設定</span> <span style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 1px 6px; border-radius: 10px; font-size: 0.7rem; font-weight: 700;">${badgeParts.join(' ')}</span>`;
     } else {
-      colDisplayBtn.innerHTML = '<span>👁️</span> 列の表示設定';
+      colDisplayBtn.innerHTML = `${SYNAPSE_LINE_ICONS.columns(14)} <span>列の表示設定</span>`;
     }
     colDisplayBtn.title = '列の非表示・統合表示を設定します';
     colDisplayBtn.addEventListener('click', () => {
@@ -11043,7 +11113,7 @@ function renderTableControlBar(tableId, parentContainerEl) {
   editBtn.style.display = 'flex';
   editBtn.style.alignItems = 'center';
   editBtn.style.gap = '0.25rem';
-  editBtn.innerHTML = `<span>${isLocked ? '🔒' : '🔓'}</span> ${isLocked ? '編集をロック中' : '編集ロック解除中'}`;
+  editBtn.innerHTML = `${isLocked ? SYNAPSE_LINE_ICONS.lock(14) : SYNAPSE_LINE_ICONS.unlock(14)} <span>${isLocked ? '編集をロック中' : '編集ロック解除中'}</span>`;
 
   editBtn.addEventListener('click', () => {
     const currentLock = isTableLocked(tableId);
@@ -11056,7 +11126,7 @@ function renderTableControlBar(tableId, parentContainerEl) {
     savePermissions();
 
     editBtn.className = `btn ${newLock ? 'btn-secondary' : 'btn-primary'}`;
-    editBtn.innerHTML = `<span>${newLock ? '🔒' : '🔓'}</span> ${newLock ? '編集をロック中' : '編集ロック解除中'}`;
+    editBtn.innerHTML = `${newLock ? SYNAPSE_LINE_ICONS.lock(14) : SYNAPSE_LINE_ICONS.unlock(14)} <span>${newLock ? '編集をロック中' : '編集ロック解除中'}</span>`;
 
     if (newLock) {
       showToast('テーブルを編集ロックしました。直接入力や行操作はブロックされます。', 'info');
