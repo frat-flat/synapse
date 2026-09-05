@@ -5967,11 +5967,26 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   color: #1e40af !important;
 }
 
-/* 統合コピー設定ボックス */
-.col-display-copy-box {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 0.6rem;
+/* 統合セル内複数項目スタック表示 */
+.synapse-merged-cell-stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  line-height: 1.25;
+  box-sizing: border-box;
+  padding: 1px 0;
+}
+
+.synapse-merged-cell-stack .synapse-merged-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: var(--text-primary);
+  user-select: text;
 }
 

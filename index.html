@@ -3410,36 +3410,15 @@
           </div>
 
           <div class="form-group" style="margin-bottom: 0;">
-            <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.25rem; display: block; color: #0f172a;">セルに通常表示する「メイン表示」カラム</label>
-            <select id="merge-primary-col-select" style="width: 100%; box-sizing: border-box; padding: 0.45rem 0.6rem; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; color: #0f172a; cursor: pointer;">
-              <option value="">-- 先に統合するカラムを選択してください --</option>
-            </select>
-          </div>
-
-          <!-- 縦コピー出力設定 -->
-          <div class="form-group col-display-copy-box" style="margin-bottom: 0;">
-            <label style="font-size: 0.8rem; font-weight: 700; margin-bottom: 0.35rem; display: block; color: #0f172a;">
-              📋 縦複数行選択時のコピー設定 (Ctrl+C / Cmd+C)
+            <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.25rem; display: flex; justify-content: space-between; align-items: center; color: #0f172a;">
+              <span>セルに表示するカラム</span>
+              <span id="merge-display-count-badge" style="font-size: 0.75rem; color: #2563eb; font-weight: 600;"></span>
             </label>
-            <p style="margin: 0 0 0.4rem 0; font-size: 0.73rem; color: #64748b; line-height: 1.4;">
-              この統合列のセルを縦に複数行選択してコピーした際に出力する情報を設定します。
+            <p style="margin: 0 0 0.35rem 0; font-size: 0.73rem; color: #64748b; line-height: 1.4;">
+              ※ 1つ選択した場合はその項目のみ表示、複数選択した場合は1つのセル内にまとめて表示されます。
             </p>
-            <div style="display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.8rem; color: #1e293b;">
-              <label style="display: flex; align-items: center; gap: 0.45rem; cursor: pointer;">
-                <input type="radio" name="merge-copy-mode" value="visible" checked />
-                <span>表示中の値のみコピー（メイン列のデータ）</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 0.45rem; cursor: pointer;">
-                <input type="radio" name="merge-copy-mode" value="all" />
-                <span>統合されている全項目をコピー（タブ区切り / Excel対応）</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 0.45rem; cursor: pointer;">
-                <input type="radio" name="merge-copy-mode" value="custom" />
-                <span>コピーする項目を指定する</span>
-              </label>
-            </div>
-            <div id="merge-copy-custom-fields-container" style="display: none; margin-top: 0.4rem; padding: 0.4rem 0.6rem; background: #ffffff; border-radius: 6px; border: 1px solid #cbd5e1; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.3rem;">
-              <!-- 選択用チェックボックス（custom選択時に表示） -->
+            <div id="merge-display-columns-checklist" class="col-display-checklist" style="max-height: 140px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.5rem; background: #f8fafc; display: flex; flex-direction: column; gap: 0.4rem;">
+              <div style="font-size: 0.78rem; color: #94a3b8; padding: 0.25rem;">先に上記の「統合するカラム」を選択してください</div>
             </div>
           </div>
         </div>

@@ -7057,7 +7057,7 @@ function renderCustomTable(tableId) {
 
       const ctMergeGroup = getMergedGroupForCol(tbl.id, col.id);
       if (ctMergeGroup && ctMergeGroup.primaryColumnId === col.id) {
-          if (typeof td.removeAttribute === 'function') td.removeAttribute('title'); else td.title = '';
+        renderMergedCellContent(td, tbl.id, row, ctMergeGroup, columns, {});
         attachMergedCellHoverEvents(td, tbl.id, row, ctMergeGroup, columns);
       }
 
@@ -9368,17 +9368,30 @@ function getMergedColumnHeaderInfo(tableId, group, columns = null) {
   const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
   const cols = (columns && columns.length > 0) ? columns : (meta ? meta.columns : []);
 
-  const labels = group.columnIds.map(cId => {
+  // セルに表示されているカラム（またはグループ内全カラム）
+  const displayIds = (group.displayColumnIds && group.displayColumnIds.length > 0)
+    ? group.displayColumnIds
+    : group.columnIds;
+
+  const displayLabels = displayIds.map(cId => {
     const c = cols.find(colDef => colDef.id === cId);
     return c ? (c.label || c.name || cId) : cId;
   });
 
-  // カラム内表示: 実際のカラム名を並べて表記 (例: 顧客番号 / 法人名 / 代表者名)
-  const headerText = labels.join(' / ');
-  // ツールチップ表示: 実際のセル(ポップアップ)と同様に各項目名を正確に改行縦並びで表示
-  const tooltipText = labels.join('\n');
+  const allLabels = group.columnIds.map(cId => {
+    const c = cols.find(colDef => colDef.id === cId);
+    return c ? (c.label || c.name || cId) : cId;
+  });
 
-  return { headerText, tooltipText, labels };
+  // カラム内表示: ユーザー指定グループ名、またはセル表示対象のカラム名
+  const headerText = (group.name && !group.name.includes('項目') && !group.name.includes('(+'))
+    ? group.name
+    : displayLabels.join(' / ');
+
+  // ツールチップ表示: グループ内のすべての項目名を改行で縦並び表示
+  const tooltipText = allLabels.join('\n');
+
+  return { headerText, tooltipText, labels: displayLabels, allLabels };
 }
 
 function buildMergedTableHeaderMarkup(tableId, col, group) {
@@ -9407,6 +9420,57 @@ function getMergeLineIconSvg(size = 14, color = 'currentColor') {
   </svg>`;
 }
 
+function renderMergedCellContent(td, tableId, rowData, group, columns, baseStyleObj = {}) {
+  const normId = normalizeTableId(tableId);
+  const screenId = getTableScreenId(normId);
+
+  let displayColIds = (group.displayColumnIds && group.displayColumnIds.length > 0)
+    ? group.displayColumnIds
+    : [group.primaryColumnId || group.columnIds[0]];
+
+  if (typeof checkColumnAccess === 'function') {
+    displayColIds = displayColIds.filter(cId => {
+      const acc = checkColumnAccess(screenId, cId);
+      return !acc || acc.visible;
+    });
+  }
+  if (displayColIds.length === 0) {
+    displayColIds = [group.columnIds[0]];
+  }
+
+  // 1個しか選ばない場合はそれをそのままシンプルに表示
+  if (displayColIds.length === 1) {
+    const singleColId = displayColIds[0];
+    const val = rowData[singleColId] !== undefined && rowData[singleColId] !== null ? String(rowData[singleColId]) : '';
+    td.textContent = val;
+    if (singleColId !== 'shopUrl') td.title = val;
+    return;
+  }
+
+  // 複数選択した場合は、それが1つのセル内に収まるようにスタック表示
+  td.innerHTML = '';
+  td.removeAttribute('title');
+
+  const stackEl = document.createElement('div');
+  stackEl.className = 'synapse-merged-cell-stack';
+
+  displayColIds.forEach((cId, idx) => {
+    const val = rowData[cId] !== undefined && rowData[cId] !== null ? String(rowData[cId]) : '';
+    const itemEl = document.createElement('div');
+    itemEl.className = 'synapse-merged-item';
+    itemEl.dataset.fieldId = cId;
+    itemEl.dataset.fieldValue = val;
+    itemEl.textContent = val || '—';
+    if (!val) itemEl.style.color = '#94a3b8';
+    if (idx === 0) {
+      itemEl.style.fontWeight = '600';
+    }
+    stackEl.appendChild(itemEl);
+  });
+
+  td.appendChild(stackEl);
+}
+
 function getFormattedMergedCellCopyText(td, activeScreen, columns) {
   const groupId = td.dataset.mergedGroupId;
   if (!groupId) return (td.innerText || td.textContent || '').replace(/[☆★]/g, '').trim();
@@ -9417,25 +9481,15 @@ function getFormattedMergedCellCopyText(td, activeScreen, columns) {
   if (!group) return (td.innerText || td.textContent || '').replace(/[☆★]/g, '').trim();
 
   const rowData = td._rowData || {};
-  const mode = group.copyMode || 'visible';
+  // セルに表示されている項目（ユーザーが選択した表示項目）をコピー対象とする
+  const displayColIds = (group.displayColumnIds && group.displayColumnIds.length > 0)
+    ? group.displayColumnIds
+    : [group.primaryColumnId || group.columnIds[0]];
 
-  if (mode === 'all') {
-    return group.columnIds.map(cId => {
-      const v = rowData[cId] !== undefined && rowData[cId] !== null ? String(rowData[cId]).replace(/[\r\n\t]/g, ' ') : '';
-      return v;
-    }).join('\t');
-  } else if (mode === 'custom' && Array.isArray(group.copyColumnIds) && group.copyColumnIds.length > 0) {
-    return group.copyColumnIds.map(cId => {
-      const v = rowData[cId] !== undefined && rowData[cId] !== null ? String(rowData[cId]).replace(/[\r\n\t]/g, ' ') : '';
-      return v;
-    }).join('\t');
-  } else {
-    const primaryId = group.primaryColumnId;
-    if (rowData[primaryId] !== undefined && rowData[primaryId] !== null) {
-      return String(rowData[primaryId]).replace(/[\r\n\t]/g, ' ');
-    }
-    return (td.innerText || td.textContent || '').replace(/[☆★]/g, '').trim();
-  }
+  return displayColIds.map(cId => {
+    const v = rowData[cId] !== undefined && rowData[cId] !== null ? String(rowData[cId]).replace(/[\r\n\t]/g, ' ') : '';
+    return v;
+  }).join('\t');
 }
 
 function resetTableColumnOrderToDefault(tableId) {
@@ -10000,9 +10054,12 @@ function renderExistingMergeGroupsList(tableId) {
       ? `<strong>${escapeHtml(group.name)}</strong> (${colLabels})`
       : colLabels;
 
-    let copyInfoBadge = '<span style="font-size: 0.7rem; color: #475569; background: #f1f5f9; padding: 1px 5px; border-radius: 4px; margin-left: 4px;">コピー: 表示中のみ</span>';
-    if (group.copyMode === 'all') copyInfoBadge = `<span style="font-size: 0.7rem; color: #059669; background: rgba(16,185,129,0.1); padding: 1px 5px; border-radius: 4px; margin-left: 4px;">コピー: 全${group.columnIds.length}列(タブ区切り)</span>`;
-    else if (group.copyMode === 'custom') copyInfoBadge = `<span style="font-size: 0.7rem; color: #2563eb; background: rgba(37,99,235,0.1); padding: 1px 5px; border-radius: 4px; margin-left: 4px;">コピー: 指定${(group.copyColumnIds || []).length}項目</span>`;
+    const displayColCount = (group.displayColumnIds && group.displayColumnIds.length > 0)
+      ? group.displayColumnIds.length
+      : 1;
+    const copyInfoBadge = displayColCount > 1
+      ? `<span style="font-size: 0.7rem; color: #2563eb; background: rgba(37,99,235,0.1); padding: 1px 6px; border-radius: 4px; margin-left: 4px; font-weight: 600;">セル内表示: ${displayColCount}項目</span>`
+      : `<span style="font-size: 0.7rem; color: #475569; background: #f1f5f9; padding: 1px 6px; border-radius: 4px; margin-left: 4px;">セル内表示: 1項目</span>`;
 
     item.innerHTML = `
       <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -10033,6 +10090,72 @@ function renderExistingMergeGroupsList(tableId) {
 
     container.appendChild(item);
   });
+}
+
+function updateMergeModalDisplayColumnsChecklist(tableId, currentDisplayColIds = null) {
+  const normId = normalizeTableId(tableId);
+  const container = document.getElementById('merge-display-columns-checklist');
+  const countBadge = document.getElementById('merge-display-count-badge');
+  const mergeCheckboxList = document.getElementById('merge-columns-checkbox-list');
+  if (!container || !mergeCheckboxList) return;
+
+  const checkedBoxes = Array.from(mergeCheckboxList.querySelectorAll('input[type="checkbox"]:checked'));
+  const selectedColIds = checkedBoxes.map(cb => cb.value);
+
+  const selBadge = document.getElementById('merge-selected-count-badge');
+  if (selBadge) selBadge.textContent = `${selectedColIds.length}件選択中`;
+
+  container.innerHTML = '';
+  if (selectedColIds.length === 0) {
+    container.innerHTML = '<div style="font-size: 0.78rem; color: #94a3b8; padding: 0.25rem;">先に上記の「統合するカラム」を選択してください</div>';
+    if (countBadge) countBadge.textContent = '';
+    return;
+  }
+
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+  const cols = meta ? meta.columns : [];
+
+  const activeDisplayIds = new Set(
+    Array.isArray(currentDisplayColIds) && currentDisplayColIds.length > 0
+      ? currentDisplayColIds.filter(id => selectedColIds.includes(id))
+      : selectedColIds
+  );
+  if (activeDisplayIds.size === 0 && selectedColIds.length > 0) {
+    activeDisplayIds.add(selectedColIds[0]);
+  }
+
+  selectedColIds.forEach(colId => {
+    const col = cols.find(c => c.id === colId);
+    const label = col ? (col.label || col.name || colId) : colId;
+    const isChecked = activeDisplayIds.has(colId);
+
+    const itemLabel = document.createElement('label');
+    itemLabel.className = 'col-display-checklist-item';
+    itemLabel.style.cssText = 'display: flex; align-items: center; gap: 0.45rem; cursor: pointer; padding: 0.25rem 0.4rem; border-radius: 4px; font-size: 0.8rem;';
+    itemLabel.innerHTML = `
+      <input type="checkbox" value="${colId}" ${isChecked ? 'checked' : ''} />
+      <span style="font-weight: 500; color: #0f172a;">${label}</span>
+      <span style="font-size: 0.72rem; color: #64748b; margin-left: auto;">${colId}</span>
+    `;
+
+    const cb = itemLabel.querySelector('input');
+    cb.addEventListener('change', () => {
+      const currentChecked = Array.from(container.querySelectorAll('input:checked'));
+      if (currentChecked.length === 0) {
+        cb.checked = true; // 最低1つは表示を残す
+      }
+      updateDisplayCountBadge();
+    });
+
+    container.appendChild(itemLabel);
+  });
+
+  function updateDisplayCountBadge() {
+    if (!countBadge) return;
+    const checkedCount = container.querySelectorAll('input:checked').length;
+    countBadge.textContent = checkedCount === 1 ? '1項目表示' : `${checkedCount}項目 (セル内同時表示)`;
+  }
+  updateDisplayCountBadge();
 }
 
 function resetMergeGroupEditor(tableId, preselectedColIds = []) {
@@ -10067,55 +10190,14 @@ function resetMergeGroupEditor(tableId, preselectedColIds = []) {
 
       const input = item.querySelector('input');
       input.addEventListener('change', () => {
-        updateMergeModalPrimarySelect(tableId);
+        updateMergeModalDisplayColumnsChecklist(tableId);
       });
 
       checkboxList.appendChild(item);
     });
   }
 
-  updateMergeModalPrimarySelect(tableId, preselectedColIds[0] || null);
-
-  // コピー設定の初期化
-  const copyRadios = document.querySelectorAll('input[name="merge-copy-mode"]');
-  copyRadios.forEach(r => {
-    r.checked = r.value === 'visible';
-    r.onchange = () => updateMergeCopyCustomContainerVisibility();
-  });
-  updateMergeCopyCustomCheckboxes(tableId, preselectedColIds, []);
-  updateMergeCopyCustomContainerVisibility();
-}
-
-function updateMergeCopyCustomContainerVisibility() {
-  const customRadio = document.querySelector('input[name="merge-copy-mode"][value="custom"]');
-  const container = document.getElementById('merge-copy-custom-fields-container');
-  if (container) {
-    container.style.display = (customRadio && customRadio.checked) ? 'flex' : 'none';
-  }
-}
-
-function updateMergeCopyCustomCheckboxes(tableId, selectedColIds, checkedColIds = []) {
-  const container = document.getElementById('merge-copy-custom-fields-container');
-  if (!container) return;
-  container.innerHTML = '';
-
-  const meta = typeof getTableMeta === 'function' ? getTableMeta(tableId) : null;
-  const cols = meta ? meta.columns : [];
-
-  selectedColIds.forEach(colId => {
-    const colDef = cols.find(c => c.id === colId);
-    const label = colDef ? (colDef.label || colDef.name || colId) : colId;
-    const isChecked = checkedColIds.length === 0 || checkedColIds.includes(colId);
-
-    const itemLabel = document.createElement('label');
-    itemLabel.style.cssText = 'display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.78rem;';
-    itemLabel.innerHTML = `
-      <input type="checkbox" value="${colId}" ${isChecked ? 'checked' : ''} />
-      <span>${label}</span>
-      <span style="font-size: 0.7rem; color: #64748b; margin-left: auto;">${colId}</span>
-    `;
-    container.appendChild(itemLabel);
-  });
+  updateMergeModalDisplayColumnsChecklist(tableId, preselectedColIds);
 }
 
 function editMergeGroupInModal(tableId, groupId) {
@@ -10138,59 +10220,7 @@ function editMergeGroupInModal(tableId, groupId) {
     });
   }
 
-  updateMergeModalPrimarySelect(tableId, group.primaryColumnId);
-
-  // コピー設定の復元
-  const copyRadios = document.querySelectorAll('input[name="merge-copy-mode"]');
-  const targetMode = group.copyMode || 'visible';
-  copyRadios.forEach(r => {
-    r.checked = r.value === targetMode;
-    r.onchange = () => updateMergeCopyCustomContainerVisibility();
-  });
-  updateMergeCopyCustomCheckboxes(tableId, group.columnIds, group.copyColumnIds || group.columnIds);
-  updateMergeCopyCustomContainerVisibility();
-}
-
-function updateMergeModalPrimarySelect(tableId, currentPrimaryId = null) {
-  const normId = normalizeTableId(tableId);
-  const select = document.getElementById('merge-primary-col-select');
-  const countBadge = document.getElementById('merge-selected-count-badge');
-  const checkboxList = document.getElementById('merge-columns-checkbox-list');
-  if (!select || !checkboxList) return;
-
-  const checkedBoxes = Array.from(checkboxList.querySelectorAll('input[type="checkbox"]:checked'));
-  const selectedColIds = checkedBoxes.map(cb => cb.value);
-
-  if (countBadge) {
-    countBadge.textContent = `${selectedColIds.length}件選択中`;
-  }
-  const currentCheckedCopyIds = Array.from(document.querySelectorAll('#merge-copy-custom-fields-container input:checked')).map(cb => cb.value);
-  updateMergeCopyCustomCheckboxes(tableId, selectedColIds, currentCheckedCopyIds);
-
-  select.innerHTML = '';
-  if (selectedColIds.length === 0) {
-    select.innerHTML = '<option value="">-- 先に統合するカラムを選択してください --</option>';
-    return;
-  }
-
-  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
-  const cols = meta ? meta.columns : [];
-
-  selectedColIds.forEach(colId => {
-    const col = cols.find(c => c.id === colId);
-    const label = col ? (col.label || col.name || colId) : colId;
-    const opt = document.createElement('option');
-    opt.value = colId;
-    opt.textContent = `${label} (${colId})`;
-    if (colId === currentPrimaryId) {
-      opt.selected = true;
-    }
-    select.appendChild(opt);
-  });
-
-  if (!select.value && selectedColIds.length > 0) {
-    select.value = selectedColIds[0];
-  }
+  updateMergeModalDisplayColumnsChecklist(tableId, group.displayColumnIds || [group.primaryColumnId || group.columnIds[0]]);
 }
 
 function handleSaveMergedColumns() {
@@ -10216,13 +10246,12 @@ function handleSaveMergedColumns() {
     return;
   }
 
-  const select = document.getElementById('merge-primary-col-select');
-  const primaryColumnId = select ? select.value : selectedColIds[0];
-
-  if (!primaryColumnId) {
-    showToast('メイン表示にするカラムを選択してください。', 'warning');
-    return;
+  const displayCheckboxes = document.querySelectorAll('#merge-display-columns-checklist input:checked');
+  let displayColumnIds = Array.from(displayCheckboxes).map(cb => cb.value);
+  if (displayColumnIds.length === 0) {
+    displayColumnIds = [selectedColIds[0]];
   }
+  const primaryColumnId = displayColumnIds[0] || selectedColIds[0];
 
   let groups = getMergedColumns(normId);
 
@@ -10237,31 +10266,23 @@ function handleSaveMergedColumns() {
 
   if (currentEditingMergeGroupId) {
     const targetIdx = groups.findIndex(g => g.id === currentEditingMergeGroupId);
-    const copyMode = document.querySelector('input[name="merge-copy-mode"]:checked')?.value || 'visible';
-    const copyColumnIds = Array.from(document.querySelectorAll('#merge-copy-custom-fields-container input:checked')).map(cb => cb.value);
-
     if (targetIdx !== -1) {
       groups[targetIdx] = {
         id: currentEditingMergeGroupId,
         name: groupName,
         columnIds: selectedColIds,
-        primaryColumnId: primaryColumnId,
-        copyMode: copyMode,
-        copyColumnIds: copyColumnIds
+        displayColumnIds: displayColumnIds,
+        primaryColumnId: primaryColumnId
       };
     }
   } else {
     const newId = 'grp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-    const copyMode = document.querySelector('input[name="merge-copy-mode"]:checked')?.value || 'visible';
-    const copyColumnIds = Array.from(document.querySelectorAll('#merge-copy-custom-fields-container input:checked')).map(cb => cb.value);
-
     groups.push({
       id: newId,
       name: groupName,
       columnIds: selectedColIds,
-      primaryColumnId: primaryColumnId,
-      copyMode: copyMode,
-      copyColumnIds: copyColumnIds
+      displayColumnIds: displayColumnIds,
+      primaryColumnId: primaryColumnId
     });
   }
 
@@ -19310,7 +19331,14 @@ function renderAgencyInfo() {
   filteredContracts.forEach((contract, index) => {
     const rowAccess = checkRowAccess('agency-info-screen', contract);
 
-    const rowHeight = state.agRowHeights[index] || 30;
+    const agActiveGroups = typeof getMergedColumns === 'function' ? getMergedColumns('ag') : [];
+    let agMaxItems = 1;
+    agActiveGroups.forEach(g => {
+      const cnt = (g.displayColumnIds && g.displayColumnIds.length > 0) ? g.displayColumnIds.length : 1;
+      if (cnt > agMaxItems) agMaxItems = cnt;
+    });
+    const agDefaultH = agMaxItems > 2 ? 46 : (agMaxItems === 2 ? 38 : 30);
+    const rowHeight = state.agRowHeights[index] || agDefaultH;
 
     const tr = document.createElement('tr');
     tr.setAttribute('data-row-id', contract.customerId);
@@ -19501,7 +19529,7 @@ function renderAgencyInfo() {
 
         const agMergeGroup = getMergedGroupForCol('ag', col.id);
         if (agMergeGroup && agMergeGroup.primaryColumnId === col.id) {
-            if (typeof td.removeAttribute === 'function') td.removeAttribute('title'); else td.title = '';
+          renderMergedCellContent(td, 'ag', contract, agMergeGroup, columns, styleObj);
           attachMergedCellHoverEvents(td, 'ag', contract, agMergeGroup, columns);
         }
 
@@ -21111,7 +21139,14 @@ function renderJoInfo() {
   filteredContracts.forEach((contract, index) => {
     const rowAccess = checkRowAccess('jo-info-screen', contract);
 
-    const rowHeight = state.joRowHeights[index] || 30;
+    const joActiveGroups = typeof getMergedColumns === 'function' ? getMergedColumns('jo') : [];
+    let joMaxItems = 1;
+    joActiveGroups.forEach(g => {
+      const cnt = (g.displayColumnIds && g.displayColumnIds.length > 0) ? g.displayColumnIds.length : 1;
+      if (cnt > joMaxItems) joMaxItems = cnt;
+    });
+    const joDefaultH = joMaxItems > 2 ? 46 : (joMaxItems === 2 ? 38 : 30);
+    const rowHeight = state.joRowHeights[index] || joDefaultH;
 
     const tr = document.createElement('tr');
     tr.setAttribute('data-row-id', contract.customerId);
@@ -21322,7 +21357,7 @@ function renderJoInfo() {
 
         const joMergeGroup = getMergedGroupForCol('jo', col.id);
         if (joMergeGroup && joMergeGroup.primaryColumnId === col.id) {
-            if (typeof td.removeAttribute === 'function') td.removeAttribute('title'); else td.title = '';
+          renderMergedCellContent(td, 'jo', contract, joMergeGroup, columns, styleObj);
           attachMergedCellHoverEvents(td, 'jo', contract, joMergeGroup, columns);
         }
 
@@ -21875,7 +21910,14 @@ function renderApplicantInfo() {
 
   filteredContracts.forEach((contract, index) => {
     const rowAccess = checkRowAccess('applicant-info-screen', contract);
-    const rowHeight = state.apRowHeights[index] || 30;
+    const apActiveGroups = typeof getMergedColumns === 'function' ? getMergedColumns('ap') : [];
+    let apMaxItems = 1;
+    apActiveGroups.forEach(g => {
+      const cnt = (g.displayColumnIds && g.displayColumnIds.length > 0) ? g.displayColumnIds.length : 1;
+      if (cnt > apMaxItems) apMaxItems = cnt;
+    });
+    const apDefaultH = apMaxItems > 2 ? 46 : (apMaxItems === 2 ? 38 : 30);
+    const rowHeight = state.apRowHeights[index] || apDefaultH;
 
     const tr = document.createElement('tr');
     tr.setAttribute('data-row-id', contract.customerId);
@@ -22062,7 +22104,7 @@ function renderApplicantInfo() {
 
         const apMergeGroup = getMergedGroupForCol('ap', col.id);
         if (apMergeGroup && apMergeGroup.primaryColumnId === col.id) {
-            if (typeof td.removeAttribute === 'function') td.removeAttribute('title'); else td.title = '';
+          renderMergedCellContent(td, 'ap', contract, apMergeGroup, columns, styleObj);
           attachMergedCellHoverEvents(td, 'ap', contract, apMergeGroup, columns);
         }
 
@@ -26659,7 +26701,7 @@ function renderDbmakePartners() {
         // 書式スタイルの取得と適用
         const dbmakeMergeGroup = getMergedGroupForCol('dbmake', col.id);
         if (dbmakeMergeGroup && dbmakeMergeGroup.primaryColumnId === col.id) {
-            if (typeof td.removeAttribute === 'function') td.removeAttribute('title'); else td.title = '';
+          renderMergedCellContent(td, 'dbmake', p, dbmakeMergeGroup, columns, styleObj);
           attachMergedCellHoverEvents(td, 'dbmake', p, dbmakeMergeGroup, columns);
         }
 
