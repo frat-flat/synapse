@@ -6658,21 +6658,23 @@ function renderCustomTable(tableId) {
     headerWrapper.style.height = '100%';
     headerWrapper.style.position = 'relative';
 
+    const ctMg = getMergedGroupForCol(tbl.id, col.id);
+    const ctHeaderText = (ctMg && ctMg.primaryColumnId === col.id && ctMg.name) ? ctMg.name : col.label;
     const labelSpan = document.createElement('span');
     labelSpan.className = 'th-label';
-    labelSpan.textContent = col.label;
+    labelSpan.textContent = ctHeaderText;
     labelSpan.style.whiteSpace = 'nowrap';
     labelSpan.style.overflow = 'hidden';
     labelSpan.style.textOverflow = 'ellipsis';
+    labelSpan.title = ctHeaderText;
     headerWrapper.appendChild(labelSpan);
 
-    const ctMg = getMergedGroupForCol(tbl.id, col.id);
     if (ctMg && ctMg.primaryColumnId === col.id) {
-      const badge = document.createElement('span');
-      badge.className = 'synapse-merged-header-badge';
-      badge.textContent = `🔗 統合: ${ctMg.columnIds.length}項目`;
-      badge.title = `統合項目: ${getMergedGroupSummaryText(tbl.id, ctMg)}`;
-      headerWrapper.appendChild(badge);
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'synapse-header-merge-icon';
+      iconSpan.textContent = '🔗';
+      iconSpan.title = `統合グループ「${ctMg.name || ''}」 (${getMergedGroupSummaryText(tbl.id, ctMg)})`;
+      headerWrapper.appendChild(iconSpan);
     }
 
     const filterBtn = document.createElement('span');
@@ -7051,11 +7053,7 @@ function renderCustomTable(tableId) {
 
       const ctMergeGroup = getMergedGroupForCol(tbl.id, col.id);
       if (ctMergeGroup && ctMergeGroup.primaryColumnId === col.id) {
-        const badge = document.createElement('span');
-        badge.className = 'synapse-merged-badge';
-        badge.textContent = `🔗 +${ctMergeGroup.columnIds.length - 1}`;
-        badge.title = `統合項目: ${getMergedGroupSummaryText(tbl.id, ctMergeGroup)}`;
-        td.appendChild(badge);
+          if (typeof td.removeAttribute === 'function') td.removeAttribute('title'); else td.title = '';
         attachMergedCellHoverEvents(td, tbl.id, row, ctMergeGroup, columns);
       }
 
@@ -9461,7 +9459,37 @@ function getCurrentActiveTableId() {
   return null;
 }
 
-// --- 1. アカウント別 ストレージ管理 ---
+// --- 1. アカウント別 ストレージ管理 (非表示列 & 統合列) ---
+function getUserHiddenColumnsStorageKey(tableId) {
+  const normId = normalizeTableId(tableId);
+  let suffix = '';
+  if (typeof getUserIdSuffix === 'function') suffix = getUserIdSuffix();
+  if (!suffix && typeof state !== 'undefined' && state.currentUser && state.currentUser.id) {
+    suffix = '_' + state.currentUser.id.toLowerCase();
+  }
+  return 'synapse_user_hidden_cols_' + normId + (suffix || '_default');
+}
+
+function getUserHiddenColumns(tableId) {
+  try {
+    const raw = localStorage.getItem(getUserHiddenColumnsStorageKey(tableId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveUserHiddenColumns(tableId, hiddenColIds) {
+  try {
+    const normId = normalizeTableId(tableId);
+    localStorage.setItem(getUserHiddenColumnsStorageKey(normId), JSON.stringify(hiddenColIds || []));
+  } catch (e) {
+    console.error('[HiddenColumns] save error:', e);
+  }
+}
+
 function getMergedColumnsStorageKey(tableId) {
   const normId = normalizeTableId(tableId);
   let suffix = '';
@@ -9474,12 +9502,28 @@ function getMergedColumnsStorageKey(tableId) {
   return 'synapse_merged_columns_' + normId + (suffix || '_default');
 }
 
+function getSharedMergedColumnsStorageKey(tableId) {
+  const normId = normalizeTableId(tableId);
+  return 'synapse_merged_columns_' + normId + '_shared';
+}
+
 function getMergedColumns(tableId) {
   try {
-    const raw = localStorage.getItem(getMergedColumnsStorageKey(tableId));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const normId = normalizeTableId(tableId);
+    // 1. 各ユーザーが独自に設定した統合設定があれば優先
+    const userKey = getMergedColumnsStorageKey(normId);
+    const userRaw = localStorage.getItem(userKey);
+    if (userRaw !== null) {
+      const parsed = JSON.parse(userRaw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+    // 2. なければオーナーが設定した共有統合設定をフォールバック反映
+    const sharedRaw = localStorage.getItem(getSharedMergedColumnsStorageKey(normId));
+    if (sharedRaw) {
+      const parsed = JSON.parse(sharedRaw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+    return [];
   } catch (e) {
     console.error('[MergedColumns] get error:', e);
     return [];
@@ -9488,7 +9532,14 @@ function getMergedColumns(tableId) {
 
 function saveMergedColumns(tableId, groups) {
   try {
-    localStorage.setItem(getMergedColumnsStorageKey(tableId), JSON.stringify(groups));
+    const normId = normalizeTableId(tableId);
+    // ユーザー個人設定として保存
+    localStorage.setItem(getMergedColumnsStorageKey(normId), JSON.stringify(groups));
+
+    // オーナーの場合は全体共有設定としても保存（一般ユーザーへ一律反映）
+    if (typeof isOwnerUser === 'function' && isOwnerUser()) {
+      localStorage.setItem(getSharedMergedColumnsStorageKey(normId), JSON.stringify(groups));
+    }
   } catch (e) {
     console.error('[MergedColumns] save error:', e);
   }
@@ -9510,11 +9561,17 @@ function getMergedGroupSummaryText(tableId, group) {
   }).join(', ');
 }
 
-// 任意カラム・スキップしたカラムの統合表示用フィルター
+// ユーザー非表示カラム & 統合表示カラムの合成可視化フィルター
 function applyMergedColumnsToVisibleList(tableId, visibleColIds, allCols) {
   const normId = normalizeTableId(tableId);
+
+  // 1. 各ユーザーが非表示にしたカラムを除外（閲覧権限があっても隠す）
+  const hiddenCols = getUserHiddenColumns(normId);
+  let list = visibleColIds.filter(cId => !hiddenCols.includes(cId));
+
+  // 2. 統合グループの適用（メイン表示列以外を非表示化）
   const groups = getMergedColumns(normId);
-  if (!groups || groups.length === 0) return visibleColIds;
+  if (!groups || groups.length === 0) return list;
 
   const hideCols = new Set();
   groups.forEach(g => {
@@ -9528,15 +9585,15 @@ function applyMergedColumnsToVisibleList(tableId, visibleColIds, allCols) {
   });
 
   const result = [];
-  visibleColIds.forEach(cId => {
+  list.forEach(cId => {
     if (!hideCols.has(cId)) {
       result.push(cId);
     }
   });
 
-  // プライマリ列が元々visibleColIdsに含まれていなくても、グループのいずれかの列が表示対象なら追加
+  // プライマリ列が元々含まれていなくてもグループのいずれかが表示対象なら追加
   groups.forEach(g => {
-    const anyVisible = g.columnIds.some(cId => visibleColIds.includes(cId));
+    const anyVisible = g.columnIds.some(cId => list.includes(cId));
     if (anyVisible && !result.includes(g.primaryColumnId)) {
       result.push(g.primaryColumnId);
     }
@@ -9569,7 +9626,7 @@ function unmergeColumnQuick(tableId, targetColId) {
   const group = groups.find(g => g.columnIds && g.columnIds.includes(targetColId));
   if (!group) return;
 
-  if (confirm(`統合グループ「${group.name || 'この統合'}」を解除してもよろしいですか？\n※データベースのデータは保持され、元の個別列表示に戻ります。`)) {
+  if (confirm(`統合グループ「${group.name || 'この統合'}」を解除してもよろしいですか？\n※データはそのまま保持され、元の個別列表示に戻ります。`)) {
     groups = groups.filter(g => g.id !== group.id);
     saveMergedColumns(normId, groups);
 
@@ -9578,15 +9635,16 @@ function unmergeColumnQuick(tableId, targetColId) {
     showToast('統合表示を解除しました。', 'info');
   }
 }
-
-// --- 2. 統合設定モーダル (#merged-columns-modal) コントローラー ---
-let currentMergeModalTableId = null;
+// --- 2. 「列の表示設定」モーダル (#merged-columns-modal) コントローラー ---
+let currentDisplayModalTableId = null;
 let currentEditingMergeGroupId = null;
+let currentActiveDisplayTab = 'hidden'; // 'hidden' | 'merge'
 
-function openMergedColumnsModal(tableId, preselectedColIds = []) {
+function openColumnDisplaySettingsModal(tableId, initialTab = 'hidden', preselectedColIds = []) {
   const normId = normalizeTableId(tableId);
-  currentMergeModalTableId = normId;
+  currentDisplayModalTableId = normId;
   currentEditingMergeGroupId = null;
+  currentActiveDisplayTab = initialTab;
 
   const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
   if (!meta) {
@@ -9599,9 +9657,16 @@ function openMergedColumnsModal(tableId, preselectedColIds = []) {
 
   const titleEl = modal.querySelector('.modal-header h3');
   if (titleEl) {
-    titleEl.innerHTML = `<span>🔗</span> 列の統合表示設定 (${meta.name || normId})`;
+    titleEl.innerHTML = `<span>👁️</span> 列の表示設定 (${meta.name || normId})`;
   }
 
+  // タブ切り替え
+  switchColumnDisplayTab(initialTab);
+
+  // 非表示カラム設定タブの描画
+  renderHiddenColumnsTab(normId);
+
+  // 統合表示設定タブの描画
   renderExistingMergeGroupsList(normId);
   resetMergeGroupEditor(normId, preselectedColIds);
 
@@ -9609,14 +9674,120 @@ function openMergedColumnsModal(tableId, preselectedColIds = []) {
   modal.classList.add('active');
 }
 
-function closeMergedColumnsModal() {
+window.openColumnDisplaySettingsModal = openColumnDisplaySettingsModal;
+window.openMergedColumnsModal = (t, p) => openColumnDisplaySettingsModal(t, 'merge', p);
+
+function closeColumnDisplaySettingsModal() {
   const modal = document.getElementById('merged-columns-modal');
   if (modal) {
     modal.classList.remove('active');
     modal.style.display = 'none';
   }
-  currentMergeModalTableId = null;
+  currentDisplayModalTableId = null;
   currentEditingMergeGroupId = null;
+}
+window.closeMergedColumnsModal = closeColumnDisplaySettingsModal;
+
+function switchColumnDisplayTab(tabName) {
+  currentActiveDisplayTab = tabName;
+  const tabHiddenBtn = document.getElementById('col-display-tab-hidden');
+  const tabMergeBtn = document.getElementById('col-display-tab-merge');
+  const paneHidden = document.getElementById('col-display-pane-hidden');
+  const paneMerge = document.getElementById('col-display-pane-merge');
+
+  if (tabName === 'hidden') {
+    tabHiddenBtn?.classList.add('active');
+    tabMergeBtn?.classList.remove('active');
+    if (paneHidden) paneHidden.style.display = 'flex';
+    if (paneMerge) paneMerge.style.display = 'none';
+  } else {
+    tabHiddenBtn?.classList.remove('active');
+    tabMergeBtn?.classList.add('active');
+    if (paneHidden) paneHidden.style.display = 'none';
+    if (paneMerge) paneMerge.style.display = 'flex';
+  }
+}
+
+// 非表示カラム設定タブのレンダリング
+function renderHiddenColumnsTab(tableId) {
+  const normId = normalizeTableId(tableId);
+  const container = document.getElementById('hidden-columns-checkbox-list');
+  const countLabel = document.getElementById('hidden-cols-count-label');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+  if (!meta) return;
+
+  const cols = meta.columns || [];
+  const screenId = getTableScreenId(normId);
+  const currentHidden = new Set(getUserHiddenColumns(normId));
+
+  let visibleCount = 0;
+  let totalCount = 0;
+
+  cols.forEach(col => {
+    // 権限チェック：閲覧権限のない列はスキップ
+    if (typeof checkColumnAccess === 'function') {
+      const access = checkColumnAccess(screenId, col.id);
+      if (access && !access.visible) return;
+    }
+
+    totalCount++;
+    const isChecked = !currentHidden.has(col.id);
+    if (isChecked) visibleCount++;
+
+    const itemLabel = document.createElement('label');
+    itemLabel.className = 'col-display-checklist-item';
+    itemLabel.innerHTML = `
+      <input type="checkbox" data-col-id="${col.id}" ${isChecked ? 'checked' : ''} />
+      <span style="font-weight: 500;">${col.label || col.name || col.id}</span>
+      <span style="font-size: 0.72rem; color: #64748b; margin-left: auto;">${col.id}</span>
+    `;
+
+    const cb = itemLabel.querySelector('input');
+    cb.addEventListener('change', () => {
+      updateHiddenColsCountBadge(tableId);
+    });
+
+    container.appendChild(itemLabel);
+  });
+
+  if (countLabel) {
+    countLabel.textContent = `表示中: ${visibleCount} / ${totalCount}列 (非表示: ${totalCount - visibleCount}列)`;
+  }
+}
+
+function updateHiddenColsCountBadge(tableId) {
+  const container = document.getElementById('hidden-columns-checkbox-list');
+  const countLabel = document.getElementById('hidden-cols-count-label');
+  if (!container || !countLabel) return;
+
+  const cbs = container.querySelectorAll('input[type="checkbox"]');
+  let checked = 0;
+  cbs.forEach(cb => { if (cb.checked) checked++; });
+  const total = cbs.length;
+  countLabel.textContent = `表示中: ${checked} / ${total}列 (非表示: ${total - checked}列)`;
+}
+
+function handleSaveHiddenColumns(tableId) {
+  const normId = normalizeTableId(tableId);
+  const container = document.getElementById('hidden-columns-checkbox-list');
+  if (!container) return;
+
+  const hiddenColIds = [];
+  container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    if (!cb.checked) {
+      hiddenColIds.push(cb.dataset.colId);
+    }
+  });
+
+  saveUserHiddenColumns(normId, hiddenColIds);
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+  if (meta && typeof meta.render === 'function') meta.render();
+
+  showToast(`非表示設定を保存しました (非表示: ${hiddenColIds.length}列)。`, 'success');
+  closeColumnDisplaySettingsModal();
 }
 
 function renderExistingMergeGroupsList(tableId) {
@@ -9630,68 +9801,48 @@ function renderExistingMergeGroupsList(tableId) {
   const cols = meta ? meta.columns : [];
 
   if (groups.length === 0) {
-    container.innerHTML = '<div style="font-size: 0.8rem; color: var(--text-muted); padding: 0.5rem; background: var(--bg-surface); border-radius: var(--radius-sm); border: 1px dashed var(--border-color);">現在統合されている列はありません。下部から複数カラムを選択して統合を作成できます。</div>';
+    container.innerHTML = '<div style="font-size: 0.8rem; color: #64748b; padding: 0.5rem; background: #f8fafc; border-radius: 6px; border: 1px dashed #cbd5e1;">現在統合されている列はありません。下部から複数カラムを選択して統合を作成できます。</div>';
     return;
   }
 
   groups.forEach(group => {
     const item = document.createElement('div');
-    item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.65rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; gap: 0.5rem;';
+    item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.84rem; gap: 0.5rem;';
 
-    const left = document.createElement('div');
-    left.style.cssText = 'display: flex; flex-direction: column; gap: 2px; flex: 1; overflow: hidden;';
-
-    const titleRow = document.createElement('div');
-    titleRow.style.cssText = 'display: flex; align-items: center; gap: 6px;';
-    const primaryCol = cols.find(c => c.id === group.primaryColumnId);
-    const primaryLabel = primaryCol ? (primaryCol.label || primaryCol.name || group.primaryColumnId) : group.primaryColumnId;
-
-    titleRow.innerHTML = `<strong>${group.name || primaryLabel + ' (統合)'}</strong> <span style="font-size: 0.7rem; background: rgba(16,185,129,0.15); color: #10b981; padding: 1px 5px; border-radius: 3px; font-weight: 600;">メイン: ${primaryLabel}</span>`;
-
-    const colsRow = document.createElement('div');
-    colsRow.style.cssText = 'font-size: 0.74rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
-    const colLabels = group.columnIds.map(cId => {
+    const colLabels = (group.columnIds || []).map(cId => {
       const c = cols.find(col => col.id === cId);
-      return c ? (c.label || c.name || cId) : cId;
-    }).join('、');
-    colsRow.textContent = `統合項目 (${group.columnIds.length}列): ${colLabels}`;
+      const name = c ? (c.label || c.name || cId) : cId;
+      return cId === group.primaryColumnId ? `<strong>${name}(メイン)</strong>` : name;
+    }).join(', ');
 
-    left.appendChild(titleRow);
-    left.appendChild(colsRow);
+    const titleText = group.name ? `<strong>${group.name}</strong> (${colLabels})` : colLabels;
 
-    const btnGroup = document.createElement('div');
-    btnGroup.style.cssText = 'display: flex; gap: 4px; flex-shrink: 0;';
+    item.innerHTML = `
+      <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        <span style="color: #2563eb; font-weight: 700; margin-right: 4px;">🔗</span>
+        <span>${titleText}</span>
+      </div>
+      <div style="display: flex; gap: 0.35rem; flex-shrink: 0;">
+        <button type="button" class="btn btn-secondary btn-sm edit-group-btn" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">編集</button>
+        <button type="button" class="btn btn-danger btn-sm del-group-btn" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; color: #ef4444; border-color: #fca5a5;">解除</button>
+      </div>
+    `;
 
-    const editBtn = document.createElement('button');
-    editBtn.type = 'button';
-    editBtn.className = 'btn btn-secondary';
-    editBtn.style.cssText = 'padding: 0.2rem 0.5rem; font-size: 0.75rem;';
-    editBtn.textContent = '編集';
-    editBtn.addEventListener('click', () => {
-      loadMergeGroupToEditor(normId, group);
+    item.querySelector('.edit-group-btn').addEventListener('click', () => {
+      editMergeGroupInModal(tableId, group.id);
     });
 
-    const unmergeBtn = document.createElement('button');
-    unmergeBtn.type = 'button';
-    unmergeBtn.className = 'btn btn-danger';
-    unmergeBtn.style.cssText = 'padding: 0.2rem 0.5rem; font-size: 0.75rem; background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid rgba(239,68,68,0.2);';
-    unmergeBtn.textContent = '解除';
-    unmergeBtn.addEventListener('click', () => {
-      if (confirm(`統合グループ「${group.name || primaryLabel}」を解除してもよろしいですか？\n※データベースのデータは保持されます。`)) {
-        const remaining = getMergedColumns(normId).filter(g => g.id !== group.id);
-        saveMergedColumns(normId, remaining);
-        renderExistingMergeGroupsList(normId);
-        resetMergeGroupEditor(normId);
+    item.querySelector('.del-group-btn').addEventListener('click', () => {
+      if (confirm(`統合グループ「${group.name || 'この統合'}」を解除しますか？`)) {
+        const updated = getMergedColumns(normId).filter(g => g.id !== group.id);
+        saveMergedColumns(normId, updated);
+        renderExistingMergeGroupsList(tableId);
+        resetMergeGroupEditor(tableId);
         if (meta && typeof meta.render === 'function') meta.render();
-        showToast('統合表示を解除しました。', 'info');
+        showToast('統合グループを解除しました。', 'info');
       }
     });
 
-    btnGroup.appendChild(editBtn);
-    btnGroup.appendChild(unmergeBtn);
-
-    item.appendChild(left);
-    item.appendChild(btnGroup);
     container.appendChild(item);
   });
 }
@@ -9699,185 +9850,217 @@ function renderExistingMergeGroupsList(tableId) {
 function resetMergeGroupEditor(tableId, preselectedColIds = []) {
   const normId = normalizeTableId(tableId);
   currentEditingMergeGroupId = null;
+
+  const titleEl = document.getElementById('merge-group-editor-title');
+  if (titleEl) titleEl.textContent = '新規グループ作成';
+
   const nameInput = document.getElementById('merge-group-name-input');
   if (nameInput) nameInput.value = '';
 
-  const editorTitle = document.getElementById('merge-group-editor-title');
-  if (editorTitle) editorTitle.textContent = '新規グループ作成';
-
   const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
   const cols = meta ? meta.columns : [];
+  const screenId = getTableScreenId(normId);
 
-  const cbList = document.getElementById('merge-columns-checkbox-list');
-  if (cbList) {
-    cbList.innerHTML = '';
+  const checkboxList = document.getElementById('merge-columns-checkbox-list');
+  if (checkboxList) {
+    checkboxList.innerHTML = '';
     cols.forEach(col => {
-      const labelEl = document.createElement('label');
-      labelEl.style.cssText = 'display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-primary); cursor: pointer; user-select: none;';
+      if (typeof checkColumnAccess === 'function') {
+        const access = checkColumnAccess(screenId, col.id);
+        if (access && !access.visible) return;
+      }
 
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.value = col.id;
-      cb.className = 'merge-col-checkbox';
-      if (preselectedColIds.includes(col.id)) cb.checked = true;
+      const item = document.createElement('label');
+      item.className = 'col-display-checklist-item';
+      item.innerHTML = `
+        <input type="checkbox" value="${col.id}" ${preselectedColIds.includes(col.id) ? 'checked' : ''} />
+        <span style="font-weight: 500;">${col.label || col.name || col.id}</span>
+      `;
 
-      cb.addEventListener('change', () => {
-        syncPrimaryColSelectOptions(cols);
+      const input = item.querySelector('input');
+      input.addEventListener('change', () => {
+        updateMergeModalPrimarySelect(tableId);
       });
 
-      labelEl.appendChild(cb);
-      labelEl.appendChild(document.createTextNode(col.label || col.name || col.id));
-      cbList.appendChild(labelEl);
+      checkboxList.appendChild(item);
     });
   }
 
-  syncPrimaryColSelectOptions(cols, preselectedColIds[0] || '');
+  updateMergeModalPrimarySelect(tableId, preselectedColIds[0] || null);
 }
 
-function loadMergeGroupToEditor(tableId, group) {
+function editMergeGroupInModal(tableId, groupId) {
   const normId = normalizeTableId(tableId);
-  currentEditingMergeGroupId = group.id;
+  const groups = getMergedColumns(normId);
+  const group = groups.find(g => g.id === groupId);
+  if (!group) return;
 
-  const editorTitle = document.getElementById('merge-group-editor-title');
-  if (editorTitle) editorTitle.textContent = `グループ「${group.name || ''}」を編集`;
+  currentEditingMergeGroupId = groupId;
+  const titleEl = document.getElementById('merge-group-editor-title');
+  if (titleEl) titleEl.textContent = `グループ編集: ${group.name || '名称未設定'}`;
 
   const nameInput = document.getElementById('merge-group-name-input');
   if (nameInput) nameInput.value = group.name || '';
 
-  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
-  const cols = meta ? meta.columns : [];
-
-  const cbList = document.getElementById('merge-columns-checkbox-list');
-  if (cbList) {
-    cbList.querySelectorAll('.merge-col-checkbox').forEach(cb => {
+  const checkboxList = document.getElementById('merge-columns-checkbox-list');
+  if (checkboxList) {
+    checkboxList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
       cb.checked = group.columnIds.includes(cb.value);
     });
   }
 
-  syncPrimaryColSelectOptions(cols, group.primaryColumnId);
+  updateMergeModalPrimarySelect(tableId, group.primaryColumnId);
 }
 
-function syncPrimaryColSelectOptions(allCols, selectedPrimaryId = '') {
-  const cbList = document.getElementById('merge-columns-checkbox-list');
-  const primarySelect = document.getElementById('merge-primary-col-select');
+function updateMergeModalPrimarySelect(tableId, currentPrimaryId = null) {
+  const normId = normalizeTableId(tableId);
+  const select = document.getElementById('merge-primary-col-select');
   const countBadge = document.getElementById('merge-selected-count-badge');
-  if (!primarySelect || !cbList) return;
+  const checkboxList = document.getElementById('merge-columns-checkbox-list');
+  if (!select || !checkboxList) return;
 
-  const checkedCheckboxes = Array.from(cbList.querySelectorAll('.merge-col-checkbox:checked'));
-  const checkedIds = checkedCheckboxes.map(cb => cb.value);
+  const checkedBoxes = Array.from(checkboxList.querySelectorAll('input[type="checkbox"]:checked'));
+  const selectedColIds = checkedBoxes.map(cb => cb.value);
 
   if (countBadge) {
-    countBadge.textContent = `${checkedIds.length}件選択中`;
+    countBadge.textContent = `${selectedColIds.length}件選択中`;
   }
 
-  const prevValue = primarySelect.value;
-  primarySelect.innerHTML = '';
-
-  if (checkedIds.length === 0) {
-    primarySelect.innerHTML = '<option value="">-- 先に統合するカラムを選択してください --</option>';
-    return;
-  }
-
-  checkedIds.forEach(cId => {
-    const col = allCols.find(c => c.id === cId);
-    const opt = document.createElement('option');
-    opt.value = cId;
-    opt.textContent = col ? (col.label || col.name || cId) : cId;
-    primarySelect.appendChild(opt);
-  });
-
-  if (selectedPrimaryId && checkedIds.includes(selectedPrimaryId)) {
-    primarySelect.value = selectedPrimaryId;
-  } else if (checkedIds.includes(prevValue)) {
-    primarySelect.value = prevValue;
-  }
-}
-
-function handleSaveMergedColumns() {
-  if (!currentMergeModalTableId) return;
-  const normId = normalizeTableId(currentMergeModalTableId);
-
-  const cbList = document.getElementById('merge-columns-checkbox-list');
-  const primarySelect = document.getElementById('merge-primary-col-select');
-  const nameInput = document.getElementById('merge-group-name-input');
-
-  const checkedCheckboxes = cbList ? Array.from(cbList.querySelectorAll('.merge-col-checkbox:checked')) : [];
-  const selectedIds = checkedCheckboxes.map(cb => cb.value);
-
-  if (selectedIds.length < 2) {
-    showToast('統合表示には2つ以上のカラムを選択してください。', 'warning');
-    return;
-  }
-
-  const primaryColId = primarySelect ? primarySelect.value : '';
-  if (!primaryColId || !selectedIds.includes(primaryColId)) {
-    showToast('通常セルに表示する「メイン表示」カラムを選択してください。', 'warning');
+  select.innerHTML = '';
+  if (selectedColIds.length === 0) {
+    select.innerHTML = '<option value="">-- 先に統合するカラムを選択してください --</option>';
     return;
   }
 
   const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
   const cols = meta ? meta.columns : [];
-  const primaryCol = cols.find(c => c.id === primaryColId);
-  const primaryLabel = primaryCol ? (primaryCol.label || primaryCol.name || primaryColId) : primaryColId;
 
-  let groupName = (nameInput ? nameInput.value.trim() : '');
-  if (!groupName) {
-    groupName = `${primaryLabel} (+${selectedIds.length - 1}項目)`;
+  selectedColIds.forEach(colId => {
+    const col = cols.find(c => c.id === colId);
+    const label = col ? (col.label || col.name || colId) : colId;
+    const opt = document.createElement('option');
+    opt.value = colId;
+    opt.textContent = `${label} (${colId})`;
+    if (colId === currentPrimaryId) {
+      opt.selected = true;
+    }
+    select.appendChild(opt);
+  });
+
+  if (!select.value && selectedColIds.length > 0) {
+    select.value = selectedColIds[0];
+  }
+}
+
+function handleSaveMergedColumns() {
+  if (!currentDisplayModalTableId) return;
+  const normId = currentDisplayModalTableId;
+
+  // もし非表示タブがアクティブなら非表示設定を保存
+  if (currentActiveDisplayTab === 'hidden') {
+    handleSaveHiddenColumns(normId);
+    return;
+  }
+
+  // 統合表示設定の保存
+  const nameInput = document.getElementById('merge-group-name-input');
+  const groupName = nameInput ? nameInput.value.trim() : '';
+
+  const checkboxList = document.getElementById('merge-columns-checkbox-list');
+  const checkedBoxes = Array.from(checkboxList ? checkboxList.querySelectorAll('input[type="checkbox"]:checked') : []);
+  const selectedColIds = checkedBoxes.map(cb => cb.value);
+
+  if (selectedColIds.length < 2) {
+    showToast('統合表示を行うには、2つ以上のカラムを選択してください。', 'warning');
+    return;
+  }
+
+  const select = document.getElementById('merge-primary-col-select');
+  const primaryColumnId = select ? select.value : selectedColIds[0];
+
+  if (!primaryColumnId) {
+    showToast('メイン表示にするカラムを選択してください。', 'warning');
+    return;
   }
 
   let groups = getMergedColumns(normId);
 
-  const groupId = currentEditingMergeGroupId || ('mg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
-
-  // 他グループとの重複カラムを除去
+  // 他のグループで既に選択されているカラムがあれば重複を解消
   groups = groups.map(g => {
-    if (g.id === groupId) return null;
-    const filteredColIds = g.columnIds.filter(cId => !selectedIds.includes(cId));
-    if (filteredColIds.length < 2) return null;
-    const newPrimary = filteredColIds.includes(g.primaryColumnId) ? g.primaryColumnId : filteredColIds[0];
-    return { ...g, columnIds: filteredColIds, primaryColumnId: newPrimary };
-  }).filter(Boolean);
+    if (g.id === currentEditingMergeGroupId) return g;
+    return {
+      ...g,
+      columnIds: g.columnIds.filter(cId => !selectedColIds.includes(cId))
+    };
+  }).filter(g => g.columnIds.length >= 2);
 
-  groups.push({
-    id: groupId,
-    name: groupName,
-    columnIds: selectedIds,
-    primaryColumnId: primaryColId
-  });
+  if (currentEditingMergeGroupId) {
+    const targetIdx = groups.findIndex(g => g.id === currentEditingMergeGroupId);
+    if (targetIdx !== -1) {
+      groups[targetIdx] = {
+        id: currentEditingMergeGroupId,
+        name: groupName,
+        columnIds: selectedColIds,
+        primaryColumnId: primaryColumnId
+      };
+    }
+  } else {
+    const newId = 'grp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    groups.push({
+      id: newId,
+      name: groupName,
+      columnIds: selectedColIds,
+      primaryColumnId: primaryColumnId
+    });
+  }
 
   saveMergedColumns(normId, groups);
 
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
   if (meta && typeof meta.render === 'function') {
     meta.render();
   }
 
-  showToast(`列の統合表示「${groupName}」を保存しました。（アカウントに保存済み）`, 'success');
-  closeMergedColumnsModal();
+  showToast(`列の表示設定を保存しました。`, 'success');
+  closeColumnDisplaySettingsModal();
 }
 
 function setupMergedColumnsModalEvents() {
-  document.getElementById('merged-columns-modal-close')?.addEventListener('click', closeMergedColumnsModal);
-  document.getElementById('merged-columns-cancel-btn')?.addEventListener('click', closeMergedColumnsModal);
+  document.getElementById('merged-columns-modal-close')?.addEventListener('click', closeColumnDisplaySettingsModal);
+  document.getElementById('merged-columns-cancel-btn')?.addEventListener('click', closeColumnDisplaySettingsModal);
+  document.getElementById('col-display-save-btn')?.addEventListener('click', handleSaveMergedColumns);
   document.getElementById('merged-columns-save-btn')?.addEventListener('click', handleSaveMergedColumns);
+
+  // タブボタンイベント
+  document.getElementById('col-display-tab-hidden')?.addEventListener('click', () => switchColumnDisplayTab('hidden'));
+  document.getElementById('col-display-tab-merge')?.addEventListener('click', () => switchColumnDisplayTab('merge'));
+
+  // 非表示タブの「すべて表示」「リセット」ボタン
+  document.getElementById('hidden-cols-select-all-btn')?.addEventListener('click', () => {
+    const list = document.getElementById('hidden-columns-checkbox-list');
+    if (list) {
+      list.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+      if (currentDisplayModalTableId) updateHiddenColsCountBadge(currentDisplayModalTableId);
+    }
+  });
+
+  document.getElementById('hidden-cols-reset-btn')?.addEventListener('click', () => {
+    if (currentDisplayModalTableId) {
+      saveUserHiddenColumns(currentDisplayModalTableId, []);
+      renderHiddenColumnsTab(currentDisplayModalTableId);
+      const meta = typeof getTableMeta === 'function' ? getTableMeta(currentDisplayModalTableId) : null;
+      if (meta && typeof meta.render === 'function') meta.render();
+      showToast('非表示設定をリセットしました（全カラム表示）。', 'info');
+    }
+  });
 
   const modal = document.getElementById('merged-columns-modal');
   if (modal) {
     modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeMergedColumnsModal();
+      if (e.target === modal) closeColumnDisplaySettingsModal();
     });
   }
 }
-
-function getSelectedColumnsForTable(tableId) {
-  const normId = normalizeTableId(tableId);
-  if (normId === 'jo' && state.joSelectedCols) return Array.from(state.joSelectedCols);
-  if (normId === 'ap' && state.apSelectedCols) return Array.from(state.apSelectedCols);
-  if (normId === 'ag' && state.agSelectedCols) return Array.from(state.agSelectedCols);
-  if (normId === 'dbmake' && state.dbmakeSelectedCols) return Array.from(state.dbmakeSelectedCols);
-  if (state.ctSelectedCols) return Array.from(state.ctSelectedCols);
-  return [];
-}
-
 // --- 3. アコーディオン型ツールチップ (#synapse-merged-cell-chip) & コピー機能 ---
 let activeChipCell = null;
 let activeChipHoveredRow = null;
@@ -9896,7 +10079,7 @@ function scheduleChipClose() {
   cancelChipClose();
   chipCloseTimer = setTimeout(() => {
     hideMergedCellChip();
-  }, 220);
+  }, 350);
 }
 
 function hideMergedCellChip() {
@@ -9995,10 +10178,17 @@ function showMergedCellChip(targetCell, tableId, rowData, group, columns, matche
     rowEl.addEventListener('mousedown', (e) => {
       if (e.target.closest('.synapse-chip-copy-btn')) return;
       isDraggingChip = true;
-      selectedChipRowEls.clear();
-      rowsContainer.querySelectorAll('.synapse-chip-row').forEach(r => r.classList.remove('is-selected'));
+      if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        selectedChipRowEls.clear();
+        rowsContainer.querySelectorAll('.synapse-chip-row').forEach(r => r.classList.remove('is-selected'));
+      }
       selectedChipRowEls.add(rowEl);
       rowEl.classList.add('is-selected');
+    });
+
+    rowEl.addEventListener('click', (e) => {
+      if (e.target.closest('.synapse-chip-copy-btn')) return;
+      rowEl.classList.toggle('is-expanded');
     });
 
     const copyBtn = rowEl.querySelector('.synapse-chip-copy-btn');
@@ -10094,7 +10284,6 @@ window.getSynapseFindCurrentIndex = () => synapseFindCurrentIndex;
 window.openSynapseFindWidget = openSynapseFindWidget;
 window.closeSynapseFindWidget = closeSynapseFindWidget;
 window.executeSynapseSearch = executeSynapseSearch;
-window.openMergedColumnsModal = openMergedColumnsModal;
 
 function toggleSynapseFindWidget() {
   const widget = document.getElementById('synapse-find-widget');
@@ -10158,6 +10347,7 @@ function executeSynapseSearch() {
 
   const input = document.getElementById('synapse-find-input');
   const includeChipCb = document.getElementById('synapse-find-include-chip');
+  const includeHiddenCb = document.getElementById('synapse-find-include-hidden');
   const counter = document.getElementById('synapse-find-counter');
   if (!input) return;
 
@@ -10168,6 +10358,7 @@ function executeSynapseSearch() {
   }
 
   const includeChips = includeChipCb ? includeChipCb.checked : true;
+  const includeHidden = includeHiddenCb ? includeHiddenCb.checked : false;
   const activeTableId = getCurrentActiveTableId();
 
   if (activeTableId) {
@@ -10190,6 +10381,7 @@ function executeSynapseSearch() {
       tds.forEach((td, cIdx) => {
         let isMatched = false;
         let isMergedMatch = false;
+        let isHiddenMatch = false;
         let matchedColLabel = '';
         let matchedFieldId = '';
 
@@ -10201,7 +10393,7 @@ function executeSynapseSearch() {
           isMatched = true;
         }
 
-        // 2. 「チップを含む」ON かつ 統合セルの場合：非表示データも検索
+        // 2. 「統合情報も含む」ON かつ 統合セルの場合：統合された隠れデータも検索
         if (!isMatched && includeChips && td.dataset.mergedGroupId) {
           const groupId = td.dataset.mergedGroupId;
           const group = getMergedColumns(activeTableId).find(g => g.id === groupId);
@@ -10221,6 +10413,22 @@ function executeSynapseSearch() {
           }
         }
 
+        // 3. 「非表示情報も含む」ON の場合：ユーザーが非表示にした列のデータも検索
+        if (!isMatched && includeHidden) {
+          const hiddenCols = getUserHiddenColumns(activeTableId);
+          for (const colId of hiddenCols) {
+            const fieldVal = rowData[colId] !== undefined && rowData[colId] !== null ? String(rowData[colId]).toLowerCase() : '';
+            if (fieldVal.includes(query)) {
+              isMatched = true;
+              isHiddenMatch = true;
+              matchedFieldId = colId;
+              const colDef = metaCols.find(c => c.id === colId);
+              matchedColLabel = colDef ? (colDef.label || colDef.name || colId) : colId;
+              break;
+            }
+          }
+        }
+
         if (isMatched) {
           td.classList.add('synapse-find-cell-match');
           synapseFindMatches.push({
@@ -10231,6 +10439,7 @@ function executeSynapseSearch() {
             rowData,
             tableId: activeTableId,
             isMergedMatch,
+            isHiddenMatch,
             matchedColLabel,
             matchedFieldId,
             group: td.dataset.mergedGroupId ? getMergedColumns(activeTableId).find(g => g.id === td.dataset.mergedGroupId) : null
@@ -10329,10 +10538,16 @@ function highlightCurrentSynapseMatch() {
     td.classList.add('synapse-find-cell-active');
     td.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
 
-    if (match.isMergedMatch) {
+    if (match.isHiddenMatch) {
       const badge = document.createElement('span');
       badge.className = 'synapse-find-merged-badge';
-      badge.textContent = `[${match.matchedColLabel}にヒット]`;
+      badge.style.background = '#475569';
+      badge.textContent = `[非表示:${match.matchedColLabel}にヒット]`;
+      td.appendChild(badge);
+    } else if (match.isMergedMatch) {
+      const badge = document.createElement('span');
+      badge.className = 'synapse-find-merged-badge';
+      badge.textContent = `[統合:${match.matchedColLabel}にヒット]`;
       td.appendChild(badge);
 
       const meta = typeof getTableMeta === 'function' ? getTableMeta(match.tableId) : null;
@@ -10396,6 +10611,11 @@ function setupSynapseFindWidgetEvents() {
   closeBtn?.addEventListener('click', closeSynapseFindWidget);
 
   includeChipCb?.addEventListener('change', () => {
+    executeSynapseSearch();
+  });
+
+  const includeHiddenCb = document.getElementById('synapse-find-include-hidden');
+  includeHiddenCb?.addEventListener('change', () => {
     executeSynapseSearch();
   });
 }
@@ -10616,25 +10836,32 @@ function renderTableControlBar(tableId, parentContainerEl) {
 
     leftDiv.appendChild(exportBtn);
 
-    // 🔗 列の統合表示ボタン
-    const mergeColsBtn = document.createElement('button');
-    mergeColsBtn.className = 'btn btn-secondary';
-    mergeColsBtn.style.padding = '0.4rem 0.75rem';
-    mergeColsBtn.style.fontSize = '0.8rem';
-    mergeColsBtn.style.display = 'flex';
-    mergeColsBtn.style.alignItems = 'center';
-    mergeColsBtn.style.gap = '0.25rem';
-    const currentMergedGroups = getMergedColumns(tableId);
-    if (currentMergedGroups.length > 0) {
-      mergeColsBtn.innerHTML = `<span>🔗</span> 列の統合表示 <span style="background: rgba(16,185,129,0.2); color: #10b981; padding: 1px 6px; border-radius: 10px; font-size: 0.7rem; font-weight: 700;">${currentMergedGroups.length}</span>`;
+    // 👁️ 列の表示設定ボタン (非表示・統合)
+    const colDisplayBtn = document.createElement('button');
+    colDisplayBtn.className = 'btn btn-secondary';
+    colDisplayBtn.style.padding = '0.4rem 0.75rem';
+    colDisplayBtn.style.fontSize = '0.8rem';
+    colDisplayBtn.style.display = 'flex';
+    colDisplayBtn.style.alignItems = 'center';
+    colDisplayBtn.style.gap = '0.35rem';
+    const currentMergedGroups = typeof getMergedColumns === 'function' ? getMergedColumns(tableId) : [];
+    const currentHiddenCols = typeof getUserHiddenColumns === 'function' ? getUserHiddenColumns(tableId) : [];
+    const badgeParts = [];
+    if (currentMergedGroups.length > 0) badgeParts.push(`統合:${currentMergedGroups.length}`);
+    if (currentHiddenCols.length > 0) badgeParts.push(`非表示:${currentHiddenCols.length}`);
+
+    if (badgeParts.length > 0) {
+      colDisplayBtn.innerHTML = `<span>👁️</span> 列の表示設定 <span style="background: rgba(37,99,235,0.12); color: #2563eb; padding: 1px 6px; border-radius: 10px; font-size: 0.7rem; font-weight: 700;">${badgeParts.join(' ')}</span>`;
     } else {
-      mergeColsBtn.innerHTML = '<span>🔗</span> 列の統合表示';
+      colDisplayBtn.innerHTML = '<span>👁️</span> 列の表示設定';
     }
-    mergeColsBtn.title = '複数のカラムを1列に統合して表示します';
-    mergeColsBtn.addEventListener('click', () => {
-      openMergedColumnsModal(tableId);
+    colDisplayBtn.title = '列の非表示・統合表示を設定します';
+    colDisplayBtn.addEventListener('click', () => {
+      if (typeof openColumnDisplaySettingsModal === 'function') {
+        openColumnDisplaySettingsModal(tableId);
+      }
     });
-    leftDiv.appendChild(mergeColsBtn);
+    leftDiv.appendChild(colDisplayBtn);
 
   }
 
@@ -18634,12 +18861,13 @@ function renderAgencyInfo() {
         const isFiltered = state.agFilters[col.id] && state.agFilters[col.id].length > 0;
         const activeClass = isFiltered ? ' filter-btn-active' : '';
 
+        const agHeaderMg = getMergedGroupForCol('ag', col.id);
+        const agHeaderText = (agHeaderMg && agHeaderMg.primaryColumnId === col.id && agHeaderMg.name) ? agHeaderMg.name : col.label;
         th.innerHTML = `
           <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${col.label}</span>${(() => {
-            const mg = getMergedGroupForCol('ag', col.id);
-            if (mg && mg.primaryColumnId === col.id) {
-              return `<span class="synapse-merged-header-badge" title="統合項目: ${getMergedGroupSummaryText('ag', mg)}">🔗 統合: ${mg.columnIds.length}項目</span>`;
+            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${agHeaderText}">${agHeaderText}</span>${(() => {
+            if (agHeaderMg && agHeaderMg.primaryColumnId === col.id) {
+              return `<span class="synapse-header-merge-icon" title="統合グループ「${agHeaderMg.name || ''}」 (${getMergedGroupSummaryText('ag', agHeaderMg)})">🔗</span>`;
             }
             return '';
           })()}
@@ -18935,11 +19163,7 @@ function renderAgencyInfo() {
 
         const agMergeGroup = getMergedGroupForCol('ag', col.id);
         if (agMergeGroup && agMergeGroup.primaryColumnId === col.id) {
-          const badge = document.createElement('span');
-          badge.className = 'synapse-merged-badge';
-          badge.textContent = `🔗 +${agMergeGroup.columnIds.length - 1}`;
-          badge.title = `統合項目: ${getMergedGroupSummaryText('ag', agMergeGroup)}`;
-          td.appendChild(badge);
+            if (typeof td.removeAttribute === 'function') td.removeAttribute('title'); else td.title = '';
           attachMergedCellHoverEvents(td, 'ag', contract, agMergeGroup, columns);
         }
 
@@ -20487,12 +20711,13 @@ function renderJoInfo() {
         const isFiltered = state.joFilters[col.id] && state.joFilters[col.id].length > 0;
         const activeClass = isFiltered ? ' filter-btn-active' : '';
 
+        const joHeaderMg = getMergedGroupForCol('jo', col.id);
+        const joHeaderText = (joHeaderMg && joHeaderMg.primaryColumnId === col.id && joHeaderMg.name) ? joHeaderMg.name : col.label;
         th.innerHTML = `
           <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${col.label}</span>${(() => {
-              const mg = getMergedGroupForCol('jo', col.id);
-              if (mg && mg.primaryColumnId === col.id) {
-                return `<span class="synapse-merged-header-badge" title="統合項目: ${getMergedGroupSummaryText('jo', mg)}">🔗 統合: ${mg.columnIds.length}項目</span>`;
+            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${joHeaderText}">${joHeaderText}</span>${(() => {
+              if (joHeaderMg && joHeaderMg.primaryColumnId === col.id) {
+                return `<span class="synapse-header-merge-icon" title="統合グループ「${joHeaderMg.name || ''}」 (${getMergedGroupSummaryText('jo', joHeaderMg)})">🔗</span>`;
               }
               return '';
             })()}
@@ -20750,11 +20975,7 @@ function renderJoInfo() {
 
         const joMergeGroup = getMergedGroupForCol('jo', col.id);
         if (joMergeGroup && joMergeGroup.primaryColumnId === col.id) {
-          const badge = document.createElement('span');
-          badge.className = 'synapse-merged-badge';
-          badge.textContent = `🔗 +${joMergeGroup.columnIds.length - 1}`;
-          badge.title = `統合項目: ${getMergedGroupSummaryText('jo', joMergeGroup)}`;
-          td.appendChild(badge);
+            if (typeof td.removeAttribute === 'function') td.removeAttribute('title'); else td.title = '';
           attachMergedCellHoverEvents(td, 'jo', contract, joMergeGroup, columns);
         }
 
@@ -21186,12 +21407,13 @@ function renderApplicantInfo() {
         const isFiltered = state.apFilters[col.id] && state.apFilters[col.id].length > 0;
         const activeClass = isFiltered ? ' filter-btn-active' : '';
 
+        const apHeaderMg = getMergedGroupForCol('ap', col.id);
+        const apHeaderText = (apHeaderMg && apHeaderMg.primaryColumnId === col.id && apHeaderMg.name) ? apHeaderMg.name : col.label;
         th.innerHTML = `
           <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${col.label}</span>${(() => {
-              const mg = getMergedGroupForCol('ap', col.id);
-              if (mg && mg.primaryColumnId === col.id) {
-                return `<span class="synapse-merged-header-badge" title="統合項目: ${getMergedGroupSummaryText('ap', mg)}">🔗 統合: ${mg.columnIds.length}項目</span>`;
+            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${apHeaderText}">${apHeaderText}</span>${(() => {
+              if (apHeaderMg && apHeaderMg.primaryColumnId === col.id) {
+                return `<span class="synapse-header-merge-icon" title="統合グループ「${apHeaderMg.name || ''}」 (${getMergedGroupSummaryText('ap', apHeaderMg)})">🔗</span>`;
               }
               return '';
             })()}
@@ -21485,11 +21707,7 @@ function renderApplicantInfo() {
 
         const apMergeGroup = getMergedGroupForCol('ap', col.id);
         if (apMergeGroup && apMergeGroup.primaryColumnId === col.id) {
-          const badge = document.createElement('span');
-          badge.className = 'synapse-merged-badge';
-          badge.textContent = `🔗 +${apMergeGroup.columnIds.length - 1}`;
-          badge.title = `統合項目: ${getMergedGroupSummaryText('ap', apMergeGroup)}`;
-          td.appendChild(badge);
+            if (typeof td.removeAttribute === 'function') td.removeAttribute('title'); else td.title = '';
           attachMergedCellHoverEvents(td, 'ap', contract, apMergeGroup, columns);
         }
 
@@ -25891,14 +26109,15 @@ function renderDbmakePartners() {
       th.style.maxWidth = `${w}px`;
       th.style.minWidth = `${w}px`;
 
-      th.textContent = col.name;
       const dbmakeMg = getMergedGroupForCol('dbmake', col.id);
+      const dbmakeHeaderText = (dbmakeMg && dbmakeMg.primaryColumnId === col.id && dbmakeMg.name) ? dbmakeMg.name : col.name;
+      th.textContent = dbmakeHeaderText;
       if (dbmakeMg && dbmakeMg.primaryColumnId === col.id) {
-        const badge = document.createElement('span');
-        badge.className = 'synapse-merged-header-badge';
-        badge.textContent = `🔗 統合: ${dbmakeMg.columnIds.length}項目`;
-        badge.title = `統合項目: ${getMergedGroupSummaryText('dbmake', dbmakeMg)}`;
-        th.appendChild(badge);
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'synapse-header-merge-icon';
+        iconSpan.textContent = '🔗';
+        iconSpan.title = `統合グループ「${dbmakeMg.name || ''}」 (${getMergedGroupSummaryText('dbmake', dbmakeMg)})`;
+        th.appendChild(iconSpan);
       }
 
       th.addEventListener('contextmenu', (e) => {
@@ -26085,11 +26304,7 @@ function renderDbmakePartners() {
         // 書式スタイルの取得と適用
         const dbmakeMergeGroup = getMergedGroupForCol('dbmake', col.id);
         if (dbmakeMergeGroup && dbmakeMergeGroup.primaryColumnId === col.id) {
-          const badge = document.createElement('span');
-          badge.className = 'synapse-merged-badge';
-          badge.textContent = `🔗 +${dbmakeMergeGroup.columnIds.length - 1}`;
-          badge.title = `統合項目: ${getMergedGroupSummaryText('dbmake', dbmakeMergeGroup)}`;
-          td.appendChild(badge);
+            if (typeof td.removeAttribute === 'function') td.removeAttribute('title'); else td.title = '';
           attachMergedCellHoverEvents(td, 'dbmake', p, dbmakeMergeGroup, columns);
         }
 

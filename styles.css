@@ -5363,6 +5363,7 @@ h3 {
     align-items: center !important;
     width: 100% !important;
   }
+}
   
 /* ==========================================================
    📱 モバイル対応 & アプリ風ボトムナビゲーションバー スタイル
@@ -5530,57 +5531,126 @@ h3 {
   cursor: pointer !important;
 }
 
-.synapse-merged-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  background: rgba(59, 130, 246, 0.12);
-  color: var(--primary, #3b82f6);
-  border: 1px solid rgba(59, 130, 246, 0.25);
-  font-size: 0.65rem;
-  font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 4px;
-  margin-left: 6px;
-  vertical-align: middle;
-  line-height: 1.2;
-  user-select: none;
-  flex-shrink: 0;
+/* =======================================================
+   👁️ 列の表示設定モーダル (高コントラスト・白背景・タブ切替)
+   ======================================================= */
+#merged-columns-modal.modal-overlay {
+  background: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(4px) !important;
+  z-index: 100000 !important;
 }
 
-.synapse-merged-header-badge {
+#merged-columns-modal .modal-content,
+#merged-columns-modal .modal-box {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 20px 30px -8px rgba(0, 0, 0, 0.3), 0 8px 12px -4px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 12px !important;
+}
+
+#merged-columns-modal h3,
+#merged-columns-modal h4,
+#merged-columns-modal label {
+  color: #0f172a !important;
+}
+
+#merged-columns-modal p,
+#merged-columns-modal .desc-text {
+  color: #475569 !important;
+}
+
+.col-display-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.col-display-tab-btn {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.col-display-tab-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.col-display-tab-btn.active {
+  background: #2563eb !important;
+  border-color: #2563eb !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+}
+
+.col-display-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  color: #0f172a !important;
+  font-size: 0.84rem;
+}
+
+.col-display-checklist-item:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.col-display-checklist-item input[type="checkbox"] {
+  accent-color: #2563eb;
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+}
+
+/* ヘッダー極小統合アイコン（文字を隠さない） */
+.synapse-header-merge-icon {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  background: rgba(16, 185, 129, 0.15);
+  justify-content: center;
   color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  font-size: 0.65rem;
-  font-weight: 600;
-  padding: 1px 4px;
-  border-radius: 3px;
-  margin-left: 4px;
+  font-size: 0.72rem;
+  margin-left: 3px;
+  cursor: help;
   vertical-align: middle;
+  flex-shrink: 0;
+  user-select: none;
 }
 
 /* =======================================================
-   📑 統合セル アコーディオン型ツールチップ
+   📑 統合セル アコーディオン型ツールチップ (実データ縦並び・選択対応)
    ======================================================= */
 .synapse-merged-chip {
   position: fixed;
   z-index: 999999;
-  min-width: 260px;
-  max-width: 380px;
-  background: var(--bg-surface-elevated, #ffffff);
-  border: 1px solid var(--border-color, #cbd5e1);
+  min-width: 270px;
+  max-width: 440px;
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
   border-radius: 8px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.08);
   font-family: inherit;
   overflow: hidden;
-  animation: synapseChipFadeIn 0.15s ease-out;
-  pointer-events: auto;
+  animation: synapseChipFadeIn 0.12s ease-out;
+  pointer-events: auto !important;
 }
 
 @keyframes synapseChipFadeIn {
@@ -5593,8 +5663,8 @@ h3 {
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  background: var(--bg-surface, #f8fafc);
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .synapse-chip-title-wrap {
@@ -5608,14 +5678,14 @@ h3 {
 }
 
 .synapse-chip-title {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  color: var(--text-primary, #1e293b);
+  color: #0f172a;
 }
 
 .synapse-chip-shortcut-hint {
   font-size: 0.65rem;
-  color: var(--text-muted, #64748b);
+  color: #64748b;
   user-select: none;
 }
 
@@ -5623,7 +5693,7 @@ h3 {
   display: flex;
   flex-direction: column;
   padding: 4px 0;
-  max-height: 260px;
+  max-height: 280px;
   overflow-y: auto;
 }
 
@@ -5632,13 +5702,13 @@ h3 {
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px;
-  gap: 8px;
-  font-size: 0.8rem;
+  gap: 10px;
+  font-size: 0.82rem;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease;
-  user-select: none;
+  user-select: text !important;
   border-left: 3px solid transparent;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .synapse-chip-row:last-child {
@@ -5647,13 +5717,13 @@ h3 {
 
 .synapse-chip-row:hover,
 .synapse-chip-row.is-hovered {
-  background: rgba(59, 130, 246, 0.12) !important;
-  border-left-color: var(--primary, #3b82f6);
+  background: #eff6ff !important;
+  border-left-color: #3b82f6 !important;
 }
 
 .synapse-chip-row.is-selected {
-  background: rgba(59, 130, 246, 0.22) !important;
-  border-left-color: var(--primary, #3b82f6);
+  background: #dbeafe !important;
+  border-left-color: #2563eb !important;
 }
 
 .synapse-chip-row.is-match-highlight {
@@ -5662,49 +5732,40 @@ h3 {
 }
 
 .synapse-chip-row-label {
-  color: var(--text-muted, #64748b);
-  font-size: 0.72rem;
+  color: #64748b;
+  font-size: 0.74rem;
   font-weight: 600;
   flex-shrink: 0;
-  min-width: 65px;
+  min-width: 75px;
+  user-select: none;
 }
 
 .synapse-chip-row-val {
-  color: var(--text-primary, #0f172a);
+  color: #0f172a;
   font-weight: 500;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: inherit;
-}
-
-.synapse-chip-main-badge {
-  font-size: 0.62rem;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  font-weight: 600;
-  flex-shrink: 0;
-  user-select: none;
+  user-select: text !important;
 }
 
 .synapse-chip-copy-btn {
   background: transparent;
   border: none;
   cursor: pointer;
-  opacity: 0.4;
+  opacity: 0.45;
   transition: opacity 0.15s, transform 0.1s;
-  font-size: 0.75rem;
-  padding: 2px 4px;
-  border-radius: 3px;
+  font-size: 0.8rem;
+  padding: 2px 5px;
+  border-radius: 4px;
 }
 
 .synapse-chip-copy-btn:hover {
   opacity: 1;
   transform: scale(1.1);
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .synapse-chip-copy-feedback {
@@ -5723,20 +5784,25 @@ h3 {
 }
 
 /* =======================================================
-   🔍 Synapse Command+F (Ctrl+F) 検索バー & ハイライト
+   🔍 Synapse Command+F (Ctrl+F) 検索バー & ハイライト (右上・横1行コンパクト)
    ======================================================= */
 .synapse-find-widget {
-  position: fixed;
-  top: 14px;
-  right: 28px;
-  z-index: 100005;
-  background: var(--bg-surface-elevated, #ffffff);
-  border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 8px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
-  padding: 5px 8px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  position: fixed !important;
+  top: 12px !important;
+  right: 20px !important;
+  bottom: auto !important;
+  left: auto !important;
+  z-index: 999999 !important;
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 20px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+  padding: 4px 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+  max-width: none !important;
   animation: synapseFindSlideDown 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -5746,93 +5812,101 @@ h3 {
 }
 
 .synapse-find-inner {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
 }
 
 .synapse-find-icon {
   font-size: 0.85rem;
   user-select: none;
+  color: #64748b;
 }
 
 .synapse-find-input {
-  width: 190px;
-  padding: 4px 8px;
-  font-size: 0.82rem;
-  border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: var(--radius-sm, 4px);
-  background: var(--bg-surface, #f8fafc);
-  color: var(--text-primary, #1e293b);
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 140px !important;
+  height: 26px !important;
+  padding: 2px 8px !important;
+  font-size: 0.82rem !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 13px !important;
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  outline: none !important;
 }
 
 .synapse-find-input:focus {
-  border-color: var(--primary, #3b82f6);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-color: #2563eb !important;
+  background: #ffffff !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
 }
 
 .synapse-find-counter {
-  font-size: 0.74rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted, #64748b);
-  min-width: 50px;
-  text-align: center;
-  user-select: none;
+  font-size: 0.74rem !important;
+  font-variant-numeric: tabular-nums !important;
+  color: #64748b !important;
+  min-width: 40px !important;
+  text-align: center !important;
 }
 
 .synapse-find-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  cursor: pointer;
-  padding: 3px 6px;
-  font-size: 0.75rem;
-  color: var(--text-primary, #334155);
-  transition: background 0.12s, border-color 0.12s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  background: transparent !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 4px !important;
+  padding: 2px 6px !important;
+  cursor: pointer !important;
+  font-size: 0.72rem !important;
+  color: #475569 !important;
+  line-height: 1 !important;
+  transition: all 0.15s ease !important;
 }
 
 .synapse-find-btn:hover {
-  background: var(--bg-surface, #f1f5f9);
-  border-color: var(--border-color, #cbd5e1);
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
 }
 
 .synapse-find-btn.synapse-find-close {
-  font-size: 1.1rem;
-  line-height: 1;
-  padding: 1px 5px;
-  color: var(--text-muted, #64748b);
+  border: none !important;
+  font-size: 1.1rem !important;
+  color: #94a3b8 !important;
+  padding: 0 4px !important;
+  margin-left: 2px !important;
 }
 
 .synapse-find-btn.synapse-find-close:hover {
-  color: var(--danger, #ef4444);
+  color: #ef4444 !important;
+  background: transparent !important;
 }
 
-.synapse-find-chip-label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.75rem;
-  color: var(--text-secondary, #475569);
-  cursor: pointer;
-  margin-left: 4px;
-  border-left: 1px solid var(--border-color, #e2e8f0);
-  padding-left: 8px;
-  user-select: none;
+.synapse-find-check-label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 0.74rem !important;
+  color: #334155 !important;
+  cursor: pointer !important;
+  margin-left: 4px !important;
+  border-left: 1px solid #e2e8f0 !important;
+  padding-left: 8px !important;
+  user-select: none !important;
+  white-space: nowrap !important;
 }
 
-.synapse-find-chip-label input[type="checkbox"] {
-  cursor: pointer;
-  accent-color: var(--primary, #3b82f6);
+.synapse-find-check-label input[type="checkbox"] {
+  cursor: pointer !important;
+  accent-color: #2563eb !important;
+  width: 14px !important;
+  height: 14px !important;
 }
 
 /* スプレッドシートと同等の薄色セルハイライト */
 .synapse-find-cell-match {
-  background-color: rgba(254, 240, 138, 0.45) !important; /* 薄黄色 */
+  background-color: rgba(254, 240, 138, 0.45) !important;
   transition: background-color 0.15s ease;
 }
 
@@ -5880,7 +5954,3 @@ mark.synapse-find-mark.is-active {
   color: #ffffff;
   font-weight: bold;
 }
-
-
-
-
