@@ -3900,14 +3900,15 @@ function setupSidebarToggleBtnEvent() {
   if (sidebarToggleBtn.dataset.bound) return;
   sidebarToggleBtn.dataset.bound = 'true';
 
-  sidebarToggleBtn.addEventListener('click', () => {
+  sidebarToggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     const sidebar = document.getElementById('app-sidebar');
     if (!sidebar) return;
 
     sidebar.classList.toggle('collapsed');
     const isCollapsed = sidebar.classList.contains('collapsed');
-    sidebarToggleBtn.style.left = isCollapsed ? '64px' : '215px';
     sidebarToggleBtn.textContent = isCollapsed ? '›' : '‹';
+    sidebarToggleBtn.title = isCollapsed ? 'サイドバーを展開' : 'サイドバーを折りたたむ';
   });
 }
 
@@ -11774,7 +11775,7 @@ function checkLoginStatus() {
     if (sidebarEl) sidebarEl.classList.remove('collapsed');
     if (toggleBtn) {
       toggleBtn.textContent = '‹';
-      toggleBtn.style.left = '215px';
+      toggleBtn.title = 'サイドバーを折りたたむ';
     }
 
     // UI表示の更新
@@ -14507,7 +14508,7 @@ async function handleLogin(e) {
       if (sidebarEl) sidebarEl.classList.remove('collapsed');
       if (toggleBtn) {
         toggleBtn.textContent = '‹';
-        toggleBtn.style.left = '215px';
+        toggleBtn.title = 'サイドバーを折りたたむ';
       }
 
       showLoginScreen(false);
@@ -14610,7 +14611,7 @@ async function handleLogin(e) {
         if (sidebarEl) sidebarEl.classList.remove('collapsed');
         if (toggleBtn) {
           toggleBtn.textContent = '‹';
-          toggleBtn.style.left = '215px';
+          toggleBtn.title = 'サイドバーを折りたたむ';
         }
 
         showLoginScreen(false);
@@ -30609,7 +30610,7 @@ function initSignupEvents() {
       if (sidebarEl) sidebarEl.classList.remove('collapsed');
       if (toggleBtn) {
         toggleBtn.textContent = '‹';
-        toggleBtn.style.left = '215px';
+        toggleBtn.title = 'サイドバーを折りたたむ';
       }
 
       updateUIForCurrentMode();
