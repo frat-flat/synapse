@@ -286,6 +286,7 @@ main {
 /* Screen View Control */
 .screen-view {
   display: none;
+  position: relative;
   animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   transition: zoom 0.15s ease-out;
   transform-origin: top left;
@@ -1090,8 +1091,8 @@ textarea {
 .tabs-outer-wrapper {
   position: relative;
   width: 100%;
-  margin-top: 0.1rem;
-  margin-bottom: 0.25rem;
+  margin-top: 0.05rem;
+  margin-bottom: 0.15rem;
   transition: margin-bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -1436,7 +1437,7 @@ textarea {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 0.35rem 0.75rem;
+  padding: 0.12rem 0.75rem !important;
   height: 100vh;
   overflow: hidden;
   background: var(--bg-main);
@@ -2922,27 +2923,103 @@ textarea {
   box-shadow: var(--shadow-sm);
 }
 
-/* メインヘッダー自体の微調整 (省スペース・クリーン化) */
+/* メインヘッダー自体の極限スリム化 (省スペース・コンパクト化: 縦幅を大幅圧縮) */
 .main-header {
-  padding: 0.35rem 0.65rem !important;
+  padding: 0.08rem 0.5rem !important;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  margin-bottom: 0.25rem !important;
-  min-height: 32px;
+  border-radius: var(--radius-xs, 3px);
+  margin-top: 0 !important;
+  margin-bottom: 0.1rem !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
   position: relative;
   z-index: 100;
   overflow: visible !important;
-  display: flex;
-  align-items: center;
+  display: flex !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
 }
 
 .main-header-top-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  gap: 0.5rem;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  height: 100% !important;
+  gap: 0.4rem !important;
+}
+
+#main-header-title {
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  line-height: 1 !important;
+  color: var(--text-primary);
+}
+
+#sync-status-indicator {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.2rem !important;
+  font-size: 0.62rem !important;
+  font-weight: 600 !important;
+  padding: 0 0.3rem !important;
+  height: 17px !important;
+  line-height: 1 !important;
+  border-radius: 2px !important;
+  border: 1px solid var(--border-color) !important;
+  background: var(--bg-surface-elevated) !important;
+  color: var(--text-secondary) !important;
+  box-sizing: border-box !important;
+}
+
+#sync-status-icon {
+  font-size: 0.55rem !important;
+  line-height: 1 !important;
+}
+
+#header-add-sticky-btn {
+  padding: 0 0.35rem !important;
+  font-size: 0.68rem !important;
+  font-weight: 600 !important;
+  height: 18px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  border-radius: 2px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.2rem !important;
+  box-sizing: border-box !important;
+}
+
+#header-user-profile-btn {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.25rem !important;
+  padding: 0 0.35rem !important;
+  height: 18px !important;
+  line-height: 1 !important;
+  background: var(--bg-surface-elevated) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 2px !important;
+  font-size: 0.68rem !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+}
+
+#logged-in-user-avatar {
+  width: 13px !important;
+  height: 13px !important;
+  font-size: 0.55rem !important;
+  line-height: 1 !important;
+}
+
+#logged-in-user-name {
+  font-size: 0.68rem !important;
+  line-height: 1 !important;
 }
 
 /* ================= Google Sheets スタイル メニューバー (テーブル画面専用) ================= */
@@ -3141,6 +3218,12 @@ body.dark-mode .sheets-dropdown-item:hover {
 [data-theme="dark"] .table-alternating-rows tbody tr:nth-child(even) td,
 body.dark-mode .table-alternating-rows tbody tr:nth-child(even) td {
   background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* グリッド線の非表示 (表示 > グリッド線) */
+table.hide-gridlines td,
+table.hide-gridlines th {
+  border-color: transparent !important;
 }
 
 /* ================= DBmake (パートナーDB管理) 移植用スタイル ================= */
