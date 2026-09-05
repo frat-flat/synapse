@@ -4594,10 +4594,25 @@
         }
         if (!qDef) return;
 
-        if (qDef.required) {
-          const qTitleEl = card.querySelector('.preview-q-title');
-          if (qTitleEl && !qTitleEl.innerHTML.includes('red-asterisk')) {
-            qTitleEl.innerHTML = `<span class="red-asterisk" style="color:var(--color-danger, #dc3545); margin-right:4px;">*</span>` + qTitleEl.innerHTML;
+        const qTitleEl = card.querySelector('.preview-q-title');
+        if (qTitleEl) {
+          const asterisks = qTitleEl.querySelectorAll('.red-asterisk');
+          if (asterisks.length > 1) {
+            for (let i = 1; i < asterisks.length; i++) {
+              asterisks[i].remove();
+            }
+          }
+          if (qDef.required) {
+            if (!qTitleEl.querySelector('.red-asterisk') && !qTitleEl.textContent.trim().startsWith('*')) {
+              const ast = document.createElement('span');
+              ast.className = 'red-asterisk';
+              ast.style.cssText = 'color:var(--color-danger, #dc3545); margin-right:4px;';
+              ast.textContent = '*';
+              qTitleEl.insertBefore(ast, qTitleEl.firstChild);
+            }
+          } else {
+            const existingAst = qTitleEl.querySelector('.red-asterisk');
+            if (existingAst) existingAst.remove();
           }
         }
 
@@ -6080,7 +6095,7 @@
       qCard.dataset.questionId = q.id;
       qCard.style.cssText = 'background:rgba(0,0,0,0.015); border:1px solid var(--color-border); border-radius:4px; padding:12px; margin-bottom:12px; display:flex; flex-direction:column; gap:6px; transition:border-color 0.2s;';
 
-      const reqAsterisk = q.required ? `<span style="color:var(--color-danger, #dc3545); margin-right:4px;">*</span>` : '';
+      const reqAsterisk = q.required ? `<span class="red-asterisk" style="color:var(--color-danger, #dc3545); margin-right:4px;">*</span>` : '';
       const qTitle = q.title ? q.title.trim() : '無題の質問';
       const qDesc = q.description ? q.description.trim() : '';
 
