@@ -23,12 +23,12 @@
         // CSSの注入
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = './assets/custom-editor-v80.css?v=' + ts;
+        link.href = './assets/custom-editor-v81.css?v=' + ts;
         document.head.appendChild(link);
         
         // JS of injection
         const script = document.createElement('script');
-        script.src = './assets/custom-editor-v80.js?v=' + ts;
+        script.src = './assets/custom-editor-v81.js?v=' + ts;
         script.defer = true;
         document.head.appendChild(script);
         
@@ -64,7 +64,7 @@
       </nav>
       <div class="header-actions">
         <!-- ユーザープロフィール表示（ログイン状態） -->
-        <div class="user-profile-header" id="gf-user-profile" style="display: none;" data-tooltip="ユーザー情報">
+        <div class="user-profile-header" id="gf-user-profile" style="display: none;">
           <span class="user-avatar">👤</span>
           <div class="user-info">
             <span class="user-name" id="gf-user-name">田中さん</span>

@@ -1364,3 +1364,899 @@ input:-webkit-autofill:active {
   padding: 0.25rem 0.75rem !important;
   border-radius: 9999px !important;
 }
+
+/* ダッシュボード全体の幅を画面サイズに合わせて広げ、表示列数が変動するようにする */
+.dashboard-container {
+  max-width: 1600px !important;
+  width: 95% !important;
+}
+
+@media (min-width: 1800px) {
+  .dashboard-container {
+    max-width: 90% !important;
+  }
+}
+
+/* ==========================================================================
+   Google Forms 風テンプレートギャラリーシステム用スタイル
+   ========================================================================== */
+
+/* 1. ダッシュボード上部のテンプレートバー */
+.dashboard-template-bar-container {
+  background-color: #f1f3f4 !important; /* 薄いグレー背景 (Google Formsのテーマ) */
+  border-bottom: 1px solid #dadce0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 6px 8px 24px 8px !important; /* 上と左はギリギリに寄せ、下はカード用に広げる */
+  margin-bottom: 20px !important;
+}
+
+.dashboard-template-bar-content {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important; /* 親コンテナ側で左端ギリギリに調整 */
+  box-sizing: border-box !important;
+}
+
+.template-bar-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 8px !important; /* カードとの間の余白も縮小 */
+}
+
+.template-bar-title {
+  font-size: 0.98rem !important;
+  font-weight: 500 !important;
+  color: #202124 !important;
+  font-family: 'Inter', 'Noto Sans JP', sans-serif !important;
+}
+
+.btn-gallery-toggle {
+  background: transparent !important;
+  border: none !important;
+  color: #5f6368 !important;
+  font-size: 0.88rem !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  padding: 8px 12px !important;
+  border-radius: 4px !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.btn-gallery-toggle:hover {
+  background-color: rgba(95, 99, 104, 0.1) !important;
+  color: #202124 !important;
+}
+
+/* 2. テンプレートカードグリッド */
+.template-cards-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+  gap: 20px !important;
+  margin-top: 10px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* テンプレートのリスト表示 (1行ずつ並ぶスタイル) */
+.template-cards-grid.list-view {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.template-cards-grid.list-view .template-card {
+  width: 100% !important;
+  max-width: none !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  background-color: #ffffff !important;
+  border: 1px solid #dadce0 !important;
+  border-radius: 6px !important;
+  padding: 10px 16px !important;
+  box-shadow: 0 1px 2px 0 rgba(60,64,67,0.05) !important;
+  box-sizing: border-box !important;
+}
+.template-cards-grid.list-view .template-card:hover {
+  transform: none !important;
+  border-color: #7248b9 !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+}
+.template-cards-grid.list-view .template-card-preview {
+  width: 50px !important;
+  height: 36px !important;
+  aspect-ratio: auto !important;
+  padding: 2px !important;
+  flex-shrink: 0 !important;
+  box-shadow: none !important;
+}
+/* リストビュー内の非表示調整 */
+.template-cards-grid.list-view .template-card-preview .template-card-dummy-field,
+.template-cards-grid.list-view .template-card-preview .template-card-dummy-line {
+  display: none !important;
+}
+.template-cards-grid.list-view .template-card-preview .template-card-dummy-title {
+  width: 80% !important;
+  margin: 2px auto !important;
+}
+.template-cards-grid.list-view .template-card-title {
+  margin-top: 0 !important;
+  margin-left: 12px !important;
+  font-size: 0.88rem !important;
+  font-weight: 500 !important;
+  flex-grow: 1 !important;
+  text-align: left !important;
+}
+.template-cards-grid.list-view .template-card-category {
+  margin-top: 0 !important;
+  margin-left: 12px !important;
+  font-size: 0.78rem !important;
+  color: #5f6368 !important;
+  flex-shrink: 0 !important;
+}
+.template-cards-grid.list-view .btn-template-fav {
+  position: static !important;
+  margin-left: 12px !important;
+  flex-shrink: 0 !important;
+}
+
+/* 常設テンプレートバーのフィルタトグルボタン */
+.tpl-bar-filter-btn {
+  color: #5f6368 !important;
+  font-size: 0.78rem !important;
+  padding: 2px 8px !important;
+  border-radius: 3px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  user-select: none !important;
+}
+.tpl-bar-filter-btn:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+  color: #202124 !important;
+}
+.tpl-bar-filter-btn.active {
+  background-color: #ffffff !important;
+  color: #7248b9 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+}
+
+/* 3. テンプレートカード本体 */
+.template-card {
+  display: flex !important;
+  flex-direction: column !important;
+  cursor: pointer !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  position: relative !important;
+}
+
+.template-card:hover {
+  transform: translateY(-2px) !important;
+}
+
+/* テンプレートカードのサムネイルプレビュー (CSSでGoogleフォームのミニチュアを表現) */
+.template-card-preview {
+  width: 100% !important;
+  aspect-ratio: 1.4 / 1 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #dadce0 !important;
+  border-radius: 4px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  box-shadow: 0 1px 2px 0 rgba(60,64,67,0.1), 0 1px 3px 1px rgba(60,64,67,0.05) !important;
+  box-sizing: border-box !important;
+  padding: 8px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.template-card:hover .template-card-preview {
+  border-color: #7248b9 !important; /* Google Formsらしい紫カラー of 枠 */
+  box-shadow: 0 1px 3px 0 rgba(60,64,67,0.15), 0 4px 8px 3px rgba(60,64,67,0.1) !important;
+}
+
+/* プレビュー内のカラフルなヘッダー帯 */
+.template-card-header-stripe {
+  height: 6px !important;
+  width: 100% !important;
+  border-radius: 2px 2px 0 0 !important;
+  margin: -8px -8px 4px -8px !important;
+  padding-right: 16px !important;
+}
+
+/* ダミーのフォーム入力項目 (CSSプレースホルダー) */
+.template-card-dummy-title {
+  height: 8px !important;
+  width: 60% !important;
+  background-color: #e8eaed !important;
+  border-radius: 2px !important;
+  margin-bottom: 4px !important;
+}
+
+.template-card-dummy-field {
+  height: 18px !important;
+  width: 100% !important;
+  border: 1px solid #f1f3f4 !important;
+  border-radius: 2px !important;
+  background-color: #fafafa !important;
+  margin-bottom: 2px !important;
+}
+
+.template-card-dummy-line {
+  height: 4px !important;
+  width: 40% !important;
+  background-color: #f1f3f4 !important;
+  border-radius: 1px !important;
+  margin: 6px 4px !important;
+}
+
+/* 特殊カード: 「空白のフォーム」用の大きな＋マーク */
+.template-card-blank-inner {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  height: 100% !important;
+  width: 100% !important;
+}
+
+.template-card-plus-icon {
+  font-size: 3rem !important;
+  font-weight: 300 !important;
+  color: #1a73e8 !important; /* カラフル＋の代わりにモダンな青プラス */
+}
+
+/* テンプレートカードのラベルタイトル */
+.template-card-title {
+  font-size: 0.82rem !important;
+  font-weight: 500 !important;
+  color: #202124 !important;
+  margin-top: 8px !important;
+  font-family: 'Inter', 'Noto Sans JP', sans-serif !important;
+  text-overflow: ellipsis !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+}
+
+.template-card-category {
+  font-size: 0.72rem !important;
+  color: #5f6368 !important;
+  margin-top: 2px !important;
+}
+
+/* 4. フルスクリーンギャラリー画面 */
+.gallery-header-bar {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 16px 24px !important;
+  border-bottom: 1px solid #dadce0 !important; /* ライトテーマ用境界 */
+  background-color: #ffffff !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+}
+
+.gallery-header-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+}
+
+.btn-gallery-back {
+  background: transparent !important;
+  border: none !important;
+  color: #5f6368 !important;
+  cursor: pointer !important;
+  padding: 8px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.btn-gallery-back:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+.gallery-header-title {
+  font-size: 1.1rem !important;
+  font-weight: 600 !important;
+  color: #202124 !important;
+  font-family: 'Inter', 'Noto Sans JP', sans-serif !important;
+}
+
+.gallery-body-content {
+  width: 100% !important;
+  max-width: 1200px !important;
+  margin: 0 auto !important;
+  padding: 30px 24px 80px 24px !important;
+  box-sizing: border-box !important;
+}
+
+.gallery-section {
+  width: 100% !important;
+  max-width: none !important;
+  margin-bottom: 45px !important;
+  box-sizing: border-box !important;
+}
+
+.gallery-section-title {
+  font-size: 0.92rem !important;
+  font-weight: 600 !important;
+  color: #5f6368 !important;
+  border-bottom: 1px solid #dadce0 !important;
+  padding-bottom: 8px !important;
+  margin-bottom: 15px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+/* 5. フォーム一覧にアペンドするテンプレート登録ボタン */
+.btn-register-template {
+  background-color: transparent !important;
+  border: 1px solid #4a5568 !important;
+  color: #cbd5e0 !important;
+  border-radius: 4px !important;
+  padding: 3px 8px !important;
+  font-size: 0.72rem !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  transition: all 0.2s ease !important;
+  margin-left: 8px !important;
+}
+
+.btn-register-template:hover {
+  background-color: rgba(255, 215, 0, 0.1) !important;
+  border-color: #ffd700 !important;
+  color: #ffd700 !important;
+}
+
+/* 6. お気に入り・タブ切り替え用のCSS追加 */
+.gallery-tabs-container {
+  display: flex !important;
+  justify-content: center !important;
+  margin-bottom: 30px !important;
+  border-bottom: 1px solid #dadce0 !important;
+  padding-bottom: 15px !important;
+}
+
+.gallery-tabs {
+  display: flex !important;
+  gap: 12px !important;
+  background-color: #f1f3f4 !important;
+  padding: 4px !important;
+  border-radius: 8px !important;
+  border: 1px solid #dadce0 !important;
+}
+
+.gallery-tab-item {
+  background: transparent !important;
+  border: none !important;
+  color: #5f6368 !important;
+  padding: 8px 18px !important;
+  border-radius: 6px !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.gallery-tab-item:hover {
+  color: #202124 !important;
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+.gallery-tab-item.active {
+  background-color: #ffffff !important;
+  color: #7248b9 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* カード上のお気に入りスターボタン */
+.btn-template-fav {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid #dadce0 !important;
+  border-radius: 50% !important;
+  width: 26px !important;
+  height: 26px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  z-index: 10 !important;
+  font-size: 0.85rem !important;
+  color: #9ca3af !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+  padding: 0 !important;
+}
+
+.btn-template-fav:hover {
+  background: #ffffff !important;
+  transform: scale(1.1) !important;
+}
+
+.btn-template-fav.active {
+  color: #f39c12 !important; /* 金星 */
+  border-color: #f39c12 !important;
+  background: #fff8e7 !important;
+}
+
+/* 画面サイズに合わせて列数を自動調整するレスポンシブグリッド */
+.template-cards-grid {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+}
+
+/* 🗑️ テンプレート削除ボタン (インライン/絶対配置の両対応) */
+.btn-delete-template-direct {
+  position: absolute !important;
+  top: 10px !important;
+  right: 40px !important; /* スターボタンの左隣 */
+  z-index: 10 !important;
+  background: rgba(255,255,255,0.9) !important;
+  border: 1px solid #dadce0 !important;
+  border-radius: 50% !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  font-size: 0.8rem !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+  transition: transform 0.1s ease !important;
+  padding: 0 !important;
+  outline: none !important;
+}
+
+.btn-delete-template-direct:hover {
+  background: #fdf2f2 !important;
+  border-color: #f8b4b4 !important;
+  transform: scale(1.1) !important;
+}
+
+/* リスト表示（リストビュー）の時は横並びのフローに組み込む */
+.template-cards-grid.list-view .btn-delete-template-direct {
+  position: static !important;
+  margin-left: 12px !important;
+  flex-shrink: 0 !important;
+}
+
+/* 🔙 ダッシュボードへの戻るボタン */
+.btn-back-to-dashboard:hover {
+  background-color: #f1f3f4 !important;
+  color: #202124 !important;
+}
+
+/* 📝 フォーム説明文の複数行入力・改行対応 */
+#editor-form-desc {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  resize: vertical !important;
+  min-height: 48px !important;
+  line-height: 1.6 !important;
+  font-family: inherit !important;
+  font-size: 0.85rem !important;
+  padding: 8px 10px !important;
+  border-radius: 4px !important;
+  border: 1px solid var(--color-border) !important;
+  background-color: var(--color-bg-input) !important;
+  color: var(--color-text) !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast) !important;
+}
+
+#editor-form-desc:focus {
+  border-color: var(--color-primary) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--color-primary-glow) !important;
+}
+
+/* プレビュー画面・ライブプレビュー画面・概要画面での改行（\n）の改行表示保証 */
+#preview-form-desc,
+#live-preview-form-desc,
+.preview-form-header p,
+.preview-q-desc,
+.overview-section-desc,
+#preview-section-container > div:first-child {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+}
+
+/* リッチテキスト埋め込みリンクスタイル */
+.rich-embedded-link {
+  color: #1a73e8 !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.rich-embedded-link:hover {
+  color: #1557b0 !important;
+  opacity: 0.85;
+}
+
+/* =========================================================
+   セクション並び替えボタン スタイル (.btn-sec-reorder, #active-section-order-controls)
+   ========================================================= */
+.sidebar-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 8px 10px !important;
+  user-select: none;
+}
+
+.sidebar-item-info {
+  display: flex !important;
+  align-items: center !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  gap: 8px !important;
+}
+
+.sidebar-item-title {
+  flex: 1 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.sidebar-item-actions {
+  display: flex !important;
+  gap: 3px !important;
+  align-items: center !important;
+  margin-left: 6px !important;
+  flex-shrink: 0 !important;
+}
+
+.btn-sec-reorder {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  padding: 0 !important;
+  font-size: 0.65rem !important;
+  line-height: 1 !important;
+  background: var(--color-bg-subtle, rgba(255, 255, 255, 0.08)) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 3px !important;
+  color: var(--color-text-muted) !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.btn-sec-reorder:hover:not(:disabled) {
+  background: var(--color-primary, #1a73e8) !important;
+  color: #ffffff !important;
+  border-color: var(--color-primary, #1a73e8) !important;
+  transform: translateY(-1px);
+}
+
+.btn-sec-reorder:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-sec-reorder:disabled {
+  opacity: 0.25 !important;
+  cursor: not-allowed !important;
+}
+
+/* セクション詳細画面下部の並び替えボタン */
+#active-section-order-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+  margin-right: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-active-sec-up,
+.btn-active-sec-down {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 6px 14px !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  border-radius: 5px !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.btn-active-sec-up:hover:not(:disabled),
+.btn-active-sec-down:hover:not(:disabled) {
+  background: var(--color-bg-hover, #e8f0fe) !important;
+  border-color: var(--color-primary, #1a73e8) !important;
+  color: var(--color-primary, #1a73e8) !important;
+  transform: translateY(-1px);
+}
+
+.btn-active-sec-up:disabled,
+.btn-active-sec-down:disabled,
+.btn-sec-reorder-disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+.sec-move-hint {
+  font-size: 0.74rem;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+/* セクション位置バッジ（編集画面上部） */
+.section-position-badge {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, rgba(26, 115, 232, 0.08) 0%, rgba(26, 115, 232, 0.02) 100%);
+  border: 1px solid rgba(26, 115, 232, 0.25);
+  border-left: 4px solid var(--color-primary, #1a73e8);
+  border-radius: 6px;
+  padding: 8px 14px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.section-position-badge.badge-highlight-pulse {
+  animation: badgePulse 0.8s ease;
+}
+
+@keyframes badgePulse {
+  0% { transform: scale(1); background-color: rgba(16, 185, 129, 0.3); border-color: #10b981; }
+  50% { transform: scale(1.015); background-color: rgba(16, 185, 129, 0.15); border-color: #10b981; }
+  100% { transform: scale(1); }
+}
+
+.section-position-badge .sec-badge-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.section-position-badge .badge-index-pill {
+  background: var(--color-primary, #1a73e8);
+  color: #ffffff;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.section-position-badge .badge-order-summary {
+  font-size: 0.82rem;
+  color: var(--color-text, #374151);
+  font-weight: 500;
+}
+
+.section-position-badge .sec-badge-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.section-position-badge .sec-badge-controls button {
+  padding: 3px 10px !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  height: 28px !important;
+  border-radius: 4px !important;
+}
+
+/* トースト通知 */
+.section-action-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  background: #1e293b;
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  z-index: 999999;
+  opacity: 0;
+  transform: translateY(-16px);
+  pointer-events: none;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  border-left: 4px solid #10b981;
+}
+
+.section-action-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.section-action-toast .toast-icon {
+  background: #10b981;
+  color: #ffffff;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+/* プレビュー手動更新ボタン */
+.btn-preview-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1.2;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-preview-refresh-btn:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.15);
+}
+
+.btn-preview-refresh-btn:active {
+  transform: scale(0.96);
+  background: #bfdbfe;
+}
+
+.btn-preview-refresh-btn .refresh-icon,
+.panel-refresh-icon,
+.btn-editor-sync-preview .sync-icon {
+  display: inline-block;
+  font-size: 0.76rem;
+  transition: transform 0.4s ease;
+}
+
+/* スピン回転アニメーション */
+.is-refreshing .refresh-icon,
+.is-refreshing .panel-refresh-icon,
+.is-refreshing .sync-icon {
+  animation: spin-refresh-anim 0.65s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes spin-refresh-anim {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* エディタ上部（セクション編集バー内）のプレビュー更新ボタン */
+.btn-editor-sync-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px !important;
+  font-size: 0.76rem !important;
+  font-weight: 600 !important;
+  color: #2563eb !important;
+  background: #ffffff !important;
+  border: 1px solid #bfdbfe !important;
+  border-radius: 4px !important;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-editor-sync-preview:hover {
+  background: #eff6ff !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.2);
+}
+
+.btn-editor-sync-preview:active {
+  transform: scale(0.97);
+}
+
+
+
+
+
+/* ==========================================
+   ユーザープロフィール基本スタイル（常時適用）
+   ========================================== */
+.user-profile-header {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 4px 10px !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+}
+.user-profile-header .user-avatar {
+  font-size: 1.1rem !important;
+}
+.user-profile-header .user-info {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+  text-align: left !important;
+}
+.user-profile-header .user-name {
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  line-height: 1.2 !important;
+}
+.user-profile-header .user-role {
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  color: #6366f1 !important;
+  line-height: 1.2 !important;
+}
+#btn-logout {
+  font-size: 0.75rem !important;
+  padding: 4px 8px !important;
+  height: auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  border-radius: 4px !important;
+  display: inline-flex !important;
+  margin-left: 4px !important;
+}
+#btn-logout::before {
+  display: none !important;
+}
+#btn-export-json .btn-text {
+  display: inline !important;
+}
+#btn-export-json {
+  font-size: 0.8rem !important;
+  padding: 6px 12px !important;
+  height: auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  border-radius: 4px !important;
+}
+#btn-export-json::before {
+  display: none !important;
+}
