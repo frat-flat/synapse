@@ -774,13 +774,21 @@
             <!-- 💡 フローマップ クイック凡例（常時表示・最小化可能） -->
             <div id="flowmap-quick-legend" class="flowmap-quick-legend">
               <div class="quick-legend-header">
-                <span class="quick-legend-title">💡 凡例（線の色・枠）</span>
+                <span class="quick-legend-title">💡 凡例（ボックス・線の色）</span>
                 <div class="quick-legend-actions">
                   <button type="button" id="btn-quick-legend-detail" title="詳しい説明を見る">📖 詳細</button>
                   <button type="button" id="btn-quick-legend-toggle" title="折りたたむ">−</button>
                 </div>
               </div>
               <div class="quick-legend-body">
+                <div class="legend-item">
+                  <span class="legend-box box-green-node"></span>
+                  <span class="legend-text"><strong>緑バー枠</strong>: 質問ボックス（回答する質問）</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-box box-orange-node"></span>
+                  <span class="legend-text"><strong>オレンジバー枠</strong>: 回答ボックス（次に分岐がある選択肢）</span>
+                </div>
                 <div class="legend-item">
                   <span class="legend-line line-blue-dash"></span>
                   <span class="legend-text"><strong>青点線</strong>: セクション間遷移（次へ）</span>
@@ -1003,6 +1011,7 @@
         <div class="login-users-list" id="login-users-list">
           <!-- JSでユーザーカードが動的に挿入されます -->
         </div>
+      </div>
     </div>
 
     <style id="theme-sync-styles">
@@ -1363,7 +1372,7 @@
 
           <!-- 3. カードの種類 -->
           <div class="guide-section">
-            <h4>3. 各カード（ノード）の種類</h4>
+            <h4>3. 各ボックス（ノード）の色の違いと役割</h4>
             <div class="guide-grid">
               <div class="guide-card-item">
                 <div class="guide-icon-box">
@@ -1379,8 +1388,8 @@
                   <span style="font-size: 1.3rem;">❓</span>
                 </div>
                 <div class="guide-text-box">
-                  <strong><span class="guide-badge-pill" style="background: #f0fff4; color: #38a169; border: 1px solid #c6f6d5;">緑バー</span> 質問カード</strong>
-                  <p>テキスト入力、チェックボックス、ラジオボタンなどの個々の質問項目です。</p>
+                  <strong><span class="guide-badge-pill" style="background: #f0fff4; color: #38a169; border: 1px solid #c6f6d5;">緑バー</span> 質問ボックス</strong>
+                  <p>テキスト入力、チェックボックス、ラジオボタン等の個々の質問項目です。その質問の回答による固有の分岐がない場合は、回答ボックスは表示されず、質問カードから自然な回答順序（グレー線）やセクション遷移（青点線）へ直結します。</p>
                 </div>
               </div>
               <div class="guide-card-item">
@@ -1388,8 +1397,8 @@
                   <span style="font-size: 1.3rem;">🔹</span>
                 </div>
                 <div class="guide-text-box">
-                  <strong><span class="guide-badge-pill" style="background: #fffaf0; color: #dd6b20; border: 1px solid #feebc8;">オレンジバー</span> 選択肢カード（分岐ノード）</strong>
-                  <p>条件分岐が設定されている質問の回答選択肢です。選択肢ごとに異なるセクションへジャンプできます。</p>
+                  <strong><span class="guide-badge-pill" style="background: #fffaf0; color: #dd6b20; border: 1px solid #feebc8;">オレンジバー</span> 回答ボックス（分岐選択肢）</strong>
+                  <p><strong>「その次に分岐先（別セクションや送信完了）が設定されている選択肢のみ」</strong>表示されます。回答による分岐がない質問では、回答ボックスは省略されシンプルなフローになります。</p>
                 </div>
               </div>
               <div class="guide-card-item">

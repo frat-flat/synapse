@@ -2390,6 +2390,16 @@ input:-webkit-autofill:active {
   border: 2px dashed #718096;
   background: rgba(66, 153, 225, 0.08);
 }
+.box-green-node {
+  background: #ffffff;
+  border: 1px solid #cbd5e0;
+  border-left: 4px solid #48bb78;
+}
+.box-orange-node {
+  background: rgba(237, 137, 54, 0.08);
+  border: 1px solid #cbd5e0;
+  border-left: 4px solid #ed8936;
+}
 .legend-text {
   line-height: 1.3;
 }
