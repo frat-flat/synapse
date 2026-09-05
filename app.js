@@ -9884,9 +9884,12 @@ function openColumnDisplaySettingsModal(tableId, initialTab = 'merge', preselect
     // 非表示カラム設定タブの描画
     renderHiddenColumnsTab(normId);
 
-    // 統合表示設定タブの描画
-    renderExistingMergeGroupsList(normId);
-    resetMergeGroupEditor(normId, preselectedColIds);
+    // 統合表示設定タブの描画（2列以上選択時以外は一覧画面を表示）
+    if (preselectedColIds && preselectedColIds.length >= 2) {
+      openMergeGroupEditor(normId, null, preselectedColIds);
+    } else {
+      showMergeGroupsList(normId);
+    }
 
     modal.style.display = 'flex';
     modal.classList.add('active');
@@ -9903,12 +9906,15 @@ function openColumnDisplaySettingsModal(tableId, initialTab = 'merge', preselect
 window.openColumnDisplaySettingsModal = openColumnDisplaySettingsModal;
 window.openMergedColumnsModal = (t, p) => openColumnDisplaySettingsModal(t, 'merge', p);
 
+let isMergeEditorOpen = false;
+
 function closeColumnDisplaySettingsModal() {
   const modal = document.getElementById('merged-columns-modal');
   if (modal) {
     modal.classList.remove('active');
     modal.style.display = 'none';
   }
+  isMergeEditorOpen = false;
   currentDisplayModalTableId = null;
   currentEditingMergeGroupId = null;
 }
@@ -9920,17 +9926,28 @@ function switchColumnDisplayTab(tabName) {
   const tabMergeBtn = document.getElementById('col-display-tab-merge');
   const paneHidden = document.getElementById('col-display-pane-hidden');
   const paneMerge = document.getElementById('col-display-pane-merge');
+  const saveBtn = document.getElementById('col-display-save-btn');
+  const footerBackBtn = document.getElementById('merge-footer-back-btn');
 
   if (tabName === 'hidden') {
     tabHiddenBtn?.classList.add('active');
     tabMergeBtn?.classList.remove('active');
     if (paneHidden) paneHidden.style.display = 'flex';
     if (paneMerge) paneMerge.style.display = 'none';
+    if (saveBtn) saveBtn.style.display = 'inline-block';
+    if (footerBackBtn) footerBackBtn.style.display = 'none';
   } else {
     tabHiddenBtn?.classList.remove('active');
     tabMergeBtn?.classList.add('active');
     if (paneHidden) paneHidden.style.display = 'none';
     if (paneMerge) paneMerge.style.display = 'flex';
+    if (isMergeEditorOpen) {
+      if (saveBtn) saveBtn.style.display = 'inline-block';
+      if (footerBackBtn) footerBackBtn.style.display = 'inline-block';
+    } else {
+      if (saveBtn) saveBtn.style.display = 'none';
+      if (footerBackBtn) footerBackBtn.style.display = 'none';
+    }
   }
 }
 
@@ -10026,8 +10043,18 @@ function renderExistingMergeGroupsList(tableId) {
   const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
   const cols = meta ? meta.columns : [];
 
+  const countEl = document.getElementById('existing-merge-groups-count');
+  if (countEl) {
+    countEl.textContent = groups.length > 0 ? `(${groups.length}件)` : '(0件)';
+  }
+
   if (groups.length === 0) {
-    container.innerHTML = '<div style="font-size: 0.8rem; color: #64748b; padding: 0.5rem; background: #f8fafc; border-radius: 6px; border: 1px dashed #cbd5e1;">現在統合されている列はありません。下部から複数カラムを選択して統合を作成できます。</div>';
+    container.innerHTML = `
+      <div style="font-size: 0.84rem; color: #64748b; padding: 1.5rem 1rem; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.4rem;">
+        <span style="font-size: 1.5rem; opacity: 0.6;">🔗</span>
+        <div>現在統合されている列はありません。<br>右上の「<strong>新規グループ作成</strong>」ボタンから作成できます。</div>
+      </div>
+    `;
     return;
   }
 
@@ -10065,15 +10092,14 @@ function renderExistingMergeGroupsList(tableId) {
     `;
 
     item.querySelector('.edit-group-btn').addEventListener('click', () => {
-      editMergeGroupInModal(tableId, group.id);
+      openMergeGroupEditor(tableId, group.id);
     });
 
     item.querySelector('.del-group-btn').addEventListener('click', () => {
       if (confirm(`統合グループ「${group.name || 'この統合'}」を解除しますか？`)) {
         const updated = getMergedColumns(normId).filter(g => g.id !== group.id);
         saveMergedColumns(normId, updated);
-        renderExistingMergeGroupsList(tableId);
-        resetMergeGroupEditor(tableId);
+        showMergeGroupsList(tableId);
         if (meta && typeof meta.render === 'function') meta.render();
         showToast('統合グループを解除しました。', 'info');
       }
@@ -10218,9 +10244,6 @@ function resetMergeGroupEditor(tableId, preselectedColIds = []) {
   const titleEl = document.getElementById('merge-group-editor-title');
   if (titleEl) titleEl.textContent = '新規グループ作成';
 
-  const resetBtn = document.getElementById('merge-group-reset-btn');
-  if (resetBtn) resetBtn.style.display = 'none';
-
   const nameInput = document.getElementById('merge-group-name-input');
   if (nameInput) nameInput.value = '';
 
@@ -10238,14 +10261,51 @@ function editMergeGroupInModal(tableId, groupId) {
   const titleEl = document.getElementById('merge-group-editor-title');
   if (titleEl) titleEl.textContent = `グループ編集: ${group.name || '名称未設定'}`;
 
-  const resetBtn = document.getElementById('merge-group-reset-btn');
-  if (resetBtn) resetBtn.style.display = 'inline-block';
-
   const nameInput = document.getElementById('merge-group-name-input');
   if (nameInput) nameInput.value = group.name || '';
 
   renderMergeColumnsCheckboxes(normId, groupId, []);
   updateMergeModalDisplayColumnsChecklist(normId, group.displayColumnIds || [group.primaryColumnId || group.columnIds[0]]);
+}
+
+function showMergeGroupsList(tableId) {
+  isMergeEditorOpen = false;
+  const normId = normalizeTableId(tableId);
+
+  const listSection = document.getElementById('existing-merge-groups-section');
+  const editorSection = document.getElementById('merge-group-editor-section');
+  const saveBtn = document.getElementById('col-display-save-btn');
+  const footerBackBtn = document.getElementById('merge-footer-back-btn');
+
+  if (listSection) listSection.style.display = 'flex';
+  if (editorSection) editorSection.style.display = 'none';
+  if (footerBackBtn) footerBackBtn.style.display = 'none';
+  if (currentActiveDisplayTab === 'merge' && saveBtn) {
+    saveBtn.style.display = 'none';
+  }
+
+  renderExistingMergeGroupsList(normId);
+}
+
+function openMergeGroupEditor(tableId, groupId = null, preselectedColIds = []) {
+  isMergeEditorOpen = true;
+  const normId = normalizeTableId(tableId);
+
+  const listSection = document.getElementById('existing-merge-groups-section');
+  const editorSection = document.getElementById('merge-group-editor-section');
+  const saveBtn = document.getElementById('col-display-save-btn');
+  const footerBackBtn = document.getElementById('merge-footer-back-btn');
+
+  if (listSection) listSection.style.display = 'none';
+  if (editorSection) editorSection.style.display = 'flex';
+  if (footerBackBtn) footerBackBtn.style.display = 'inline-block';
+  if (saveBtn) saveBtn.style.display = 'inline-block';
+
+  if (groupId) {
+    editMergeGroupInModal(normId, groupId);
+  } else {
+    resetMergeGroupEditor(normId, preselectedColIds);
+  }
 }
 
 function handleSaveMergedColumns() {
@@ -10318,9 +10378,8 @@ function handleSaveMergedColumns() {
     meta.render();
   }
 
-  // 既存グループ一覧を再描画し、エディタを「新規グループ作成」へ復帰
-  renderExistingMergeGroupsList(normId);
-  resetMergeGroupEditor(normId);
+  // 既存グループ一覧画面へ戻る
+  showMergeGroupsList(normId);
 
   showToast(`統合グループ「${groupName || '名称未設定'}」の設定を保存しました。`, 'success');
 }
@@ -10330,8 +10389,18 @@ function setupMergedColumnsModalEvents() {
   document.getElementById('merged-columns-cancel-btn')?.addEventListener('click', closeColumnDisplaySettingsModal);
   document.getElementById('col-display-save-btn')?.addEventListener('click', handleSaveMergedColumns);
   document.getElementById('merged-columns-save-btn')?.addEventListener('click', handleSaveMergedColumns);
-  document.getElementById('merge-group-reset-btn')?.addEventListener('click', () => {
-    if (currentDisplayModalTableId) resetMergeGroupEditor(currentDisplayModalTableId);
+
+  // 新規グループ作成ボタン（一覧からエディタを開く）
+  document.getElementById('btn-open-create-merge-group')?.addEventListener('click', () => {
+    if (currentDisplayModalTableId) openMergeGroupEditor(currentDisplayModalTableId, null);
+  });
+
+  // 一覧に戻るボタン（エディタから一覧へ戻る）
+  document.getElementById('merge-group-back-btn')?.addEventListener('click', () => {
+    if (currentDisplayModalTableId) showMergeGroupsList(currentDisplayModalTableId);
+  });
+  document.getElementById('merge-footer-back-btn')?.addEventListener('click', () => {
+    if (currentDisplayModalTableId) showMergeGroupsList(currentDisplayModalTableId);
   });
 
   // タブボタンイベント
@@ -41583,7 +41652,7 @@ window.openResumableUrl = function(urlStr) {
 
 const MOBILE_BOTTOM_NAV_DEFAULTS = {
   sales: {
-    role1: 'appointment-new',
+    role1: 'appointment',
     role2: 'agency-info-screen'
   },
   support: {
@@ -41613,7 +41682,7 @@ const MOBILE_BOTTOM_NAV_DEFAULTS = {
 };
 
 const ALL_SELECTABLE_NAV_OPTIONS = [
-  { id: 'appointment-new', icon: '📅', label: '新規アポ', type: 'tab', tabId: 'appointment-new', tabType: 'appointment-new', tabTitle: '📅 新規アポイント' },
+  { id: 'appointment', icon: '📅', label: 'アポイント', type: 'tab', tabId: 'appointment-new', tabType: 'appointment-screen', tabTitle: '📅 新規アポイント' },
   { id: 'history-view-screen', icon: '🕒', label: 'アポ履歴', type: 'tab', tabId: 'history-view-screen', tabType: 'history-view-screen', tabTitle: '🕒 アポイント履歴' },
   { id: 'drafts-view-screen', icon: '💾', label: '一時保存', type: 'tab', tabId: 'drafts-view-screen', tabType: 'drafts-view-screen', tabTitle: '💾 一時保存一覧' },
   { id: 'agency-info-screen', icon: '💼', label: '代理店情報', type: 'tab', tabId: 'agency-info-screen', tabType: 'agency-info-screen', tabTitle: '💼 代理店 基本マスタ' },
@@ -41629,6 +41698,21 @@ const ALL_SELECTABLE_NAV_OPTIONS = [
   { id: 'mypage-screen', icon: '⭐', label: 'お気に入り', type: 'view', viewId: 'mypage-screen' }
 ];
 
+function findNavOption(optId) {
+  if (optId === 'appointment-new') optId = 'appointment';
+  return ALL_SELECTABLE_NAV_OPTIONS.find(o => o.id === optId) || ALL_SELECTABLE_NAV_OPTIONS[0];
+}
+
+function matchesNavOption(opt, targetId) {
+  if (!opt || !targetId) return false;
+  if (opt.id === targetId) return true;
+  if (opt.tabId && opt.tabId === targetId) return true;
+  if (opt.tabType && opt.tabType === targetId) return true;
+  if (opt.viewId && opt.viewId === targetId) return true;
+  if (opt.id === 'appointment' && (targetId === 'appointment-new' || targetId === 'appointment-screen' || targetId === 'appointment-existing')) return true;
+  return false;
+}
+
 function getMobileNavConfigForCurrentUser() {
   const user = state.currentUser;
   const role = (user && user.role) ? user.role : 'sales';
@@ -41640,6 +41724,8 @@ function getMobileNavConfigForCurrentUser() {
     try {
       const parsed = JSON.parse(saved);
       if (parsed && parsed.role1 && parsed.role2) {
+        if (parsed.role1 === 'appointment-new') parsed.role1 = 'appointment';
+        if (parsed.role2 === 'appointment-new') parsed.role2 = 'appointment';
         return parsed;
       }
     } catch (e) {}
@@ -41684,8 +41770,8 @@ function renderMobileBottomNav() {
   navEl.style.setProperty('display', 'flex', 'important');
 
   const config = getMobileNavConfigForCurrentUser();
-  const opt1 = ALL_SELECTABLE_NAV_OPTIONS.find(o => o.id === config.role1) || ALL_SELECTABLE_NAV_OPTIONS[0];
-  const opt2 = ALL_SELECTABLE_NAV_OPTIONS.find(o => o.id === config.role2) || ALL_SELECTABLE_NAV_OPTIONS[3];
+  const opt1 = findNavOption(config.role1);
+  const opt2 = findNavOption(config.role2);
 
   const role1IconEl = document.getElementById('mob-nav-role1-icon');
   const role1LabelEl = document.getElementById('mob-nav-role1-label');
@@ -41725,16 +41811,18 @@ function updateMobileBottomNavActiveState(targetId) {
   const mypageBtn = document.getElementById('mob-nav-mypage');
 
   const config = getMobileNavConfigForCurrentUser();
+  const opt1 = findNavOption(config.role1);
+  const opt2 = findNavOption(config.role2);
 
   if (targetId === 'home-screen' || targetId === 'home') {
     if (homeBtn) homeBtn.classList.add('active');
   } else if (targetId === 'search') {
     if (searchBtn) searchBtn.classList.add('active');
-  } else if (targetId === config.role1 || (role1Btn && role1Btn.dataset.targetId === targetId)) {
+  } else if (matchesNavOption(opt1, targetId)) {
     if (role1Btn) role1Btn.classList.add('active');
-  } else if (targetId === config.role2 || (role2Btn && role2Btn.dataset.targetId === targetId)) {
+  } else if (matchesNavOption(opt2, targetId)) {
     if (role2Btn) role2Btn.classList.add('active');
-  } else if (targetId && (targetId.startsWith('mypage') || targetId === 'user-manager-screen' && !['role1', 'role2'].includes(targetId))) {
+  } else if (targetId && (targetId.startsWith('mypage') || (targetId === 'user-manager-screen' && !matchesNavOption(opt1, targetId) && !matchesNavOption(opt2, targetId)))) {
     if (mypageBtn) mypageBtn.classList.add('active');
   }
 }
@@ -41769,7 +41857,7 @@ function initMobileBottomNavEvents() {
   }
 
   function executeNavOption(optId) {
-    const opt = ALL_SELECTABLE_NAV_OPTIONS.find(o => o.id === optId);
+    const opt = findNavOption(optId);
     if (!opt) return;
 
     if (opt.type === 'tab') {

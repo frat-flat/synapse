@@ -3361,19 +3361,30 @@
           ※ 離れた位置（スキップしたカラム）同士でも自由に統合可能です。オーナー設定は全社に共有され、一般ユーザー設定はそのユーザーのみに適用されます。
         </p>
 
-        <!-- 既存の統合グループ一覧 -->
-        <div id="existing-merge-groups-section" style="display: flex; flex-direction: column; gap: 0.5rem;">
-          <h4 style="margin: 0; font-size: 0.88rem; font-weight: 700; color: #0f172a;">現在の統合グループ</h4>
-          <div id="existing-merge-groups-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 140px; overflow-y: auto;">
+        <!-- 既存の統合グループ一覧 (初期表示) -->
+        <div id="existing-merge-groups-section" style="display: flex; flex-direction: column; gap: 0.65rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 0.45rem;">
+              <h4 style="margin: 0; font-size: 0.88rem; font-weight: 700; color: #0f172a;">現在の統合グループ</h4>
+              <span id="existing-merge-groups-count" style="font-size: 0.75rem; color: #64748b; font-weight: 500;"></span>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-open-create-merge-group" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 600;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>新規グループ作成</span>
+            </button>
+          </div>
+          <div id="existing-merge-groups-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 320px; overflow-y: auto;">
             <!-- 登録済みグループ一覧 -->
           </div>
         </div>
 
-        <!-- 新規作成・編集セクション -->
-        <div style="border-top: 1px solid #e2e8f0; padding-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
+        <!-- 新規作成・編集セクション (初期状態は非表示) -->
+        <div id="merge-group-editor-section" style="display: none; border-top: 1px solid #e2e8f0; padding-top: 0.75rem; flex-direction: column; gap: 0.75rem;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <h4 id="merge-group-editor-title" style="margin: 0; font-size: 0.88rem; font-weight: 700; color: #2563eb;">新規グループ作成</h4>
-            <button type="button" class="btn btn-secondary btn-sm" id="merge-group-reset-btn" style="display: none; padding: 0.2rem 0.6rem; font-size: 0.75rem;">新規作成に戻る</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="merge-group-back-btn" style="padding: 0.25rem 0.65rem; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 0.3rem;">
+              <span>←</span> 一覧に戻る
+            </button>
           </div>
           
           <div class="form-group" style="margin-bottom: 0;">
@@ -3386,7 +3397,7 @@
               <span>統合するカラムを選択 (2つ以上)</span>
               <span id="merge-selected-count-badge" style="font-size: 0.75rem; color: #2563eb; font-weight: 600;">0件選択中</span>
             </label>
-            <div id="merge-columns-checkbox-list" style="max-height: 170px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.5rem; background: #f8fafc; display: flex; flex-direction: column; gap: 0.4rem;">
+            <div id="merge-columns-checkbox-list" style="max-height: 180px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.5rem; background: #f8fafc; display: flex; flex-direction: column; gap: 0.4rem;">
               <!-- チェックボックス一覧 -->
             </div>
           </div>
@@ -3430,7 +3441,8 @@
     <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 0.75rem; margin-top: auto;">
       <button type="button" class="btn btn-secondary" id="merged-columns-cancel-btn" style="padding: 0.4rem 0.85rem; font-size: 0.85rem;">閉じる</button>
       <div style="display: flex; gap: 0.5rem;">
-        <button type="button" class="btn btn-primary" id="col-display-save-btn" style="padding: 0.4rem 1.2rem; font-size: 0.85rem; font-weight: 600;">設定を保存</button>
+        <button type="button" class="btn btn-secondary" id="merge-footer-back-btn" style="display: none; padding: 0.4rem 0.85rem; font-size: 0.85rem;">一覧に戻る</button>
+        <button type="button" class="btn btn-primary" id="col-display-save-btn" style="display: none; padding: 0.4rem 1.2rem; font-size: 0.85rem; font-weight: 600;">設定を保存</button>
       </div>
     </div>
   </div>
