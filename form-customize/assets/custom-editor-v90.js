@@ -4233,8 +4233,16 @@
 
     card.innerHTML = `
       <div class="flow-choice-header" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span class="flow-choice-badge-icon">📋</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="flow-choice-badge-icon" title="進め方の分岐">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12h5" />
+              <path d="M8 12c3.5 0 5-6 8.5-6h3.5" />
+              <path d="M17 3.5l3.5 2.5-3.5 2.5" />
+              <path d="M8 12c3.5 0 5 6 8.5 6h3.5" />
+              <path d="M17 15.5l3.5 2.5-3.5 2.5" />
+            </svg>
+          </span>
           <span class="flow-choice-badge-title">上記の質問内容をご確認の上、このセクションの進め方を選択してください</span>
         </div>
         <button type="button" id="btn-open-flow-guide-modal" class="btn-flow-guide-trigger" title="図解付き詳細ガイドを見る">
@@ -4410,7 +4418,15 @@
           <!-- 1. 2つの進め方の図解比較 -->
           <div class="guide-section">
             <h4 class="guide-section-title">
-              <span>⚖️</span> 1. あなたに合わせた2つの進め方（図解比較）
+              <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:5px; background:#eff6ff; color:#2563eb; vertical-align:middle; margin-right:4px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 12h5" />
+                  <path d="M8 12c3.5 0 5-6 8.5-6h3.5" />
+                  <path d="M17 3.5l3.5 2.5-3.5 2.5" />
+                  <path d="M8 12c3.5 0 5 6 8.5 6h3.5" />
+                  <path d="M17 15.5l3.5 2.5-3.5 2.5" />
+                </svg>
+              </span> 1. あなたに合わせた2つの進め方（図解比較）
             </h4>
             <div class="guide-compare-grid">
               <!-- ルート1 -->
