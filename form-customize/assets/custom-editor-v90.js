@@ -1473,6 +1473,68 @@
       .replace(/[\s\-\u30FC\u30FB/|\u3000\uFF5C]/g, "");
   }
 
+  // ============================================================================
+  // 🔍 【API連携メタデータ解決エンジン: getQuestionApiConfig & findQuestionDefById】
+  // - ユーザー指摘: 問題は質問項目（タイトル文字列）ではなく、回答の入力規則の
+  //   「規則の種類が API 連携（category === 'api'）になっていること」と、
+  //   「判定ルールで何の API を連携しているか（condition）を取得すること」。
+  // - 質問定義の validation メタデータを Single Source of Truth（真実の情報源）として
+  //   最優先で取得・解決する。
+  // ============================================================================
+  function findQuestionDefById(questionId) {
+    if (!questionId) return null;
+    const formSources = [window.L, window.G, window.n];
+    for (const formSrc of formSources) {
+      if (formSrc && formSrc.sections) {
+        for (const sec of formSrc.sections) {
+          if (!sec.questions) continue;
+          const q = sec.questions.find(item => item.id === questionId);
+          if (q) return q;
+        }
+      }
+    }
+    return null;
+  }
+
+  function getQuestionApiConfig(qDef) {
+    if (!qDef) return null;
+
+    // ① 最優先（Single Source of Truth）: 作成者が設定した「回答の入力規則（検証）」
+    if (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition) {
+      const cond = qDef.validation.condition;
+      return {
+        isApi: true,
+        category: 'api',
+        condition: cond,
+        isCorp: cond === 'corp_name',
+        isInvoice: cond === 'invoice_number',
+        isBank: cond === 'bank_name',
+        label: cond === 'corp_name' ? '国税庁法人番号API連携' :
+               cond === 'invoice_number' ? '適格請求書発行事業者API連携' :
+               cond === 'bank_name' ? '全銀協金融機関API連携' : 'API連携',
+        source: 'validation_metadata'
+      };
+    }
+
+    // ② 補助フォールバック（作成者が入力規則を設定していない場合のタイトル推測アシスト）
+    if (qDef.type === 'text' && qDef.title) {
+      const t = qDef.title;
+      if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
+        return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isBank: false, label: '適格請求書発行事業者API連携', source: 'title_fallback' };
+      }
+      if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('屋号')) &&
+          !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな')) {
+        return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isBank: false, label: '国税庁法人番号API連携', source: 'title_fallback' };
+      }
+      if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座')) ||
+          t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード'))) {
+        return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isBank: true, label: '全銀協金融機関API連携', source: 'title_fallback' };
+      }
+    }
+
+    return null;
+  }
+
   // 3. おすすめ2色カラープリセット
   const COLOR_PRESETS = {
     seattle_blue: { primary: "#0056b3", bg: "#f8fafd", label: "シアトルブルー" },
@@ -4617,10 +4679,9 @@
               }
             }
 
-            // ② インボイス番号の架空ベタ打ちブロック
-            const isInvoice = (q.validation && q.validation.category === 'api' && q.validation.condition === 'invoice_number') ||
-                              (q.type === 'text' && (q.title.includes('インボイス') || q.title.includes('登録番号')));
-            if (isInvoice && strVal) {
+            // ② インボイス番号の架空ベタ打ちブロック（規則の種類がAPI連携 & 判定ルールがinvoice_numberの項目を検証）
+            const apiConfig = getQuestionApiConfig(q);
+            if (apiConfig && apiConfig.isInvoice && strVal) {
               const isDirectInvoiceNum = /^T\d{13}$/i.test(strVal);
               const isDigits13 = /^\d{13}$/.test(strVal);
               const fullNum = isDirectInvoiceNum ? strVal.toUpperCase() : (isDigits13 ? ('T' + strVal) : '');
@@ -5794,36 +5855,24 @@
           }
         }
 
-        const isInvoiceApi = (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition === 'invoice_number') ||
-                             (qDef.type === 'text' && (qDef.title.includes('インボイス') || qDef.title.includes('登録番号')));
-        if (isInvoiceApi) {
+        // ユーザー指示反映: 質問項目（タイトル）ではなく、回答の入力規則の「規則の種類: API連携」と
+        // 「判定ルールで何のAPIを連携しているか」を取得して各API機能をセットアップ
+        const apiConfig = getQuestionApiConfig(qDef);
+
+        if (apiConfig && apiConfig.isInvoice) {
           // 登録番号に都道府県エリア絞り込み機能は不要：残存フィルタを除去
           card.querySelectorAll('.corp-pref-filter-container').forEach(el => el.remove());
           setupInvoiceApiSearch(card, qDef);
-        }
-
-        // 法人名・屋号の判定（カナ・フリガナ欄は除外）
-        const isCorpApi = !isInvoiceApi && (
-          (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition === 'corp_name') ||
-          (qDef.type === 'text' && (
-            qDef.title.includes('法人名') ||
-            qDef.title.includes('企業名') ||
-            qDef.title.includes('会社名') ||
-            qDef.title.includes('屋号')
-          ) && !qDef.title.includes('カナ') && !qDef.title.includes('フリガナ') && !qDef.title.includes('ふりがな'))
-        );
-        if (isCorpApi) {
+        } else if (apiConfig && apiConfig.isCorp) {
           setupCorpApiSearch(card, qDef);
         } else {
-          // カナ欄などisCorpApi対象外のカードに誤適用された検索ボタン・パネル・フィルタを完全除去
+          // isCorpApi対象外のカードに誤適用された検索ボタン・パネル・フィルタを完全除去
           card.querySelectorAll('.api-corp-search-btn').forEach(btn => btn.remove());
           card.querySelectorAll('.corp-search-panel').forEach(p => p.remove());
           card.querySelectorAll('.corp-pref-filter-container').forEach(f => f.remove());
         }
 
-        const isBankApi = (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition === 'bank_name') ||
-                          (qDef.type === 'text' && (qDef.title.includes('銀行名') || (qDef.title.includes('銀行') && !qDef.title.includes('コード') && !qDef.title.includes('口座')) || (qDef.title.includes('金融機関名') || (qDef.title.includes('金融機関') && !qDef.title.includes('コード')))));
-        if (isBankApi) {
+        if (apiConfig && apiConfig.isBank) {
           setupBankApiSearch(card, qDef);
         }
 
@@ -6192,10 +6241,9 @@
     if (!input) return;
 
     // インボイス登録番号やカナ欄のカードには法人検索・エリア絞り込みを絶対に適用しない
-    const isInvoice = (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition === 'invoice_number') ||
-                      (qDef.title && (qDef.title.includes('インボイス') || qDef.title.includes('登録番号')));
+    const apiConf = getQuestionApiConfig(qDef);
     const isKana = qDef.title && (qDef.title.includes('カナ') || qDef.title.includes('フリガナ') || qDef.title.includes('ふりがな'));
-    if (isInvoice || isKana) {
+    if ((apiConf && apiConf.isInvoice) || isKana) {
       card.querySelectorAll('.corp-pref-filter-container').forEach(f => f.remove());
       const oldPanel = card.querySelector('.corp-search-panel');
       if (oldPanel) oldPanel.remove();
@@ -6392,10 +6440,9 @@
               window.V[q.id] = item.nameKana;
             }
           }
-          // インボイス登録番号項目
-          const isInv = (q.validation && q.validation.category === 'api' && q.validation.condition === 'invoice_number') ||
-                        (q.title && (q.title.includes('インボイス') || q.title.includes('登録番号')));
-          if (isInv && item.num) {
+          // インボイス登録番号項目（規則の種類がAPI連携 & 判定ルールがinvoice_number）
+          const apiConfig = getQuestionApiConfig(q);
+          if (apiConfig && apiConfig.isInvoice && item.num) {
             const formattedInv = item.num.startsWith('T') ? item.num : ('T' + item.num);
             window.V[q.id] = formattedInv;
           }
@@ -6418,6 +6465,8 @@
     containers.forEach(container => {
       const cards = container.querySelectorAll('.preview-q-card');
       cards.forEach(c => {
+        const qDef = findQuestionDefById(c.dataset.questionId);
+        const apiConfig = getQuestionApiConfig(qDef);
         const titleEl = c.querySelector('.preview-q-title');
         const title = titleEl ? titleEl.textContent : "";
         const inputEl = c.querySelector('input');
@@ -6432,9 +6481,8 @@
           }
         }
 
-        // ② インボイス登録番号: 法人の場合は法人名を入力してインボイス登録されているなら自動入力
-        const isInv = title.includes('インボイス') || title.includes('登録番号');
-        if (isInv && item.num) {
+        // ② インボイス登録番号: 規則の種類がAPI連携 & 判定ルールがinvoice_number（タイトル文字列に依存せず確実に特定）
+        if (apiConfig && apiConfig.isInvoice && item.num) {
           const formattedInv = item.num.startsWith('T') ? item.num : ('T' + item.num);
           inputEl.dataset.suppressSearch = "1";
           inputEl.value = formattedInv;
@@ -8000,12 +8048,9 @@
       if (q.type === 'text') {
         let placeholder = "回答を入力してください";
         let apiBadge = "";
-        const isInvoiceApi = (q.validation && q.validation.category === 'api' && q.validation.condition === 'invoice_number') ||
-                             (editorMode === 'pro' && (q.title.includes('インボイス') || q.title.includes('登録番号')));
-        const isCorpApi = !isInvoiceApi && (
-          (q.validation && q.validation.category === 'api' && q.validation.condition === 'corp_name') ||
-          (editorMode === 'pro' && (q.title.includes('法人名') || q.title.includes('企業名') || q.title.includes('会社名')))
-        );
+        const apiConfig = getQuestionApiConfig(q);
+        const isInvoiceApi = apiConfig && apiConfig.isInvoice;
+        const isCorpApi = apiConfig && apiConfig.isCorp;
 
         if (isCorpApi || isInvoiceApi) {
           if (isInvoiceApi) {
