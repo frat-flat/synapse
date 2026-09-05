@@ -9855,9 +9855,9 @@ function unmergeColumnQuick(tableId, targetColId) {
 // --- 2. 「列の表示設定」モーダル (#merged-columns-modal) コントローラー ---
 let currentDisplayModalTableId = null;
 let currentEditingMergeGroupId = null;
-let currentActiveDisplayTab = 'hidden'; // 'hidden' | 'merge'
-
-function openColumnDisplaySettingsModal(tableId, initialTab = 'hidden', preselectedColIds = []) {
+let currentActiveDisplayTab = 'merge'; // 'merge' | 'hidden'
+ 
+function openColumnDisplaySettingsModal(tableId, initialTab = 'merge', preselectedColIds = []) {
   try {
     const normId = normalizeTableId(tableId);
     currentDisplayModalTableId = normId;
