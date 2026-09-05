@@ -2716,7 +2716,6 @@
         document.querySelectorAll('.pro-only-field').forEach(el => {
           el.style.display = 'block';
         });
-        loadProSettingsToInputs();
       } else {
         if (bSimple) bSimple.classList.add('active');
         if (bPro) bPro.classList.remove('active');
@@ -2724,6 +2723,10 @@
         document.querySelectorAll('.pro-only-field').forEach(el => {
           el.style.display = 'none';
         });
+      }
+      loadProSettingsToInputs(true);
+      if (typeof saveAndSyncMindmapData === 'function') {
+        saveAndSyncMindmapData();
       }
       applyPreviewTheme();
       renderLivePreview();
@@ -2748,13 +2751,20 @@
     }
 
     document.addEventListener('click', (e) => {
-      if (editorMode === 'simple') {
-        const target = e.target;
-        // 簡易版・プロ版の切り替えタブや切り替えスイッチ自体はブロック対象外にする
-        if (target.closest('#btn-mode-pro') || target.closest('#btn-mode-simple') || target.closest('.mode-switch-btn')) {
-          return;
+      const target = e.target;
+      // 簡易版・プロ版の切り替えタブやスイッチはブロック対象外
+      if (target.closest('#btn-mode-pro') || target.closest('#btn-mode-simple') || target.closest('.mode-switch-btn')) {
+        return;
+      }
+      // プロ設定パネル内の操作（トグルスイッチ、スライダー、ラベル、入力欄など）は絶対にブロックせずプロモード化
+      if (target.closest('#pro-settings-panel')) {
+        if (editorMode !== 'pro') {
+          setEditorMode('pro');
         }
-        if (target.closest('#pro-settings-panel') || target.classList.contains('pro-only-action')) {
+        return;
+      }
+      if (editorMode === 'simple') {
+        if (target.classList.contains('pro-only-action')) {
           e.preventDefault();
           e.stopPropagation();
           showProFeaturePopup('プロ版なら、より高度な分岐ロジックや自由度の高いデザイン編集、法人API連携が利用可能になります！');
@@ -2762,15 +2772,15 @@
       }
     }, true);
 
-    // 起動時の初期モード自動復元
+    // 起動時の初期モード自動復元 (プロ版設定があるか指定があればプロ版を優先)
     if (window.G && window.G.editorMode) {
       setEditorMode(window.G.editorMode);
     } else {
-      setEditorMode('simple');
+      setEditorMode('pro');
     }
   }
 
-  function loadProSettingsToInputs() {
+  function loadProSettingsToInputs(preserveCurrentMode = false) {
     if (!window.G) return;
 
     // localStorage 内の「現在のフォーム個別データ」からプロ版設定項目を window.G に強制同期
@@ -2786,10 +2796,13 @@
     const savedForm = allForms[activeIndex];
     if (savedForm) {
       const proKeys = [
-        'editorMode', 'appearance', 'header', 'announcement', 'displayMode', 'progressIndicator',
+        'appearance', 'header', 'announcement', 'displayMode', 'progressIndicator',
         'showLogo', 'headerImage', 'headerImageScale', 'headerImagePosition', 'headerImagePositionX',
         'logoType', 'logoPosition', 'logoImageUrl', 'useHeaderImage', 'useBgImage', 'bgTheme', 'bgCustomUrl'
       ];
+      if (!preserveCurrentMode && savedForm.editorMode !== undefined) {
+        window.G.editorMode = savedForm.editorMode;
+      }
       proKeys.forEach(key => {
         if (savedForm[key] !== undefined) {
           window.G[key] = savedForm[key];
@@ -3519,6 +3532,9 @@
       if (el) {
         el.addEventListener('change', (e) => {
           callback(e.target.type === 'checkbox' ? e.target.checked : e.target.value);
+          if (typeof saveAndSyncMindmapData === 'function') {
+            saveAndSyncMindmapData();
+          }
           applyPreviewTheme();
           renderLivePreview();
           if (window.S) window.S();
