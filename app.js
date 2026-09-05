@@ -9983,14 +9983,6 @@ function renderHiddenColumnsTab(tableId) {
     countLabel.textContent = `表示中: ${visibleCount} / ${totalCount}列 (非表示: ${totalCount - visibleCount}列)`;
   }
 
-  const orderResetBtn = document.getElementById('hidden-cols-order-reset-btn');
-  if (orderResetBtn) {
-    orderResetBtn.onclick = () => {
-      if (confirm('列の並び順を初期状態に戻しますか？\n（運営状況などの標準位置が初期状態に整流化されます）')) {
-        resetTableColumnOrderToDefault(tableId);
-      }
-    };
-  }
 }
 
 function updateHiddenColsCountBadge(tableId) {
