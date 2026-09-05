@@ -1311,7 +1311,10 @@
     { name: "株式会社wayway", nameKana: "カブシキガイシャウェイウェイ", num: "1010001999999", pref: "東京都", regDate: "2023-10-01", estDate: "2015-05-15" },
     { name: "wayway合同会社", nameKana: "ウェイウェイゴウドウガイシャ", num: "2010001999999", pref: "広島県", regDate: "2024-04-01", estDate: "2020-11-20", cancelDate: "2025-12-31" },
     { name: "ヤフー株式会社", nameKana: "ヤフーカブシキガイシャ", num: "3010001888888", pref: "東京都", regDate: "2023-10-01", estDate: "1996-01-31" },
-    { name: "株式会社wayway広島", nameKana: "カブシキガイシャウェイウェイヒロシマ", num: "4010001999999", pref: "広島県", regDate: "2025-01-15", estDate: "2024-09-01" }
+    { name: "株式会社wayway広島", nameKana: "カブシキガイシャウェイウェイヒロシマ", num: "4010001999999", pref: "広島県", regDate: "2025-01-15", estDate: "2024-09-01" },
+    { name: "トヨタ自動車株式会社", nameKana: "トヨタジドウシャカブシキガイシャ", num: "1180301018778", pref: "愛知県", regDate: "2023-10-01", estDate: "1937-08-28" },
+    { name: "ソニーグループ株式会社", nameKana: "ソニーグループカブシキガイシャ", num: "5010401067252", pref: "東京都", regDate: "2023-10-01", estDate: "1946-05-07" },
+    { name: "ソフトバンク株式会社", nameKana: "ソフトバンクカブシキガイシャ", num: "9010401052465", pref: "東京都", regDate: "2023-10-01", estDate: "1986-12-09" }
   ];
 
   // 2. 表記揺れ正規化
@@ -4554,9 +4557,13 @@
       if (!questionId) return;
 
       let qDef = null;
-      if (window.L && window.L.sections) {
-        for (const sec of window.L.sections) {
-          qDef = sec.questions.find(q => q.id === questionId);
+      const formSources = [window.L, window.G, window.n];
+      for (const formSrc of formSources) {
+        if (formSrc && formSrc.sections) {
+          for (const sec of formSrc.sections) {
+            qDef = sec.questions.find(q => q.id === questionId);
+            if (qDef) break;
+          }
           if (qDef) break;
         }
       }
@@ -4658,11 +4665,15 @@
         }
       }
 
-      if (editorMode === 'pro' && qDef.type === 'text' && (qDef.title.includes('法人名') || qDef.title.includes('企業名') || qDef.title.includes('会社名'))) {
+      const isCorpApi = (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition === 'corp_name') ||
+                        (editorMode === 'pro' && qDef.type === 'text' && (qDef.title.includes('法人名') || qDef.title.includes('企業名') || qDef.title.includes('会社名')));
+      if (isCorpApi) {
         setupCorpApiSearch(card, qDef);
       }
 
-      if (editorMode === 'pro' && qDef.type === 'text' && (qDef.title.includes('インボイス') || qDef.title.includes('登録番号'))) {
+      const isInvoiceApi = (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition === 'invoice_number') ||
+                           (editorMode === 'pro' && qDef.type === 'text' && (qDef.title.includes('インボイス') || qDef.title.includes('登録番号')));
+      if (isInvoiceApi) {
         setupInvoiceApiSearch(card, qDef);
       }
 
@@ -4902,6 +4913,9 @@
     const oldPanel = card.querySelector('.corp-search-panel');
     if (oldPanel) oldPanel.remove();
 
+    const oldFilter = card.querySelector('.corp-pref-filter-container');
+    if (oldFilter) oldFilter.remove();
+
     const searchPanel = document.createElement('div');
     searchPanel.className = 'corp-search-panel';
     searchPanel.style.cssText = 'position:absolute; background:#ffffff; border:1px solid var(--color-border); border-radius:4px; z-index:2000; width:100%; box-shadow:var(--shadow-md); display:none; max-height:200px; overflow-y:auto; margin-top:2px;';
@@ -4910,6 +4924,7 @@
     input.parentNode.appendChild(searchPanel);
 
     const filterContainer = document.createElement('div');
+    filterContainer.className = 'corp-pref-filter-container';
     filterContainer.style.cssText = 'display:flex; gap:6px; align-items:center; margin-top:6px;';
     filterContainer.innerHTML = `
       <span style="font-size:0.75rem; color:var(--color-text-muted);">エリア絞り込み:</span>
@@ -4918,6 +4933,7 @@
         <option value="東京都">東京都</option>
         <option value="広島県">広島県</option>
         <option value="大阪府">大阪府</option>
+        <option value="愛知県">愛知県</option>
       </select>
     `;
     input.parentNode.insertBefore(filterContainer, input.nextSibling);
@@ -5053,6 +5069,7 @@
       }
     });
   }
+  window.setupLiveAutocompleteEvents = setupLiveAutocompleteEvents;
 
   const originalDt = window.Dt;
   if (originalDt) {
@@ -5150,7 +5167,11 @@
       if (e.target.value.startsWith('pro_')) {
         selectChanger(e);
       } else {
-        originalWe(e);
+        if (typeof originalWe === 'function') {
+          originalWe(e);
+        } else if (typeof window.we === 'function') {
+          window.we(e);
+        }
         renderLivePreview();
       }
     });
@@ -5868,7 +5889,18 @@
 
       let inputHtml = "";
       if (q.type === 'text') {
-        inputHtml = `<input type="text" class="form-control form-control-sm" placeholder="回答を入力してください" disabled style="opacity: 0.8; background: var(--color-bg-input);" />`;
+        let placeholder = "回答を入力してください";
+        let apiBadge = "";
+        if (q.validation && q.validation.category === 'api') {
+          if (q.validation.condition === 'invoice_number') {
+            placeholder = "Tから始まる13桁 (例: T1010001999999)";
+            apiBadge = `<div style="font-size:0.68rem; color:var(--color-primary); margin-top:2px; display:flex; align-items:center; gap:4px;">🧾 適格請求書発行事業者API連携</div>`;
+          } else {
+            placeholder = "法人名を入力... (国税庁DB自動補完)";
+            apiBadge = `<div style="font-size:0.68rem; color:var(--color-primary); margin-top:2px; display:flex; align-items:center; gap:4px;">🏛️ 国税庁法人番号API連携</div>`;
+          }
+        }
+        inputHtml = `<input type="text" class="form-control form-control-sm" placeholder="${placeholder}" disabled style="opacity: 0.8; background: var(--color-bg-input);" />${apiBadge}`;
       } else if (q.type === 'textarea' || q.type === 'paragraph') {
         inputHtml = `<textarea class="form-control form-control-sm" rows="2" placeholder="自由回答を入力してください" disabled style="opacity: 0.8; background: var(--color-bg-input);"></textarea>`;
       } else if (q.type === 'radio') {
@@ -6131,6 +6163,9 @@
         const curData = window.G || window.n;
         if (curData) window.yt(curData);
       } catch(e) {}
+    }
+    if (typeof setupLiveAutocompleteEvents === 'function') {
+      try { setupLiveAutocompleteEvents(); } catch(e) {}
     }
 
     // 5. アニメーション完了とトースト通知
