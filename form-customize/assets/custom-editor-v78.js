@@ -6435,7 +6435,7 @@
       }
     }
     const metaEdit = document.querySelector('.section-meta-edit');
-    if (!sec || !metaEdit) return;
+    if (!metaEdit) return;
 
     // --- 途中送信（コード確定＆続きリンク発行）のプルダウン選択肢＆補足案内UI ---
     const nextSelect = document.getElementById('editor-section-next');
@@ -6524,7 +6524,7 @@
     const draftEnable = document.getElementById('editor-section-draft-enable');
     const draftMsgWrapper = document.getElementById('draft-message-edit-wrapper');
     const draftMsg = document.getElementById('editor-section-draft-message');
-    if (draftEnable && draftMsg) {
+    if (sec && draftEnable && draftMsg) {
       if (!sec.draftSaveConfig) {
         sec.draftSaveConfig = { enabled: false, message: 'ここまでの回答を一時保存して、後から再開することができます。' };
       }
@@ -6686,16 +6686,22 @@
       };
     }
 
-    // アクティブセクション編集画面が表示されているときの一時保存UIの自律維持
+    // アクティブセクション編集画面が表示されているときの一時保存UI・途中送信UIの自律維持
     setInterval(() => {
       const activeSectionEditor = document.getElementById('active-section-editor');
       if (activeSectionEditor && activeSectionEditor.style.display !== 'none') {
         const metaEdit = activeSectionEditor.querySelector('.section-meta-edit');
-        if (metaEdit && !metaEdit.querySelector('.draft-save-config-container')) {
+        const nextSelect = document.getElementById('editor-section-next');
+        const needsEnhancement = metaEdit && (
+          !metaEdit.querySelector('.draft-save-config-container') ||
+          (nextSelect && !nextSelect.querySelector('option[value="partial_submit"]')) ||
+          !metaEdit.querySelector('.partial-submit-hint-box')
+        );
+        if (needsEnhancement) {
           injectSectionEnhancements();
         }
       }
-    }, 150);
+    }, 100);
 
     document.addEventListener('input', (e) => {
       const target = e.target;

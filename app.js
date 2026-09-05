@@ -18251,14 +18251,17 @@ function handleFormSubmitMessage(event) {
     return;
   }
 
-  // 1. 一時保存データ取得の要求をハンドリング
+  // 1. 一時保存・途中再開データ取得の要求をハンドリング
   if (event.data.type === 'FORM_GET_TEMPORARY_DATA') {
     const { rowId, formTitle } = event.data;
-    if (!rowId || !formTitle) return;
+    if (!rowId) return;
 
     console.log('[Synapse Database] Request received to get temporary data for row:', rowId, 'in table:', formTitle);
     
-    let targetTable = state.customTables.find(t => t.name === formTitle);
+    let targetTable = formTitle ? state.customTables.find(t => t.name === formTitle) : null;
+    if (!targetTable) {
+      targetTable = state.customTables.find(t => (t.rows || t.data || []).some(r => r.id === rowId));
+    }
     if (targetTable) {
       const row = (targetTable.rows || targetTable.data || []).find(r => r.id === rowId);
       if (row) {
@@ -18273,6 +18276,8 @@ function handleFormSubmitMessage(event) {
         event.source.postMessage({
           type: 'FORM_TEMPORARY_DATA_RESPONSE',
           rowId: rowId,
+          partnerId: row.partnerId || null,
+          registrationCode: row.registrationCode || row.partnerId || null,
           data: decodedData
         }, '*');
         return;
@@ -18284,25 +18289,24 @@ function handleFormSubmitMessage(event) {
   // 送信イベント以外はスルー
   if (event.data.type !== 'FORM_SUBMIT') return;
 
-  const { formTitle, data, isTemporary, rowId: clientRowId } = event.data;
+  const { formTitle, data, isTemporary, isPartialSubmit, rowId: clientRowId, nextSectionId, currentSectionId } = event.data;
   if (!data) return;
 
   // 事前に行IDを決定（新規なら採番、既存なら引き継ぐ）
   const targetRowId = clientRowId || 'row_' + Date.now();
 
-  // 一時保存・回答完了ステータスおよび再開用URLをデータに自動マージ
-  data["ステータス"] = isTemporary ? "一時保存" : "回答完了";
+  // 一時保存・途中送信・回答完了ステータスおよび再開用URLをデータに自動マージ
+  data["ステータス"] = isTemporary ? "一時保存" : (isPartialSubmit ? "途中送信（コード確定済）" : "回答完了");
   
   // プレビュー画面で再開させるためのURLを生成
-  // トークンはデモ用に簡易的なタイムスタンプベース
-  const generatedToken = 'token_' + Math.random().toString(36).substr(2, 9);
-  const resumeUrl = isTemporary 
-    ? window.location.origin + "/form-customize/index.html?res_id=" + targetRowId + "&token=" + generatedToken + "&active_tab=preview"
+  const resumeSecParam = nextSectionId ? `&resumeSec=${encodeURIComponent(nextSectionId)}` : '';
+  const resumeUrl = (isTemporary || isPartialSubmit || nextSectionId)
+    ? window.location.origin + "/form-customize/index.html?res_id=" + targetRowId + resumeSecParam + "&active_tab=preview"
     : "";
   
   data["再開用URL"] = resumeUrl;
 
-  console.log(`%c[Form Submit]%c Received submission for form "${formTitle}" (isTemporary: ${!!isTemporary}, rowId: ${targetRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
+  console.log(`%c[Form Submit]%c Received submission for form "${formTitle}" (isTemporary: ${!!isTemporary}, isPartial: ${!!isPartialSubmit}, rowId: ${targetRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
 
   // ----------------------------------------------------
   // 1. COS内カスタムマスターテーブルへのデータ蓄積・更新
@@ -18411,17 +18415,6 @@ function handleFormSubmitMessage(event) {
   // 編集監査ログへ記録
   logCellEdit(targetTable.id, targetRowId, 'all_columns', 'none', JSON.stringify(data));
   console.log(`%c[Synapse Database]%c Saved row (ID: ${targetRowId}) to Custom Master Table "${formTitle}":`, "color: #3b82f6; font-weight: bold;", "color: inherit;", targetRow);
-
-  // 送信元（iframe）に結果を返却
-  if (event.source && typeof event.source.postMessage === 'function') {
-    event.source.postMessage({
-      type: 'FORM_SUBMIT_RESPONSE',
-      success: true,
-      rowId: targetRowId,
-      isTemporary: !!isTemporary,
-      resumeUrl: resumeUrl
-    }, '*');
-  }
 
   // もしカスタムテーブルが新設された場合は、サイドメニューを再描画する
   if (isNewTable) {
@@ -18560,11 +18553,35 @@ function handleFormSubmitMessage(event) {
     }
   }
 
+  // 登録コード（partnerIdまたは一般登録コード）を決定
+  if (!targetRow.partnerId && !targetRow.registrationCode) {
+    targetRow.registrationCode = 'REG' + Math.floor(10000000 + Math.random() * 90000000).toString().substring(0, 8);
+  } else if (targetRow.partnerId) {
+    targetRow.registrationCode = targetRow.partnerId;
+  }
+  const confirmedCode = targetRow.partnerId || targetRow.registrationCode || targetRowId;
+
+  // カスタムテーブルの登録コードカラムにも反映して永続化
+  let codeCol = targetTable.columns.find(c => c.name === '登録コード' || c.label === '登録コード');
+  if (!codeCol) {
+    codeCol = {
+      id: 'col_regcode_' + Math.random().toString(36).substr(2, 6),
+      label: '登録コード',
+      name: '登録コード',
+      type: 'text'
+    };
+    targetTable.columns.push(codeCol);
+    if (targetTable.visibleColumns) targetTable.visibleColumns.push(codeCol.id);
+    if (targetTable.columnWidths) targetTable.columnWidths[codeCol.id] = 120;
+  }
+  targetRow[codeCol.id] = confirmedCode;
+  localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+
   // ----------------------------------------------------
   // 3. レスポンス送信と通知
   // ----------------------------------------------------
   if (isTemporary) {
-    if (event.source) {
+    if (event.source && typeof event.source.postMessage === 'function') {
       event.source.postMessage({
         type: 'FORM_SUBMIT_TEMPORARY_RESPONSE',
         success: true,
@@ -18574,7 +18591,25 @@ function handleFormSubmitMessage(event) {
     }
     showToast(`フォーム「${formTitle}」の途中回答を一時保存しました。`, 'success');
   } else {
-    showToast(`フォーム「${formTitle}」の回答を受信し、パートナーDBおよびCOSマスタへ保存しました。`, 'success');
+    if (event.source && typeof event.source.postMessage === 'function') {
+      event.source.postMessage({
+        type: 'FORM_SUBMIT_RESPONSE',
+        success: true,
+        rowId: targetRowId,
+        partnerId: targetRow.partnerId || null,
+        registrationCode: confirmedCode,
+        isTemporary: false,
+        isPartialSubmit: !!isPartialSubmit,
+        resumeUrl: resumeUrl,
+        nextSectionId: nextSectionId || null,
+        formTitle: formTitle
+      }, '*');
+    }
+    if (isPartialSubmit) {
+      showToast(`フォーム「${formTitle}」の途中回答を受信し、登録コード [${confirmedCode}] を確定しました。`, 'success');
+    } else {
+      showToast(`フォーム「${formTitle}」の回答を受信し、パートナーDBおよびCOSマスタへ保存しました。`, 'success');
+    }
   }
 }
 
