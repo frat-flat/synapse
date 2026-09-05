@@ -5621,6 +5621,22 @@ h3 {
   height: 15px;
 }
 
+.col-display-checklist-item.disabled-item {
+  background: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  cursor: not-allowed !important;
+  opacity: 0.6;
+}
+
+.col-display-checklist-item.disabled-item:hover {
+  background: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+.col-display-checklist-item.disabled-item input[type="checkbox"] {
+  cursor: not-allowed !important;
+}
+
 /* ヘッダー極小統合アイコン（文字を隠さない） */
 .synapse-header-merge-icon {
   display: inline-flex;

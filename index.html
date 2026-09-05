@@ -3371,7 +3371,10 @@
 
         <!-- 新規作成・編集セクション -->
         <div style="border-top: 1px solid #e2e8f0; padding-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
-          <h4 id="merge-group-editor-title" style="margin: 0; font-size: 0.88rem; font-weight: 700; color: #2563eb;">新規グループ作成 / 編集</h4>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 id="merge-group-editor-title" style="margin: 0; font-size: 0.88rem; font-weight: 700; color: #2563eb;">新規グループ作成</h4>
+            <button type="button" class="btn btn-secondary btn-sm" id="merge-group-reset-btn" style="display: none; padding: 0.2rem 0.6rem; font-size: 0.75rem;">新規作成に戻る</button>
+          </div>
           
           <div class="form-group" style="margin-bottom: 0;">
             <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.25rem; display: block; color: #0f172a;">グループ名（ヘッダーに表示されます）</label>

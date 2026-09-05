@@ -10158,6 +10158,68 @@ function updateMergeModalDisplayColumnsChecklist(tableId, currentDisplayColIds =
   updateDisplayCountBadge();
 }
 
+function renderMergeColumnsCheckboxes(tableId, editingGroupId = null, preselectedColIds = []) {
+  const normId = normalizeTableId(tableId);
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+  const cols = meta ? meta.columns : [];
+  const screenId = getTableScreenId(normId);
+  const groups = typeof getMergedColumns === 'function' ? getMergedColumns(normId) : [];
+
+  const checkboxList = document.getElementById('merge-columns-checkbox-list');
+  if (!checkboxList) return;
+
+  checkboxList.innerHTML = '';
+
+  cols.forEach(col => {
+    if (typeof checkColumnAccess === 'function') {
+      const access = checkColumnAccess(screenId, col.id);
+      if (access && !access.visible) return;
+    }
+
+    // 他のグループで使用中か判定（現在編集中のグループに属するカラムは除外）
+    const otherGroup = groups.find(g => g.id !== editingGroupId && g.columnIds && g.columnIds.includes(col.id));
+
+    const item = document.createElement('label');
+    item.className = 'col-display-checklist-item';
+    
+    const colName = col.label || col.name || col.id;
+    let isChecked = false;
+
+    if (otherGroup) {
+      // 案1：他グループで使用中のカラムはチェック不可（disabled）＆グレーアウト＆使用中グループ名を表示
+      item.classList.add('disabled-item');
+      item.title = `「${otherGroup.name || '統合グループ'}」で使用中のため選択できません`;
+
+      item.innerHTML = `
+        <input type="checkbox" value="${col.id}" disabled />
+        <span style="font-weight: 500; color: #64748b;">${escapeHtml(colName)}</span>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-left: auto; white-space: nowrap;">(※「${escapeHtml(otherGroup.name || '統合グループ')}」で使用中)</span>
+      `;
+    } else {
+      if (editingGroupId) {
+        const curGroup = groups.find(g => g.id === editingGroupId);
+        if (curGroup && curGroup.columnIds && curGroup.columnIds.includes(col.id)) {
+          isChecked = true;
+        }
+      } else if (preselectedColIds.includes(col.id)) {
+        isChecked = true;
+      }
+
+      item.innerHTML = `
+        <input type="checkbox" value="${col.id}" ${isChecked ? 'checked' : ''} />
+        <span style="font-weight: 500;">${escapeHtml(colName)}</span>
+      `;
+
+      const input = item.querySelector('input');
+      input.addEventListener('change', () => {
+        updateMergeModalDisplayColumnsChecklist(tableId);
+      });
+    }
+
+    checkboxList.appendChild(item);
+  });
+}
+
 function resetMergeGroupEditor(tableId, preselectedColIds = []) {
   const normId = normalizeTableId(tableId);
   currentEditingMergeGroupId = null;
@@ -10165,39 +10227,14 @@ function resetMergeGroupEditor(tableId, preselectedColIds = []) {
   const titleEl = document.getElementById('merge-group-editor-title');
   if (titleEl) titleEl.textContent = '新規グループ作成';
 
+  const resetBtn = document.getElementById('merge-group-reset-btn');
+  if (resetBtn) resetBtn.style.display = 'none';
+
   const nameInput = document.getElementById('merge-group-name-input');
   if (nameInput) nameInput.value = '';
 
-  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
-  const cols = meta ? meta.columns : [];
-  const screenId = getTableScreenId(normId);
-
-  const checkboxList = document.getElementById('merge-columns-checkbox-list');
-  if (checkboxList) {
-    checkboxList.innerHTML = '';
-    cols.forEach(col => {
-      if (typeof checkColumnAccess === 'function') {
-        const access = checkColumnAccess(screenId, col.id);
-        if (access && !access.visible) return;
-      }
-
-      const item = document.createElement('label');
-      item.className = 'col-display-checklist-item';
-      item.innerHTML = `
-        <input type="checkbox" value="${col.id}" ${preselectedColIds.includes(col.id) ? 'checked' : ''} />
-        <span style="font-weight: 500;">${col.label || col.name || col.id}</span>
-      `;
-
-      const input = item.querySelector('input');
-      input.addEventListener('change', () => {
-        updateMergeModalDisplayColumnsChecklist(tableId);
-      });
-
-      checkboxList.appendChild(item);
-    });
-  }
-
-  updateMergeModalDisplayColumnsChecklist(tableId, preselectedColIds);
+  renderMergeColumnsCheckboxes(normId, null, preselectedColIds);
+  updateMergeModalDisplayColumnsChecklist(normId, preselectedColIds);
 }
 
 function editMergeGroupInModal(tableId, groupId) {
@@ -10210,17 +10247,14 @@ function editMergeGroupInModal(tableId, groupId) {
   const titleEl = document.getElementById('merge-group-editor-title');
   if (titleEl) titleEl.textContent = `グループ編集: ${group.name || '名称未設定'}`;
 
+  const resetBtn = document.getElementById('merge-group-reset-btn');
+  if (resetBtn) resetBtn.style.display = 'inline-block';
+
   const nameInput = document.getElementById('merge-group-name-input');
   if (nameInput) nameInput.value = group.name || '';
 
-  const checkboxList = document.getElementById('merge-columns-checkbox-list');
-  if (checkboxList) {
-    checkboxList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-      cb.checked = group.columnIds.includes(cb.value);
-    });
-  }
-
-  updateMergeModalDisplayColumnsChecklist(tableId, group.displayColumnIds || [group.primaryColumnId || group.columnIds[0]]);
+  renderMergeColumnsCheckboxes(normId, groupId, []);
+  updateMergeModalDisplayColumnsChecklist(normId, group.displayColumnIds || [group.primaryColumnId || group.columnIds[0]]);
 }
 
 function handleSaveMergedColumns() {
@@ -10238,7 +10272,7 @@ function handleSaveMergedColumns() {
   const groupName = nameInput ? nameInput.value.trim() : '';
 
   const checkboxList = document.getElementById('merge-columns-checkbox-list');
-  const checkedBoxes = Array.from(checkboxList ? checkboxList.querySelectorAll('input[type="checkbox"]:checked') : []);
+  const checkedBoxes = Array.from(checkboxList ? checkboxList.querySelectorAll('input[type="checkbox"]:checked:not(:disabled)') : []);
   const selectedColIds = checkedBoxes.map(cb => cb.value);
 
   if (selectedColIds.length < 2) {
@@ -10302,6 +10336,9 @@ function setupMergedColumnsModalEvents() {
   document.getElementById('merged-columns-cancel-btn')?.addEventListener('click', closeColumnDisplaySettingsModal);
   document.getElementById('col-display-save-btn')?.addEventListener('click', handleSaveMergedColumns);
   document.getElementById('merged-columns-save-btn')?.addEventListener('click', handleSaveMergedColumns);
+  document.getElementById('merge-group-reset-btn')?.addEventListener('click', () => {
+    if (currentDisplayModalTableId) resetMergeGroupEditor(currentDisplayModalTableId);
+  });
 
   // タブボタンイベント
   document.getElementById('col-display-tab-hidden')?.addEventListener('click', () => switchColumnDisplayTab('hidden'));
