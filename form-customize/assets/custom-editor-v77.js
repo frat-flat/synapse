@@ -5527,13 +5527,13 @@
   function getActiveSection() {
     if (!window.n || !window.n.sections || window.n.sections.length === 0) return null;
     if (window.r) {
-      const found = window.n.sections.find(s => s.id === window.r);
+      const found = window.n.sections.find(s => s && s.id === window.r);
       if (found) return found;
     }
     const activeSidebar = document.querySelector('#section-list .sidebar-item.active');
     if (activeSidebar && activeSidebar.dataset && activeSidebar.dataset.sectionId) {
       const secId = activeSidebar.dataset.sectionId;
-      const found = window.n.sections.find(s => s.id === secId);
+      const found = window.n.sections.find(s => s && s.id === secId);
       if (found) {
         window.r = secId;
         return found;
@@ -6046,7 +6046,7 @@
     if (window.n && window.n.sections) {
       // window.r が未定義の場合は、安全のために最初のセクションIDか、親ウィンドウのアクティブセクションIDをフォールバック解決
       const currentSecId = window.r || (window.parent && window.parent.r) || (window.n.sections[0] ? window.n.sections[0].id : '');
-      const currentIdx = window.n.sections.findIndex(s => s.id === currentSecId);
+      const currentIdx = window.n.sections.findIndex(s => s && s.id === currentSecId);
       
       if (currentSecId) {
         allSelects.forEach(select => {
@@ -6066,7 +6066,7 @@
           options.forEach(opt => {
             const val = opt.value;
             if (val && val !== 'next' && val !== 'submit') {
-              const targetIdx = window.n.sections.findIndex(s => s.id === val);
+              const targetIdx = window.n.sections.findIndex(s => s && s.id === val);
               
               // 自分自身へのループ遷移、または過去セクションへの遷移を厳格に禁止
               const isSelf = (val === currentSecId);
