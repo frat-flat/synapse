@@ -2712,7 +2712,7 @@
 
     document.getElementById('editor-pro-logo').value = g.header.logoText || "";
     document.getElementById('editor-pro-title').value = g.header.title || "";
-    document.getElementById('editor-pro-subtitle').value = g.header.subtitle || "";
+    document.getElementById('editor-pro-subtitle').value = (g.header && g.header.subtitle) ? g.header.subtitle : (g.subtitle || "");
     document.getElementById('editor-pro-disclaimer').value = g.header.disclaimer || "";
 
     document.getElementById('editor-pro-display-mode').value = g.displayMode;
@@ -3731,6 +3731,22 @@
     if (previewTitle) {
       previewTitle.textContent = isPro ? ((g.header ? g.header.title : null) || g.title || "セクション") : (g.title || "セクション");
     }
+
+    // サブタイトルの取得と反映（リアルタイム入力値＆データオブジェクト双方対応）
+    const curSubtitleVal = document.getElementById('editor-pro-subtitle') 
+      ? document.getElementById('editor-pro-subtitle').value 
+      : ((g.header && g.header.subtitle) ? g.header.subtitle : (g.subtitle || ""));
+
+    if (subtitleP) {
+      if (curSubtitleVal && curSubtitleVal.trim() !== "") {
+        subtitleP.textContent = curSubtitleVal;
+        subtitleP.style.display = 'block';
+      } else {
+        subtitleP.textContent = "";
+        subtitleP.style.display = 'none';
+      }
+    }
+
     if (previewDesc) {
       const pDescVal = isPro ? ((g.header ? g.header.disclaimer : null) || g.description || "") : (g.description || "");
       previewDesc.innerHTML = renderRichTextWithLinks(pDescVal);
@@ -3807,13 +3823,6 @@
     }
 
     if (isPro) {
-      if (g.header && g.header.subtitle) {
-        subtitleP.textContent = g.header.subtitle;
-        subtitleP.style.display = 'block';
-      } else {
-        subtitleP.style.display = 'none';
-      }
-
       let showAnnounce = false;
       if (g.announcement && g.announcement.showDuration && g.announcement.durationText) {
         document.getElementById('preview-duration-value').textContent = g.announcement.durationText;
@@ -3880,7 +3889,7 @@
 
     } else {
       logoArea.style.display = 'none';
-      subtitleP.style.display = 'none';
+      if (subtitleP && (!curSubtitleVal || curSubtitleVal.trim() === "")) subtitleP.style.display = 'none';
       announceArea.style.display = 'none';
       previewContainer.classList.remove('preview-scroll-mode');
       document.querySelector('.progress-bar-container').style.display = 'block';
@@ -5608,6 +5617,22 @@
     const proDescVal = (g.header && g.header.disclaimer) ? g.header.disclaimer : currentFormDesc;
 
     if (liveTitleH) liveTitleH.textContent = isPro ? (proTitleVal || "フォーム") : (currentFormTitle || "フォーム");
+
+    // サブタイトルの取得と反映（リアルタイム入力値＆データオブジェクト双方対応）
+    const currentSubtitle = document.getElementById('editor-pro-subtitle') 
+      ? document.getElementById('editor-pro-subtitle').value 
+      : ((g.header && g.header.subtitle) ? g.header.subtitle : (g.subtitle || ""));
+
+    if (liveSubtitleP) {
+      if (currentSubtitle && currentSubtitle.trim() !== "") {
+        liveSubtitleP.textContent = currentSubtitle;
+        liveSubtitleP.style.display = 'block';
+      } else {
+        liveSubtitleP.textContent = "";
+        liveSubtitleP.style.display = 'none';
+      }
+    }
+
     if (liveDescP) liveDescP.innerHTML = renderRichTextWithLinks(isPro ? proDescVal : currentFormDesc);
 
     // ライブプレビューのヘッダー画像表示制御
@@ -5681,16 +5706,6 @@
     }
 
     if (isPro && g.appearance) {
-      const subtitleText = g.header ? g.header.subtitle : "";
-      if (liveSubtitleP) {
-        if (subtitleText) {
-          liveSubtitleP.textContent = subtitleText;
-          liveSubtitleP.style.display = 'block';
-        } else {
-          liveSubtitleP.style.display = 'none';
-        }
-      }
-
       let showLiveAnnounce = false;
       if (g.announcement && g.announcement.showDuration && g.announcement.durationText) {
         const durVal = document.getElementById('live-preview-duration-value');
@@ -5769,7 +5784,7 @@
       }
     } else {
       if (liveLogoArea) liveLogoArea.style.display = 'none';
-      if (liveSubtitleP) liveSubtitleP.style.display = 'none';
+      if (liveSubtitleP && (!currentSubtitle || currentSubtitle.trim() === "")) liveSubtitleP.style.display = 'none';
       if (liveAnnounceArea) liveAnnounceArea.style.display = 'none';
       const liveProgBarCont = document.getElementById('live-progress-bar-container');
       if (liveProgBarCont) liveProgBarCont.style.display = 'block';
@@ -5964,6 +5979,17 @@
       if (el) el.textContent = value || "フォーム";
       const mob = document.querySelector('.mobile-preview-title');
       if (mob) mob.textContent = value || "フォーム";
+    } else if (type === 'subtitle' || type === 'form_subtitle') {
+      const liveSub = document.getElementById('live-preview-form-subtitle');
+      if (liveSub) {
+        liveSub.textContent = value || "";
+        liveSub.style.display = (value && value.trim() !== "") ? 'block' : 'none';
+      }
+      const panelSub = document.getElementById('preview-form-subtitle');
+      if (panelSub) {
+        panelSub.textContent = value || "";
+        panelSub.style.display = (value && value.trim() !== "") ? 'block' : 'none';
+      }
     } else if (type === 'form_desc') {
       const el = document.getElementById('live-preview-form-desc');
       if (el) el.innerHTML = renderRichTextWithLinks(value || "");
@@ -6050,6 +6076,22 @@
       if (g) {
         const titleEl = document.getElementById('editor-form-title');
         if (titleEl) g.title = titleEl.value;
+        const subTitleEl = document.getElementById('editor-pro-subtitle');
+        if (subTitleEl) {
+          if (!g.header) g.header = {};
+          g.header.subtitle = subTitleEl.value;
+          g.subtitle = subTitleEl.value;
+          if (window.G) {
+            if (!window.G.header) window.G.header = {};
+            window.G.header.subtitle = subTitleEl.value;
+            window.G.subtitle = subTitleEl.value;
+          }
+          if (window.n) {
+            if (!window.n.header) window.n.header = {};
+            window.n.header.subtitle = subTitleEl.value;
+            window.n.subtitle = subTitleEl.value;
+          }
+        }
         const descEl = document.getElementById('editor-form-desc');
         if (descEl) g.description = descEl.value;
 
@@ -6130,6 +6172,19 @@
       if (!t) return;
       if (t.id === 'editor-form-title') {
         fastUpdateLivePreview('form_title', t.value);
+      } else if (t.id === 'editor-pro-subtitle') {
+        fastUpdateLivePreview('subtitle', t.value);
+        if (window.G) {
+          if (!window.G.header) window.G.header = {};
+          window.G.header.subtitle = t.value;
+          window.G.subtitle = t.value;
+        }
+        if (window.n) {
+          if (!window.n.header) window.n.header = {};
+          window.n.header.subtitle = t.value;
+          window.n.subtitle = t.value;
+        }
+        if (typeof window.S === 'function') window.S();
       } else if (t.id === 'editor-form-desc') {
         fastUpdateLivePreview('form_desc', t.value);
       } else if (t.id === 'editor-section-title') {
