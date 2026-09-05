@@ -1101,6 +1101,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (typeof initMypageCalendar === 'function') initMypageCalendar(); // カレンダーの初回初期化
   initFloatingStickyNotes(); // 浮遊付箋の復元
   setupInactivityMonitors(); // 無操作監視の初期化
+  setupMergedColumnsModalEvents();
+  setupSynapseFindWidgetEvents();
 
   // 同期キューのロードと再試行
   loadSyncQueueFromStorage();
@@ -6229,14 +6231,45 @@ function showCtContextMenu(x, y, tbl, type, targetId) {
   const heightItem = document.getElementById('ct-menu-change-height');
   const dropdownSettingsItem = document.getElementById('ct-menu-dropdown-settings');
 
+  const mergeItem = document.getElementById('ct-menu-merge-columns');
+  const switchPrimaryItem = document.getElementById('ct-menu-switch-primary-merge');
+  const unmergeItem = document.getElementById('ct-menu-unmerge-columns');
+
   if (type === 'col') {
     if (widthItem) widthItem.style.display = 'block';
     if (heightItem) heightItem.style.display = 'none';
     if (dropdownSettingsItem) dropdownSettingsItem.style.display = 'block';
+
+    const normId = normalizeTableId(tbl.id);
+    const existingGroup = getMergedGroupForCol(normId, targetId);
+    if (existingGroup) {
+      if (mergeItem) {
+        mergeItem.style.display = 'block';
+        mergeItem.textContent = '🔗 統合表示を編集...';
+      }
+      if (switchPrimaryItem) {
+        switchPrimaryItem.style.display = 'block';
+        switchPrimaryItem.textContent = '🔄 メイン表示を切り替え...';
+      }
+      if (unmergeItem) {
+        unmergeItem.style.display = 'block';
+        unmergeItem.textContent = `🔓 「${existingGroup.name || 'この統合'}」を解除`;
+      }
+    } else {
+      if (mergeItem) {
+        mergeItem.style.display = 'block';
+        mergeItem.textContent = '🔗 列の統合表示を設定...';
+      }
+      if (switchPrimaryItem) switchPrimaryItem.style.display = 'none';
+      if (unmergeItem) unmergeItem.style.display = 'none';
+    }
   } else {
     if (widthItem) widthItem.style.display = 'none';
     if (heightItem) heightItem.style.display = 'block';
     if (dropdownSettingsItem) dropdownSettingsItem.style.display = 'none';
+    if (mergeItem) mergeItem.style.display = 'none';
+    if (switchPrimaryItem) switchPrimaryItem.style.display = 'none';
+    if (unmergeItem) unmergeItem.style.display = 'none';
   }
 
   menu.style.left = `${x}px`;
@@ -6449,15 +6482,16 @@ function renderCustomTable(tableId) {
 
   const columns = tbl.columns;
   const baseVisibleColumnIds = tbl.visibleColumns;
-  const visibleColumnIds = [];
+  const rawCtVisibleColumnIds = [];
   columns.forEach(col => {
     const access = checkColumnAccess(`custom-table-${tbl.id}`, col.id);
     if (access.visible) {
       if (baseVisibleColumnIds.includes(col.id) || access.grayout) {
-        visibleColumnIds.push(col.id);
+        rawCtVisibleColumnIds.push(col.id);
       }
     }
   });
+  const visibleColumnIds = applyMergedColumnsToVisibleList(tbl.id, rawCtVisibleColumnIds, columns);
 
   // --- 固定列・固定行の計算 ---
   const fixedColIds = [];
@@ -6631,6 +6665,15 @@ function renderCustomTable(tableId) {
     labelSpan.style.overflow = 'hidden';
     labelSpan.style.textOverflow = 'ellipsis';
     headerWrapper.appendChild(labelSpan);
+
+    const ctMg = getMergedGroupForCol(tbl.id, col.id);
+    if (ctMg && ctMg.primaryColumnId === col.id) {
+      const badge = document.createElement('span');
+      badge.className = 'synapse-merged-header-badge';
+      badge.textContent = `🔗 統合: ${ctMg.columnIds.length}項目`;
+      badge.title = `統合項目: ${getMergedGroupSummaryText(tbl.id, ctMg)}`;
+      headerWrapper.appendChild(badge);
+    }
 
     const filterBtn = document.createElement('span');
     filterBtn.className = 'filter-icon-btn';
@@ -7004,6 +7047,16 @@ function renderCustomTable(tableId) {
         } else {
           td.textContent = displayVal;
         }
+      }
+
+      const ctMergeGroup = getMergedGroupForCol(tbl.id, col.id);
+      if (ctMergeGroup && ctMergeGroup.primaryColumnId === col.id) {
+        const badge = document.createElement('span');
+        badge.className = 'synapse-merged-badge';
+        badge.textContent = `🔗 +${ctMergeGroup.columnIds.length - 1}`;
+        badge.title = `統合項目: ${getMergedGroupSummaryText(tbl.id, ctMergeGroup)}`;
+        td.appendChild(badge);
+        attachMergedCellHoverEvents(td, tbl.id, row, ctMergeGroup, columns);
       }
 
       // シングルクリックでドロップダウン編集を開く（ドロップダウンのみ）
@@ -8996,6 +9049,43 @@ function setupCtButtonsEvents() {
     openValidationSidebar(tbl, ctResizeState.targetId);
   });
 
+  // 🔗 列の統合表示を設定
+  document.getElementById('ct-menu-merge-columns')?.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('ct-context-menu');
+    if (menu) menu.style.display = 'none';
+    if (!ctResizeState.tblId) return;
+    const normId = normalizeTableId(ctResizeState.tblId);
+    const selectedCols = getSelectedColumnsForTable(normId);
+    if (selectedCols.length >= 2) {
+      openMergedColumnsModal(normId, selectedCols);
+    } else if (ctResizeState.targetId) {
+      openMergedColumnsModal(normId, [ctResizeState.targetId]);
+    } else {
+      openMergedColumnsModal(normId);
+    }
+  });
+
+  // 🔄 メイン表示を切り替え
+  document.getElementById('ct-menu-switch-primary-merge')?.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('ct-context-menu');
+    if (menu) menu.style.display = 'none';
+    if (!ctResizeState.tblId || !ctResizeState.targetId) return;
+    const normId = normalizeTableId(ctResizeState.tblId);
+    switchPrimaryColumnQuick(normId, ctResizeState.targetId);
+  });
+
+  // 🔓 統合表示を解除
+  document.getElementById('ct-menu-unmerge-columns')?.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('ct-context-menu');
+    if (menu) menu.style.display = 'none';
+    if (!ctResizeState.tblId || !ctResizeState.targetId) return;
+    const normId = normalizeTableId(ctResizeState.tblId);
+    unmergeColumnQuick(normId, ctResizeState.targetId);
+  });
+
   // リサイズダイアログ：キャンセル
   const closeCtResizeDialog = () => {
     const modal = document.getElementById('ct-resize-dialog-modal');
@@ -9315,6 +9405,1012 @@ function getTableMeta(tableId) {
   return null;
 }
 
+
+// =========================================================================
+// 🔗 テーブル列の表示統合 (Merged Columns) & Synapse Command+F 検索エンジン
+// =========================================================================
+
+function normalizeTableId(tableId) {
+  if (!tableId) return 'unknown';
+  if (tableId === 'jo-info-screen' || tableId === 'jo') return 'jo';
+  if (tableId === 'applicant-info-screen' || tableId === 'ap') return 'ap';
+  if (tableId === 'agency-info-screen' || tableId === 'agency-screen' || tableId === 'ag') return 'ag';
+  if (tableId === 'dbmake-screen' || tableId === 'dbmake') return 'dbmake';
+  return tableId;
+}
+
+function getTableScreenId(tableId) {
+  const norm = normalizeTableId(tableId);
+  if (norm === 'jo') return 'jo-info-screen';
+  if (norm === 'ap') return 'applicant-info-screen';
+  if (norm === 'ag') return 'agency-info-screen';
+  if (norm === 'dbmake') return 'dbmake-screen';
+  return 'custom-table-screen';
+}
+
+function getCurrentActiveTableId() {
+  const currentView = state.currentView || '';
+  if (currentView === 'jo-info-screen') return 'jo';
+  if (currentView === 'applicant-info-screen') return 'ap';
+  if (currentView === 'agency-info-screen' || currentView === 'agency-screen') return 'ag';
+  if (currentView === 'dbmake-screen') return 'dbmake';
+  if (currentView === 'custom-table-screen' && state.activeCustomTableId) return state.activeCustomTableId;
+
+  if (state.activeTabId) {
+    const tab = state.tabs.find(t => t.id === state.activeTabId);
+    if (tab) {
+      if (tab.type === 'jo-info-screen' || tab.id === 'jo-info-screen') return 'jo';
+      if (tab.type === 'applicant-info-screen' || tab.id === 'applicant-info-screen') return 'ap';
+      if (tab.type === 'agency-info-screen' || tab.id === 'agency-info-screen') return 'ag';
+      if (tab.type === 'dbmake-screen' || tab.id === 'dbmake-screen') return 'dbmake';
+      if (tab.id && tab.id.startsWith('custom-table-')) return tab.id.replace('custom-table-', '');
+    }
+  }
+
+  const joScreen = document.getElementById('jo-info-screen');
+  if (joScreen && window.getComputedStyle(joScreen).display !== 'none') return 'jo';
+  const apScreen = document.getElementById('applicant-info-screen');
+  if (apScreen && window.getComputedStyle(apScreen).display !== 'none') return 'ap';
+  const agScreen = document.getElementById('agency-info-screen');
+  if (agScreen && window.getComputedStyle(agScreen).display !== 'none') return 'ag';
+  const dbmakeScreen = document.getElementById('dbmake-screen');
+  if (dbmakeScreen && window.getComputedStyle(dbmakeScreen).display !== 'none') return 'dbmake';
+  const ctScreen = document.getElementById('custom-table-screen');
+  if (ctScreen && window.getComputedStyle(ctScreen).display !== 'none') return state.activeCustomTableId || null;
+
+  return null;
+}
+
+// --- 1. アカウント別 ストレージ管理 ---
+function getMergedColumnsStorageKey(tableId) {
+  const normId = normalizeTableId(tableId);
+  let suffix = '';
+  if (typeof getUserIdSuffix === 'function') {
+    suffix = getUserIdSuffix();
+  }
+  if (!suffix && typeof state !== 'undefined' && state.currentUser && state.currentUser.id) {
+    suffix = '_' + state.currentUser.id.toLowerCase();
+  }
+  return 'synapse_merged_columns_' + normId + (suffix || '_default');
+}
+
+function getMergedColumns(tableId) {
+  try {
+    const raw = localStorage.getItem(getMergedColumnsStorageKey(tableId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.error('[MergedColumns] get error:', e);
+    return [];
+  }
+}
+
+function saveMergedColumns(tableId, groups) {
+  try {
+    localStorage.setItem(getMergedColumnsStorageKey(tableId), JSON.stringify(groups));
+  } catch (e) {
+    console.error('[MergedColumns] save error:', e);
+  }
+}
+
+function getMergedGroupForCol(tableId, colId) {
+  const groups = getMergedColumns(tableId);
+  return groups.find(g => g.columnIds && g.columnIds.includes(colId)) || null;
+}
+
+function getMergedGroupSummaryText(tableId, group) {
+  const normId = normalizeTableId(tableId);
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+  const cols = meta ? meta.columns : [];
+  return group.columnIds.map(cId => {
+    const c = cols.find(col => col.id === cId);
+    const label = c ? (c.label || c.name || cId) : cId;
+    return cId === group.primaryColumnId ? `${label}(メイン)` : label;
+  }).join(', ');
+}
+
+// 任意カラム・スキップしたカラムの統合表示用フィルター
+function applyMergedColumnsToVisibleList(tableId, visibleColIds, allCols) {
+  const normId = normalizeTableId(tableId);
+  const groups = getMergedColumns(normId);
+  if (!groups || groups.length === 0) return visibleColIds;
+
+  const hideCols = new Set();
+  groups.forEach(g => {
+    if (g.columnIds && g.primaryColumnId) {
+      g.columnIds.forEach(cId => {
+        if (cId !== g.primaryColumnId) {
+          hideCols.add(cId);
+        }
+      });
+    }
+  });
+
+  const result = [];
+  visibleColIds.forEach(cId => {
+    if (!hideCols.has(cId)) {
+      result.push(cId);
+    }
+  });
+
+  // プライマリ列が元々visibleColIdsに含まれていなくても、グループのいずれかの列が表示対象なら追加
+  groups.forEach(g => {
+    const anyVisible = g.columnIds.some(cId => visibleColIds.includes(cId));
+    if (anyVisible && !result.includes(g.primaryColumnId)) {
+      result.push(g.primaryColumnId);
+    }
+  });
+
+  return result;
+}
+
+function switchPrimaryColumnQuick(tableId, targetColId) {
+  const normId = normalizeTableId(tableId);
+  const groups = getMergedColumns(normId);
+  const group = groups.find(g => g.columnIds && g.columnIds.includes(targetColId));
+  if (!group) return;
+
+  group.primaryColumnId = targetColId;
+  saveMergedColumns(normId, groups);
+
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+  if (meta && typeof meta.render === 'function') meta.render();
+
+  const cols = meta ? meta.columns : [];
+  const colDef = cols.find(c => c.id === targetColId);
+  const colLabel = colDef ? (colDef.label || colDef.name || targetColId) : targetColId;
+  showToast(`メイン表示を「${colLabel}」に切り替えました。`, 'success');
+}
+
+function unmergeColumnQuick(tableId, targetColId) {
+  const normId = normalizeTableId(tableId);
+  let groups = getMergedColumns(normId);
+  const group = groups.find(g => g.columnIds && g.columnIds.includes(targetColId));
+  if (!group) return;
+
+  if (confirm(`統合グループ「${group.name || 'この統合'}」を解除してもよろしいですか？\n※データベースのデータは保持され、元の個別列表示に戻ります。`)) {
+    groups = groups.filter(g => g.id !== group.id);
+    saveMergedColumns(normId, groups);
+
+    const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+    if (meta && typeof meta.render === 'function') meta.render();
+    showToast('統合表示を解除しました。', 'info');
+  }
+}
+
+// --- 2. 統合設定モーダル (#merged-columns-modal) コントローラー ---
+let currentMergeModalTableId = null;
+let currentEditingMergeGroupId = null;
+
+function openMergedColumnsModal(tableId, preselectedColIds = []) {
+  const normId = normalizeTableId(tableId);
+  currentMergeModalTableId = normId;
+  currentEditingMergeGroupId = null;
+
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+  if (!meta) {
+    showToast('テーブル情報が見つかりません。', 'error');
+    return;
+  }
+
+  const modal = document.getElementById('merged-columns-modal');
+  if (!modal) return;
+
+  const titleEl = modal.querySelector('.modal-header h3');
+  if (titleEl) {
+    titleEl.innerHTML = `<span>🔗</span> 列の統合表示設定 (${meta.name || normId})`;
+  }
+
+  renderExistingMergeGroupsList(normId);
+  resetMergeGroupEditor(normId, preselectedColIds);
+
+  modal.style.display = 'flex';
+  modal.classList.add('active');
+}
+
+function closeMergedColumnsModal() {
+  const modal = document.getElementById('merged-columns-modal');
+  if (modal) {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  }
+  currentMergeModalTableId = null;
+  currentEditingMergeGroupId = null;
+}
+
+function renderExistingMergeGroupsList(tableId) {
+  const normId = normalizeTableId(tableId);
+  const container = document.getElementById('existing-merge-groups-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const groups = getMergedColumns(normId);
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+  const cols = meta ? meta.columns : [];
+
+  if (groups.length === 0) {
+    container.innerHTML = '<div style="font-size: 0.8rem; color: var(--text-muted); padding: 0.5rem; background: var(--bg-surface); border-radius: var(--radius-sm); border: 1px dashed var(--border-color);">現在統合されている列はありません。下部から複数カラムを選択して統合を作成できます。</div>';
+    return;
+  }
+
+  groups.forEach(group => {
+    const item = document.createElement('div');
+    item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.65rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; gap: 0.5rem;';
+
+    const left = document.createElement('div');
+    left.style.cssText = 'display: flex; flex-direction: column; gap: 2px; flex: 1; overflow: hidden;';
+
+    const titleRow = document.createElement('div');
+    titleRow.style.cssText = 'display: flex; align-items: center; gap: 6px;';
+    const primaryCol = cols.find(c => c.id === group.primaryColumnId);
+    const primaryLabel = primaryCol ? (primaryCol.label || primaryCol.name || group.primaryColumnId) : group.primaryColumnId;
+
+    titleRow.innerHTML = `<strong>${group.name || primaryLabel + ' (統合)'}</strong> <span style="font-size: 0.7rem; background: rgba(16,185,129,0.15); color: #10b981; padding: 1px 5px; border-radius: 3px; font-weight: 600;">メイン: ${primaryLabel}</span>`;
+
+    const colsRow = document.createElement('div');
+    colsRow.style.cssText = 'font-size: 0.74rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+    const colLabels = group.columnIds.map(cId => {
+      const c = cols.find(col => col.id === cId);
+      return c ? (c.label || c.name || cId) : cId;
+    }).join('、');
+    colsRow.textContent = `統合項目 (${group.columnIds.length}列): ${colLabels}`;
+
+    left.appendChild(titleRow);
+    left.appendChild(colsRow);
+
+    const btnGroup = document.createElement('div');
+    btnGroup.style.cssText = 'display: flex; gap: 4px; flex-shrink: 0;';
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'btn btn-secondary';
+    editBtn.style.cssText = 'padding: 0.2rem 0.5rem; font-size: 0.75rem;';
+    editBtn.textContent = '編集';
+    editBtn.addEventListener('click', () => {
+      loadMergeGroupToEditor(normId, group);
+    });
+
+    const unmergeBtn = document.createElement('button');
+    unmergeBtn.type = 'button';
+    unmergeBtn.className = 'btn btn-danger';
+    unmergeBtn.style.cssText = 'padding: 0.2rem 0.5rem; font-size: 0.75rem; background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid rgba(239,68,68,0.2);';
+    unmergeBtn.textContent = '解除';
+    unmergeBtn.addEventListener('click', () => {
+      if (confirm(`統合グループ「${group.name || primaryLabel}」を解除してもよろしいですか？\n※データベースのデータは保持されます。`)) {
+        const remaining = getMergedColumns(normId).filter(g => g.id !== group.id);
+        saveMergedColumns(normId, remaining);
+        renderExistingMergeGroupsList(normId);
+        resetMergeGroupEditor(normId);
+        if (meta && typeof meta.render === 'function') meta.render();
+        showToast('統合表示を解除しました。', 'info');
+      }
+    });
+
+    btnGroup.appendChild(editBtn);
+    btnGroup.appendChild(unmergeBtn);
+
+    item.appendChild(left);
+    item.appendChild(btnGroup);
+    container.appendChild(item);
+  });
+}
+
+function resetMergeGroupEditor(tableId, preselectedColIds = []) {
+  const normId = normalizeTableId(tableId);
+  currentEditingMergeGroupId = null;
+  const nameInput = document.getElementById('merge-group-name-input');
+  if (nameInput) nameInput.value = '';
+
+  const editorTitle = document.getElementById('merge-group-editor-title');
+  if (editorTitle) editorTitle.textContent = '新規グループ作成';
+
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+  const cols = meta ? meta.columns : [];
+
+  const cbList = document.getElementById('merge-columns-checkbox-list');
+  if (cbList) {
+    cbList.innerHTML = '';
+    cols.forEach(col => {
+      const labelEl = document.createElement('label');
+      labelEl.style.cssText = 'display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-primary); cursor: pointer; user-select: none;';
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = col.id;
+      cb.className = 'merge-col-checkbox';
+      if (preselectedColIds.includes(col.id)) cb.checked = true;
+
+      cb.addEventListener('change', () => {
+        syncPrimaryColSelectOptions(cols);
+      });
+
+      labelEl.appendChild(cb);
+      labelEl.appendChild(document.createTextNode(col.label || col.name || col.id));
+      cbList.appendChild(labelEl);
+    });
+  }
+
+  syncPrimaryColSelectOptions(cols, preselectedColIds[0] || '');
+}
+
+function loadMergeGroupToEditor(tableId, group) {
+  const normId = normalizeTableId(tableId);
+  currentEditingMergeGroupId = group.id;
+
+  const editorTitle = document.getElementById('merge-group-editor-title');
+  if (editorTitle) editorTitle.textContent = `グループ「${group.name || ''}」を編集`;
+
+  const nameInput = document.getElementById('merge-group-name-input');
+  if (nameInput) nameInput.value = group.name || '';
+
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+  const cols = meta ? meta.columns : [];
+
+  const cbList = document.getElementById('merge-columns-checkbox-list');
+  if (cbList) {
+    cbList.querySelectorAll('.merge-col-checkbox').forEach(cb => {
+      cb.checked = group.columnIds.includes(cb.value);
+    });
+  }
+
+  syncPrimaryColSelectOptions(cols, group.primaryColumnId);
+}
+
+function syncPrimaryColSelectOptions(allCols, selectedPrimaryId = '') {
+  const cbList = document.getElementById('merge-columns-checkbox-list');
+  const primarySelect = document.getElementById('merge-primary-col-select');
+  const countBadge = document.getElementById('merge-selected-count-badge');
+  if (!primarySelect || !cbList) return;
+
+  const checkedCheckboxes = Array.from(cbList.querySelectorAll('.merge-col-checkbox:checked'));
+  const checkedIds = checkedCheckboxes.map(cb => cb.value);
+
+  if (countBadge) {
+    countBadge.textContent = `${checkedIds.length}件選択中`;
+  }
+
+  const prevValue = primarySelect.value;
+  primarySelect.innerHTML = '';
+
+  if (checkedIds.length === 0) {
+    primarySelect.innerHTML = '<option value="">-- 先に統合するカラムを選択してください --</option>';
+    return;
+  }
+
+  checkedIds.forEach(cId => {
+    const col = allCols.find(c => c.id === cId);
+    const opt = document.createElement('option');
+    opt.value = cId;
+    opt.textContent = col ? (col.label || col.name || cId) : cId;
+    primarySelect.appendChild(opt);
+  });
+
+  if (selectedPrimaryId && checkedIds.includes(selectedPrimaryId)) {
+    primarySelect.value = selectedPrimaryId;
+  } else if (checkedIds.includes(prevValue)) {
+    primarySelect.value = prevValue;
+  }
+}
+
+function handleSaveMergedColumns() {
+  if (!currentMergeModalTableId) return;
+  const normId = normalizeTableId(currentMergeModalTableId);
+
+  const cbList = document.getElementById('merge-columns-checkbox-list');
+  const primarySelect = document.getElementById('merge-primary-col-select');
+  const nameInput = document.getElementById('merge-group-name-input');
+
+  const checkedCheckboxes = cbList ? Array.from(cbList.querySelectorAll('.merge-col-checkbox:checked')) : [];
+  const selectedIds = checkedCheckboxes.map(cb => cb.value);
+
+  if (selectedIds.length < 2) {
+    showToast('統合表示には2つ以上のカラムを選択してください。', 'warning');
+    return;
+  }
+
+  const primaryColId = primarySelect ? primarySelect.value : '';
+  if (!primaryColId || !selectedIds.includes(primaryColId)) {
+    showToast('通常セルに表示する「メイン表示」カラムを選択してください。', 'warning');
+    return;
+  }
+
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+  const cols = meta ? meta.columns : [];
+  const primaryCol = cols.find(c => c.id === primaryColId);
+  const primaryLabel = primaryCol ? (primaryCol.label || primaryCol.name || primaryColId) : primaryColId;
+
+  let groupName = (nameInput ? nameInput.value.trim() : '');
+  if (!groupName) {
+    groupName = `${primaryLabel} (+${selectedIds.length - 1}項目)`;
+  }
+
+  let groups = getMergedColumns(normId);
+
+  const groupId = currentEditingMergeGroupId || ('mg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
+
+  // 他グループとの重複カラムを除去
+  groups = groups.map(g => {
+    if (g.id === groupId) return null;
+    const filteredColIds = g.columnIds.filter(cId => !selectedIds.includes(cId));
+    if (filteredColIds.length < 2) return null;
+    const newPrimary = filteredColIds.includes(g.primaryColumnId) ? g.primaryColumnId : filteredColIds[0];
+    return { ...g, columnIds: filteredColIds, primaryColumnId: newPrimary };
+  }).filter(Boolean);
+
+  groups.push({
+    id: groupId,
+    name: groupName,
+    columnIds: selectedIds,
+    primaryColumnId: primaryColId
+  });
+
+  saveMergedColumns(normId, groups);
+
+  if (meta && typeof meta.render === 'function') {
+    meta.render();
+  }
+
+  showToast(`列の統合表示「${groupName}」を保存しました。（アカウントに保存済み）`, 'success');
+  closeMergedColumnsModal();
+}
+
+function setupMergedColumnsModalEvents() {
+  document.getElementById('merged-columns-modal-close')?.addEventListener('click', closeMergedColumnsModal);
+  document.getElementById('merged-columns-cancel-btn')?.addEventListener('click', closeMergedColumnsModal);
+  document.getElementById('merged-columns-save-btn')?.addEventListener('click', handleSaveMergedColumns);
+
+  const modal = document.getElementById('merged-columns-modal');
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeMergedColumnsModal();
+    });
+  }
+}
+
+function getSelectedColumnsForTable(tableId) {
+  const normId = normalizeTableId(tableId);
+  if (normId === 'jo' && state.joSelectedCols) return Array.from(state.joSelectedCols);
+  if (normId === 'ap' && state.apSelectedCols) return Array.from(state.apSelectedCols);
+  if (normId === 'ag' && state.agSelectedCols) return Array.from(state.agSelectedCols);
+  if (normId === 'dbmake' && state.dbmakeSelectedCols) return Array.from(state.dbmakeSelectedCols);
+  if (state.ctSelectedCols) return Array.from(state.ctSelectedCols);
+  return [];
+}
+
+// --- 3. アコーディオン型ツールチップ (#synapse-merged-cell-chip) & コピー機能 ---
+let activeChipCell = null;
+let activeChipHoveredRow = null;
+let chipCloseTimer = null;
+let isDraggingChip = false;
+const selectedChipRowEls = new Set();
+
+function cancelChipClose() {
+  if (chipCloseTimer) {
+    clearTimeout(chipCloseTimer);
+    chipCloseTimer = null;
+  }
+}
+
+function scheduleChipClose() {
+  cancelChipClose();
+  chipCloseTimer = setTimeout(() => {
+    hideMergedCellChip();
+  }, 220);
+}
+
+function hideMergedCellChip() {
+  cancelChipClose();
+  const chip = document.getElementById('synapse-merged-cell-chip');
+  if (chip) chip.style.display = 'none';
+  activeChipCell = null;
+  activeChipHoveredRow = null;
+  selectedChipRowEls.clear();
+}
+
+function hideSynapseMergedChip() {
+  hideMergedCellChip();
+}
+
+function isSynapseChipOpen() {
+  const chip = document.getElementById('synapse-merged-cell-chip');
+  return !!(chip && chip.style.display !== 'none' && chip.style.visibility !== 'hidden');
+}
+
+function attachMergedCellHoverEvents(td, tableId, rowData, group, columns) {
+  td.classList.add('synapse-merged-cell');
+  td.dataset.mergedGroupId = group.id;
+  td.dataset.mergedTableId = normalizeTableId(tableId);
+  td._rowData = rowData;
+
+  let enterTimer = null;
+
+  td.addEventListener('mouseenter', () => {
+    cancelChipClose();
+    enterTimer = setTimeout(() => {
+      showMergedCellChip(td, tableId, rowData, group, columns);
+    }, 120);
+  });
+
+  td.addEventListener('mouseleave', () => {
+    if (enterTimer) clearTimeout(enterTimer);
+    scheduleChipClose();
+  });
+}
+
+function showMergedCellChip(targetCell, tableId, rowData, group, columns, matchedFieldId = null) {
+  cancelChipClose();
+  const chip = document.getElementById('synapse-merged-cell-chip');
+  const rowsContainer = document.getElementById('synapse-chip-rows-container');
+  const titleEl = document.getElementById('synapse-chip-group-title');
+  if (!chip || !rowsContainer) return;
+
+  activeChipCell = targetCell;
+  activeChipHoveredRow = null;
+  selectedChipRowEls.clear();
+
+  if (titleEl) {
+    titleEl.textContent = group.name || '統合データ';
+  }
+
+  rowsContainer.innerHTML = '';
+  const screenId = getTableScreenId(tableId);
+
+  group.columnIds.forEach(colId => {
+    const colDef = columns.find(c => c.id === colId) || { id: colId, label: colId };
+    
+    if (typeof checkColumnAccess === 'function') {
+      const access = checkColumnAccess(screenId, colId);
+      if (access && !access.visible) return;
+    }
+
+    const val = rowData[colId] !== undefined && rowData[colId] !== null ? String(rowData[colId]) : '';
+    const isPrimary = colId === group.primaryColumnId;
+    const isMatched = matchedFieldId && colId === matchedFieldId;
+
+    const rowEl = document.createElement('div');
+    rowEl.className = 'synapse-chip-row' + (isPrimary ? ' is-primary' : '') + (isMatched ? ' is-match-highlight' : '');
+    rowEl.dataset.fieldId = colId;
+    rowEl.dataset.fieldValue = val;
+
+    rowEl.innerHTML = `
+      <span class="synapse-chip-row-label">${colDef.label || colDef.name || colId}:</span>
+      <span class="synapse-chip-row-val" title="${val}">${val || '—'}</span>
+      ${isPrimary ? '<span class="synapse-chip-main-badge">メイン</span>' : ''}
+      <button type="button" class="synapse-chip-copy-btn" title="この行の値をコピー">📋</button>
+    `;
+
+    rowEl.addEventListener('mouseenter', () => {
+      cancelChipClose();
+      rowsContainer.querySelectorAll('.synapse-chip-row').forEach(r => r.classList.remove('is-hovered'));
+      rowEl.classList.add('is-hovered');
+      activeChipHoveredRow = rowEl;
+
+      if (isDraggingChip) {
+        selectedChipRowEls.add(rowEl);
+        rowEl.classList.add('is-selected');
+      }
+    });
+
+    rowEl.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.synapse-chip-copy-btn')) return;
+      isDraggingChip = true;
+      selectedChipRowEls.clear();
+      rowsContainer.querySelectorAll('.synapse-chip-row').forEach(r => r.classList.remove('is-selected'));
+      selectedChipRowEls.add(rowEl);
+      rowEl.classList.add('is-selected');
+    });
+
+    const copyBtn = rowEl.querySelector('.synapse-chip-copy-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        copyChipRowValue(val, colDef.label || colDef.name || colId);
+      });
+    }
+
+    rowsContainer.appendChild(rowEl);
+  });
+
+  chip.onmouseenter = cancelChipClose;
+  chip.onmouseleave = scheduleChipClose;
+
+  chip.style.visibility = 'hidden';
+  chip.style.display = 'block';
+
+  const cellRect = targetCell.getBoundingClientRect();
+  const chipRect = chip.getBoundingClientRect();
+
+  let top = cellRect.bottom + 6;
+  if (top + chipRect.height > window.innerHeight - 10) {
+    top = Math.max(10, cellRect.top - chipRect.height - 6);
+  }
+
+  let left = cellRect.left;
+  if (left + chipRect.width > window.innerWidth - 15) {
+    left = Math.max(10, window.innerWidth - chipRect.width - 15);
+  }
+
+  chip.style.top = `${top}px`;
+  chip.style.left = `${left}px`;
+  chip.style.visibility = 'visible';
+}
+
+function copyChipRowValue(value, labelName = '') {
+  if (typeof copyToClipboard === 'function') {
+    copyToClipboard(value);
+  } else {
+    navigator.clipboard.writeText(value);
+  }
+
+  const feedback = document.getElementById('synapse-chip-copy-feedback');
+  if (feedback) {
+    feedback.textContent = `✓ ${labelName ? labelName + 'を' : ''}コピーしました`;
+    feedback.style.display = 'block';
+    setTimeout(() => {
+      feedback.style.display = 'none';
+    }, 1500);
+  }
+  showToast(`${labelName ? labelName + ': ' : ''}「${value}」をコピーしました`, 'success');
+}
+
+function handleSynapseChipCopy(e) {
+  const chip = document.getElementById('synapse-merged-cell-chip');
+  if (!chip || chip.style.display === 'none') return false;
+
+  if (selectedChipRowEls.size > 1) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    const lines = [];
+    selectedChipRowEls.forEach(rowEl => {
+      lines.push(rowEl.dataset.fieldValue || '');
+    });
+    const text = lines.join('\n');
+    copyChipRowValue(text, `${selectedChipRowEls.size}行`);
+    return true;
+  }
+
+  if (activeChipHoveredRow) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    const val = activeChipHoveredRow.dataset.fieldValue || '';
+    const label = activeChipHoveredRow.querySelector('.synapse-chip-row-label')?.textContent?.replace(':', '') || '';
+    copyChipRowValue(val, label);
+    return true;
+  }
+
+  return false;
+}
+
+window.addEventListener('mouseup', () => {
+  isDraggingChip = false;
+});
+
+// --- 4. Synapse専用 Command+F (Ctrl+F) 検索エンジン ---
+let synapseFindMatches = [];
+let synapseFindCurrentIndex = -1;
+let synapseFindDebounceTimer = null;
+
+window.getSynapseFindMatches = () => synapseFindMatches;
+window.getSynapseFindCurrentIndex = () => synapseFindCurrentIndex;
+window.openSynapseFindWidget = openSynapseFindWidget;
+window.closeSynapseFindWidget = closeSynapseFindWidget;
+window.executeSynapseSearch = executeSynapseSearch;
+window.openMergedColumnsModal = openMergedColumnsModal;
+
+function toggleSynapseFindWidget() {
+  const widget = document.getElementById('synapse-find-widget');
+  if (!widget) return;
+  if (widget.style.display === 'none' || !widget.style.display) {
+    openSynapseFindWidget();
+  } else {
+    closeSynapseFindWidget();
+  }
+}
+
+function openSynapseFindWidget() {
+  const widget = document.getElementById('synapse-find-widget');
+  const input = document.getElementById('synapse-find-input');
+  if (!widget || !input) return;
+
+  widget.style.display = 'block';
+  input.focus();
+  input.select();
+
+  if (input.value.trim()) {
+    executeSynapseSearch();
+  }
+}
+
+function closeSynapseFindWidget() {
+  const widget = document.getElementById('synapse-find-widget');
+  if (widget) widget.style.display = 'none';
+  clearSynapseSearchHighlights();
+  hideMergedCellChip();
+}
+
+function clearSynapseSearchHighlights() {
+  document.querySelectorAll('.synapse-find-cell-match').forEach(el => {
+    el.classList.remove('synapse-find-cell-match');
+  });
+  document.querySelectorAll('.synapse-find-cell-active').forEach(el => {
+    el.classList.remove('synapse-find-cell-active');
+  });
+  document.querySelectorAll('.synapse-find-merged-badge').forEach(el => {
+    el.remove();
+  });
+
+  document.querySelectorAll('mark.synapse-find-mark').forEach(mark => {
+    const parent = mark.parentNode;
+    if (parent) {
+      parent.replaceChild(document.createTextNode(mark.textContent), mark);
+      parent.normalize();
+    }
+  });
+
+  synapseFindMatches = [];
+  synapseFindCurrentIndex = -1;
+
+  const counter = document.getElementById('synapse-find-counter');
+  if (counter) counter.textContent = '0 / 0';
+}
+
+function executeSynapseSearch() {
+  clearSynapseSearchHighlights();
+
+  const input = document.getElementById('synapse-find-input');
+  const includeChipCb = document.getElementById('synapse-find-include-chip');
+  const counter = document.getElementById('synapse-find-counter');
+  if (!input) return;
+
+  const query = input.value.trim().toLowerCase();
+  if (!query) {
+    if (counter) counter.textContent = '0 / 0';
+    return;
+  }
+
+  const includeChips = includeChipCb ? includeChipCb.checked : true;
+  const activeTableId = getCurrentActiveTableId();
+
+  if (activeTableId) {
+    const meta = typeof getTableMeta === 'function' ? getTableMeta(activeTableId) : null;
+    const screenId = getTableScreenId(activeTableId);
+    const screenEl = document.getElementById(screenId);
+    const tableEl = (screenEl && screenEl.querySelector('table')) || document.querySelector('.spreadsheet-table') || document.querySelector('table');
+    if (!tableEl) return;
+
+    const tbody = tableEl.querySelector('tbody');
+    if (!tbody) return;
+
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const metaRows = meta ? meta.rows : [];
+    const metaCols = meta ? meta.columns : [];
+
+    rows.forEach((tr, rIdx) => {
+      const tds = Array.from(tr.querySelectorAll('td')).filter(td => !td.classList.contains('row-number-col') && !td.classList.contains('ct-row-select-col'));
+
+      tds.forEach((td, cIdx) => {
+        let isMatched = false;
+        let isMergedMatch = false;
+        let matchedColLabel = '';
+        let matchedFieldId = '';
+
+        const rowData = td._rowData || metaRows[rIdx] || {};
+
+        // 1. 通常の表示テキストのマッチ判定
+        const cellText = td.textContent.toLowerCase();
+        if (cellText.includes(query)) {
+          isMatched = true;
+        }
+
+        // 2. 「チップを含む」ON かつ 統合セルの場合：非表示データも検索
+        if (!isMatched && includeChips && td.dataset.mergedGroupId) {
+          const groupId = td.dataset.mergedGroupId;
+          const group = getMergedColumns(activeTableId).find(g => g.id === groupId);
+          if (group && group.columnIds) {
+            for (const colId of group.columnIds) {
+              if (colId === group.primaryColumnId) continue;
+              const fieldVal = rowData[colId] !== undefined && rowData[colId] !== null ? String(rowData[colId]).toLowerCase() : '';
+              if (fieldVal.includes(query)) {
+                isMatched = true;
+                isMergedMatch = true;
+                matchedFieldId = colId;
+                const colDef = metaCols.find(c => c.id === colId);
+                matchedColLabel = colDef ? (colDef.label || colDef.name || colId) : colId;
+                break;
+              }
+            }
+          }
+        }
+
+        if (isMatched) {
+          td.classList.add('synapse-find-cell-match');
+          synapseFindMatches.push({
+            type: 'table',
+            td,
+            rIdx,
+            cIdx,
+            rowData,
+            tableId: activeTableId,
+            isMergedMatch,
+            matchedColLabel,
+            matchedFieldId,
+            group: td.dataset.mergedGroupId ? getMergedColumns(activeTableId).find(g => g.id === td.dataset.mergedGroupId) : null
+          });
+        }
+      });
+    });
+  } else {
+    const activeScreenEl = document.getElementById(state.currentView) || document.querySelector('.main-content') || document.body;
+    if (activeScreenEl) {
+      searchNonTableScreenText(activeScreenEl, query);
+    }
+  }
+
+  if (synapseFindMatches.length > 0) {
+    synapseFindCurrentIndex = 0;
+    updateSynapseFindCounter();
+    highlightCurrentSynapseMatch();
+  } else {
+    synapseFindCurrentIndex = -1;
+    if (counter) counter.textContent = '0 / 0';
+  }
+}
+
+function searchNonTableScreenText(container, query) {
+  const walker = document.createTreeWalker(
+    container,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        if (!node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        const tag = parent.tagName.toLowerCase();
+        if (['script', 'style', 'textarea', 'input', 'select'].includes(tag)) return NodeFilter.FILTER_REJECT;
+        if (parent.closest('#synapse-find-widget') || parent.closest('#synapse-merged-cell-chip') || parent.closest('#merged-columns-modal')) return NodeFilter.FILTER_REJECT;
+        return node.nodeValue.toLowerCase().includes(query) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    }
+  );
+
+  const matchedNodes = [];
+  while (walker.nextNode()) {
+    matchedNodes.push(walker.currentNode);
+  }
+
+  matchedNodes.forEach(node => {
+    const parent = node.parentNode;
+    if (!parent) return;
+    const text = node.nodeValue;
+    const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
+    const parts = text.split(regex);
+
+    const frag = document.createDocumentFragment();
+    parts.forEach(part => {
+      if (part.toLowerCase() === query) {
+        const mark = document.createElement('mark');
+        mark.className = 'synapse-find-mark';
+        mark.textContent = part;
+        frag.appendChild(mark);
+        synapseFindMatches.push({ type: 'dom', markEl: mark });
+      } else if (part) {
+        frag.appendChild(document.createTextNode(part));
+      }
+    });
+    parent.replaceChild(frag, node);
+  });
+}
+
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function updateSynapseFindCounter() {
+  const counter = document.getElementById('synapse-find-counter');
+  if (!counter) return;
+  if (synapseFindMatches.length === 0) {
+    counter.textContent = '0 / 0';
+  } else {
+    counter.textContent = `${synapseFindCurrentIndex + 1} / ${synapseFindMatches.length}`;
+  }
+}
+
+function highlightCurrentSynapseMatch() {
+  if (synapseFindMatches.length === 0 || synapseFindCurrentIndex < 0) return;
+
+  document.querySelectorAll('.synapse-find-cell-active').forEach(el => el.classList.remove('synapse-find-cell-active'));
+  document.querySelectorAll('.synapse-find-merged-badge').forEach(el => el.remove());
+  document.querySelectorAll('mark.synapse-find-mark.is-active').forEach(el => el.classList.remove('is-active'));
+
+  const match = synapseFindMatches[synapseFindCurrentIndex];
+  if (!match) return;
+
+  if (match.type === 'table') {
+    const td = match.td;
+    td.classList.add('synapse-find-cell-active');
+    td.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+
+    if (match.isMergedMatch) {
+      const badge = document.createElement('span');
+      badge.className = 'synapse-find-merged-badge';
+      badge.textContent = `[${match.matchedColLabel}にヒット]`;
+      td.appendChild(badge);
+
+      const meta = typeof getTableMeta === 'function' ? getTableMeta(match.tableId) : null;
+      if (match.group && meta) {
+        showMergedCellChip(td, match.tableId, match.rowData, match.group, meta.columns, match.matchedFieldId);
+      }
+    } else {
+      hideMergedCellChip();
+    }
+  } else if (match.type === 'dom') {
+    match.markEl.classList.add('is-active');
+    match.markEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    hideMergedCellChip();
+  }
+}
+
+function goToNextSynapseMatch() {
+  if (synapseFindMatches.length === 0) return;
+  synapseFindCurrentIndex = (synapseFindCurrentIndex + 1) % synapseFindMatches.length;
+  updateSynapseFindCounter();
+  highlightCurrentSynapseMatch();
+}
+
+function goToPrevSynapseMatch() {
+  if (synapseFindMatches.length === 0) return;
+  synapseFindCurrentIndex = (synapseFindCurrentIndex - 1 + synapseFindMatches.length) % synapseFindMatches.length;
+  updateSynapseFindCounter();
+  highlightCurrentSynapseMatch();
+}
+
+function setupSynapseFindWidgetEvents() {
+  const input = document.getElementById('synapse-find-input');
+  const nextBtn = document.getElementById('synapse-find-next-btn');
+  const prevBtn = document.getElementById('synapse-find-prev-btn');
+  const closeBtn = document.getElementById('synapse-find-close-btn');
+  const includeChipCb = document.getElementById('synapse-find-include-chip');
+
+  if (input) {
+    input.addEventListener('input', () => {
+      clearTimeout(synapseFindDebounceTimer);
+      synapseFindDebounceTimer = setTimeout(executeSynapseSearch, 120);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          goToPrevSynapseMatch();
+        } else {
+          goToNextSynapseMatch();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSynapseFindWidget();
+      }
+    });
+  }
+
+  nextBtn?.addEventListener('click', goToNextSynapseMatch);
+  prevBtn?.addEventListener('click', goToPrevSynapseMatch);
+  closeBtn?.addEventListener('click', closeSynapseFindWidget);
+
+  includeChipCb?.addEventListener('change', () => {
+    executeSynapseSearch();
+  });
+}
+
+// 統合列モーダルと検索ウィジェットの確実な初期化
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    setupMergedColumnsModalEvents();
+    setupSynapseFindWidgetEvents();
+  });
+} else {
+  setupMergedColumnsModalEvents();
+  setupSynapseFindWidgetEvents();
+}
+
 function renderTableControlBar(tableId, parentContainerEl) {
   const existing = parentContainerEl.querySelector(`.table-control-bar-${tableId}`);
   if (existing && existing.parentNode) {
@@ -9519,6 +10615,27 @@ function renderTableControlBar(tableId, parentContainerEl) {
     });
 
     leftDiv.appendChild(exportBtn);
+
+    // 🔗 列の統合表示ボタン
+    const mergeColsBtn = document.createElement('button');
+    mergeColsBtn.className = 'btn btn-secondary';
+    mergeColsBtn.style.padding = '0.4rem 0.75rem';
+    mergeColsBtn.style.fontSize = '0.8rem';
+    mergeColsBtn.style.display = 'flex';
+    mergeColsBtn.style.alignItems = 'center';
+    mergeColsBtn.style.gap = '0.25rem';
+    const currentMergedGroups = getMergedColumns(tableId);
+    if (currentMergedGroups.length > 0) {
+      mergeColsBtn.innerHTML = `<span>🔗</span> 列の統合表示 <span style="background: rgba(16,185,129,0.2); color: #10b981; padding: 1px 6px; border-radius: 10px; font-size: 0.7rem; font-weight: 700;">${currentMergedGroups.length}</span>`;
+    } else {
+      mergeColsBtn.innerHTML = '<span>🔗</span> 列の統合表示';
+    }
+    mergeColsBtn.title = '複数のカラムを1列に統合して表示します';
+    mergeColsBtn.addEventListener('click', () => {
+      openMergedColumnsModal(tableId);
+    });
+    leftDiv.appendChild(mergeColsBtn);
+
   }
 
   const rightDiv = document.createElement('div');
@@ -17247,15 +18364,16 @@ function renderAgencyInfo() {
   
   const isAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
   const baseVisibleColumnIds = isAdmin ? columns.map(c => c.id) : state.agVisibleColumns;
-  const visibleColumnIds = [];
+  const rawAgVisibleColumnIds = [];
   columns.forEach(col => {
     const access = checkColumnAccess('agency-info-screen', col.id);
     if (access.visible) {
       if (baseVisibleColumnIds.includes(col.id) || access.grayout) {
-        visibleColumnIds.push(col.id);
+        rawAgVisibleColumnIds.push(col.id);
       }
     }
   });
+  const visibleColumnIds = applyMergedColumnsToVisibleList('ag', rawAgVisibleColumnIds, columns);
   
   const selectorBtn = document.getElementById('ag-column-selector-btn');
   if (selectorBtn) {
@@ -17518,7 +18636,13 @@ function renderAgencyInfo() {
 
         th.innerHTML = `
           <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${col.label}</span>
+            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${col.label}</span>${(() => {
+            const mg = getMergedGroupForCol('ag', col.id);
+            if (mg && mg.primaryColumnId === col.id) {
+              return `<span class="synapse-merged-header-badge" title="統合項目: ${getMergedGroupSummaryText('ag', mg)}">🔗 統合: ${mg.columnIds.length}項目</span>`;
+            }
+            return '';
+          })()}
             <button class="btn-filter-toggle${activeClass}" data-col-id="${col.id}" style="background: transparent; border: none; padding: 0.1rem 0.2rem; color: var(--text-muted); cursor: pointer; font-size: 0.65rem; transition: color 0.2s; margin-left: 2px;">
               ▼
             </button>
@@ -17807,6 +18931,16 @@ function renderAgencyInfo() {
           if (index >= minR && index <= maxR && vColIdx >= minC && vColIdx <= maxC) {
             inRange = true;
           }
+        }
+
+        const agMergeGroup = getMergedGroupForCol('ag', col.id);
+        if (agMergeGroup && agMergeGroup.primaryColumnId === col.id) {
+          const badge = document.createElement('span');
+          badge.className = 'synapse-merged-badge';
+          badge.textContent = `🔗 +${agMergeGroup.columnIds.length - 1}`;
+          badge.title = `統合項目: ${getMergedGroupSummaryText('ag', agMergeGroup)}`;
+          td.appendChild(badge);
+          attachMergedCellHoverEvents(td, 'ag', contract, agMergeGroup, columns);
         }
 
         const currentCellKey = `${contract.customerId}_${col.id}`;
@@ -19082,15 +20216,16 @@ function renderJoInfo() {
   
   const isAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
   const baseVisibleColumnIds = isAdmin ? columns.map(c => c.id) : state.joVisibleColumns;
-  const visibleColumnIds = [];
+  const rawJoVisibleColumnIds = [];
   columns.forEach(col => {
     const access = checkColumnAccess('jo-info-screen', col.id);
     if (access.visible) {
       if (baseVisibleColumnIds.includes(col.id) || access.grayout) {
-        visibleColumnIds.push(col.id);
+        rawJoVisibleColumnIds.push(col.id);
       }
     }
   });
+  const visibleColumnIds = applyMergedColumnsToVisibleList('jo', rawJoVisibleColumnIds, columns);
   
   const selectorBtn = document.getElementById('jo-column-selector-btn');
   if (selectorBtn) {
@@ -19354,7 +20489,13 @@ function renderJoInfo() {
 
         th.innerHTML = `
           <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${col.label}</span>
+            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${col.label}</span>${(() => {
+              const mg = getMergedGroupForCol('jo', col.id);
+              if (mg && mg.primaryColumnId === col.id) {
+                return `<span class="synapse-merged-header-badge" title="統合項目: ${getMergedGroupSummaryText('jo', mg)}">🔗 統合: ${mg.columnIds.length}項目</span>`;
+              }
+              return '';
+            })()}
             <button class="btn-filter-toggle${activeClass}" data-col-id="${col.id}" style="background: transparent; border: none; padding: 0.1rem 0.2rem; color: var(--text-muted); cursor: pointer; font-size: 0.65rem; transition: color 0.2s; margin-left: 2px;">
               ▼
             </button>
@@ -19607,6 +20748,16 @@ function renderJoInfo() {
           }
         }
 
+        const joMergeGroup = getMergedGroupForCol('jo', col.id);
+        if (joMergeGroup && joMergeGroup.primaryColumnId === col.id) {
+          const badge = document.createElement('span');
+          badge.className = 'synapse-merged-badge';
+          badge.textContent = `🔗 +${joMergeGroup.columnIds.length - 1}`;
+          badge.title = `統合項目: ${getMergedGroupSummaryText('jo', joMergeGroup)}`;
+          td.appendChild(badge);
+          attachMergedCellHoverEvents(td, 'jo', contract, joMergeGroup, columns);
+        }
+
         // 選択状態の枠線付与
         const currentCellKey = `${contract.customerId}_${col.id}`;
         const isSelected = (state.joSelectedCell && 
@@ -19773,15 +20924,16 @@ function renderApplicantInfo() {
   
   const isAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
   const baseVisibleColumnIds = isAdmin ? columns.map(c => c.id) : state.apVisibleColumns;
-  const visibleColumnIds = [];
+  const rawApVisibleColumnIds = [];
   columns.forEach(col => {
     const access = checkColumnAccess('applicant-info-screen', col.id);
     if (access.visible) {
       if (baseVisibleColumnIds.includes(col.id) || access.grayout) {
-        visibleColumnIds.push(col.id);
+        rawApVisibleColumnIds.push(col.id);
       }
     }
   });
+  const visibleColumnIds = applyMergedColumnsToVisibleList('ap', rawApVisibleColumnIds, columns);
   
   const selectorBtn = document.getElementById('ap-column-selector-btn');
   if (selectorBtn) {
@@ -20036,7 +21188,13 @@ function renderApplicantInfo() {
 
         th.innerHTML = `
           <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${col.label}</span>
+            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${col.label}</span>${(() => {
+              const mg = getMergedGroupForCol('ap', col.id);
+              if (mg && mg.primaryColumnId === col.id) {
+                return `<span class="synapse-merged-header-badge" title="統合項目: ${getMergedGroupSummaryText('ap', mg)}">🔗 統合: ${mg.columnIds.length}項目</span>`;
+              }
+              return '';
+            })()}
             <button class="btn-filter-toggle${activeClass}" data-col-id="${col.id}" style="background: transparent; border: none; padding: 0.1rem 0.2rem; color: var(--text-muted); cursor: pointer; font-size: 0.65rem; transition: color 0.2s; margin-left: 2px;">
               ▼
             </button>
@@ -20323,6 +21481,16 @@ function renderApplicantInfo() {
           if (index >= minR && index <= maxR && vColIdx >= minC && vColIdx <= maxC) {
             inRange = true;
           }
+        }
+
+        const apMergeGroup = getMergedGroupForCol('ap', col.id);
+        if (apMergeGroup && apMergeGroup.primaryColumnId === col.id) {
+          const badge = document.createElement('span');
+          badge.className = 'synapse-merged-badge';
+          badge.textContent = `🔗 +${apMergeGroup.columnIds.length - 1}`;
+          badge.title = `統合項目: ${getMergedGroupSummaryText('ap', apMergeGroup)}`;
+          td.appendChild(badge);
+          attachMergedCellHoverEvents(td, 'ap', contract, apMergeGroup, columns);
         }
 
         const currentCellKey = `${contract.customerId}_${col.id}`;
@@ -24477,7 +25645,8 @@ function renderDbmakePartners() {
   thead.innerHTML = '';
 
   const columns = state.dbmakeColumns;
-  const visibleColumnIds = state.dbmakeVisibleColumns;
+  const rawDbmakeVisibleColumns = state.dbmakeVisibleColumns;
+  const visibleColumnIds = applyMergedColumnsToVisibleList('dbmake', rawDbmakeVisibleColumns, columns);
 
   // --- 固定ウィンドウ枠 of dbmake ---
   const fixedColIds = [];
@@ -24723,6 +25892,14 @@ function renderDbmakePartners() {
       th.style.minWidth = `${w}px`;
 
       th.textContent = col.name;
+      const dbmakeMg = getMergedGroupForCol('dbmake', col.id);
+      if (dbmakeMg && dbmakeMg.primaryColumnId === col.id) {
+        const badge = document.createElement('span');
+        badge.className = 'synapse-merged-header-badge';
+        badge.textContent = `🔗 統合: ${dbmakeMg.columnIds.length}項目`;
+        badge.title = `統合項目: ${getMergedGroupSummaryText('dbmake', dbmakeMg)}`;
+        th.appendChild(badge);
+      }
 
       th.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -24906,6 +26083,16 @@ function renderDbmakePartners() {
         }
 
         // 書式スタイルの取得と適用
+        const dbmakeMergeGroup = getMergedGroupForCol('dbmake', col.id);
+        if (dbmakeMergeGroup && dbmakeMergeGroup.primaryColumnId === col.id) {
+          const badge = document.createElement('span');
+          badge.className = 'synapse-merged-badge';
+          badge.textContent = `🔗 +${dbmakeMergeGroup.columnIds.length - 1}`;
+          badge.title = `統合項目: ${getMergedGroupSummaryText('dbmake', dbmakeMergeGroup)}`;
+          td.appendChild(badge);
+          attachMergedCellHoverEvents(td, 'dbmake', p, dbmakeMergeGroup, columns);
+        }
+
         const cellKey = `${p.id}_${col.id}`;
         const styleObj = getCellFormatStyles('dbmake', p.id, col.id, p, val);
 
@@ -26537,6 +27724,28 @@ function expandColumnSelection(prefix, tbodyId, allColumns, visibleColIds, selec
 // 14. ショートカットキーによるセルコピー (Ctrl+C / Cmd+C)
 // ==========================================
 window.addEventListener('keydown', (e) => {
+  // 1. Escキー: 統合セルアコーディオンおよび検索ウィジェットを閉じる
+  if (e.key === 'Escape') {
+    hideSynapseMergedChip();
+    closeSynapseFindWidget();
+  }
+
+  // 2. Ctrl+F / Cmd+F: Synapse専用の検索バーを開く
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+    e.preventDefault();
+    openSynapseFindWidget();
+    return;
+  }
+
+  // 3. Ctrl+C / Cmd+C: 統合ツールチップが表示中の場合、ホバー中の行（またはドラッグ選択行）を優先コピー
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+    if (isSynapseChipOpen()) {
+      if (handleSynapseChipCopy(e)) {
+        return;
+      }
+    }
+  }
+
   // セルが選択されている場合、上下左右キー（Shift/Ctrl連動含む）でのセル移動・拡張を処理
   const activeScreen = state.currentView;
   const isCellSelected = {
