@@ -4152,68 +4152,254 @@
   setupSmartLinkPaste();
 
   // 🔗 文字リンク挿入モーダルダイアログ
+  // 🔗 文字リンク挿入モーダルダイアログ（どこに当てるかを選択可能＆複数箇所対応）
   function setupInsertLinkModal() {
     let modal = document.getElementById('dialog-insert-link-helper');
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'dialog-insert-link-helper';
-      modal.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:99999; display:none; align-items:center; justify-content:center; padding:16px; box-sizing:border-box; font-family:Inter, "Noto Sans JP", sans-serif;';
+      modal.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.55); z-index:99999; display:none; align-items:center; justify-content:center; padding:16px; box-sizing:border-box; font-family:Inter, "Noto Sans JP", sans-serif;';
       modal.innerHTML = `
-        <div style="background:#fff; border-radius:12px; max-width:460px; width:100%; box-shadow:0 12px 36px rgba(0,0,0,0.25); padding:24px; box-sizing:border-box;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="background:#fff; border-radius:12px; max-width:520px; width:100%; box-shadow:0 16px 40px rgba(0,0,0,0.28); padding:24px; box-sizing:border-box; max-height:92vh; overflow-y:auto;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:10px;">
             <h3 style="margin:0; font-size:1.15rem; font-weight:700; color:#202124; display:flex; align-items:center; gap:8px;">
               <span>🔗</span> 文字にリンクを設定
             </h3>
-            <button type="button" id="btn-close-link-dialog-x" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:#5f6368; padding:4px 8px; border-radius:4px;">✕</button>
+            <button type="button" id="btn-close-link-dialog-x" style="background:none; border:none; font-size:1.25rem; cursor:pointer; color:#5f6368; padding:4px 8px; border-radius:4px;">✕</button>
           </div>
-          <p style="margin:0 0 16px 0; font-size:0.83rem; color:#5f6368; line-height:1.5;">
-            指定した文字をクリックしたときに、入力したURLへ移動するリンクを作成します。
-          </p>
+          
           <div style="display:flex; flex-direction:column; gap:14px;">
+            <!-- 1. 挿入先の場所を選択 -->
             <div>
-              <label for="input-link-dialog-text" style="display:block; font-size:0.82rem; font-weight:600; color:#3c4043; margin-bottom:6px;">表示する文字 <span style="color:#d93025;">*</span></label>
+              <label for="select-link-target-location" style="display:block; font-size:0.82rem; font-weight:600; color:#3c4043; margin-bottom:5px;">
+                ① リンクを設定する場所（対象項目）を選択 <span style="color:#d93025;">*</span>
+              </label>
+              <select id="select-link-target-location" style="width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid #dadce0; border-radius:6px; font-size:0.88rem; outline:none; background:#fff; cursor:pointer;">
+              </select>
+            </div>
+
+            <!-- 現在の文章プレビュー -->
+            <div style="background:#f8f9fa; border:1px solid #e8eaed; border-radius:6px; padding:10px 12px; max-height:95px; overflow-y:auto; font-size:0.8rem; color:#5f6368; line-height:1.45;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span style="font-size:0.72rem; font-weight:600; color:#80868b;">現在の文章プレビュー：</span>
+                <span style="font-size:0.7rem; color:#1a73e8;">💡 下の文字と一致する部分がリンク化されます</span>
+              </div>
+              <div id="preview-target-current-text" style="word-break:break-all; white-space:pre-wrap; color:#202124;">（文章なし）</div>
+            </div>
+
+            <!-- 2. リンクを当てはめる文字 -->
+            <div>
+              <label for="input-link-dialog-text" style="display:block; font-size:0.82rem; font-weight:600; color:#3c4043; margin-bottom:5px;">
+                ② リンクを当てはめる文字（表示テキスト） <span style="color:#d93025;">*</span>
+              </label>
               <input type="text" id="input-link-dialog-text" placeholder="例: 紹介代理店契約書、利用規約、こちら など" style="width:100%; box-sizing:border-box; padding:8px 12px; border:1px solid #dadce0; border-radius:6px; font-size:0.9rem; outline:none;">
+              <div style="font-size:0.72rem; color:#5f6368; margin-top:3px;">
+                💡 文章内にこの文字がある場合は自動でリンクに置換されます。無い場合は文末に挿入されます。
+              </div>
             </div>
+
+            <!-- 3. リンク先URL -->
             <div>
-              <label for="input-link-dialog-url" style="display:block; font-size:0.82rem; font-weight:600; color:#3c4043; margin-bottom:6px;">リンク先URL <span style="color:#d93025;">*</span></label>
-              <input type="text" id="input-link-dialog-url" placeholder="例: https://example.com/contract" style="width:100%; box-sizing:border-box; padding:8px 12px; border:1px solid #dadce0; border-radius:6px; font-size:0.9rem; outline:none;">
+              <label for="input-link-dialog-url" style="display:block; font-size:0.82rem; font-weight:600; color:#3c4043; margin-bottom:5px;">
+                ③ リンク先URL <span style="color:#d93025;">*</span>
+              </label>
+              <input type="text" id="input-link-dialog-url" placeholder="例: https://drive.google.com/... または https://example.com" style="width:100%; box-sizing:border-box; padding:8px 12px; border:1px solid #dadce0; border-radius:6px; font-size:0.9rem; outline:none;">
             </div>
-            <div style="font-size:0.75rem; color:#5f6368; background:#f8f9fa; padding:8px 10px; border-radius:6px; border:1px solid #e8eaed;">
-              💡 リンクは新しいタブ（別ウィンドウ）で安全に開きます。
+
+            <div id="link-dialog-status-msg" style="display:none; font-size:0.78rem; padding:8px 12px; border-radius:6px; background:#e6f4ea; color:#137333; font-weight:500;">
+              ✓ リンクを適用しました！
+            </div>
+
+            <div style="font-size:0.74rem; background:#e8f0fe; padding:8px 10px; border-radius:6px; border:1px solid #d2e3fc; color:#174ea6;">
+              💡 リンクは回答者が別ウィンドウ（新しいタブ）で開ける安全な形式で挿入されます。
             </div>
           </div>
-          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-            <button type="button" id="btn-cancel-link-dialog" style="background:#fff; border:1px solid #dadce0; padding:8px 16px; border-radius:6px; font-size:0.85rem; font-weight:600; color:#5f6368; cursor:pointer;">キャンセル</button>
-            <button type="button" id="btn-submit-link-dialog" style="background:#1a73e8; border:none; padding:8px 18px; border-radius:6px; font-size:0.85rem; font-weight:600; color:#fff; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.1);">リンクを挿入</button>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; border-top:1px solid #eee; padding-top:14px; gap:8px; flex-wrap:wrap;">
+            <button type="button" id="btn-cancel-link-dialog" style="background:#fff; border:1px solid #dadce0; padding:8px 14px; border-radius:6px; font-size:0.85rem; font-weight:500; color:#5f6368; cursor:pointer;">閉じる</button>
+            <div style="display:flex; gap:8px;">
+              <button type="button" id="btn-submit-link-dialog-continue" style="background:#f1f3f4; border:1px solid #dadce0; padding:8px 14px; border-radius:6px; font-size:0.85rem; font-weight:600; color:#3c4043; cursor:pointer;">適用して別のリンクも追加</button>
+              <button type="button" id="btn-submit-link-dialog" style="background:#1a73e8; border:none; padding:8px 18px; border-radius:6px; font-size:0.85rem; font-weight:600; color:#fff; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.15);">適用して完了</button>
+            </div>
           </div>
         </div>
       `;
       document.body.appendChild(modal);
 
-      let currentTargetInput = null;
-      let selectionInfo = null;
+      let currentTargetInfo = null;
 
-      function openLinkModal(targetElement) {
-        currentTargetInput = targetElement;
-        const textInput = document.getElementById('input-link-dialog-text');
-        const urlInput = document.getElementById('input-link-dialog-url');
-
-        let selectedText = '';
-        if (targetElement && targetElement.selectionStart !== undefined && targetElement.selectionEnd !== undefined) {
-          const start = targetElement.selectionStart;
-          const end = targetElement.selectionEnd;
-          selectionInfo = { start, end };
-          selectedText = targetElement.value.substring(start, end).trim();
-        } else {
-          selectionInfo = null;
+      // 挿入先候補リストの収集
+      function getAvailableTargets() {
+        const list = [];
+        // 1. フォーム全体の説明
+        const formDesc = document.getElementById('editor-form-desc');
+        if (formDesc) {
+          list.push({
+            key: 'form_desc',
+            label: '📝 フォーム全体の説明文',
+            getElement: () => document.getElementById('editor-form-desc'),
+            getValue: () => (document.getElementById('editor-form-desc') ? document.getElementById('editor-form-desc').value : (window.n ? window.n.description : '')),
+            setValue: (val) => {
+              const el = document.getElementById('editor-form-desc');
+              if (el) {
+                el.value = val;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+              if (window.n) window.n.description = val;
+              if (window.S) window.S();
+            }
+          });
         }
 
-        textInput.value = selectedText;
+        // 2. セクション説明文
+        const secDesc = document.getElementById('editor-section-desc');
+        if (window.n && window.n.sections) {
+          window.n.sections.forEach((sec, sIdx) => {
+            const isCurrent = sec.id === window.r;
+            list.push({
+              key: `sec_desc_${sec.id}`,
+              label: `📑 セクション${sIdx+1}の説明文（${sec.title || '無題のセクション'}）${isCurrent ? ' [現在編集中]' : ''}`,
+              getElement: () => (isCurrent ? document.getElementById('editor-section-desc') : null),
+              getValue: () => (isCurrent && secDesc ? secDesc.value : (sec.description || '')),
+              setValue: (val) => {
+                if (isCurrent && secDesc) {
+                  secDesc.value = val;
+                  secDesc.dispatchEvent(new Event('input', { bubbles: true }));
+                  secDesc.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                sec.description = val;
+                if (window.S) window.S();
+                if (window.se) window.se();
+              }
+            });
+
+            // 質問項目
+            if (sec.questions) {
+              sec.questions.forEach((q, qIdx) => {
+                // 質問説明文
+                list.push({
+                  key: `q_desc_${q.id}`,
+                  label: `❓ [${sec.title || `セクション${sIdx+1}`}] 質問${qIdx+1}「${q.title || '無題の質問'}」の説明`,
+                  getElement: () => document.querySelector(`.q-desc-input[data-question-id="${q.id}"]`),
+                  getValue: () => {
+                    const qEl = document.querySelector(`.q-desc-input[data-question-id="${q.id}"]`);
+                    return qEl ? qEl.value : (q.description || '');
+                  },
+                  setValue: (val) => {
+                    const qEl = document.querySelector(`.q-desc-input[data-question-id="${q.id}"]`);
+                    if (qEl) {
+                      qEl.value = val;
+                      qEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    q.description = val;
+                    if (window.S) window.S();
+                  }
+                });
+
+                // スクロール同意本文
+                if (q.scrollRequired || q.scrollText !== undefined) {
+                  list.push({
+                    key: `q_scroll_${q.id}`,
+                    label: `📜 [${sec.title || `セクション${sIdx+1}`}] 質問${qIdx+1}「${q.title || '無題の質問'}」の規約本文`,
+                    getElement: () => document.querySelector(`.q-scroll-input[data-question-id="${q.id}"]`),
+                    getValue: () => {
+                      const sEl = document.querySelector(`.q-scroll-input[data-question-id="${q.id}"]`);
+                      return sEl ? sEl.value : (q.scrollText || '');
+                    },
+                    setValue: (val) => {
+                      const sEl = document.querySelector(`.q-scroll-input[data-question-id="${q.id}"]`);
+                      if (sEl) {
+                        sEl.value = val;
+                        sEl.dispatchEvent(new Event('input', { bubbles: true }));
+                      }
+                      q.scrollText = val;
+                      if (window.S) window.S();
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+
+        return list;
+      }
+
+      function updateCurrentTextPreview() {
+        const select = document.getElementById('select-link-target-location');
+        const previewDiv = document.getElementById('preview-target-current-text');
+        if (!select || !previewDiv) return;
+
+        const targets = getAvailableTargets();
+        const selectedKey = select.value;
+        const target = targets.find(t => t.key === selectedKey);
+        currentTargetInfo = target || null;
+
+        if (target) {
+          const val = target.getValue() || '';
+          previewDiv.textContent = val.trim() ? val : '（文章がまだ入力されていません）';
+        } else {
+          previewDiv.textContent = '（文章なし）';
+        }
+      }
+
+      function openLinkModal(preferredKeyOrElement) {
+        const select = document.getElementById('select-link-target-location');
+        const textInput = document.getElementById('input-link-dialog-text');
+        const urlInput = document.getElementById('input-link-dialog-url');
+        const statusMsg = document.getElementById('link-dialog-status-msg');
+        if (statusMsg) statusMsg.style.display = 'none';
+
+        // 挿入先ドロップダウンの更新
+        const targets = getAvailableTargets();
+        select.innerHTML = '';
+        targets.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t.key;
+          opt.textContent = t.label;
+          select.appendChild(opt);
+        });
+
+        // 初期選択の判定
+        let defaultKey = 'form_desc';
+        let prefilledText = '';
+
+        if (typeof preferredKeyOrElement === 'string') {
+          defaultKey = preferredKeyOrElement;
+        } else if (preferredKeyOrElement && preferredKeyOrElement.nodeType) {
+          const el = preferredKeyOrElement;
+          if (el.id === 'editor-section-desc') {
+            defaultKey = window.r ? `sec_desc_${window.r}` : 'form_desc';
+          } else if (el.classList && el.classList.contains('q-desc-input')) {
+            defaultKey = `q_desc_${el.dataset.questionId}`;
+          } else if (el.classList && el.classList.contains('q-scroll-input')) {
+            defaultKey = `q_scroll_${el.dataset.questionId}`;
+          } else {
+            defaultKey = 'form_desc';
+          }
+
+          // 選択範囲文字列を取得
+          if (el.selectionStart !== undefined && el.selectionEnd !== undefined) {
+            prefilledText = el.value.substring(el.selectionStart, el.selectionEnd).trim();
+          }
+        }
+
+        const exists = targets.some(t => t.key === defaultKey);
+        if (exists) {
+          select.value = defaultKey;
+        } else if (targets.length > 0) {
+          select.value = targets[0].key;
+        }
+
+        updateCurrentTextPreview();
+
+        textInput.value = prefilledText;
         urlInput.value = '';
         modal.style.display = 'flex';
 
         setTimeout(() => {
-          if (selectedText) {
+          if (prefilledText) {
             urlInput.focus();
           } else {
             textInput.focus();
@@ -4223,71 +4409,125 @@
 
       function closeLinkModal() {
         modal.style.display = 'none';
-        currentTargetInput = null;
-        selectionInfo = null;
+        currentTargetInfo = null;
       }
 
+      document.getElementById('select-link-target-location').addEventListener('change', updateCurrentTextPreview);
       document.getElementById('btn-close-link-dialog-x').addEventListener('click', closeLinkModal);
       document.getElementById('btn-cancel-link-dialog').addEventListener('click', closeLinkModal);
       modal.addEventListener('click', (e) => {
         if (e.target === modal) closeLinkModal();
       });
 
-      document.getElementById('btn-submit-link-dialog').addEventListener('click', () => {
+      function applyLinkInsertion(isContinue) {
         const textInput = document.getElementById('input-link-dialog-text');
         const urlInput = document.getElementById('input-link-dialog-url');
+        const statusMsg = document.getElementById('link-dialog-status-msg');
         const text = textInput.value.trim();
         let url = urlInput.value.trim();
 
+        if (!currentTargetInfo) {
+          alert('リンクを挿入する対象項目を選択してください。');
+          return false;
+        }
         if (!text) {
-          alert('表示する文字を入力してください。');
+          alert('リンクを当てはめる文字を入力してください。');
           textInput.focus();
-          return;
+          return false;
         }
         if (!url) {
           alert('リンク先URLを入力してください。');
           urlInput.focus();
-          return;
+          return false;
         }
 
+        // 全角英数・記号の半角正規化
         url = url.replace(/[！-～]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).trim();
         if (!/^(https?:\/\/|\/|mailto:|tel:)/i.test(url)) {
           url = 'https://' + url;
         }
 
         const mdLink = `[${text}](${url})`;
+        let currentVal = currentTargetInfo.getValue() || '';
 
-        if (currentTargetInput) {
-          const val = currentTargetInput.value || '';
-          let start = currentTargetInput.value.length;
-          let end = start;
+        // 文章の中に該当文字が含まれているかチェック
+        // すでに [text](url) になっていない該当文字を置換
+        const alreadyLinkedRegex = new RegExp(`\\[${escapeRegex(text)}\\]\\([^)]+\\)`, 'g');
+        const unlinkedMatches = [];
+        let tempText = currentVal;
 
-          if (selectionInfo) {
-            start = selectionInfo.start;
-            end = selectionInfo.end;
-          } else if (currentTargetInput.selectionStart !== undefined) {
-            start = currentTargetInput.selectionStart;
-            end = currentTargetInput.selectionEnd;
+        if (tempText.includes(text)) {
+          // すでにリンク化されていない箇所の置換
+          const placeholder = `___LINK_ALREADY_${Date.now()}___`;
+          const protectedLinks = [];
+          tempText = tempText.replace(alreadyLinkedRegex, (m) => {
+            protectedLinks.push(m);
+            return `${placeholder}_${protectedLinks.length - 1}___`;
+          });
+
+          if (tempText.includes(text)) {
+            // 該当テキストをリンクに置換（最初の1箇所）
+            tempText = tempText.replace(text, mdLink);
+            // 保護したリンクを復元
+            tempText = tempText.replace(new RegExp(`${placeholder}_(\\d+)___`, 'g'), (_, idx) => protectedLinks[parseInt(idx, 10)]);
+            currentVal = tempText;
+          } else {
+            // 全て既にリンク化されていた場合は末尾に追加
+            currentVal = currentVal + (currentVal ? '\n\n' : '') + mdLink;
           }
-
-          currentTargetInput.value = val.substring(0, start) + mdLink + val.substring(end);
-          currentTargetInput.selectionStart = currentTargetInput.selectionEnd = start + mdLink.length;
-          currentTargetInput.dispatchEvent(new Event('input', { bubbles: true }));
-          currentTargetInput.dispatchEvent(new Event('change', { bubbles: true }));
-          currentTargetInput.focus();
+        } else {
+          // 文章の中に該当文字がない場合は末尾に追加
+          currentVal = currentVal + (currentVal ? '\n\n' : '') + mdLink;
         }
 
-        closeLinkModal();
+        currentTargetInfo.setValue(currentVal);
+        updateCurrentTextPreview();
+
+        if (statusMsg) {
+          statusMsg.textContent = `✓ 「${text}」にリンクを設定しました！`;
+          statusMsg.style.display = 'block';
+        }
+
+        if (isContinue) {
+          textInput.value = '';
+          urlInput.value = '';
+          textInput.focus();
+        } else {
+          closeLinkModal();
+        }
+
+        return true;
+      }
+
+      function escapeRegex(str) {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+
+      document.getElementById('btn-submit-link-dialog').addEventListener('click', () => {
+        applyLinkInsertion(false);
       });
 
+      document.getElementById('btn-submit-link-dialog-continue').addEventListener('click', () => {
+        applyLinkInsertion(true);
+      });
+
+      // イベントデリゲーションで「🔗 リンクを挿入」ボタンのクリックを検知
       document.addEventListener('click', (e) => {
         const btn = e.target.closest('.btn-insert-link-modal');
         if (btn) {
           e.preventDefault();
           e.stopPropagation();
-          const targetId = btn.dataset.target;
-          const targetEl = targetId ? document.getElementById(targetId) : null;
-          openLinkModal(targetEl || document.activeElement);
+          const targetKey = btn.dataset.targetKey || btn.dataset.target;
+          if (targetKey) {
+            const el = document.getElementById(targetKey);
+            openLinkModal(el || targetKey);
+          } else if (btn.dataset.questionId) {
+            const qId = btn.dataset.questionId;
+            const field = btn.dataset.field;
+            openLinkModal(field === 'scrollText' ? `q_scroll_${qId}` : `q_desc_${qId}`);
+          } else {
+            openLinkModal(document.activeElement);
+          }
         }
       });
     }
