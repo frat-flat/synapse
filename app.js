@@ -6660,14 +6660,19 @@ function renderCustomTable(tableId) {
 
     const ctMg = getMergedGroupForCol(tbl.id, col.id);
     const isCtMergedHeader = ctMg && ctMg.primaryColumnId === col.id;
-    const ctHeaderText = (isCtMergedHeader && ctMg.name) ? ctMg.name : col.label;
+    let ctHeaderText = col.label;
+    let ctTooltipText = col.label;
     if (isCtMergedHeader) {
+      const mgInfo = getMergedColumnHeaderInfo(tbl.id, ctMg, tbl.columns);
+      ctHeaderText = mgInfo.headerText;
+      ctTooltipText = mgInfo.tooltipText;
       th.classList.add('synapse-merged-header-th');
-      th.title = `統合グループ「${ctHeaderText}」 (${getMergedGroupSummaryText(tbl.id, ctMg)})`;
+      th.title = ctTooltipText;
     }
     const labelSpan = document.createElement('span');
     labelSpan.className = 'th-label';
     labelSpan.textContent = ctHeaderText;
+    labelSpan.title = ctTooltipText;
     labelSpan.style.whiteSpace = 'nowrap';
     labelSpan.style.overflow = 'hidden';
     labelSpan.style.textOverflow = 'ellipsis';
@@ -9349,46 +9354,46 @@ const SYNAPSE_LINE_ICONS = {
 };
 window.SYNAPSE_LINE_ICONS = SYNAPSE_LINE_ICONS;
 
-function buildMergedTableHeaderMarkup(tableId, col, group) {
+function sanitizeMergeGroup(group) {
+  if (!group) return group;
+  if (group.name && (group.name.includes('項目') || group.name.includes('(+') || /^\s*.*?\s*\(\+.*?\)\s*$/.test(group.name))) {
+    group.name = '';
+  }
+  return group;
+}
+
+function getMergedColumnHeaderInfo(tableId, group, columns = null) {
+  if (!group || !group.columnIds) return { headerText: '', tooltipText: '', labels: [] };
   const normId = normalizeTableId(tableId);
   const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
-  const cols = meta ? meta.columns : [];
+  const cols = (columns && columns.length > 0) ? columns : (meta ? meta.columns : []);
 
-  const allLabels = (group.columnIds || []).map(cId => {
+  const labels = group.columnIds.map(cId => {
     const c = cols.find(colDef => colDef.id === cId);
     return c ? (c.label || c.name || cId) : cId;
   });
 
-  const primaryColDef = cols.find(c => c.id === group.primaryColumnId);
-  const primaryLabel = primaryColDef ? (primaryColDef.label || primaryColDef.name || group.primaryColumnId) : (col.label || col.name || col.id);
+  // カラム内表示: 実際のカラム名を並べて表記 (例: 顧客番号 / 法人名 / 代表者名)
+  const headerText = labels.join(' / ');
+  // ツールチップ表示: 実際のセル(ポップアップ)と同様に各項目名を正確に改行縦並びで表示
+  const tooltipText = labels.join('\n');
 
-  const otherLabels = (group.columnIds || [])
-    .filter(cId => cId !== group.primaryColumnId)
-    .map(cId => {
-      const c = cols.find(colDef => colDef.id === cId);
-      return c ? (c.label || c.name || cId) : cId;
-    });
+  return { headerText, tooltipText, labels };
+}
 
-  let mainName = primaryLabel;
-  if (group.name && !group.name.includes('項目') && group.name.trim()) {
-    mainName = group.name.trim();
-  }
-
-  const allLabelsText = allLabels.join(' / ');
-  const otherLabelsText = otherLabels.join('・');
-
+function buildMergedTableHeaderMarkup(tableId, col, group) {
+  const info = getMergedColumnHeaderInfo(tableId, group, null);
   return {
-    mainName,
-    otherLabelsText,
-    allLabelsText,
+    mainName: info.labels[0] || '',
+    otherLabelsText: info.labels.slice(1).join(' / '),
+    allLabelsText: info.headerText,
     html: `
       <div style="display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1; overflow: hidden; white-space: nowrap;">
         <span class="synapse-sheets-group-tag" style="font-size: 0.65rem; color: #2563eb; background: #dbeafe; border: 1px solid #bfdbfe; padding: 1px 4px; border-radius: 3px; font-weight: 700; flex-shrink: 0; line-height: 1.2;">[統合]</span>
-        <span style="font-weight: 700; font-size: 0.75rem; color: #1e40af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${mainName}">${mainName}</span>
-        <span style="font-size: 0.72rem; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;" title="統合カラム内訳: ${allLabelsText}">(＋${otherLabelsText || '統合'})</span>
+        <span style="font-weight: 700; font-size: 0.75rem; color: #1e40af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(info.tooltipText)}">${escapeHtml(info.headerText)}</span>
       </div>
     `,
-    tooltip: `統合グループ「${mainName}」: ${allLabelsText}`
+    tooltip: info.tooltipText
   };
 }
 
@@ -9655,13 +9660,13 @@ function getMergedColumns(tableId) {
     const userRaw = localStorage.getItem(userKey);
     if (userRaw !== null) {
       const parsed = JSON.parse(userRaw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) return parsed.map(sanitizeMergeGroup);
     }
     // 2. なければオーナーが設定した共有統合設定をフォールバック反映
     const sharedRaw = localStorage.getItem(getSharedMergedColumnsStorageKey(normId));
     if (sharedRaw) {
       const parsed = JSON.parse(sharedRaw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) return parsed.map(sanitizeMergeGroup);
     }
     return [];
   } catch (e) {
@@ -9694,11 +9699,11 @@ function getMergedGroupSummaryText(tableId, group) {
   const normId = normalizeTableId(tableId);
   const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
   const cols = meta ? meta.columns : [];
-  return group.columnIds.map(cId => {
+  return (group.columnIds || []).map(cId => {
     const c = cols.find(col => col.id === cId);
     const label = c ? (c.label || c.name || cId) : cId;
-    return cId === group.primaryColumnId ? `${label}(メイン)` : label;
-  }).join(', ');
+    return label;
+  }).join(' / ');
 }
 
 // ユーザー非表示カラム & 統合表示カラムの合成可視化フィルター
@@ -9799,35 +9804,46 @@ let currentEditingMergeGroupId = null;
 let currentActiveDisplayTab = 'hidden'; // 'hidden' | 'merge'
 
 function openColumnDisplaySettingsModal(tableId, initialTab = 'hidden', preselectedColIds = []) {
-  const normId = normalizeTableId(tableId);
-  currentDisplayModalTableId = normId;
-  currentEditingMergeGroupId = null;
-  currentActiveDisplayTab = initialTab;
+  try {
+    const normId = normalizeTableId(tableId);
+    currentDisplayModalTableId = normId;
+    currentEditingMergeGroupId = null;
+    currentActiveDisplayTab = initialTab;
 
-  const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
-  if (!meta) {
-    showToast('テーブル情報が見つかりません。', 'error');
-    return;
+    const meta = typeof getTableMeta === 'function' ? getTableMeta(normId) : null;
+    if (!meta) {
+      showToast('テーブル情報が見つかりません。', 'error');
+      return;
+    }
+
+    const modal = document.getElementById('merged-columns-modal');
+    if (!modal) return;
+
+    const titleEl = modal.querySelector('.modal-header h3');
+    if (titleEl) {
+      titleEl.innerHTML = `${SYNAPSE_LINE_ICONS.columns(18)} <span>列の表示設定 (${meta.name || normId})</span>`;
+    }
+
+    // タブ切り替え
+    switchColumnDisplayTab(initialTab);
+
+    // 非表示カラム設定タブの描画
+    renderHiddenColumnsTab(normId);
+
+    // 統合表示設定タブの描画
+    renderExistingMergeGroupsList(normId);
+    resetMergeGroupEditor(normId, preselectedColIds);
+
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+  } catch (err) {
+    console.error('Error opening column display settings modal:', err);
+    const modal = document.getElementById('merged-columns-modal');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+    }
   }
-
-  const modal = document.getElementById('merged-columns-modal');
-  if (!modal) return;
-
-  const titleEl = modal.querySelector('.modal-header h3');
-  // No chip header (photo 5)
-
-  // タブ切り替え
-  switchColumnDisplayTab(initialTab);
-
-  // 非表示カラム設定タブの描画
-  renderHiddenColumnsTab(normId);
-
-  // 統合表示設定タブの描画
-  renderExistingMergeGroupsList(normId);
-  resetMergeGroupEditor(normId, preselectedColIds);
-
-  modal.style.display = 'flex';
-  modal.classList.add('active');
 }
 
 window.openColumnDisplaySettingsModal = openColumnDisplaySettingsModal;
@@ -9979,6 +9995,10 @@ function renderExistingMergeGroupsList(tableId) {
       const name = c ? (c.label || c.name || cId) : cId;
       return cId === group.primaryColumnId ? `<strong>${name}(メイン)</strong>` : name;
     }).join(', ');
+
+    const titleText = (group.name && !group.name.includes('項目') && !group.name.includes('(+'))
+      ? `<strong>${escapeHtml(group.name)}</strong> (${colLabels})`
+      : colLabels;
 
     let copyInfoBadge = '<span style="font-size: 0.7rem; color: #475569; background: #f1f5f9; padding: 1px 5px; border-radius: 4px; margin-left: 4px;">コピー: 表示中のみ</span>';
     if (group.copyMode === 'all') copyInfoBadge = `<span style="font-size: 0.7rem; color: #059669; background: rgba(16,185,129,0.1); padding: 1px 5px; border-radius: 4px; margin-left: 4px;">コピー: 全${group.columnIds.length}列(タブ区切り)</span>`;
@@ -10352,6 +10372,20 @@ function attachMergedCellHoverEvents(td, tableId, rowData, group, columns) {
   });
 }
 
+let chipDragStartIndex = -1;
+let hasDraggedChip = false;
+
+function showChipCopyFeedback(msg = '✓ コピーしました') {
+  const feedback = document.getElementById('synapse-chip-copy-feedback');
+  if (feedback) {
+    feedback.textContent = msg;
+    feedback.style.display = 'block';
+    setTimeout(() => {
+      feedback.style.display = 'none';
+    }, 1500);
+  }
+}
+
 function showMergedCellChip(targetCell, tableId, rowData, group, columns, matchedFieldId = null) {
   cancelChipClose();
   const chip = document.getElementById('synapse-merged-cell-chip');
@@ -10362,6 +10396,8 @@ function showMergedCellChip(targetCell, tableId, rowData, group, columns, matche
   activeChipCell = targetCell;
   activeChipHoveredRow = null;
   selectedChipRowEls.clear();
+  isDraggingChip = false;
+  hasDraggedChip = false;
 
   if (titleEl) {
     titleEl.innerHTML = `${getMergeLineIconSvg(14)} ${group.name || '統合データ'}`;
@@ -10370,6 +10406,7 @@ function showMergedCellChip(targetCell, tableId, rowData, group, columns, matche
   rowsContainer.innerHTML = '';
   const screenId = getTableScreenId(tableId);
 
+  let rowIndex = 0;
   group.columnIds.forEach(colId => {
     const colDef = columns.find(c => c.id === colId) || { id: colId, label: colId };
     
@@ -10381,36 +10418,73 @@ function showMergedCellChip(targetCell, tableId, rowData, group, columns, matche
     const val = rowData[colId] !== undefined && rowData[colId] !== null ? String(rowData[colId]) : '';
     const isPrimary = colId === group.primaryColumnId;
     const isMatched = matchedFieldId && colId === matchedFieldId;
+    const currentRowIdx = rowIndex++;
 
     const rowEl = document.createElement('div');
     rowEl.className = 'synapse-chip-row' + (isPrimary ? ' is-primary' : '') + (isMatched ? ' is-match-highlight' : '');
     rowEl.dataset.fieldId = colId;
     rowEl.dataset.fieldValue = val;
+    rowEl.dataset.rowIndex = currentRowIdx;
 
     // 写真5対応：最小限のデータ値のみ表示（ラベルなし、コピーアイコンなし、native tooltipなし）
     rowEl.innerHTML = `<span class="synapse-chip-row-val">${escapeHtml(val || '—')}</span>`;
+
+    rowEl.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return; // 左クリックのみ
+      isDraggingChip = true;
+      hasDraggedChip = false;
+      chipDragStartIndex = currentRowIdx;
+
+      if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        selectedChipRowEls.clear();
+        rowsContainer.querySelectorAll('.synapse-chip-row').forEach(r => r.classList.remove('is-selected'));
+      }
+      rowEl.classList.add('is-selected');
+      selectedChipRowEls.add(rowEl);
+    });
 
     rowEl.addEventListener('mouseenter', () => {
       cancelChipClose();
       rowsContainer.querySelectorAll('.synapse-chip-row').forEach(r => r.classList.remove('is-hovered'));
       rowEl.classList.add('is-hovered');
       activeChipHoveredRow = rowEl;
+
+      if (isDraggingChip) {
+        hasDraggedChip = true;
+        const allRows = Array.from(rowsContainer.querySelectorAll('.synapse-chip-row'));
+        const minIdx = Math.min(chipDragStartIndex, currentRowIdx);
+        const maxIdx = Math.max(chipDragStartIndex, currentRowIdx);
+
+        if (!window.event?.ctrlKey && !window.event?.metaKey) {
+          selectedChipRowEls.clear();
+          allRows.forEach(r => r.classList.remove('is-selected'));
+        }
+        for (let i = minIdx; i <= maxIdx; i++) {
+          if (allRows[i]) {
+            allRows[i].classList.add('is-selected');
+            selectedChipRowEls.add(allRows[i]);
+          }
+        }
+      }
     });
 
     rowEl.addEventListener('click', (e) => {
       e.stopPropagation();
-      const textToCopy = val;
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(textToCopy).then(() => {
-          showChipCopyFeedback('✓ コピーしました');
-        }).catch(() => {
-          copyTextFallback(textToCopy);
-          showChipCopyFeedback('✓ コピーしました');
-        });
-      } else {
-        copyTextFallback(textToCopy);
-        showChipCopyFeedback('✓ コピーしました');
+      // ドラッグ操作で複数行選択完了後のクリックは重複コピー防止
+      if (hasDraggedChip && selectedChipRowEls.size > 1) {
+        return;
       }
+      // 既に複数行選択されている状態でクリックした場合は選択行をすべてコピー
+      if (selectedChipRowEls.size > 1) {
+        const selectedRows = Array.from(rowsContainer.querySelectorAll('.synapse-chip-row.is-selected'));
+        const textToCopy = selectedRows.map(r => r.dataset.fieldValue !== undefined ? r.dataset.fieldValue : r.innerText.trim()).join('\n');
+        copyChipValueToClipboard(textToCopy);
+        showChipCopyFeedback(`✓ ${selectedRows.length}行をコピーしました`);
+        return;
+      }
+      // 単一クリックの場合はその行をコピー
+      copyChipValueToClipboard(val);
+      showChipCopyFeedback('✓ コピーしました');
     });
 
     rowsContainer.appendChild(rowEl);
@@ -10425,12 +10499,12 @@ function showMergedCellChip(targetCell, tableId, rowData, group, columns, matche
   const cellRect = targetCell.getBoundingClientRect();
   const chipRect = chip.getBoundingClientRect();
 
-  // 写真2枚目と同様のセルに対する位置：
-  // セルの下半分（テキスト直下〜境界線付近）に重ねて表示
-  let top = cellRect.top + 14;
-  let left = cellRect.left + 16;
+  // ユーザー要求：セルに対してもっと右下にホバーポップアップを配置
+  // セルの下端のすぐ下（+2px）、かつセルの左端から32px右へオフセット
+  let top = cellRect.bottom + 2;
+  let left = cellRect.left + 32;
 
-  // 画面下端にはみ出る場合のフォールバック
+  // 画面下端にはみ出る場合のフォールバック（セル上部に配置）
   if (top + chipRect.height > window.innerHeight - 10) {
     top = Math.max(10, cellRect.top - chipRect.height - 2);
   }
@@ -10443,6 +10517,16 @@ function showMergedCellChip(targetCell, tableId, rowData, group, columns, matche
   chip.style.top = `${top}px`;
   chip.style.left = `${left}px`;
   chip.style.visibility = 'visible';
+}
+
+function copyChipValueToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {
+      copyTextFallback(text);
+    });
+  } else {
+    copyTextFallback(text);
+  }
 }
 
 function copyChipRowValue(value, labelName = '') {
@@ -10467,22 +10551,33 @@ function handleSynapseChipCopy(e) {
   const chip = document.getElementById('synapse-merged-cell-chip');
   if (!chip || chip.style.display === 'none') return false;
 
-  if (selectedChipRowEls.size > 1) {
-    if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    const lines = [];
-    selectedChipRowEls.forEach(rowEl => {
-      lines.push(rowEl.dataset.fieldValue || '');
-    });
-    const text = lines.join('\n');
-    copyChipRowValue(text, `${selectedChipRowEls.size}行`);
+  const rowsContainer = document.getElementById('synapse-chip-rows-container');
+  if (!rowsContainer) return false;
+
+  // 1. もしユーザーがテキストをマウス等で直接ハイライト選択している場合はブラウザのネイティブコピーを尊重
+  const winSelection = window.getSelection() ? window.getSelection().toString() : '';
+  if (winSelection && winSelection.trim().length > 0) {
+    showChipCopyFeedback('✓ コピーしました');
     return true;
   }
 
+  // 2. ドラッグまたは選択された行がある場合
+  const selectedRows = Array.from(rowsContainer.querySelectorAll('.synapse-chip-row.is-selected'));
+  if (selectedRows.length > 0) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    const lines = selectedRows.map(r => r.dataset.fieldValue !== undefined ? r.dataset.fieldValue : r.innerText.trim());
+    const text = lines.join('\n');
+    copyChipValueToClipboard(text);
+    showChipCopyFeedback(selectedRows.length > 1 ? `✓ ${selectedRows.length}行をコピーしました` : '✓ コピーしました');
+    return true;
+  }
+
+  // 3. 単一ホバー行のコピー
   if (activeChipHoveredRow) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    const val = activeChipHoveredRow.dataset.fieldValue || '';
-    const label = activeChipHoveredRow.querySelector('.synapse-chip-row-label')?.textContent?.replace(':', '') || '';
-    copyChipRowValue(val, label);
+    const val = activeChipHoveredRow.dataset.fieldValue !== undefined ? activeChipHoveredRow.dataset.fieldValue : activeChipHoveredRow.innerText.trim();
+    copyChipValueToClipboard(val);
+    showChipCopyFeedback('✓ コピーしました');
     return true;
   }
 
@@ -19098,14 +19193,22 @@ function renderAgencyInfo() {
 
         const agHeaderMg = getMergedGroupForCol('ag', col.id);
         const isAgMergedHeader = agHeaderMg && agHeaderMg.primaryColumnId === col.id;
-        const agHeaderText = (isAgMergedHeader && agHeaderMg.name) ? agHeaderMg.name : col.label;
+        let agHeaderText = col.label;
         if (isAgMergedHeader) {
+          const mgInfo = getMergedColumnHeaderInfo('ag', agHeaderMg, columns);
+          agHeaderText = mgInfo.headerText;
           th.classList.add('synapse-merged-header-th');
-          th.title = `統合グループ「${agHeaderText}」 (${getMergedGroupSummaryText('ag', agHeaderMg)})`;
+          th.title = mgInfo.tooltipText;
+          const currentW = state.agColumnWidths[col.id] || 100;
+          if (currentW < 140) {
+            th.style.width = '140px';
+            th.style.minWidth = '140px';
+            th.style.maxWidth = '140px';
+          }
         }
         th.innerHTML = `
           <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 2px;">
-            <span style="font-size: 0.75rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${agHeaderText}">${agHeaderText}</span>
+            <span style="font-size: 0.75rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${isAgMergedHeader ? escapeHtml(th.title) : escapeHtml(agHeaderText)}">${escapeHtml(agHeaderText)}</span>
             <button class="btn-filter-toggle${activeClass}" data-col-id="${col.id}" style="background: transparent; border: none; padding: 0.1rem 0.2rem; color: var(--text-muted); cursor: pointer; font-size: 0.65rem; transition: color 0.2s; margin-left: 2px; flex-shrink: 0;">
               ▼
             </button>
@@ -20948,14 +21051,23 @@ function renderJoInfo() {
 
         const joHeaderMg = getMergedGroupForCol('jo', col.id);
         const isJoMergedHeader = joHeaderMg && joHeaderMg.primaryColumnId === col.id;
-        const joHeaderText = (isJoMergedHeader && joHeaderMg.name) ? joHeaderMg.name : col.label;
+        let joHeaderText = col.label;
         if (isJoMergedHeader) {
+          const mgInfo = getMergedColumnHeaderInfo('jo', joHeaderMg, columns);
+          joHeaderText = mgInfo.headerText;
           th.classList.add('synapse-merged-header-th');
-          th.title = `統合グループ「${joHeaderText}」 (${getMergedGroupSummaryText('jo', joHeaderMg)})`;
+          th.title = mgInfo.tooltipText;
+          // 統合列の幅が狭くて見切れるのを防止
+          const currentW = state.joColumnWidths[col.id] || 100;
+          if (currentW < 140) {
+            th.style.width = '140px';
+            th.style.minWidth = '140px';
+            th.style.maxWidth = '140px';
+          }
         }
         th.innerHTML = `
           <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 2px;">
-            <span style="font-size: 0.75rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${joHeaderText}">${joHeaderText}</span>
+            <span style="font-size: 0.75rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${isJoMergedHeader ? escapeHtml(th.title) : escapeHtml(joHeaderText)}">${escapeHtml(joHeaderText)}</span>
             <button class="btn-filter-toggle${activeClass}" data-col-id="${col.id}" style="background: transparent; border: none; padding: 0.1rem 0.2rem; color: var(--text-muted); cursor: pointer; font-size: 0.65rem; transition: color 0.2s; margin-left: 2px; flex-shrink: 0;">
               ▼
             </button>
@@ -21644,14 +21756,22 @@ function renderApplicantInfo() {
 
         const apHeaderMg = getMergedGroupForCol('ap', col.id);
         const isApMergedHeader = apHeaderMg && apHeaderMg.primaryColumnId === col.id;
-        const apHeaderText = (isApMergedHeader && apHeaderMg.name) ? apHeaderMg.name : col.label;
+        let apHeaderText = col.label;
         if (isApMergedHeader) {
+          const mgInfo = getMergedColumnHeaderInfo('ap', apHeaderMg, columns);
+          apHeaderText = mgInfo.headerText;
           th.classList.add('synapse-merged-header-th');
-          th.title = `統合グループ「${apHeaderText}」 (${getMergedGroupSummaryText('ap', apHeaderMg)})`;
+          th.title = mgInfo.tooltipText;
+          const currentW = state.apColumnWidths[col.id] || 100;
+          if (currentW < 140) {
+            th.style.width = '140px';
+            th.style.minWidth = '140px';
+            th.style.maxWidth = '140px';
+          }
         }
         th.innerHTML = `
           <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 2px;">
-            <span style="font-size: 0.75rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${apHeaderText}">${apHeaderText}</span>
+            <span style="font-size: 0.75rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${isApMergedHeader ? escapeHtml(th.title) : escapeHtml(apHeaderText)}">${escapeHtml(apHeaderText)}</span>
             <button class="btn-filter-toggle${activeClass}" data-col-id="${col.id}" style="background: transparent; border: none; padding: 0.1rem 0.2rem; color: var(--text-muted); cursor: pointer; font-size: 0.65rem; transition: color 0.2s; margin-left: 2px; flex-shrink: 0;">
               ▼
             </button>
@@ -26346,12 +26466,14 @@ function renderDbmakePartners() {
 
       const dbmakeMg = getMergedGroupForCol('dbmake', col.id);
       const isDbmakeMergedHeader = dbmakeMg && dbmakeMg.primaryColumnId === col.id;
-      const dbmakeHeaderText = (isDbmakeMergedHeader && dbmakeMg.name) ? dbmakeMg.name : col.name;
-      th.textContent = dbmakeHeaderText;
+      let dbmakeHeaderText = col.name;
       if (isDbmakeMergedHeader) {
+        const mgInfo = getMergedColumnHeaderInfo('dbmake', dbmakeMg, state.dbmakeColumns);
+        dbmakeHeaderText = mgInfo.headerText;
         th.classList.add('synapse-merged-header-th');
-        th.title = `統合グループ「${dbmakeHeaderText}」 (${getMergedGroupSummaryText('dbmake', dbmakeMg)})`;
+        th.title = mgInfo.tooltipText;
       }
+      th.textContent = dbmakeHeaderText;
 
       th.addEventListener('contextmenu', (e) => {
         e.preventDefault();

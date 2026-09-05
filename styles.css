@@ -5694,6 +5694,10 @@ h3 {
   color: #1e40af !important;
 }
 
+.synapse-chip-row.is-selected .synapse-chip-row-val {
+  color: #1e40af !important;
+}
+
 .synapse-chip-row.is-match-highlight {
   background: rgba(234, 179, 8, 0.3) !important;
 }
