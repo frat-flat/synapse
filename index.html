@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="styles.css?v=2.2">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script id="session-safety-patch">
   (function() {
     try {
@@ -265,11 +266,43 @@
                 <span class="item-left"><span class="item-icon">📋</span><span>コピーを作成</span></span>
               </div>
               <div class="sheets-dropdown-divider"></div>
-              <div class="sheets-dropdown-item" data-action="file-export">
-                <span class="item-left"><span class="item-icon">📤</span><span>ダウンロード (CSV)</span></span>
+              <!-- ダウンロード サブメニュー (Image 1) -->
+              <div class="sheets-dropdown-item has-submenu" data-submenu="download">
+                <span class="item-left"><span class="item-icon">📥</span><span>ダウンロード</span></span>
+                <span class="sheets-submenu-arrow">▶</span>
+                <div class="sheets-submenu" id="submenu-download" style="min-width: 250px;">
+                  <div class="sheets-dropdown-item" data-action="download-xlsx">
+                    <span class="item-left"><span class="item-icon" style="color:#107c41; font-weight:bold;">X</span><span>Microsoft Excel（.xlsx）</span></span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="download-ods">
+                    <span class="item-left"><span class="item-icon" style="color:#008080; font-weight:bold;">O</span><span>OpenDocument（.ods）</span></span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="download-pdf">
+                    <span class="item-left"><span class="item-icon" style="color:#e11d48; font-weight:bold;">P</span><span>PDF（.pdf）</span></span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="download-html">
+                    <span class="item-left"><span class="item-icon" style="color:#ea580c; font-weight:bold;">H</span><span>ウェブページ（.html）</span></span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="download-csv">
+                    <span class="item-left"><span class="item-icon" style="color:#2563eb; font-weight:bold;">C</span><span>カンマ区切り形式（.csv）</span></span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="download-tsv">
+                    <span class="item-left"><span class="item-icon" style="color:#7c3aed; font-weight:bold;">T</span><span>タブ区切り形式（.tsv）</span></span>
+                  </div>
+                </div>
               </div>
+              <div class="sheets-dropdown-divider"></div>
               <div class="sheets-dropdown-item" data-action="file-rename">
-                <span class="item-left"><span class="item-icon">🏷️</span><span>名前を変更</span></span>
+                <span class="item-left"><span class="item-icon">✏️</span><span>名前を変更</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="file-move">
+                <span class="item-left"><span class="item-icon">📁</span><span>移動</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="file-shortcut">
+                <span class="item-left"><span class="item-icon">🔺</span><span>ドライブにショートカットを追加</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="file-trash">
+                <span class="item-left"><span class="item-icon">🗑️</span><span>ゴミ箱に移動</span></span>
               </div>
               <div class="sheets-dropdown-divider"></div>
               <div class="sheets-dropdown-item" data-action="file-history">
@@ -308,15 +341,63 @@
                 <span class="item-left"><span class="item-icon">📋</span><span>貼り付け</span></span>
                 <span class="item-shortcut">Ctrl+V</span>
               </div>
+              <!-- 特殊貼り付け サブメニュー (Image 2) -->
+              <div class="sheets-dropdown-item has-submenu" data-submenu="paste-special">
+                <span class="item-left"><span class="item-icon">📋</span><span>特殊貼り付け</span></span>
+                <span class="sheets-submenu-arrow">▶</span>
+                <div class="sheets-submenu" id="submenu-paste-special" style="min-width: 270px;">
+                  <div class="sheets-dropdown-item" data-action="paste-values">
+                    <span class="item-left"><span>値のみ貼り付け</span></span>
+                    <span class="item-shortcut">Ctrl+Shift+V</span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="paste-format">
+                    <span class="item-left"><span>書式のみ貼り付け</span></span>
+                    <span class="item-shortcut">Ctrl+Alt+V</span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="paste-formula">
+                    <span class="item-left"><span>数式のみ貼り付け</span></span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="paste-cf">
+                    <span class="item-left"><span>条件付き書式のみ貼り付け</span></span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="paste-validation">
+                    <span class="item-left"><span>データの入力規則のみ貼り付け</span></span>
+                  </div>
+                  <div class="sheets-dropdown-divider"></div>
+                  <div class="sheets-dropdown-item" data-action="paste-transpose">
+                    <span class="item-left"><span>転置して貼り付け</span></span>
+                  </div>
+                  <div class="sheets-dropdown-divider"></div>
+                  <div class="sheets-dropdown-item" data-action="paste-col-width">
+                    <span class="item-left"><span>列の幅のみ貼り付け</span></span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="paste-no-borders">
+                    <span class="item-left"><span>枠線を除くすべてを貼り付け</span></span>
+                  </div>
+                </div>
+              </div>
               <div class="sheets-dropdown-divider"></div>
-              <div class="sheets-dropdown-item" data-action="edit-delete">
-                <span class="item-left"><span class="item-icon">🗑️</span><span>削除 (値のクリア)</span></span>
-                <span class="item-shortcut">Delete</span>
+              <div class="sheets-dropdown-item has-submenu" data-submenu="edit-move">
+                <span class="item-left"><span class="item-icon">↕️</span><span>移動</span></span>
+                <span class="sheets-submenu-arrow">▶</span>
+                <div class="sheets-submenu">
+                  <div class="sheets-dropdown-item" data-action="move-row-up"><span class="item-left"><span>行を上に移動</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="move-row-down"><span class="item-left"><span>行を下に移動</span></span></div>
+                </div>
+              </div>
+              <div class="sheets-dropdown-item has-submenu" data-submenu="edit-delete">
+                <span class="item-left"><span class="item-icon">🗑️</span><span>削除</span></span>
+                <span class="sheets-submenu-arrow">▶</span>
+                <div class="sheets-submenu">
+                  <div class="sheets-dropdown-item" data-action="delete-selected-rows"><span class="item-left"><span>選択した行を削除</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="delete-selected-cols"><span class="item-left"><span>選択した列を削除</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="edit-delete"><span class="item-left"><span>値をクリア</span></span><span class="item-shortcut">Delete</span></div>
+                </div>
               </div>
               <div class="sheets-dropdown-divider"></div>
               <div class="sheets-dropdown-item" data-action="edit-find">
                 <span class="item-left"><span class="item-icon">🔍</span><span>検索と置換...</span></span>
-                <span class="item-shortcut">Ctrl+F</span>
+                <span class="item-shortcut">Ctrl+H</span>
               </div>
             </div>
           </div>
@@ -392,40 +473,173 @@
           <div class="sheets-menu-item" data-menu="format" tabindex="0">
             <span>表示形式</span>
             <div class="sheets-dropdown-menu" id="dropdown-format">
-              <div class="sheets-dropdown-item" data-action="format-bold">
-                <span class="item-left"><span class="item-icon" style="font-weight: bold;">B</span><span>太字</span></span>
-                <span class="item-shortcut">Ctrl+B</span>
-              </div>
-              <div class="sheets-dropdown-item" data-action="format-italic">
-                <span class="item-left"><span class="item-icon" style="font-style: italic;">/</span><span>斜体</span></span>
-                <span class="item-shortcut">Ctrl+I</span>
-              </div>
-              <div class="sheets-dropdown-item" data-action="format-strike">
-                <span class="item-left"><span class="item-icon" style="text-decoration: line-through;">S</span><span>取り消し線</span></span>
+              <div class="sheets-dropdown-item" data-action="format-theme">
+                <span class="item-left"><span class="item-icon">🎨</span><span>テーマ</span></span>
               </div>
               <div class="sheets-dropdown-divider"></div>
-              <div class="sheets-dropdown-item" data-action="format-fontsize">
-                <span class="item-left"><span class="item-icon">🔤</span><span>フォントサイズ変更...</span></span>
+              <!-- 123 数字 サブメニュー (Image 3) -->
+              <div class="sheets-dropdown-item has-submenu" data-submenu="format-numbers">
+                <span class="item-left"><span class="item-icon" style="font-weight: bold; font-size: 0.8rem;">123</span><span>数字</span></span>
+                <span class="sheets-submenu-arrow">▶</span>
+                <div class="sheets-submenu" id="submenu-format-numbers" style="min-width: 290px;">
+                  <div class="sheets-dropdown-item" data-action="numformat-auto">
+                    <span class="item-left"><span class="item-icon">✓</span><span>自動</span></span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="numformat-text">
+                    <span class="item-left"><span>書式なしテキスト</span></span>
+                  </div>
+                  <div class="sheets-dropdown-divider"></div>
+                  <div class="sheets-dropdown-item" data-action="numformat-number">
+                    <span class="item-left"><span>数値</span></span>
+                    <span class="item-shortcut">1,000.12</span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="numformat-percent">
+                    <span class="item-left"><span>パーセント</span></span>
+                    <span class="item-shortcut">10.12%</span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="numformat-scientific">
+                    <span class="item-left"><span>指数</span></span>
+                    <span class="item-shortcut">1.01E+03</span>
+                  </div>
+                  <div class="sheets-dropdown-divider"></div>
+                  <div class="sheets-dropdown-item" data-action="numformat-accounting-yen">
+                    <span class="item-left"><span>会計</span></span>
+                    <span class="item-shortcut">¥ (1,000.12)</span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="numformat-accounting">
+                    <span class="item-left"><span>会計</span></span>
+                    <span class="item-shortcut">(1,000.12)</span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="numformat-currency">
+                    <span class="item-left"><span>通貨</span></span>
+                    <span class="item-shortcut">¥1,000.12</span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="numformat-currency-round">
+                    <span class="item-left"><span>通貨（端数切り捨て）</span></span>
+                    <span class="item-shortcut">¥1,000</span>
+                  </div>
+                  <div class="sheets-dropdown-divider"></div>
+                  <div class="sheets-dropdown-item" data-action="numformat-date-slash">
+                    <span class="item-left"><span>日付</span></span>
+                    <span class="item-shortcut">2008/09/26</span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="numformat-time">
+                    <span class="item-left"><span>時間</span></span>
+                    <span class="item-shortcut">15:59:00</span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="numformat-datetime">
+                    <span class="item-left"><span>日時</span></span>
+                    <span class="item-shortcut">2008/09/26 15:59:00</span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="numformat-duration">
+                    <span class="item-left"><span>経過時間</span></span>
+                    <span class="item-shortcut">24:01:00</span>
+                  </div>
+                  <div class="sheets-dropdown-divider"></div>
+                  <div class="sheets-dropdown-item" data-action="numformat-date-ym">
+                    <span class="item-left"><span>2008年9月</span></span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="numformat-date-ymd-kanji">
+                    <span class="item-left"><span>2008年9月26日</span></span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="numformat-date-ymd">
+                    <span class="item-left"><span>2008/09/26</span></span>
+                  </div>
+                  <div class="sheets-dropdown-divider"></div>
+                  <div class="sheets-dropdown-item" data-action="numformat-custom-currency">
+                    <span class="item-left"><span>カスタム通貨</span></span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="numformat-custom-datetime">
+                    <span class="item-left"><span>カスタム日時</span></span>
+                  </div>
+                  <div class="sheets-dropdown-item" data-action="numformat-custom-number">
+                    <span class="item-left"><span>カスタム数値形式</span></span>
+                  </div>
+                </div>
               </div>
-              <div class="sheets-dropdown-item" data-action="format-text-color">
-                <span class="item-left"><span class="item-icon">🎨</span><span>テキストの色...</span></span>
+              <div class="sheets-dropdown-item has-submenu" data-submenu="format-text">
+                <span class="item-left"><span class="item-icon" style="font-weight: bold;">B</span><span>テキスト</span></span>
+                <span class="sheets-submenu-arrow">▶</span>
+                <div class="sheets-submenu">
+                  <div class="sheets-dropdown-item" data-action="format-bold"><span class="item-left"><span class="item-icon" style="font-weight:bold;">B</span><span>太字</span></span><span class="item-shortcut">Ctrl+B</span></div>
+                  <div class="sheets-dropdown-item" data-action="format-italic"><span class="item-left"><span class="item-icon" style="font-style:italic;">I</span><span>斜体</span></span><span class="item-shortcut">Ctrl+I</span></div>
+                  <div class="sheets-dropdown-item" data-action="format-underline"><span class="item-left"><span class="item-icon" style="text-decoration:underline;">U</span><span>下線</span></span><span class="item-shortcut">Ctrl+U</span></div>
+                  <div class="sheets-dropdown-item" data-action="format-strike"><span class="item-left"><span class="item-icon" style="text-decoration:line-through;">S</span><span>取り消し線</span></span><span class="item-shortcut">Alt+Shift+5</span></div>
+                </div>
               </div>
-              <div class="sheets-dropdown-item" data-action="format-bg-color">
-                <span class="item-left"><span class="item-icon">🪣</span><span>塗りつぶしの色 (セル背景)...</span></span>
+              <div class="sheets-dropdown-item has-submenu" data-submenu="format-align">
+                <span class="item-left"><span class="item-icon">≡</span><span>配置</span></span>
+                <span class="sheets-submenu-arrow">▶</span>
+                <div class="sheets-submenu">
+                  <div class="sheets-dropdown-item" data-action="format-align-left"><span class="item-left"><span>左揃え</span></span><span class="item-shortcut">Ctrl+Shift+L</span></div>
+                  <div class="sheets-dropdown-item" data-action="format-align-center"><span class="item-left"><span>中央揃え</span></span><span class="item-shortcut">Ctrl+Shift+E</span></div>
+                  <div class="sheets-dropdown-item" data-action="format-align-right"><span class="item-left"><span>右揃え</span></span><span class="item-shortcut">Ctrl+Shift+R</span></div>
+                  <div class="sheets-dropdown-divider"></div>
+                  <div class="sheets-dropdown-item" data-action="format-valign-top"><span class="item-left"><span>上揃え</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="format-valign-middle"><span class="item-left"><span>中央揃え (垂直)</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="format-valign-bottom"><span class="item-left"><span>下揃え</span></span></div>
+                </div>
+              </div>
+              <div class="sheets-dropdown-item has-submenu" data-submenu="format-wrap">
+                <span class="item-left"><span class="item-icon">|a|</span><span>ラッピング</span></span>
+                <span class="sheets-submenu-arrow">▶</span>
+                <div class="sheets-submenu">
+                  <div class="sheets-dropdown-item" data-action="format-overflow"><span class="item-left"><span>はみ出し (オーバーフロー)</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="format-wrap"><span class="item-left"><span>折り返し</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="format-clip"><span class="item-left"><span>切り詰め (クリップ)</span></span></div>
+                </div>
+              </div>
+              <div class="sheets-dropdown-item has-submenu" data-submenu="format-rotate">
+                <span class="item-left"><span class="item-icon">⤹</span><span>回転</span></span>
+                <span class="sheets-submenu-arrow">▶</span>
+                <div class="sheets-submenu">
+                  <div class="sheets-dropdown-item" data-action="format-rotate-none"><span class="item-left"><span>傾斜なし</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="format-rotate-up"><span class="item-left"><span>傾斜上向き</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="format-rotate-down"><span class="item-left"><span>傾斜下向き</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="format-rotate-vertical"><span class="item-left"><span>縦書き</span></span></div>
+                </div>
               </div>
               <div class="sheets-dropdown-divider"></div>
-              <div class="sheets-dropdown-item" data-action="format-align-left">
-                <span class="item-left"><span class="item-icon">⬅️</span><span>左揃え</span></span>
+              <div class="sheets-dropdown-item has-submenu" data-submenu="format-fontsize">
+                <span class="item-left"><span class="item-icon">TT</span><span>フォントサイズ</span></span>
+                <span class="sheets-submenu-arrow">▶</span>
+                <div class="sheets-submenu" style="min-width: 120px;">
+                  <div class="sheets-dropdown-item" data-action="fontsize-6"><span class="item-left"><span>6</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="fontsize-8"><span class="item-left"><span>8</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="fontsize-9"><span class="item-left"><span>9</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="fontsize-10"><span class="item-left"><span>10 (標準)</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="fontsize-11"><span class="item-left"><span>11</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="fontsize-12"><span class="item-left"><span>12</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="fontsize-14"><span class="item-left"><span>14</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="fontsize-18"><span class="item-left"><span>18</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="fontsize-24"><span class="item-left"><span>24</span></span></div>
+                </div>
               </div>
-              <div class="sheets-dropdown-item" data-action="format-align-center">
-                <span class="item-left"><span class="item-icon">↔️</span><span>中央揃え</span></span>
-              </div>
-              <div class="sheets-dropdown-item" data-action="format-align-right">
-                <span class="item-left"><span class="item-icon">➡️</span><span>右揃え</span></span>
+              <div class="sheets-dropdown-item has-submenu" data-submenu="format-merge">
+                <span class="item-left"><span class="item-icon">⛓️</span><span>セルを結合</span></span>
+                <span class="sheets-submenu-arrow">▶</span>
+                <div class="sheets-submenu">
+                  <div class="sheets-dropdown-item" data-action="merge-all"><span class="item-left"><span>すべて結合</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="merge-horizontal"><span class="item-left"><span>横方向に結合</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="merge-vertical"><span class="item-left"><span>縦方向に結合</span></span></div>
+                  <div class="sheets-dropdown-item" data-action="unmerge"><span class="item-left"><span>結合を解除</span></span></div>
+                </div>
               </div>
               <div class="sheets-dropdown-divider"></div>
-              <div class="sheets-dropdown-item" data-action="format-wrap">
-                <span class="item-left"><span class="item-icon">↩️</span><span>テキストの折り返し</span></span>
+              <div class="sheets-dropdown-item" data-action="format-table">
+                <span class="item-left"><span class="item-icon">▦</span><span>テーブルに変換</span></span>
+                <span class="item-shortcut">Ctrl+Alt+T</span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="format-cf">
+                <span class="item-left"><span class="item-icon">🎨</span><span>条件付き書式</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="format-alternating-colors">
+                <span class="item-left"><span class="item-icon">🫙</span><span>交互の背景色</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="format-clear">
+                <span class="item-left"><span class="item-icon">✕</span><span>書式をクリア</span></span>
+                <span class="item-shortcut">Ctrl+\</span>
               </div>
             </div>
           </div>
@@ -3875,6 +4089,83 @@
   <div class="context-item" id="ct-menu-merge-columns" style="padding: 0.5rem 1rem; font-size: 0.85rem; color: #0f172a; cursor: pointer; transition: background 0.15s; text-align: left; border-top: 1px solid #e2e8f0;">👁️ 列の表示設定...</div>
   <div class="context-item" id="ct-menu-switch-primary-merge" style="display: none; padding: 0.5rem 1rem; font-size: 0.85rem; color: #0f172a; cursor: pointer; transition: background 0.15s; text-align: left;">🔄 メイン表示を切り替え...</div>
   <div class="context-item" id="ct-menu-unmerge-columns" style="display: none; padding: 0.5rem 1rem; font-size: 0.85rem; color: #ef4444; cursor: pointer; transition: background 0.15s; text-align: left;">🔓 統合表示を解除</div>
+</div>
+
+<!-- ================= 🖱️ スプレッドシート セル右クリック コンテキストメニュー (Image 2, 3) ================= -->
+<div id="spreadsheet-cell-context-menu" class="sheets-dropdown-menu" style="display: none; position: fixed; z-index: 99999; min-width: 230px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); border-radius: 6px; border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-surface-elevated, #ffffff); padding: 4px 0;">
+  <div class="sheets-dropdown-item" data-action="edit-undo">
+    <span class="item-left"><span class="item-icon">↩️</span><span>元に戻す</span></span>
+    <span class="item-shortcut">Ctrl+Z</span>
+  </div>
+  <div class="sheets-dropdown-item" data-action="edit-redo">
+    <span class="item-left"><span class="item-icon">↪️</span><span>やり直し</span></span>
+    <span class="item-shortcut">Ctrl+Y</span>
+  </div>
+  <div class="sheets-dropdown-divider"></div>
+  <div class="sheets-dropdown-item" data-action="edit-cut">
+    <span class="item-left"><span class="item-icon">✂️</span><span>切り取り</span></span>
+    <span class="item-shortcut">Ctrl+X</span>
+  </div>
+  <div class="sheets-dropdown-item" data-action="edit-copy">
+    <span class="item-left"><span class="item-icon">📄</span><span>コピー</span></span>
+    <span class="item-shortcut">Ctrl+C</span>
+  </div>
+  <div class="sheets-dropdown-item" data-action="edit-paste">
+    <span class="item-left"><span class="item-icon">📋</span><span>貼り付け</span></span>
+    <span class="item-shortcut">Ctrl+V</span>
+  </div>
+  <!-- 特殊貼り付け サブメニュー (Image 2) -->
+  <div class="sheets-dropdown-item has-submenu" data-submenu="cell-paste-special">
+    <span class="item-left"><span class="item-icon">📋</span><span>特殊貼り付け</span></span>
+    <span class="sheets-submenu-arrow">▶</span>
+    <div class="sheets-submenu" style="min-width: 260px;">
+      <div class="sheets-dropdown-item" data-action="paste-values"><span class="item-left"><span>値のみ貼り付け</span></span><span class="item-shortcut">Ctrl+Shift+V</span></div>
+      <div class="sheets-dropdown-item" data-action="paste-format"><span class="item-left"><span>書式のみ貼り付け</span></span><span class="item-shortcut">Ctrl+Alt+V</span></div>
+      <div class="sheets-dropdown-item" data-action="paste-formula"><span class="item-left"><span>数式のみ貼り付け</span></span></div>
+      <div class="sheets-dropdown-item" data-action="paste-cf"><span class="item-left"><span>条件付き書式のみ貼り付け</span></span></div>
+      <div class="sheets-dropdown-item" data-action="paste-validation"><span class="item-left"><span>データの入力規則のみ貼り付け</span></span></div>
+      <div class="sheets-dropdown-divider"></div>
+      <div class="sheets-dropdown-item" data-action="paste-transpose"><span class="item-left"><span>転置して貼り付け</span></span></div>
+      <div class="sheets-dropdown-divider"></div>
+      <div class="sheets-dropdown-item" data-action="paste-col-width"><span class="item-left"><span>列の幅のみ貼り付け</span></span></div>
+      <div class="sheets-dropdown-item" data-action="paste-no-borders"><span class="item-left"><span>枠線を除くすべてを貼り付け</span></span></div>
+    </div>
+  </div>
+  <div class="sheets-dropdown-divider"></div>
+  <div class="sheets-dropdown-item" data-action="insert-row-above"><span class="item-left"><span class="item-icon">⬆️</span><span>上に行を挿入</span></span></div>
+  <div class="sheets-dropdown-item" data-action="insert-row-below"><span class="item-left"><span class="item-icon">⬇️</span><span>下に行を挿入</span></span></div>
+  <div class="sheets-dropdown-item" data-action="insert-col-left"><span class="item-left"><span class="item-icon">⬅️</span><span>左に列を挿入</span></span></div>
+  <div class="sheets-dropdown-item" data-action="insert-col-right"><span class="item-left"><span class="item-icon">➡️</span><span>右に列を挿入</span></span></div>
+  <div class="sheets-dropdown-divider"></div>
+  <div class="sheets-dropdown-item" data-action="delete-selected-rows"><span class="item-left"><span class="item-icon">🗑️</span><span>行を削除</span></span></div>
+  <div class="sheets-dropdown-item" data-action="delete-selected-cols"><span class="item-left"><span class="item-icon">🗑️</span><span>列を削除</span></span></div>
+  <div class="sheets-dropdown-item" data-action="edit-delete"><span class="item-left"><span class="item-icon">✕</span><span>値をクリア</span></span><span class="item-shortcut">Delete</span></div>
+  <div class="sheets-dropdown-divider"></div>
+  <!-- 123 表示形式 サブメニュー (Image 3) -->
+  <div class="sheets-dropdown-item has-submenu" data-submenu="cell-numformats">
+    <span class="item-left"><span class="item-icon" style="font-weight:bold; font-size:0.8rem;">123</span><span>数字の表示形式</span></span>
+    <span class="sheets-submenu-arrow">▶</span>
+    <div class="sheets-submenu" style="min-width: 270px;">
+      <div class="sheets-dropdown-item" data-action="numformat-auto"><span class="item-left"><span>自動</span></span></div>
+      <div class="sheets-dropdown-item" data-action="numformat-text"><span class="item-left"><span>書式なしテキスト</span></span></div>
+      <div class="sheets-dropdown-divider"></div>
+      <div class="sheets-dropdown-item" data-action="numformat-number"><span class="item-left"><span>数値</span></span><span class="item-shortcut">1,000.12</span></div>
+      <div class="sheets-dropdown-item" data-action="numformat-percent"><span class="item-left"><span>パーセント</span></span><span class="item-shortcut">10.12%</span></div>
+      <div class="sheets-dropdown-item" data-action="numformat-scientific"><span class="item-left"><span>指数</span></span><span class="item-shortcut">1.01E+03</span></div>
+      <div class="sheets-dropdown-divider"></div>
+      <div class="sheets-dropdown-item" data-action="numformat-currency"><span class="item-left"><span>通貨</span></span><span class="item-shortcut">¥1,000.12</span></div>
+      <div class="sheets-dropdown-item" data-action="numformat-currency-round"><span class="item-left"><span>通貨 (端数切り捨て)</span></span><span class="item-shortcut">¥1,000</span></div>
+      <div class="sheets-dropdown-divider"></div>
+      <div class="sheets-dropdown-item" data-action="numformat-date-slash"><span class="item-left"><span>日付</span></span><span class="item-shortcut">2008/09/26</span></div>
+      <div class="sheets-dropdown-item" data-action="numformat-time"><span class="item-left"><span>時間</span></span><span class="item-shortcut">15:59:00</span></div>
+      <div class="sheets-dropdown-item" data-action="numformat-datetime"><span class="item-left"><span>日時</span></span><span class="item-shortcut">2008/09/26 15:59:00</span></div>
+    </div>
+  </div>
+  <div class="sheets-dropdown-item" data-action="format-cf"><span class="item-left"><span class="item-icon">🎨</span><span>条件付き書式</span></span></div>
+  <div class="sheets-dropdown-item" data-action="data-validation"><span class="item-left"><span class="item-icon">🏷️</span><span>データの入力規則...</span></span></div>
+  <div class="sheets-dropdown-item" data-action="format-clear"><span class="item-left"><span class="item-icon">✕</span><span>書式をクリア</span></span><span class="item-shortcut">Ctrl+\</span></div>
+  <div class="sheets-dropdown-divider"></div>
+  <div class="sheets-dropdown-item" data-action="edit-find"><span class="item-left"><span class="item-icon">🔍</span><span>検索と置換</span></span><span class="item-shortcut">Ctrl+H</span></div>
 </div>
 
 <!-- ================= 🏷️ データの入力規則 (ドロップダウン) 設定サイドバー ================= -->

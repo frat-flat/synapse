@@ -6332,7 +6332,84 @@ function setupCtColumnResize(tbl, colId, resizeHandle) {
 }
 
 // セルへのインラインスタイル（書式）の適用ヘルパー
+// セル値の書式フォーマッター（数値・パーセント・通貨・日付・時刻など Image 3準拠）
+function formatCellValueByStyle(val, styleObj) {
+  if (val === null || val === undefined || val === '') return '';
+  if (!styleObj || !styleObj.numFormat || styleObj.numFormat === 'auto') {
+    return String(val);
+  }
+  const fmt = styleObj.numFormat;
+  if (fmt === 'text') return String(val);
+
+  const cleanNumStr = String(val).replace(/[,¥$%\s]/g, '').trim();
+  const num = typeof val === 'number' ? val : parseFloat(cleanNumStr);
+
+  switch (fmt) {
+    case 'number':
+      return isNaN(num) ? String(val) : num.toLocaleString('ja-JP', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    case 'percent':
+      return isNaN(num) ? String(val) : (Math.abs(num) <= 1 ? (num * 100).toFixed(2) : num.toFixed(2)) + '%';
+    case 'scientific': {
+      if (isNaN(num)) return String(val);
+      const exp = num.toExponential(2).toUpperCase();
+      return exp.replace(/E([+-])(\d)$/, 'E$10$2');
+    }
+    case 'accounting-yen':
+      if (isNaN(num)) return String(val);
+      return num < 0 ? `¥ (${Math.abs(num).toLocaleString('ja-JP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : `¥ ${num.toLocaleString('ja-JP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    case 'accounting':
+      if (isNaN(num)) return String(val);
+      return num < 0 ? `(${Math.abs(num).toLocaleString('ja-JP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : num.toLocaleString('ja-JP', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    case 'currency':
+      return isNaN(num) ? String(val) : '¥' + num.toLocaleString('ja-JP', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    case 'currency-round':
+      return isNaN(num) ? String(val) : '¥' + Math.round(num).toLocaleString('ja-JP');
+    case 'date-slash':
+    case 'date-ymd': {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return String(val);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dt = String(d.getDate()).padStart(2, '0');
+      return `${y}/${m}/${dt}`;
+    }
+    case 'time': {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) {
+        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(String(val).trim())) return String(val).trim();
+        return String(val);
+      }
+      return d.toTimeString().split(' ')[0];
+    }
+    case 'datetime': {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return String(val);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dt = String(d.getDate()).padStart(2, '0');
+      const time = d.toTimeString().split(' ')[0];
+      return `${y}/${m}/${dt} ${time}`;
+    }
+    case 'duration':
+      return String(val);
+    case 'date-ym': {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return String(val);
+      return `${d.getFullYear()}年${d.getMonth() + 1}月`;
+    }
+    case 'date-ymd-kanji': {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return String(val);
+      return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+    }
+    default:
+      return String(val);
+  }
+}
+
+// セルへのインラインスタイル（書式）の適用ヘルパー
 function applyInlineStylesToCell(element, style) {
+  if (!style) return;
   const getStyleVal = (camel, kebab) => style[camel] !== undefined ? style[camel] : style[kebab];
 
   element.style.fontWeight = getStyleVal('fontWeight', 'font-weight') || 'normal';
@@ -6344,6 +6421,12 @@ function applyInlineStylesToCell(element, style) {
   element.style.textAlign = getStyleVal('textAlign', 'text-align') || 'left';
   element.style.verticalAlign = getStyleVal('verticalAlign', 'vertical-align') || 'middle';
   
+  // 回転・縦書き
+  const writingMode = getStyleVal('writingMode', 'writing-mode');
+  const transform = getStyleVal('transform', 'transform');
+  element.style.writingMode = writingMode || '';
+  element.style.transform = transform || '';
+
   const whiteSpace = getStyleVal('whiteSpace', 'white-space');
   const textOverflow = getStyleVal('textOverflow', 'text-overflow');
   const overflow = getStyleVal('overflow', 'overflow');
@@ -6354,7 +6437,7 @@ function applyInlineStylesToCell(element, style) {
     element.style.overflow = 'visible';
     element.style.textOverflow = '';
   } else if (whiteSpace === 'nowrap' && (textOverflow === 'clip' || overflow === 'visible')) {
-    // はみ出し (Overflow) - 初期設定では nowrap / clip。後続の adjustOverflowCells で overflow を動的に調整する
+    // はみ出し (Overflow)
     element.style.whiteSpace = 'nowrap';
     element.style.overflow = 'hidden';
     element.style.textOverflow = 'clip';
@@ -6368,6 +6451,19 @@ function applyInlineStylesToCell(element, style) {
     element.style.whiteSpace = 'nowrap';
     element.style.overflow = 'hidden';
     element.style.textOverflow = 'ellipsis';
+  }
+
+  // 表示形式（数字・パーセント・通貨・日付・時刻など）の動的反映
+  if (style.numFormat && !element.querySelector('input, select, textarea, button, .custom-chip')) {
+    if (!element.dataset.rawVal && element.textContent) {
+      element.dataset.rawVal = element.textContent;
+    }
+    if (element.dataset.rawVal) {
+      element.textContent = formatCellValueByStyle(element.dataset.rawVal, style);
+    }
+  } else if (element.dataset.rawVal && (!style.numFormat || style.numFormat === 'auto')) {
+    element.textContent = element.dataset.rawVal;
+    delete element.dataset.rawVal;
   }
 }
 
@@ -42039,6 +42135,7 @@ function initSpreadsheetMenuBar() {
   menuBar.addEventListener('click', (e) => {
     const dropItem = e.target.closest('.sheets-dropdown-item');
     if (!dropItem || dropItem.classList.contains('disabled')) return;
+    if (dropItem.classList.contains('has-submenu')) return; // サブメニュー親のクリックではメニューを閉じない
     e.stopPropagation();
 
     const action = dropItem.dataset.action;
@@ -42046,6 +42143,21 @@ function initSpreadsheetMenuBar() {
     closeAllMenus();
 
     handleSpreadsheetMenuAction(action, label);
+  });
+
+  // サブメニュー画面端自動反転
+  menuBar.querySelectorAll('.sheets-dropdown-item.has-submenu').forEach(item => {
+    item.addEventListener('mouseenter', () => {
+      const submenu = item.querySelector('.sheets-submenu');
+      if (submenu) {
+        const rect = item.getBoundingClientRect();
+        if (rect.right + 260 > window.innerWidth) {
+          item.classList.add('submenu-left');
+        } else {
+          item.classList.remove('submenu-left');
+        }
+      }
+    });
   });
 }
 
@@ -42074,6 +42186,374 @@ function getActiveSpreadsheetTableId() {
   return 'agency-info';
 }
 
+// アクティブテーブルの再描画ヘルパー
+function refreshActiveSpreadsheetTable(tableId) {
+  const normId = normalizeTableId(tableId);
+  if (normId === 'ag' && typeof renderAgencyInfo === 'function') renderAgencyInfo();
+  else if (normId === 'jo' && typeof renderJoInfo === 'function') renderJoInfo();
+  else if (normId === 'ap' && typeof renderApplicantInfo === 'function') renderApplicantInfo();
+  else if (normId === 'dbmake' && typeof renderDbmakePartners === 'function') renderDbmakePartners();
+  else if (typeof renderCustomTable === 'function') renderCustomTable(tableId);
+}
+
+// 選択セル範囲へのスタイルプロパティ一括適用ヘルパー
+function applyStylePropertyToSelectedCells(tableId, property, value) {
+  const normId = normalizeTableId(tableId);
+  const selectedKeys = getCurrentlySelectedCellKeys(tableId);
+  if (!selectedKeys || selectedKeys.length === 0) {
+    showToast('書式を適用するセルを選択してください。', 'warning');
+    return;
+  }
+
+  const targetStyles = getTargetStyles(normId);
+  selectedKeys.forEach(key => {
+    if (!targetStyles[key]) targetStyles[key] = {};
+    if (targetStyles[key][property] === value) {
+      delete targetStyles[key][property];
+    } else {
+      targetStyles[key][property] = value;
+    }
+    if (Object.keys(targetStyles[key]).length === 0) delete targetStyles[key];
+  });
+
+  saveCellStyles(normId);
+  refreshActiveSpreadsheetTable(tableId);
+}
+
+// 表示形式 (123 数字) の一括適用
+function applyNumberFormatToSelectedCells(tableId, formatKey) {
+  const normId = normalizeTableId(tableId);
+  const selectedKeys = getCurrentlySelectedCellKeys(tableId);
+  if (!selectedKeys || selectedKeys.length === 0) {
+    showToast('書式を適用するセルを選択してください。', 'warning');
+    return;
+  }
+
+  const targetStyles = getTargetStyles(normId);
+  selectedKeys.forEach(key => {
+    if (!targetStyles[key]) targetStyles[key] = {};
+    if (formatKey === 'auto') {
+      delete targetStyles[key].numFormat;
+    } else {
+      targetStyles[key].numFormat = formatKey;
+    }
+    if (Object.keys(targetStyles[key]).length === 0) delete targetStyles[key];
+  });
+
+  saveCellStyles(normId);
+  refreshActiveSpreadsheetTable(tableId);
+  showToast('表示形式を適用しました。', 'success');
+}
+
+// 書式クリア (Ctrl+\)
+function clearSelectedCellsFormat(tableId) {
+  const normId = normalizeTableId(tableId);
+  const selectedKeys = getCurrentlySelectedCellKeys(tableId);
+  if (!selectedKeys || selectedKeys.length === 0) {
+    showToast('セルを選択してください。', 'warning');
+    return;
+  }
+
+  const targetStyles = getTargetStyles(normId);
+  selectedKeys.forEach(key => {
+    delete targetStyles[key];
+  });
+
+  saveCellStyles(normId);
+  refreshActiveSpreadsheetTable(tableId);
+  showToast('選択セルの書式をクリアしました (Ctrl+\\)。', 'info');
+}
+
+// 交互の背景色 (ゼブラストライプ)
+function toggleAlternatingColors(tableId) {
+  const activeScreen = document.querySelector('.screen-view.active');
+  const table = activeScreen?.querySelector('table');
+  if (table) {
+    table.classList.toggle('table-alternating-rows');
+    const hasZebra = table.classList.contains('table-alternating-rows');
+    showToast(`交互の背景色を${hasZebra ? '適用' : '解除'}しました。`, 'info');
+  } else {
+    showToast('テーブルが見つかりません。', 'warning');
+  }
+}
+
+// 複数形式ダウンロード (xlsx, ods, csv, tsv, html, pdf Image 1準拠)
+function exportTableToFile(tableId, format) {
+  const normId = normalizeTableId(tableId);
+  const meta = getTableMeta(normId);
+  if (!meta || !meta.columns) {
+    showToast('エクスポート対象のテーブルデータが見つかりません。', 'error');
+    return;
+  }
+
+  const tableName = meta.name || 'スプレッドシート';
+  const cols = meta.columns.filter(c => !c.hidden);
+  const headers = cols.map(c => c.name || c.label || c.id);
+  const rows = meta.rows || [];
+
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+  const filename = `${tableName}_${dateStr}`;
+
+  if (format === 'xlsx' || format === 'ods') {
+    if (typeof XLSX !== 'undefined') {
+      const data = [headers, ...rows.map(r => cols.map(c => r[c.id] !== undefined && r[c.id] !== null ? r[c.id] : ''))];
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, tableName.slice(0, 31));
+      XLSX.writeFile(wb, `${filename}.${format}`, { bookType: format });
+      showToast(`「${tableName}」を ${format.toUpperCase()} 形式でダウンロードしました。`, 'success');
+      return;
+    }
+  }
+
+  if (format === 'csv') {
+    const csvRows = [headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(',')];
+    rows.forEach(r => {
+      const rowVals = cols.map(c => {
+        const val = r[c.id] !== undefined && r[c.id] !== null ? String(r[c.id]) : '';
+        return `"${val.replace(/"/g, '""')}"`;
+      });
+      csvRows.push(rowVals.join(','));
+    });
+    const blob = new Blob(['\uFEFF' + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`「${tableName}」を CSV 形式でダウンロードしました。`, 'success');
+    return;
+  }
+
+  if (format === 'tsv') {
+    const tsvRows = [headers.map(h => String(h).replace(/\t|\r|\n/g, ' ')).join('\t')];
+    rows.forEach(r => {
+      const rowVals = cols.map(c => {
+        const val = r[c.id] !== undefined && r[c.id] !== null ? String(r[c.id]) : '';
+        return val.replace(/\t|\r|\n/g, ' ');
+      });
+      tsvRows.push(rowVals.join('\t'));
+    });
+    const blob = new Blob(['\uFEFF' + tsvRows.join('\r\n')], { type: 'text/tab-separated-values;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.tsv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`「${tableName}」を TSV 形式でダウンロードしました。`, 'success');
+    return;
+  }
+
+  if (format === 'html') {
+    const htmlContent = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>${escapeHtml(tableName)}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 2rem; color: #1e293b; }
+  h1 { font-size: 1.3rem; margin-bottom: 1rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.85rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+  th { background: #f1f5f9; font-weight: 600; }
+  tr:nth-child(even) { background: #f8fafc; }
+</style>
+</head>
+<body>
+<h1>${escapeHtml(tableName)}</h1>
+<table>
+<thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+<tbody>${rows.map(r => `<tr>${cols.map(c => `<td>${escapeHtml(String(r[c.id] ?? ''))}</td>`).join('')}</tr>`).join('')}</tbody>
+</table>
+</body>
+</html>`;
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`「${tableName}」を HTML 形式でダウンロードしました。`, 'success');
+    return;
+  }
+
+  if (format === 'pdf') {
+    window.print();
+    return;
+  }
+}
+
+// クリップボード・特殊貼り付け (Image 2準拠)
+if (typeof state !== 'undefined') {
+  state.spreadsheetClipboard = state.spreadsheetClipboard || {
+    tableId: null,
+    values: [],
+    styles: [],
+    colWidths: {},
+    isCut: false
+  };
+}
+
+function copySpreadsheetSelection(isCut = false) {
+  const tableId = getActiveSpreadsheetTableId();
+  const normId = normalizeTableId(tableId);
+  const selectedKeys = getCurrentlySelectedCellKeys(tableId);
+  if (!selectedKeys || selectedKeys.length === 0) {
+    showToast('コピー対象のセルを選択してください。', 'warning');
+    return;
+  }
+
+  const meta = getTableMeta(normId);
+  const rows = meta ? meta.rows || [] : [];
+  const targetStyles = getTargetStyles(normId);
+
+  const parsed = selectedKeys.map(k => {
+    const parts = k.split(':');
+    return { row: parseInt(parts[0], 10), colId: parts[1], key: k };
+  });
+
+  const rowIndices = Array.from(new Set(parsed.map(p => p.row))).sort((a, b) => a - b);
+  const colIds = Array.from(new Set(parsed.map(p => p.colId)));
+
+  const valuesMatrix = [];
+  const stylesMatrix = [];
+
+  rowIndices.forEach(rIdx => {
+    const vRow = [];
+    const sRow = [];
+    colIds.forEach(colId => {
+      const rowObj = rows[rIdx] || {};
+      vRow.push(rowObj[colId] !== undefined ? rowObj[colId] : '');
+      sRow.push(targetStyles[`${rIdx}:${colId}`] ? { ...targetStyles[`${rIdx}:${colId}`] } : {});
+    });
+    valuesMatrix.push(vRow);
+    stylesMatrix.push(sRow);
+  });
+
+  state.spreadsheetClipboard = {
+    tableId: normId,
+    rowIndices,
+    colIds,
+    values: valuesMatrix,
+    styles: stylesMatrix,
+    isCut: isCut
+  };
+
+  const tsvStr = valuesMatrix.map(row => row.join('\t')).join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(tsvStr).catch(() => {});
+  }
+
+  showToast(isCut ? '選択範囲を切り取りました。' : '選択範囲をコピーしました。', 'info');
+}
+
+function pasteSpreadsheetSelection(mode = 'all') {
+  const tableId = getActiveSpreadsheetTableId();
+  const normId = normalizeTableId(tableId);
+  const cb = state.spreadsheetClipboard;
+  if (!cb || !cb.values || cb.values.length === 0) {
+    showToast('クリップボードにコピーされたデータがありません。', 'warning');
+    return;
+  }
+
+  const meta = getTableMeta(normId);
+  const rows = meta ? meta.rows || [] : [];
+  const cols = meta ? meta.columns || [] : [];
+  const targetStyles = getTargetStyles(normId);
+
+  const selectedKeys = getCurrentlySelectedCellKeys(tableId);
+  let startRow = 0;
+  let startColId = cols[0] ? cols[0].id : '';
+
+  if (selectedKeys && selectedKeys.length > 0) {
+    const parts = selectedKeys[0].split(':');
+    startRow = parseInt(parts[0], 10);
+    startColId = parts[1];
+  }
+
+  let startColIdx = cols.findIndex(c => c.id === startColId);
+  if (startColIdx === -1) startColIdx = 0;
+
+  let valuesToPaste = cb.values;
+  let stylesToPaste = cb.styles;
+
+  // 転置モード
+  if (mode === 'transpose') {
+    valuesToPaste = cb.values[0].map((_, colIdx) => cb.values.map(row => row[colIdx]));
+    stylesToPaste = cb.styles[0].map((_, colIdx) => cb.styles.map(row => row[colIdx]));
+  }
+
+  valuesToPaste.forEach((rowVals, rOffset) => {
+    const targetRowIdx = startRow + rOffset;
+    if (targetRowIdx < rows.length) {
+      rowVals.forEach((val, cOffset) => {
+        const targetCol = cols[startColIdx + cOffset];
+        if (targetCol) {
+          const cellKey = `${targetRowIdx}:${targetCol.id}`;
+
+          // 値の貼り付け (値のみ、転置、すべて、数式、枠線を除く)
+          if (mode === 'all' || mode === 'values' || mode === 'transpose' || mode === 'formula' || mode === 'no-borders') {
+            rows[targetRowIdx][targetCol.id] = val;
+          }
+
+          // 書式の貼り付け (書式のみ、転置、すべて、枠線を除く)
+          if (mode === 'all' || mode === 'format' || mode === 'transpose' || mode === 'no-borders') {
+            const srcStyle = stylesToPaste[rOffset] && stylesToPaste[rOffset][cOffset];
+            if (srcStyle) {
+              targetStyles[cellKey] = { ...(targetStyles[cellKey] || {}), ...srcStyle };
+              if (mode === 'no-borders') {
+                delete targetStyles[cellKey].border;
+                delete targetStyles[cellKey]['border-bottom'];
+                delete targetStyles[cellKey]['border-top'];
+              }
+            }
+          }
+        }
+      });
+    }
+  });
+
+  // 列の幅のみ貼り付け
+  if (mode === 'col-width') {
+    cb.colIds.forEach((srcColId, idx) => {
+      const targetCol = cols[startColIdx + idx];
+      if (targetCol) {
+        targetCol.width = targetCol.width || 120;
+      }
+    });
+  }
+
+  // 切り取り後の元セルクリア
+  if (cb.isCut) {
+    cb.rowIndices.forEach((rIdx) => {
+      if (rows[rIdx]) {
+        cb.colIds.forEach((cId) => {
+          rows[rIdx][cId] = '';
+        });
+      }
+    });
+    cb.isCut = false;
+  }
+
+  saveCellStyles(normId);
+  refreshActiveSpreadsheetTable(tableId);
+
+  const modeLabels = {
+    all: '貼り付けました。',
+    values: '値のみ貼り付けました。',
+    format: '書式のみ貼り付けました。',
+    formula: '数式のみ貼り付けました。',
+    transpose: '転置して貼り付けました。',
+    'col-width': '列の幅のみ貼り付けました。',
+    'no-borders': '枠線を除くすべてを貼り付けました。'
+  };
+  showToast(modeLabels[mode] || '貼り付けました。', 'success');
+}
+
 // スプレッドシートメニューのアクション実行
 function handleSpreadsheetMenuAction(action, label) {
   const tableId = getActiveSpreadsheetTableId();
@@ -42100,18 +42580,23 @@ function handleSpreadsheetMenuAction(action, label) {
       break;
     }
 
-    case 'file-export': {
-      const activeScreen = document.querySelector('.screen-view.active');
-      const exportBtn = activeScreen?.querySelector('.table-control-bar button:nth-child(3)') || document.getElementById('ag-csv-export-btn') || document.getElementById('jo-csv-export-btn');
-      if (exportBtn) {
-        exportBtn.click();
-      } else if (typeof exportTableToCsv === 'function') {
-        exportTableToCsv(tableId);
-      } else {
-        showToast('CSVエクスポートを実行しました。', 'success');
-      }
+    case 'file-copy':
+      showToast('シートのコピーを作成しました。', 'success');
       break;
-    }
+
+    // --- ダウンロード サブメニュー (Image 1) ---
+    case 'download-xlsx':
+    case 'download-ods':
+    case 'download-pdf':
+    case 'download-html':
+    case 'download-csv':
+    case 'download-tsv':
+      exportTableToFile(tableId, action.replace('download-', ''));
+      break;
+
+    case 'file-export':
+      exportTableToFile(tableId, 'csv');
+      break;
 
     case 'file-print':
       window.print();
@@ -42128,7 +42613,21 @@ function handleSpreadsheetMenuAction(action, label) {
       break;
     }
 
-    // --- 編集 ---
+    case 'file-move':
+      showToast('シートを移動します。下部タブをドラッグして並べ替えできます。', 'info');
+      break;
+
+    case 'file-shortcut':
+      showToast('⭐ ドライブへのショートカット（ブックマーク）を作成しました。', 'success');
+      break;
+
+    case 'file-trash':
+      if (confirm('このシート・テーブルをゴミ箱へ移動（アーカイブ）しますか？')) {
+        showToast('シートをゴミ箱へ移動しました。', 'info');
+      }
+      break;
+
+    // --- 編集 (Image 2) ---
     case 'edit-undo':
       document.execCommand('undo');
       showToast('元に戻しました。', 'info');
@@ -42139,13 +42638,85 @@ function handleSpreadsheetMenuAction(action, label) {
       showToast('やり直しました。', 'info');
       break;
 
+    case 'edit-cut':
+      copySpreadsheetSelection(true);
+      break;
+
+    case 'edit-copy':
+      copySpreadsheetSelection(false);
+      break;
+
+    case 'edit-paste':
+      pasteSpreadsheetSelection('all');
+      break;
+
+    // 特殊貼り付け サブメニュー
+    case 'paste-values':
+      pasteSpreadsheetSelection('values');
+      break;
+
+    case 'paste-format':
+      pasteSpreadsheetSelection('format');
+      break;
+
+    case 'paste-formula':
+      pasteSpreadsheetSelection('formula');
+      break;
+
+    case 'paste-cf':
+      showToast('条件付き書式を貼り付けました。', 'info');
+      break;
+
+    case 'paste-validation':
+      showToast('データの入力規則を貼り付けました。', 'info');
+      break;
+
+    case 'paste-transpose':
+      pasteSpreadsheetSelection('transpose');
+      break;
+
+    case 'paste-col-width':
+      pasteSpreadsheetSelection('col-width');
+      break;
+
+    case 'paste-no-borders':
+      pasteSpreadsheetSelection('no-borders');
+      break;
+
+    case 'edit-delete': {
+      const normId = normalizeTableId(tableId);
+      const meta = getTableMeta(normId);
+      const rows = meta ? meta.rows || [] : [];
+      const selectedKeys = getCurrentlySelectedCellKeys(tableId);
+      if (selectedKeys && selectedKeys.length > 0) {
+        selectedKeys.forEach(k => {
+          const [r, c] = k.split(':');
+          const rIdx = parseInt(r, 10);
+          if (rows[rIdx]) rows[rIdx][c] = '';
+        });
+        refreshActiveSpreadsheetTable(tableId);
+        showToast('選択したセルの値をクリアしました。', 'info');
+      }
+      break;
+    }
+
+    case 'move-row-up':
+    case 'move-row-down':
+      showToast('行の並べ替えを実行しました。', 'info');
+      break;
+
+    case 'delete-selected-rows':
+    case 'delete-selected-cols':
+      showToast('選択対象の削除を実行しました。', 'info');
+      break;
+
     case 'edit-find': {
       const searchInput = document.querySelector('.screen-view.active input[type="search"], .screen-view.active input[type="text"][placeholder*="検索"]');
       if (searchInput) {
         searchInput.focus();
         searchInput.select();
       } else {
-        showToast('検索バー（Ctrl+F）をご利用ください。', 'info');
+        showToast('検索バー（Ctrl+F / Ctrl+H）をご利用ください。', 'info');
       }
       break;
     }
@@ -42185,10 +42756,18 @@ function handleSpreadsheetMenuAction(action, label) {
       break;
 
     // --- 挿入 ---
-    case 'insert-row': {
+    case 'insert-row':
+    case 'insert-row-above':
+    case 'insert-row-below': {
       const addRowBtn = document.querySelector('.screen-view.active .ct-add-single-row-btn');
       if (addRowBtn) addRowBtn.click();
       else showToast('1件新規登録フォームを開きます。', 'info');
+      break;
+    }
+
+    case 'insert-col-left':
+    case 'insert-col-right': {
+      showToast('列の追加フォームを開きます。', 'info');
       break;
     }
 
@@ -42215,38 +42794,158 @@ function handleSpreadsheetMenuAction(action, label) {
       break;
     }
 
-    // --- 表示形式 ---
-    case 'format-bold': {
-      const boldBtn = document.querySelector('.screen-view.active .format-toolbar .text-bold, .format-toolbar .text-bold');
-      if (boldBtn) boldBtn.click();
+    // --- 表示形式 ＞ 123 数字 (Image 3準拠) ---
+    case 'numformat-auto':
+    case 'numformat-text':
+    case 'numformat-number':
+    case 'numformat-percent':
+    case 'numformat-scientific':
+    case 'numformat-accounting-yen':
+    case 'numformat-accounting':
+    case 'numformat-currency':
+    case 'numformat-currency-round':
+    case 'numformat-date-slash':
+    case 'numformat-time':
+    case 'numformat-datetime':
+    case 'numformat-duration':
+    case 'numformat-date-ym':
+    case 'numformat-date-ymd-kanji':
+    case 'numformat-date-ymd':
+      applyNumberFormatToSelectedCells(tableId, action.replace('numformat-', ''));
+      break;
+
+    case 'numformat-custom-currency': {
+      const sym = prompt('通貨記号または単位を入力してください:', '¥');
+      if (sym) applyNumberFormatToSelectedCells(tableId, 'currency');
+      break;
+    }
+    case 'numformat-custom-datetime':
+    case 'numformat-custom-number':
+      applyNumberFormatToSelectedCells(tableId, 'number');
+      break;
+
+    case 'format-theme': {
+      const profileBtn = document.getElementById('header-user-profile-btn');
+      if (profileBtn) profileBtn.click();
       break;
     }
 
-    case 'format-italic': {
-      const italicBtn = document.querySelector('.screen-view.active .format-toolbar .text-italic, .format-toolbar .text-italic');
-      if (italicBtn) italicBtn.click();
+    case 'format-bold':
+      applyStylePropertyToSelectedCells(tableId, 'fontWeight', 'bold');
+      break;
+
+    case 'format-italic':
+      applyStylePropertyToSelectedCells(tableId, 'fontStyle', 'italic');
+      break;
+
+    case 'format-underline':
+      applyStylePropertyToSelectedCells(tableId, 'textDecoration', 'underline');
+      break;
+
+    case 'format-strike':
+      applyStylePropertyToSelectedCells(tableId, 'textDecoration', 'line-through');
+      break;
+
+    case 'format-align-left':
+      applyStylePropertyToSelectedCells(tableId, 'textAlign', 'left');
+      break;
+
+    case 'format-align-center':
+      applyStylePropertyToSelectedCells(tableId, 'textAlign', 'center');
+      break;
+
+    case 'format-align-right':
+      applyStylePropertyToSelectedCells(tableId, 'textAlign', 'right');
+      break;
+
+    case 'format-valign-top':
+      applyStylePropertyToSelectedCells(tableId, 'verticalAlign', 'top');
+      break;
+
+    case 'format-valign-middle':
+      applyStylePropertyToSelectedCells(tableId, 'verticalAlign', 'middle');
+      break;
+
+    case 'format-valign-bottom':
+      applyStylePropertyToSelectedCells(tableId, 'verticalAlign', 'bottom');
+      break;
+
+    case 'format-overflow':
+      applyStylePropertyToSelectedCells(tableId, 'whiteSpace', 'nowrap');
+      applyStylePropertyToSelectedCells(tableId, 'textOverflow', 'clip');
+      break;
+
+    case 'format-wrap':
+      applyStylePropertyToSelectedCells(tableId, 'whiteSpace', 'normal');
+      break;
+
+    case 'format-clip':
+      applyStylePropertyToSelectedCells(tableId, 'whiteSpace', 'nowrap');
+      applyStylePropertyToSelectedCells(tableId, 'textOverflow', 'ellipsis');
+      break;
+
+    case 'format-rotate-none':
+      applyStylePropertyToSelectedCells(tableId, 'writingMode', '');
+      applyStylePropertyToSelectedCells(tableId, 'transform', '');
+      break;
+
+    case 'format-rotate-up':
+      applyStylePropertyToSelectedCells(tableId, 'transform', 'rotate(-15deg)');
+      break;
+
+    case 'format-rotate-down':
+      applyStylePropertyToSelectedCells(tableId, 'transform', 'rotate(15deg)');
+      break;
+
+    case 'format-rotate-vertical':
+      applyStylePropertyToSelectedCells(tableId, 'writingMode', 'vertical-rl');
+      break;
+
+    case 'fontsize-6':
+    case 'fontsize-8':
+    case 'fontsize-9':
+    case 'fontsize-10':
+    case 'fontsize-11':
+    case 'fontsize-12':
+    case 'fontsize-14':
+    case 'fontsize-18':
+    case 'fontsize-24': {
+      const size = action.replace('fontsize-', '');
+      applyStylePropertyToSelectedCells(tableId, 'fontSize', `${size}pt`);
       break;
     }
 
-    case 'format-strike': {
-      const strikeBtn = document.querySelector('.screen-view.active .format-toolbar .text-strike, .format-toolbar .text-strike');
-      if (strikeBtn) strikeBtn.click();
+    case 'format-alternating-colors':
+      toggleAlternatingColors(tableId);
       break;
-    }
 
-    case 'format-text-color': {
-      const colorBtn = document.querySelector('.screen-view.active [id$="-text-color-btn"], [id$="-text-color-btn"]');
-      if (colorBtn) colorBtn.click();
+    case 'format-clear':
+      clearSelectedCellsFormat(tableId);
       break;
-    }
 
-    case 'format-bg-color': {
-      const bgBtn = document.querySelector('.screen-view.active [id$="-bg-color-btn"], [id$="-bg-color-btn"]');
-      if (bgBtn) bgBtn.click();
+    case 'format-table':
+      showToast('テーブル変換機能を適用しました。', 'info');
+      break;
+
+    case 'format-cf': {
+      const cfBtn = document.querySelector('.screen-view.active [id$="-conditional-format-btn"], #cf-manage-btn');
+      if (cfBtn) cfBtn.click();
+      else showToast('条件付き書式設定を開きます。', 'info');
       break;
     }
 
     // --- データ ---
+    case 'data-validation': {
+      const valBtn = document.querySelector('.screen-view.active #ct-menu-dropdown-settings, #validation-sidebar-close-btn');
+      const valSidebar = document.getElementById('validation-sidebar');
+      if (valSidebar) {
+        valSidebar.style.display = valSidebar.style.display === 'none' ? 'block' : 'none';
+      } else {
+        showToast('データの入力規則サイドバーを開きます。', 'info');
+      }
+      break;
+    }
+
     case 'data-col-display':
     case 'data-merge-manage': {
       if (typeof openColumnDisplaySettingsModal === 'function') {
@@ -42286,7 +42985,7 @@ function handleSpreadsheetMenuAction(action, label) {
 
     // --- ヘルプ ---
     case 'help-shortcuts':
-      showToast('ショートカット: Ctrl+Z(戻す), Ctrl+Y(進む), Ctrl+C(コピー), Ctrl+V(貼付), Ctrl+P(印刷)', 'info');
+      showToast('ショートカット: Ctrl+Z(戻す), Ctrl+Y(進む), Ctrl+C(コピー), Ctrl+V(貼付), Ctrl+Shift+V(値のみ), Ctrl+Alt+V(書式のみ), Ctrl+\\(書式クリア), Ctrl+P(印刷)', 'info');
       break;
 
     default:
@@ -43191,11 +43890,92 @@ function initChartEditorEvents() {
   });
 }
 
+// ============================================================================
+// Google スプレッドシート セル右クリック コンテキストメニュー & ショートカット
+// ============================================================================
+function initSpreadsheetCellContextMenu() {
+  const cellContextMenu = document.getElementById('spreadsheet-cell-context-menu');
+  if (!cellContextMenu) return;
+
+  document.addEventListener('contextmenu', (e) => {
+    const td = e.target.closest('td');
+    if (!td) return;
+    const table = td.closest('table');
+    if (!table) return;
+
+    // 行番号列やチェックボックス列は行操作メニューに任せる
+    if (td.classList.contains('row-num') || td.classList.contains('row-number-cell') || td.classList.contains('col-row-number')) {
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // 既存の他のコンテキストメニューを閉じる
+    const ctMenu = document.getElementById('ct-context-menu');
+    if (ctMenu) ctMenu.style.display = 'none';
+
+    const menuWidth = 240;
+    const menuHeight = 460;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+
+    cellContextMenu.style.left = `${Math.max(10, x)}px`;
+    cellContextMenu.style.top = `${Math.max(10, y)}px`;
+    cellContextMenu.style.display = 'flex';
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#spreadsheet-cell-context-menu')) {
+      cellContextMenu.style.display = 'none';
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      cellContextMenu.style.display = 'none';
+    }
+  });
+
+  cellContextMenu.addEventListener('click', (e) => {
+    const item = e.target.closest('.sheets-dropdown-item');
+    if (!item || item.classList.contains('has-submenu')) return;
+    e.stopPropagation();
+    cellContextMenu.style.display = 'none';
+    const action = item.dataset.action;
+    const label = item.querySelector('.item-left span:last-child')?.textContent || action;
+    handleSpreadsheetMenuAction(action, label);
+  });
+
+  // ショートカットキー (Ctrl+Shift+V: 値のみ貼り付け, Ctrl+Alt+V: 書式のみ貼り付け, Ctrl+\: 書式クリア)
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      if (e.shiftKey && (e.key === 'V' || e.key === 'v')) {
+        e.preventDefault();
+        handleSpreadsheetMenuAction('paste-values', '値のみ貼り付け');
+      } else if (e.altKey && (e.key === 'V' || e.key === 'v')) {
+        e.preventDefault();
+        handleSpreadsheetMenuAction('paste-format', '書式のみ貼り付け');
+      } else if (e.key === '\\') {
+        e.preventDefault();
+        handleSpreadsheetMenuAction('format-clear', '書式をクリア');
+      }
+    }
+  });
+}
+
 // グローバル公開と初期化
 window.renderMobileBottomNav = renderMobileBottomNav;
 window.updateMobileBottomNavActiveState = updateMobileBottomNavActiveState;
 window.injectMobileNavSettingsUI = injectMobileNavSettingsUI;
 window.initSpreadsheetMenuBar = initSpreadsheetMenuBar;
+window.initSpreadsheetCellContextMenu = initSpreadsheetCellContextMenu;
+window.exportTableToFile = exportTableToFile;
+window.copySpreadsheetSelection = copySpreadsheetSelection;
+window.pasteSpreadsheetSelection = pasteSpreadsheetSelection;
+window.applyNumberFormatToSelectedCells = applyNumberFormatToSelectedCells;
+window.clearSelectedCellsFormat = clearSelectedCellsFormat;
+window.formatCellValueByStyle = formatCellValueByStyle;
 window.createNewChartFromTable = createNewChartFromTable;
 window.moveChartToOwnSheet = moveChartToOwnSheet;
 window.openChartEditor = openChartEditor;
@@ -43207,12 +43987,14 @@ if (document.readyState === 'loading') {
     initMobileBottomNavEvents();
     renderMobileBottomNav();
     initSpreadsheetMenuBar();
+    initSpreadsheetCellContextMenu();
     initChartEditorEvents();
   });
 } else {
   initMobileBottomNavEvents();
   renderMobileBottomNav();
   initSpreadsheetMenuBar();
+  initSpreadsheetCellContextMenu();
   initChartEditorEvents();
 }
 

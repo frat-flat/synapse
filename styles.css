@@ -3089,6 +3089,57 @@ body.dark-mode .sheets-dropdown-item:hover {
   margin: 0.25rem 0;
 }
 
+/* 多階層フライアウト サブメニュー */
+.sheets-dropdown-item.has-submenu {
+  position: relative;
+}
+.sheets-submenu-arrow {
+  font-size: 0.65rem;
+  color: var(--text-muted, #94a3b8);
+  margin-left: auto;
+  padding-left: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+}
+.sheets-dropdown-item.has-submenu:hover > .sheets-submenu-arrow {
+  color: var(--primary, #2563eb);
+}
+.sheets-submenu {
+  display: none;
+  position: absolute;
+  top: -4px;
+  left: 100%;
+  z-index: 1300;
+  min-width: 230px;
+  background: var(--bg-surface-elevated, #ffffff);
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.18);
+  padding: 0.35rem 0;
+  flex-direction: column;
+  animation: sheetsDropdownFadeIn 0.12s ease-out;
+}
+.sheets-dropdown-item.has-submenu:hover > .sheets-submenu {
+  display: flex !important;
+}
+/* 画面右端に近い場合のサブメニュー左展開 */
+.sheets-dropdown-item.has-submenu.submenu-left > .sheets-submenu,
+.sheets-menu-item[data-menu="tools"] .sheets-submenu,
+.sheets-menu-item[data-menu="extensions"] .sheets-submenu,
+.sheets-menu-item[data-menu="help"] .sheets-submenu {
+  left: auto;
+  right: 100%;
+}
+
+/* 交互の背景色 (ゼブラストライプ) */
+.table-alternating-rows tbody tr:nth-child(even) td {
+  background-color: rgba(0, 0, 0, 0.025) !important;
+}
+[data-theme="dark"] .table-alternating-rows tbody tr:nth-child(even) td,
+body.dark-mode .table-alternating-rows tbody tr:nth-child(even) td {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
 /* ================= DBmake (パートナーDB管理) 移植用スタイル ================= */
 .modal-tabs {
   margin-bottom: 0.5rem;
