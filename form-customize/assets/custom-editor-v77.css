@@ -1834,3 +1834,39 @@ input:-webkit-autofill:active {
   color: #202124 !important;
 }
 
+/* 📝 フォーム説明文の複数行入力・改行対応 */
+#editor-form-desc {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  resize: vertical !important;
+  min-height: 48px !important;
+  line-height: 1.6 !important;
+  font-family: inherit !important;
+  font-size: 0.85rem !important;
+  padding: 8px 10px !important;
+  border-radius: 4px !important;
+  border: 1px solid var(--color-border) !important;
+  background-color: var(--color-bg-input) !important;
+  color: var(--color-text) !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast) !important;
+}
+
+#editor-form-desc:focus {
+  border-color: var(--color-primary) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--color-primary-glow) !important;
+}
+
+/* プレビュー画面・ライブプレビュー画面・概要画面での改行（\n）の改行表示保証 */
+#preview-form-desc,
+#live-preview-form-desc,
+.preview-form-header p,
+.preview-q-desc,
+.overview-section-desc,
+#preview-section-container > div:first-child {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+}
+

@@ -1628,6 +1628,12 @@
     }
   }
 
+  function autoResizeTextarea(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.max(el.scrollHeight, 48) + 'px';
+  }
+
   function setupFormTitleSync() {
     const simpleTitleInput = document.getElementById('editor-form-title');
     const simpleDescInput = document.getElementById('editor-form-desc');
@@ -1652,14 +1658,19 @@
     }
 
     if (simpleDescInput) {
+      autoResizeTextarea(simpleDescInput);
       simpleDescInput.addEventListener('input', (e) => {
+        autoResizeTextarea(simpleDescInput);
         const v = e.target.value;
         if (window.G) {
           window.G.description = v;
           if (!window.G.header) window.G.header = {};
           window.G.header.disclaimer = v; // プロ版免責事項も同期
           const proDesc = document.getElementById('editor-pro-disclaimer');
-          if (proDesc) proDesc.value = v;
+          if (proDesc) {
+            proDesc.value = v;
+            autoResizeTextarea(proDesc);
+          }
 
           saveAndSyncMindmapData();
           applyPreviewTheme();
@@ -3151,6 +3162,12 @@
           console.log('[Dashboard Hook] Template bar grid is empty, re-rendering...');
           renderTemplateBar();
         }
+
+        // 5. フォーム説明文 textarea の高さ自動追従
+        const formDescEl = document.getElementById('editor-form-desc');
+        if (formDescEl && document.activeElement !== formDescEl) {
+          autoResizeTextarea(formDescEl);
+        }
       } catch (err) {
         console.error('[Dashboard Hook Error]', err);
       }
@@ -3447,7 +3464,10 @@
       window.G.header.disclaimer = v;
       window.G.description = v; // 簡易版説明も同期
       const simpleDesc = document.getElementById('editor-form-desc');
-      if (simpleDesc) simpleDesc.value = v;
+      if (simpleDesc) {
+        simpleDesc.value = v;
+        autoResizeTextarea(simpleDesc);
+      }
     });
 
     bindChange('editor-pro-display-mode', v => window.G.displayMode = v);
