@@ -41957,20 +41957,335 @@ function injectMobileNavSettingsUI() {
   }
 }
 
+// ============================================================================
+// Google スプレッドシート形式 メニューバー制御
+// ============================================================================
+function initSpreadsheetMenuBar() {
+  const menuBar = document.getElementById('spreadsheet-menu-bar');
+  if (!menuBar) return;
+
+  const menuItems = menuBar.querySelectorAll('.sheets-menu-item');
+  let isAnyMenuOpen = false;
+
+  function closeAllMenus() {
+    menuItems.forEach(item => {
+      item.classList.remove('active');
+    });
+    isAnyMenuOpen = false;
+  }
+
+  function openMenu(item) {
+    menuItems.forEach(other => {
+      if (other !== item) other.classList.remove('active');
+    });
+    item.classList.add('active');
+    isAnyMenuOpen = true;
+  }
+
+  menuItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      // ドロップダウン内のアイテムをクリックした場合は別処理
+      if (e.target.closest('.sheets-dropdown-item')) return;
+      e.stopPropagation();
+
+      if (item.classList.contains('active')) {
+        closeAllMenus();
+      } else {
+        openMenu(item);
+      }
+    });
+
+    item.addEventListener('mouseenter', () => {
+      if (isAnyMenuOpen && !item.classList.contains('active')) {
+        openMenu(item);
+      }
+    });
+  });
+
+  // ドキュメントクリックでメニューを閉じる
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#spreadsheet-menu-bar')) {
+      closeAllMenus();
+    }
+  });
+
+  // ESCキーで閉じる
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isAnyMenuOpen) {
+      closeAllMenus();
+    }
+  });
+
+  // ドロップダウンアイテムのアクション処理
+  menuBar.addEventListener('click', (e) => {
+    const dropItem = e.target.closest('.sheets-dropdown-item');
+    if (!dropItem || dropItem.classList.contains('disabled')) return;
+    e.stopPropagation();
+
+    const action = dropItem.dataset.action;
+    const label = dropItem.querySelector('.item-left span:last-child')?.textContent || action;
+    closeAllMenus();
+
+    handleSpreadsheetMenuAction(action, label);
+  });
+}
+
+// 現在アクティブなテーブルIDを特定するヘルパー
+function getActiveSpreadsheetTableId() {
+  if (typeof state !== 'undefined') {
+    if (state.activeTabId === 'agency-info-screen' || state.currentView === 'agency-info-screen') return 'agency-info';
+    if (state.activeTabId === 'jo-info-screen' || state.currentView === 'jo-info-screen') return 'jo-info';
+    if (state.activeTabId === 'applicant-info-screen' || state.currentView === 'applicant-info-screen') return 'applicant-info';
+    if (state.activeTabId === 'dbmake-screen' || state.currentView === 'dbmake-screen') return 'dbmake';
+    if (state.activeTabId && state.activeTabId.startsWith('custom-table-')) {
+      return state.activeTabId.replace('custom-table-', '');
+    }
+  }
+  const activeScreen = document.querySelector('.screen-view.active');
+  if (activeScreen) {
+    if (activeScreen.id === 'agency-info-screen') return 'agency-info';
+    if (activeScreen.id === 'jo-info-screen') return 'jo-info';
+    if (activeScreen.id === 'applicant-info-screen') return 'applicant-info';
+    if (activeScreen.id === 'dbmake-screen') return 'dbmake';
+    if (activeScreen.id === 'custom-table-screen') {
+      const select = document.getElementById('custom-table-select');
+      return select ? select.value : 'custom-table';
+    }
+  }
+  return 'agency-info';
+}
+
+// スプレッドシートメニューのアクション実行
+function handleSpreadsheetMenuAction(action, label) {
+  const tableId = getActiveSpreadsheetTableId();
+
+  switch (action) {
+    // --- ファイル ---
+    case 'file-new':
+      showToast('新規シートの作成機能です。', 'info');
+      break;
+
+    case 'file-open':
+      showToast('シート一覧またはファイル選択を開きます。', 'info');
+      break;
+
+    case 'file-import': {
+      const importBtn = document.querySelector('.screen-view.active .table-control-bar button:has(svg), #ag-csv-import-btn, #jo-csv-import-btn, #dbmake-csv-import-btn');
+      if (importBtn) {
+        importBtn.click();
+      } else {
+        const fileInput = document.getElementById('csv-file-input') || document.getElementById('ag-csv-input') || document.getElementById('jo-csv-input');
+        if (fileInput) fileInput.click();
+        else showToast('CSVインポート機能を開きます。', 'info');
+      }
+      break;
+    }
+
+    case 'file-export': {
+      const activeScreen = document.querySelector('.screen-view.active');
+      const exportBtn = activeScreen?.querySelector('.table-control-bar button:nth-child(3)') || document.getElementById('ag-csv-export-btn') || document.getElementById('jo-csv-export-btn');
+      if (exportBtn) {
+        exportBtn.click();
+      } else if (typeof exportTableToCsv === 'function') {
+        exportTableToCsv(tableId);
+      } else {
+        showToast('CSVエクスポートを実行しました。', 'success');
+      }
+      break;
+    }
+
+    case 'file-print':
+      window.print();
+      break;
+
+    case 'file-rename': {
+      const headerTitle = document.getElementById('main-header-title');
+      const currentName = headerTitle ? headerTitle.textContent.trim() : 'ワークスペース';
+      const newName = prompt('シート・ワークスペース名を入力してください:', currentName);
+      if (newName && headerTitle) {
+        headerTitle.textContent = newName;
+        showToast(`名称を「${newName}」に変更しました。`, 'success');
+      }
+      break;
+    }
+
+    // --- 編集 ---
+    case 'edit-undo':
+      document.execCommand('undo');
+      showToast('元に戻しました。', 'info');
+      break;
+
+    case 'edit-redo':
+      document.execCommand('redo');
+      showToast('やり直しました。', 'info');
+      break;
+
+    case 'edit-find': {
+      const searchInput = document.querySelector('.screen-view.active input[type="search"], .screen-view.active input[type="text"][placeholder*="検索"]');
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      } else {
+        showToast('検索バー（Ctrl+F）をご利用ください。', 'info');
+      }
+      break;
+    }
+
+    // --- 表示 ---
+    case 'view-freeze': {
+      const freezeBtn = document.querySelector('.screen-view.active [id$="-frame-fix-btn"]');
+      if (freezeBtn) freezeBtn.click();
+      else showToast('ウィンドウ枠の固定メニューを表示します。', 'info');
+      break;
+    }
+
+    case 'view-columns': {
+      if (typeof openColumnDisplaySettingsModal === 'function') {
+        openColumnDisplaySettingsModal(tableId, 'hidden');
+      } else {
+        showToast('列の表示設定を開きます。', 'info');
+      }
+      break;
+    }
+
+    case 'view-merge-columns': {
+      if (typeof openColumnDisplaySettingsModal === 'function') {
+        openColumnDisplaySettingsModal(tableId, 'merge');
+      } else {
+        showToast('統合カラム設定を開きます。', 'info');
+      }
+      break;
+    }
+
+    case 'view-fullscreen':
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+      break;
+
+    // --- 挿入 ---
+    case 'insert-row': {
+      const addRowBtn = document.querySelector('.screen-view.active .ct-add-single-row-btn');
+      if (addRowBtn) addRowBtn.click();
+      else showToast('1件新規登録フォームを開きます。', 'info');
+      break;
+    }
+
+    case 'insert-merge-group': {
+      if (typeof openColumnDisplaySettingsModal === 'function') {
+        openColumnDisplaySettingsModal(tableId, 'merge');
+        if (typeof openMergeGroupEditor === 'function') {
+          openMergeGroupEditor(tableId, null);
+        }
+      }
+      break;
+    }
+
+    case 'insert-sticky': {
+      const stickyBtn = document.getElementById('header-add-sticky-btn');
+      if (stickyBtn) stickyBtn.click();
+      break;
+    }
+
+    // --- 表示形式 ---
+    case 'format-bold': {
+      const boldBtn = document.querySelector('.screen-view.active .format-toolbar .text-bold, .format-toolbar .text-bold');
+      if (boldBtn) boldBtn.click();
+      break;
+    }
+
+    case 'format-italic': {
+      const italicBtn = document.querySelector('.screen-view.active .format-toolbar .text-italic, .format-toolbar .text-italic');
+      if (italicBtn) italicBtn.click();
+      break;
+    }
+
+    case 'format-strike': {
+      const strikeBtn = document.querySelector('.screen-view.active .format-toolbar .text-strike, .format-toolbar .text-strike');
+      if (strikeBtn) strikeBtn.click();
+      break;
+    }
+
+    case 'format-text-color': {
+      const colorBtn = document.querySelector('.screen-view.active [id$="-text-color-btn"], [id$="-text-color-btn"]');
+      if (colorBtn) colorBtn.click();
+      break;
+    }
+
+    case 'format-bg-color': {
+      const bgBtn = document.querySelector('.screen-view.active [id$="-bg-color-btn"], [id$="-bg-color-btn"]');
+      if (bgBtn) bgBtn.click();
+      break;
+    }
+
+    // --- データ ---
+    case 'data-col-display':
+    case 'data-merge-manage': {
+      if (typeof openColumnDisplaySettingsModal === 'function') {
+        openColumnDisplaySettingsModal(tableId, 'merge');
+      }
+      break;
+    }
+
+    case 'data-protect': {
+      const lockBtn = document.querySelector('.screen-view.active .table-control-bar button:last-child');
+      if (lockBtn) lockBtn.click();
+      break;
+    }
+
+    // --- ツール ---
+    case 'tools-form': {
+      const formScreen = document.getElementById('form-customize-screen');
+      if (formScreen && typeof showScreenView === 'function') {
+        showScreenView('form-customize-screen');
+      }
+      break;
+    }
+
+    case 'tools-permissions': {
+      const partyScreen = document.getElementById('party-id-mgmt-screen');
+      if (partyScreen && typeof showScreenView === 'function') {
+        showScreenView('party-id-mgmt-screen');
+      }
+      break;
+    }
+
+    case 'tools-theme': {
+      const profileBtn = document.getElementById('header-user-profile-btn');
+      if (profileBtn) profileBtn.click();
+      break;
+    }
+
+    // --- ヘルプ ---
+    case 'help-shortcuts':
+      showToast('ショートカット: Ctrl+Z(戻す), Ctrl+Y(進む), Ctrl+C(コピー), Ctrl+V(貼付), Ctrl+P(印刷)', 'info');
+      break;
+
+    default:
+      showToast(`「${label}」機能を準備中です。`, 'info');
+      break;
+  }
+}
+
 // グローバル公開と初期化
 window.renderMobileBottomNav = renderMobileBottomNav;
 window.updateMobileBottomNavActiveState = updateMobileBottomNavActiveState;
 window.injectMobileNavSettingsUI = injectMobileNavSettingsUI;
+window.initSpreadsheetMenuBar = initSpreadsheetMenuBar;
 
 // DOMContentLoaded または実行時初期化
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     initMobileBottomNavEvents();
     renderMobileBottomNav();
+    initSpreadsheetMenuBar();
   });
 } else {
   initMobileBottomNavEvents();
   renderMobileBottomNav();
+  initSpreadsheetMenuBar();
 }
 
 

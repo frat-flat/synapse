@@ -2922,7 +2922,7 @@ textarea {
   box-shadow: var(--shadow-sm);
 }
 
-/* メインヘッダー自体の微調整 (省スペース・コンパクト化) */
+/* メインヘッダー自体の微調整 (Google スプレッドシート形式メニューバー統合 & 省スペース化) */
 .main-header {
   padding: 0.2rem 0.65rem !important;
   background: var(--bg-surface);
@@ -2930,6 +2930,163 @@ textarea {
   border-radius: var(--radius-sm);
   margin-bottom: 0.25rem !important;
   min-height: 32px;
+  position: relative;
+  z-index: 100;
+  overflow: visible !important;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.main-header-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+}
+
+/* ================= Google Sheets スタイル メニューバー ================= */
+.spreadsheet-menu-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  user-select: none;
+  width: 100%;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  padding-top: 0.15rem;
+}
+[data-theme="dark"] .spreadsheet-menu-bar,
+body.dark-mode .spreadsheet-menu-bar {
+  border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+.sheets-menu-item {
+  position: relative;
+  padding: 0.18rem 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.12s ease, color 0.12s ease;
+  line-height: 1.25;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sheets-menu-item:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+[data-theme="dark"] .sheets-menu-item:hover,
+body.dark-mode .sheets-menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.sheets-menu-item.active {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: var(--primary);
+  font-weight: 600;
+}
+[data-theme="dark"] .sheets-menu-item.active,
+body.dark-mode .sheets-menu-item.active {
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+/* メニュードロップダウン */
+.sheets-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 1200;
+  min-width: 230px;
+  background: var(--bg-surface-elevated, #ffffff);
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  padding: 0.35rem 0;
+  display: none;
+  flex-direction: column;
+  color: var(--text-primary);
+  animation: sheetsDropdownFadeIn 0.12s ease-out;
+}
+
+@keyframes sheetsDropdownFadeIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.sheets-menu-item.active > .sheets-dropdown-menu {
+  display: flex !important;
+}
+
+.sheets-menu-item[data-menu="tools"] > .sheets-dropdown-menu,
+.sheets-menu-item[data-menu="extensions"] > .sheets-dropdown-menu,
+.sheets-menu-item[data-menu="help"] > .sheets-dropdown-menu {
+  left: auto;
+  right: 0;
+}
+
+.sheets-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.1s ease, color 0.1s ease;
+  gap: 1.2rem;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.sheets-dropdown-item:hover {
+  background-color: var(--primary-light, rgba(37, 99, 235, 0.08));
+  color: var(--primary, #2563eb);
+}
+[data-theme="dark"] .sheets-dropdown-item:hover,
+body.dark-mode .sheets-dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.sheets-dropdown-item .item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sheets-dropdown-item .item-icon {
+  font-size: 0.85rem;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.sheets-dropdown-item .item-shortcut {
+  font-size: 0.7rem;
+  color: var(--text-muted, #94a3b8);
+  font-family: monospace;
+  margin-left: auto;
+}
+
+.sheets-dropdown-item.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.sheets-dropdown-divider {
+  height: 1px;
+  background-color: var(--border-color, #e2e8f0);
+  margin: 0.25rem 0;
 }
 
 /* ================= DBmake (パートナーDB管理) 移植用スタイル ================= */

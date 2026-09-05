@@ -213,33 +213,309 @@
 <!-- 右側メインコンテンツ領域 -->
 <div class="main-content">
 <!-- トップバー（ログイン後に表示） -->
-<div id="main-header" class="main-header" style="display: none; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
-        <!-- 左側グループ: ワークスペースタイトル & ズーム & 表示モード -->
-        <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
-          <div class="header-title-section" style="font-weight: 700; font-size: 0.88rem; color: var(--text-primary);">
-            ワークスペース
+<div id="main-header" class="main-header" style="display: none;">
+        <!-- 上段: ワークスペースタイトル & ステータス & 右側アカウントボタン群 -->
+        <div class="main-header-top-row">
+          <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+            <div class="header-title-section" id="main-header-title" style="font-weight: 700; font-size: 0.88rem; color: var(--text-primary);">
+              ワークスペース
+            </div>
+            <!-- ☁️ 同期ステータスインジケータ -->
+            <div id="sync-status-indicator" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; font-weight: 600; padding: 0.1rem 0.4rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-secondary); transition: all 0.2s; user-select: none;">
+              <span id="sync-status-icon">🟢</span>
+              <span id="sync-status-text">同期済み</span>
+            </div>
           </div>
-          <!-- ☁️ 同期ステータスインジケータ -->
-          <div id="sync-status-indicator" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; font-weight: 600; padding: 0.1rem 0.4rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-secondary); transition: all 0.2s; user-select: none;">
-            <span id="sync-status-icon">🟢</span>
-            <span id="sync-status-text">同期済み</span>
+
+          <!-- 一番右端グループ: 👤 アカウントプロファイルボタン ＆ 付箋 ＆ ⚙ 設定 -->
+          <div style="display: flex; align-items: center; gap: 0.45rem; margin-left: auto;">
+            <button id="header-add-sticky-btn" class="btn btn-secondary" style="padding: 0.2rem 0.55rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem;">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="#eab308" style="display: block; width: 12px; height: 12px; flex-shrink: 0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h9l6-6V5c0-1.1-.9-2-2-2zm-5 16V15h5l-5 5z"/></svg>
+              付箋を追加
+            </button>
+            <!-- 👤 アカウントプロファイルボタン (クリックでGoogle風カード表示) -->
+            <div id="header-user-profile-btn" class="topbar-user-profile" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.15rem 0.5rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.78rem; font-weight: 600; color: var(--text-primary); cursor: pointer; user-select: none; transition: all 0.2s;" title="アカウント情報を表示">
+              <div class="user-avatar" id="logged-in-user-avatar" style="width: 18px; height: 18px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold;">👤</div>
+              <span class="user-name" id="logged-in-user-name">営業担当A</span>
+            </div>
+
+            <!-- ⚙ テーマ・色味設定ボタン (アカウント内へ移動したため非表示) -->
+            <button id="sidebar-settings-btn" class="btn-icon" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.85rem; cursor: pointer; color: var(--text-secondary); padding: 0.15rem 0.4rem; transition: all 0.2s; display: none; align-items: center;" title="テーマ・色味設定">⚙</button>
           </div>
         </div>
 
-        <!-- 一番右端グループ: 👤 アカウントプロファイルボタン ＆ ⚙ 設定 -->
-        <div style="display: flex; align-items: center; gap: 0.45rem; margin-left: auto;">
-          <button id="header-add-sticky-btn" class="btn btn-secondary" style="padding: 0.2rem 0.55rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.25rem;">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="#eab308" style="display: block; width: 12px; height: 12px; flex-shrink: 0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h9l6-6V5c0-1.1-.9-2-2-2zm-5 16V15h5l-5 5z"/></svg>
-            付箋を追加
-          </button>
-          <!-- 👤 アカウントプロファイルボタン (クリックでGoogle風カード表示) -->
-          <div id="header-user-profile-btn" class="topbar-user-profile" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.15rem 0.5rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.78rem; font-weight: 600; color: var(--text-primary); cursor: pointer; user-select: none; transition: all 0.2s;" title="アカウント情報を表示">
-            <div class="user-avatar" id="logged-in-user-avatar" style="width: 18px; height: 18px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold;">👤</div>
-            <span class="user-name" id="logged-in-user-name">営業担当A</span>
+        <!-- 下段: Google スプレッドシート形式メニューバー -->
+        <div id="spreadsheet-menu-bar" class="spreadsheet-menu-bar">
+          <!-- ① ファイル -->
+          <div class="sheets-menu-item" data-menu="file" tabindex="0">
+            <span>ファイル</span>
+            <div class="sheets-dropdown-menu" id="dropdown-file">
+              <div class="sheets-dropdown-item" data-action="file-new">
+                <span class="item-left"><span class="item-icon">📄</span><span>新規作成</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="file-open">
+                <span class="item-left"><span class="item-icon">📂</span><span>開く...</span></span>
+                <span class="item-shortcut">Ctrl+O</span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="file-import">
+                <span class="item-left"><span class="item-icon">📥</span><span>インポート (CSV)...</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="file-copy">
+                <span class="item-left"><span class="item-icon">📋</span><span>コピーを作成</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="file-export">
+                <span class="item-left"><span class="item-icon">📤</span><span>ダウンロード (CSV)</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="file-rename">
+                <span class="item-left"><span class="item-icon">🏷️</span><span>名前を変更</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="file-history">
+                <span class="item-left"><span class="item-icon">🕒</span><span>変更履歴</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="file-print">
+                <span class="item-left"><span class="item-icon">🖨️</span><span>印刷</span></span>
+                <span class="item-shortcut">Ctrl+P</span>
+              </div>
+            </div>
           </div>
 
-          <!-- ⚙ テーマ・色味設定ボタン (アカウント内へ移動したため非表示) -->
-          <button id="sidebar-settings-btn" class="btn-icon" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.85rem; cursor: pointer; color: var(--text-secondary); padding: 0.15rem 0.4rem; transition: all 0.2s; display: none; align-items: center;" title="テーマ・色味設定">⚙</button>
+          <!-- ② 編集 -->
+          <div class="sheets-menu-item" data-menu="edit" tabindex="0">
+            <span>編集</span>
+            <div class="sheets-dropdown-menu" id="dropdown-edit">
+              <div class="sheets-dropdown-item" data-action="edit-undo">
+                <span class="item-left"><span class="item-icon">↩️</span><span>元に戻す</span></span>
+                <span class="item-shortcut">Ctrl+Z</span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="edit-redo">
+                <span class="item-left"><span class="item-icon">↪️</span><span>やり直し</span></span>
+                <span class="item-shortcut">Ctrl+Y</span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="edit-cut">
+                <span class="item-left"><span class="item-icon">✂️</span><span>切り取り</span></span>
+                <span class="item-shortcut">Ctrl+X</span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="edit-copy">
+                <span class="item-left"><span class="item-icon">📄</span><span>コピー</span></span>
+                <span class="item-shortcut">Ctrl+C</span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="edit-paste">
+                <span class="item-left"><span class="item-icon">📋</span><span>貼り付け</span></span>
+                <span class="item-shortcut">Ctrl+V</span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="edit-delete">
+                <span class="item-left"><span class="item-icon">🗑️</span><span>削除 (値のクリア)</span></span>
+                <span class="item-shortcut">Delete</span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="edit-find">
+                <span class="item-left"><span class="item-icon">🔍</span><span>検索と置換...</span></span>
+                <span class="item-shortcut">Ctrl+F</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ③ 表示 -->
+          <div class="sheets-menu-item" data-menu="view" tabindex="0">
+            <span>表示</span>
+            <div class="sheets-dropdown-menu" id="dropdown-view">
+              <div class="sheets-dropdown-item" data-action="view-freeze">
+                <span class="item-left"><span class="item-icon">📌</span><span>枠の固定...</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="view-columns">
+                <span class="item-left"><span class="item-icon">⚙️</span><span>表示項目の選択 (列設定)...</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="view-merge-columns">
+                <span class="item-left"><span class="item-icon">🔀</span><span>統合カラム設定...</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="view-gridlines">
+                <span class="item-left"><span class="item-icon">🔲</span><span>グリッド線 (表示/非表示)</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="view-zoom">
+                <span class="item-left"><span class="item-icon">📏</span><span>表示倍率 (ズーム)...</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="view-fullscreen">
+                <span class="item-left"><span class="item-icon">⛶</span><span>全画面表示</span></span>
+                <span class="item-shortcut">F11</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ④ 挿入 -->
+          <div class="sheets-menu-item" data-menu="insert" tabindex="0">
+            <span>挿入</span>
+            <div class="sheets-dropdown-menu" id="dropdown-insert">
+              <div class="sheets-dropdown-item" data-action="insert-row">
+                <span class="item-left"><span class="item-icon">➕</span><span>1件新規登録 (行を追加)</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="insert-row-above">
+                <span class="item-left"><span class="item-icon">⬆️</span><span>上に行を挿入</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="insert-row-below">
+                <span class="item-left"><span class="item-icon">⬇️</span><span>下に行を挿入</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="insert-col-left">
+                <span class="item-left"><span class="item-icon">⬅️</span><span>左に列を挿入</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="insert-col-right">
+                <span class="item-left"><span class="item-icon">➡️</span><span>右に列を挿入</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="insert-merge-group">
+                <span class="item-left"><span class="item-icon">🔀</span><span>新規統合カラムを作成...</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="insert-sticky">
+                <span class="item-left"><span class="item-icon">📝</span><span>付箋・メモを追加</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="insert-chip">
+                <span class="item-left"><span class="item-icon">🏷️</span><span>ドロップダウン (チップ設定)...</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="insert-checkbox">
+                <span class="item-left"><span class="item-icon">☑️</span><span>チェックボックス</span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ⑤ 表示形式 -->
+          <div class="sheets-menu-item" data-menu="format" tabindex="0">
+            <span>表示形式</span>
+            <div class="sheets-dropdown-menu" id="dropdown-format">
+              <div class="sheets-dropdown-item" data-action="format-bold">
+                <span class="item-left"><span class="item-icon" style="font-weight: bold;">B</span><span>太字</span></span>
+                <span class="item-shortcut">Ctrl+B</span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="format-italic">
+                <span class="item-left"><span class="item-icon" style="font-style: italic;">/</span><span>斜体</span></span>
+                <span class="item-shortcut">Ctrl+I</span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="format-strike">
+                <span class="item-left"><span class="item-icon" style="text-decoration: line-through;">S</span><span>取り消し線</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="format-fontsize">
+                <span class="item-left"><span class="item-icon">🔤</span><span>フォントサイズ変更...</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="format-text-color">
+                <span class="item-left"><span class="item-icon">🎨</span><span>テキストの色...</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="format-bg-color">
+                <span class="item-left"><span class="item-icon">🪣</span><span>塗りつぶしの色 (セル背景)...</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="format-align-left">
+                <span class="item-left"><span class="item-icon">⬅️</span><span>左揃え</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="format-align-center">
+                <span class="item-left"><span class="item-icon">↔️</span><span>中央揃え</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="format-align-right">
+                <span class="item-left"><span class="item-icon">➡️</span><span>右揃え</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="format-wrap">
+                <span class="item-left"><span class="item-icon">↩️</span><span>テキストの折り返し</span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ⑥ データ -->
+          <div class="sheets-menu-item" data-menu="data" tabindex="0">
+            <span>データ</span>
+            <div class="sheets-dropdown-menu" id="dropdown-data">
+              <div class="sheets-dropdown-item" data-action="data-sort-asc">
+                <span class="item-left"><span class="item-icon">🔼</span><span>シートを並べ替え (昇順 A→Z)</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="data-sort-desc">
+                <span class="item-left"><span class="item-icon">🔽</span><span>シートを並べ替え (降順 Z→A)</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="data-filter">
+                <span class="item-left"><span class="item-icon">⚡</span><span>フィルターを作成</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="data-col-display">
+                <span class="item-left"><span class="item-icon">👁️</span><span>列の表示設定 (非表示・統合)...</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="data-merge-manage">
+                <span class="item-left"><span class="item-icon">🔀</span><span>統合カラムの管理...</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="data-validation">
+                <span class="item-left"><span class="item-icon">🏷️</span><span>データの入力規則 (チップ)...</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="data-protect">
+                <span class="item-left"><span class="item-icon">🔒</span><span>シートを保護 (編集ロックの切替)</span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ⑦ ツール -->
+          <div class="sheets-menu-item" data-menu="tools" tabindex="0">
+            <span>ツール</span>
+            <div class="sheets-dropdown-menu" id="dropdown-tools">
+              <div class="sheets-dropdown-item" data-action="tools-form">
+                <span class="item-left"><span class="item-icon">📝</span><span>フォーム作成画面を開く</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="tools-permissions">
+                <span class="item-left"><span class="item-icon">👥</span><span>ユーザー権限・アクセス管理</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="tools-notifications">
+                <span class="item-left"><span class="item-icon">🔔</span><span>通知ルール設定</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="tools-theme">
+                <span class="item-left"><span class="item-icon">⚙️</span><span>テーマ・カラー設定...</span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ⑧ 拡張機能 -->
+          <div class="sheets-menu-item" data-menu="extensions" tabindex="0">
+            <span>拡張機能</span>
+            <div class="sheets-dropdown-menu" id="dropdown-extensions">
+              <div class="sheets-dropdown-item" data-action="ext-addons">
+                <span class="item-left"><span class="item-icon">🧩</span><span>アドオンの管理</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="ext-scripts">
+                <span class="item-left"><span class="item-icon">📜</span><span>Apps Script / カスタム自動化</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="ext-webhook">
+                <span class="item-left"><span class="item-icon">🔗</span><span>外部API連携 / Webhook</span></span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="ext-sync">
+                <span class="item-left"><span class="item-icon">🔄</span><span>Google スプレッドシート連携</span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ⑨ ヘルプ -->
+          <div class="sheets-menu-item" data-menu="help" tabindex="0">
+            <span>ヘルプ</span>
+            <div class="sheets-dropdown-menu" id="dropdown-help">
+              <div class="sheets-dropdown-item" data-action="help-docs">
+                <span class="item-left"><span class="item-icon">❓</span><span>操作ヘルプ・ガイド</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="help-shortcuts">
+                <span class="item-left"><span class="item-icon">⌨️</span><span>キーボード ショートカット</span></span>
+                <span class="item-shortcut">Ctrl+/</span>
+              </div>
+              <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="help-updates">
+                <span class="item-left"><span class="item-icon">📢</span><span>最新アップデート情報</span></span>
+              </div>
+              <div class="sheets-dropdown-item" data-action="help-feedback">
+                <span class="item-left"><span class="item-icon">🐛</span><span>フィードバック・不具合報告</span></span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
