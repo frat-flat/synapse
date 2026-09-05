@@ -2922,9 +2922,9 @@ textarea {
   box-shadow: var(--shadow-sm);
 }
 
-/* メインヘッダー自体の微調整 (Google スプレッドシート形式メニューバー統合 & 省スペース化) */
+/* メインヘッダー自体の微調整 (省スペース・クリーン化) */
 .main-header {
-  padding: 0.2rem 0.65rem !important;
+  padding: 0.35rem 0.65rem !important;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
@@ -2934,8 +2934,7 @@ textarea {
   z-index: 100;
   overflow: visible !important;
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  align-items: center;
 }
 
 .main-header-top-row {
@@ -2946,22 +2945,26 @@ textarea {
   gap: 0.5rem;
 }
 
-/* ================= Google Sheets スタイル メニューバー ================= */
+/* ================= Google Sheets スタイル メニューバー (テーブル画面専用) ================= */
 .spreadsheet-menu-bar {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 0.15rem;
-  padding: 0;
-  margin: 0;
+  padding: 0.15rem 0.45rem;
+  margin-bottom: 0.25rem;
+  background: var(--bg-surface-elevated, #ffffff);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
   overflow: visible;
   user-select: none;
   width: 100%;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-  padding-top: 0.15rem;
+  box-sizing: border-box;
+  box-shadow: var(--shadow-sm);
 }
 [data-theme="dark"] .spreadsheet-menu-bar,
 body.dark-mode .spreadsheet-menu-bar {
-  border-top-color: rgba(255, 255, 255, 0.06);
+  background: var(--bg-surface-elevated, #1e293b);
+  border-color: var(--border-color, #334155);
 }
 
 .sheets-menu-item {
@@ -3002,7 +3005,7 @@ body.dark-mode .sheets-menu-item.active {
   position: absolute;
   top: calc(100% + 2px);
   left: 0;
-  z-index: 1200;
+  z-index: 2500;
   min-width: 230px;
   background: var(--bg-surface-elevated, #ffffff);
   border: 1px solid var(--border-color, #cbd5e1);

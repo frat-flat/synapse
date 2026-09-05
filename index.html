@@ -245,9 +245,10 @@
             <button id="sidebar-settings-btn" class="btn-icon" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.85rem; cursor: pointer; color: var(--text-secondary); padding: 0.15rem 0.4rem; transition: all 0.2s; display: none; align-items: center;" title="テーマ・色味設定">⚙</button>
           </div>
         </div>
+      </div>
 
-        <!-- 下段: Google スプレッドシート形式メニューバー -->
-        <div id="spreadsheet-menu-bar" class="spreadsheet-menu-bar">
+      <!-- Google スプレッドシート形式メニューバー (テーブル画面表示時のみ対象テーブル上部に動的配置) -->
+      <div id="spreadsheet-menu-bar" class="spreadsheet-menu-bar" style="display: none;">
           <!-- ① ファイル -->
           <div class="sheets-menu-item" data-menu="file" tabindex="0">
             <span>ファイル</span>
@@ -735,7 +736,6 @@
             </div>
           </div>
         </div>
-      </div>
 
       <!-- 画面右上: Googleスタイル ユーザーアカウントカードポップアップ -->
       <div id="user-profile-popover" class="user-profile-popover" style="display: none;">

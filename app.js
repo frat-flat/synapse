@@ -11953,6 +11953,11 @@ async function switchView(viewId) {
     updateMobileBottomNavActiveState(viewId);
   }
 
+  // スプレッドシートメニューバーの表示・配置同期（テーブル画面のみ）
+  if (typeof syncSpreadsheetMenuBar === 'function') {
+    syncSpreadsheetMenuBar(viewId);
+  }
+
   // サイドメニューのハイライト状態の更新
   const sidebarNavItems = document.querySelectorAll('.sidebar-nav .nav-item');
   sidebarNavItems.forEach(item => {
@@ -12028,6 +12033,7 @@ function showLoginScreen(show) {
     if (sidebar) sidebar.style.display = 'none';
     if (toggleBtn) toggleBtn.style.display = 'none';
     if (mainHeader) mainHeader.style.display = 'none';
+    if (typeof syncSpreadsheetMenuBar === 'function') syncSpreadsheetMenuBar(null);
 
     // 📱 スマホボトムバーを未ログイン時・ログイン画面では完全に非表示
     if (mobileNav) {
@@ -12121,6 +12127,10 @@ function showLoginScreen(show) {
       }
       state.currentView = 'home-screen';
     }
+
+    if (typeof syncSpreadsheetMenuBar === 'function') {
+      syncSpreadsheetMenuBar(state.currentView || 'home-screen');
+    }
   }
 }
 
@@ -12162,6 +12172,9 @@ function openHomePage() {
   
   state.activeTabId = null;
   state.currentView = 'home-screen';
+  if (typeof syncSpreadsheetMenuBar === 'function') {
+    syncSpreadsheetMenuBar('home-screen');
+  }
   renderTabBar();
 }
 
@@ -12197,6 +12210,9 @@ function openMyPage() {
   }
   
   state.currentView = 'mypage-screen';
+  if (typeof syncSpreadsheetMenuBar === 'function') {
+    syncSpreadsheetMenuBar('mypage-screen');
+  }
   renderTabBar();
   state.memoUnlockedSecure = false;
   if (typeof window.updateMypageMemoUI === 'function') window.updateMypageMemoUI();
@@ -13032,6 +13048,9 @@ function activateTab(id) {
   });
 
   state.currentView = tab.type;
+  if (typeof syncSpreadsheetMenuBar === 'function') {
+    syncSpreadsheetMenuBar(tab.type);
+  }
   renderTabBar();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -13086,6 +13105,9 @@ function closeTab(id, event) {
     }
     
     state.currentView = 'home-screen';
+    if (typeof syncSpreadsheetMenuBar === 'function') {
+      syncSpreadsheetMenuBar('home-screen');
+    }
   } else if (nextActiveTabId) {
     activateTab(nextActiveTabId);
   } else {
@@ -42073,8 +42095,66 @@ function injectMobileNavSettingsUI() {
 }
 
 // ============================================================================
-// Google スプレッドシート形式 メニューバー制御
+// Google スプレッドシート形式 テーブル専用メニューバー制御
 // ============================================================================
+
+// テーブル画面かどうか判定するヘルパー (テーブル画面のみにスプレッドシートメニューを提供)
+function isTableScreen(screenId) {
+  if (!screenId) return false;
+  return (
+    screenId === 'agency-info-screen' ||
+    screenId === 'jo-info-screen' ||
+    screenId === 'applicant-info-screen' ||
+    screenId === 'dbmake-screen' ||
+    screenId === 'custom-table-screen' ||
+    screenId.startsWith('custom-table-')
+  );
+}
+
+// スプレッドシートメニューバーの表示・配置同期（テーブル画面上部のみに動的配置）
+function syncSpreadsheetMenuBar(viewId) {
+  const menuBar = document.getElementById('spreadsheet-menu-bar');
+  if (!menuBar) return;
+
+  const currentView = viewId || (typeof state !== 'undefined' && (state.activeTabId || state.currentView));
+  if (!isTableScreen(currentView)) {
+    menuBar.style.display = 'none';
+    return;
+  }
+
+  // テーブル画面の要素を取得
+  const targetScreenId = (currentView && currentView.startsWith('custom-table-'))
+    ? 'custom-table-screen'
+    : currentView;
+  const targetScreen = document.getElementById(targetScreenId);
+  if (!targetScreen) {
+    menuBar.style.display = 'none';
+    return;
+  }
+
+  // 画面内の .format-toolbar の直前にメニューバーを配置して表示
+  const toolbar = targetScreen.querySelector('.format-toolbar');
+  if (toolbar) {
+    if (menuBar.nextElementSibling !== toolbar || menuBar.parentElement !== toolbar.parentElement) {
+      toolbar.parentNode.insertBefore(menuBar, toolbar);
+    }
+    menuBar.style.display = 'flex';
+    return;
+  }
+
+  // format-toolbar が見つからない場合は list-section または テーブルコンテナの直前に配置
+  const listSec = targetScreen.querySelector('.list-section') || targetScreen.querySelector('.spreadsheet-table-container');
+  if (listSec) {
+    if (menuBar.nextElementSibling !== listSec || menuBar.parentElement !== listSec.parentElement) {
+      listSec.parentNode.insertBefore(menuBar, listSec);
+    }
+    menuBar.style.display = 'flex';
+    return;
+  }
+
+  menuBar.style.display = 'none';
+}
+
 function initSpreadsheetMenuBar() {
   const menuBar = document.getElementById('spreadsheet-menu-bar');
   if (!menuBar) return;
@@ -42159,6 +42239,10 @@ function initSpreadsheetMenuBar() {
       }
     });
   });
+
+  // 初期化時に現在のビューに応じたメニューバー表示状態を同期
+  const initialView = typeof state !== 'undefined' ? (state.activeTabId || state.currentView) : 'home-screen';
+  syncSpreadsheetMenuBar(initialView);
 }
 
 // 現在アクティブなテーブルIDを特定するヘルパー
@@ -43968,6 +44052,8 @@ function initSpreadsheetCellContextMenu() {
 window.renderMobileBottomNav = renderMobileBottomNav;
 window.updateMobileBottomNavActiveState = updateMobileBottomNavActiveState;
 window.injectMobileNavSettingsUI = injectMobileNavSettingsUI;
+window.isTableScreen = isTableScreen;
+window.syncSpreadsheetMenuBar = syncSpreadsheetMenuBar;
 window.initSpreadsheetMenuBar = initSpreadsheetMenuBar;
 window.initSpreadsheetCellContextMenu = initSpreadsheetCellContextMenu;
 window.exportTableToFile = exportTableToFile;
