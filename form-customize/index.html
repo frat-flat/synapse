@@ -23,12 +23,12 @@
         // CSSの注入
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = './assets/custom-editor-v81.css?v=' + ts;
+        link.href = './assets/custom-editor-v82.css?v=' + ts;
         document.head.appendChild(link);
         
         // JS of injection
         const script = document.createElement('script');
-        script.src = './assets/custom-editor-v81.js?v=' + ts;
+        script.src = './assets/custom-editor-v82.js?v=' + ts;
         script.defer = true;
         document.head.appendChild(script);
         
@@ -222,7 +222,6 @@
           <aside class="editor-sidebar">
              <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                <h2>フォーム全体の構成</h2>
-               <button type="button" id="btn-sidebar-collapse" style="background: none; border: none; font-size: 0.9rem; font-weight: bold; cursor: pointer; color: #718096; padding: 2px 6px; transition: color 0.15s; margin: 0;" title="構成ナビゲーションを隠す">◀</button>
              </div>
             <!-- 全体の概要へのジャンプ -->
             <div class="sidebar-overview-btn-area">
@@ -242,11 +241,6 @@
 
            <!-- メイン編集エリア -->
            <div class="editor-main" style="position: relative;">
-             <!-- 📁 構成ナビゲーションを表示するトグルボタン (最小化時に浮き上がる) -->
-             <button type="button" id="btn-sidebar-expand" style="display: none; position: absolute; left: 10px; top: 10px; z-index: 100; background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: 4px; font-size: 0.8rem; padding: 6px 12px; font-weight: bold; cursor: pointer; color: var(--color-text); box-shadow: 0 2px 6px rgba(0,0,0,0.08); transition: all 0.15s; align-items: center; gap: 6px;" title="構成ナビゲーションを展開する">
-               <span>▶</span>
-               <span>構成ナビゲーション</span>
-             </button>
              <!-- A. 【全体概要画面】フォームに入ったら最初に見えるセクション一覧 -->
             <div id="form-overview-editor" class="overview-editor-container">
               <!-- 全体の概要画面内のサブタブ -->
@@ -764,6 +758,9 @@
               <p style="margin: 0; font-size: 0.75rem;">セクション間の遷移と、質問の回答選択肢による分岐ルートを自動描画します。右端のドットからドラッグして接続先を直感的に変更できます。</p>
             </div>
             <div class="toolbar-actions" style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
+              <button type="button" id="btn-flowmap-legend" class="btn btn-secondary btn-sm" style="height: 30px; font-size: 0.75rem; display: flex; align-items: center; gap: 6px; font-weight: 600; color: #1e293b; background: #edf2f7; border: 1px solid #cbd5e0;" title="フローマップの線や枠の意味を確認">
+                <span style="font-size: 0.9rem;">📖</span> 凡例・マップの見方
+              </button>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <label for="flowmap-form-select" style="font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted); margin: 0; white-space: nowrap;">表示するフォーム:</label>
                 <select id="flowmap-form-select" class="form-control" style="width: 220px; font-size: 0.75rem; height: 30px; padding: 2px 8px; border-radius: var(--border-radius-sm); border: 1px solid var(--color-border); background: var(--color-bg-card); color: var(--color-text); font-weight: 600; cursor: pointer; position: relative; z-index: 101;"></select>
@@ -774,6 +771,35 @@
           <div class="flowmap-viewport" style="flex: 1; min-height: 650px; height: calc(100vh - 180px); position: relative; border: 1px solid var(--color-border); border-radius: var(--border-radius-sm); overflow: hidden;">
             <iframe id="flowmap-iframe" src="flowmap-iframe.html" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;" onload="if (window.F && window.G) { window.F(window.G); }"></iframe>
             
+            <!-- 💡 フローマップ クイック凡例（常時表示・最小化可能） -->
+            <div id="flowmap-quick-legend" class="flowmap-quick-legend">
+              <div class="quick-legend-header">
+                <span class="quick-legend-title">💡 凡例（線の色・枠）</span>
+                <div class="quick-legend-actions">
+                  <button type="button" id="btn-quick-legend-detail" title="詳しい説明を見る">📖 詳細</button>
+                  <button type="button" id="btn-quick-legend-toggle" title="折りたたむ">−</button>
+                </div>
+              </div>
+              <div class="quick-legend-body">
+                <div class="legend-item">
+                  <span class="legend-line line-blue-dash"></span>
+                  <span class="legend-text"><strong>青点線</strong>: セクション間遷移（次へ）</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-line line-orange-dash"></span>
+                  <span class="legend-text"><strong>オレンジ点線</strong>: 選択肢の条件分岐</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-line line-gray-solid"></span>
+                  <span class="legend-text"><strong>グレー線</strong>: 質問の回答順序</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-box box-dashed"></span>
+                  <span class="legend-text"><strong>青破線枠</strong>: セクション（ページ区切り）</span>
+                </div>
+              </div>
+            </div>
+
             <!-- Viteの初期化エラー防止用ダミー要素（非表示） -->
             <svg id="flowmap-svg" style="display: none; width: 0; height: 0;">
               <g id="flowmap-edges"></g>
@@ -1276,6 +1302,127 @@
     </script>
 
 
+
+    <!-- 📖 フローマップ 凡例・詳細ガイドモーダル -->
+    <div id="flowmap-legend-modal" class="flowmap-modal-overlay">
+      <div class="flowmap-modal-card">
+        <div class="flowmap-modal-header">
+          <h3><span>📖</span> フローマップの見方・各色の線と枠の意味</h3>
+          <button type="button" id="btn-flowmap-legend-close" class="flowmap-modal-close" title="閉じる">&times;</button>
+        </div>
+        <div class="flowmap-modal-body">
+          <!-- 1. 線の色と種類 -->
+          <div class="guide-section">
+            <h4>1. 接続線（矢印）の色の意味</h4>
+            <div class="guide-grid">
+              <div class="guide-card-item">
+                <div class="guide-icon-box">
+                  <span class="legend-line line-blue-dash" style="width: 36px; border-top-width: 3px;"></span>
+                </div>
+                <div class="guide-text-box">
+                  <strong>🔵 青い点線（アニメーション）: セクション間遷移（次のページへ）</strong>
+                  <p>セクションの最後の質問に回答した後に、次にどのセクションへ進むか（または回答送信完了へ進むか）の通常フローを表します。</p>
+                </div>
+              </div>
+              <div class="guide-card-item">
+                <div class="guide-icon-box">
+                  <span class="legend-line line-orange-dash" style="width: 36px; border-top-width: 3px;"></span>
+                </div>
+                <div class="guide-text-box">
+                  <strong>🟠 オレンジの点線（アニメーション）: 選択肢による条件分岐ジャンプ</strong>
+                  <p>ラジオボタンやプルダウン等で特定の選択肢を選んだときに、指定したセクションへスキップ・ジャンプする個別分岐ルートを表します。</p>
+                </div>
+              </div>
+              <div class="guide-card-item">
+                <div class="guide-icon-box">
+                  <span class="legend-line line-gray-solid" style="width: 36px; border-top-width: 2px;"></span>
+                </div>
+                <div class="guide-text-box">
+                  <strong>⚪ 薄いグレーの実線: 同一セクション内の回答順序</strong>
+                  <p>同じセクションの中で、上から下へ順番に回答していく自然な質問の流れを表します。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. 枠（エリア）の意味 -->
+          <div class="guide-section">
+            <h4>2. 枠（破線エリア）の意味</h4>
+            <div class="guide-grid">
+              <div class="guide-card-item">
+                <div class="guide-icon-box">
+                  <span class="legend-box box-dashed" style="width: 36px; height: 24px;"></span>
+                </div>
+                <div class="guide-text-box">
+                  <strong>📦 青い破線の大きな外枠: セクション（ページ区切り）</strong>
+                  <p>1つの画面（ステップ）として回答者に表示される質問のグループです。枠の左上にセクション名が表示されます。この枠ごとに回答者は「次へ」を押して進みます。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. カードの種類 -->
+          <div class="guide-section">
+            <h4>3. 各カード（ノード）の種類</h4>
+            <div class="guide-grid">
+              <div class="guide-card-item">
+                <div class="guide-icon-box">
+                  <span style="font-size: 1.3rem;">📋</span>
+                </div>
+                <div class="guide-text-box">
+                  <strong><span class="guide-badge-pill" style="background: #ebf8ff; color: #3182ce; border: 1px solid #bee3f8;">青バー</span> フォーム（開始地点）</strong>
+                  <p>フォーム全体の出発点です。フォームタイトルが表示され、最初のセクションへと流れます。</p>
+                </div>
+              </div>
+              <div class="guide-card-item">
+                <div class="guide-icon-box">
+                  <span style="font-size: 1.3rem;">❓</span>
+                </div>
+                <div class="guide-text-box">
+                  <strong><span class="guide-badge-pill" style="background: #f0fff4; color: #38a169; border: 1px solid #c6f6d5;">緑バー</span> 質問カード</strong>
+                  <p>テキスト入力、チェックボックス、ラジオボタンなどの個々の質問項目です。</p>
+                </div>
+              </div>
+              <div class="guide-card-item">
+                <div class="guide-icon-box">
+                  <span style="font-size: 1.3rem;">🔹</span>
+                </div>
+                <div class="guide-text-box">
+                  <strong><span class="guide-badge-pill" style="background: #fffaf0; color: #dd6b20; border: 1px solid #feebc8;">オレンジバー</span> 選択肢カード（分岐ノード）</strong>
+                  <p>条件分岐が設定されている質問の回答選択肢です。選択肢ごとに異なるセクションへジャンプできます。</p>
+                </div>
+              </div>
+              <div class="guide-card-item">
+                <div class="guide-icon-box">
+                  <span style="font-size: 1.3rem;">🏁</span>
+                </div>
+                <div class="guide-text-box">
+                  <strong><span class="guide-badge-pill" style="background: #fff5f5; color: #e53e3e; border: 1px solid #fed7d7;">赤バー</span> 送信（回答完了ゴール）</strong>
+                  <p>すべての回答が完了し、フォームが送信されるゴール地点です。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. 接続操作 -->
+          <div class="guide-section">
+            <h4>4. 直感的なルート変更（ドラッグ＆ドロップ）</h4>
+            <div class="guide-card-item" style="background: #f0fdf4; border-color: #bbf7d0;">
+              <div class="guide-icon-box">
+                <span style="font-size: 1.3rem;">💡</span>
+              </div>
+              <div class="guide-text-box">
+                <strong style="color: #166534;">接続ドット（丸ポチ）から直感的に繋ぎ替えが可能</strong>
+                <p style="color: #14532d;">右端のドット（<span style="color: #38a169; font-weight: bold;">緑</span> または <span style="color: #dd6b20; font-weight: bold;">オレンジ</span>）をクリック＆ドラッグして、別のセクションの左端のドット（受取口）へ繋ぐだけで、移動先・分岐先をマウス操作で瞬時に変更できます。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end;">
+          <button type="button" id="btn-flowmap-legend-close-footer" class="btn btn-primary btn-sm" style="padding: 6px 18px; font-weight: 600;">閉じる</button>
+        </div>
+      </div>
+    </div>
 
     <!-- モジュールスクリプトのエントリ -->
   </body>
