@@ -9382,14 +9382,10 @@ function buildMergedTableHeaderMarkup(tableId, col, group) {
     otherLabelsText,
     allLabelsText,
     html: `
-      <div class="synapse-merged-th-box" style="display: flex; flex-direction: column; min-width: 0; flex: 1; text-align: left; line-height: 1.2; padding: 2px 0;">
-        <div style="display: flex; align-items: center; gap: 4px; min-width: 0;">
-          <span style="font-weight: 700; font-size: 0.75rem; color: #1e40af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${mainName}">${mainName}</span>
-          <span class="synapse-sheets-group-tag" style="font-size: 0.62rem; color: #2563eb; background: #dbeafe; border: 1px solid #bfdbfe; padding: 0 4px; border-radius: 3px; font-weight: 600; flex-shrink: 0; line-height: 1.3;">グループ</span>
-        </div>
-        <div style="font-size: 0.68rem; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="統合カラム内訳: ${allLabelsText}">
-          ＋ ${otherLabelsText || '統合'}
-        </div>
+      <div style="display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1; overflow: hidden; white-space: nowrap;">
+        <span class="synapse-sheets-group-tag" style="font-size: 0.65rem; color: #2563eb; background: #dbeafe; border: 1px solid #bfdbfe; padding: 1px 4px; border-radius: 3px; font-weight: 700; flex-shrink: 0; line-height: 1.2;">[統合]</span>
+        <span style="font-weight: 700; font-size: 0.75rem; color: #1e40af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${mainName}">${mainName}</span>
+        <span style="font-size: 0.72rem; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;" title="統合カラム内訳: ${allLabelsText}">(＋${otherLabelsText || '統合'})</span>
       </div>
     `,
     tooltip: `統合グループ「${mainName}」: ${allLabelsText}`
