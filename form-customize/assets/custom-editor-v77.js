@@ -6240,14 +6240,14 @@
       skipContainer.innerHTML = `
         <span style="font-size:0.8rem; font-weight:600; color:var(--color-primary);">⚡ プロ版限定: セクション内スキップ（条件分岐）</span>
         <div class="form-group-row" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <select class="form-control skip-depends-select" style="flex:2; font-size:0.8rem; height:32px;">
+          <select class="form-control skip-depends-select" style="flex:2; font-size:0.82rem; height:36px; padding:4px 10px; line-height:1.4; box-sizing:border-box;">
             ${optionsHtml}
           </select>
-          <select class="form-control skip-action-select" style="flex:1; font-size:0.8rem; height:32px;">
+          <select class="form-control skip-action-select" style="flex:1; font-size:0.82rem; height:36px; padding:4px 10px; line-height:1.4; box-sizing:border-box;">
             <option value="disable">非活性にする</option>
             <option value="hide">非表示にする</option>
           </select>
-          <input type="text" class="form-control skip-value-input" style="flex:1; font-size:0.8rem; height:32px;" placeholder="トリガー値" />
+          <input type="text" class="form-control skip-value-input" style="flex:1; font-size:0.82rem; height:36px; padding:4px 10px; line-height:1.4; box-sizing:border-box;" placeholder="トリガー値" />
         </div>
       `;
 
