@@ -3341,7 +3341,13 @@
         <span>👁️</span> 非表示カラム設定
       </button>
       <button type="button" id="col-display-tab-merge" class="col-display-tab-btn">
-        <span>🔗</span> 統合表示設定
+        <svg class="synapse-merge-line-icon" viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;">
+          <rect x="2.5" y="3" width="5" height="14" rx="1"></rect>
+          <rect x="12.5" y="3" width="5" height="14" rx="1"></rect>
+          <path d="M7.5 10h5"></path>
+          <path d="M9.5 8.5l-1.5 1.5 1.5 1.5"></path>
+          <path d="M10.5 8.5l1.5 1.5-1.5 1.5"></path>
+        </svg> 統合表示設定
       </button>
     </div>
 
@@ -3359,6 +3365,7 @@
           <div style="display: flex; gap: 0.4rem;">
             <button type="button" class="btn btn-secondary btn-sm" id="hidden-cols-select-all-btn" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;">すべて表示</button>
             <button type="button" class="btn btn-secondary btn-sm" id="hidden-cols-reset-btn" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;">リセット</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="hidden-cols-order-reset-btn" title="列の並び順を初期状態に戻します" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;">🔄 列順リセット</button>
           </div>
         </div>
 
@@ -3406,6 +3413,33 @@
             <select id="merge-primary-col-select" style="width: 100%; box-sizing: border-box; padding: 0.45rem 0.6rem; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; color: #0f172a; cursor: pointer;">
               <option value="">-- 先に統合するカラムを選択してください --</option>
             </select>
+          </div>
+
+          <!-- 縦コピー出力設定 -->
+          <div class="form-group col-display-copy-box" style="margin-bottom: 0;">
+            <label style="font-size: 0.8rem; font-weight: 700; margin-bottom: 0.35rem; display: block; color: #0f172a;">
+              📋 縦複数行選択時のコピー設定 (Ctrl+C / Cmd+C)
+            </label>
+            <p style="margin: 0 0 0.4rem 0; font-size: 0.73rem; color: #64748b; line-height: 1.4;">
+              この統合列のセルを縦に複数行選択してコピーした際に出力する情報を設定します。
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.8rem; color: #1e293b;">
+              <label style="display: flex; align-items: center; gap: 0.45rem; cursor: pointer;">
+                <input type="radio" name="merge-copy-mode" value="visible" checked />
+                <span>表示中の値のみコピー（メイン列のデータ）</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.45rem; cursor: pointer;">
+                <input type="radio" name="merge-copy-mode" value="all" />
+                <span>統合されている全項目をコピー（タブ区切り / Excel対応）</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.45rem; cursor: pointer;">
+                <input type="radio" name="merge-copy-mode" value="custom" />
+                <span>コピーする項目を指定する</span>
+              </label>
+            </div>
+            <div id="merge-copy-custom-fields-container" style="display: none; margin-top: 0.4rem; padding: 0.4rem 0.6rem; background: #ffffff; border-radius: 6px; border: 1px solid #cbd5e1; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.3rem;">
+              <!-- 選択用チェックボックス（custom選択時に表示） -->
+            </div>
           </div>
         </div>
       </div>

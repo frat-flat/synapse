@@ -6659,23 +6659,22 @@ function renderCustomTable(tableId) {
     headerWrapper.style.position = 'relative';
 
     const ctMg = getMergedGroupForCol(tbl.id, col.id);
-    const ctHeaderText = (ctMg && ctMg.primaryColumnId === col.id && ctMg.name) ? ctMg.name : col.label;
+    const isCtMergedHeader = ctMg && ctMg.primaryColumnId === col.id;
+    const ctHeaderText = (isCtMergedHeader && ctMg.name) ? ctMg.name : col.label;
+    if (isCtMergedHeader) {
+      th.classList.add('synapse-merged-header-th');
+      th.title = `統合グループ「${ctHeaderText}」 (${getMergedGroupSummaryText(tbl.id, ctMg)})`;
+    }
     const labelSpan = document.createElement('span');
     labelSpan.className = 'th-label';
     labelSpan.textContent = ctHeaderText;
     labelSpan.style.whiteSpace = 'nowrap';
     labelSpan.style.overflow = 'hidden';
     labelSpan.style.textOverflow = 'ellipsis';
+    labelSpan.style.flex = '1';
+    labelSpan.style.minWidth = '0';
     labelSpan.title = ctHeaderText;
     headerWrapper.appendChild(labelSpan);
-
-    if (ctMg && ctMg.primaryColumnId === col.id) {
-      const iconSpan = document.createElement('span');
-      iconSpan.className = 'synapse-header-merge-icon';
-      iconSpan.textContent = '🔗';
-      iconSpan.title = `統合グループ「${ctMg.name || ''}」 (${getMergedGroupSummaryText(tbl.id, ctMg)})`;
-      headerWrapper.appendChild(iconSpan);
-    }
 
     const filterBtn = document.createElement('span');
     filterBtn.className = 'filter-icon-btn';
@@ -9324,6 +9323,78 @@ function renderMasterDropdownCellMarkup(td, val, col, styleObj = {}) {
 }
 window.renderMasterDropdownCellMarkup = renderMasterDropdownCellMarkup;
 
+function getMergeLineIconSvg(size = 14, color = 'currentColor') {
+  return `<svg class="synapse-merge-line-icon" viewBox="0 0 20 20" width="${size}" height="${size}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;">
+    <rect x="2.5" y="3" width="5" height="14" rx="1"></rect>
+    <rect x="12.5" y="3" width="5" height="14" rx="1"></rect>
+    <path d="M7.5 10h5"></path>
+    <path d="M9.5 8.5l-1.5 1.5 1.5 1.5"></path>
+    <path d="M10.5 8.5l1.5 1.5-1.5 1.5"></path>
+  </svg>`;
+}
+
+function getFormattedMergedCellCopyText(td, activeScreen, columns) {
+  const groupId = td.dataset.mergedGroupId;
+  if (!groupId) return (td.innerText || td.textContent || '').replace(/[☆★]/g, '').trim();
+
+  const activeTableId = (typeof getCurrentActiveTableId === 'function' ? getCurrentActiveTableId() : null) || normalizeTableId(activeScreen);
+  const groups = typeof getMergedColumns === 'function' ? getMergedColumns(activeTableId) : [];
+  const group = groups.find(g => g.id === groupId);
+  if (!group) return (td.innerText || td.textContent || '').replace(/[☆★]/g, '').trim();
+
+  const rowData = td._rowData || {};
+  const mode = group.copyMode || 'visible';
+
+  if (mode === 'all') {
+    return group.columnIds.map(cId => {
+      const v = rowData[cId] !== undefined && rowData[cId] !== null ? String(rowData[cId]).replace(/[\r\n\t]/g, ' ') : '';
+      return v;
+    }).join('\t');
+  } else if (mode === 'custom' && Array.isArray(group.copyColumnIds) && group.copyColumnIds.length > 0) {
+    return group.copyColumnIds.map(cId => {
+      const v = rowData[cId] !== undefined && rowData[cId] !== null ? String(rowData[cId]).replace(/[\r\n\t]/g, ' ') : '';
+      return v;
+    }).join('\t');
+  } else {
+    const primaryId = group.primaryColumnId;
+    if (rowData[primaryId] !== undefined && rowData[primaryId] !== null) {
+      return String(rowData[primaryId]).replace(/[\r\n\t]/g, ' ');
+    }
+    return (td.innerText || td.textContent || '').replace(/[☆★]/g, '').trim();
+  }
+}
+
+function resetTableColumnOrderToDefault(tableId) {
+  const normId = normalizeTableId(tableId);
+  if (normId === 'jo') {
+    state.joColumns = JSON.parse(JSON.stringify(INITIAL_JO_COLUMNS));
+    localStorage.setItem(STORAGE_KEYS.JO_COLUMNS, JSON.stringify(state.joColumns));
+    state.joVisibleColumns = INITIAL_JO_COLUMNS.map(c => c.id);
+    setSettingItem(STORAGE_KEYS.JO_VISIBLE_COLUMNS, JSON.stringify(state.joVisibleColumns));
+    renderJoInfo();
+    renderHiddenColumnsTab('jo');
+    showToast('JO基本マスタの列の並び順を初期状態にリセットしました。', 'success');
+  } else if (normId === 'ap') {
+    state.apColumns = JSON.parse(JSON.stringify(INITIAL_AP_COLUMNS));
+    localStorage.setItem(STORAGE_KEYS.AP_COLUMNS, JSON.stringify(state.apColumns));
+    state.apVisibleColumns = INITIAL_AP_COLUMNS.map(c => c.id);
+    setSettingItem(STORAGE_KEYS.AP_VISIBLE_COLUMNS, JSON.stringify(state.apVisibleColumns));
+    renderApplicantInfo();
+    renderHiddenColumnsTab('ap');
+    showToast('申込者マスタの列の並び順を初期状態にリセットしました。', 'success');
+  } else if (normId === 'ag') {
+    state.agColumns = JSON.parse(JSON.stringify(INITIAL_AG_COLUMNS));
+    localStorage.setItem(STORAGE_KEYS.AG_COLUMNS, JSON.stringify(state.agColumns));
+    state.agVisibleColumns = INITIAL_AG_COLUMNS.map(c => c.id);
+    setSettingItem(STORAGE_KEYS.AG_VISIBLE_COLUMNS, JSON.stringify(state.agVisibleColumns));
+    renderAgencyInfo();
+    renderHiddenColumnsTab('ag');
+    showToast('代理店マスタの列の並び順を初期状態にリセットしました。', 'success');
+  } else {
+    showToast('このテーブルの初期順序は定義されていません。', 'info');
+  }
+}
+
 function getTableMeta(tableId) {
   if (tableId === 'jo') {
     return {
@@ -9569,15 +9640,34 @@ function applyMergedColumnsToVisibleList(tableId, visibleColIds, allCols) {
   const hiddenCols = getUserHiddenColumns(normId);
   let list = visibleColIds.filter(cId => !hiddenCols.includes(cId));
 
-  // 2. 統合グループの適用（メイン表示列以外を非表示化）
+  // 2. 統合グループの適用（グループの先頭カラム位置に統合列を固定配置し、列順序の予期せぬ変動を防ぐ）
   const groups = getMergedColumns(normId);
   if (!groups || groups.length === 0) return list;
 
+  const colsOrder = (allCols || []).map(c => typeof c === 'string' ? c : c.id);
+  const groupMap = new Map();
   const hideCols = new Set();
+  const firstColOfGroup = new Map();
+
   groups.forEach(g => {
-    if (g.columnIds && g.primaryColumnId) {
+    if (g.columnIds && g.primaryColumnId && g.columnIds.length >= 2) {
+      let earliestIdx = Infinity;
+      let earliestColId = g.columnIds[0];
+
       g.columnIds.forEach(cId => {
-        if (cId !== g.primaryColumnId) {
+        const idx = colsOrder.indexOf(cId);
+        if (idx !== -1 && idx < earliestIdx) {
+          earliestIdx = idx;
+          earliestColId = cId;
+        }
+      });
+
+      firstColOfGroup.set(g.id, earliestColId);
+
+      g.columnIds.forEach(cId => {
+        groupMap.set(cId, g);
+        // 先頭カラム以外のグループ所属カラムは非表示（隠す）
+        if (cId !== earliestColId) {
           hideCols.add(cId);
         }
       });
@@ -9586,16 +9676,15 @@ function applyMergedColumnsToVisibleList(tableId, visibleColIds, allCols) {
 
   const result = [];
   list.forEach(cId => {
-    if (!hideCols.has(cId)) {
-      result.push(cId);
+    if (hideCols.has(cId)) {
+      return;
     }
-  });
-
-  // プライマリ列が元々含まれていなくてもグループのいずれかが表示対象なら追加
-  groups.forEach(g => {
-    const anyVisible = g.columnIds.some(cId => list.includes(cId));
-    if (anyVisible && !result.includes(g.primaryColumnId)) {
+    const g = groupMap.get(cId);
+    if (g && firstColOfGroup.get(g.id) === cId) {
+      // 先頭カラム位置に、グループで指定されたプライマリ列（メイン表示項目）を配置
       result.push(g.primaryColumnId);
+    } else {
+      result.push(cId);
     }
   });
 
@@ -9756,6 +9845,15 @@ function renderHiddenColumnsTab(tableId) {
   if (countLabel) {
     countLabel.textContent = `表示中: ${visibleCount} / ${totalCount}列 (非表示: ${totalCount - visibleCount}列)`;
   }
+
+  const orderResetBtn = document.getElementById('hidden-cols-order-reset-btn');
+  if (orderResetBtn) {
+    orderResetBtn.onclick = () => {
+      if (confirm('列の並び順を初期状態に戻しますか？\n（運営状況などの標準位置が初期状態に整流化されます）')) {
+        resetTableColumnOrderToDefault(tableId);
+      }
+    };
+  }
 }
 
 function updateHiddenColsCountBadge(tableId) {
@@ -9815,12 +9913,15 @@ function renderExistingMergeGroupsList(tableId) {
       return cId === group.primaryColumnId ? `<strong>${name}(メイン)</strong>` : name;
     }).join(', ');
 
-    const titleText = group.name ? `<strong>${group.name}</strong> (${colLabels})` : colLabels;
+    let copyInfoBadge = '<span style="font-size: 0.7rem; color: #475569; background: #f1f5f9; padding: 1px 5px; border-radius: 4px; margin-left: 4px;">コピー: 表示中のみ</span>';
+    if (group.copyMode === 'all') copyInfoBadge = `<span style="font-size: 0.7rem; color: #059669; background: rgba(16,185,129,0.1); padding: 1px 5px; border-radius: 4px; margin-left: 4px;">コピー: 全${group.columnIds.length}列(タブ区切り)</span>`;
+    else if (group.copyMode === 'custom') copyInfoBadge = `<span style="font-size: 0.7rem; color: #2563eb; background: rgba(37,99,235,0.1); padding: 1px 5px; border-radius: 4px; margin-left: 4px;">コピー: 指定${(group.copyColumnIds || []).length}項目</span>`;
 
     item.innerHTML = `
       <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-        <span style="color: #2563eb; font-weight: 700; margin-right: 4px;">🔗</span>
+        <span style="color: #2563eb; margin-right: 4px; display: inline-block; vertical-align: middle;">${getMergeLineIconSvg(14)}</span>
         <span>${titleText}</span>
+        ${copyInfoBadge}
       </div>
       <div style="display: flex; gap: 0.35rem; flex-shrink: 0;">
         <button type="button" class="btn btn-secondary btn-sm edit-group-btn" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">編集</button>
@@ -9887,6 +9988,47 @@ function resetMergeGroupEditor(tableId, preselectedColIds = []) {
   }
 
   updateMergeModalPrimarySelect(tableId, preselectedColIds[0] || null);
+
+  // コピー設定の初期化
+  const copyRadios = document.querySelectorAll('input[name="merge-copy-mode"]');
+  copyRadios.forEach(r => {
+    r.checked = r.value === 'visible';
+    r.onchange = () => updateMergeCopyCustomContainerVisibility();
+  });
+  updateMergeCopyCustomCheckboxes(tableId, preselectedColIds, []);
+  updateMergeCopyCustomContainerVisibility();
+}
+
+function updateMergeCopyCustomContainerVisibility() {
+  const customRadio = document.querySelector('input[name="merge-copy-mode"][value="custom"]');
+  const container = document.getElementById('merge-copy-custom-fields-container');
+  if (container) {
+    container.style.display = (customRadio && customRadio.checked) ? 'flex' : 'none';
+  }
+}
+
+function updateMergeCopyCustomCheckboxes(tableId, selectedColIds, checkedColIds = []) {
+  const container = document.getElementById('merge-copy-custom-fields-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const meta = typeof getTableMeta === 'function' ? getTableMeta(tableId) : null;
+  const cols = meta ? meta.columns : [];
+
+  selectedColIds.forEach(colId => {
+    const colDef = cols.find(c => c.id === colId);
+    const label = colDef ? (colDef.label || colDef.name || colId) : colId;
+    const isChecked = checkedColIds.length === 0 || checkedColIds.includes(colId);
+
+    const itemLabel = document.createElement('label');
+    itemLabel.style.cssText = 'display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.78rem;';
+    itemLabel.innerHTML = `
+      <input type="checkbox" value="${colId}" ${isChecked ? 'checked' : ''} />
+      <span>${label}</span>
+      <span style="font-size: 0.7rem; color: #64748b; margin-left: auto;">${colId}</span>
+    `;
+    container.appendChild(itemLabel);
+  });
 }
 
 function editMergeGroupInModal(tableId, groupId) {
@@ -9910,6 +10052,16 @@ function editMergeGroupInModal(tableId, groupId) {
   }
 
   updateMergeModalPrimarySelect(tableId, group.primaryColumnId);
+
+  // コピー設定の復元
+  const copyRadios = document.querySelectorAll('input[name="merge-copy-mode"]');
+  const targetMode = group.copyMode || 'visible';
+  copyRadios.forEach(r => {
+    r.checked = r.value === targetMode;
+    r.onchange = () => updateMergeCopyCustomContainerVisibility();
+  });
+  updateMergeCopyCustomCheckboxes(tableId, group.columnIds, group.copyColumnIds || group.columnIds);
+  updateMergeCopyCustomContainerVisibility();
 }
 
 function updateMergeModalPrimarySelect(tableId, currentPrimaryId = null) {
@@ -9925,6 +10077,8 @@ function updateMergeModalPrimarySelect(tableId, currentPrimaryId = null) {
   if (countBadge) {
     countBadge.textContent = `${selectedColIds.length}件選択中`;
   }
+  const currentCheckedCopyIds = Array.from(document.querySelectorAll('#merge-copy-custom-fields-container input:checked')).map(cb => cb.value);
+  updateMergeCopyCustomCheckboxes(tableId, selectedColIds, currentCheckedCopyIds);
 
   select.innerHTML = '';
   if (selectedColIds.length === 0) {
@@ -9996,21 +10150,31 @@ function handleSaveMergedColumns() {
 
   if (currentEditingMergeGroupId) {
     const targetIdx = groups.findIndex(g => g.id === currentEditingMergeGroupId);
+    const copyMode = document.querySelector('input[name="merge-copy-mode"]:checked')?.value || 'visible';
+    const copyColumnIds = Array.from(document.querySelectorAll('#merge-copy-custom-fields-container input:checked')).map(cb => cb.value);
+
     if (targetIdx !== -1) {
       groups[targetIdx] = {
         id: currentEditingMergeGroupId,
         name: groupName,
         columnIds: selectedColIds,
-        primaryColumnId: primaryColumnId
+        primaryColumnId: primaryColumnId,
+        copyMode: copyMode,
+        copyColumnIds: copyColumnIds
       };
     }
   } else {
     const newId = 'grp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    const copyMode = document.querySelector('input[name="merge-copy-mode"]:checked')?.value || 'visible';
+    const copyColumnIds = Array.from(document.querySelectorAll('#merge-copy-custom-fields-container input:checked')).map(cb => cb.value);
+
     groups.push({
       id: newId,
       name: groupName,
       columnIds: selectedColIds,
-      primaryColumnId: primaryColumnId
+      primaryColumnId: primaryColumnId,
+      copyMode: copyMode,
+      copyColumnIds: copyColumnIds
     });
   }
 
@@ -10133,7 +10297,7 @@ function showMergedCellChip(targetCell, tableId, rowData, group, columns, matche
   selectedChipRowEls.clear();
 
   if (titleEl) {
-    titleEl.textContent = group.name || '統合データ';
+    titleEl.innerHTML = `${getMergeLineIconSvg(14)} ${group.name || '統合データ'}`;
   }
 
   rowsContainer.innerHTML = '';
@@ -18862,16 +19026,16 @@ function renderAgencyInfo() {
         const activeClass = isFiltered ? ' filter-btn-active' : '';
 
         const agHeaderMg = getMergedGroupForCol('ag', col.id);
-        const agHeaderText = (agHeaderMg && agHeaderMg.primaryColumnId === col.id && agHeaderMg.name) ? agHeaderMg.name : col.label;
+        const isAgMergedHeader = agHeaderMg && agHeaderMg.primaryColumnId === col.id;
+        const agHeaderText = (isAgMergedHeader && agHeaderMg.name) ? agHeaderMg.name : col.label;
+        if (isAgMergedHeader) {
+          th.classList.add('synapse-merged-header-th');
+          th.title = `統合グループ「${agHeaderText}」 (${getMergedGroupSummaryText('ag', agHeaderMg)})`;
+        }
         th.innerHTML = `
-          <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${agHeaderText}">${agHeaderText}</span>${(() => {
-            if (agHeaderMg && agHeaderMg.primaryColumnId === col.id) {
-              return `<span class="synapse-header-merge-icon" title="統合グループ「${agHeaderMg.name || ''}」 (${getMergedGroupSummaryText('ag', agHeaderMg)})">🔗</span>`;
-            }
-            return '';
-          })()}
-            <button class="btn-filter-toggle${activeClass}" data-col-id="${col.id}" style="background: transparent; border: none; padding: 0.1rem 0.2rem; color: var(--text-muted); cursor: pointer; font-size: 0.65rem; transition: color 0.2s; margin-left: 2px;">
+          <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 2px;">
+            <span style="font-size: 0.75rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${agHeaderText}">${agHeaderText}</span>
+            <button class="btn-filter-toggle${activeClass}" data-col-id="${col.id}" style="background: transparent; border: none; padding: 0.1rem 0.2rem; color: var(--text-muted); cursor: pointer; font-size: 0.65rem; transition: color 0.2s; margin-left: 2px; flex-shrink: 0;">
               ▼
             </button>
           </div>
@@ -20712,16 +20876,16 @@ function renderJoInfo() {
         const activeClass = isFiltered ? ' filter-btn-active' : '';
 
         const joHeaderMg = getMergedGroupForCol('jo', col.id);
-        const joHeaderText = (joHeaderMg && joHeaderMg.primaryColumnId === col.id && joHeaderMg.name) ? joHeaderMg.name : col.label;
+        const isJoMergedHeader = joHeaderMg && joHeaderMg.primaryColumnId === col.id;
+        const joHeaderText = (isJoMergedHeader && joHeaderMg.name) ? joHeaderMg.name : col.label;
+        if (isJoMergedHeader) {
+          th.classList.add('synapse-merged-header-th');
+          th.title = `統合グループ「${joHeaderText}」 (${getMergedGroupSummaryText('jo', joHeaderMg)})`;
+        }
         th.innerHTML = `
-          <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${joHeaderText}">${joHeaderText}</span>${(() => {
-              if (joHeaderMg && joHeaderMg.primaryColumnId === col.id) {
-                return `<span class="synapse-header-merge-icon" title="統合グループ「${joHeaderMg.name || ''}」 (${getMergedGroupSummaryText('jo', joHeaderMg)})">🔗</span>`;
-              }
-              return '';
-            })()}
-            <button class="btn-filter-toggle${activeClass}" data-col-id="${col.id}" style="background: transparent; border: none; padding: 0.1rem 0.2rem; color: var(--text-muted); cursor: pointer; font-size: 0.65rem; transition: color 0.2s; margin-left: 2px;">
+          <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 2px;">
+            <span style="font-size: 0.75rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${joHeaderText}">${joHeaderText}</span>
+            <button class="btn-filter-toggle${activeClass}" data-col-id="${col.id}" style="background: transparent; border: none; padding: 0.1rem 0.2rem; color: var(--text-muted); cursor: pointer; font-size: 0.65rem; transition: color 0.2s; margin-left: 2px; flex-shrink: 0;">
               ▼
             </button>
           </div>
@@ -21408,16 +21572,16 @@ function renderApplicantInfo() {
         const activeClass = isFiltered ? ' filter-btn-active' : '';
 
         const apHeaderMg = getMergedGroupForCol('ap', col.id);
-        const apHeaderText = (apHeaderMg && apHeaderMg.primaryColumnId === col.id && apHeaderMg.name) ? apHeaderMg.name : col.label;
+        const isApMergedHeader = apHeaderMg && apHeaderMg.primaryColumnId === col.id;
+        const apHeaderText = (isApMergedHeader && apHeaderMg.name) ? apHeaderMg.name : col.label;
+        if (isApMergedHeader) {
+          th.classList.add('synapse-merged-header-th');
+          th.title = `統合グループ「${apHeaderText}」 (${getMergedGroupSummaryText('ap', apHeaderMg)})`;
+        }
         th.innerHTML = `
-          <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${apHeaderText}">${apHeaderText}</span>${(() => {
-              if (apHeaderMg && apHeaderMg.primaryColumnId === col.id) {
-                return `<span class="synapse-header-merge-icon" title="統合グループ「${apHeaderMg.name || ''}」 (${getMergedGroupSummaryText('ap', apHeaderMg)})">🔗</span>`;
-              }
-              return '';
-            })()}
-            <button class="btn-filter-toggle${activeClass}" data-col-id="${col.id}" style="background: transparent; border: none; padding: 0.1rem 0.2rem; color: var(--text-muted); cursor: pointer; font-size: 0.65rem; transition: color 0.2s; margin-left: 2px;">
+          <div class="th-filter-container" style="height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 2px;">
+            <span style="font-size: 0.75rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${apHeaderText}">${apHeaderText}</span>
+            <button class="btn-filter-toggle${activeClass}" data-col-id="${col.id}" style="background: transparent; border: none; padding: 0.1rem 0.2rem; color: var(--text-muted); cursor: pointer; font-size: 0.65rem; transition: color 0.2s; margin-left: 2px; flex-shrink: 0;">
               ▼
             </button>
           </div>
@@ -26110,14 +26274,12 @@ function renderDbmakePartners() {
       th.style.minWidth = `${w}px`;
 
       const dbmakeMg = getMergedGroupForCol('dbmake', col.id);
-      const dbmakeHeaderText = (dbmakeMg && dbmakeMg.primaryColumnId === col.id && dbmakeMg.name) ? dbmakeMg.name : col.name;
+      const isDbmakeMergedHeader = dbmakeMg && dbmakeMg.primaryColumnId === col.id;
+      const dbmakeHeaderText = (isDbmakeMergedHeader && dbmakeMg.name) ? dbmakeMg.name : col.name;
       th.textContent = dbmakeHeaderText;
-      if (dbmakeMg && dbmakeMg.primaryColumnId === col.id) {
-        const iconSpan = document.createElement('span');
-        iconSpan.className = 'synapse-header-merge-icon';
-        iconSpan.textContent = '🔗';
-        iconSpan.title = `統合グループ「${dbmakeMg.name || ''}」 (${getMergedGroupSummaryText('dbmake', dbmakeMg)})`;
-        th.appendChild(iconSpan);
+      if (isDbmakeMergedHeader) {
+        th.classList.add('synapse-merged-header-th');
+        th.title = `統合グループ「${dbmakeHeaderText}」 (${getMergedGroupSummaryText('dbmake', dbmakeMg)})`;
       }
 
       th.addEventListener('contextmenu', (e) => {
@@ -28177,8 +28339,13 @@ function getSelectedTableText(type, activeScreen, selectedCell, selectedRange, c
           if (c < tds.length) {
             const td = tds[c];
             if (td.classList.contains('selected-cell')) {
-              let cellText = td.innerText || td.textContent || '';
-              cellText = cellText.replace(/[☆★]/g, '').trim();
+              let cellText = '';
+              if (td.dataset.mergedGroupId) {
+                cellText = getFormattedMergedCellCopyText(td, activeScreen, columns);
+              } else {
+                cellText = td.innerText || td.textContent || '';
+                cellText = cellText.replace(/[☆★]/g, '').trim();
+              }
               lineCells.push(cellText);
             } else {
               lineCells.push('');
@@ -28212,8 +28379,13 @@ function getSelectedTableText(type, activeScreen, selectedCell, selectedRange, c
       for (let c = startCol; c <= endCol; c++) {
         if (c >= dataTds.length) continue;
         const td = dataTds[c];
-        let cellText = td.innerText || td.textContent || '';
-        cellText = cellText.replace(/[☆★]/g, '').trim();
+        let cellText = '';
+        if (td.dataset.mergedGroupId) {
+          cellText = getFormattedMergedCellCopyText(td, activeScreen, columns);
+        } else {
+          cellText = td.innerText || td.textContent || '';
+          cellText = cellText.replace(/[☆★]/g, '').trim();
+        }
         lineCells.push(cellText);
       }
       textLines.push(lineCells.join('\t'));
@@ -28228,8 +28400,14 @@ function getSelectedTableText(type, activeScreen, selectedCell, selectedRange, c
       const tds = tr.querySelectorAll('td');
       const dataTds = Array.from(tds).filter(td => !td.classList.contains('row-number-col'));
       if (selectedCell.col < dataTds.length) {
-        let cellText = dataTds[selectedCell.col].innerText || dataTds[selectedCell.col].textContent || '';
-        cellText = cellText.replace(/[☆★]/g, '').trim();
+        const td = dataTds[selectedCell.col];
+        let cellText = '';
+        if (td.dataset.mergedGroupId) {
+          cellText = getFormattedMergedCellCopyText(td, activeScreen, columns);
+        } else {
+          cellText = td.innerText || td.textContent || '';
+          cellText = cellText.replace(/[☆★]/g, '').trim();
+        }
         return cellText;
       }
     }

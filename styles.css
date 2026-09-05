@@ -5954,3 +5954,33 @@ mark.synapse-find-mark.is-active {
   color: #ffffff;
   font-weight: bold;
 }
+
+/* 統合表示用 線画アイコン */
+.synapse-merge-line-icon {
+  display: inline-block;
+  vertical-align: -2px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  fill: none;
+}
+
+/* 統合カラムヘッダー：テキスト文字切れ防止スタイル（インラインアイコン不要、上部アクセント線＆微弱着色） */
+th.synapse-merged-header-th {
+  border-top: 3px solid #2563eb !important;
+  background-color: rgba(37, 99, 235, 0.05) !important;
+}
+
+th.synapse-merged-header-th .th-filter-container span,
+th.synapse-merged-header-th .th-wrapper span.th-label {
+  font-weight: 700 !important;
+  color: #1e40af !important;
+}
+
+/* 統合コピー設定ボックス */
+.col-display-copy-box {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0.6rem;
+}
+
