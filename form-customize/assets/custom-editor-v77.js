@@ -4775,6 +4775,61 @@
         }
         // ------------------------------------------
 
+        // --- 質問の並び替え（▲ / ▼）ボタンの注入（全モード共通） ---
+        const allQCards = document.querySelectorAll('#questions-container .question-card');
+        allQCards.forEach((qCard, idx) => {
+          const qId = qCard.dataset.questionId;
+          const qDef = sec.questions ? sec.questions.find(q => q.id === qId) : null;
+          if (!qDef) return;
+
+          const actionsRow = qCard.querySelector('.question-card-actions');
+          if (actionsRow && !actionsRow.querySelector('.btn-move-q-up')) {
+            let btnGroup = actionsRow.querySelector('.question-action-buttons');
+            if (!btnGroup) {
+              btnGroup = document.createElement('div');
+              btnGroup.className = 'question-action-buttons';
+              btnGroup.style.display = 'flex';
+              btnGroup.style.gap = '6px';
+              btnGroup.style.alignItems = 'center';
+
+              const delBtn = actionsRow.querySelector('.btn-danger');
+              if (delBtn) {
+                actionsRow.appendChild(btnGroup);
+                btnGroup.appendChild(delBtn);
+              } else {
+                actionsRow.appendChild(btnGroup);
+              }
+            }
+
+            const upBtn = document.createElement('button');
+            upBtn.type = 'button';
+            upBtn.className = 'btn btn-sm btn-secondary btn-move-q-up';
+            upBtn.innerHTML = '▲';
+            upBtn.title = '上へ移動';
+            upBtn.disabled = (idx === 0);
+            upBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              moveQuestionInEditor(sec, idx, idx - 1);
+            });
+
+            const downBtn = document.createElement('button');
+            downBtn.type = 'button';
+            downBtn.className = 'btn btn-sm btn-secondary btn-move-q-down';
+            downBtn.innerHTML = '▼';
+            downBtn.title = '下へ移動';
+            downBtn.disabled = (idx === sec.questions.length - 1);
+            downBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              moveQuestionInEditor(sec, idx, idx + 1);
+            });
+
+            const firstChild = btnGroup.firstChild;
+            btnGroup.insertBefore(downBtn, firstChild);
+            btnGroup.insertBefore(upBtn, downBtn);
+          }
+        });
 
         if (editorMode !== 'pro') return;
 
@@ -4861,6 +4916,47 @@
         renderLivePreview();
       }
     });
+
+    // サイドバーのセクションクリックや概要画面からの編集クリックを検知して即座にプレビュー更新
+    document.addEventListener('click', (e) => {
+      const sidebarItem = e.target.closest('#section-list .sidebar-item');
+      if (sidebarItem && sidebarItem.dataset.sectionId) {
+        window.r = sidebarItem.dataset.sectionId;
+        setTimeout(renderLivePreview, 40);
+      }
+      const ovEditBtn = e.target.closest('#overview-sections-list .overview-section-card .btn-primary');
+      if (ovEditBtn) {
+        setTimeout(() => {
+          const activeItem = document.querySelector('#section-list .sidebar-item.active');
+          if (activeItem && activeItem.dataset.sectionId) {
+            window.r = activeItem.dataset.sectionId;
+          }
+          renderLivePreview();
+        }, 40);
+      }
+      const ovTab = e.target.closest('#sidebar-item-overview') || e.target.closest('#btn-back-to-overview');
+      if (ovTab) {
+        window.r = null;
+        setTimeout(renderLivePreview, 40);
+      }
+    });
+  }
+
+  function moveQuestionInEditor(sec, fromIdx, toIdx) {
+    if (!sec || !sec.questions) return;
+    if (fromIdx < 0 || fromIdx >= sec.questions.length) return;
+    if (toIdx < 0 || toIdx >= sec.questions.length) return;
+    const targetId = sec.questions[fromIdx].id;
+    const temp = sec.questions[fromIdx];
+    sec.questions[fromIdx] = sec.questions[toIdx];
+    sec.questions[toIdx] = temp;
+    if (window.S) window.S();
+    if (window.x) window.x();
+    renderLivePreview();
+    setTimeout(() => {
+      const moved = document.querySelector(`.question-card[data-question-id="${targetId}"]`);
+      if (moved) moved.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 40);
   }
 
   function evaluateLiveSkipLogic() {
@@ -4953,12 +5049,30 @@
     }
   }
 
+  function getActiveSection() {
+    if (!window.n || !window.n.sections || window.n.sections.length === 0) return null;
+    if (window.r) {
+      const found = window.n.sections.find(s => s.id === window.r);
+      if (found) return found;
+    }
+    const activeSidebar = document.querySelector('#section-list .sidebar-item.active');
+    if (activeSidebar && activeSidebar.dataset && activeSidebar.dataset.sectionId) {
+      const secId = activeSidebar.dataset.sectionId;
+      const found = window.n.sections.find(s => s.id === secId);
+      if (found) {
+        window.r = secId;
+        return found;
+      }
+    }
+    return window.n.sections[0] || null;
+  }
+
   function renderLivePreview() {
     const liveContainer = document.getElementById('live-preview-section-container');
     if (!liveContainer || !window.n) return;
 
     const g = window.G || window.n;
-    const activeSec = window.n.sections ? window.n.sections.find(s => s.id === window.r) : null;
+    const activeSec = getActiveSection();
     const isPro = editorMode === "pro";
 
     const liveCard = document.querySelector('.device-screen-content');
@@ -5018,8 +5132,8 @@
     const proTitleVal = (g.header && g.header.title) ? g.header.title : currentFormTitle;
     const proDescVal = (g.header && g.header.disclaimer) ? g.header.disclaimer : currentFormDesc;
 
-    liveTitleH.textContent = isPro ? (proTitleVal || "セクション") : (currentFormTitle || "セクション");
-    liveDescP.textContent = isPro ? proDescVal : currentFormDesc;
+    if (liveTitleH) liveTitleH.textContent = isPro ? (proTitleVal || "フォーム") : (currentFormTitle || "フォーム");
+    if (liveDescP) liveDescP.textContent = isPro ? proDescVal : currentFormDesc;
 
     // ライブプレビューのヘッダー画像表示制御
     const liveHeaderImgContainer = document.getElementById('live-preview-header-image-container');
@@ -5093,42 +5207,50 @@
 
     if (isPro && g.appearance) {
       const subtitleText = g.header ? g.header.subtitle : "";
-      if (subtitleText) {
-        liveSubtitleP.textContent = subtitleText;
-        liveSubtitleP.style.display = 'block';
-      } else {
-        liveSubtitleP.style.display = 'none';
+      if (liveSubtitleP) {
+        if (subtitleText) {
+          liveSubtitleP.textContent = subtitleText;
+          liveSubtitleP.style.display = 'block';
+        } else {
+          liveSubtitleP.style.display = 'none';
+        }
       }
 
       let showLiveAnnounce = false;
       if (g.announcement && g.announcement.showDuration && g.announcement.durationText) {
-        document.getElementById('live-preview-duration-value').textContent = g.announcement.durationText;
-        liveDurationBox.style.display = 'flex';
+        const durVal = document.getElementById('live-preview-duration-value');
+        if (durVal) durVal.textContent = g.announcement.durationText;
+        if (liveDurationBox) liveDurationBox.style.display = 'flex';
         showLiveAnnounce = true;
-      } else {
+      } else if (liveDurationBox) {
         liveDurationBox.style.display = 'none';
       }
 
       if (g.announcement && g.announcement.showAlertBox && g.announcement.alertBoxText) {
-        document.getElementById('live-preview-alert-value').textContent = g.announcement.alertBoxText;
-        liveAlertBox.style.display = 'block';
+        const alertVal = document.getElementById('live-preview-alert-value');
+        if (alertVal) alertVal.textContent = g.announcement.alertBoxText;
+        if (liveAlertBox) liveAlertBox.style.display = 'block';
         showLiveAnnounce = true;
-      } else {
+      } else if (liveAlertBox) {
         liveAlertBox.style.display = 'none';
       }
-      liveAnnounceArea.style.display = showLiveAnnounce ? 'flex' : 'none';
+      if (liveAnnounceArea) liveAnnounceArea.style.display = showLiveAnnounce ? 'flex' : 'none';
 
       const primaryColor = g.appearance.primaryColor || "#0056b3";
       const bgColor = g.appearance.backgroundColor || "#f8fafd";
       const txtColor = getTextColorForBg(bgColor);
 
-      liveCard.parentNode.style.setProperty('--color-primary', primaryColor);
-      if (isPro && g.useBgImage && g.bgTheme) {
-        liveCard.style.removeProperty('background-color');
-      } else {
-        liveCard.style.backgroundColor = bgColor;
+      if (liveCard && liveCard.parentNode) {
+        liveCard.parentNode.style.setProperty('--color-primary', primaryColor);
       }
-      liveCard.style.color = txtColor;
+      if (liveCard) {
+        if (isPro && g.useBgImage && g.bgTheme) {
+          liveCard.style.removeProperty('background-color');
+        } else {
+          liveCard.style.backgroundColor = bgColor;
+        }
+        liveCard.style.color = txtColor;
+      }
 
       const getActualFontSize = (val, type, isMobile) => {
         if (val && val.startsWith('custom:')) {
@@ -5155,58 +5277,93 @@
       const sectionSize = getActualFontSize(g.appearance.fontSizes.section, 'section', true);
       const labelSize = getActualFontSize(g.appearance.fontSizes.label, 'label', true);
 
-      liveTitleH.style.fontSize = titleSize;
-      liveCard.style.setProperty('--preview-section-title-size', sectionSize);
-      liveCard.style.setProperty('--preview-label-size', labelSize);
+      if (liveTitleH) liveTitleH.style.fontSize = titleSize;
+      if (liveCard) {
+        liveCard.style.setProperty('--preview-section-title-size', sectionSize);
+        liveCard.style.setProperty('--preview-label-size', labelSize);
+      }
 
-      if (g.displayMode === 'scroll') {
-        document.getElementById('live-progress-bar-container').style.display = 'none';
-      } else {
-        const indicator = g.progressIndicator || "both";
-        document.getElementById('live-progress-bar-container').style.display = indicator === 'none' ? 'none' : 'block';
+      const liveProgBarCont = document.getElementById('live-progress-bar-container');
+      if (liveProgBarCont) {
+        if (g.displayMode === 'scroll') {
+          liveProgBarCont.style.display = 'none';
+        } else {
+          const indicator = g.progressIndicator || "both";
+          liveProgBarCont.style.display = indicator === 'none' ? 'none' : 'block';
+        }
       }
     } else {
-      liveLogoArea.style.display = 'none';
-      liveSubtitleP.style.display = 'none';
-      liveAnnounceArea.style.display = 'none';
-      document.getElementById('live-progress-bar-container').style.display = 'block';
+      if (liveLogoArea) liveLogoArea.style.display = 'none';
+      if (liveSubtitleP) liveSubtitleP.style.display = 'none';
+      if (liveAnnounceArea) liveAnnounceArea.style.display = 'none';
+      const liveProgBarCont = document.getElementById('live-progress-bar-container');
+      if (liveProgBarCont) liveProgBarCont.style.display = 'block';
 
-      liveCard.parentNode.style.setProperty('--color-primary', '#0056b3');
-      liveCard.style.backgroundColor = '#ffffff';
-      liveCard.style.color = '#212529';
-      liveTitleH.style.fontSize = '1.3rem';
+      if (liveCard && liveCard.parentNode) {
+        liveCard.parentNode.style.setProperty('--color-primary', '#0056b3');
+      }
+      if (liveCard) {
+        liveCard.style.backgroundColor = '#ffffff';
+        liveCard.style.color = '#212529';
+      }
+      if (liveTitleH) liveTitleH.style.fontSize = '1.3rem';
     }
 
-    if (window.n.sections) {
+    if (window.n.sections && activeSec) {
       const totalSecs = window.n.sections.length;
-      const currentSecIdx = window.n.sections.findIndex(s => s.id === window.r) + 1;
+      const currentSecIdx = window.n.sections.findIndex(s => s.id === activeSec.id) + 1;
       const progText = document.getElementById('live-preview-progress-text');
       if (progText) {
         progText.textContent = `セクション ${currentSecIdx || 1} / ${totalSecs || 1}`;
+      }
+      const progBar = document.getElementById('live-preview-progress-bar');
+      if (progBar) {
+        const pct = totalSecs > 0 ? Math.round((currentSecIdx / totalSecs) * 100) : 100;
+        progBar.style.width = `${pct}%`;
       }
     }
 
     liveContainer.innerHTML = "";
 
-    if (!activeSec || !activeSec.questions || activeSec.questions.length === 0) {
-      liveContainer.innerHTML = `
-        <div style="text-align:center; padding:30px; color:var(--color-text-muted); font-size:0.8rem; border:1px dashed var(--color-border); border-radius:4px;">
-          このセクションにはまだ質問がありません。<br>左側の「＋ 質問を追加」またはプリセットから質問を作成してください。
-        </div>
-      `;
-      return;
+    if (!activeSec) return;
+
+    const activeSecInputTitle = (window.r === activeSec.id && document.getElementById('editor-section-title'))
+      ? document.getElementById('editor-section-title').value
+      : (activeSec.title || "");
+    const activeSecInputDesc = (window.r === activeSec.id && document.getElementById('editor-section-desc'))
+      ? document.getElementById('editor-section-desc').value
+      : (activeSec.description || "");
+
+    const secTitle = activeSecInputTitle ? activeSecInputTitle.trim() : "";
+    const secDesc = activeSecInputDesc ? activeSecInputDesc.trim() : "";
+
+    let secMediaHtml = "";
+    if (activeSec.media && activeSec.media.url) {
+      if (activeSec.media.type === 'image') {
+        secMediaHtml = `<div style="margin-top:8px;"><img src="${escapeHtml(activeSec.media.url)}" style="max-width:100%; border-radius:4px; max-height:180px; object-fit:contain;" /></div>`;
+      } else if (activeSec.media.type === 'video') {
+        secMediaHtml = `<div style="margin-top:8px;"><video src="${escapeHtml(activeSec.media.url)}" controls style="max-width:100%; border-radius:4px; max-height:180px;"></video></div>`;
+      }
     }
 
-    const secTitle = activeSec.title ? activeSec.title.trim() : "";
-    const secDesc = activeSec.description ? activeSec.description.trim() : "";
-    if (secTitle !== "" || secDesc !== "") {
+    if (secTitle !== "" || secDesc !== "" || secMediaHtml !== "") {
       const secHeader = document.createElement('div');
-      secHeader.style.cssText = 'margin-bottom: 20px; border-bottom: 1.5px solid var(--color-primary); padding-bottom: 6px;';
+      secHeader.className = 'live-preview-section-header';
+      secHeader.style.cssText = 'margin-bottom: 20px; border-bottom: 1.5px solid var(--color-primary); padding-bottom: 8px;';
       secHeader.innerHTML = `
-        <h3 style="font-size:var(--preview-section-title-size, 1rem); font-weight:700; margin:0; color:var(--color-primary);">${secTitle || 'セクションタイトル'}</h3>
-        ${secDesc ? `<p style="font-size:0.75rem; color:var(--color-text-muted); margin:4px 0 0 0;">${secDesc}</p>` : ''}
+        <h3 style="font-size:var(--preview-section-title-size, 1rem); font-weight:700; margin:0; color:var(--color-primary);">${escapeHtml(secTitle) || 'セクションタイトル'}</h3>
+        ${secDesc ? `<p style="font-size:0.75rem; color:var(--color-text-muted); margin:4px 0 0 0; white-space:pre-wrap;">${escapeHtml(secDesc)}</p>` : ''}
+        ${secMediaHtml}
       `;
       liveContainer.appendChild(secHeader);
+    }
+
+    if (!activeSec.questions || activeSec.questions.length === 0) {
+      const emptyNotice = document.createElement('div');
+      emptyNotice.style.cssText = 'text-align:center; padding:30px; color:var(--color-text-muted); font-size:0.8rem; border:1px dashed var(--color-border); border-radius:4px; margin-bottom:12px;';
+      emptyNotice.innerHTML = `このセクションにはまだ質問がありません。<br>左側の「＋ 質問を追加」またはプリセットから質問を作成してください。`;
+      liveContainer.appendChild(emptyNotice);
+      return;
     }
 
     activeSec.questions.forEach(q => {
@@ -5221,7 +5378,7 @@
       let inputHtml = "";
       if (q.type === 'text') {
         inputHtml = `<input type="text" class="form-control form-control-sm" placeholder="回答を入力してください" disabled style="opacity: 0.8; background: var(--color-bg-input);" />`;
-      } else if (q.type === 'textarea') {
+      } else if (q.type === 'textarea' || q.type === 'paragraph') {
         inputHtml = `<textarea class="form-control form-control-sm" rows="2" placeholder="自由回答を入力してください" disabled style="opacity: 0.8; background: var(--color-bg-input);"></textarea>`;
       } else if (q.type === 'radio') {
         let opts = "";
@@ -5229,7 +5386,7 @@
         options.forEach(opt => {
           opts += `
             <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; margin:0; cursor:default;">
-              <input type="radio" disabled style="margin:0;" /> ${opt.label}
+              <input type="radio" disabled style="margin:0;" /> ${escapeHtml(opt.label || '')}
             </label>
           `;
         });
@@ -5240,7 +5397,7 @@
         options.forEach(opt => {
           opts += `
             <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; margin:0; cursor:default;">
-              <input type="checkbox" disabled style="margin:0;" /> ${opt.label}
+              <input type="checkbox" disabled style="margin:0;" /> ${escapeHtml(opt.label || '')}
             </label>
           `;
         });
@@ -5249,7 +5406,7 @@
         let opts = `<option value="">選択してください</option>`;
         const options = q.options || [{ label: "選択肢1" }, { label: "選択肢2" }];
         options.forEach(opt => {
-          opts += `<option>${opt.label}</option>`;
+          opts += `<option>${escapeHtml(opt.label || '')}</option>`;
         });
         inputHtml = `<select class="form-control form-control-sm" disabled style="opacity: 0.8; background: var(--color-bg-input);">${opts}</select>`;
       } else if (q.type === 'password') {
@@ -5270,11 +5427,29 @@
         `;
       }
 
+      let mediaHtml = "";
+      if (q.media && q.media.url) {
+        if (q.media.type === 'image') {
+          mediaHtml = `<div style="margin-top:6px;"><img src="${escapeHtml(q.media.url)}" style="max-width:100%; border-radius:4px; max-height:160px; object-fit:contain;" /></div>`;
+        } else if (q.media.type === 'video') {
+          mediaHtml = `<div style="margin-top:6px;"><video src="${escapeHtml(q.media.url)}" controls style="max-width:100%; border-radius:4px; max-height:160px;"></video></div>`;
+        } else {
+          mediaHtml = `<div style="margin-top:6px; font-size:0.75rem;"><a href="${escapeHtml(q.media.url)}" target="_blank" style="color:var(--color-primary);">📎 添付ファイル</a></div>`;
+        }
+      }
+
+      let scrollHtml = "";
+      if (q.scrollRequired && q.scrollText) {
+        scrollHtml = `<div style="max-height:80px; overflow-y:auto; font-size:0.7rem; padding:6px; border:1px solid var(--color-border); border-radius:4px; background:rgba(0,0,0,0.02); margin-top:4px; line-height:1.4; white-space:pre-wrap;">${escapeHtml(q.scrollText)}</div>`;
+      }
+
       qCard.innerHTML = `
         <div class="preview-q-title" style="font-size:var(--preview-label-size, 0.85rem); font-weight:600; color:var(--color-text); margin:0;">
-          ${reqAsterisk}${qTitle}
+          ${reqAsterisk}${escapeHtml(qTitle)}
         </div>
-        ${qDesc ? `<div style="font-size:0.7rem; color:var(--color-text-muted); margin-top:-2px;">${qDesc}</div>` : ''}
+        ${qDesc ? `<div style="font-size:0.7rem; color:var(--color-text-muted); margin-top:-2px; white-space:pre-wrap;">${escapeHtml(qDesc)}</div>` : ''}
+        ${mediaHtml}
+        ${scrollHtml}
         <div class="preview-q-input-wrap" style="margin-top:4px;">
           ${inputHtml}
         </div>
@@ -5310,17 +5485,24 @@
   let lastStateStr = "";
   setInterval(() => {
     if (window.n) {
+      const active = getActiveSection();
+      const secTitleInput = document.getElementById('editor-section-title')?.value || "";
+      const secDescInput = document.getElementById('editor-section-desc')?.value || "";
+      const formTitleInput = document.getElementById('editor-form-title')?.value || "";
+      const formDescInput = document.getElementById('editor-form-desc')?.value || "";
+
       const currentStateStr = JSON.stringify({
-        title: window.n.title,
-        desc: window.n.description,
+        title: formTitleInput || window.n.title,
+        desc: formDescInput || window.n.description,
         sectionsCount: window.n.sections ? window.n.sections.length : 0,
-        activeSectionId: window.r,
+        activeSectionId: active ? active.id : null,
+        activeSecTitle: secTitleInput || (active?.title || ""),
+        activeSecDesc: secDescInput || (active?.description || ""),
         appearance: window.G ? window.G.appearance : null,
         header: window.G ? window.G.header : null,
         announcement: window.G ? window.G.announcement : null,
         displayMode: window.G ? window.G.displayMode : null,
-        questions: (window.n.sections && window.r) ? 
-          JSON.stringify(window.n.sections.find(s => s.id === window.r)?.questions || []) : ""
+        questions: active ? JSON.stringify(active.questions || []) : ""
       });
 
       if (currentStateStr !== lastStateStr) {
