@@ -52,6 +52,7 @@ function x(){
         <div class="sec-badge-controls">
           <button type="button" class="btn btn-sm btn-secondary btn-header-sec-up" title="${curIdx===0?'先頭です':`「${ke(prevTitle)}」と位置を入れ替えます`}" ${curIdx===0?'disabled':''}>▲ 前へ</button>
           <button type="button" class="btn btn-sm btn-secondary btn-header-sec-down" title="${curIdx===n.sections.length-1?'末尾です':`「${ke(nextTitle)}」と位置を入れ替えます`}" ${curIdx===n.sections.length-1?'disabled':''}>▼ 次へ</button>
+          <button type="button" class="btn btn-sm btn-secondary btn-editor-sync-preview" title="プレビューを最新の状態に更新します"><span class="sync-icon">🔄</span> プレビュー更新</button>
         </div>
       `;
       let hUp=secBadge.querySelector('.btn-header-sec-up');
@@ -61,6 +62,10 @@ function x(){
       }
       if(hDown&&curIdx<n.sections.length-1){
         hDown.addEventListener('click',ev=>{ev.preventDefault();swapSection(curIdx,curIdx+1);});
+      }
+      let hSync=secBadge.querySelector('.btn-editor-sync-preview');
+      if(hSync){
+        hSync.addEventListener('click',ev=>{ev.preventDefault();window.refreshAllPreviews&&window.refreshAllPreviews(true);});
       }
     }
 

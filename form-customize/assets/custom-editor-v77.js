@@ -6039,6 +6039,86 @@
   }
   window.triggerLivePreview = debouncedTriggerLivePreview;
 
+  // 手動プレビュー更新・強制完全同期（最新DOM値反映＋LocalStorage同期＋全再描画＋回転アニメーション＋トースト）
+  function refreshAllPreviews(showFeedback = true) {
+    const refreshBtns = document.querySelectorAll('#btn-preview-refresh, #btn-panel-preview-refresh, .btn-editor-sync-preview');
+    refreshBtns.forEach(btn => btn.classList.add('is-refreshing'));
+
+    try {
+      // 1. DOMの最新入力値をフォームオブジェクトに反映
+      const g = window.G || window.n;
+      if (g) {
+        const titleEl = document.getElementById('editor-form-title');
+        if (titleEl) g.title = titleEl.value;
+        const descEl = document.getElementById('editor-form-desc');
+        if (descEl) g.description = descEl.value;
+
+        if (window.r && g.sections) {
+          const curSec = g.sections.find(s => s.id === window.r);
+          if (curSec) {
+            const secTitleEl = document.getElementById('editor-section-title');
+            if (secTitleEl) curSec.title = secTitleEl.value;
+            const secDescEl = document.getElementById('editor-section-desc');
+            if (secDescEl) curSec.description = secDescEl.value;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[refreshAllPreviews] DOM sync warn:', e);
+    }
+
+    // 2. LocalStorageへの即時確定保存
+    if (typeof window.S === 'function') {
+      try { window.S(true); } catch(e) {}
+    }
+    if (typeof saveAndSyncMindmapData === 'function') {
+      try { saveAndSyncMindmapData(); } catch(e) {}
+    }
+
+    // 3. ライブプレビューの強制再描画・テーマ適用
+    if (typeof renderLivePreview === 'function') {
+      try { renderLivePreview(); } catch(e) {}
+    }
+    if (typeof applyPreviewTheme === 'function') {
+      try { applyPreviewTheme(); } catch(e) {}
+    }
+
+    // 4. 回答プレビュー画面（yt）も最新データで再同期
+    if (typeof window.yt === 'function') {
+      try {
+        const curData = window.G || window.n;
+        if (curData) window.yt(curData);
+      } catch(e) {}
+    }
+
+    // 5. アニメーション完了とトースト通知
+    setTimeout(() => {
+      refreshBtns.forEach(btn => btn.classList.remove('is-refreshing'));
+      if (showFeedback && typeof window.showSectionToast === 'function') {
+        window.showSectionToast('プレビューを最新の状態に更新しました');
+      }
+    }, 450);
+  }
+  window.refreshAllPreviews = refreshAllPreviews;
+  window.triggerPreviewRefresh = refreshAllPreviews;
+
+  // ショートカットキー (Ctrl+Shift+R / Alt+R) によるプレビュー更新
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey && e.shiftKey && e.key && e.key.toLowerCase() === 'r') || (e.altKey && e.key && e.key.toLowerCase() === 'r')) {
+      e.preventDefault();
+      refreshAllPreviews(true);
+    }
+  });
+
+  // プレビュー更新ボタンのクリック委譲
+  document.addEventListener('click', (e) => {
+    const refreshTarget = e.target.closest('#btn-preview-refresh, #btn-panel-preview-refresh, .btn-editor-sync-preview');
+    if (refreshTarget) {
+      e.preventDefault();
+      refreshAllPreviews(true);
+    }
+  });
+
   // エディタ入力の包括的イベント委譲（任意の入力欄から即座にインプレース同期）
   function setupLiveEditorInputDelegation() {
     const panel = document.getElementById('panel-editor');

@@ -687,7 +687,10 @@
           <div class="editor-live-preview-pane">
              <div class="live-preview-header" style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
                <span style="font-weight: 700; color: #4a5568; font-size: 0.76rem;">👁️ ライブプレビュー</span>
-               <div class="preview-controls" style="display: flex; gap: 8px; align-items: center;">
+               <div class="preview-controls" style="display: flex; gap: 6px; align-items: center;">
+                 <button type="button" id="btn-preview-refresh" class="btn-preview-refresh-btn" title="プレビューを最新の状態に更新">
+                   <span class="refresh-icon">🔄</span> <span class="refresh-label">更新</span>
+                 </button>
                  <button type="button" id="btn-preview-minimize" style="background: none; border: none; font-size: 0.95rem; font-weight: bold; cursor: pointer; color: #718096; padding: 2px 6px; transition: color 0.15s;" title="最小化する（折りたたむ）">─</button>
                  <button type="button" id="btn-preview-toggle-size" style="background: none; border: none; font-size: 0.85rem; font-weight: bold; cursor: pointer; color: #718096; padding: 2px 6px; transition: color 0.15s;" title="表示サイズの切り替え（通常 / 縮小）">🗖</button>
                </div>
@@ -778,7 +781,12 @@
       <section id="panel-preview" class="tab-panel">
         <div class="preview-container">
           <div class="preview-card">
-            <div class="preview-badge">プレビューモード</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
+              <div class="preview-badge" style="margin-bottom: 0;">プレビューモード</div>
+              <button type="button" id="btn-panel-preview-refresh" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer;" title="編集した最新の内容をプレビューに再反映します">
+                <span class="panel-refresh-icon">🔄</span> プレビュー更新
+              </button>
+            </div>
             
             <div id="preview-header-image-container" class="preview-header-image-container" style="display: none; width: 100%; max-height: 180px; overflow: hidden; border-radius: var(--border-radius) var(--border-radius) 0 0; margin-bottom: 1rem; border-bottom: 1px solid var(--color-border);">
               <img id="preview-header-image" src="" style="width: 100%; height: 100%; object-fit: cover;" />

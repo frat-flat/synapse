@@ -2105,4 +2105,85 @@ input:-webkit-autofill:active {
   font-weight: bold;
 }
 
+/* プレビュー手動更新ボタン */
+.btn-preview-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1.2;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-preview-refresh-btn:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.15);
+}
+
+.btn-preview-refresh-btn:active {
+  transform: scale(0.96);
+  background: #bfdbfe;
+}
+
+.btn-preview-refresh-btn .refresh-icon,
+.panel-refresh-icon,
+.btn-editor-sync-preview .sync-icon {
+  display: inline-block;
+  font-size: 0.76rem;
+  transition: transform 0.4s ease;
+}
+
+/* スピン回転アニメーション */
+.is-refreshing .refresh-icon,
+.is-refreshing .panel-refresh-icon,
+.is-refreshing .sync-icon {
+  animation: spin-refresh-anim 0.65s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes spin-refresh-anim {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* エディタ上部（セクション編集バー内）のプレビュー更新ボタン */
+.btn-editor-sync-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px !important;
+  font-size: 0.76rem !important;
+  font-weight: 600 !important;
+  color: #2563eb !important;
+  background: #ffffff !important;
+  border: 1px solid #bfdbfe !important;
+  border-radius: 4px !important;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-editor-sync-preview:hover {
+  background: #eff6ff !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.2);
+}
+
+.btn-editor-sync-preview:active {
+  transform: scale(0.97);
+}
+
+
 
