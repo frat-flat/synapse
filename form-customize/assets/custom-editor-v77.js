@@ -5844,6 +5844,7 @@
     activeSec.questions.forEach(q => {
       const qCard = document.createElement('div');
       qCard.className = 'preview-q-card';
+      qCard.dataset.questionId = q.id;
       qCard.style.cssText = 'background:rgba(0,0,0,0.015); border:1px solid var(--color-border); border-radius:4px; padding:12px; margin-bottom:12px; display:flex; flex-direction:column; gap:6px; transition:border-color 0.2s;';
 
       const reqAsterisk = q.required ? `<span style="color:var(--color-danger, #dc3545); margin-right:4px;">*</span>` : '';
@@ -5858,10 +5859,10 @@
       } else if (q.type === 'radio') {
         let opts = "";
         const options = q.options || [{ label: "選択肢1" }, { label: "選択肢2" }];
-        options.forEach(opt => {
+        options.forEach((opt, idx) => {
           opts += `
             <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; margin:0; cursor:default;">
-              <input type="radio" disabled style="margin:0;" /> ${escapeHtml(opt.label || '')}
+              <input type="radio" disabled style="margin:0;" /> <span class="preview-opt-label-text" data-opt-index="${idx}">${escapeHtml(opt.label || '')}</span>
             </label>
           `;
         });
@@ -5869,10 +5870,10 @@
       } else if (q.type === 'checkbox') {
         let opts = "";
         const options = q.options || [{ label: "選択肢1" }, { label: "選択肢2" }];
-        options.forEach(opt => {
+        options.forEach((opt, idx) => {
           opts += `
             <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; margin:0; cursor:default;">
-              <input type="checkbox" disabled style="margin:0;" /> ${escapeHtml(opt.label || '')}
+              <input type="checkbox" disabled style="margin:0;" /> <span class="preview-opt-label-text" data-opt-index="${idx}">${escapeHtml(opt.label || '')}</span>
             </label>
           `;
         });
@@ -5880,8 +5881,8 @@
       } else if (q.type === 'select') {
         let opts = `<option value="">選択してください</option>`;
         const options = q.options || [{ label: "選択肢1" }, { label: "選択肢2" }];
-        options.forEach(opt => {
-          opts += `<option>${escapeHtml(opt.label || '')}</option>`;
+        options.forEach((opt, idx) => {
+          opts += `<option data-opt-index="${idx}">${escapeHtml(opt.label || '')}</option>`;
         });
         inputHtml = `<select class="form-control form-control-sm" disabled style="opacity: 0.8; background: var(--color-bg-input);">${opts}</select>`;
       } else if (q.type === 'password') {
@@ -5915,14 +5916,14 @@
 
       let scrollHtml = "";
       if (q.scrollRequired && q.scrollText) {
-        scrollHtml = `<div style="max-height:80px; overflow-y:auto; font-size:0.7rem; padding:6px; border:1px solid var(--color-border); border-radius:4px; background:rgba(0,0,0,0.02); margin-top:4px; line-height:1.4;">${renderRichTextWithLinks(q.scrollText)}</div>`;
+        scrollHtml = `<div class="preview-q-scroll-box" style="max-height:80px; overflow-y:auto; font-size:0.7rem; padding:6px; border:1px solid var(--color-border); border-radius:4px; background:rgba(0,0,0,0.02); margin-top:4px; line-height:1.4;">${renderRichTextWithLinks(q.scrollText)}</div>`;
       }
 
       qCard.innerHTML = `
         <div class="preview-q-title" style="font-size:var(--preview-label-size, 0.85rem); font-weight:600; color:var(--color-text); margin:0;">
-          ${reqAsterisk}${escapeHtml(qTitle)}
+          ${reqAsterisk}<span class="preview-q-title-text">${escapeHtml(qTitle)}</span>
         </div>
-        ${qDesc ? `<div style="font-size:0.7rem; color:var(--color-text-muted); margin-top:-2px; line-height:1.4;">${renderRichTextWithLinks(qDesc)}</div>` : ''}
+        ${qDesc ? `<div class="preview-q-desc" style="font-size:0.7rem; color:var(--color-text-muted); margin-top:-2px; line-height:1.4;">${renderRichTextWithLinks(qDesc)}</div>` : ''}
         ${mediaHtml}
         ${scrollHtml}
         <div class="preview-q-input-wrap" style="margin-top:4px;">
@@ -5956,9 +5957,138 @@
 
   }
 
-  // リアクティブ・ステート・ポーリングループ
+  // 高速インプレース・プレビュー更新（文字入力時の全DOM破棄・チラつき・遅延を解消）
+  function fastUpdateLivePreview(type, value, extra) {
+    if (type === 'form_title') {
+      const el = document.getElementById('live-preview-form-title');
+      if (el) el.textContent = value || "フォーム";
+      const mob = document.querySelector('.mobile-preview-title');
+      if (mob) mob.textContent = value || "フォーム";
+    } else if (type === 'form_desc') {
+      const el = document.getElementById('live-preview-form-desc');
+      if (el) el.innerHTML = renderRichTextWithLinks(value || "");
+    } else if (type === 'section_title') {
+      const el = document.querySelector('.live-preview-section-header h3');
+      if (el) {
+        el.textContent = value || "セクションタイトル";
+      } else {
+        debouncedTriggerLivePreview(true);
+      }
+    } else if (type === 'section_desc') {
+      const el = document.querySelector('.live-preview-section-header p');
+      if (el) {
+        el.innerHTML = renderRichTextWithLinks(value || "");
+        el.style.display = value ? 'block' : 'none';
+      } else if (value) {
+        const header = document.querySelector('.live-preview-section-header');
+        if (header) {
+          const p = document.createElement('p');
+          p.style.cssText = 'font-size:0.75rem; color:var(--color-text-muted); margin:4px 0 0 0; line-height:1.5;';
+          p.innerHTML = renderRichTextWithLinks(value);
+          header.appendChild(p);
+        }
+      }
+    } else if (type === 'question_title' && extra && extra.questionId) {
+      const card = document.querySelector(`.preview-q-card[data-question-id="${extra.questionId}"]`);
+      if (card) {
+        const span = card.querySelector('.preview-q-title-text');
+        if (span) span.textContent = value || "無題の質問";
+      }
+    } else if (type === 'question_desc' && extra && extra.questionId) {
+      const card = document.querySelector(`.preview-q-card[data-question-id="${extra.questionId}"]`);
+      if (card) {
+        let descDiv = card.querySelector('.preview-q-desc');
+        if (descDiv) {
+          descDiv.innerHTML = renderRichTextWithLinks(value || "");
+          descDiv.style.display = value ? 'block' : 'none';
+        } else if (value) {
+          debouncedTriggerLivePreview(true);
+        }
+      }
+    } else if (type === 'question_scroll' && extra && extra.questionId) {
+      const card = document.querySelector(`.preview-q-card[data-question-id="${extra.questionId}"]`);
+      if (card) {
+        const scrollBox = card.querySelector('.preview-q-scroll-box');
+        if (scrollBox) scrollBox.innerHTML = renderRichTextWithLinks(value || "");
+      }
+    } else if (type === 'option_label' && extra && extra.questionId && extra.optionIndex !== undefined) {
+      const card = document.querySelector(`.preview-q-card[data-question-id="${extra.questionId}"]`);
+      if (card) {
+        const optText = card.querySelector(`.preview-opt-label-text[data-opt-index="${extra.optionIndex}"]`);
+        if (optText) optText.textContent = value || "";
+        const selectOpt = card.querySelector(`select option[data-opt-index="${extra.optionIndex}"]`);
+        if (selectOpt) selectOpt.textContent = value || "";
+      }
+    }
+  }
+  window.fastUpdateLivePreview = fastUpdateLivePreview;
+
+  // アニメーションフレーム合流（多重描画・過負荷抑制）
+  let _livePreviewRaf = null;
+  function debouncedTriggerLivePreview(force = false) {
+    if (force) {
+      if (_livePreviewRaf) { cancelAnimationFrame(_livePreviewRaf); _livePreviewRaf = null; }
+      renderLivePreview();
+      return;
+    }
+    if (_livePreviewRaf) return;
+    _livePreviewRaf = requestAnimationFrame(() => {
+      _livePreviewRaf = null;
+      renderLivePreview();
+    });
+  }
+  window.triggerLivePreview = debouncedTriggerLivePreview;
+
+  // エディタ入力の包括的イベント委譲（任意の入力欄から即座にインプレース同期）
+  function setupLiveEditorInputDelegation() {
+    const panel = document.getElementById('panel-editor');
+    if (!panel || panel._liveDelegated) return;
+    panel._liveDelegated = true;
+
+    panel.addEventListener('input', (e) => {
+      const t = e.target;
+      if (!t) return;
+      if (t.id === 'editor-form-title') {
+        fastUpdateLivePreview('form_title', t.value);
+      } else if (t.id === 'editor-form-desc') {
+        fastUpdateLivePreview('form_desc', t.value);
+      } else if (t.id === 'editor-section-title') {
+        fastUpdateLivePreview('section_title', t.value);
+      } else if (t.id === 'editor-section-desc') {
+        fastUpdateLivePreview('section_desc', t.value);
+      } else if (t.classList.contains('q-desc-input')) {
+        fastUpdateLivePreview('question_desc', t.value, { questionId: t.dataset.questionId });
+      } else if (t.classList.contains('q-scroll-input')) {
+        fastUpdateLivePreview('question_scroll', t.value, { questionId: t.dataset.questionId });
+      } else {
+        const card = t.closest('.question-card');
+        if (card && t.placeholder && t.placeholder.includes('タイトル')) {
+          fastUpdateLivePreview('question_title', t.value, { questionId: card.dataset.questionId });
+        }
+        const optRow = t.closest('.option-edit-row');
+        if (optRow && card) {
+          const rows = Array.from(card.querySelectorAll('.option-edit-row'));
+          const optIdx = rows.indexOf(optRow);
+          if (optIdx !== -1) {
+            fastUpdateLivePreview('option_label', t.value, { questionId: card.dataset.questionId, optionIndex: optIdx });
+          }
+        }
+      }
+    });
+  }
+  setupLiveEditorInputDelegation();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupLiveEditorInputDelegation);
+  }
+
+  // リアクティブ・ステート・ポーリングループ（入力中の破棄を防止）
   let lastStateStr = "";
   setInterval(() => {
+    // ユーザーがテキスト入力中の場合はプレビューの強制再描画（DOM破棄）を抑止してタイピングを保護
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+      return;
+    }
     if (window.n) {
       const active = getActiveSection();
       const secTitleInput = document.getElementById('editor-section-title')?.value || "";
@@ -5982,14 +6112,12 @@
 
       if (currentStateStr !== lastStateStr) {
         lastStateStr = currentStateStr;
-        console.log('Master state changed. Reactive refreshing live preview...');
         renderLivePreview();
         applyPreviewTheme();
       }
     }
   }, 250);
 
-  window.triggerLivePreview = renderLivePreview;
   window.triggerFlowmapRender = refreshFlowmapPortsAndStyles;
 
   function setupValidationInterceptors() {
