@@ -6260,3 +6260,243 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   user-select: text;
 }
 
+/* ================= Google スプレッドシート風 グラフ機能スタイル ================= */
+
+/* フローティンググラフカード */
+.sheets-floating-chart-card {
+  position: absolute;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  z-index: 85;
+  min-width: 320px;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.sheets-floating-chart-card.selected {
+  outline: 2px solid #2563eb;
+}
+
+/* リサイズハンドル (四隅・四辺の青い点) */
+.sheets-floating-chart-card .chart-resize-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #2563eb;
+  border: 1px solid #ffffff;
+  z-index: 10;
+  display: none;
+}
+.sheets-floating-chart-card.selected .chart-resize-handle {
+  display: block;
+}
+.chart-resize-handle.handle-nw { top: -4px; left: -4px; cursor: nwse-resize; }
+.chart-resize-handle.handle-ne { top: -4px; right: -4px; cursor: nesw-resize; }
+.chart-resize-handle.handle-sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
+.chart-resize-handle.handle-se { bottom: -4px; right: -4px; cursor: nwse-resize; }
+.chart-resize-handle.handle-n  { top: -4px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+.chart-resize-handle.handle-s  { bottom: -4px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+.chart-resize-handle.handle-w  { top: 50%; left: -4px; transform: translateY(-50%); cursor: ew-resize; }
+.chart-resize-handle.handle-e  { top: 50%; right: -4px; transform: translateY(-50%); cursor: ew-resize; }
+
+/* グラフヘッダー */
+.sheets-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.65rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-surface-elevated, #f8fafc);
+  cursor: grab;
+  border-radius: 6px 6px 0 0;
+}
+.sheets-chart-header:active {
+  cursor: grabbing;
+}
+
+.sheets-chart-title-input {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  outline: none;
+  flex: 1;
+  margin-right: 0.5rem;
+}
+.sheets-chart-title-input:hover {
+  border-color: var(--border-color);
+}
+.sheets-chart-title-input:focus {
+  border-color: #2563eb;
+  background: var(--bg-surface);
+}
+
+.sheets-chart-dots-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  line-height: 1;
+}
+.sheets-chart-dots-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-primary);
+}
+
+/* 3点リーダー ドロップダウンメニュー */
+.sheets-chart-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0.5rem;
+  background: var(--bg-surface-elevated, #ffffff);
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+  z-index: 100;
+  min-width: 180px;
+  padding: 0.35rem 0;
+  display: none;
+  flex-direction: column;
+}
+.sheets-chart-menu-dropdown.show {
+  display: flex !important;
+}
+
+.sheets-chart-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.1s;
+}
+.sheets-chart-menu-item:hover {
+  background-color: var(--primary-light, rgba(37, 99, 235, 0.08));
+  color: var(--primary, #2563eb);
+}
+.sheets-chart-menu-divider {
+  height: 1px;
+  background-color: var(--border-color, #e2e8f0);
+  margin: 0.25rem 0;
+}
+
+/* グラフキャンバスコンテナ */
+.sheets-chart-canvas-box {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sheets-chart-canvas-box canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* グラフエディタ サイドバー */
+.sheets-chart-editor-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 320px;
+  height: 100vh;
+  background: var(--bg-surface, #ffffff);
+  border-left: 1px solid var(--border-color, #cbd5e1);
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  animation: chartSidebarSlideIn 0.2s ease-out;
+}
+@keyframes chartSidebarSlideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* グラフ種類選択ポップアップ (Image 2) */
+.chart-type-picker-popup {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 290px;
+  max-height: 440px;
+  overflow-y: auto;
+  background: var(--bg-surface-elevated, #ffffff);
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  z-index: 1100;
+  padding: 0.4rem 0.5rem;
+}
+
+.chart-type-category-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted, #64748b);
+  padding: 0.35rem 0.25rem 0.2rem;
+  text-transform: uppercase;
+}
+
+.chart-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 5px;
+  margin-bottom: 0.4rem;
+}
+
+.chart-type-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.2rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  user-select: none;
+}
+.chart-type-option:hover {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.05);
+}
+.chart-type-option.active {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.12);
+  outline: 2px solid #2563eb;
+}
+.chart-type-option .thumb-icon {
+  font-size: 1.4rem;
+  margin-bottom: 0.2rem;
+  line-height: 1;
+}
+.chart-type-option .thumb-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.1;
+}
+.chart-type-option.active .thumb-label {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+

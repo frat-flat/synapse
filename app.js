@@ -11315,6 +11315,23 @@ function renderTableControlBar(tableId, parentContainerEl) {
     });
     leftDiv.appendChild(colDisplayBtn);
 
+    // 📊 グラフ作成ボタン
+    const chartBtn = document.createElement('button');
+    chartBtn.className = 'btn btn-secondary';
+    chartBtn.style.padding = '0.22rem 0.55rem';
+    chartBtn.style.fontSize = '0.78rem';
+    chartBtn.style.display = 'flex';
+    chartBtn.style.alignItems = 'center';
+    chartBtn.style.gap = '0.3rem';
+    chartBtn.innerHTML = `<span>📊</span> <span>グラフ</span>`;
+    chartBtn.title = '選択した項目またはテーブルデータからグラフを作成します';
+    chartBtn.addEventListener('click', () => {
+      if (typeof createNewChartFromTable === 'function') {
+        createNewChartFromTable(tableId);
+      }
+    });
+    leftDiv.appendChild(chartBtn);
+
   }
 
   const rightDiv = document.createElement('div');
@@ -11993,7 +12010,7 @@ function showLoginScreen(show) {
         const activeView = document.getElementById(activeTab.type);
         if (activeView) {
           activeView.classList.add('active');
-          activeView.style.display = 'block';
+          activeView.style.display = activeTab.type === 'chart-sheet-screen' ? 'flex' : 'block';
           applyZoom(activeTab.zoomLevel || 100);
         }
         state.currentView = activeTab.type;
@@ -12899,16 +12916,18 @@ function activateTab(id) {
     applyZoom(currentZoom);
   } else if (tab.type === 'party-id-mgmt-screen') {
     loadPartyIds();
+  } else if (tab.type === 'chart-sheet-screen') {
+    if (tab.chartId && typeof renderChartSheetView === 'function') {
+      renderChartSheetView(tab.chartId);
+    }
   }
-
-
 
   // 画面表示切り替え
   const views = document.querySelectorAll('.screen-view');
   views.forEach(v => {
     if (v.id === tab.type) {
       v.classList.add('active');
-      v.style.display = 'block';
+      v.style.display = tab.type === 'chart-sheet-screen' ? 'flex' : 'block';
       applyZoom(tab.zoomLevel || 100);
     } else {
       v.classList.remove('active');
@@ -42183,6 +42202,13 @@ function handleSpreadsheetMenuAction(action, label) {
       break;
     }
 
+    case 'insert-chart': {
+      if (typeof createNewChartFromTable === 'function') {
+        createNewChartFromTable(tableId);
+      }
+      break;
+    }
+
     case 'insert-sticky': {
       const stickyBtn = document.getElementById('header-add-sticky-btn');
       if (stickyBtn) stickyBtn.click();
@@ -42269,11 +42295,911 @@ function handleSpreadsheetMenuAction(action, label) {
   }
 }
 
+// ============================================================================
+// Google スプレッドシート形式 グラフ機能システム
+// ============================================================================
+
+// グラフ全種類の定義（Image 2準拠）
+const CHART_TYPE_DEFINITIONS = {
+  // 候補
+  'scatter': { id: 'scatter', label: '散布図', icon: '⚄', category: '候補', baseType: 'scatter' },
+  'bar': { id: 'bar', label: '縦棒グラフ', icon: '📊', category: '候補', baseType: 'bar' },
+  'pie': { id: 'pie', label: '円グラフ', icon: '🥧', category: '候補', baseType: 'pie' },
+  'line': { id: 'line', label: '折れ線グラフ', icon: '📈', category: '候補', baseType: 'line' },
+
+  // 折れ線
+  'line-smooth': { id: 'line-smooth', label: 'スムーズ折れ線', icon: '〰️', category: '折れ線', baseType: 'line', tension: 0.4 },
+
+  // 複合グラフ
+  'combo-bar-line': { id: 'combo-bar-line', label: '縦棒＋折れ線', icon: '📊📈', category: '複合グラフ', baseType: 'combo' },
+  'combo-stacked-line': { id: 'combo-stacked-line', label: '積み上げ縦棒＋折れ線', icon: '📶📈', category: '複合グラフ', baseType: 'combo', stacked: true },
+
+  // 面
+  'area': { id: 'area', label: '面グラフ', icon: '⛰️', category: '面', baseType: 'line', fill: true },
+  'area-stacked': { id: 'area-stacked', label: '積み上げ面グラフ', icon: '🏔️', category: '面', baseType: 'line', fill: true, stacked: true },
+  'area-stacked-100': { id: 'area-stacked-100', label: '100%積み上げ面', icon: '🏔️', category: '面', baseType: 'line', fill: true, stacked: '100%' },
+
+  // 縦棒
+  'bar-stacked': { id: 'bar-stacked', label: '積み上げ縦棒グラフ', icon: '📶', category: '縦棒', baseType: 'bar', stacked: true },
+  'bar-stacked-100': { id: 'bar-stacked-100', label: '100%積み上げ縦棒', icon: '📶', category: '縦棒', baseType: 'bar', stacked: '100%' },
+
+  // 横棒
+  'bar-horizontal': { id: 'bar-horizontal', label: '横棒グラフ', icon: '🔲', category: '横棒', baseType: 'bar', indexAxis: 'y' },
+  'bar-horizontal-stacked': { id: 'bar-horizontal-stacked', label: '積み上げ横棒グラフ', icon: '🔲', category: '横棒', baseType: 'bar', indexAxis: 'y', stacked: true },
+  'bar-horizontal-stacked-100': { id: 'bar-horizontal-stacked-100', label: '100%積み上げ横棒', icon: '🔲', category: '横棒', baseType: 'bar', indexAxis: 'y', stacked: '100%' },
+
+  // 円
+  'doughnut': { id: 'doughnut', label: 'ドーナツグラフ', icon: '🍩', category: '円', baseType: 'doughnut' },
+
+  // 散布図
+  'bubble': { id: 'bubble', label: 'バブルチャート', icon: '🫧', category: '散布図', baseType: 'bubble' },
+
+  // その他
+  'histogram': { id: 'histogram', label: 'ヒストグラム', icon: '📊', category: 'その他', baseType: 'bar' },
+  'radar': { id: 'radar', label: 'レーダーチャート', icon: '🕸️', category: 'その他', baseType: 'radar' },
+  'scorecard': { id: 'scorecard', label: 'スコアカード', icon: '🔢', category: 'その他', baseType: 'scorecard' }
+};
+
+if (typeof state !== 'undefined') {
+  state.activeCharts = state.activeCharts || {};
+  state.chartCounter = state.chartCounter || 0;
+  state.currentEditingChartId = null;
+}
+
+function parseChartNum(val) {
+  if (val === null || val === undefined || val === '') return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  const cleaned = String(val).replace(/[^0-9.-]/g, '');
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+}
+
+function parseChartDateOrNum(val) {
+  if (val === null || val === undefined || val === '') return 0;
+  if (typeof val === 'number') return val;
+  const s = String(val).trim();
+  const match = s.match(/(\d{4})[年/-](\d{1,2})[月/-](\d{1,2})/);
+  if (match) {
+    return new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10)).getTime();
+  }
+  const timestamp = Date.parse(s);
+  if (!isNaN(timestamp) && s.length > 5 && isNaN(Number(s))) {
+    return timestamp;
+  }
+  const n = parseChartNum(s);
+  return n !== 0 ? n : s;
+}
+
+function getColumnDisplayName(meta, colId) {
+  if (!meta || !meta.columns) return colId;
+  const col = meta.columns.find(c => c.id === colId);
+  return col ? (col.name || col.id) : colId;
+}
+
+// グラフ新規作成
+function createNewChartFromTable(tableId, options = {}) {
+  const normId = normalizeTableId(tableId);
+  const meta = getTableMeta(normId);
+  if (!meta || !meta.columns || meta.columns.length === 0) {
+    showToast('グラフを作成できるカラムが存在しません。', 'error');
+    return;
+  }
+
+  const cols = meta.columns;
+  const rows = meta.rows || [];
+
+  // X軸候補カラムの特定（日付・文字列・名称系を優先）
+  let xCol = options.xAxisCol;
+  if (!xCol) {
+    const candidateX = cols.find(c => (c.id.toLowerCase().includes('date') || c.name.includes('日') || c.id.includes('time') || c.type === 'date')) ||
+                       cols.find(c => (c.name.includes('店') || c.name.includes('名') || c.id.includes('name'))) ||
+                       cols[1] || cols[0];
+    xCol = candidateX ? candidateX.id : cols[0].id;
+  }
+
+  // Y軸（系列）候補カラムの特定（数値・ID・金額系を優先）
+  let yCols = options.yAxisCols;
+  if (!yCols || yCols.length === 0) {
+    const candidateY = cols.find(c => c.id !== xCol && (c.type === 'number' || c.id.toLowerCase().includes('id') || c.name.includes('番号') || c.name.includes('額') || c.name.includes('金'))) ||
+                       cols.find(c => c.id !== xCol) ||
+                       cols[0];
+    yCols = [candidateY ? candidateY.id : cols[0].id];
+  }
+
+  const chartId = 'chart_' + Date.now() + '_' + (++state.chartCounter);
+  const xColName = getColumnDisplayName(meta, xCol);
+  const yColName = getColumnDisplayName(meta, yCols[0]);
+  const defaultTitle = `${yColName} と ${xColName}`;
+
+  const chartObj = {
+    id: chartId,
+    tableId: normId,
+    title: defaultTitle,
+    type: options.type || 'scatter',
+    xAxisCol: xCol,
+    yAxisCols: yCols,
+    isAggregated: options.isAggregated || false,
+    legendPos: 'top',
+    bgColor: '#ffffff',
+    instance: null,
+    sheetInstance: null
+  };
+
+  state.activeCharts[chartId] = chartObj;
+
+  renderFloatingChart(chartId);
+  openChartEditor(chartId);
+
+  showToast(`グラフ「${defaultTitle}」を作成しました。`, 'success');
+}
+
+// グラフデータセット・Chart.js設定の生成
+function buildChartDatasetsAndOptions(chart, rows, meta) {
+  const xColId = chart.xAxisCol;
+  const yCols = chart.yAxisCols || [];
+  const typeDef = CHART_TYPE_DEFINITIONS[chart.type] || CHART_TYPE_DEFINITIONS['scatter'];
+  const colors = ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D01', '#46BDC6', '#7BAAF7', '#F07B72', '#FCD06F', '#71C287'];
+
+  // 集計（Aggregation）または 円/ドーナツグラフ
+  if (chart.isAggregated || typeDef.baseType === 'pie' || typeDef.baseType === 'doughnut') {
+    const groups = new Map();
+    rows.forEach(r => {
+      const xVal = String(r[xColId] || '（未設定）');
+      if (!groups.has(xVal)) {
+        groups.set(xVal, { count: 0, sums: {} });
+        yCols.forEach(yCol => { groups.get(xVal).sums[yCol] = 0; });
+      }
+      const g = groups.get(xVal);
+      g.count += 1;
+      yCols.forEach(yCol => {
+        g.sums[yCol] += parseChartNum(r[yCol]);
+      });
+    });
+
+    const labels = Array.from(groups.keys());
+    if (typeDef.baseType === 'pie' || typeDef.baseType === 'doughnut') {
+      const primaryY = yCols[0];
+      const data = labels.map(lbl => primaryY ? groups.get(lbl).sums[primaryY] : groups.get(lbl).count);
+      return {
+        type: typeDef.baseType,
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: colors.slice(0, labels.length)
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: chart.legendPos || 'top' },
+            title: { display: true, text: chart.title }
+          }
+        }
+      };
+    } else {
+      const datasets = yCols.map((yCol, idx) => ({
+        label: getColumnDisplayName(meta, yCol),
+        data: labels.map(lbl => groups.get(lbl).sums[yCol]),
+        backgroundColor: colors[idx % colors.length] + 'cc',
+        borderColor: colors[idx % colors.length],
+        borderWidth: 1.5,
+        type: typeDef.baseType === 'combo' ? (idx === 0 ? 'bar' : 'line') : (typeDef.baseType === 'histogram' ? 'bar' : typeDef.baseType),
+        fill: typeDef.fill || false,
+        tension: typeDef.tension || 0
+      }));
+
+      return {
+        type: typeDef.baseType === 'combo' ? 'bar' : (typeDef.baseType === 'histogram' ? 'bar' : typeDef.baseType),
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: typeDef.indexAxis || 'x',
+          scales: {
+            x: { stacked: typeDef.stacked === true || typeDef.stacked === '100%' },
+            y: { stacked: typeDef.stacked === true || typeDef.stacked === '100%' }
+          },
+          plugins: {
+            legend: { position: chart.legendPos || 'top' },
+            title: { display: true, text: chart.title }
+          }
+        }
+      };
+    }
+  }
+
+  // 散布図 (Scatter) または バブル (Bubble)
+  if (typeDef.baseType === 'scatter' || typeDef.baseType === 'bubble') {
+    const isDateX = rows.some(r => {
+      const v = String(r[xColId] || '');
+      return v.includes('年') || v.includes('-') || v.includes('/');
+    });
+
+    const datasets = yCols.map((yCol, idx) => {
+      const pts = rows.map(r => {
+        const xRaw = r[xColId];
+        const yRaw = r[yCol];
+        return {
+          x: isDateX ? parseChartDateOrNum(xRaw) : parseChartNum(xRaw),
+          y: parseChartNum(yRaw),
+          r: typeDef.baseType === 'bubble' ? Math.max(4, Math.min(18, parseChartNum(yRaw) / 200)) : 4.5
+        };
+      }).filter(p => p.x !== null && !isNaN(p.y));
+
+      return {
+        label: getColumnDisplayName(meta, yCol),
+        data: pts,
+        backgroundColor: colors[idx % colors.length] + 'cc',
+        borderColor: colors[idx % colors.length],
+        pointRadius: 4.5,
+        pointHoverRadius: 7
+      };
+    });
+
+    return {
+      type: 'scatter',
+      data: { datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            type: 'linear',
+            ticks: {
+              callback: function(val) {
+                if (isDateX && val > 100000000000) {
+                  const d = new Date(val);
+                  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+                }
+                return val;
+              }
+            },
+            title: { display: true, text: getColumnDisplayName(meta, xColId) }
+          },
+          y: {
+            title: { display: true, text: yCols.map(y => getColumnDisplayName(meta, y)).join(', ') }
+          }
+        },
+        plugins: {
+          legend: { position: chart.legendPos || 'top' },
+          title: { display: true, text: chart.title }
+        }
+      }
+    };
+  }
+
+  // 標準的な折れ線 / 縦棒 / 横棒 / 面 / 複合グラフ
+  const labels = rows.map(r => String(r[xColId] || ''));
+  const datasets = yCols.map((yCol, idx) => ({
+    label: getColumnDisplayName(meta, yCol),
+    data: rows.map(r => parseChartNum(r[yCol])),
+    backgroundColor: colors[idx % colors.length] + 'cc',
+    borderColor: colors[idx % colors.length],
+    borderWidth: 1.5,
+    type: typeDef.baseType === 'combo' ? (idx === 0 ? 'bar' : 'line') : (typeDef.baseType === 'histogram' ? 'bar' : typeDef.baseType),
+    fill: typeDef.fill || false,
+    tension: typeDef.tension || 0
+  }));
+
+  return {
+    type: typeDef.baseType === 'combo' ? 'bar' : (typeDef.baseType === 'histogram' ? 'bar' : typeDef.baseType),
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: typeDef.indexAxis || 'x',
+      scales: {
+        x: { stacked: typeDef.stacked === true || typeDef.stacked === '100%' },
+        y: { stacked: typeDef.stacked === true || typeDef.stacked === '100%' }
+      },
+      plugins: {
+        legend: { position: chart.legendPos || 'top' },
+        title: { display: true, text: chart.title }
+      }
+    }
+  };
+}
+
+// フローティンググラフカードの描画
+function renderFloatingChart(chartId) {
+  const chart = state.activeCharts[chartId];
+  if (!chart) return;
+
+  const targetScreen = document.querySelector('.screen-view.active') || document.querySelector('.main-content');
+  if (!targetScreen) return;
+
+  // 既存カードがあれば削除
+  const oldCard = document.getElementById('floating-chart-' + chartId);
+  if (oldCard) oldCard.remove();
+
+  const card = document.createElement('div');
+  card.id = 'floating-chart-' + chartId;
+  card.className = 'sheets-floating-chart-card selected';
+
+  // 配置位置
+  const count = Object.keys(state.activeCharts).length;
+  card.style.top = `${60 + (count * 20)}px`;
+  card.style.left = `${140 + (count * 20)}px`;
+  card.style.width = '520px';
+  card.style.height = '340px';
+
+  card.innerHTML = `
+    <!-- リサイズハンドル 8点 -->
+    <div class="chart-resize-handle handle-nw"></div>
+    <div class="chart-resize-handle handle-n"></div>
+    <div class="chart-resize-handle handle-ne"></div>
+    <div class="chart-resize-handle handle-e"></div>
+    <div class="chart-resize-handle handle-se"></div>
+    <div class="chart-resize-handle handle-s"></div>
+    <div class="chart-resize-handle handle-sw"></div>
+    <div class="chart-resize-handle handle-w"></div>
+
+    <!-- グラフヘッダー (タイトル ＆ 3点リーダー) -->
+    <div class="sheets-chart-header">
+      <input type="text" class="sheets-chart-title-input" value="${chart.title}" title="タイトルを編集">
+      <div style="position: relative;">
+        <button type="button" class="sheets-chart-dots-btn" title="オプション">⋮</button>
+        <!-- 3点リーダーメニュー (Image 3 完全再現) -->
+        <div class="sheets-chart-menu-dropdown">
+          <div class="sheets-chart-menu-item" data-action="chart-edit">
+            <span>✏️</span> <span>グラフを編集</span>
+          </div>
+          <div class="sheets-chart-menu-item" data-action="chart-delete">
+            <span>🗑️</span> <span>グラフを削除</span>
+          </div>
+          <div class="sheets-chart-menu-divider"></div>
+          <div class="sheets-chart-menu-item" data-action="chart-download">
+            <span>📥</span> <span>グラフをダウンロード</span>
+          </div>
+          <div class="sheets-chart-menu-item" data-action="chart-copy">
+            <span>📋</span> <span>グラフをコピー</span>
+          </div>
+          <div class="sheets-chart-menu-divider"></div>
+          <div class="sheets-chart-menu-item" data-action="chart-move-sheet">
+            <span>↪️</span> <span style="font-weight: 700; color: #2563eb;">個別のシートに移動</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- グラフキャンバス -->
+    <div class="sheets-chart-canvas-box">
+      <canvas id="canvas-${chartId}"></canvas>
+    </div>
+  `;
+
+  targetScreen.appendChild(card);
+
+  // タイトル入力変更イベント
+  const titleInput = card.querySelector('.sheets-chart-title-input');
+  titleInput.addEventListener('input', (e) => {
+    chart.title = e.target.value;
+    const customTitle = document.getElementById('chart-custom-title-input');
+    if (customTitle) customTitle.value = e.target.value;
+  });
+
+  // 3点リーダーボタントグル
+  const dotsBtn = card.querySelector('.sheets-chart-dots-btn');
+  const dropdown = card.querySelector('.sheets-chart-menu-dropdown');
+  dotsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('show');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.sheets-chart-header')) {
+      dropdown.classList.remove('show');
+    }
+  });
+
+  // メニューアクション
+  dropdown.addEventListener('click', (e) => {
+    const item = e.target.closest('.sheets-chart-menu-item');
+    if (!item) return;
+    e.stopPropagation();
+    dropdown.classList.remove('show');
+
+    const action = item.dataset.action;
+    if (action === 'chart-edit') {
+      openChartEditor(chartId);
+    } else if (action === 'chart-delete') {
+      removeChart(chartId);
+    } else if (action === 'chart-download') {
+      downloadChartImage(chartId, 'png');
+    } else if (action === 'chart-copy') {
+      downloadChartImage(chartId, 'png');
+    } else if (action === 'chart-move-sheet') {
+      moveChartToOwnSheet(chartId);
+    }
+  });
+
+  // ドラッグ＆リサイズバインディング
+  makeChartCardDraggableAndResizable(card, chartId);
+
+  // Chart.js インスタンス生成
+  const canvas = card.querySelector(`#canvas-${chartId}`);
+  const meta = getTableMeta(normalizeTableId(chart.tableId));
+  const cfg = buildChartDatasetsAndOptions(chart, meta.rows || [], meta);
+
+  if (typeof Chart !== 'undefined') {
+    chart.instance = new Chart(canvas, cfg);
+  }
+}
+
+// ドラッグ & リサイズ制御
+function makeChartCardDraggableAndResizable(card, chartId) {
+  const header = card.querySelector('.sheets-chart-header');
+  let isDragging = false;
+  let startX, startY, startLeft, startTop;
+
+  header.addEventListener('mousedown', (e) => {
+    if (e.target.closest('input, button, .sheets-chart-menu-dropdown')) return;
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    startLeft = card.offsetLeft;
+    startTop = card.offsetTop;
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    e.preventDefault();
+  });
+
+  function onMouseMove(e) {
+    if (!isDragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    card.style.left = `${Math.max(10, startLeft + dx)}px`;
+    card.style.top = `${Math.max(10, startTop + dy)}px`;
+  }
+
+  function onMouseUp() {
+    isDragging = false;
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  }
+
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.sheets-floating-chart-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+  });
+
+  const handles = card.querySelectorAll('.chart-resize-handle');
+  handles.forEach(handle => {
+    handle.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const startW = card.offsetWidth;
+      const startH = card.offsetHeight;
+      const sX = e.clientX;
+      const sY = e.clientY;
+
+      function onResizeMove(ev) {
+        const dw = ev.clientX - sX;
+        const dh = ev.clientY - sY;
+        if (handle.classList.contains('handle-se') || handle.classList.contains('handle-e')) {
+          card.style.width = `${Math.max(280, startW + dw)}px`;
+        }
+        if (handle.classList.contains('handle-se') || handle.classList.contains('handle-s')) {
+          card.style.height = `${Math.max(200, startH + dh)}px`;
+        }
+        const chart = state.activeCharts[chartId];
+        if (chart && chart.instance) {
+          chart.instance.resize();
+        }
+      }
+
+      function onResizeUp() {
+        document.removeEventListener('mousemove', onResizeMove);
+        document.removeEventListener('mouseup', onResizeUp);
+      }
+
+      document.addEventListener('mousemove', onResizeMove);
+      document.addEventListener('mouseup', onResizeUp);
+    });
+  });
+}
+
+// グラフ再描画（設定変更時）
+function refreshChart(chartId) {
+  const chart = state.activeCharts[chartId];
+  if (!chart) return;
+
+  const meta = getTableMeta(normalizeTableId(chart.tableId));
+  const cfg = buildChartDatasetsAndOptions(chart, meta.rows || [], meta);
+
+  // フローティンググラフ更新
+  if (chart.instance) {
+    chart.instance.destroy();
+    const canvas = document.getElementById(`canvas-${chartId}`);
+    if (canvas && typeof Chart !== 'undefined') {
+      chart.instance = new Chart(canvas, cfg);
+    }
+  }
+
+  // 個別シートビュー更新
+  if (chart.sheetInstance) {
+    chart.sheetInstance.destroy();
+    const sheetCanvas = document.getElementById('chart-sheet-canvas');
+    if (sheetCanvas && typeof Chart !== 'undefined') {
+      chart.sheetInstance = new Chart(sheetCanvas, cfg);
+    }
+  }
+
+  // タイトル・バッジ更新
+  const sheetTitle = document.getElementById('chart-sheet-title-text');
+  if (sheetTitle) sheetTitle.textContent = chart.title;
+  const badgeEl = document.getElementById('chart-sheet-type-badge');
+  const typeDef = CHART_TYPE_DEFINITIONS[chart.type] || CHART_TYPE_DEFINITIONS['scatter'];
+  if (badgeEl) badgeEl.textContent = typeDef.label;
+}
+
+// グラフ削除
+function removeChart(chartId) {
+  const chart = state.activeCharts[chartId];
+  if (chart) {
+    if (chart.instance) chart.instance.destroy();
+    if (chart.sheetInstance) chart.sheetInstance.destroy();
+    delete state.activeCharts[chartId];
+  }
+  const card = document.getElementById('floating-chart-' + chartId);
+  if (card) card.remove();
+  closeChartEditor();
+  showToast('グラフを削除しました。', 'info');
+}
+
+// グラフエディタを開く
+function openChartEditor(chartId) {
+  const chart = state.activeCharts[chartId];
+  if (!chart) return;
+
+  state.currentEditingChartId = chartId;
+  const sidebar = document.getElementById('sheets-chart-editor-sidebar');
+  if (!sidebar) return;
+
+  const meta = getTableMeta(normalizeTableId(chart.tableId));
+  const cols = meta ? meta.columns || [] : [];
+
+  // 現在のグラフタイプ表示
+  const typeDef = CHART_TYPE_DEFINITIONS[chart.type] || CHART_TYPE_DEFINITIONS['scatter'];
+  const iconEl = document.getElementById('chart-type-current-icon');
+  const labelEl = document.getElementById('chart-type-current-label');
+  if (iconEl) iconEl.textContent = typeDef.icon;
+  if (labelEl) labelEl.textContent = typeDef.label;
+
+  // データ範囲表示
+  const rangeEl = document.getElementById('chart-editor-data-range');
+  if (rangeEl) {
+    rangeEl.textContent = `${meta.name || 'シート'}: ${chart.xAxisCol}, ${chart.yAxisCols.join(', ')}`;
+  }
+
+  // X軸セレクト構築
+  const xSelect = document.getElementById('chart-xaxis-select');
+  if (xSelect) {
+    xSelect.innerHTML = cols.map(c => `<option value="${c.id}" ${c.id === chart.xAxisCol ? 'selected' : ''}>${c.name || c.id}</option>`).join('');
+  }
+
+  // 集計チェックボックス
+  const aggChk = document.getElementById('chart-xaxis-aggregate-chk');
+  if (aggChk) aggChk.checked = !!chart.isAggregated;
+
+  // 系列一覧
+  renderChartSeriesList(chart, cols);
+
+  // カスタマイズタブのタイトル
+  const titleInput = document.getElementById('chart-custom-title-input');
+  if (titleInput) titleInput.value = chart.title;
+
+  // 凡例位置
+  const legendSelect = document.getElementById('chart-custom-legend-pos');
+  if (legendSelect) legendSelect.value = chart.legendPos || 'top';
+
+  sidebar.style.display = 'flex';
+}
+
+function renderChartSeriesList(chart, cols) {
+  const container = document.getElementById('chart-series-list');
+  if (!container) return;
+
+  container.innerHTML = '';
+  chart.yAxisCols.forEach((yColId, index) => {
+    const colObj = cols.find(c => c.id === yColId) || { id: yColId, name: yColId };
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.alignItems = 'center';
+    row.style.justifyContent = 'space-between';
+    row.style.padding = '0.35rem 0.6rem';
+    row.style.border = '1px solid var(--border-color)';
+    row.style.borderRadius = 'var(--radius-sm)';
+    row.style.background = 'var(--bg-surface)';
+    row.style.fontSize = '0.8rem';
+
+    row.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 0.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        <span style="font-size: 0.75rem; color: #2563eb;">123</span>
+        <span style="font-weight: 600; color: var(--text-primary);">${colObj.name || colObj.id}</span>
+      </div>
+      ${chart.yAxisCols.length > 1 ? `<button type="button" class="btn-remove-series" data-idx="${index}" style="background: none; border: none; color: #ef4444; font-size: 0.9rem; cursor: pointer; padding: 0 0.2rem;">✕</button>` : ''}
+    `;
+    container.appendChild(row);
+  });
+
+  container.querySelectorAll('.btn-remove-series').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(e.target.dataset.idx, 10);
+      chart.yAxisCols.splice(idx, 1);
+      renderChartSeriesList(chart, cols);
+      refreshChart(chart.id);
+    });
+  });
+}
+
+function closeChartEditor() {
+  const sidebar = document.getElementById('sheets-chart-editor-sidebar');
+  if (sidebar) sidebar.style.display = 'none';
+  state.currentEditingChartId = null;
+}
+
+// グラフ全種類 ピッカー ポップアップ構築 (Image 2)
+function renderChartTypePickerOptions() {
+  const popup = document.getElementById('chart-type-picker-popup');
+  if (!popup) return;
+
+  const categories = ['候補', '折れ線', '複合グラフ', '面', '縦棒', '横棒', '円', '散布図', 'その他'];
+  let html = '';
+
+  categories.forEach(cat => {
+    const types = Object.values(CHART_TYPE_DEFINITIONS).filter(t => t.category === cat);
+    if (types.length === 0) return;
+
+    html += `<div class="chart-type-category-title">${cat}</div>`;
+    html += `<div class="chart-type-grid">`;
+    types.forEach(t => {
+      html += `
+        <div class="chart-type-option" data-type-id="${t.id}" title="${t.label}">
+          <span class="thumb-icon">${t.icon}</span>
+          <span class="thumb-label">${t.label}</span>
+        </div>
+      `;
+    });
+    html += `</div>`;
+  });
+
+  popup.innerHTML = html;
+
+  popup.querySelectorAll('.chart-type-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const typeId = opt.dataset.typeId;
+      selectChartType(typeId);
+      popup.style.display = 'none';
+    });
+  });
+}
+
+function selectChartType(typeId) {
+  const def = CHART_TYPE_DEFINITIONS[typeId];
+  if (!def) return;
+
+  const iconEl = document.getElementById('chart-type-current-icon');
+  const labelEl = document.getElementById('chart-type-current-label');
+  if (iconEl) iconEl.textContent = def.icon;
+  if (labelEl) labelEl.textContent = def.label;
+
+  const chartId = state.currentEditingChartId;
+  if (chartId && state.activeCharts[chartId]) {
+    state.activeCharts[chartId].type = typeId;
+    refreshChart(chartId);
+    showToast(`グラフの種類を「${def.label}」に変更しました。`, 'info');
+  }
+}
+
+// 「個別のシートに移動」（シート出力機能 Image 3）
+function moveChartToOwnSheet(chartId) {
+  const chart = state.activeCharts[chartId];
+  if (!chart) return;
+
+  const tabId = 'chart-sheet-tab-' + chartId;
+  const tabTitle = '📊 ' + (chart.title || 'グラフ 1');
+
+  let tab = state.tabs.find(t => t.id === tabId);
+  if (!tab) {
+    tab = {
+      id: tabId,
+      type: 'chart-sheet-screen',
+      title: tabTitle,
+      chartId: chartId
+    };
+    state.tabs.push(tab);
+  }
+
+  // フローティングカードは非表示にしてシートに集中
+  const card = document.getElementById('floating-chart-' + chartId);
+  if (card) {
+    card.style.display = 'none';
+  }
+
+  if (typeof openTab === 'function') {
+    openTab(tabId, 'chart-sheet-screen', tabTitle);
+  }
+
+  renderChartSheetView(chartId);
+  showToast(`グラフを個別のシート「${tabTitle}」に出力しました。`, 'success');
+}
+
+// 個別シートでの全画面描画
+function renderChartSheetView(chartId) {
+  const chart = state.activeCharts[chartId];
+  if (!chart) return;
+
+  const titleEl = document.getElementById('chart-sheet-title-text');
+  if (titleEl) titleEl.textContent = chart.title || 'グラフ';
+
+  const typeDef = CHART_TYPE_DEFINITIONS[chart.type] || CHART_TYPE_DEFINITIONS['scatter'];
+  const badgeEl = document.getElementById('chart-sheet-type-badge');
+  if (badgeEl) badgeEl.textContent = typeDef.label;
+
+  const canvas = document.getElementById('chart-sheet-canvas');
+  if (!canvas) return;
+
+  if (chart.sheetInstance) {
+    chart.sheetInstance.destroy();
+  }
+
+  const meta = getTableMeta(normalizeTableId(chart.tableId));
+  const cfg = buildChartDatasetsAndOptions(chart, meta.rows || [], meta);
+  if (typeof Chart !== 'undefined') {
+    chart.sheetInstance = new Chart(canvas, cfg);
+  }
+
+  const editBtn = document.getElementById('chart-sheet-edit-btn');
+  if (editBtn) {
+    editBtn.onclick = () => openChartEditor(chartId);
+  }
+
+  const downloadBtn = document.getElementById('chart-sheet-download-btn');
+  if (downloadBtn) {
+    downloadBtn.onclick = () => downloadChartImage(chartId, 'png');
+  }
+}
+
+// グラフ画像ダウンロード (PNG)
+function downloadChartImage(chartId, format = 'png') {
+  const chart = state.activeCharts[chartId];
+  if (!chart) return;
+
+  const inst = chart.sheetInstance || chart.instance;
+  if (!inst) {
+    showToast('グラフが描画されていません。', 'error');
+    return;
+  }
+
+  const url = inst.toBase64Image();
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${chart.title || 'chart'}_${Date.now()}.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast('グラフ画像をPNGダウンロードしました。', 'success');
+}
+
+// グラフエディタのイベント初期化
+function initChartEditorEvents() {
+  const sidebar = document.getElementById('sheets-chart-editor-sidebar');
+  if (!sidebar) return;
+
+  document.getElementById('chart-editor-close-btn')?.addEventListener('click', closeChartEditor);
+
+  const tabSetup = document.getElementById('tab-btn-chart-setup');
+  const tabCustom = document.getElementById('tab-btn-chart-custom');
+  const panelSetup = document.getElementById('chart-setup-panel');
+  const panelCustom = document.getElementById('chart-custom-panel');
+
+  tabSetup?.addEventListener('click', () => {
+    tabSetup.classList.add('active');
+    tabSetup.style.borderBottomColor = '#0f9d58';
+    tabSetup.style.color = '#0f9d58';
+    tabCustom.classList.remove('active');
+    tabCustom.style.borderBottomColor = 'transparent';
+    tabCustom.style.color = 'var(--text-secondary)';
+    if (panelSetup) panelSetup.style.display = 'flex';
+    if (panelCustom) panelCustom.style.display = 'none';
+  });
+
+  tabCustom?.addEventListener('click', () => {
+    tabCustom.classList.add('active');
+    tabCustom.style.borderBottomColor = '#0f9d58';
+    tabCustom.style.color = '#0f9d58';
+    tabSetup.classList.remove('active');
+    tabSetup.style.borderBottomColor = 'transparent';
+    tabSetup.style.color = 'var(--text-secondary)';
+    if (panelCustom) panelCustom.style.display = 'flex';
+    if (panelSetup) panelSetup.style.display = 'none';
+  });
+
+  // グラフ種類ピッカー
+  const typePickerBtn = document.getElementById('chart-type-picker-btn');
+  const typePopup = document.getElementById('chart-type-picker-popup');
+  typePickerBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (typePopup) typePopup.style.display = typePopup.style.display === 'none' ? 'block' : 'none';
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#chart-type-picker-btn') && !e.target.closest('#chart-type-picker-popup')) {
+      if (typePopup) typePopup.style.display = 'none';
+    }
+  });
+
+  renderChartTypePickerOptions();
+
+  // X軸変更
+  document.getElementById('chart-xaxis-select')?.addEventListener('change', (e) => {
+    const chartId = state.currentEditingChartId;
+    if (chartId && state.activeCharts[chartId]) {
+      state.activeCharts[chartId].xAxisCol = e.target.value;
+      refreshChart(chartId);
+    }
+  });
+
+  // 集計チェックボックス
+  document.getElementById('chart-xaxis-aggregate-chk')?.addEventListener('change', (e) => {
+    const chartId = state.currentEditingChartId;
+    if (chartId && state.activeCharts[chartId]) {
+      state.activeCharts[chartId].isAggregated = e.target.checked;
+      refreshChart(chartId);
+    }
+  });
+
+  // 系列追加ボタン
+  document.getElementById('chart-add-series-btn')?.addEventListener('click', () => {
+    const chartId = state.currentEditingChartId;
+    if (!chartId || !state.activeCharts[chartId]) return;
+    const chart = state.activeCharts[chartId];
+    const meta = getTableMeta(normalizeTableId(chart.tableId));
+    const cols = meta ? meta.columns || [] : [];
+    const available = cols.find(c => !chart.yAxisCols.includes(c.id));
+    if (available) {
+      chart.yAxisCols.push(available.id);
+      renderChartSeriesList(chart, cols);
+      refreshChart(chartId);
+    } else {
+      showToast('追加可能なカラムがありません。', 'info');
+    }
+  });
+
+  // カスタマイズ: タイトル
+  document.getElementById('chart-custom-title-input')?.addEventListener('input', (e) => {
+    const chartId = state.currentEditingChartId;
+    if (chartId && state.activeCharts[chartId]) {
+      state.activeCharts[chartId].title = e.target.value;
+      const titleInput = document.querySelector(`#floating-chart-${chartId} .sheets-chart-title-input`);
+      if (titleInput) titleInput.value = e.target.value;
+      const sheetTitle = document.getElementById('chart-sheet-title-text');
+      if (sheetTitle) sheetTitle.textContent = e.target.value;
+    }
+  });
+
+  // カスタマイズ: 凡例位置
+  document.getElementById('chart-custom-legend-pos')?.addEventListener('change', (e) => {
+    const chartId = state.currentEditingChartId;
+    if (chartId && state.activeCharts[chartId]) {
+      state.activeCharts[chartId].legendPos = e.target.value;
+      refreshChart(chartId);
+    }
+  });
+}
+
 // グローバル公開と初期化
 window.renderMobileBottomNav = renderMobileBottomNav;
 window.updateMobileBottomNavActiveState = updateMobileBottomNavActiveState;
 window.injectMobileNavSettingsUI = injectMobileNavSettingsUI;
 window.initSpreadsheetMenuBar = initSpreadsheetMenuBar;
+window.createNewChartFromTable = createNewChartFromTable;
+window.moveChartToOwnSheet = moveChartToOwnSheet;
+window.openChartEditor = openChartEditor;
+window.downloadChartImage = downloadChartImage;
 
 // DOMContentLoaded または実行時初期化
 if (document.readyState === 'loading') {
@@ -42281,11 +43207,13 @@ if (document.readyState === 'loading') {
     initMobileBottomNavEvents();
     renderMobileBottomNav();
     initSpreadsheetMenuBar();
+    initChartEditorEvents();
   });
 } else {
   initMobileBottomNavEvents();
   renderMobileBottomNav();
   initSpreadsheetMenuBar();
+  initChartEditorEvents();
 }
 
 

@@ -17,6 +17,7 @@
 
 <link rel="stylesheet" href="styles.css?v=2.2">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script id="session-safety-patch">
   (function() {
     try {
@@ -372,6 +373,9 @@
                 <span class="item-left"><span class="item-icon">🔀</span><span>新規統合カラムを作成...</span></span>
               </div>
               <div class="sheets-dropdown-divider"></div>
+              <div class="sheets-dropdown-item" data-action="insert-chart">
+                <span class="item-left"><span class="item-icon">📊</span><span style="font-weight: 600;">グラフ...</span></span>
+              </div>
               <div class="sheets-dropdown-item" data-action="insert-sticky">
                 <span class="item-left"><span class="item-icon">📝</span><span>付箋・メモを追加</span></span>
               </div>
@@ -3243,7 +3247,147 @@
   </div>
 </section>
 
+<!-- ================= 個別シート出力用 グラフ全画面ビュー ================= -->
+<section id="chart-sheet-screen" class="screen-view" style="display: none; padding: 0; height: 100%; flex-direction: column; overflow: hidden; background: var(--bg-main);">
+  <div class="chart-sheet-toolbar" style="display: flex; align-items: center; justify-content: space-between; padding: 0.35rem 1rem; border-bottom: 1px solid var(--border-color); background: var(--bg-surface); flex-shrink: 0;">
+    <div style="display: flex; align-items: center; gap: 0.65rem;">
+      <h2 id="chart-sheet-title" style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
+        <span>📊</span> <span id="chart-sheet-title-text">グラフ 1</span>
+      </h2>
+      <span id="chart-sheet-type-badge" style="font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(37, 99, 235, 0.1); color: #2563eb; font-weight: 600;">散布図</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <button type="button" class="btn btn-secondary btn-sm" id="chart-sheet-edit-btn" style="padding: 0.25rem 0.65rem; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 0.3rem;">
+        <span>✏️</span> <span>グラフを編集</span>
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" id="chart-sheet-download-btn" style="padding: 0.25rem 0.75rem; font-size: 0.78rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem;">
+        <span>📥</span> <span>PNGダウンロード</span>
+      </button>
+    </div>
+  </div>
+  <div class="chart-sheet-canvas-container" style="flex: 1; min-height: 0; padding: 1.25rem; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+    <div style="width: 100%; height: 100%; max-width: 1100px; max-height: 650px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; box-shadow: var(--shadow-sm); position: relative; display: flex; flex-direction: column;">
+      <canvas id="chart-sheet-canvas" style="width: 100%; height: 100%;"></canvas>
+    </div>
+  </div>
+</section>
+
 </main>
+
+<!-- ================= Google スプレッドシート風 グラフ エディタ サイドバー (320px) ================= -->
+<aside id="sheets-chart-editor-sidebar" class="sheets-chart-editor-sidebar" style="display: none;">
+  <!-- ヘッダー -->
+  <div class="chart-editor-header">
+    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0.55rem 0.85rem; border-bottom: 1px solid var(--border-color);">
+      <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">グラフ エディタ</h3>
+      <button type="button" id="chart-editor-close-btn" style="background: none; border: none; font-size: 1.15rem; color: var(--text-muted); cursor: pointer; padding: 0 0.2rem; line-height: 1;" title="閉じる">✕</button>
+    </div>
+    <!-- タブ (設定 / カスタマイズ) -->
+    <div class="chart-editor-tabs" style="display: flex; border-bottom: 1px solid var(--border-color); background: var(--bg-surface);">
+      <button type="button" class="chart-editor-tab active" id="tab-btn-chart-setup" style="flex: 1; padding: 0.45rem; background: none; border: none; border-bottom: 2px solid #0f9d58; font-size: 0.82rem; font-weight: 700; color: #0f9d58; cursor: pointer;">設定</button>
+      <button type="button" class="chart-editor-tab" id="tab-btn-chart-custom" style="flex: 1; padding: 0.45rem; background: none; border: none; border-bottom: 2px solid transparent; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); cursor: pointer;">カスタマイズ</button>
+    </div>
+  </div>
+
+  <!-- エディタ コンテンツ領域 -->
+  <div class="chart-editor-content" style="flex: 1; overflow-y: auto; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.9rem;">
+    
+    <!-- === 設定パネル === -->
+    <div id="chart-setup-panel" style="display: flex; flex-direction: column; gap: 0.85rem;">
+      <!-- グラフの種類 (Image 2 完全対応セレクター) -->
+      <div>
+        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">グラフの種類</label>
+        <div style="position: relative;">
+          <button type="button" id="chart-type-picker-btn" class="chart-type-picker-btn" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); cursor: pointer; font-size: 0.82rem; color: var(--text-primary);">
+            <span style="display: flex; align-items: center; gap: 0.45rem;">
+              <span id="chart-type-current-icon" style="font-size: 0.95rem;">⚄</span>
+              <span id="chart-type-current-label" style="font-weight: 600;">散布図</span>
+            </span>
+            <span style="font-size: 0.7rem; color: var(--text-muted);">▼</span>
+          </button>
+
+          <!-- グラフ全種類 ピッカー ポップアップ (Image 2) -->
+          <div id="chart-type-picker-popup" class="chart-type-picker-popup" style="display: none;">
+            <!-- JSで動的構築 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- データ範囲 -->
+      <div>
+        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">データ範囲</label>
+        <div style="display: flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.6rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); font-size: 0.78rem; color: var(--text-secondary);">
+          <span style="font-size: 0.85rem;">▦</span>
+          <span id="chart-editor-data-range" style="font-family: monospace; font-size: 0.75rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">全データ範囲</span>
+        </div>
+      </div>
+
+      <!-- X 軸 -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+          <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin: 0;">X 軸</label>
+        </div>
+        <select id="chart-xaxis-select" class="chart-editor-select" style="width: 100%; padding: 0.4rem 0.55rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); font-size: 0.8rem; outline: none; cursor: pointer;">
+          <!-- JSで動的カラム -->
+        </select>
+        <div style="margin-top: 0.35rem;">
+          <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;">
+            <input type="checkbox" id="chart-xaxis-aggregate-chk" style="cursor: pointer;">
+            <span>集計</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 系列 (Y軸) -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+          <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin: 0;">系列</label>
+        </div>
+        <div id="chart-series-list" style="display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.4rem;">
+          <!-- 選択中系列一覧 -->
+        </div>
+        <button type="button" id="chart-add-series-btn" class="btn btn-secondary btn-sm" style="width: 100%; padding: 0.32rem; font-size: 0.78rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 0.3rem;">
+          <span>＋ 系列を追加</span>
+        </button>
+      </div>
+
+      <!-- オプション -->
+      <div style="border-top: 1px solid var(--border-color); padding-top: 0.65rem; display: flex; flex-direction: column; gap: 0.45rem;">
+        <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;">
+          <input type="checkbox" id="chart-opt-switch-rowcol" style="cursor: pointer;">
+          <span>行と列を切り替える</span>
+        </label>
+        <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;">
+          <input type="checkbox" id="chart-opt-header-row" checked style="cursor: pointer;">
+          <span>行1を見出しとして使用</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- === カスタマイズパネル === -->
+    <div id="chart-custom-panel" style="display: none; flex-direction: column; gap: 0.85rem;">
+      <div>
+        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">グラフのタイトル</label>
+        <input type="text" id="chart-custom-title-input" placeholder="タイトルを入力..." style="width: 100%; padding: 0.4rem 0.55rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); font-size: 0.8rem; box-sizing: border-box;">
+      </div>
+      <div>
+        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">凡例の位置</label>
+        <select id="chart-custom-legend-pos" style="width: 100%; padding: 0.4rem 0.55rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); font-size: 0.8rem; outline: none; cursor: pointer;">
+          <option value="top">上</option>
+          <option value="bottom">下</option>
+          <option value="left">左</option>
+          <option value="right">右</option>
+          <option value="none">なし</option>
+        </select>
+      </div>
+      <div>
+        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">背景色</label>
+        <input type="color" id="chart-custom-bg-color" value="#ffffff" style="width: 100%; height: 32px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer; background: transparent; padding: 2px;">
+      </div>
+    </div>
+
+  </div>
+</aside>
 </div>
 </div>
 
