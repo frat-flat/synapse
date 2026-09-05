@@ -4067,10 +4067,30 @@
             evaluateLiveSkipLogic();
             checkAndRestoreDraftSession();
             setupPreviewDraftObserver();
+            injectDraftSavePanelToPreview();
           }, 150);
         }
       };
     }
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('#btn-tab-preview') || e.target.closest('#btn-open-preview') || e.target.closest('#btn-panel-preview-refresh');
+      if (btn) {
+        setTimeout(() => {
+          injectDraftSavePanelToPreview();
+        }, 150);
+      }
+    });
+
+    setInterval(() => {
+      const panelPreview = document.getElementById('panel-preview');
+      if (panelPreview && (panelPreview.classList.contains('active') || panelPreview.style.display !== 'none')) {
+        const container = document.getElementById('preview-section-container');
+        if (container && !container.querySelector('.preview-draft-save-panel')) {
+          injectDraftSavePanelToPreview();
+        }
+      }
+    }, 200);
 
     window.addEventListener('message', (event) => {
       if (!event.data) return;
@@ -4116,8 +4136,10 @@
     if (!container) return;
     const existing = container.querySelector('.preview-draft-save-panel');
     if (existing) existing.remove();
-    if (!window.L || !window.L.sections || !window.R) return;
-    const activeSec = window.L.sections.find(s => s.id === window.R);
+    const formData = window.L || window.n;
+    if (!formData || !formData.sections) return;
+    const currentR = window.R || (window.n && window.r) || (formData.sections[0] ? formData.sections[0].id : null);
+    const activeSec = formData.sections.find(s => s.id === currentR) || formData.sections[0];
     if (!activeSec || !activeSec.draftSaveConfig || !activeSec.draftSaveConfig.enabled) return;
     const draftPanel = document.createElement('div');
     draftPanel.className = 'preview-draft-save-panel';
@@ -6068,181 +6090,201 @@
     clearIntegrityError(card);
   }
 
+  let lastEnhancedSectionId = null;
+
+  function injectSectionEnhancements(sec) {
+    if (!sec) {
+      if (window.n && window.n.sections) {
+        if (window.r) {
+          sec = window.n.sections.find(s => s.id === window.r);
+        }
+        if (!sec && window.n.sections.length > 0) {
+          const activeSidebar = document.querySelector('#section-list .sidebar-item.active');
+          if (activeSidebar && activeSidebar.dataset.sectionId) {
+            sec = window.n.sections.find(s => s.id === activeSidebar.dataset.sectionId);
+          }
+        }
+      }
+    }
+    const metaEdit = document.querySelector('.section-meta-edit');
+    if (!sec || !metaEdit) return;
+
+    // --- 一時保存（下書き）設定UIの動的挿入 ---
+    if (!metaEdit.querySelector('.draft-save-config-container')) {
+      const draftContainer = document.createElement('div');
+      draftContainer.className = 'draft-save-config-container';
+      draftContainer.style.cssText = 'margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--color-border);';
+      draftContainer.innerHTML = `
+        <div class="form-group" style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+          <input type="checkbox" id="editor-section-draft-enable" style="width: 16px; height: 16px; cursor: pointer; margin: 0;" />
+          <label for="editor-section-draft-enable" style="margin: 0; cursor: pointer; font-weight: 600; font-size: 0.8rem; color: var(--color-text);">このセクションの後に一時保存を有効にする</label>
+        </div>
+        <div id="draft-message-edit-wrapper" style="display: none; flex-direction: column; gap: 4px; margin-top: 8px;">
+          <label for="editor-section-draft-message" style="font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted);">一時保存の案内文章</label>
+          <textarea id="editor-section-draft-message" class="form-control" rows="2" style="font-size:0.8rem;"></textarea>
+        </div>
+      `;
+      const nextSelect = document.getElementById('editor-section-next');
+      if (nextSelect && nextSelect.parentElement) {
+        nextSelect.parentElement.insertAdjacentElement('afterend', draftContainer);
+      } else {
+        metaEdit.appendChild(draftContainer);
+      }
+    }
+
+    const draftEnable = document.getElementById('editor-section-draft-enable');
+    const draftMsgWrapper = document.getElementById('draft-message-edit-wrapper');
+    const draftMsg = document.getElementById('editor-section-draft-message');
+    if (draftEnable && draftMsg) {
+      if (!sec.draftSaveConfig) {
+        sec.draftSaveConfig = { enabled: false, message: 'ここまでの回答を一時保存して、後から再開することができます。' };
+      }
+      draftEnable.checked = sec.draftSaveConfig.enabled || false;
+      draftMsg.value = sec.draftSaveConfig.message || 'ここまでの回答を一時保存して、後から再開することができます。';
+      draftMsgWrapper.style.display = sec.draftSaveConfig.enabled ? 'flex' : 'none';
+
+      draftEnable.onchange = function() {
+        sec.draftSaveConfig.enabled = draftEnable.checked;
+        draftMsgWrapper.style.display = draftEnable.checked ? 'flex' : 'none';
+        if (window.S) window.S();
+        if (window.x) window.x();
+        renderLivePreview();
+      };
+      draftMsg.oninput = function() {
+        sec.draftSaveConfig.message = draftMsg.value;
+        if (window.S) window.S();
+        if (window.x) window.x();
+        renderLivePreview();
+      };
+    }
+    // ------------------------------------------
+
+    // --- 質問の並び替え（▲ / ▼）ボタンの注入（全モード共通） ---
+    const allQCards = document.querySelectorAll('#questions-container .question-card');
+    allQCards.forEach((qCard, idx) => {
+      const qId = qCard.dataset.questionId;
+      const qDef = sec.questions ? sec.questions.find(q => q.id === qId) : null;
+      if (!qDef) return;
+
+      const actionsRow = qCard.querySelector('.question-card-actions');
+      if (actionsRow && !actionsRow.querySelector('.btn-move-q-up')) {
+        let btnGroup = actionsRow.querySelector('.question-action-buttons');
+        if (!btnGroup) {
+          btnGroup = document.createElement('div');
+          btnGroup.className = 'question-action-buttons';
+          btnGroup.style.display = 'flex';
+          btnGroup.style.gap = '6px';
+          btnGroup.style.alignItems = 'center';
+
+          const delBtn = actionsRow.querySelector('.btn-danger');
+          if (delBtn) {
+            actionsRow.appendChild(btnGroup);
+            btnGroup.appendChild(delBtn);
+          } else {
+            actionsRow.appendChild(btnGroup);
+          }
+        }
+
+        const upBtn = document.createElement('button');
+        upBtn.type = 'button';
+        upBtn.className = 'btn btn-sm btn-secondary btn-move-q-up';
+        upBtn.innerHTML = '▲';
+        upBtn.title = '上へ移動';
+        upBtn.disabled = (idx === 0);
+        upBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          moveQuestionInEditor(sec, idx, idx - 1);
+        });
+
+        const downBtn = document.createElement('button');
+        downBtn.type = 'button';
+        downBtn.className = 'btn btn-sm btn-secondary btn-move-q-down';
+        downBtn.innerHTML = '▼';
+        downBtn.title = '下へ移動';
+        downBtn.disabled = (idx === sec.questions.length - 1);
+        downBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          moveQuestionInEditor(sec, idx, idx + 1);
+        });
+
+        const firstChild = btnGroup.firstChild;
+        btnGroup.insertBefore(downBtn, firstChild);
+        btnGroup.insertBefore(upBtn, downBtn);
+      }
+    });
+
+    if (editorMode !== 'pro') return;
+
+    const qCards = document.querySelectorAll('#questions-container .question-card');
+    qCards.forEach(qCard => {
+      const qId = qCard.dataset.questionId;
+      const qDef = sec.questions.find(q => q.id === qId);
+      if (!qDef) return;
+
+      if (qCard.querySelector('.pro-skip-logic-container')) return;
+
+      const skipContainer = document.createElement('div');
+      skipContainer.className = 'pro-skip-logic-container';
+      skipContainer.style.cssText = 'margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--color-border); display:flex; flex-direction:column; gap:8px;';
+
+      const otherQuestions = sec.questions.filter(q => q.id !== qId);
+      let optionsHtml = '<option value="">-- スキップ分岐を設定しない --</option>';
+      otherQuestions.forEach(oq => {
+        optionsHtml += `<option value="${oq.id}">${oq.title || '無題の質問'}</option>`;
+      });
+
+      qDef.skipLogic = qDef.skipLogic || { dependsOn: "", condition: "equals", value: "", action: "disable" };
+
+      skipContainer.innerHTML = `
+        <span style="font-size:0.8rem; font-weight:600; color:var(--color-primary);">⚡ プロ版限定: セクション内スキップ（条件分岐）</span>
+        <div class="form-group-row" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <select class="form-control skip-depends-select" style="flex:2; font-size:0.8rem; height:32px;">
+            ${optionsHtml}
+          </select>
+          <select class="form-control skip-action-select" style="flex:1; font-size:0.8rem; height:32px;">
+            <option value="disable">非活性にする</option>
+            <option value="hide">非表示にする</option>
+          </select>
+          <input type="text" class="form-control skip-value-input" style="flex:1; font-size:0.8rem; height:32px;" placeholder="トリガー値" />
+        </div>
+      `;
+
+      const actionsRow = qCard.querySelector('.question-card-actions');
+      if (actionsRow) {
+        qCard.insertBefore(skipContainer, actionsRow);
+      }
+
+      const depSelect = skipContainer.querySelector('.skip-depends-select');
+      const actSelect = skipContainer.querySelector('.skip-action-select');
+      const valInput = skipContainer.querySelector('.skip-value-input');
+
+      depSelect.value = qDef.skipLogic.dependsOn || "";
+      actSelect.value = qDef.skipLogic.action || "disable";
+      valInput.value = qDef.skipLogic.value || "";
+
+      const saveLogic = () => {
+        qDef.skipLogic.dependsOn = depSelect.value;
+        qDef.skipLogic.action = actSelect.value;
+        qDef.skipLogic.value = valInput.value;
+        if (window.S) window.S();
+        renderLivePreview();
+      };
+
+      depSelect.addEventListener('change', saveLogic);
+      actSelect.addEventListener('change', saveLogic);
+      valInput.addEventListener('input', saveLogic);
+    });
+  }
+
   function setupEditorRenderHooks() {
     const originalLe = window.le;
     if (originalLe) {
       window.le = function(sec) {
         originalLe(sec);
         renderLivePreview();
-
-        // --- 一時保存（下書き）設定UIの動的挿入 ---
-        const metaEdit = document.querySelector('.section-meta-edit');
-        if (metaEdit && !metaEdit.querySelector('.draft-save-config-container')) {
-          const draftContainer = document.createElement('div');
-          draftContainer.className = 'draft-save-config-container';
-          draftContainer.style.cssText = 'margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--color-border);';
-          draftContainer.innerHTML = `
-            <div class="form-group" style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-              <input type="checkbox" id="editor-section-draft-enable" style="width: 16px; height: 16px; cursor: pointer; margin: 0;" />
-              <label for="editor-section-draft-enable" style="margin: 0; cursor: pointer; font-weight: 600; font-size: 0.8rem; color: var(--color-text);">このセクションの後に一時保存を有効にする</label>
-            </div>
-            <div id="draft-message-edit-wrapper" style="display: none; flex-direction: column; gap: 4px; margin-top: 8px;">
-              <label for="editor-section-draft-message" style="font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted);">一時保存の案内文章</label>
-              <textarea id="editor-section-draft-message" class="form-control" rows="2" style="font-size:0.8rem;"></textarea>
-            </div>
-          `;
-          const nextSelect = document.getElementById('editor-section-next');
-          if (nextSelect && nextSelect.parentElement) {
-            nextSelect.parentElement.insertAdjacentElement('afterend', draftContainer);
-          } else {
-            metaEdit.appendChild(draftContainer);
-          }
-        }
-
-        const draftEnable = document.getElementById('editor-section-draft-enable');
-        const draftMsgWrapper = document.getElementById('draft-message-edit-wrapper');
-        const draftMsg = document.getElementById('editor-section-draft-message');
-        if (draftEnable && draftMsg) {
-          if (!sec.draftSaveConfig) {
-            sec.draftSaveConfig = { enabled: false, message: 'ここまでの回答を一時保存して、後から再開することができます。' };
-          }
-          draftEnable.checked = sec.draftSaveConfig.enabled || false;
-          draftMsg.value = sec.draftSaveConfig.message || 'ここまでの回答を一時保存して、後から再開することができます。';
-          draftMsgWrapper.style.display = sec.draftSaveConfig.enabled ? 'flex' : 'none';
-
-          draftEnable.onchange = function() {
-            sec.draftSaveConfig.enabled = draftEnable.checked;
-            draftMsgWrapper.style.display = draftEnable.checked ? 'flex' : 'none';
-            if (window.S) window.S();
-            if (window.x) window.x();
-            renderLivePreview();
-          };
-          draftMsg.oninput = function() {
-            sec.draftSaveConfig.message = draftMsg.value;
-            if (window.S) window.S();
-            if (window.x) window.x();
-            renderLivePreview();
-          };
-        }
-        // ------------------------------------------
-
-        // --- 質問の並び替え（▲ / ▼）ボタンの注入（全モード共通） ---
-        const allQCards = document.querySelectorAll('#questions-container .question-card');
-        allQCards.forEach((qCard, idx) => {
-          const qId = qCard.dataset.questionId;
-          const qDef = sec.questions ? sec.questions.find(q => q.id === qId) : null;
-          if (!qDef) return;
-
-          const actionsRow = qCard.querySelector('.question-card-actions');
-          if (actionsRow && !actionsRow.querySelector('.btn-move-q-up')) {
-            let btnGroup = actionsRow.querySelector('.question-action-buttons');
-            if (!btnGroup) {
-              btnGroup = document.createElement('div');
-              btnGroup.className = 'question-action-buttons';
-              btnGroup.style.display = 'flex';
-              btnGroup.style.gap = '6px';
-              btnGroup.style.alignItems = 'center';
-
-              const delBtn = actionsRow.querySelector('.btn-danger');
-              if (delBtn) {
-                actionsRow.appendChild(btnGroup);
-                btnGroup.appendChild(delBtn);
-              } else {
-                actionsRow.appendChild(btnGroup);
-              }
-            }
-
-            const upBtn = document.createElement('button');
-            upBtn.type = 'button';
-            upBtn.className = 'btn btn-sm btn-secondary btn-move-q-up';
-            upBtn.innerHTML = '▲';
-            upBtn.title = '上へ移動';
-            upBtn.disabled = (idx === 0);
-            upBtn.addEventListener('click', (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              moveQuestionInEditor(sec, idx, idx - 1);
-            });
-
-            const downBtn = document.createElement('button');
-            downBtn.type = 'button';
-            downBtn.className = 'btn btn-sm btn-secondary btn-move-q-down';
-            downBtn.innerHTML = '▼';
-            downBtn.title = '下へ移動';
-            downBtn.disabled = (idx === sec.questions.length - 1);
-            downBtn.addEventListener('click', (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              moveQuestionInEditor(sec, idx, idx + 1);
-            });
-
-            const firstChild = btnGroup.firstChild;
-            btnGroup.insertBefore(downBtn, firstChild);
-            btnGroup.insertBefore(upBtn, downBtn);
-          }
-        });
-
-        if (editorMode !== 'pro') return;
-
-        const qCards = document.querySelectorAll('#questions-container .question-card');
-        qCards.forEach(qCard => {
-          const qId = qCard.dataset.questionId;
-          const qDef = sec.questions.find(q => q.id === qId);
-          if (!qDef) return;
-
-          if (qCard.querySelector('.pro-skip-logic-container')) return;
-
-          const skipContainer = document.createElement('div');
-          skipContainer.className = 'pro-skip-logic-container';
-          skipContainer.style.cssText = 'margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--color-border); display:flex; flex-direction:column; gap:8px;';
-
-          const otherQuestions = sec.questions.filter(q => q.id !== qId);
-          let optionsHtml = '<option value="">-- スキップ分岐を設定しない --</option>';
-          otherQuestions.forEach(oq => {
-            optionsHtml += `<option value="${oq.id}">${oq.title || '無題の質問'}</option>`;
-          });
-
-          qDef.skipLogic = qDef.skipLogic || { dependsOn: "", condition: "equals", value: "", action: "disable" };
-
-          skipContainer.innerHTML = `
-            <span style="font-size:0.8rem; font-weight:600; color:var(--color-primary);">⚡ プロ版限定: セクション内スキップ（条件分岐）</span>
-            <div class="form-group-row" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-              <select class="form-control skip-depends-select" style="flex:2; font-size:0.8rem; height:32px;">
-                ${optionsHtml}
-              </select>
-              <select class="form-control skip-action-select" style="flex:1; font-size:0.8rem; height:32px;">
-                <option value="disable">非活性にする</option>
-                <option value="hide">非表示にする</option>
-              </select>
-              <input type="text" class="form-control skip-value-input" style="flex:1; font-size:0.8rem; height:32px;" placeholder="トリガー値" />
-            </div>
-          `;
-
-          const actionsRow = qCard.querySelector('.question-card-actions');
-          if (actionsRow) {
-            qCard.insertBefore(skipContainer, actionsRow);
-          }
-
-          const depSelect = skipContainer.querySelector('.skip-depends-select');
-          const actSelect = skipContainer.querySelector('.skip-action-select');
-          const valInput = skipContainer.querySelector('.skip-value-input');
-
-          depSelect.value = qDef.skipLogic.dependsOn || "";
-          actSelect.value = qDef.skipLogic.action || "disable";
-          valInput.value = qDef.skipLogic.value || "";
-
-          const saveLogic = () => {
-            qDef.skipLogic.dependsOn = depSelect.value;
-            qDef.skipLogic.action = actSelect.value;
-            qDef.skipLogic.value = valInput.value;
-            if (window.S) window.S();
-            renderLivePreview();
-          };
-
-          depSelect.addEventListener('change', saveLogic);
-          actSelect.addEventListener('change', saveLogic);
-          valInput.addEventListener('input', saveLogic);
-        });
+        injectSectionEnhancements(sec);
       };
     }
 
@@ -6251,8 +6293,20 @@
       window.x = function() {
         originalX();
         renderLivePreview();
+        injectSectionEnhancements();
       };
     }
+
+    // アクティブセクション編集画面が表示されているときの一時保存UIの自律維持
+    setInterval(() => {
+      const activeSectionEditor = document.getElementById('active-section-editor');
+      if (activeSectionEditor && activeSectionEditor.style.display !== 'none') {
+        const metaEdit = activeSectionEditor.querySelector('.section-meta-edit');
+        if (metaEdit && !metaEdit.querySelector('.draft-save-config-container')) {
+          injectSectionEnhancements();
+        }
+      }
+    }, 150);
 
     document.addEventListener('input', (e) => {
       const target = e.target;
@@ -6273,7 +6327,10 @@
       const sidebarItem = e.target.closest('#section-list .sidebar-item');
       if (sidebarItem && sidebarItem.dataset.sectionId) {
         window.r = sidebarItem.dataset.sectionId;
-        setTimeout(renderLivePreview, 40);
+        setTimeout(() => {
+          injectSectionEnhancements();
+          renderLivePreview();
+        }, 40);
       }
       const ovEditBtn = e.target.closest('#overview-sections-list .overview-section-card .btn-primary');
       if (ovEditBtn) {
@@ -6282,6 +6339,7 @@
           if (activeItem && activeItem.dataset.sectionId) {
             window.r = activeItem.dataset.sectionId;
           }
+          injectSectionEnhancements();
           renderLivePreview();
         }, 40);
       }
