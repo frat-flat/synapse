@@ -9730,6 +9730,54 @@
       });
     }
 
+    // 1-2. ヘッダーの「▼」ドロップダウントグルボタン & ドロップダウンメニュー
+    const dropdownToggle = document.getElementById('btn-share-dropdown-toggle');
+    const dropdownMenu = document.getElementById('share-dropdown-menu');
+    const exportGroup = document.getElementById('share-export-group');
+    if (dropdownToggle && dropdownMenu && !dropdownToggle._hooked) {
+      dropdownToggle._hooked = true;
+      dropdownToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const isOpen = dropdownMenu.classList.toggle('active');
+        if (exportGroup) exportGroup.classList.toggle('open', isOpen);
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#share-export-group')) {
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+        }
+      });
+
+      const menuShareLink = document.getElementById('menu-item-share-link');
+      if (menuShareLink && !menuShareLink._hooked) {
+        menuShareLink._hooked = true;
+        menuShareLink.addEventListener('click', () => {
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          copyFormShareUrl();
+          openShareUrlModal();
+        });
+      }
+
+      const menuExportJson = document.getElementById('btn-export-json');
+      if (menuExportJson && !menuExportJson._customHooked) {
+        menuExportJson._customHooked = true;
+        menuExportJson.addEventListener('click', (e) => {
+          e.preventDefault();
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          const modalExport = document.getElementById('modal-export');
+          const jsonTextarea = document.getElementById('export-json-textarea');
+          if (modalExport && jsonTextarea && window.G) {
+            jsonTextarea.value = JSON.stringify(window.G, null, 2);
+            modalExport.classList.add('active');
+          }
+        });
+      }
+    }
+
     // 2. プレビュー画面の「🔗 回答用リンクをコピー」ボタン
     const panelCopyBtn = document.getElementById('btn-panel-copy-url');
     if (panelCopyBtn && !panelCopyBtn._hooked) {
@@ -9754,6 +9802,50 @@
             setTimeout(() => { toastEl.style.display = 'none'; }, 2500);
           }
         }
+      });
+    }
+
+    // 3-2. 「リンクを発行」モーダル内の「📄 フォーム定義JSONを出力」トグル＆コピー
+    const modalToggleJsonBtn = document.getElementById('btn-share-modal-toggle-json');
+    const modalJsonArea = document.getElementById('share-modal-json-area');
+    const modalJsonTextarea = document.getElementById('share-modal-json-textarea');
+    const modalCopyJsonBtn = document.getElementById('btn-share-modal-copy-json');
+
+    if (modalToggleJsonBtn && modalJsonArea && !modalToggleJsonBtn._hooked) {
+      modalToggleJsonBtn._hooked = true;
+      modalToggleJsonBtn.addEventListener('click', () => {
+        const isHidden = modalJsonArea.style.display === 'none' || !modalJsonArea.style.display;
+        if (isHidden) {
+          if (modalJsonTextarea && window.G) {
+            modalJsonTextarea.value = JSON.stringify(window.G, null, 2);
+          }
+          modalJsonArea.style.display = 'block';
+          modalToggleJsonBtn.textContent = '閉じる ▲';
+        } else {
+          modalJsonArea.style.display = 'none';
+          modalToggleJsonBtn.textContent = '表示・コピー ▼';
+        }
+      });
+    }
+
+    if (modalCopyJsonBtn && modalJsonTextarea && !modalCopyJsonBtn._hooked) {
+      modalCopyJsonBtn._hooked = true;
+      modalCopyJsonBtn.addEventListener('click', () => {
+        if (!modalJsonTextarea.value && window.G) {
+          modalJsonTextarea.value = JSON.stringify(window.G, null, 2);
+        }
+        navigator.clipboard.writeText(modalJsonTextarea.value).then(() => {
+          const originalText = modalCopyJsonBtn.textContent;
+          modalCopyJsonBtn.textContent = '✓ コピー完了！';
+          modalCopyJsonBtn.classList.add('btn-success');
+          setTimeout(() => {
+            modalCopyJsonBtn.textContent = originalText;
+            modalCopyJsonBtn.classList.remove('btn-success');
+          }, 1800);
+        }).catch(err => {
+          console.error('Clipboard copy failed:', err);
+          modalJsonTextarea.select();
+        });
       });
     }
 

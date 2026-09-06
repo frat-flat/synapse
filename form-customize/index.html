@@ -71,28 +71,47 @@
         </button>
       </nav>
       <div class="header-actions">
-        <!-- ユーザープロフィール表示（ログイン状態） -->
+        <!-- 📱 プレビュー表示トグルボタン (最小化/展開) -->
+        <button id="btn-header-preview-toggle" class="btn btn-secondary active" data-tooltip="プレビューを非表示にする" style="display: none; align-items: center; gap: 6px; margin-right: 8px;">
+          <span class="btn-icon">📱</span>
+          <span class="btn-text">プレビュー</span>
+        </button>
+        <!-- 🔗 回答用リンク発行＆出力ボタングループ (リンク発行枠内にJSON出力を集約) -->
+        <div class="share-export-btn-group" id="share-export-group">
+          <button id="btn-share-form-url" class="btn btn-share-link" data-tooltip="回答用URLを発行・コピー">
+            <span class="btn-icon">🔗</span>
+            <span class="btn-text">リンクを発行</span>
+          </button>
+          <button type="button" id="btn-share-dropdown-toggle" class="btn btn-share-dropdown-toggle" data-tooltip="その他の出力オプション" aria-label="その他の出力オプション">
+            <span class="dropdown-arrow">▼</span>
+          </button>
+          <div class="share-dropdown-menu" id="share-dropdown-menu">
+            <div class="share-dropdown-item" id="menu-item-share-link">
+              <span class="menu-icon">🔗</span>
+              <div class="menu-text-group">
+                <span class="menu-title">回答用リンクを発行</span>
+                <span class="menu-desc">回答者向け共有URLをコピー・モーダル表示</span>
+              </div>
+            </div>
+            <div class="share-dropdown-divider"></div>
+            <div class="share-dropdown-item" id="btn-export-json">
+              <span class="menu-icon">📄</span>
+              <div class="menu-text-group">
+                <span class="menu-title">フォーム定義JSONを出力</span>
+                <span class="menu-desc">フォーム設定をJSON形式で確認・コピー</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- 👤 ユーザープロフィール表示（ログイン状態・最右端へ配置） -->
         <div class="user-profile-header" id="gf-user-profile" style="display: none;">
           <span class="user-avatar">👤</span>
           <div class="user-info">
             <span class="user-name" id="gf-user-name">田中さん</span>
             <span class="user-role" id="gf-user-role">閲覧者</span>
           </div>
-          <button id="btn-logout" class="btn btn-sm btn-secondary" data-tooltip="ログアウト">ログアウト</button>
+          <button id="btn-logout" class="btn btn-sm btn-secondary" data-tooltip="権限ロールの切り替え・ログアウト">ログアウト</button>
         </div>
-        <!-- 📱 プレビュー表示トグルボタン (最小化/展開) -->
-        <button id="btn-header-preview-toggle" class="btn btn-secondary active" data-tooltip="プレビューを非表示にする" style="display: none; align-items: center; gap: 6px; margin-right: 8px;">
-          <span class="btn-icon">📱</span>
-          <span class="btn-text">プレビュー</span>
-        </button>
-        <!-- 🔗 回答用リンク発行ボタン (Google Forms風) -->
-        <button id="btn-share-form-url" class="btn btn-share-link" data-tooltip="回答用URLを発行・コピー" style="display: inline-flex; align-items: center; gap: 6px; background: #673ab7 !important; color: #ffffff !important; border: none; font-weight: 600; padding: 6px 14px; border-radius: 4px; cursor: pointer; transition: background 0.15s; margin-right: 8px; font-size: 0.85rem; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
-          <span class="btn-icon">🔗</span>
-          <span class="btn-text">リンクを発行</span>
-        </button>
-        <button id="btn-export-json" class="btn btn-secondary" data-tooltip="JSON形式でエクスポート" style="font-size: 0.8rem; padding: 6px 10px;">
-          <span class="btn-text">JSON出力</span>
-        </button>
       </div>
     </header>
 
@@ -966,6 +985,26 @@
             <button type="button" id="btn-open-share-url-tab" class="btn btn-secondary btn-sm" style="font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: #475569;">
               ↗ 別タブでプレビューを開く
             </button>
+          </div>
+
+          <!-- フォーム定義JSON出力エリア（リンク発行モーダルの枠内に統合） -->
+          <div style="margin-top: 18px; padding-top: 14px; border-top: 1px dashed #dadce0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-size: 0.82rem; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 6px;">
+                <span>📄</span> フォーム定義データ (JSON出力)
+              </span>
+              <button type="button" id="btn-share-modal-toggle-json" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 3px 8px; cursor: pointer; color: #475569;">
+                表示・コピー ▼
+              </button>
+            </div>
+            <div id="share-modal-json-area" style="display: none; margin-top: 8px;">
+              <textarea id="share-modal-json-textarea" class="form-control" readonly style="height: 130px; font-size: 0.75rem; font-family: monospace; background: #f8fafc; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; resize: none;"></textarea>
+              <div style="display: flex; justify-content: flex-end; margin-top: 6px;">
+                <button type="button" id="btn-share-modal-copy-json" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 4px 10px; cursor: pointer;">
+                  📋 JSONをコピー
+                </button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="modal-footer" style="padding: 12px 24px; display: flex; justify-content: flex-end; border-top: 1px solid #dadce0;">
