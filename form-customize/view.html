@@ -1,0 +1,1230 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>フォーム回答</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png?v=20260904">
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon.png?v=20260904">
+    <link rel="shortcut icon" href="../favicon.ico?v=20260904">
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png?v=20260904">
+
+    <!-- Google Fonts: Inter & Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+      :root {
+        --color-bg-page: #f0f4f9;
+        --color-bg-card: #ffffff;
+        --color-primary: #1a73e8;
+        --color-primary-hover: #1557b0;
+        --color-primary-light: #e8f0fe;
+        --color-text-main: #202124;
+        --color-text-muted: #5f6368;
+        --color-text-dark: #3c4043;
+        --color-border: #dadce0;
+        --color-border-focus: #1a73e8;
+        --color-danger: #d93025;
+        --color-danger-light: #fce8e6;
+        --color-success: #1e8e3e;
+        --shadow-card: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
+        --border-radius: 8px;
+        --font-family: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background-color: var(--color-bg-page);
+        color: var(--color-text-main);
+        font-family: var(--font-family);
+        line-height: 1.6;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 24px 16px 60px;
+      }
+
+      .view-wrapper {
+        width: 100%;
+        max-width: 680px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      /* フォームヘッダーカード */
+      .form-header-card {
+        background-color: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius);
+        border-top: 8px solid var(--color-primary);
+        padding: 32px 32px 24px;
+        box-shadow: 0 1px 2px rgba(60,64,67,0.1);
+        position: relative;
+      }
+
+      .form-header-card h1 {
+        font-size: 1.85rem;
+        font-weight: 700;
+        color: var(--color-text-main);
+        margin-bottom: 12px;
+        line-height: 1.3;
+      }
+
+      .form-header-card .form-subtitle {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--color-primary);
+        margin-bottom: 10px;
+      }
+
+      .form-header-card .form-desc {
+        color: var(--color-text-muted);
+        font-size: 0.95rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+        line-height: 1.6;
+      }
+
+      .form-header-card .form-desc a {
+        color: var(--color-primary);
+        text-decoration: underline;
+      }
+
+      .form-header-card .estimated-time {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.82rem;
+        color: var(--color-text-muted);
+        background: #f8f9fa;
+        padding: 4px 10px;
+        border-radius: 12px;
+        margin-top: 14px;
+      }
+
+      /* 進捗インジケーター */
+      .progress-container {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+
+      .progress-bar-bg {
+        width: 100%;
+        height: 4px;
+        background-color: #e0e0e0;
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .progress-bar-fill {
+        height: 100%;
+        background-color: var(--color-primary);
+        transition: width 0.3s ease;
+        width: 0%;
+      }
+
+      .progress-text {
+        font-size: 0.78rem;
+        color: var(--color-text-muted);
+        text-align: right;
+      }
+
+      /* セクションタイトルカード（複数セクションある場合） */
+      .section-info-card {
+        background-color: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius);
+        padding: 20px 24px;
+        box-shadow: 0 1px 2px rgba(60,64,67,0.08);
+      }
+
+      .section-info-card h2 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--color-text-main);
+        margin-bottom: 6px;
+      }
+
+      .section-info-card p {
+        font-size: 0.9rem;
+        color: var(--color-text-muted);
+        white-space: pre-wrap;
+      }
+
+      /* 質問カード */
+      .question-card {
+        background-color: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius);
+        padding: 24px;
+        box-shadow: 0 1px 2px rgba(60,64,67,0.08);
+        transition: border-color 0.2s, box-shadow 0.2s;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .question-card:focus-within {
+        border-color: var(--color-primary);
+        box-shadow: 0 1px 3px rgba(26,115,232,0.25);
+      }
+
+      .question-card.has-error {
+        border-color: var(--color-danger) !important;
+        background-color: #fffbfa;
+      }
+
+      .question-title {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: var(--color-text-main);
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+      }
+
+      .required-star {
+        color: var(--color-danger);
+        font-weight: bold;
+        margin-left: 2px;
+      }
+
+      .question-desc {
+        font-size: 0.85rem;
+        color: var(--color-text-muted);
+        line-height: 1.4;
+        white-space: pre-wrap;
+      }
+
+      .question-desc a {
+        color: var(--color-primary);
+        text-decoration: underline;
+      }
+
+      /* 入力フォームコントロール */
+      .form-control {
+        width: 100%;
+        padding: 10px 12px;
+        font-size: 0.95rem;
+        color: var(--color-text-main);
+        background: #ffffff;
+        border: 1px solid var(--color-border);
+        border-radius: 4px;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+        font-family: inherit;
+      }
+
+      .form-control:focus {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+      }
+
+      textarea.form-control {
+        min-height: 100px;
+        resize: vertical;
+        line-height: 1.5;
+      }
+
+      /* 選択肢オプション (ラジオ & チェックボックス) */
+      .options-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .option-label {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.15s, border-color 0.15s;
+        user-select: none;
+        font-size: 0.95rem;
+      }
+
+      .option-label:hover {
+        background-color: #f8f9fa;
+        border-color: #c0c4cc;
+      }
+
+      .option-label.selected {
+        background-color: var(--color-primary-light);
+        border-color: var(--color-primary);
+        font-weight: 500;
+      }
+
+      .option-label input[type="radio"],
+      .option-label input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: var(--color-primary);
+      }
+
+      /* 規約スクロール同意ボックス */
+      .consent-scroll-box {
+        max-height: 140px;
+        overflow-y: auto;
+        padding: 12px;
+        background: #f8f9fa;
+        border: 1px solid var(--color-border);
+        border-radius: 4px;
+        font-size: 0.82rem;
+        line-height: 1.5;
+        color: var(--color-text-dark);
+        white-space: pre-wrap;
+      }
+
+      .consent-scroll-notice {
+        font-size: 0.78rem;
+        color: var(--color-text-muted);
+        margin-top: 4px;
+      }
+
+      /* エラーメッセージ */
+      .error-message {
+        display: none;
+        align-items: center;
+        gap: 6px;
+        color: var(--color-danger);
+        font-size: 0.82rem;
+        font-weight: 500;
+        margin-top: 4px;
+      }
+
+      .has-error .error-message {
+        display: flex;
+      }
+
+      /* アクションボタン（前へ・次へ・送信） */
+      .action-buttons-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 8px;
+        gap: 12px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 10px 24px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.15s, box-shadow 0.15s, transform 0.1s;
+        user-select: none;
+        font-family: inherit;
+      }
+
+      .btn:active {
+        transform: translateY(1px);
+      }
+
+      .btn-primary {
+        background-color: var(--color-primary);
+        color: #ffffff;
+      }
+
+      .btn-primary:hover {
+        background-color: var(--color-primary-hover);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      }
+
+      .btn-secondary {
+        background-color: #ffffff;
+        color: var(--color-text-dark);
+        border: 1px solid var(--color-border);
+      }
+
+      .btn-secondary:hover {
+        background-color: #f8f9fa;
+        border-color: #c0c4cc;
+      }
+
+      .btn-success {
+        background-color: var(--color-success);
+        color: #ffffff;
+      }
+
+      .btn-success:hover {
+        background-color: #137333;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      }
+
+      /* 送信完了カード */
+      .success-card {
+        display: none;
+        background-color: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius);
+        border-top: 8px solid var(--color-success);
+        padding: 48px 32px;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(60,64,67,0.15);
+      }
+
+      .success-icon {
+        font-size: 3.5rem;
+        margin-bottom: 16px;
+      }
+
+      .success-card h2 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--color-text-main);
+        margin-bottom: 10px;
+      }
+
+      .success-card p {
+        color: var(--color-text-muted);
+        font-size: 0.95rem;
+        line-height: 1.6;
+        margin-bottom: 24px;
+      }
+
+      /* フッター */
+      .view-footer {
+        margin-top: 32px;
+        text-align: center;
+        font-size: 0.78rem;
+        color: var(--color-text-muted);
+      }
+
+      /* ローディング＆エラー表示 */
+      .view-loading-state,
+      .view-error-state {
+        background: var(--color-bg-card);
+        border-radius: var(--border-radius);
+        border: 1px solid var(--color-border);
+        padding: 40px;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      }
+
+      .view-error-state h2 {
+        color: var(--color-danger);
+        margin-bottom: 12px;
+      }
+
+      /* レスポンシブ調整 */
+      @media (max-width: 640px) {
+        body {
+          padding: 12px 10px 40px;
+        }
+        .form-header-card {
+          padding: 24px 18px;
+        }
+        .form-header-card h1 {
+          font-size: 1.45rem;
+        }
+        .question-card {
+          padding: 18px 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="view-wrapper" id="view-wrapper">
+      <!-- 読み込み中表示 -->
+      <div id="loading-box" class="view-loading-state">
+        <p style="font-size: 1.1rem; font-weight: 500;">フォームを読み込んでいます...</p>
+      </div>
+
+      <!-- エラー表示 -->
+      <div id="error-box" class="view-error-state" style="display: none;">
+        <h2>フォームが見つかりませんでした</h2>
+        <p style="color: var(--color-text-muted); font-size: 0.9rem; margin-top: 8px;">
+          URLが正しくないか、指定されたフォームデータが存在しません。<br>
+          発行されたリンクをもう一度ご確認ください。
+        </p>
+      </div>
+
+      <!-- フォーム本体コンテナ -->
+      <div id="form-container" style="display: none; flex-direction: column; gap: 16px;">
+        <!-- ヘッダーカード -->
+        <header class="form-header-card" id="form-header-card">
+          <div id="form-subtitle" class="form-subtitle" style="display: none;"></div>
+          <h1 id="form-title">無題のフォーム</h1>
+          <div id="form-desc" class="form-desc"></div>
+          <div id="form-time-badge" class="estimated-time" style="display: none;">
+            <span>⏱️</span>
+            <span id="form-time-text">所要時間 目安5〜10分</span>
+          </div>
+        </header>
+
+        <!-- 進捗バー -->
+        <div class="progress-container" id="progress-container" style="display: none;">
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progress-bar-fill"></div>
+          </div>
+          <div class="progress-text" id="progress-text">セクション 1 / 1</div>
+        </div>
+
+        <!-- セクション情報（タイトル・説明） -->
+        <div class="section-info-card" id="section-info-card" style="display: none;">
+          <h2 id="section-title"></h2>
+          <p id="section-desc"></p>
+        </div>
+
+        <!-- 質問項目レンダリング領域 -->
+        <div id="questions-container" style="display: flex; flex-direction: column; gap: 16px;"></div>
+
+        <!-- 操作ボタングループ -->
+        <div class="action-buttons-row">
+          <button type="button" id="btn-prev" class="btn btn-secondary" style="display: none;">
+            前へ
+          </button>
+          <div style="flex: 1;"></div>
+          <button type="button" id="btn-next" class="btn btn-primary">
+            次へ
+          </button>
+          <button type="button" id="btn-submit" class="btn btn-success" style="display: none;">
+            送信
+          </button>
+        </div>
+      </div>
+
+      <!-- 送信完了カード -->
+      <div id="success-card" class="success-card">
+        <div class="success-icon">🎉</div>
+        <h2 id="success-title">回答を受け付けました</h2>
+        <p id="success-desc">ご回答ありがとうございました。内容は正常に記録されました。</p>
+        <button type="button" id="btn-submit-another" class="btn btn-secondary" style="display: inline-flex;">
+          別の回答を送信
+        </button>
+      </div>
+
+      <footer class="view-footer">
+        Powered by <strong style="color: var(--color-text-dark);">株式会社wayway [ヨサンダス]</strong>
+      </footer>
+    </div>
+
+    <!-- フォームデータ復元 & 回答処理エンジン -->
+    <script>
+      (function() {
+        // ==========================================
+        // 1. データ復元用Codec（Deflate / Base64）
+        // ==========================================
+        async function decodeFormData(encoded) {
+          if (!encoded) return null;
+          try {
+            if (encoded.startsWith('z1_')) {
+              const b64 = encoded.slice(3).replace(/-/g, '+').replace(/_/g, '/');
+              const binStr = atob(b64);
+              const bytes = new Uint8Array(binStr.length);
+              for (let i = 0; i < binStr.length; i++) {
+                bytes[i] = binStr.charCodeAt(i);
+              }
+              const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+              const response = new Response(stream);
+              const text = await response.text();
+              return JSON.parse(text);
+            } else if (encoded.startsWith('b1_')) {
+              const b64 = encoded.slice(3).replace(/-/g, '+').replace(/_/g, '/');
+              const binStr = atob(b64);
+              const jsonStr = decodeURIComponent(binStr.split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+              return JSON.parse(jsonStr);
+            } else {
+              try {
+                return JSON.parse(decodeURIComponent(encoded));
+              } catch(e) {
+                return JSON.parse(encoded);
+              }
+            }
+          } catch(err) {
+            console.error('[Decode] Failed to parse encoded form data:', err);
+            return null;
+          }
+        }
+
+        // リッチテキストリンク化ヘルパー
+        function renderRichTextWithLinks(text) {
+          if (!text) return '';
+          let escaped = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+          
+          // [label](url) -> <a href="url" target="_blank">label</a>
+          escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+          // 生URL -> <a href="url">url</a>
+          escaped = escaped.replace(/(^|[^"'])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+          return escaped;
+        }
+
+        // ==========================================
+        // 2. 状態管理
+        // ==========================================
+        let formDefinition = null;
+        let currentSectionId = null;
+        let sectionHistory = [];
+        let formValues = {};
+        let visitedSections = new Set();
+
+        // DOM参照
+        const loadingBox = document.getElementById('loading-box');
+        const errorBox = document.getElementById('error-box');
+        const formContainer = document.getElementById('form-container');
+        const successCard = document.getElementById('success-card');
+
+        const formTitleEl = document.getElementById('form-title');
+        const formSubtitleEl = document.getElementById('form-subtitle');
+        const formDescEl = document.getElementById('form-desc');
+        const formTimeBadgeEl = document.getElementById('form-time-badge');
+        const formTimeTextEl = document.getElementById('form-time-text');
+
+        const progressContainerEl = document.getElementById('progress-container');
+        const progressBarFillEl = document.getElementById('progress-bar-fill');
+        const progressTextEl = document.getElementById('progress-text');
+
+        const sectionInfoCardEl = document.getElementById('section-info-card');
+        const sectionTitleEl = document.getElementById('section-title');
+        const sectionDescEl = document.getElementById('section-desc');
+
+        const questionsContainerEl = document.getElementById('questions-container');
+
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+        const btnSubmit = document.getElementById('btn-submit');
+        const btnSubmitAnother = document.getElementById('btn-submit-another');
+
+        // ==========================================
+        // 3. フォーム初期ロード
+        // ==========================================
+        async function loadForm() {
+          const hash = window.location.hash || '';
+          const search = new URLSearchParams(window.location.search);
+
+          let dataParam = null;
+          if (hash.startsWith('#data=')) {
+            dataParam = hash.substring(6);
+          } else if (hash.includes('data=')) {
+            const match = hash.match(/[#&]data=([^&]+)/);
+            if (match) dataParam = match[1];
+          } else if (search.get('data')) {
+            dataParam = search.get('data');
+          }
+
+          if (dataParam) {
+            formDefinition = await decodeFormData(dataParam);
+          }
+
+          // フォールバック: ローカルストレージからの検索（同一端末・テスト環境）
+          if (!formDefinition) {
+            const formId = search.get('id');
+            const formIdx = search.get('form_idx');
+            try {
+              const allFormsRaw = localStorage.getItem('form_customize_all_forms');
+              if (allFormsRaw) {
+                const allForms = JSON.parse(allFormsRaw);
+                if (formId) {
+                  formDefinition = allForms.find(f => f.id === formId);
+                }
+                if (!formDefinition && formIdx !== null) {
+                  const idx = parseInt(formIdx, 10);
+                  if (!isNaN(idx) && allForms[idx]) {
+                    formDefinition = allForms[idx];
+                  }
+                }
+              }
+            } catch(e) {}
+          }
+
+          if (!formDefinition || !formDefinition.sections || formDefinition.sections.length === 0) {
+            loadingBox.style.display = 'none';
+            errorBox.style.display = 'block';
+            return;
+          }
+
+          // フォーム名の設定
+          document.title = formDefinition.title ? `${formDefinition.title} - フォーム回答` : 'フォーム回答';
+
+          loadingBox.style.display = 'none';
+          formContainer.style.display = 'flex';
+
+          // 初期化
+          initFormView();
+        }
+
+        function initFormView() {
+          formValues = {};
+          sectionHistory = [];
+          visitedSections = new Set();
+          currentSectionId = formDefinition.sections[0].id;
+
+          // ヘッダー情報描画
+          formTitleEl.textContent = formDefinition.title || '無題のフォーム';
+          if (formDefinition.subtitle) {
+            formSubtitleEl.textContent = formDefinition.subtitle;
+            formSubtitleEl.style.display = 'block';
+          } else {
+            formSubtitleEl.style.display = 'none';
+          }
+
+          if (formDefinition.description) {
+            formDescEl.innerHTML = renderRichTextWithLinks(formDefinition.description);
+            formDescEl.style.display = 'block';
+          } else {
+            formDescEl.style.display = 'none';
+          }
+
+          if (formDefinition.estimatedTime) {
+            formTimeTextEl.textContent = `所要時間 目安${formDefinition.estimatedTime}`;
+            formTimeBadgeEl.style.display = 'inline-flex';
+          } else {
+            formTimeBadgeEl.style.display = 'none';
+          }
+
+          // 最初のセクションを描画
+          renderCurrentSection();
+        }
+
+        // ==========================================
+        // 4. セクション描画
+        // ==========================================
+        function renderCurrentSection() {
+          const sections = formDefinition.sections;
+          const sectionIndex = sections.findIndex(s => s.id === currentSectionId);
+          if (sectionIndex === -1) return;
+
+          const section = sections[sectionIndex];
+          visitedSections.add(section.id);
+
+          // 進捗バー更新（複数セクションある場合のみ表示）
+          if (sections.length > 1) {
+            progressContainerEl.style.display = 'flex';
+            const progress = Math.round(((sectionIndex + 1) / sections.length) * 100);
+            progressBarFillEl.style.width = `${progress}%`;
+            progressTextEl.textContent = `セクション ${sectionIndex + 1} / ${sections.length} : ${section.title || ''}`;
+          } else {
+            progressContainerEl.style.display = 'none';
+          }
+
+          // セクション情報（タイトル・説明）
+          if (sections.length > 1 && (section.title || section.description)) {
+            sectionInfoCardEl.style.display = 'block';
+            sectionTitleEl.textContent = section.title || `セクション ${sectionIndex + 1}`;
+            sectionDescEl.innerHTML = section.description ? renderRichTextWithLinks(section.description) : '';
+          } else {
+            sectionInfoCardEl.style.display = 'none';
+          }
+
+          // 質問一覧クリア＆再描画
+          questionsContainerEl.innerHTML = '';
+          const questions = section.questions || [];
+
+          questions.forEach((q, qIndex) => {
+            const card = createQuestionCard(q, qIndex);
+            questionsContainerEl.appendChild(card);
+          });
+
+          // ボタン表示切り替え
+          btnPrev.style.display = sectionHistory.length > 0 ? 'inline-flex' : 'none';
+
+          // 次へ or 送信判定
+          updateNavButtons(section);
+
+          // 上部へスムーススクロール
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // 次へ・送信ボタンのラベルおよび表示制御
+        function updateNavButtons(section) {
+          const nextAction = getSectionNextAction(section);
+          if (nextAction === 'submit') {
+            btnNext.style.display = 'none';
+            btnSubmit.style.display = 'inline-flex';
+            btnSubmit.textContent = '送信';
+          } else {
+            btnNext.style.display = 'inline-flex';
+            btnSubmit.style.display = 'none';
+            btnNext.textContent = '次へ';
+          }
+        }
+
+        // セクションの次のアクション（分岐またはデフォルト）判定
+        function getSectionNextAction(section) {
+          const questions = section.questions || [];
+          for (const q of questions) {
+            if (['radio', 'select'].includes(q.type)) {
+              const val = formValues[q.id];
+              if (val) {
+                const opt = (q.options || []).find(o => o.label === val);
+                if (opt && opt.nextSectionId) {
+                  return opt.nextSectionId;
+                }
+              }
+            }
+          }
+
+          if (section.nextAction) {
+            return section.nextAction;
+          }
+
+          const sections = formDefinition.sections;
+          const idx = sections.findIndex(s => s.id === section.id);
+          if (idx !== -1 && idx < sections.length - 1) {
+            return sections[idx + 1].id;
+          }
+          return 'submit';
+        }
+
+        // ==========================================
+        // 5. 質問カード生成
+        // ==========================================
+        function createQuestionCard(q, qIndex) {
+          const card = document.createElement('div');
+          card.className = 'question-card';
+          card.dataset.questionId = q.id;
+
+          // タイトル
+          const title = document.createElement('div');
+          title.className = 'question-title';
+          title.textContent = q.title || `質問 ${qIndex + 1}`;
+          if (q.required) {
+            const star = document.createElement('span');
+            star.className = 'required-star';
+            star.textContent = '*';
+            star.title = '必須項目';
+            title.appendChild(star);
+          }
+          card.appendChild(title);
+
+          // 説明文
+          if (q.description) {
+            const desc = document.createElement('div');
+            desc.className = 'question-desc';
+            desc.innerHTML = renderRichTextWithLinks(q.description);
+            card.appendChild(desc);
+          }
+
+          // 入力部
+          const inputContainer = document.createElement('div');
+          inputContainer.className = 'question-input-wrapper';
+
+          // 利用規約等のスクロール同意
+          if (q.scrollRequired && q.scrollText) {
+            const scrollBox = document.createElement('div');
+            scrollBox.className = 'consent-scroll-box';
+            scrollBox.innerHTML = renderRichTextWithLinks(q.scrollText);
+            
+            const notice = document.createElement('div');
+            notice.className = 'consent-scroll-notice';
+            notice.textContent = '※ 内容を最下部までスクロールしてご確認いただくと、同意が可能になります。';
+
+            inputContainer.appendChild(scrollBox);
+            inputContainer.appendChild(notice);
+
+            // スクロール検知
+            scrollBox.addEventListener('scroll', () => {
+              if (scrollBox.scrollHeight - scrollBox.scrollTop - scrollBox.clientHeight < 5) {
+                formValues[q.id + '_scrolled'] = true;
+                notice.style.color = 'var(--color-success)';
+                notice.textContent = '✓ 内容を確認しました。選択肢にチェックを入れてください。';
+                enableQuestionInputs(inputContainer);
+              }
+            });
+
+            // 初期チェック
+            setTimeout(() => {
+              if (scrollBox.scrollHeight <= scrollBox.clientHeight) {
+                formValues[q.id + '_scrolled'] = true;
+                notice.style.display = 'none';
+              } else if (!formValues[q.id + '_scrolled']) {
+                disableQuestionInputs(inputContainer);
+              }
+            }, 50);
+          }
+
+          // タイプ別の入力フォーム
+          renderInputField(q, inputContainer);
+
+          // エラーメッセージ要素
+          const errorMsg = document.createElement('div');
+          errorMsg.className = 'error-message';
+          errorMsg.innerHTML = '⚠️ <span class="error-text">この質問は必須です。</span>';
+          card.appendChild(inputContainer);
+          card.appendChild(errorMsg);
+
+          return card;
+        }
+
+        function disableQuestionInputs(container) {
+          container.querySelectorAll('input, select, textarea').forEach(el => el.disabled = true);
+        }
+
+        function enableQuestionInputs(container) {
+          container.querySelectorAll('input, select, textarea').forEach(el => el.disabled = false);
+        }
+
+        function renderInputField(q, container) {
+          const val = formValues[q.id];
+
+          if (q.type === 'text') {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'form-control';
+            input.placeholder = '回答を入力...';
+            input.value = val || '';
+            input.addEventListener('input', (e) => {
+              formValues[q.id] = e.target.value;
+              clearError(q.id);
+            });
+            container.appendChild(input);
+          } else if (q.type === 'paragraph') {
+            const textarea = document.createElement('textarea');
+            textarea.className = 'form-control';
+            textarea.placeholder = '回答を入力...';
+            textarea.value = val || '';
+            textarea.addEventListener('input', (e) => {
+              formValues[q.id] = e.target.value;
+              clearError(q.id);
+            });
+            container.appendChild(textarea);
+          } else if (['radio', 'checkbox'].includes(q.type)) {
+            const list = document.createElement('div');
+            list.className = 'options-list';
+            const options = q.options || [];
+
+            options.forEach((opt, oIdx) => {
+              const label = document.createElement('label');
+              label.className = 'option-label';
+
+              const input = document.createElement('input');
+              input.type = q.type;
+              input.name = `opt_${q.id}`;
+              input.value = opt.label;
+
+              if (q.type === 'radio') {
+                input.checked = val === opt.label;
+                if (input.checked) label.classList.add('selected');
+              } else {
+                input.checked = Array.isArray(val) && val.includes(opt.label);
+                if (input.checked) label.classList.add('selected');
+              }
+
+              input.addEventListener('change', () => {
+                if (q.type === 'radio') {
+                  formValues[q.id] = opt.label;
+                  list.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
+                  label.classList.add('selected');
+                  // ラジオ変更で次のアクションが変わる可能性があるので更新
+                  const section = formDefinition.sections.find(s => s.id === currentSectionId);
+                  if (section) updateNavButtons(section);
+                } else {
+                  if (!Array.isArray(formValues[q.id])) formValues[q.id] = [];
+                  if (input.checked) {
+                    formValues[q.id].push(opt.label);
+                    label.classList.add('selected');
+                  } else {
+                    formValues[q.id] = formValues[q.id].filter(v => v !== opt.label);
+                    label.classList.remove('selected');
+                  }
+                }
+                clearError(q.id);
+              });
+
+              label.appendChild(input);
+              const textSpan = document.createElement('span');
+              textSpan.textContent = opt.label;
+              label.appendChild(textSpan);
+              list.appendChild(label);
+            });
+            container.appendChild(list);
+          } else if (q.type === 'select') {
+            const select = document.createElement('select');
+            select.className = 'form-control';
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.textContent = '選択してください';
+            select.appendChild(defaultOpt);
+
+            (q.options || []).forEach(opt => {
+              const optEl = document.createElement('option');
+              optEl.value = opt.label;
+              optEl.textContent = opt.label;
+              if (val === opt.label) optEl.selected = true;
+              select.appendChild(optEl);
+            });
+
+            select.addEventListener('change', (e) => {
+              formValues[q.id] = e.target.value;
+              clearError(q.id);
+              const section = formDefinition.sections.find(s => s.id === currentSectionId);
+              if (section) updateNavButtons(section);
+            });
+            container.appendChild(select);
+          } else if (q.type === 'password') {
+            const pwWrapper = document.createElement('div');
+            pwWrapper.style.display = 'flex';
+            pwWrapper.style.flexDirection = 'column';
+            pwWrapper.style.gap = '8px';
+
+            const input1 = document.createElement('input');
+            input1.type = 'password';
+            input1.className = 'form-control';
+            input1.placeholder = 'パスワードを入力...';
+            input1.value = val || '';
+            input1.addEventListener('input', (e) => {
+              formValues[q.id] = e.target.value;
+              clearError(q.id);
+            });
+
+            const input2 = document.createElement('input');
+            input2.type = 'password';
+            input2.className = 'form-control';
+            input2.placeholder = '確認用パスワードを再入力...';
+            input2.value = formValues[q.id + '_confirm'] || '';
+            input2.addEventListener('input', (e) => {
+              formValues[q.id + '_confirm'] = e.target.value;
+              clearError(q.id);
+            });
+
+            pwWrapper.appendChild(input1);
+            pwWrapper.appendChild(input2);
+            container.appendChild(pwWrapper);
+          } else if (q.type === 'file') {
+            const fileBox = document.createElement('div');
+            fileBox.style.padding = '16px';
+            fileBox.style.border = '2px dashed var(--color-border)';
+            fileBox.style.borderRadius = '6px';
+            fileBox.style.textAlign = 'center';
+            fileBox.style.background = '#f8f9fa';
+
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.style.display = 'none';
+
+            const fileBtn = document.createElement('button');
+            fileBtn.type = 'button';
+            fileBtn.className = 'btn btn-secondary';
+            fileBtn.textContent = '📁 ファイルを選択';
+            fileBtn.addEventListener('click', () => fileInput.click());
+
+            const fileStatus = document.createElement('div');
+            fileStatus.style.fontSize = '0.82rem';
+            fileStatus.style.color = 'var(--color-text-muted)';
+            fileStatus.style.marginTop = '8px';
+            fileStatus.textContent = val ? `選択済み: ${val}` : 'ファイルが選択されていません';
+
+            fileInput.addEventListener('change', (e) => {
+              if (e.target.files && e.target.files[0]) {
+                const file = e.target.files[0];
+                formValues[q.id] = file.name;
+                fileStatus.textContent = `選択済み: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+                clearError(q.id);
+              }
+            });
+
+            fileBox.appendChild(fileBtn);
+            fileBox.appendChild(fileInput);
+            fileBox.appendChild(fileStatus);
+            container.appendChild(fileBox);
+          }
+        }
+
+        function clearError(questionId) {
+          const card = document.querySelector(`.question-card[data-question-id="${questionId}"]`);
+          if (card) {
+            card.classList.remove('has-error');
+          }
+        }
+
+        // ==========================================
+        // 6. 入力バリデーション
+        // ==========================================
+        function validateCurrentSection() {
+          const section = formDefinition.sections.find(s => s.id === currentSectionId);
+          if (!section) return true;
+
+          let isValid = true;
+          let firstErrorCard = null;
+
+          (section.questions || []).forEach(q => {
+            const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+            if (!card) return;
+
+            const errorTextEl = card.querySelector('.error-text');
+            card.classList.remove('has-error');
+
+            // 1. スクロール同意チェック
+            if (q.scrollRequired && !formValues[q.id + '_scrolled']) {
+              card.classList.add('has-error');
+              if (errorTextEl) errorTextEl.textContent = '規約内容を最下部までスクロールしてご確認ください。';
+              isValid = false;
+              if (!firstErrorCard) firstErrorCard = card;
+              return;
+            }
+
+            const val = formValues[q.id];
+
+            // 2. 必須チェック
+            if (q.required) {
+              let isEmpty = false;
+              if (val === undefined || val === null || val === '') {
+                isEmpty = true;
+              } else if (Array.isArray(val) && val.length === 0) {
+                isEmpty = true;
+              }
+
+              if (isEmpty) {
+                card.classList.add('has-error');
+                if (errorTextEl) errorTextEl.textContent = 'この質問は必須項目です。';
+                isValid = false;
+                if (!firstErrorCard) firstErrorCard = card;
+                return;
+              }
+            }
+
+            // 3. パスワード一致チェック
+            if (q.type === 'password' && val) {
+              const confirmVal = formValues[q.id + '_confirm'];
+              if (val !== confirmVal) {
+                card.classList.add('has-error');
+                if (errorTextEl) errorTextEl.textContent = 'パスワードが一致しません。';
+                isValid = false;
+                if (!firstErrorCard) firstErrorCard = card;
+                return;
+              }
+            }
+
+            // 4. バリデーションルールチェック
+            if (val && typeof val === 'string' && q.validation) {
+              const v = q.validation;
+              let rulePassed = true;
+              if (v.category === 'text') {
+                if (v.condition === 'email') {
+                  rulePassed = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+                } else if (v.condition === 'url') {
+                  rulePassed = /^https?:\/\/[^\s]+$/.test(val);
+                }
+              } else if (v.category === 'number') {
+                const num = Number(val);
+                if (isNaN(num)) rulePassed = false;
+              }
+
+              if (!rulePassed) {
+                card.classList.add('has-error');
+                if (errorTextEl) errorTextEl.textContent = v.errorMessage || '正しい形式で入力してください。';
+                isValid = false;
+                if (!firstErrorCard) firstErrorCard = card;
+                return;
+              }
+            }
+          });
+
+          if (!isValid && firstErrorCard) {
+            firstErrorCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          return isValid;
+        }
+
+        // ==========================================
+        // 7. 画面遷移 & 送信処理
+        // ==========================================
+        btnNext.addEventListener('click', () => {
+          if (!validateCurrentSection()) return;
+
+          const section = formDefinition.sections.find(s => s.id === currentSectionId);
+          if (!section) return;
+
+          const nextAction = getSectionNextAction(section);
+          if (nextAction === 'submit') {
+            submitForm();
+          } else {
+            sectionHistory.push(currentSectionId);
+            currentSectionId = nextAction;
+            renderCurrentSection();
+          }
+        });
+
+        btnPrev.addEventListener('click', () => {
+          if (sectionHistory.length > 0) {
+            currentSectionId = sectionHistory.pop();
+            renderCurrentSection();
+          }
+        });
+
+        btnSubmit.addEventListener('click', () => {
+          if (!validateCurrentSection()) return;
+          submitForm();
+        });
+
+        function submitForm() {
+          const submitData = {};
+          formDefinition.sections.forEach(s => {
+            (s.questions || []).forEach(q => {
+              if (formValues[q.id] !== undefined && formValues[q.id] !== '') {
+                submitData[q.title || q.id] = formValues[q.id];
+              }
+            });
+          });
+
+          console.log('[Form Submit] Submitted data:', submitData);
+
+          // 1. 親ウィンドウ (iframe) への postMessage 送信
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+              type: 'FORM_SUBMIT',
+              formTitle: formDefinition.title || '無題のフォーム',
+              data: submitData,
+              isTemporary: false,
+              isPartialSubmit: false
+            }, '*');
+          }
+
+          // 2. ローカルストレージへの回答データ蓄積（スタンドアローン回答ログ）
+          try {
+            const formKey = `form_responses_${formDefinition.id || 'default'}`;
+            const existing = JSON.parse(localStorage.getItem(formKey) || '[]');
+            existing.push({
+              submittedAt: new Date().toISOString(),
+              data: submitData
+            });
+            localStorage.setItem(formKey, JSON.stringify(existing));
+          } catch(e) {}
+
+          // 3. 完了画面表示
+          formContainer.style.display = 'none';
+          successCard.style.display = 'block';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        btnSubmitAnother.addEventListener('click', () => {
+          successCard.style.display = 'none';
+          formContainer.style.display = 'flex';
+          initFormView();
+        });
+
+        // 起動
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', loadForm);
+        } else {
+          loadForm();
+        }
+      })();
+    </script>
+  </body>
+</html>

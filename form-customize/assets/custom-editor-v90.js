@@ -9615,22 +9615,77 @@
   }
 
   // =========================================================================
-  // 🔗 フォーム回答用リンク（公開URL）の発行・コピー機能 (Google Forms風)
+  // 🔗 フォーム回答用リンク（公開URL）の発行・コピー機能 (回答専用ページ view.html 連携)
   // =========================================================================
-  function getPublicFormShareUrl(formIndex) {
+  function getCurrentFormObject(formIndex) {
+    const idx = (formIndex !== undefined && formIndex !== null) ? formIndex : (window.W !== undefined ? window.W : (parseInt(localStorage.getItem('form_customize_active_index'), 10) || 0));
+    let formObj = null;
+    if (window.U && window.U[idx]) {
+      formObj = window.U[idx];
+    } else if (window.G && window.G.title) {
+      formObj = window.G;
+    } else {
+      try {
+        const raw = localStorage.getItem('form_customize_all_forms');
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (list && list[idx]) formObj = list[idx];
+        }
+      } catch(e) {}
+    }
+    return { formObj, idx };
+  }
+
+  // フォームJSONのURL-Safe圧縮エンコーダー
+  async function encodeFormDataForUrl(formObj) {
+    if (!formObj) return '';
+    try {
+      const jsonStr = JSON.stringify(formObj);
+      if (typeof CompressionStream !== 'undefined') {
+        const stream = new Blob([jsonStr]).stream().pipeThrough(new CompressionStream('deflate'));
+        const response = new Response(stream);
+        const buffer = await response.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return 'z1_' + btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      } else {
+        return 'b1_' + btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)))
+          .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+    } catch (e) {
+      console.warn('[Share URL] Encode failed, using raw fallback:', e);
+      return 'raw_' + encodeURIComponent(JSON.stringify(formObj));
+    }
+  }
+
+  async function getPublicFormShareUrl(formIndex) {
     const origin = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : '';
     let pathname = window.location.pathname || '';
-    if (!pathname.includes('form-customize/index.html')) {
-      if (pathname.endsWith('/')) {
-        pathname = pathname + 'form-customize/index.html';
-      } else if (pathname.endsWith('.html')) {
-        pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1) + 'form-customize/index.html';
-      } else {
-        pathname = pathname + '/form-customize/index.html';
-      }
+    
+    // view.html へのパスに変換
+    if (pathname.includes('form-customize/index.html')) {
+      pathname = pathname.replace('form-customize/index.html', 'form-customize/view.html');
+    } else if (pathname.endsWith('/')) {
+      pathname = pathname + 'form-customize/view.html';
+    } else if (pathname.endsWith('.html')) {
+      pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1) + 'view.html';
+    } else {
+      pathname = pathname + '/form-customize/view.html';
     }
-    const idx = (formIndex !== undefined && formIndex !== null) ? formIndex : (window.W !== undefined ? window.W : (parseInt(localStorage.getItem('form_customize_active_index'), 10) || 0));
-    return `${origin}${pathname}?active_tab=preview&form_idx=${idx}`;
+
+    const { formObj, idx } = getCurrentFormObject(formIndex);
+    const formId = formObj && formObj.id ? formObj.id : `form_${idx}`;
+    
+    let hashData = '';
+    if (formObj) {
+      hashData = await encodeFormDataForUrl(formObj);
+    }
+
+    const hashPart = hashData ? `#data=${hashData}` : '';
+    return `${origin}${pathname}?id=${encodeURIComponent(formId)}&form_idx=${idx}${hashPart}`;
   }
 
   function showGlobalShareToast(msg) {
@@ -9651,14 +9706,15 @@
     }, 2500);
   }
 
-  function copyFormShareUrl(formIndex, silent = false) {
-    const url = getPublicFormShareUrl(formIndex);
+  async function copyFormShareUrl(formIndex, silent = false) {
+    const url = await getPublicFormShareUrl(formIndex);
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(() => {
-        if (!silent) showGlobalShareToast('回答用リンクをクリップボードにコピーしました！');
-      }).catch(() => {
+      try {
+        await navigator.clipboard.writeText(url);
+        if (!silent) showGlobalShareToast('回答者用リンクをクリップボードにコピーしました！');
+      } catch (e) {
         fallbackCopy(url, silent);
-      });
+      }
     } else {
       fallbackCopy(url, silent);
     }
@@ -9673,38 +9729,33 @@
     textarea.select();
     try {
       document.execCommand('copy');
-      if (!silent) showGlobalShareToast('回答用リンクをクリップボードにコピーしました！');
+      if (!silent) showGlobalShareToast('回答者用リンクをクリップボードにコピーしました！');
     } catch (e) {
       console.warn('Copy failed:', e);
     }
     textarea.remove();
   }
 
-  function openShareUrlModal(formIndex) {
+  async function openShareUrlModal(formIndex) {
     const modal = document.getElementById('modal-share-url');
     if (!modal) return;
-    const idx = (formIndex !== undefined && formIndex !== null) ? formIndex : (window.W !== undefined ? window.W : (parseInt(localStorage.getItem('form_customize_active_index'), 10) || 0));
-    const url = getPublicFormShareUrl(idx);
-    
-    // フォームタイトルの取得
-    let formTitle = '無題のフォーム';
-    if (window.U && window.U[idx]) {
-      formTitle = window.U[idx].title || formTitle;
-    } else if (window.G && window.G.title) {
-      formTitle = window.G.title;
-    }
+    const { formObj, idx } = getCurrentFormObject(formIndex);
+    const formTitle = formObj && formObj.title ? formObj.title : '無題のフォーム';
 
     const titleEl = document.getElementById('share-modal-form-title');
     if (titleEl) titleEl.textContent = formTitle;
 
     const inputEl = document.getElementById('share-modal-url-input');
-    if (inputEl) inputEl.value = url;
+    if (inputEl) inputEl.value = 'URLを生成中...';
 
     const toastEl = document.getElementById('share-modal-copy-toast');
     if (toastEl) toastEl.style.display = 'none';
 
     modal.classList.add('active');
     modal.style.display = 'flex';
+
+    const url = await getPublicFormShareUrl(idx);
+    if (inputEl) inputEl.value = url;
 
     // 別タブで開くボタンのリンク先
     const openTabBtn = document.getElementById('btn-open-share-url-tab');
