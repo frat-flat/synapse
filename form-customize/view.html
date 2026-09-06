@@ -894,17 +894,21 @@
           formDefinition.sections.forEach(sec => {
             (sec.questions || []).forEach(q => {
               const qTitle = q.title || '';
-              // カナ欄
+              // カナ欄: 法人名でカナが登録されている場合のみ自動で補完。ない場合は空欄にして手動入力を必須とする
               if (q.type === 'text' && (qTitle.includes('カナ') || qTitle.includes('フリガナ') || qTitle.includes('ふりがな'))) {
-                if (item.nameKana) {
-                  formValues[q.id] = item.nameKana;
-                  const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
-                  if (card) {
-                    const input = card.querySelector('input.form-control');
-                    if (input) {
-                      input.value = item.nameKana;
-                      clearError(q.id);
-                    }
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                const input = card ? card.querySelector('input.form-control') : null;
+                if (item.nameKana && item.nameKana.trim()) {
+                  formValues[q.id] = item.nameKana.trim();
+                  if (input) {
+                    input.value = item.nameKana.trim();
+                    clearError(q.id);
+                  }
+                } else {
+                  // カナが公表システムに登録されていない場合は自動補完しない
+                  delete formValues[q.id];
+                  if (input) {
+                    input.value = '';
                   }
                 }
               }
@@ -1344,8 +1348,8 @@
               listToRender = [
                 { name: `合同会社${clean}`, nameKana: `ゴウドウガイシャ${clean}`, num: generateHashNum(clean + "1"), pref: targetPref, address: `${targetPref}中央区銀座1丁目`, estDate: "2021-06-01" },
                 { name: `株式会社${clean}`, nameKana: `カブシキガイシャ${clean}`, num: generateHashNum(clean + "2"), pref: targetPref, address: `${targetPref}千代田区丸の内2丁目`, estDate: "2018-04-01" },
-                { name: `${clean}株式会社`, nameKana: `${clean}カブシキガイシャ`, num: generateHashNum(clean + "3"), pref: targetPref, address: `${targetPref}港区六本木3丁目`, estDate: "2015-10-12" },
-                { name: `${clean}ホールディングス株式会社`, nameKana: `${clean}ホールディングスカブシキガイシャ`, num: generateHashNum(clean + "4"), pref: targetPref, address: `${targetPref}新宿区西新宿2丁目`, estDate: "2008-01-20" }
+                { name: `${clean}株式会社`, nameKana: ``, num: generateHashNum(clean + "3"), pref: targetPref, address: `${targetPref}港区六本木3丁目`, estDate: "2015-10-12" },
+                { name: `${clean}ホールディングス株式会社`, nameKana: ``, num: generateHashNum(clean + "4"), pref: targetPref, address: `${targetPref}新宿区西新宿2丁目`, estDate: "2008-01-20" }
               ];
             }
 
@@ -1367,7 +1371,7 @@
                   <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
                     <div style="flex: 1; min-width: 0;">
                       <div style="font-weight: 700; font-size: 0.88rem; color: var(--color-primary); word-break: break-word;">${escapeHtml(item.name)}</div>
-                      ${item.nameKana ? `<div style="font-size: 0.7rem; color: #64748b; margin-top: 1px; word-break: break-word;">${escapeHtml(item.nameKana)}</div>` : ''}
+                      ${item.nameKana ? `<div style="font-size: 0.7rem; color: #64748b; margin-top: 1px; word-break: break-word;">${escapeHtml(item.nameKana)}</div>` : '<div style="font-size: 0.68rem; color: #94a3b8; margin-top: 1px;">（カナ未登録）</div>'}
                     </div>
                     <span style="background: #e6f4ea; color: #137333; font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 600; white-space: nowrap; flex-shrink: 0;">実在確認済</span>
                   </div>
@@ -1837,15 +1841,41 @@
         // 未入力時に自動で半角ハイフン「-」を補填する処理（個人事業の屋号なし等）
         function autoFillHyphenForEmptyFields(section) {
           if (!section || !section.questions) return;
+
+          // 1. 法人名・屋号の質問状況をチェック（当セクションまたは全セクション）
+          let isSoleProprietorNoTrade = false;
+          if (formDefinition && formDefinition.sections) {
+            formDefinition.sections.forEach(s => {
+              (s.questions || []).forEach(q => {
+                const isCorp = q.title && (q.title.includes('法人名') || q.title.includes('屋号')) &&
+                               !q.title.includes('カナ') && !q.title.includes('フリガナ') && !q.title.includes('ふりがな');
+                if (isCorp) {
+                  const val = formValues[q.id];
+                  if (val === undefined || val === null || (typeof val === 'string' && val.trim() === '') || val === '-') {
+                    isSoleProprietorNoTrade = true;
+                    formValues[q.id] = '-';
+                    const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                    if (card) {
+                      const input = card.querySelector('input.form-control, textarea.form-control');
+                      if (input) input.value = '-';
+                      card.classList.remove('has-error');
+                    }
+                  }
+                }
+              });
+            });
+          }
+
+          // 2. セクション内の質問に対する補填処理
           section.questions.forEach(q => {
             const isAutoHyphenRule = q.validation && (q.validation.condition === 'auto_hyphen' || q.validation.autoHyphen);
-            const isCorpField = q.title && (q.title.includes('法人名') || q.title.includes('屋号')) && !q.title.includes('カナ') && !q.title.includes('フリガナ') && !q.title.includes('ふりがな');
+            const isKanaField = q.title && (q.title.includes('カナ') || q.title.includes('フリガナ') || q.title.includes('ふりがな'));
 
-            if (isAutoHyphenRule || isCorpField) {
+            // 個人事業で屋号がない場合はカナ欄も自動で半角ハイフン「-」を補填してエラーにならないようにする
+            if (isAutoHyphenRule || (isKanaField && isSoleProprietorNoTrade)) {
               const curVal = formValues[q.id];
               const isEmpty = curVal === undefined || curVal === null || (typeof curVal === 'string' && curVal.trim() === '');
               if (isEmpty) {
-                // 自動で半角ハイフン「-」を補填
                 formValues[q.id] = '-';
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
                 if (card) {
@@ -1897,7 +1927,41 @@
 
               if (isEmpty) {
                 card.classList.add('has-error');
-                if (errorTextEl) errorTextEl.textContent = 'この質問は必須項目です。';
+                const isKana = q.title && (q.title.includes('カナ') || q.title.includes('フリガナ') || q.title.includes('ふりがな'));
+                if (errorTextEl) {
+                  errorTextEl.textContent = isKana ? 'カナの登録がない法人のため、フリガナを入力してください。' : 'この質問は必須項目です。';
+                }
+                isValid = false;
+                if (!firstErrorCard) firstErrorCard = card;
+                return;
+              }
+            }
+
+            // 2-2. カナ入力必須チェック
+            // ユーザー要件: 法人名でカナが登録されている場合のみ自動で補完。ない場合は入力しないとエラー。
+            // 個人事業で屋号がない場合は自動で半角ハイフンの補完がされるのでエラーにならない。
+            const isKanaField = q.title && (q.title.includes('カナ') || q.title.includes('フリガナ') || q.title.includes('ふりがな'));
+            if (isKanaField) {
+              // 法人名・屋号がハイフン以外で入力されているかチェック
+              let corpVal = '';
+              if (formDefinition && formDefinition.sections) {
+                formDefinition.sections.forEach(s => {
+                  (s.questions || []).forEach(cq => {
+                    const isCorp = cq.title && (cq.title.includes('法人名') || cq.title.includes('屋号')) &&
+                                   !cq.title.includes('カナ') && !cq.title.includes('フリガナ') && !cq.title.includes('ふりがな');
+                    if (isCorp && formValues[cq.id]) {
+                      corpVal = String(formValues[cq.id]).trim();
+                    }
+                  });
+                });
+              }
+
+              const isCorpEntered = corpVal !== '' && corpVal !== '-';
+              const isKanaEmpty = val === undefined || val === null || (typeof val === 'string' && val.trim() === '');
+              
+              if (isCorpEntered && isKanaEmpty) {
+                card.classList.add('has-error');
+                if (errorTextEl) errorTextEl.textContent = 'カナの登録がない法人のため、フリガナを入力してください。';
                 isValid = false;
                 if (!firstErrorCard) firstErrorCard = card;
                 return;
@@ -1920,7 +1984,9 @@
             if (val && typeof val === 'string' && q.validation) {
               const v = q.validation;
               let rulePassed = true;
-              if (v.category === 'text') {
+              if (val.trim() === '-') {
+                rulePassed = true; // 自動補填された半角ハイフン「-」は全ルール通過
+              } else if (v.category === 'text') {
                 if (v.condition === 'email') {
                   rulePassed = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
                 } else if (v.condition === 'url') {

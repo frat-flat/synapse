@@ -6457,8 +6457,10 @@
         sec.questions.forEach(q => {
           // カナ項目
           if (q.type === 'text' && (q.title.includes('カナ') || q.title.includes('フリガナ') || q.title.includes('ふりがな'))) {
-            if (item.nameKana) {
-              window.V[q.id] = item.nameKana;
+            if (item.nameKana && item.nameKana.trim()) {
+              window.V[q.id] = item.nameKana.trim();
+            } else {
+              delete window.V[q.id];
             }
           }
           // インボイス登録番号項目（規則の種類がAPI連携 & 判定ルールがinvoice_number）
@@ -6493,11 +6495,14 @@
         const inputEl = c.querySelector('input');
         if (!inputEl) return;
 
-        // ① カナ表記: 公的データに記載されている場合はそのまま表示、ない場合は空欄のまま手入力可能
+        // ① カナ表記: 公的データに登録されている場合のみ自動で補完。ない場合は空欄にして手動入力を促す
         if (title.includes('カナ') || title.includes('フリガナ') || title.includes('ふりがな')) {
-          if (item.nameKana) {
-            inputEl.value = item.nameKana;
+          if (item.nameKana && item.nameKana.trim()) {
+            inputEl.value = item.nameKana.trim();
             clearIntegrityError(c);
+            triggerInputChange(inputEl);
+          } else {
+            inputEl.value = '';
             triggerInputChange(inputEl);
           }
         }
@@ -9665,16 +9670,20 @@
     const origin = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : '';
     let pathname = window.location.pathname || '';
     
-    // view.html へのパスに変換
-    if (pathname.includes('form-customize/index.html')) {
-      pathname = pathname.replace('form-customize/index.html', 'form-customize/view.html');
-    } else if (pathname.endsWith('/')) {
-      pathname = pathname + 'form-customize/view.html';
+    // 正確に /form-customize/view.html へのパスを解決する（二重パスの防止）
+    let viewPath = '';
+    if (pathname.includes('form-customize')) {
+      const prefix = pathname.substring(0, pathname.indexOf('form-customize'));
+      viewPath = `${prefix}form-customize/view.html`;
     } else if (pathname.endsWith('.html')) {
-      pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1) + 'view.html';
+      viewPath = pathname.substring(0, pathname.lastIndexOf('/') + 1) + 'view.html';
+    } else if (pathname.endsWith('/')) {
+      viewPath = pathname + 'view.html';
     } else {
-      pathname = pathname + '/form-customize/view.html';
+      viewPath = pathname + '/view.html';
     }
+    viewPath = viewPath.replace(/\/+/g, '/');
+    if (!viewPath.startsWith('/')) viewPath = '/' + viewPath;
 
     const { formObj, idx } = getCurrentFormObject(formIndex);
     const formId = formObj && formObj.id ? formObj.id : `form_${idx}`;
@@ -9685,7 +9694,7 @@
     }
 
     const hashPart = hashData ? `#data=${hashData}` : '';
-    return `${origin}${pathname}?id=${encodeURIComponent(formId)}&form_idx=${idx}${hashPart}`;
+    return `${origin}${viewPath}?id=${encodeURIComponent(formId)}&form_idx=${idx}${hashPart}`;
   }
 
   function showGlobalShareToast(msg) {
@@ -10229,19 +10238,41 @@
       
       const previewRoot = document.getElementById('preview-content') || document.querySelector('.live-preview-container') || document.body;
       const inputs = previewRoot.querySelectorAll('input.form-control, textarea.form-control');
+      
+      let isSoleProprietorNoTrade = false;
       inputs.forEach(input => {
         const card = input.closest('.question-card, .preview-question-card');
         if (!card) return;
         const titleEl = card.querySelector('.question-title, .preview-q-title');
         const titleText = titleEl ? titleEl.textContent : '';
-        const isCorp = titleText.includes('法人名') || titleText.includes('屋号');
+        const isCorp = (titleText.includes('法人名') || titleText.includes('屋号')) &&
+                       !titleText.includes('カナ') && !titleText.includes('フリガナ') && !titleText.includes('ふりがな');
         
-        if (isCorp && (!input.value || input.value.trim() === '')) {
-          input.value = '-';
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
+        if (isCorp) {
+          if (!input.value || input.value.trim() === '' || input.value.trim() === '-') {
+            isSoleProprietorNoTrade = true;
+            input.value = '-';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
         }
       });
+
+      // 個人事業で屋号がない場合はカナ欄も自動で半角ハイフン「-」を補填
+      if (isSoleProprietorNoTrade) {
+        inputs.forEach(input => {
+          const card = input.closest('.question-card, .preview-question-card');
+          if (!card) return;
+          const titleEl = card.querySelector('.question-title, .preview-q-title');
+          const titleText = titleEl ? titleEl.textContent : '';
+          const isKana = titleText.includes('カナ') || titleText.includes('フリガナ') || titleText.includes('ふりがな');
+          if (isKana && (!input.value || input.value.trim() === '')) {
+            input.value = '-';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+      }
     }, true);
   }
 
