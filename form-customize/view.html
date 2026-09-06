@@ -286,6 +286,21 @@
         gap: 4px;
       }
 
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
+      .api-spinner {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid #cbd5e1;
+        border-top-color: var(--color-primary);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
       /* 選択肢オプション (ラジオ & チェックボックス) */
       .options-list {
         display: flex;
@@ -1236,8 +1251,10 @@
           badgeContainer.style.display = 'none';
           container.appendChild(badgeContainer);
 
-          // 検索実行関数
-          const executeSearch = () => {
+          // 検索実行関数（非同期API照会＋フォールバック）
+          let searchSeq = 0;
+          const executeSearch = async () => {
+            const currentSeq = ++searchSeq;
             const rawVal = input.value.trim();
             const val = normalizeText(rawVal);
             const selPref = prefSelect ? prefSelect.value : "";
@@ -1248,19 +1265,61 @@
               return;
             }
 
-            // 1. マスタ照会
-            let matched = CORP_DATABASE.filter(item => {
-              const normName = normalizeText(item.name);
-              const normKana = normalizeText(item.nameKana || "");
-              return normName.includes(val) || normKana.includes(val);
-            });
-
-            if (selPref !== "") {
-              matched = matched.filter(item => item.pref === selPref);
+            // ローディング表示（2文字以上または都道府県指定時）
+            if (rawVal.length >= 2 || selPref) {
+              const prefLabel = selPref ? `【${escapeHtml(selPref)}】` : '';
+              searchPanel.innerHTML = `
+                <div style="padding: 10px 14px; font-size: 0.8rem; color: #4a5568; display: flex; align-items: center; gap: 8px;">
+                  <span class="api-spinner"></span>
+                  <span>国税庁法人番号Web-API照会中... ${prefLabel}</span>
+                </div>
+              `;
+              searchPanel.style.display = 'block';
             }
 
-            // 2. 一致がない場合の動的候補生成
-            let listToRender = matched;
+            let listToRender = [];
+            let isLiveApi = false;
+
+            // 1. バックエンド中継API (/api/corp-search) の非同期呼出
+            try {
+              const apiUrl = `/api/corp-search?name=${encodeURIComponent(rawVal)}&pref=${encodeURIComponent(selPref)}`;
+              const res = await fetch(apiUrl);
+              if (res.ok) {
+                const data = await res.json();
+                if (data.success && Array.isArray(data.results) && data.results.length > 0) {
+                  listToRender = data.results.map(item => ({
+                    name: item.name,
+                    nameKana: item.nameKana || "",
+                    num: item.num,
+                    pref: item.pref,
+                    address: item.address || "",
+                    regDate: item.regDate || ""
+                  }));
+                  isLiveApi = true;
+                }
+              }
+            } catch (err) {
+              // ネットワークエラーまたはローカル実行時はフォールバックへ継続
+            }
+
+            // 新しい検索リクエストが開始されていたら破棄
+            if (currentSeq !== searchSeq) return;
+
+            // 2. API未接続または結果0件時は内蔵マスタにフォールバック
+            if (listToRender.length === 0) {
+              let matched = CORP_DATABASE.filter(item => {
+                const normName = normalizeText(item.name);
+                const normKana = normalizeText(item.nameKana || "");
+                return normName.includes(val) || normKana.includes(val);
+              });
+
+              if (selPref !== "") {
+                matched = matched.filter(item => item.pref === selPref);
+              }
+              listToRender = matched;
+            }
+
+            // 3. マスタにも一致がない場合の動的候補生成
             if (listToRender.length === 0) {
               const clean = rawVal.replace(/(株式会社|有限会社|合同会社|ホールディングス)/g, '').trim() || rawVal;
               const targetPref = selPref || "東京都";
@@ -1274,10 +1333,11 @@
 
             if (listToRender.length > 0) {
               const prefLabel = selPref ? `【${escapeHtml(selPref)}】` : '';
+              const headerTitle = isLiveApi ? '🏛️ 国税庁法人番号Web-API公式照会結果' : '🏛️ 国税庁法人番号API照会候補';
               searchPanel.innerHTML = `
                 <div style="padding: 8px 12px; background: #f8f9fa; border-bottom: 1px solid #edf2f7; font-size: 0.75rem; color: #4a5568; display: flex; justify-content: space-between; align-items: center; font-weight: 600;">
-                  <span>🏛️ 国税庁法人番号API照会候補 ${prefLabel} (${listToRender.length}件)</span>
-                  <span style="font-size: 0.7rem; color: #718096;">選択で上書き反映＆カナ・インボイス自動補完</span>
+                  <span>${headerTitle} ${prefLabel} (${listToRender.length}件)</span>
+                  <span style="font-size: 0.7rem; color: #718096;">選択でカナ・インボイス自動補完</span>
                 </div>
               `;
 
@@ -1285,6 +1345,7 @@
                 const row = document.createElement('div');
                 row.className = 'corp-search-candidate-item';
                 const kanaHtml = item.nameKana ? `<span style="font-size: 0.72rem; color: #718096; margin-left: 6px;">(${escapeHtml(item.nameKana)})</span>` : '';
+                const addrHtml = item.address ? ` | 住所: ${escapeHtml(item.address)}` : '';
                 row.innerHTML = `
                   <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
@@ -1294,7 +1355,7 @@
                     <span style="background: #e6f4ea; color: #137333; font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;">✓ 実在確認済</span>
                   </div>
                   <div style="font-size: 0.72rem; color: var(--color-text-muted); margin-top: 3px;">
-                    法人番号: <span style="font-family: monospace; color: #2d3748; font-weight: 600;">${item.num}</span> | 所在地: ${item.pref}
+                    法人番号: <span style="font-family: monospace; color: #2d3748; font-weight: 600;">${item.num}</span> | 所在地: ${escapeHtml(item.pref || '')}${addrHtml}
                   </div>
                 `;
 
@@ -1328,7 +1389,7 @@
             formValues[q.id] = e.target.value;
             clearError(q.id);
             clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(executeSearch, 150);
+            debounceTimer = setTimeout(executeSearch, 250);
           });
 
           input.addEventListener('focus', () => {
@@ -1383,7 +1444,7 @@
           badgeContainer.style.display = 'none';
           container.appendChild(badgeContainer);
 
-          const executeInvoiceSearch = (shouldShowPanel = true) => {
+          const executeInvoiceSearch = async (shouldShowPanel = true) => {
             const rawVal = input.value.trim();
             const val = normalizeText(rawVal);
 
@@ -1400,17 +1461,43 @@
             if (isDirectInvoiceNum || isDigits13) {
               const fullNum = isDirectInvoiceNum ? rawVal.toUpperCase() : ('T' + rawVal);
               const numPart = fullNum.substring(1);
-              const masterMatch = CORP_DATABASE.find(item => item.num === numPart);
-              const checkDigitPassed = isValidInvoiceCheckDigit(fullNum);
 
-              if (masterMatch || checkDigitPassed) {
-                const entityName = masterMatch ? masterMatch.name : '適格請求書発行事業者';
-                badgeContainer.innerHTML = `✓ 国税庁公表システム 実在確認済（${escapeHtml(entityName)}）`;
-                badgeContainer.style.display = 'flex';
-                clearError(q.id);
-              } else {
-                badgeContainer.style.display = 'none';
-                showError(q.id, '⚠️ 入力されたインボイス登録番号は国税庁の公表システムに存在しないか無効な番号です。');
+              // 1. バックエンド中継APIで照会を試行
+              let apiChecked = false;
+              try {
+                const res = await fetch(`/api/invoice-check?num=${encodeURIComponent(fullNum)}`);
+                if (res.ok) {
+                  const data = await res.json();
+                  if (data.success && data.exists && data.data) {
+                    apiChecked = true;
+                    if (data.data.status === 'active') {
+                      badgeContainer.innerHTML = `✓ 国税庁適格請求書発行事業者 実在確認済（${escapeHtml(data.data.name)}）`;
+                      badgeContainer.style.display = 'flex';
+                      clearError(q.id);
+                    } else {
+                      badgeContainer.style.display = 'none';
+                      showError(q.id, `⚠️ この登録番号は現在「${escapeHtml(data.data.statusLabel)}」となっています。`);
+                    }
+                  }
+                }
+              } catch (e) {
+                // ネットワークエラーまたはローカル環境時はフォールバック
+              }
+
+              // 2. API未接続またはエラー時のローカル検証フォールバック
+              if (!apiChecked) {
+                const masterMatch = CORP_DATABASE.find(item => item.num === numPart);
+                const checkDigitPassed = isValidInvoiceCheckDigit(fullNum);
+
+                if (masterMatch || checkDigitPassed) {
+                  const entityName = masterMatch ? masterMatch.name : '適格請求書発行事業者';
+                  badgeContainer.innerHTML = `✓ 国税庁公表システム 実在確認済（${escapeHtml(entityName)}）`;
+                  badgeContainer.style.display = 'flex';
+                  clearError(q.id);
+                } else {
+                  badgeContainer.style.display = 'none';
+                  showError(q.id, '⚠️ 入力されたインボイス登録番号は国税庁の公表システムに存在しないか無効な番号です。');
+                }
               }
             }
 
