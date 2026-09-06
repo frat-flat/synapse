@@ -703,6 +703,20 @@
           visitedSections = new Set();
           currentSectionId = formDefinition.sections[0].id;
 
+          // 法人名・屋号の質問に対する案内文＆自動ハイフン補填ルールの自動適用
+          formDefinition.sections.forEach(s => {
+            (s.questions || []).forEach(q => {
+              if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
+                if (!q.description || !q.description.includes('屋号がない場合')) {
+                  q.description = (q.description ? q.description + '\n' : '') + '※ 個人事業主の方で屋号がない場合は未入力のまま「次へ」へお進みください（自動で半角ハイフン「-」が補填されます）。';
+                }
+                if (!q.validation) {
+                  q.validation = { category: 'text', condition: 'auto_hyphen', errorMessage: '' };
+                }
+              }
+            });
+          });
+
           // ヘッダー情報描画
           formTitleEl.textContent = formDefinition.title || '無題のフォーム';
           if (formDefinition.subtitle) {
@@ -957,6 +971,15 @@
               clearError(q.id);
             });
             container.appendChild(input);
+
+            // 法人名・屋号または自動ハイフン補填規則がある場合、個人事業主向けの案内文を表示
+            if ((q.validation && q.validation.condition === 'auto_hyphen') || (q.title && (q.title.includes('法人名') || q.title.includes('屋号')))) {
+              const hint = document.createElement('div');
+              hint.className = 'auto-hyphen-hint';
+              hint.style.cssText = 'font-size: 0.8rem; color: var(--color-text-muted); margin-top: 6px; line-height: 1.4;';
+              hint.innerHTML = '💡 <span style="font-weight: 500;">個人事業主の方へ</span>: 屋号がない場合は未入力のまま「次へ」へお進みください（自動で半角ハイフン「-」が補填されます）。';
+              container.appendChild(hint);
+            }
           } else if (q.type === 'paragraph') {
             const textarea = document.createElement('textarea');
             textarea.className = 'form-control';
@@ -1122,9 +1145,39 @@
         // ==========================================
         // 6. 入力バリデーション
         // ==========================================
+        // ==========================================
+        // 6. 入力バリデーション & 自動補填
+        // ==========================================
+        // 未入力時に自動で半角ハイフン「-」を補填する処理（個人事業の屋号なし等）
+        function autoFillHyphenForEmptyFields(section) {
+          if (!section || !section.questions) return;
+          section.questions.forEach(q => {
+            const isAutoHyphenRule = q.validation && (q.validation.condition === 'auto_hyphen' || q.validation.autoHyphen);
+            const isCorpField = q.title && (q.title.includes('法人名') || q.title.includes('屋号'));
+
+            if (isAutoHyphenRule || (isCorpField && (!q.validation || q.validation.condition === 'auto_hyphen'))) {
+              const curVal = formValues[q.id];
+              const isEmpty = curVal === undefined || curVal === null || (typeof curVal === 'string' && curVal.trim() === '');
+              if (isEmpty) {
+                // 自動で半角ハイフン「-」を補填
+                formValues[q.id] = '-';
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const input = card.querySelector('input.form-control, textarea.form-control');
+                  if (input) input.value = '-';
+                  card.classList.remove('has-error');
+                }
+              }
+            }
+          });
+        }
+
         function validateCurrentSection() {
           const section = formDefinition.sections.find(s => s.id === currentSectionId);
           if (!section) return true;
+
+          // 未入力ハイフン自動補填をバリデーション前に実行（必須チェック通過のため）
+          autoFillHyphenForEmptyFields(section);
 
           let isValid = true;
           let firstErrorCard = null;
@@ -1186,6 +1239,8 @@
                   rulePassed = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
                 } else if (v.condition === 'url') {
                   rulePassed = /^https?:\/\/[^\s]+$/.test(val);
+                } else if (v.condition === 'auto_hyphen') {
+                  rulePassed = true; // 自動ハイフン補填規則は形式問わずパス
                 }
               } else if (v.category === 'number') {
                 const num = Number(val);

@@ -10092,5 +10092,152 @@
     ensureAdmin();
   }
   setInterval(ensureAdmin, 500);
+
+  // =========================================================================
+  // 🏢 法人名・屋号の案内文 & 未入力時半角ハイフン自動補填入力規則機能
+  // =========================================================================
+  const AUTO_HYPHEN_NOTICE_TEXT = '※ 個人事業主の方で屋号がない場合は、未入力のまま「次へ」へお進みください（自動で半角ハイフン「-」が補填されます）。';
+
+  // 1. バリデーション定義 (window.b) の拡張
+  if (typeof window.b !== 'undefined') {
+    if (window.b.text && window.b.text.conditions) {
+      window.b.text.conditions.auto_hyphen = '未入力時は自動で半角ハイフン補填（屋号なし等）';
+    }
+  }
+
+  // 2. エディタ内の入力規則（validation）ドロップダウンへの動的注入＆案内バッジ表示
+  function patchAutoHyphenValidationUI() {
+    const valContainers = document.querySelectorAll('.validation-edit-container');
+    valContainers.forEach(container => {
+      // カテゴリセレクトボックス
+      const categorySelect = container.querySelector('.form-group-row .form-group:first-child select');
+      // 条件ルールセレクトボックス
+      const conditionSelect = container.querySelector('.form-group-row .form-group:nth-child(2) select');
+      const valInputsContainer = container.querySelector('.val-inputs-container');
+
+      if (categorySelect && conditionSelect) {
+        if (categorySelect.value === 'text') {
+          // auto_hyphen オプションが存在しない場合は追加
+          const hasAutoHyphen = Array.from(conditionSelect.options).some(o => o.value === 'auto_hyphen');
+          if (!hasAutoHyphen) {
+            const opt = document.createElement('option');
+            opt.value = 'auto_hyphen';
+            opt.textContent = '未入力時は自動で半角ハイフン補填（屋号なし等）';
+            conditionSelect.appendChild(opt);
+          }
+
+          // auto_hyphen が選択されている場合の説明表示
+          if (conditionSelect.value === 'auto_hyphen' && valInputsContainer) {
+            let notice = valInputsContainer.querySelector('.auto-hyphen-validation-notice');
+            if (!notice) {
+              notice = document.createElement('div');
+              notice.className = 'auto-hyphen-validation-notice';
+              notice.style.cssText = 'background: rgba(26,115,232,0.08); border: 1px solid rgba(26,115,232,0.3); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; font-size: 0.85rem; color: var(--color-text); line-height: 1.5;';
+              notice.innerHTML = '<div style="font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">ℹ️ 未入力時のハイフン自動補填機能</div><div style="color: var(--color-text-muted); font-size: 0.8rem;">回答者がこの質問を未入力のまま「次へ」または「送信」へ進んだ際、自動的に半角ハイフン「-」を補填します。<br>「必須回答」が有効になっている場合でも、エラーにならずそのままスムーズに進行できるようになります（個人事業主で屋号がない場合などに推奨）。</div>';
+              valInputsContainer.appendChild(notice);
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // 3. 「法人名・屋号」設問に対する案内文＆自動ハイフンルールの初期・動的補強
+  function ensureCorpQuestionGuidance() {
+    const formsToCheck = [];
+    if (window.G && window.G.sections) formsToCheck.push(window.G);
+    if (window.n && window.n.sections && window.n !== window.G) formsToCheck.push(window.n);
+
+    try {
+      const raw = localStorage.getItem('form_customize_all_forms');
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          let updated = false;
+          list.forEach(form => {
+            if (form && form.sections) {
+              form.sections.forEach(sec => {
+                (sec.questions || []).forEach(q => {
+                  if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
+                    if (!q.description || !q.description.includes('屋号がない場合')) {
+                      q.description = (q.description ? q.description + '\n' : '') + AUTO_HYPHEN_NOTICE_TEXT;
+                      updated = true;
+                    }
+                    if (!q.validation || q.validation.condition !== 'auto_hyphen') {
+                      q.validation = { category: 'text', condition: 'auto_hyphen', value: '', value2: '', errorMessage: '' };
+                      updated = true;
+                    }
+                  }
+                });
+              });
+            }
+          });
+          if (updated) {
+            localStorage.setItem('form_customize_all_forms', JSON.stringify(list));
+          }
+        }
+      }
+    } catch(e) {}
+
+    formsToCheck.forEach(form => {
+      form.sections.forEach(sec => {
+        (sec.questions || []).forEach(q => {
+          if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
+            if (!q.description || !q.description.includes('屋号がない場合')) {
+              q.description = (q.description ? q.description + '\n' : '') + AUTO_HYPHEN_NOTICE_TEXT;
+              const descInput = document.querySelector(`.q-desc-input[data-question-id="${q.id}"]`);
+              if (descInput && !descInput.value.includes('屋号がない場合')) {
+                descInput.value = q.description;
+              }
+            }
+            if (!q.validation || q.validation.condition !== 'auto_hyphen') {
+              q.validation = { category: 'text', condition: 'auto_hyphen', value: '', value2: '', errorMessage: '' };
+            }
+          }
+        });
+      });
+    });
+  }
+
+  // 4. 管理画面プレビューでの未入力ハイフン自動補填
+  function setupPreviewAutoHyphenHook() {
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('#preview-next-btn, #preview-submit-btn, .btn-preview-next, .btn-preview-submit, #btn-next, #btn-submit');
+      if (!btn) return;
+      
+      const previewRoot = document.getElementById('preview-content') || document.querySelector('.live-preview-container') || document.body;
+      const inputs = previewRoot.querySelectorAll('input.form-control, textarea.form-control');
+      inputs.forEach(input => {
+        const card = input.closest('.question-card, .preview-question-card');
+        if (!card) return;
+        const titleEl = card.querySelector('.question-title, .preview-q-title');
+        const titleText = titleEl ? titleEl.textContent : '';
+        const isCorp = titleText.includes('法人名') || titleText.includes('屋号');
+        
+        if (isCorp && (!input.value || input.value.trim() === '')) {
+          input.value = '-';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    }, true);
+  }
+
+  // 監視と初期化
+  setTimeout(() => {
+    ensureCorpQuestionGuidance();
+    patchAutoHyphenValidationUI();
+    setupPreviewAutoHyphenHook();
+  }, 300);
+
+  const questionsBox = document.getElementById('questions-container');
+  if (questionsBox) {
+    const observer = new MutationObserver(() => {
+      patchAutoHyphenValidationUI();
+    });
+    observer.observe(questionsBox, { childList: true, subtree: true });
+  }
+
+  setInterval(patchAutoHyphenValidationUI, 1200);
 })();
 
