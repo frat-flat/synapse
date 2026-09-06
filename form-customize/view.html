@@ -252,21 +252,22 @@
         border: 1px solid var(--color-border);
         border-radius: 8px;
         z-index: 2050;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
         display: none;
         max-height: 280px;
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
       }
 
       .corp-pref-filter-container {
         display: flex;
-        gap: 8px;
+        gap: 6px;
         align-items: center;
-        margin-top: 8px;
+        margin-top: 6px;
       }
 
       .corp-search-candidate-item, .invoice-search-candidate-item {
-        padding: 10px 14px;
+        padding: 10px 12px;
         cursor: pointer;
         border-bottom: 1px solid rgba(0, 0, 0, 0.05);
         transition: background-color 0.15s;
@@ -277,13 +278,9 @@
       }
 
       .api-verified-badge {
-        font-size: 0.75rem;
-        color: #137333;
+        font-size: 0.78rem;
         margin-top: 6px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 4px;
+        display: none;
       }
 
       @keyframes spin {
@@ -299,6 +296,25 @@
         border-top-color: var(--color-primary);
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
+        flex-shrink: 0;
+      }
+
+      @media (max-width: 600px) {
+        .form-container {
+          padding: 12px 10px 32px;
+        }
+        .form-header-card, .question-card {
+          padding: 18px 14px;
+          border-radius: 8px;
+          margin-bottom: 12px;
+        }
+        .corp-search-panel, .invoice-search-panel {
+          max-height: 250px;
+        }
+        .btn-invoice-search {
+          padding: 6px 12px !important;
+          font-size: 0.8rem !important;
+        }
       }
 
       /* 選択肢オプション (ラジオ & チェックボックス) */
@@ -1221,29 +1237,31 @@
 
           container.appendChild(inputGroup);
 
-          // 都道府県エリア絞り込みセレクトボックス
+          // 都道府県エリア絞り込みセレクトボックス（スマホ対応コンパクトレイアウト）
           const filterContainer = document.createElement('div');
           filterContainer.className = 'corp-pref-filter-container';
-          filterContainer.style.cssText = 'display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap;';
+          filterContainer.style.cssText = 'display: flex; gap: 6px; align-items: center; margin-top: 6px;';
           const prefOptions = JAPAN_PREFECTURES.map(p => `<option value="${p}">${p}</option>`).join('');
           filterContainer.innerHTML = `
-            <span style="font-size: 0.8rem; font-weight: 500; color: var(--color-text-muted);">エリア絞り込み:</span>
-            <select class="corp-pref-filter form-control" style="width: auto; min-width: 140px; font-size: 0.8rem; padding: 4px 8px; height: 32px; border-radius: 4px; cursor: pointer;">
+            <span style="font-size: 0.75rem; font-weight: 600; color: #64748b; white-space: nowrap;">絞り込み:</span>
+            <select class="corp-pref-filter form-control" style="width: auto; max-width: 160px; font-size: 0.75rem; padding: 2px 8px; height: 30px; border-radius: 6px; border: 1px solid #cbd5e1; background-color: #f8fafc; cursor: pointer;">
               <option value="">都道府県すべて</option>
               ${prefOptions}
             </select>
-            <span style="font-size: 0.75rem; color: var(--color-text-muted);">※ 都道府県を選択すると該当法人のみ絞り込みます</span>
           `;
           container.appendChild(filterContainer);
 
           const prefSelect = filterContainer.querySelector('.corp-pref-filter');
 
-          // 個人事業主向け案内文（ハイフン自動補填に関する言及はなし）
-          const hint = document.createElement('div');
-          hint.className = 'auto-hyphen-hint';
-          hint.style.cssText = 'font-size: 0.8rem; color: var(--color-text-muted); margin-top: 6px; line-height: 1.4;';
-          hint.innerHTML = '💡 <span style="font-weight: 500;">個人事業主の方へ</span>: 屋号がない場合は未入力のまま「次へ」へお進みください。';
-          container.appendChild(hint);
+          // 個人事業主向け案内文（設問説明文にまだ書かれていない場合のみ表示し、重複を防ぐ）
+          const descText = q.description || '';
+          if (!descText.includes('屋号がない場合') && !descText.includes('個人事業主')) {
+            const hint = document.createElement('div');
+            hint.className = 'auto-hyphen-hint';
+            hint.style.cssText = 'font-size: 0.75rem; color: var(--color-text-muted); margin-top: 6px; line-height: 1.4;';
+            hint.innerHTML = '💡 <span style="font-weight: 500;">個人事業主の方へ</span>: 屋号がない場合は未入力のまま進めます。';
+            container.appendChild(hint);
+          }
 
           // 実在確認済バッジ用コンテナ
           const badgeContainer = document.createElement('div');
@@ -1269,9 +1287,9 @@
             if (rawVal.length >= 2 || selPref) {
               const prefLabel = selPref ? `【${escapeHtml(selPref)}】` : '';
               searchPanel.innerHTML = `
-                <div style="padding: 10px 14px; font-size: 0.8rem; color: #4a5568; display: flex; align-items: center; gap: 8px;">
+                <div style="padding: 10px 12px; font-size: 0.78rem; color: #475569; display: flex; align-items: center; gap: 8px;">
                   <span class="api-spinner"></span>
-                  <span>国税庁法人番号Web-API照会中... ${prefLabel}</span>
+                  <span>国税庁法人番号API照会中... ${prefLabel}</span>
                 </div>
               `;
               searchPanel.style.display = 'block';
@@ -1333,36 +1351,32 @@
 
             if (listToRender.length > 0) {
               const prefLabel = selPref ? `【${escapeHtml(selPref)}】` : '';
-              const headerTitle = isLiveApi ? '🏛️ 国税庁法人番号Web-API公式照会結果' : '🏛️ 国税庁法人番号API照会候補';
               searchPanel.innerHTML = `
-                <div style="padding: 8px 12px; background: #f8f9fa; border-bottom: 1px solid #edf2f7; font-size: 0.75rem; color: #4a5568; display: flex; justify-content: space-between; align-items: center; font-weight: 600;">
-                  <span>${headerTitle} ${prefLabel} (${listToRender.length}件)</span>
-                  <span style="font-size: 0.7rem; color: #718096;">選択でカナ・インボイス自動補完</span>
+                <div style="padding: 8px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 0.74rem; color: #334155; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
+                  <span>🏛️ 国税庁照会候補 ${prefLabel} <span style="color: #64748b; font-weight: normal;">(${listToRender.length}件)</span></span>
+                  <span style="font-size: 0.68rem; color: #0284c7; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">タップで選択</span>
                 </div>
               `;
 
               listToRender.forEach(item => {
                 const row = document.createElement('div');
                 row.className = 'corp-search-candidate-item';
-                const kanaHtml = item.nameKana ? `<span style="font-size: 0.72rem; color: #718096; margin-left: 6px;">(${escapeHtml(item.nameKana)})</span>` : '';
-                const displayAddress = item.address || (item.pref ? `${item.pref}（所在地情報）` : '住所情報なし');
+                const displayAddress = item.address || (item.pref ? `${item.pref}（所在地）` : '住所情報なし');
 
                 row.innerHTML = `
-                  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-                    <div>
-                      <span style="font-weight: 700; font-size: 0.92rem; color: var(--color-primary);">${escapeHtml(item.name)}</span>
-                      ${kanaHtml}
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
+                    <div style="flex: 1; min-width: 0;">
+                      <div style="font-weight: 700; font-size: 0.88rem; color: var(--color-primary); word-break: break-word;">${escapeHtml(item.name)}</div>
+                      ${item.nameKana ? `<div style="font-size: 0.7rem; color: #64748b; margin-top: 1px; word-break: break-word;">${escapeHtml(item.nameKana)}</div>` : ''}
                     </div>
-                    <span style="background: #e6f4ea; color: #137333; font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; white-space: nowrap; flex-shrink: 0;">✓ 実在確認済</span>
+                    <span style="background: #e6f4ea; color: #137333; font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 600; white-space: nowrap; flex-shrink: 0;">実在確認済</span>
                   </div>
-                  <div style="margin-top: 6px; padding: 6px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.78rem;">
-                    <div style="color: #1a202c; display: flex; align-items: flex-start; gap: 6px; line-height: 1.4;">
-                      <span style="color: #4a5568; font-weight: 700; flex-shrink: 0;">📍 本店所在地（住所）:</span>
-                      <strong style="color: #1a202c;">${escapeHtml(displayAddress)}</strong>
+                  <div style="margin-top: 5px; padding: 5px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.75rem; line-height: 1.4;">
+                    <div style="color: #1e293b; word-break: break-all;">
+                      <span style="color: #64748b; font-weight: 600;">📍 住所:</span> <strong style="color: #0f172a;">${escapeHtml(displayAddress)}</strong>
                     </div>
-                    <div style="margin-top: 3px; font-size: 0.72rem; color: #718096; display: flex; align-items: center; gap: 8px;">
-                      <span>🔢 法人番号: <strong style="font-family: monospace; color: #4a5568;">${item.num}</strong></span>
-                      ${item.regDate ? `<span>| 登録日: ${escapeHtml(item.regDate)}</span>` : ''}
+                    <div style="margin-top: 2px; font-size: 0.7rem; color: #64748b;">
+                      <span>法人番号: <span style="font-family: monospace; font-weight: 600; color: #334155;">${item.num}</span></span>
                     </div>
                   </div>
                 `;
@@ -1375,20 +1389,20 @@
                   clearError(q.id);
                   searchPanel.style.display = 'none';
 
-                  // 実在確認済バッジ表示（法人番号と住所の両方を明記）
+                  // 実在確認済バッジ表示（スマホ幅でも美しく整理）
                   badgeContainer.innerHTML = `
-                    <div style="display: flex; flex-direction: column; gap: 4px; width: 100%; background: #e6f4ea; border: 1px solid #b7e1cd; padding: 10px 14px; border-radius: 8px; font-size: 0.8rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); line-height: 1.4;">
-                      <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span style="font-weight: 700; color: #137333; display: flex; align-items: center; gap: 6px;">
-                          <span>✓ 国税庁法人番号公表システム 実在確認済</span>
+                    <div style="margin-top: 6px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 8px 12px; border-radius: 8px; font-size: 0.78rem; line-height: 1.4;">
+                      <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+                        <span style="font-weight: 700; color: #166534; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;">
+                          <span>✓</span> 国税庁法人番号 実在確認済
                         </span>
-                        <span style="font-size: 0.68rem; background: #fff; padding: 2px 8px; border-radius: 4px; border: 1px solid #a8dab5; color: #137333; font-weight: 600;">確認完了</span>
+                        <span style="font-size: 0.65rem; background: #dcfce7; color: #15803d; padding: 1px 6px; border-radius: 4px; font-weight: 600;">照会完了</span>
                       </div>
-                      <div style="color: #202124; font-size: 0.82rem; margin-top: 2px;">
-                        <span style="font-weight: 700; color: #3c4043;">📍 本店所在地（住所）:</span> <strong style="color: #1a202c;">${escapeHtml(displayAddress)}</strong>
+                      <div style="color: #1f2937; margin-top: 4px; word-break: break-all;">
+                        <span style="color: #4b5563; font-weight: 600;">📍 本店所在地:</span> <strong style="color: #111827;">${escapeHtml(displayAddress)}</strong>
                       </div>
-                      <div style="color: #5f6368; font-size: 0.74rem;">
-                        <span style="font-weight: 600;">🔢 法人番号:</span> <span style="font-family: monospace; font-weight: 700; color: #3c4043;">${item.num}</span>
+                      <div style="color: #6b7280; font-size: 0.72rem; margin-top: 2px;">
+                        <span>法人番号: <span style="font-family: monospace; font-weight: 600; color: #374151;">${item.num}</span></span>
                       </div>
                     </div>
                   `;
@@ -1442,7 +1456,7 @@
           const input = document.createElement('input');
           input.type = 'text';
           input.className = 'form-control';
-          input.placeholder = 'Tから始まる13桁 または事業者名 (例: T1010001999999)';
+          input.placeholder = '例: T1234567890123';
           input.value = initialVal || '';
           input.style.flex = '1';
           inputGroup.appendChild(input);
@@ -1450,7 +1464,7 @@
           const searchBtn = document.createElement('button');
           searchBtn.type = 'button';
           searchBtn.className = 'btn-invoice-search';
-          searchBtn.style.cssText = 'white-space: nowrap; padding: 6px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer; background: var(--color-primary); color: #fff; border: none; border-radius: 4px; height: 38px; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;';
+          searchBtn.style.cssText = 'white-space: nowrap; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer; background: var(--color-primary); color: #fff; border: none; border-radius: 4px; height: 38px; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;';
           searchBtn.innerHTML = '🔍 照会';
           inputGroup.appendChild(searchBtn);
 
@@ -1535,9 +1549,9 @@
             }
 
             searchPanel.innerHTML = `
-              <div style="padding: 8px 12px; background: #f8f9fa; border-bottom: 1px solid #edf2f7; font-size: 0.75rem; color: #4a5568; display: flex; justify-content: space-between; align-items: center; font-weight: 600;">
-                <span>🧾 国税庁インボイス公表API照会候補 (${matched.length}件)</span>
-                <span style="font-size: 0.7rem; color: #718096;">選択で登録番号自動補完</span>
+              <div style="padding: 8px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 0.74rem; color: #334155; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
+                <span>🧾 インボイス照会候補 <span style="color: #64748b; font-weight: normal;">(${matched.length}件)</span></span>
+                <span style="font-size: 0.68rem; color: #0284c7; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">タップで選択</span>
               </div>
             `;
 
