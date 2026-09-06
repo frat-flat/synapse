@@ -1124,49 +1124,21 @@ input:-webkit-autofill:active {
     margin: 0 !important;
   }
 
-  /* ユーザー情報エリア・ログアウトボタン・JSON出力ボタンの安定表示 */
-  .user-profile-header {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    padding: 4px 10px !important;
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 6px !important;
-  }
-  .user-profile-header .user-avatar {
-    font-size: 1.1rem !important;
-  }
-  .user-profile-header .user-info {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 1px !important;
-    text-align: left !important;
-  }
-  .user-profile-header .user-name {
-    font-size: 0.82rem !important;
-    font-weight: 700 !important;
-    color: #1e293b !important;
-    line-height: 1.2 !important;
-  }
-  .user-profile-header .user-role {
-    font-size: 0.7rem !important;
-    font-weight: 600 !important;
-    color: #6366f1 !important;
-    line-height: 1.2 !important;
-  }
-  #btn-logout {
-    font-size: 0.75rem !important;
-    padding: 4px 8px !important;
-    height: auto !important;
-    width: auto !important;
-    min-width: 0 !important;
-    border-radius: 4px !important;
-    display: inline-flex !important;
-    margin-left: 4px !important;
-  }
-  #btn-logout::before {
+  /* ユーザー情報エリア・ログアウトボタン・シミュレーションログインの完全非表示（親システム連携のため不要） */
+  .user-profile-header,
+  #gf-user-profile,
+  #btn-logout,
+  .login-overlay,
+  #login-overlay {
     display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
   }
   #btn-export-json .btn-text {
     display: inline !important;
@@ -2201,50 +2173,14 @@ input:-webkit-autofill:active {
 
 
 /* ==========================================
-   ユーザープロフィール基本スタイル（常時適用）
+   ユーザープロフィール（親システム連携のため無効化）
    ========================================== */
-.user-profile-header {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  padding: 4px 10px !important;
-  background: #f8fafc !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 6px !important;
-}
-.user-profile-header .user-avatar {
-  font-size: 1.1rem !important;
-}
-.user-profile-header .user-info {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 1px !important;
-  text-align: left !important;
-}
-.user-profile-header .user-name {
-  font-size: 0.82rem !important;
-  font-weight: 700 !important;
-  color: #1e293b !important;
-  line-height: 1.2 !important;
-}
-.user-profile-header .user-role {
-  font-size: 0.7rem !important;
-  font-weight: 600 !important;
-  color: #6366f1 !important;
-  line-height: 1.2 !important;
-}
+.user-profile-header,
+#gf-user-profile,
 #btn-logout {
-  font-size: 0.75rem !important;
-  padding: 4px 8px !important;
-  height: auto !important;
-  width: auto !important;
-  min-width: 0 !important;
-  border-radius: 4px !important;
-  display: inline-flex !important;
-  margin-left: 4px !important;
-}
-#btn-logout::before {
   display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 #btn-export-json .btn-text {
   display: inline !important;

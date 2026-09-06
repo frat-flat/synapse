@@ -60,6 +60,11 @@
   // 起動時セーフガード: フラグのリセットおよび破損データの自動修復
   (function initSanitize() {
     try {
+      // 🚀 親システム連携：常時管理者権限（フルアクセス）を担保
+      const adminUser = { id: 'user_admin', name: '管理者', role: 'admin' };
+      localStorage.setItem('gf_current_user', JSON.stringify(adminUser));
+      window.K = adminUser;
+
       localStorage.setItem('form_customize_is_template_mode', 'false');
       setTimeout(() => {
         initTemplates(); // テンプレートマスタ初期化
@@ -9986,3 +9991,55 @@
     }
   });
 })();
+
+// ===================================================
+// 親システム連携：内部ログアウト機能の無効化とヘッダークリーンアップ
+// ===================================================
+(function enforceAdminSessionAndHideLogout() {
+  const adminUser = { id: 'user_admin', name: '管理者', role: 'admin' };
+
+  function ensureAdmin() {
+    try {
+      const cur = localStorage.getItem('gf_current_user');
+      if (!cur || JSON.parse(cur).role !== 'admin') {
+        localStorage.setItem('gf_current_user', JSON.stringify(adminUser));
+      }
+      if (typeof window.K !== 'undefined' && (!window.K || window.K.role !== 'admin')) {
+        window.K = adminUser;
+      }
+    } catch(e) {}
+
+    // プロフィール要素とシミュレーションログインオーバーレイの徹底非表示
+    const profile = document.getElementById('gf-user-profile');
+    if (profile) {
+      profile.style.setProperty('display', 'none', 'important');
+      profile.style.setProperty('visibility', 'hidden', 'important');
+      profile.style.setProperty('pointer-events', 'none', 'important');
+    }
+    const overlay = document.getElementById('login-overlay');
+    if (overlay) {
+      overlay.classList.remove('active');
+      overlay.style.setProperty('display', 'none', 'important');
+      overlay.style.setProperty('visibility', 'hidden', 'important');
+      overlay.style.setProperty('pointer-events', 'none', 'important');
+    }
+  }
+
+  // ログアウトボタン押下をキャプチャフェーズで完全に阻止
+  document.addEventListener('click', (e) => {
+    if (e.target && (e.target.id === 'btn-logout' || e.target.closest('#btn-logout'))) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      console.log('[Auth] Internal logout prevented (auth handled by parent system).');
+      ensureAdmin();
+    }
+  }, true);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureAdmin);
+  } else {
+    ensureAdmin();
+  }
+  setInterval(ensureAdmin, 500);
+})();
+

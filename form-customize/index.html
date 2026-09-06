@@ -16,6 +16,15 @@
     <script type="module" src="./assets/index-W0nnFdhS-v6.js?v=6.0.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
     <script>
+      // 🚀 親システム（Synapse）連携：常時フル権限（管理者）を保証し、不要な内部ログイン・ログアウトを抑止
+      try {
+        const defaultAdmin = { id: 'user_admin', name: '管理者', role: 'admin' };
+        localStorage.setItem('gf_current_user', JSON.stringify(defaultAdmin));
+        window.K = defaultAdmin;
+      } catch(e) {
+        console.warn('[Antigravity] Failed to set default admin session:', e);
+      }
+
       // 🚀 キャッシュを100%強制回避して最新のCSSとJSをロードするインラインローダー
       (function() {
         const ts = Date.now();
@@ -103,14 +112,14 @@
             </div>
           </div>
         </div>
-        <!-- 👤 ユーザープロフィール表示（ログイン状態・最右端へ配置） -->
-        <div class="user-profile-header" id="gf-user-profile" style="display: none;">
+        <!-- 👤 ユーザープロフィール表示（親システム側で認証管理されるため完全非表示） -->
+        <div class="user-profile-header" id="gf-user-profile" style="display: none !important; visibility: hidden !important; pointer-events: none !important;">
           <span class="user-avatar">👤</span>
           <div class="user-info">
-            <span class="user-name" id="gf-user-name">田中さん</span>
-            <span class="user-role" id="gf-user-role">閲覧者</span>
+            <span class="user-name" id="gf-user-name">管理者</span>
+            <span class="user-role" id="gf-user-role">管理者</span>
           </div>
-          <button id="btn-logout" class="btn btn-sm btn-secondary" data-tooltip="権限ロールの切り替え・ログアウト">ログアウト</button>
+          <button id="btn-logout" class="btn btn-sm btn-secondary" style="display: none !important;">ログアウト</button>
         </div>
       </div>
     </header>
@@ -1047,8 +1056,8 @@
       </div>
     </div>
 
-    <!-- ログイン・モーダル（オーバーレイ） -->
-    <div id="login-overlay" class="login-overlay">
+    <!-- ログイン・モーダル（オーバーレイ：親システムで認証済みのため非表示） -->
+    <div id="login-overlay" class="login-overlay" style="display: none !important; visibility: hidden !important; pointer-events: none !important;">
       <div class="login-box">
         <div class="login-logo">
           <span class="login-logo-icon">🔒</span>
