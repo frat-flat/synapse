@@ -742,10 +742,16 @@
 
           // フォールバック1: クラウドAPI（Supabase synapse_storage）からの取得（初見端末・別ブラウザ・モバイル端末対応）
           if (!formDefinition) {
-            const formId = search.get('id');
+            let formId = search.get('id');
             const formIdx = search.get('form_idx');
+            // 短縮URLパス (/f/:id または /form/:id) からの自動抽出
+            if (!formId) {
+              const pathMatch = window.location.pathname.match(/\/(?:f|form)\/([^/]+)/);
+              if (pathMatch) formId = decodeURIComponent(pathMatch[1]);
+            }
+
             try {
-              let apiUrl = '../api/forms';
+              let apiUrl = '/api/forms';
               const queryParts = [];
               if (formId) queryParts.push(`id=${encodeURIComponent(formId)}`);
               if (formIdx !== null && formIdx !== '') queryParts.push(`form_idx=${encodeURIComponent(formIdx)}`);
@@ -778,8 +784,23 @@
                     let forms = rows[0].value;
                     if (typeof forms === 'string') forms = JSON.parse(forms);
                     if (Array.isArray(forms) && forms.length > 0) {
-                      const idx = (formIdx !== null && formIdx !== '') ? parseInt(formIdx, 10) : 0;
-                      formDefinition = forms[!isNaN(idx) && forms[idx] ? idx : 0];
+                      let targetForm = null;
+                      if (formId) {
+                        targetForm = forms.find(f => f && (f.id === formId || f.formId === formId));
+                        if (!targetForm && typeof formId === 'string' && formId.startsWith('form_')) {
+                          const subIdx = parseInt(formId.replace('form_', ''), 10);
+                          if (!isNaN(subIdx) && forms[subIdx]) targetForm = forms[subIdx];
+                        }
+                        if (!targetForm) {
+                          const numIdx = parseInt(formId, 10);
+                          if (!isNaN(numIdx) && forms[numIdx]) targetForm = forms[numIdx];
+                        }
+                      }
+                      if (!targetForm && formIdx !== null && formIdx !== '') {
+                        const idx = parseInt(formIdx, 10);
+                        if (!isNaN(idx) && forms[idx]) targetForm = forms[idx];
+                      }
+                      formDefinition = targetForm || forms[0];
                     }
                   }
                 }
@@ -789,16 +810,28 @@
 
           // フォールバック2: ローカルストレージからの検索（同一端末・テスト環境）
           if (!formDefinition) {
-            const formId = search.get('id');
+            let formId = search.get('id');
             const formIdx = search.get('form_idx');
+            if (!formId) {
+              const pathMatch = window.location.pathname.match(/\/(?:f|form)\/([^/]+)/);
+              if (pathMatch) formId = decodeURIComponent(pathMatch[1]);
+            }
             try {
               const allFormsRaw = localStorage.getItem('form_customize_all_forms');
               if (allFormsRaw) {
                 const allForms = JSON.parse(allFormsRaw);
                 if (formId) {
-                  formDefinition = allForms.find(f => f.id === formId);
+                  formDefinition = allForms.find(f => f && (f.id === formId || f.formId === formId));
+                  if (!formDefinition && typeof formId === 'string' && formId.startsWith('form_')) {
+                    const subIdx = parseInt(formId.replace('form_', ''), 10);
+                    if (!isNaN(subIdx) && allForms[subIdx]) formDefinition = allForms[subIdx];
+                  }
+                  if (!formDefinition) {
+                    const numIdx = parseInt(formId, 10);
+                    if (!isNaN(numIdx) && allForms[numIdx]) formDefinition = allForms[numIdx];
+                  }
                 }
-                if (!formDefinition && formIdx !== null) {
+                if (!formDefinition && formIdx !== null && formIdx !== '') {
                   const idx = parseInt(formIdx, 10);
                   if (!isNaN(idx) && allForms[idx]) {
                     formDefinition = allForms[idx];

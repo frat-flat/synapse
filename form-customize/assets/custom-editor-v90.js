@@ -9693,7 +9693,18 @@
     }
   }
 
-  async function getPublicFormShareUrl(formIndex) {
+  let _currentShareModalFormIndex = null;
+
+  function updateShareModalOpenTabBtn(targetUrl) {
+    const openTabBtn = document.getElementById('btn-open-share-url-tab');
+    if (openTabBtn) {
+      openTabBtn.onclick = () => {
+        window.open(targetUrl, '_blank');
+      };
+    }
+  }
+
+  function getPublicFormShareUrl(formIndex, shorten = true) {
     const origin = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : '';
     let pathname = window.location.pathname || '';
     
@@ -9715,14 +9726,16 @@
     const { formObj, idx } = getCurrentFormObject(formIndex);
     const formId = formObj && formObj.id ? formObj.id : `form_${idx}`;
     
-    let hashData = '';
-    if (formObj) {
-      hashData = await encodeFormDataForUrl(formObj);
-      try { syncFormsToCloud(); } catch(e) {}
+    // バックグラウンドでクラウド（Supabase）への保存・同期を実行
+    try { syncFormsToCloud(); } catch(e) {}
+
+    // 短縮URL (Google Forms短縮URL風: 例 https://synapse-wayway.vercel.app/f/0)
+    if (shorten) {
+      return `${origin}/f/${idx}`;
     }
 
-    const hashPart = hashData ? `#data=${hashData}` : '';
-    return `${origin}${viewPath}?id=${encodeURIComponent(formId)}&form_idx=${idx}${hashPart}`;
+    // 完全URL (例: https://synapse-wayway.vercel.app/form-customize/view.html?id=form_0)
+    return `${origin}${viewPath}?id=${encodeURIComponent(formId)}&form_idx=${idx}`;
   }
 
   function showGlobalShareToast(msg) {
@@ -9743,18 +9756,19 @@
     }, 2500);
   }
 
-  async function copyFormShareUrl(formIndex, silent = false) {
-    const url = await getPublicFormShareUrl(formIndex);
+  async function copyFormShareUrl(formIndex, silent = false, forceShorten = true) {
+    const url = getPublicFormShareUrl(formIndex, forceShorten);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       try {
         await navigator.clipboard.writeText(url);
-        if (!silent) showGlobalShareToast('回答者用リンクをクリップボードにコピーしました！');
+        if (!silent) showGlobalShareToast('回答者用短縮リンクをクリップボードにコピーしました！');
       } catch (e) {
         fallbackCopy(url, silent);
       }
     } else {
       fallbackCopy(url, silent);
     }
+    return url;
   }
 
   function fallbackCopy(text, silent = false) {
@@ -9766,7 +9780,7 @@
     textarea.select();
     try {
       document.execCommand('copy');
-      if (!silent) showGlobalShareToast('回答者用リンクをクリップボードにコピーしました！');
+      if (!silent) showGlobalShareToast('回答者用短縮リンクをクリップボードにコピーしました！');
     } catch (e) {
       console.warn('Copy failed:', e);
     }
@@ -9777,30 +9791,33 @@
     const modal = document.getElementById('modal-share-url');
     if (!modal) return;
     const { formObj, idx } = getCurrentFormObject(formIndex);
+    _currentShareModalFormIndex = idx;
     const formTitle = formObj && formObj.title ? formObj.title : '無題のフォーム';
 
     const titleEl = document.getElementById('share-modal-form-title');
     if (titleEl) titleEl.textContent = formTitle;
 
     const inputEl = document.getElementById('share-modal-url-input');
-    if (inputEl) inputEl.value = 'URLを生成中...';
-
+    const shortenCheckbox = document.getElementById('share-modal-shorten-checkbox');
     const toastEl = document.getElementById('share-modal-copy-toast');
     if (toastEl) toastEl.style.display = 'none';
 
+    const isShorten = shortenCheckbox ? shortenCheckbox.checked : true;
+    const url = getPublicFormShareUrl(idx, isShorten);
+    if (inputEl) inputEl.value = url;
+    updateShareModalOpenTabBtn(url);
+
+    if (shortenCheckbox && !shortenCheckbox._hooked) {
+      shortenCheckbox._hooked = true;
+      shortenCheckbox.addEventListener('change', () => {
+        const currentUrl = getPublicFormShareUrl(_currentShareModalFormIndex, shortenCheckbox.checked);
+        if (inputEl) inputEl.value = currentUrl;
+        updateShareModalOpenTabBtn(currentUrl);
+      });
+    }
+
     modal.classList.add('active');
     modal.style.display = 'flex';
-
-    const url = await getPublicFormShareUrl(idx);
-    if (inputEl) inputEl.value = url;
-
-    // 別タブで開くボタンのリンク先
-    const openTabBtn = document.getElementById('btn-open-share-url-tab');
-    if (openTabBtn) {
-      openTabBtn.onclick = () => {
-        window.open(url, '_blank');
-      };
-    }
   }
 
   function closeShareUrlModal() {
@@ -9885,15 +9902,29 @@
     const modalCopyBtn = document.getElementById('btn-copy-share-url-modal');
     if (modalCopyBtn && !modalCopyBtn._hooked) {
       modalCopyBtn._hooked = true;
-      modalCopyBtn.addEventListener('click', () => {
+      modalCopyBtn.addEventListener('click', async () => {
         const inputEl = document.getElementById('share-modal-url-input');
-        if (inputEl) {
-          copyFormShareUrl(null, true);
-          const toastEl = document.getElementById('share-modal-copy-toast');
+        const textToCopy = (inputEl && inputEl.value) ? inputEl.value : getPublicFormShareUrl(_currentShareModalFormIndex, true);
+        const toastEl = document.getElementById('share-modal-copy-toast');
+        const showToast = () => {
           if (toastEl) {
             toastEl.style.display = 'block';
-            setTimeout(() => { toastEl.style.display = 'none'; }, 2500);
+            clearTimeout(toastEl._timer);
+            toastEl._timer = setTimeout(() => { toastEl.style.display = 'none'; }, 2500);
           }
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          try {
+            await navigator.clipboard.writeText(textToCopy);
+            showToast();
+          } catch (e) {
+            fallbackCopy(textToCopy, true);
+            showToast();
+          }
+        } else {
+          fallbackCopy(textToCopy, true);
+          showToast();
         }
       });
     }
@@ -10339,7 +10370,7 @@
       try {
         console.log('[Cloud Sync] Pushing forms to Supabase...', forms.length, 'forms');
         // 1. サーバーレス API (/api/forms) への POST
-        const res = await fetch('../api/forms', {
+        const res = await fetch('/api/forms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ allForms: forms })
@@ -10383,7 +10414,7 @@
     try {
       let cloudForms = null;
       try {
-        const res = await fetch('../api/forms?all=1');
+        const res = await fetch('/api/forms?all=1');
         if (res.ok) {
           const data = await res.json();
           if (data && data.success && Array.isArray(data.forms) && data.forms.length > 0) {

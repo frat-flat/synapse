@@ -66,6 +66,18 @@ module.exports = async (req, res) => {
       let targetForm = null;
       if (id) {
         targetForm = allForms.find(f => f && (f.id === id || f.formId === id));
+        if (!targetForm && typeof id === 'string' && id.startsWith('form_')) {
+          const subIdx = parseInt(id.replace('form_', ''), 10);
+          if (!isNaN(subIdx) && allForms[subIdx]) {
+            targetForm = allForms[subIdx];
+          }
+        }
+        if (!targetForm) {
+          const numIdx = parseInt(id, 10);
+          if (!isNaN(numIdx) && allForms[numIdx]) {
+            targetForm = allForms[numIdx];
+          }
+        }
       }
       if (!targetForm && form_idx !== undefined && form_idx !== null && form_idx !== '') {
         const idx = parseInt(form_idx, 10);

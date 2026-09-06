@@ -1,6 +1,8 @@
 {
   "rewrites": [
     { "source": "/login", "destination": "/index.html" },
-    { "source": "/signup", "destination": "/index.html" }
+    { "source": "/signup", "destination": "/index.html" },
+    { "source": "/f/:id", "destination": "/form-customize/view.html?id=:id" },
+    { "source": "/form/:id", "destination": "/form-customize/view.html?id=:id" }
   ]
 }
