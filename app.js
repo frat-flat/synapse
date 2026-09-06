@@ -13166,7 +13166,7 @@ function activateTab(id) {
   views.forEach(v => {
     if (v.id === tab.type) {
       v.classList.add('active');
-      v.style.display = tab.type === 'chart-sheet-screen' ? 'flex' : 'block';
+      v.style.display = (tab.type === 'chart-sheet-screen' || tab.type === 'form-customize-screen') ? 'flex' : 'block';
       applyZoom(tab.zoomLevel || 100);
     } else {
       v.classList.remove('active');
@@ -18306,7 +18306,7 @@ function handleFormSubmitMessage(event) {
   // プレビュー画面で再開させるためのURLを生成
   const resumeSecParam = nextSectionId ? `&resumeSec=${encodeURIComponent(nextSectionId)}` : '';
   const resumeUrl = (isTemporary || isPartialSubmit || nextSectionId)
-    ? window.location.origin + "/form-customize/index.html?res_id=" + targetRowId + resumeSecParam + "&active_tab=preview"
+    ? window.location.origin + "/form-customize/view.html?res_id=" + targetRowId + resumeSecParam
     : "";
   
   data["再開用URL"] = resumeUrl;
@@ -35921,7 +35921,7 @@ window.openResumableUrl = function(urlStr) {
     try {
       const url = new URL(urlStr);
       // 相対パスに変換、または現在のオリジンに合わせる
-      iframe.src = 'form-customize/index.html' + url.search;
+      iframe.src = 'form-customize/view.html' + url.search;
       
       const formCustomizeBtn = document.getElementById('menu-form-customize');
       if (formCustomizeBtn) {

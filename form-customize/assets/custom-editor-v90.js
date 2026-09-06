@@ -1940,7 +1940,11 @@
         const btnHeaderPreview = document.getElementById("btn-header-preview-toggle");
         if (btnHeaderPreview) {
           if (tabName === 'editor') {
-            btnHeaderPreview.style.setProperty("display", "flex", "important");
+            if (window.innerWidth <= 768) {
+              btnHeaderPreview.style.setProperty("display", "none", "important");
+            } else {
+              btnHeaderPreview.style.setProperty("display", "flex", "important");
+            }
 
             // プレビューペインの開閉状態に応じてactiveクラスを同期
             const pane = document.querySelector(".editor-live-preview-pane");
@@ -4567,6 +4571,30 @@
   window.openPartialSubmitGuideModal = openPartialSubmitGuideModal;
   window.ensurePartialSubmitGuideModal = ensurePartialSubmitGuideModal;
 
+  function getCleanViewResumeUrl(rId, sId) {
+    const origin = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : '';
+    let pathname = window.location.pathname || '';
+    let viewPath = '';
+    if (pathname.includes('form-customize')) {
+      const prefix = pathname.substring(0, pathname.indexOf('form-customize'));
+      viewPath = `${prefix}form-customize/view.html`;
+    } else if (pathname.endsWith('.html')) {
+      viewPath = pathname.substring(0, pathname.lastIndexOf('/') + 1) + 'view.html';
+    } else if (pathname.endsWith('/')) {
+      viewPath = pathname + 'view.html';
+    } else {
+      viewPath = pathname + '/view.html';
+    }
+    viewPath = viewPath.replace(/\/+/g, '/');
+    if (!viewPath.startsWith('/')) viewPath = '/' + viewPath;
+
+    const curIdx = window.W !== undefined ? window.W : (parseInt(localStorage.getItem('form_customize_active_index'), 10) || 0);
+    const formObj = (window.U && window.U[curIdx]) || window.G;
+    const formId = (formObj && formObj.id) ? formObj.id : `form_${curIdx}`;
+    const secParam = sId ? `&resumeSec=${encodeURIComponent(sId)}` : '';
+    return `${origin}${viewPath}?id=${encodeURIComponent(formId)}&form_idx=${curIdx}&res_id=${encodeURIComponent(rId)}${secParam}`;
+  }
+
   function executeRespondentPartialSubmit(currentSec) {
     const formData = window.L || window.G || window.n;
     const currentSecId = currentSec ? currentSec.id : window.R;
@@ -4596,7 +4624,7 @@
       window.currentRegistrationCode = confirmedCode;
     }
 
-    const resumeUrl = `${window.location.origin}${window.location.pathname}?res_id=${rowId}&resumeSec=${encodeURIComponent(currentSecId)}&active_tab=preview`;
+    const resumeUrl = getCleanViewResumeUrl(rowId, currentSecId);
 
     try {
       localStorage.setItem('form_draft_' + rowId, JSON.stringify({
@@ -4949,7 +4977,7 @@
 
     const isPartial = !!info.isPartialSubmit;
     const confirmedCode = info.registrationCode || info.partnerId || window.currentRegistrationCode || '';
-    const resumeUrl = info.resumeUrl || (window.currentResumeRowId ? `${window.location.origin}${window.location.pathname}?res_id=${window.currentResumeRowId}&active_tab=preview` : '');
+    const resumeUrl = info.resumeUrl || (window.currentResumeRowId ? getCleanViewResumeUrl(window.currentResumeRowId, info.nextSectionId) : '');
 
     if (isPartial) {
       if (titleEl) titleEl.textContent = '途中送信が完了し、登録コードが確定しました！';
@@ -5115,8 +5143,7 @@
       confirmedCode = String(Math.floor(10000000 + Math.random() * 90000000));
       window.currentRegistrationCode = confirmedCode;
     }
-    const resumeSecParam = submitInfo.nextSectionId ? `&resumeSec=${encodeURIComponent(submitInfo.nextSectionId)}` : '';
-    const resumeUrl = `${window.location.origin}${window.location.pathname}?res_id=${rowId}${resumeSecParam}&active_tab=preview`;
+    const resumeUrl = getCleanViewResumeUrl(rowId, submitInfo.nextSectionId);
 
     try {
       localStorage.setItem('form_draft_' + rowId, JSON.stringify({
@@ -9691,6 +9718,7 @@
     let hashData = '';
     if (formObj) {
       hashData = await encodeFormDataForUrl(formObj);
+      try { syncFormsToCloud(); } catch(e) {}
     }
 
     const hashPart = hashData ? `#data=${hashData}` : '';
@@ -10291,6 +10319,146 @@
     observer.observe(questionsBox, { childList: true, subtree: true });
   }
 
-  setInterval(patchAutoHyphenValidationUI, 1200);
+  // =========================================================================
+  // ☁️ クラウド（Supabase）自動同期モジュール (全ブラウザ・端末共有)
+  // =========================================================================
+  let _cloudSyncDebounceTimer = null;
+  let _isCloudSyncing = false;
+
+  async function syncFormsToCloud(forms) {
+    if (!forms) {
+      try {
+        const raw = localStorage.getItem('form_customize_all_forms');
+        if (raw) forms = JSON.parse(raw);
+      } catch(e) {}
+    }
+    if (!forms || !Array.isArray(forms) || forms.length === 0) return;
+
+    clearTimeout(_cloudSyncDebounceTimer);
+    _cloudSyncDebounceTimer = setTimeout(async () => {
+      try {
+        console.log('[Cloud Sync] Pushing forms to Supabase...', forms.length, 'forms');
+        // 1. サーバーレス API (/api/forms) への POST
+        const res = await fetch('../api/forms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ allForms: forms })
+        });
+        if (res.ok) {
+          console.log('[Cloud Sync] Successfully pushed forms to Supabase via API.');
+          return;
+        }
+      } catch (err) {
+        console.warn('[Cloud Sync] API push failed, attempting direct Supabase fallback:', err);
+      }
+
+      // フォールバック: 直接 Supabase REST API へ Upsert
+      try {
+        const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+        const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+        await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+          method: 'POST',
+          headers: {
+            apikey: sbKey,
+            Authorization: `Bearer ${sbKey}`,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify({
+            key: 'synapse_form_customize_all_forms',
+            value: forms,
+            updated_at: new Date().toISOString()
+          })
+        });
+        console.log('[Cloud Sync] Direct Supabase fallback push completed.');
+      } catch(e) {
+        console.error('[Cloud Sync] Direct Supabase fallback failed:', e);
+      }
+    }, 300);
+  }
+
+  async function loadFormsFromCloud() {
+    if (_isCloudSyncing) return;
+    _isCloudSyncing = true;
+    try {
+      let cloudForms = null;
+      try {
+        const res = await fetch('../api/forms?all=1');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && Array.isArray(data.forms) && data.forms.length > 0) {
+            cloudForms = data.forms;
+          }
+        }
+      } catch(e) {}
+
+      if (!cloudForms) {
+        // 直接 Supabase REST API
+        try {
+          const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+          const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+          const sbRes = await fetch(`${sbUrl}/rest/v1/synapse_storage?key=eq.synapse_form_customize_all_forms&select=value`, {
+            headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+          });
+          if (sbRes.ok) {
+            const rows = await sbRes.json();
+            if (rows && rows[0] && rows[0].value) {
+              let parsed = rows[0].value;
+              if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+              if (Array.isArray(parsed) && parsed.length > 0) cloudForms = parsed;
+            }
+          }
+        } catch(e) {}
+      }
+
+      let localForms = [];
+      try {
+        const raw = localStorage.getItem('form_customize_all_forms');
+        if (raw) localForms = JSON.parse(raw);
+      } catch(e) {}
+
+      if (cloudForms && cloudForms.length > 0) {
+        console.log('[Cloud Sync] Loaded', cloudForms.length, 'forms from cloud.');
+        const isLocalDummy = localForms.length === 0 || (localForms.length === 2 && localForms[0].title === '新規作成されたフォーム');
+        if (isLocalDummy || localForms.length < cloudForms.length) {
+          _origSetItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(cloudForms));
+          if (window.U) {
+            window.U.length = 0;
+            cloudForms.forEach(f => window.U.push(f));
+            const curIdx = parseInt(localStorage.getItem('form_customize_active_index') || '0', 10);
+            window.W = Math.min(curIdx, window.U.length - 1);
+            window.G = window.U[window.W];
+            window.n = window.G;
+            if (typeof window.x === 'function') window.x();
+          }
+        } else if (!isLocalDummy) {
+          // ローカルにユーザーが編集したフォームがある場合、クラウドへバックアップ保存
+          syncFormsToCloud(localForms);
+        }
+      } else if (localForms.length > 0) {
+        // クラウドが空でローカルにフォームがある場合、即座にクラウドへ初期アップロード
+        syncFormsToCloud(localForms);
+      }
+    } catch(err) {
+      console.warn('[Cloud Sync] loadFormsFromCloud exception:', err);
+    } finally {
+      _isCloudSyncing = false;
+    }
+  }
+
+  // localStorage.setItem のフック: form_customize_all_forms への書き込み時にクラウドへ自動保存
+  const _origSetItem = localStorage.setItem;
+  localStorage.setItem = function(key, value) {
+    _origSetItem.apply(this, arguments);
+    if (key === 'form_customize_all_forms') {
+      try {
+        const parsed = JSON.parse(value);
+        syncFormsToCloud(parsed);
+      } catch(e) {}
+    }
+  };
+
+  // 起動時の初期同期
+  setTimeout(loadFormsFromCloud, 100);
 })();
 

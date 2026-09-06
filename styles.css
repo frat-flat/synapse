@@ -2090,6 +2090,19 @@ body:not(.logged-in) .login-layout {
   display: flex;
 }
 
+#form-customize-screen.active {
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+}
+
+#form-customize-screen iframe {
+  width: 100% !important;
+  height: 100% !important;
+  flex: 1 1 auto !important;
+  border: none !important;
+}
+
 /* 書式設定ツールバー (省スペース・コンパクト化) */
 .format-toolbar {
   display: flex;
@@ -5841,12 +5854,11 @@ h3 {
 
   /* 3. 各画面コンテンツ（ログイン画面以外）の下部にボトムバーの高さ分の余白を確保 */
   .main-content,
-  .screen-view:not(#login-screen),
+  .screen-view:not(#login-screen):not(#form-customize-screen),
   #home-screen,
   #mypage-screen,
   #dashboard-screen,
   #appointment-screen,
-  #form-customize-screen,
   #custom-table-screen,
   #agency-info-screen,
   #jo-info-screen,
@@ -5858,6 +5870,29 @@ h3 {
     padding-left: 1rem !important;
     padding-right: 1rem !important;
     padding-bottom: calc(72px + env(safe-area-inset-bottom, 16px)) !important;
+  }
+
+  /* 3-B. フォーム作成画面 (iframe埋め込み) は全画面・全高展開 */
+  #form-customize-screen {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    height: calc(100dvh - 56px - env(safe-area-inset-bottom, 0px)) !important;
+    max-height: calc(100dvh - 56px - env(safe-area-inset-bottom, 0px)) !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    overflow: hidden !important;
+  }
+  #form-customize-screen iframe {
+    width: 100% !important;
+    height: 100% !important;
+    flex: 1 1 auto !important;
+    border: none !important;
+    display: block !important;
   }
 
   /* 4. アプリ風ボトムナビゲーションバー（ログイン完了時かつスマホ表示時のみ固定表示） */

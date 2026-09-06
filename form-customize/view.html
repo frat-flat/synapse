@@ -740,7 +740,54 @@
             formDefinition = await decodeFormData(dataParam);
           }
 
-          // フォールバック: ローカルストレージからの検索（同一端末・テスト環境）
+          // フォールバック1: クラウドAPI（Supabase synapse_storage）からの取得（初見端末・別ブラウザ・モバイル端末対応）
+          if (!formDefinition) {
+            const formId = search.get('id');
+            const formIdx = search.get('form_idx');
+            try {
+              let apiUrl = '../api/forms';
+              const queryParts = [];
+              if (formId) queryParts.push(`id=${encodeURIComponent(formId)}`);
+              if (formIdx !== null && formIdx !== '') queryParts.push(`form_idx=${encodeURIComponent(formIdx)}`);
+              if (queryParts.length > 0) apiUrl += '?' + queryParts.join('&');
+
+              const apiRes = await fetch(apiUrl);
+              if (apiRes.ok) {
+                const apiJson = await apiRes.json();
+                if (apiJson && apiJson.success) {
+                  if (apiJson.form) {
+                    formDefinition = apiJson.form;
+                  } else if (Array.isArray(apiJson.forms) && apiJson.forms.length > 0) {
+                    const idx = (formIdx !== null && formIdx !== '') ? parseInt(formIdx, 10) : 0;
+                    formDefinition = apiJson.forms[!isNaN(idx) && apiJson.forms[idx] ? idx : 0];
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('[View] Cloud API fetch failed, trying direct Supabase fallback:', err);
+              // 直接 Supabase REST API を試行
+              try {
+                const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+                const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+                const sbRes = await fetch(`${sbUrl}/rest/v1/synapse_storage?key=eq.synapse_form_customize_all_forms&select=value`, {
+                  headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+                });
+                if (sbRes.ok) {
+                  const rows = await sbRes.json();
+                  if (rows && rows[0] && rows[0].value) {
+                    let forms = rows[0].value;
+                    if (typeof forms === 'string') forms = JSON.parse(forms);
+                    if (Array.isArray(forms) && forms.length > 0) {
+                      const idx = (formIdx !== null && formIdx !== '') ? parseInt(formIdx, 10) : 0;
+                      formDefinition = forms[!isNaN(idx) && forms[idx] ? idx : 0];
+                    }
+                  }
+                }
+              } catch(e) {}
+            }
+          }
+
+          // フォールバック2: ローカルストレージからの検索（同一端末・テスト環境）
           if (!formDefinition) {
             const formId = search.get('id');
             const formIdx = search.get('form_idx');
@@ -761,10 +808,47 @@
             } catch(e) {}
           }
 
+          // 取得成功時は次回高速アクセスのためローカルストレージも更新キャッシュ
+          if (formDefinition) {
+            try {
+              const currentCached = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]');
+              const existingIdx = currentCached.findIndex(f => f && f.id === formDefinition.id);
+              if (existingIdx !== -1) {
+                currentCached[existingIdx] = formDefinition;
+              } else {
+                currentCached.push(formDefinition);
+              }
+              localStorage.setItem('form_customize_all_forms', JSON.stringify(currentCached));
+            } catch(e) {}
+          }
+
           if (!formDefinition || !formDefinition.sections || formDefinition.sections.length === 0) {
             loadingBox.style.display = 'none';
             errorBox.style.display = 'block';
             return;
+          }
+
+          // 途中再開（res_id）指定時の入力復元
+          const resId = search.get('res_id');
+          if (resId) {
+            try {
+              const draftRaw = localStorage.getItem('form_draft_' + resId);
+              if (draftRaw) {
+                const draft = JSON.parse(draftRaw);
+                if (draft && draft.data) {
+                  Object.assign(formValues, draft.data);
+                  window.currentResumeRowId = resId;
+                  window.currentRegistrationCode = draft.registrationCode;
+                  const resumeSec = search.get('resumeSec') || draft.nextSectionId || draft.currentSectionId;
+                  if (resumeSec && formDefinition.sections.some(s => s.id === resumeSec)) {
+                    currentSectionId = resumeSec;
+                  }
+                  showResumeBanner(draft.registrationCode || resId);
+                }
+              }
+            } catch(e) {
+              console.warn('[View] Failed to restore draft session:', e);
+            }
           }
 
           // フォーム名の設定
@@ -1070,6 +1154,33 @@
             btnSubmit.style.display = 'none';
             btnNext.textContent = '次へ';
           }
+        }
+
+        // 再開用バナー表示
+        function showResumeBanner(code) {
+          let banner = document.getElementById('view-resume-banner');
+          if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'view-resume-banner';
+            banner.style.cssText = 'background: #e6fffa; border: 1.5px solid #38b2ac; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: #234e52; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
+            const container = document.getElementById('form-container');
+            if (container) {
+              const secCard = document.getElementById('section-info-card');
+              if (secCard && secCard.parentNode) {
+                secCard.parentNode.insertBefore(banner, secCard);
+              } else {
+                container.prepend(banner);
+              }
+            }
+          }
+          banner.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.1rem;">ℹ️</span>
+              <span>確定登録コード: <strong style="font-family: monospace; letter-spacing: 1.5px; font-size: 0.95rem; color: #285e61;">${escapeHtml(code)}</strong> の続きから回答しています</span>
+            </div>
+            <span style="font-size: 0.72rem; background: #38b2ac; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 700;">コード確定済</span>
+          `;
+          banner.style.display = 'flex';
         }
 
         // バリデーション等のトースト通知
@@ -2061,6 +2172,10 @@
         });
 
         function submitForm() {
+          const section = formDefinition.sections.find(s => s.id === currentSectionId);
+          const nextAction = section ? getSectionNextAction(section) : 'submit';
+          const isPartial = nextAction === 'partial_submit';
+
           const submitData = {};
           formDefinition.sections.forEach(s => {
             (s.questions || []).forEach(q => {
@@ -2072,6 +2187,38 @@
 
           console.log('[Form Submit] Submitted data:', submitData);
 
+          const rowId = window.currentResumeRowId || ('row_' + Date.now());
+          window.currentResumeRowId = rowId;
+          let confirmedCode = window.currentRegistrationCode;
+          if (!confirmedCode) {
+            confirmedCode = String(Math.floor(10000000 + Math.random() * 90000000));
+            window.currentRegistrationCode = confirmedCode;
+          }
+
+          // 次のセクション特定
+          let nextSecId = null;
+          const curIdx = formDefinition.sections.findIndex(s => s.id === currentSectionId);
+          if (curIdx !== -1 && curIdx < formDefinition.sections.length - 1) {
+            nextSecId = formDefinition.sections[curIdx + 1].id;
+          }
+
+          // 再開用URL生成（確実に view.html を指すように）
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.set('res_id', rowId);
+          if (nextSecId) currentUrl.searchParams.set('resumeSec', nextSecId);
+          const resumeUrl = currentUrl.toString();
+
+          // ドラフト保存
+          try {
+            localStorage.setItem('form_draft_' + rowId, JSON.stringify({
+              rowId: rowId,
+              registrationCode: confirmedCode,
+              data: formValues,
+              currentSectionId: currentSectionId,
+              nextSectionId: nextSecId
+            }));
+          } catch(e) {}
+
           // 1. 親ウィンドウ (iframe) への postMessage 送信
           if (window.parent && window.parent !== window) {
             window.parent.postMessage({
@@ -2079,7 +2226,11 @@
               formTitle: formDefinition.title || '無題のフォーム',
               data: submitData,
               isTemporary: false,
-              isPartialSubmit: false
+              isPartialSubmit: isPartial,
+              rowId: rowId,
+              registrationCode: confirmedCode,
+              currentSectionId: currentSectionId,
+              nextSectionId: nextSecId
             }, '*');
           }
 
@@ -2089,12 +2240,34 @@
             const existing = JSON.parse(localStorage.getItem(formKey) || '[]');
             existing.push({
               submittedAt: new Date().toISOString(),
-              data: submitData
+              data: submitData,
+              isPartial: isPartial,
+              registrationCode: confirmedCode
             });
             localStorage.setItem(formKey, JSON.stringify(existing));
           } catch(e) {}
 
           // 3. 完了画面表示
+          const successTitle = document.getElementById('success-title');
+          const successDesc = document.getElementById('success-desc');
+          if (isPartial) {
+            if (successTitle) successTitle.textContent = '途中送信が完了し、登録コードが確定しました！';
+            if (successDesc) successDesc.innerHTML = `
+              <div style="margin: 16px 0; background: rgba(49, 130, 206, 0.08); border: 1.5px solid #3182ce; border-radius: 8px; padding: 16px; text-align: center;">
+                <div style="font-size: 0.85rem; font-weight: 700; color: #2b6cb0; margin-bottom: 6px;">【 確定登録コード 】</div>
+                <div style="font-size: 1.6rem; font-weight: 800; letter-spacing: 2px; color: #2b6cb0; font-family: monospace;">${escapeHtml(confirmedCode)}</div>
+                <div style="font-size: 0.75rem; color: #4a5568; margin-top: 4px;">入力内容が一時保存されました。続きのセクションは後からでもご回答いただけます。</div>
+              </div>
+              <div style="background: rgba(237, 242, 247, 0.7); border: 1px solid #cbd5e0; border-radius: 8px; padding: 12px; margin-bottom: 16px; text-align: left;">
+                <div style="font-size: 0.8rem; font-weight: 700; color: #4a5568; margin-bottom: 4px;">🔗 再開用URL</div>
+                <input type="text" readonly value="${escapeHtml(resumeUrl)}" style="width: 100%; box-sizing: border-box; font-size: 0.75rem; padding: 6px 8px; font-family: monospace; background: #fff; border: 1px solid #cbd5e0; border-radius: 4px;" onclick="this.select();" />
+              </div>
+            `;
+          } else {
+            if (successTitle) successTitle.textContent = '回答を受け付けました';
+            if (successDesc) successDesc.textContent = 'ご回答ありがとうございました。内容は正常に記録されました。';
+          }
+
           formContainer.style.display = 'none';
           successCard.style.display = 'block';
           window.scrollTo({ top: 0, behavior: 'smooth' });

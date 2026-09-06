@@ -3220,5 +3220,399 @@ input:-webkit-autofill:active {
   background: #334155;
 }
 
+/* ==========================================================================
+   スマートフォン・タブレット向け完全レスポンシブ最適化 (<= 768px)
+   ========================================================================== */
+@media (max-width: 768px) {
+  /* 1. アプリヘッダーのコンパクト化（1行に整列収容） */
+  .app-header {
+    height: 50px !important;
+    padding: 0 8px !important;
+    gap: 4px !important;
+  }
+
+  .header-logo {
+    gap: 4px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .header-logo h1 {
+    display: none !important; /* スマホではタイトル文字を隠し、アイコンのみにする */
+  }
+
+  .btn-back-to-dashboard {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 1.1rem !important;
+    margin-right: 2px !important;
+  }
+
+  .header-nav {
+    padding: 2px !important;
+    border-radius: 16px !important;
+    gap: 2px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .nav-tab {
+    padding: 6px 8px !important;
+    border-radius: 12px !important;
+    gap: 0 !important;
+    font-size: 0.85rem !important;
+  }
+
+  .nav-tab .tab-text {
+    display: none !important; /* アイコンのみ（🏠, ✏️, 分岐SVG, 👁️） */
+  }
+
+  .nav-tab .tab-icon {
+    margin: 0 !important;
+  }
+
+  .header-actions {
+    gap: 4px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* スマホではエディタ右側のライブプレビューは非表示（プレビュータブで確認可能） */
+  #btn-header-preview-toggle,
+  .editor-live-preview-pane {
+    display: none !important;
+  }
+
+  /* リンク発行ボタンのコンパクト化 */
+  .share-export-btn-group {
+    height: 32px !important;
+  }
+
+  .btn-share-link {
+    padding: 4px 8px !important;
+    font-size: 0.75rem !important;
+    height: 32px !important;
+  }
+
+  .btn-share-link .btn-text {
+    display: none !important; /* 🔗 アイコンのみ */
+  }
+
+  .btn-share-dropdown-toggle {
+    padding: 4px 6px !important;
+    height: 32px !important;
+  }
+
+  /* 2. エディタ全体の縦積みレイアウト */
+  .editor-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100vh - 50px) !important;
+    height: calc(100dvh - 50px) !important;
+    overflow: hidden !important;
+    background: #f8fafc !important;
+  }
+
+  /* 3. 左サイドバーを上部横スクロール・ピルナビゲーションバーに変換 */
+  .editor-sidebar {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    max-height: 46px !important;
+    border-right: none !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 4px 8px !important;
+    gap: 6px !important;
+    background: #ffffff !important;
+    flex-shrink: 0 !important;
+    box-sizing: border-box !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .editor-sidebar .sidebar-header {
+    display: none !important;
+  }
+
+  .editor-sidebar .sidebar-overview-btn-area {
+    padding: 0 !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .editor-sidebar .sidebar-overview-btn {
+    padding: 4px 10px !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap !important;
+    border-radius: 16px !important;
+    height: 30px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  .editor-sidebar #btn-add-section {
+    display: inline-flex !important;
+    align-items: center !important;
+    padding: 4px 8px !important;
+    font-size: 0.72rem !important;
+    white-space: nowrap !important;
+    border-radius: 16px !important;
+    height: 28px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .editor-sidebar .sidebar-list {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    list-style: none !important;
+    flex-shrink: 0 !important;
+  }
+
+  .editor-sidebar .sidebar-item {
+    padding: 4px 10px !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap !important;
+    border-radius: 16px !important;
+    height: 30px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    flex-shrink: 0 !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  .editor-sidebar .sidebar-item-title {
+    max-width: 100px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 0.75rem !important;
+  }
+
+  .editor-sidebar .sidebar-item-badge {
+    padding: 1px 4px !important;
+    font-size: 0.65rem !important;
+  }
+
+  /* 4. エディタメイン編集エリアのフル幅展開＆縦スクロール */
+  .editor-main {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: calc(100% - 46px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 12px 10px 80px 10px !important;
+    background: #ffffff !important;
+    box-sizing: border-box !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .overview-editor-container,
+  .section-editor-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding: 14px 10px !important;
+    box-sizing: border-box !important;
+  }
+
+  .form-title-desc-card {
+    padding: 14px 10px !important;
+    border-radius: 8px !important;
+  }
+
+  .title-input {
+    font-size: 1.15rem !important;
+    padding: 4px 0 !important;
+  }
+
+  .desc-input {
+    font-size: 0.85rem !important;
+    padding: 4px 0 !important;
+  }
+
+  .overview-subtabs {
+    display: flex !important;
+    gap: 4px !important;
+    overflow-x: auto !important;
+    margin-bottom: 0.85rem !important;
+  }
+
+  .overview-subtabs .subtab-btn {
+    padding: 6px 10px !important;
+    font-size: 0.78rem !important;
+    white-space: nowrap !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+  }
+
+  .overview-subtabs .subtab-btn .subtab-text {
+    display: inline !important;
+    font-size: 0.78rem !important;
+  }
+
+  .mode-toggle-container {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  /* セクション編集画面のヘッダーバッジカード */
+  .sec-badge-card {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+  }
+
+  .sec-badge-main {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+  }
+
+  .sec-badge-controls {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin-top: 4px !important;
+  }
+
+  .sec-badge-controls .btn {
+    padding: 4px 8px !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap !important;
+  }
+
+  .overview-section-card {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding: 12px !important;
+  }
+
+  .overview-section-actions {
+    justify-content: flex-end !important;
+    gap: 6px !important;
+  }
+
+  /* 質問ヘッダー＆プリセット追加エリア */
+  .questions-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    margin: 20px 0 12px !important;
+  }
+
+  .editor-question-actions {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 6px !important;
+    align-items: center !important;
+  }
+
+  #select-preset-question {
+    flex: 1 !important;
+    min-width: 0 !important;
+    width: auto !important;
+    font-size: 0.78rem !important;
+  }
+
+  #btn-add-question {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    padding: 4px 10px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .question-card {
+    padding: 12px 10px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .question-card-header {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .sec-title-input {
+    font-size: 1rem !important;
+  }
+
+  .option-edit-row {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .option-branch-select {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* 5. ダッシュボード・プレビュー画面のスマホ最適化 */
+  .dashboard-container {
+    padding: 12px 8px 80px 8px !important;
+  }
+
+  .dashboard-header-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .dashboard-title-area h2 {
+    font-size: 1.25rem !important;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .preview-container {
+    padding: 14px 8px 80px 8px !important;
+  }
+
+  .preview-card {
+    padding: 16px 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 8px !important;
+  }
+
+  .preview-card .preview-badge {
+    position: static !important;
+  }
+
+  .preview-form-header h1 {
+    font-size: 1.25rem !important;
+  }
+
+  .preview-q-card {
+    padding: 14px 10px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .preview-option-label {
+    padding: 10px 12px !important;
+    font-size: 0.88rem !important;
+  }
+}
+
+
 
 

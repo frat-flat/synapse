@@ -16,6 +16,33 @@
     <script type="module" src="./assets/index-W0nnFdhS-v6.js?v=6.0.0"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
     <script>
+      // 🚀 回答者向けアクセス（active_tab=preview または res_id / mode=view）の即時自動転送
+      // 管理エディタ画面やプレビューバッジを露出させず、クリーンな回答専用ページ（view.html）へ直ちに転送する
+      (function() {
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          const isPreview = urlParams.get('active_tab') === 'preview';
+          const isResume = !!urlParams.get('res_id') || !!urlParams.get('resumeRowId');
+          const isViewMode = urlParams.get('mode') === 'view';
+
+          if (isPreview || isResume || isViewMode) {
+            const newParams = new URLSearchParams(window.location.search);
+            newParams.delete('active_tab');
+            if (newParams.get('mode') === 'view') newParams.delete('mode');
+
+            let targetUrl = './view.html';
+            const qs = newParams.toString();
+            if (qs) targetUrl += '?' + qs;
+            if (window.location.hash) targetUrl += window.location.hash;
+
+            window.location.replace(targetUrl);
+            return;
+          }
+        } catch(e) {
+          console.error('[Redirect] Failed to check preview/resume redirect:', e);
+        }
+      })();
+
       // 🚀 親システム（Synapse）連携：常時フル権限（管理者）を保証し、不要な内部ログイン・ログアウトを抑止
       try {
         const defaultAdmin = { id: 'user_admin', name: '管理者', role: 'admin' };
