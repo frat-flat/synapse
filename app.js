@@ -12156,6 +12156,10 @@ function showLoginScreen(show) {
     if (sidebar) sidebar.style.display = 'none';
     if (toggleBtn) toggleBtn.style.display = 'none';
     if (mainHeader) mainHeader.style.display = 'none';
+    const nameEl = document.getElementById('logged-in-user-name');
+    if (nameEl) nameEl.textContent = '';
+    const avatarEl = document.getElementById('logged-in-user-avatar');
+    if (avatarEl) avatarEl.textContent = '👤';
     if (typeof syncSpreadsheetMenuBar === 'function') syncSpreadsheetMenuBar(null);
 
     // 📱 スマホボトムバーを未ログイン時・ログイン画面では完全に非表示

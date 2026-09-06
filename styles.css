@@ -1042,6 +1042,44 @@ textarea {
   border-left-color: var(--danger);
 }
 
+/* 未ログイン状態・ログイン画面表示時の非表示制御 */
+body:not(.logged-in) .main-header,
+body:not(.logged-in) #main-header,
+body:not(.logged-in) .tabs-outer-wrapper,
+body:not(.logged-in) #tabs-outer-wrapper,
+body:not(.logged-in) .app-sidebar,
+body:not(.logged-in) #app-sidebar,
+body:not(.logged-in) .sidebar-menu,
+body:not(.logged-in) .sidebar-toggle-btn,
+body:not(.logged-in) #sidebar-toggle-btn,
+body:not(.logged-in) .spreadsheet-menu-bar,
+body:not(.logged-in) #spreadsheet-menu-bar,
+body.login-active .main-header,
+body.login-active #main-header,
+body.login-active .tabs-outer-wrapper,
+body.login-active #tabs-outer-wrapper,
+body.login-active .app-sidebar,
+body.login-active #app-sidebar,
+body.login-active .sidebar-menu,
+body.login-active .sidebar-toggle-btn,
+body.login-active #sidebar-toggle-btn,
+body.login-active .spreadsheet-menu-bar,
+body.login-active #spreadsheet-menu-bar {
+  display: none !important;
+}
+
+body.login-active .main-content,
+body:not(.logged-in) .main-content {
+  padding: 0 !important;
+  height: 100vh !important;
+  overflow-y: auto !important;
+}
+
+body.login-active .login-layout,
+body:not(.logged-in) .login-layout {
+  min-height: 100vh !important;
+}
+
 /* Login Screen Layout */
 .login-layout {
   display: flex;
@@ -2937,9 +2975,13 @@ textarea {
   position: relative;
   z-index: 100;
   overflow: visible !important;
-  display: flex !important;
+  display: flex;
   align-items: center !important;
   box-sizing: border-box !important;
+}
+
+body.logged-in .main-header {
+  display: flex;
 }
 
 .main-header-top-row {
