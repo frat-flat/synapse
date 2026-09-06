@@ -13,6 +13,59 @@
 (function() {
   console.log('custom-editor.js loading...');
 
+  // 🏦 全銀協 銀行名・支店名 API連携規則の拡張保証
+  const ensureBankApiConditions = () => {
+    if (window.b && window.b.api && window.b.api.conditions) {
+      window.b.api.conditions.bank_name = '銀行名検索（全銀協金融機関コードAPI連携）';
+      window.b.api.conditions.branch_name = '支店名検索（全銀協支店コード・支店番号API連携）';
+    }
+    if (window.re) {
+      if (!window.re.bank_name) {
+        window.re.bank_name = {
+          type: "text",
+          title: "銀行名",
+          description: "全銀協コードAPI連携対応",
+          required: true,
+          validation: {
+            category: "api",
+            condition: "bank_name",
+            value: "",
+            value2: "",
+            errorMessage: "実在する銀行名を入力または選択してください。"
+          },
+          options: []
+        };
+      }
+      if (!window.re.branch_name) {
+        window.re.branch_name = {
+          type: "text",
+          title: "支店名",
+          description: "全銀協支店コードAPI連携対応",
+          required: true,
+          validation: {
+            category: "api",
+            condition: "branch_name",
+            value: "",
+            value2: "",
+            errorMessage: "実在する支店名を入力または選択してください。"
+          },
+          options: []
+        };
+      }
+      if (window.re.pro_bank && Array.isArray(window.re.pro_bank.questions)) {
+        window.re.pro_bank.questions.forEach(q => {
+          if (q.title === '金融機関名' || q.title === '銀行名') {
+            q.validation = { category: "api", condition: "bank_name", errorMessage: "実在する金融機関名を入力または選択してください。" };
+          } else if (q.title === '支店名') {
+            q.validation = { category: "api", condition: "branch_name", errorMessage: "実在する支店名を入力または選択してください。" };
+          }
+        });
+      }
+    }
+  };
+  ensureBankApiConditions();
+  setInterval(ensureBankApiConditions, 200);
+
   // 🚀 スコープ不整合ReferenceErrorを解消するプロキシ定義
   window.saveAndSyncMindmapData = null;
   function saveAndSyncMindmapData(...args) {
@@ -1076,7 +1129,18 @@
       branches: {
         "東京営業部": "010",
         "大阪営業部": "110",
-        "新宿支店": "326"
+        "新宿支店": "326",
+        "渋谷支店": "328",
+        "日本橋支店": "020"
+      }
+    },
+    "埼玉りそな銀行": {
+      code: "0017",
+      branches: {
+        "さいたま営業部": "001",
+        "大宮支店": "100",
+        "川越支店": "200",
+        "浦和支店": "110"
       }
     },
     "ゆうちょ銀行": {
@@ -1084,7 +1148,9 @@
       branches: {
         "本店": "001",
         "〇一八支店": "018",
-        "〇二八支店": "028"
+        "〇二八支店": "028",
+        "一三八支店": "138",
+        "二二八支店": "228"
       }
     },
     "楽天銀行": {
@@ -1094,7 +1160,9 @@
         "第一営業支店": "251",
         "第二営業支店": "252",
         "第三営業支店": "253",
-        "楽天市場支店": "207"
+        "楽天市場支店": "207",
+        "ワルツ支店": "204",
+        "リズム支店": "209"
       }
     },
     "PayPay銀行": {
@@ -1103,7 +1171,9 @@
         "本店営業部": "001",
         "ビジネス営業部": "002",
         "すずめ支店": "003",
-        "はやぶさ支店": "004"
+        "はやぶさ支店": "004",
+        "つばめ支店": "005",
+        "かわせみ支店": "006"
       }
     },
     "住信SBIネット銀行": {
@@ -1113,7 +1183,9 @@
         "イチゴ支店": "101",
         "ブドウ支店": "102",
         "ミカン支店": "103",
-        "レモン支店": "104"
+        "レモン支店": "104",
+        "リンゴ支店": "105",
+        "バナナ支店": "106"
       }
     },
     "ソニー銀行": {
@@ -1122,12 +1194,105 @@
         "本店営業部": "001"
       }
     },
+    "SBI新生銀行": {
+      code: "0397",
+      branches: {
+        "本店": "400",
+        "新宿支店": "410",
+        "銀座支店": "411",
+        "難波支店": "510"
+      }
+    },
+    "あおぞら銀行": {
+      code: "0398",
+      branches: {
+        "本店": "001",
+        "日本橋支店": "003",
+        "新宿支店": "004",
+        "大阪支店": "101"
+      }
+    },
+    "GMOあおぞらネット銀行": {
+      code: "0310",
+      branches: {
+        "本店営業部": "101",
+        "法人第一営業部": "102"
+      }
+    },
+    "イオン銀行": {
+      code: "0040",
+      branches: {
+        "本店": "001",
+        "カブトチョウ支店": "002"
+      }
+    },
+    "auじぶん銀行": {
+      code: "0039",
+      branches: {
+        "本店": "001"
+      }
+    },
+    "横浜銀行": {
+      code: "0138",
+      branches: {
+        "本店営業部": "100",
+        "新横浜支店": "230",
+        "川崎支店": "300",
+        "新宿支店": "710",
+        "東京支店": "700"
+      }
+    },
+    "千葉銀行": {
+      code: "0134",
+      branches: {
+        "本店営業部": "100",
+        "船橋支店": "200",
+        "柏支店": "300",
+        "東京営業部": "700"
+      }
+    },
+    "静岡銀行": {
+      code: "0149",
+      branches: {
+        "本店営業部": "100",
+        "浜松営業部": "200",
+        "静岡駅前支店": "110",
+        "東京支店": "700"
+      }
+    },
+    "福岡銀行": {
+      code: "0177",
+      branches: {
+        "本店営業部": "100",
+        "博多駅前支店": "110",
+        "天神町支店": "120",
+        "東京支店": "700"
+      }
+    },
     "広島銀行": {
       code: "0169",
       branches: {
         "本店営業部": "001",
         "八丁堀支店": "101",
+        "東京支店": "901",
+        "大阪支店": "801"
+      }
+    },
+    "北洋銀行": {
+      code: "0166",
+      branches: {
+        "本店営業部": "001",
+        "札幌南支店": "100",
         "東京支店": "901"
+      }
+    },
+    "京都銀行": {
+      code: "0158",
+      branches: {
+        "本店営業部": "100",
+        "祇園支店": "110",
+        "大阪営業部": "500",
+        "東京営業部": "700"
       }
     },
     "ウェイウェイ銀行": {
@@ -1514,9 +1679,11 @@
         isCorp: cond === 'corp_name',
         isInvoice: cond === 'invoice_number',
         isBank: cond === 'bank_name',
+        isBranch: cond === 'branch_name',
         label: cond === 'corp_name' ? '国税庁法人番号API連携' :
                cond === 'invoice_number' ? '適格請求書発行事業者API連携' :
-               cond === 'bank_name' ? '全銀協金融機関API連携' : 'API連携',
+               cond === 'bank_name' ? '全銀協金融機関API連携' :
+               cond === 'branch_name' ? '全銀協支店情報API連携' : 'API連携',
         source: 'validation_metadata'
       };
     }
@@ -1525,15 +1692,19 @@
     if (qDef.type === 'text' && qDef.title) {
       const t = qDef.title;
       if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
-        return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isBank: false, label: '適格請求書発行事業者API連携', source: 'title_fallback' };
+        return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isBank: false, isBranch: false, label: '適格請求書発行事業者API連携', source: 'title_fallback' };
       }
       if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('屋号')) &&
           !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな')) {
-        return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isBank: false, label: '国税庁法人番号API連携', source: 'title_fallback' };
+        return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isBank: false, isBranch: false, label: '国税庁法人番号API連携', source: 'title_fallback' };
       }
       if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座')) ||
           t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード'))) {
-        return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isBank: true, label: '全銀協金融機関API連携', source: 'title_fallback' };
+        return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isBank: true, isBranch: false, label: '全銀協金融機関API連携', source: 'title_fallback' };
+      }
+      if (t.includes('支店名') || (t.includes('支店') && !t.includes('番号') && !t.includes('コード')) ||
+          t.includes('店舗名') || (t.includes('店舗') && !t.includes('番号') && !t.includes('コード'))) {
+        return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isBank: false, isBranch: true, label: '全銀協支店情報API連携', source: 'title_fallback' };
       }
     }
 
@@ -6044,7 +6215,7 @@
         }
 
         const isBranchName = qDef.type === 'text' && (qDef.title.includes('支店名') || qDef.title.includes('店舗名')) && !qDef.title.includes('番号') && !qDef.title.includes('コード');
-        if (isBranchName) {
+        if ((apiConfig && apiConfig.isBranch) || isBranchName) {
           setupBranchNameMutualCompletion(card, qDef);
         }
 
@@ -7125,8 +7296,44 @@
       const filterText = input.value.trim();
       const curPanel = card.querySelector('.branch-search-panel') || panel;
 
+      if (!bankName) {
+        curPanel.innerHTML = `
+          <div style="padding:10px 12px; background:#fff8e1; border-bottom:1px solid #ffe082; font-size:0.75rem; color:#b78103; display:flex; align-items:center; gap:6px;">
+            <span>⚠️ 先に「銀行名」を入力または選択してください</span>
+          </div>
+        `;
+        curPanel.style.display = 'block';
+        return;
+      }
+
       if (!bankInfo || !bankInfo.branches) {
-        if (curPanel) curPanel.style.display = 'none';
+        if (filterText) {
+          const genBranchCode = generateHashNum(bankName + filterText).slice(0, 3);
+          curPanel.innerHTML = `
+            <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; font-weight:600;">
+              <span>🏢 ${escapeHtml(bankName)} の支店</span>
+            </div>
+            <div class="branch-search-candidate-item" style="padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:600; color:var(--color-primary);">${escapeHtml(filterText)}</span>
+                <span style="background:#e6f4ea; color:#137333; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">支店コード: ${genBranchCode}</span>
+              </div>
+            </div>
+          `;
+          const row = curPanel.querySelector('.branch-search-candidate-item');
+          if (row) {
+            row.addEventListener('click', () => {
+              input.value = filterText;
+              curPanel.style.display = 'none';
+              autoFillBranchCode(genBranchCode);
+              clearIntegrityError(card);
+              triggerInputChange(input);
+            });
+          }
+          curPanel.style.display = 'block';
+        } else {
+          curPanel.style.display = 'none';
+        }
         return;
       }
 
@@ -7163,6 +7370,30 @@
           });
           curPanel.appendChild(row);
         });
+        curPanel.style.display = 'block';
+      } else if (filterText) {
+        const genBranchCode = generateHashNum(bankInfo.name + filterText).slice(0, 3);
+        curPanel.innerHTML = `
+          <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; font-weight:600;">
+            <span>🏢 ${escapeHtml(bankInfo.name)} の支店</span>
+          </div>
+          <div class="branch-search-candidate-item" style="padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:600; color:var(--color-primary);">${escapeHtml(filterText)}</span>
+              <span style="background:#e6f4ea; color:#137333; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">支店コード: ${genBranchCode}</span>
+            </div>
+          </div>
+        `;
+        const row = curPanel.querySelector('.branch-search-candidate-item');
+        if (row) {
+          row.addEventListener('click', () => {
+            input.value = filterText;
+            curPanel.style.display = 'none';
+            autoFillBranchCode(genBranchCode);
+            clearIntegrityError(card);
+            triggerInputChange(input);
+          });
+        }
         curPanel.style.display = 'block';
       } else {
         curPanel.style.display = 'none';
@@ -7251,6 +7482,51 @@
   }
 
   function patchPresetSelectMenu() {
+    // 単体プリセットに「銀行名」「支店名」を補完
+    if (window.re) {
+      if (!window.re.bank_name) {
+        window.re.bank_name = {
+          type: "text",
+          title: "銀行名",
+          description: "銀行名を入力または検索して選択してください。",
+          required: true,
+          validation: {
+            category: "api",
+            condition: "bank_name",
+            value: "",
+            value2: "",
+            errorMessage: "実在する銀行名を入力または選択してください。"
+          },
+          options: []
+        };
+      }
+      if (!window.re.branch_name) {
+        window.re.branch_name = {
+          type: "text",
+          title: "支店名",
+          description: "支店名を入力または候補から選択してください。",
+          required: true,
+          validation: {
+            category: "api",
+            condition: "branch_name",
+            value: "",
+            value2: "",
+            errorMessage: "実在する支店名を入力または選択してください。"
+          },
+          options: []
+        };
+      }
+      if (window.re.pro_bank && Array.isArray(window.re.pro_bank.questions)) {
+        window.re.pro_bank.questions.forEach(q => {
+          if (q.title === '金融機関名' || q.title === '銀行名') {
+            q.validation = { category: "api", condition: "bank_name", errorMessage: "実在する金融機関名を入力または選択してください。" };
+          } else if (q.title === '支店名') {
+            q.validation = { category: "api", condition: "branch_name", errorMessage: "実在する支店名を入力または選択してください。" };
+          }
+        });
+      }
+    }
+
     const presetSelect = document.getElementById('select-preset-question');
     if (!presetSelect) return;
 
@@ -7274,6 +7550,18 @@
       optGroup.appendChild(optPw);
 
       presetSelect.appendChild(optGroup);
+    }
+    if (!presetSelect.querySelector('option[value="bank_name"]')) {
+      const optBankSingle = document.createElement('option');
+      optBankSingle.value = "bank_name";
+      optBankSingle.textContent = "銀行名（全銀協API連携）";
+      presetSelect.appendChild(optBankSingle);
+    }
+    if (!presetSelect.querySelector('option[value="branch_name"]')) {
+      const optBranchSingle = document.createElement('option');
+      optBranchSingle.value = "branch_name";
+      optBranchSingle.textContent = "支店名（全銀協API連携）";
+      presetSelect.appendChild(optBranchSingle);
     }
 
     const originalWe = window.we;
@@ -7358,7 +7646,13 @@
             title: "支店名",
             description: "支店名を入力または候補から選択してください",
             required: true,
-            validation: null,
+            validation: {
+              category: "api",
+              condition: "branch_name",
+              value: "",
+              value2: "",
+              errorMessage: "実在する支店名を入力または選択してください。"
+            },
             options: []
           },
           {
@@ -8213,14 +8507,22 @@
         const apiConfig = getQuestionApiConfig(q);
         const isInvoiceApi = apiConfig && apiConfig.isInvoice;
         const isCorpApi = apiConfig && apiConfig.isCorp;
+        const isBankApi = apiConfig && apiConfig.isBank;
+        const isBranchApi = apiConfig && apiConfig.isBranch;
 
-        if (isCorpApi || isInvoiceApi) {
+        if (isCorpApi || isInvoiceApi || isBankApi || isBranchApi) {
           if (isInvoiceApi) {
             placeholder = "Tから始まる13桁 または事業者名 (例: T1010001999999)";
             apiBadge = `<div style="font-size:0.68rem; color:var(--color-primary); margin-top:2px; display:flex; align-items:center; gap:4px;">🧾 適格請求書発行事業者API連携</div>`;
-          } else {
+          } else if (isCorpApi) {
             placeholder = "法人名を入力して検索... (例: トヨタ、メルカリ)";
             apiBadge = `<div style="font-size:0.68rem; color:var(--color-primary); margin-top:2px; display:flex; align-items:center; gap:4px;">🏛️ 国税庁法人番号API連携</div>`;
+          } else if (isBankApi) {
+            placeholder = "銀行名を入力または検索 (例: 三菱UFJ銀行、みずほ銀行)";
+            apiBadge = `<div style="font-size:0.68rem; color:var(--color-primary); margin-top:2px; display:flex; align-items:center; gap:4px;">🏦 全銀協金融機関API連携</div>`;
+          } else if (isBranchApi) {
+            placeholder = "支店名を入力または選択 (例: 本店、新宿支店)";
+            apiBadge = `<div style="font-size:0.68rem; color:var(--color-primary); margin-top:2px; display:flex; align-items:center; gap:4px;">🏢 全銀協支店情報API連携</div>`;
           }
           // ライブプレビューでも操作・検索できるように disabled を解除
           inputHtml = `<input type="text" class="form-control form-control-sm" placeholder="${placeholder}" style="background: var(--color-bg-input);" />${apiBadge}`;

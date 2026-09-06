@@ -243,7 +243,7 @@
         width: 100%;
       }
 
-      .corp-search-panel, .invoice-search-panel {
+      .corp-search-panel, .invoice-search-panel, .bank-search-panel, .branch-search-panel {
         position: absolute;
         top: calc(100% + 4px);
         left: 0;
@@ -266,14 +266,14 @@
         margin-top: 6px;
       }
 
-      .corp-search-candidate-item, .invoice-search-candidate-item {
+      .corp-search-candidate-item, .invoice-search-candidate-item, .bank-search-candidate-item, .branch-search-candidate-item {
         padding: 10px 12px;
         cursor: pointer;
         border-bottom: 1px solid rgba(0, 0, 0, 0.05);
         transition: background-color 0.15s;
       }
 
-      .corp-search-candidate-item:hover, .invoice-search-candidate-item:hover {
+      .corp-search-candidate-item:hover, .invoice-search-candidate-item:hover, .bank-search-candidate-item:hover, .branch-search-candidate-item:hover {
         background-color: #f1f5f9;
       }
 
@@ -308,7 +308,7 @@
           border-radius: 8px;
           margin-bottom: 12px;
         }
-        .corp-search-panel, .invoice-search-panel {
+        .corp-search-panel, .invoice-search-panel, .bank-search-panel, .branch-search-panel {
           max-height: 250px;
         }
         .btn-invoice-search {
@@ -980,6 +980,341 @@
           return checkDigit === calcCheckDigit;
         }
 
+        const BANK_DATABASE = {
+          "三菱UFJ銀行": {
+            code: "0005",
+            branches: {
+              "本店": "001",
+              "丸の内支店": "010",
+              "日本橋支店": "020",
+              "新宿支店": "341",
+              "渋谷支店": "135",
+              "横浜支店": "211",
+              "名古屋営業部": "611",
+              "大阪営業部": "501"
+            }
+          },
+          "三井住友銀行": {
+            code: "0009",
+            branches: {
+              "本店営業部": "100",
+              "東京営業部": "200",
+              "新宿支店": "208",
+              "渋谷支店": "248",
+              "梅田支店": "501",
+              "名古屋支店": "401"
+            }
+          },
+          "みずほ銀行": {
+            code: "0001",
+            branches: {
+              "本店": "001",
+              "丸の内支店": "100",
+              "新宿支店": "210",
+              "渋谷支店": "220",
+              "大阪支店": "510",
+              "名古屋支店": "410"
+            }
+          },
+          "りそな銀行": {
+            code: "0010",
+            branches: {
+              "東京営業部": "010",
+              "大阪営業部": "110",
+              "新宿支店": "326",
+              "渋谷支店": "328",
+              "日本橋支店": "020"
+            }
+          },
+          "埼玉りそな銀行": {
+            code: "0017",
+            branches: {
+              "さいたま営業部": "001",
+              "大宮支店": "100",
+              "川越支店": "200",
+              "浦和支店": "110"
+            }
+          },
+          "ゆうちょ銀行": {
+            code: "9900",
+            branches: {
+              "本店": "001",
+              "〇一八支店": "018",
+              "〇二八支店": "028",
+              "一三八支店": "138",
+              "二二八支店": "228"
+            }
+          },
+          "楽天銀行": {
+            code: "0036",
+            branches: {
+              "本店": "001",
+              "第一営業支店": "251",
+              "第二営業支店": "252",
+              "第三営業支店": "253",
+              "楽天市場支店": "207",
+              "ワルツ支店": "204",
+              "リズム支店": "209"
+            }
+          },
+          "PayPay銀行": {
+            code: "0033",
+            branches: {
+              "本店営業部": "001",
+              "ビジネス営業部": "002",
+              "すずめ支店": "003",
+              "はやぶさ支店": "004",
+              "つばめ支店": "005",
+              "かわせみ支店": "006"
+            }
+          },
+          "住信SBIネット銀行": {
+            code: "0038",
+            branches: {
+              "本店": "001",
+              "イチゴ支店": "101",
+              "ブドウ支店": "102",
+              "ミカン支店": "103",
+              "レモン支店": "104",
+              "リンゴ支店": "105",
+              "バナナ支店": "106"
+            }
+          },
+          "ソニー銀行": {
+            code: "0035",
+            branches: {
+              "本店営業部": "001"
+            }
+          },
+          "SBI新生銀行": {
+            code: "0397",
+            branches: {
+              "本店": "400",
+              "新宿支店": "410",
+              "銀座支店": "411",
+              "難波支店": "510"
+            }
+          },
+          "あおぞら銀行": {
+            code: "0398",
+            branches: {
+              "本店": "001",
+              "日本橋支店": "003",
+              "新宿支店": "004",
+              "大阪支店": "101"
+            }
+          },
+          "GMOあおぞらネット銀行": {
+            code: "0310",
+            branches: {
+              "本店営業部": "101",
+              "法人第一営業部": "102"
+            }
+          },
+          "イオン銀行": {
+            code: "0040",
+            branches: {
+              "本店": "001",
+              "カブトチョウ支店": "002"
+            }
+          },
+          "auじぶん銀行": {
+            code: "0039",
+            branches: {
+              "本店": "001"
+            }
+          },
+          "横浜銀行": {
+            code: "0138",
+            branches: {
+              "本店営業部": "100",
+              "新横浜支店": "230",
+              "川崎支店": "300",
+              "新宿支店": "710",
+              "東京支店": "700"
+            }
+          },
+          "千葉銀行": {
+            code: "0134",
+            branches: {
+              "本店営業部": "100",
+              "船橋支店": "200",
+              "柏支店": "300",
+              "東京営業部": "700"
+            }
+          },
+          "静岡銀行": {
+            code: "0149",
+            branches: {
+              "本店営業部": "100",
+              "浜松営業部": "200",
+              "静岡駅前支店": "110",
+              "東京支店": "700"
+            }
+          },
+          "福岡銀行": {
+            code: "0177",
+            branches: {
+              "本店営業部": "100",
+              "博多駅前支店": "110",
+              "天神町支店": "120",
+              "東京支店": "700"
+            }
+          },
+          "広島銀行": {
+            code: "0169",
+            branches: {
+              "本店営業部": "001",
+              "八丁堀支店": "101",
+              "東京支店": "901",
+              "大阪支店": "801"
+            }
+          },
+          "北洋銀行": {
+            code: "0166",
+            branches: {
+              "本店営業部": "001",
+              "札幌南支店": "100",
+              "東京支店": "901"
+            }
+          },
+          "京都銀行": {
+            code: "0158",
+            branches: {
+              "本店営業部": "100",
+              "祇園支店": "110",
+              "大阪営業部": "500",
+              "東京営業部": "700"
+            }
+          },
+          "ウェイウェイ銀行": {
+            code: "9999",
+            branches: {
+              "本店営業部": "001",
+              "東京支店": "101",
+              "大阪支店": "201",
+              "広島支店": "301"
+            }
+          },
+          "ヤフー銀行": {
+            code: "8888",
+            branches: {
+              "本店営業部": "001",
+              "ネット営業部": "002"
+            }
+          }
+        };
+
+        function findBankByCode(code) {
+          if (!code) return null;
+          const clean = code.trim();
+          for (const [name, info] of Object.entries(BANK_DATABASE)) {
+            if (info.code === clean) return { name, ...info };
+          }
+          return null;
+        }
+
+        function findBankByName(name) {
+          if (!name) return null;
+          const clean = name.trim();
+          if (BANK_DATABASE[clean]) return { name: clean, ...BANK_DATABASE[clean] };
+          for (const [k, info] of Object.entries(BANK_DATABASE)) {
+            if (k.includes(clean) || clean.includes(k)) return { name: k, ...info };
+          }
+          return null;
+        }
+
+        function getSelectedBankNameInView() {
+          if (!formDefinition || !formDefinition.sections) return "";
+          for (const sec of formDefinition.sections) {
+            for (const q of (sec.questions || [])) {
+              const conf = getQuestionApiConfig(q);
+              const isBank = (conf && conf.isBank) || (q.title && (q.title.includes('銀行名') || (q.title.includes('銀行') && !q.title.includes('コード') && !q.title.includes('口座') && !q.title.includes('支店')) || q.title.includes('金融機関名')));
+              if (isBank) {
+                const val = formValues[q.id];
+                if (val && typeof val === 'string' && val.trim()) {
+                  return val.trim();
+                }
+              }
+            }
+          }
+          return "";
+        }
+
+        function autoFillBankCodeInView(code) {
+          if (!code || !formDefinition || !formDefinition.sections) return;
+          formDefinition.sections.forEach(sec => {
+            (sec.questions || []).forEach(q => {
+              const title = q.title || '';
+              if (title.includes('金融機関コード') || (title.includes('銀行') && title.includes('コード'))) {
+                formValues[q.id] = code;
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const input = card.querySelector('input.form-control');
+                  if (input) input.value = code;
+                  clearError(q.id);
+                }
+              }
+            });
+          });
+        }
+
+        function autoFillBankNameInView(name) {
+          if (!name || !formDefinition || !formDefinition.sections) return;
+          formDefinition.sections.forEach(sec => {
+            (sec.questions || []).forEach(q => {
+              const conf = getQuestionApiConfig(q);
+              const isBank = (conf && conf.isBank) || (q.title && (q.title.includes('銀行名') || (q.title.includes('銀行') && !q.title.includes('コード') && !q.title.includes('口座') && !q.title.includes('支店')) || q.title.includes('金融機関名')));
+              if (isBank) {
+                formValues[q.id] = name;
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const input = card.querySelector('input.form-control');
+                  if (input) input.value = name;
+                  clearError(q.id);
+                }
+              }
+            });
+          });
+        }
+
+        function autoFillBranchCodeInView(code) {
+          if (!code || !formDefinition || !formDefinition.sections) return;
+          formDefinition.sections.forEach(sec => {
+            (sec.questions || []).forEach(q => {
+              const title = q.title || '';
+              if (title.includes('支店番号') || title.includes('支店コード') || (title.includes('店舗コード') || (title.includes('支店') && title.includes('番号')))) {
+                formValues[q.id] = code;
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const input = card.querySelector('input.form-control');
+                  if (input) input.value = code;
+                  clearError(q.id);
+                }
+              }
+            });
+          });
+        }
+
+        function autoFillBranchNameInView(name) {
+          if (!name || !formDefinition || !formDefinition.sections) return;
+          formDefinition.sections.forEach(sec => {
+            (sec.questions || []).forEach(q => {
+              const conf = getQuestionApiConfig(q);
+              const isBranch = (conf && conf.isBranch) || (q.title && (q.title.includes('支店名') || (q.title.includes('支店') && !q.title.includes('番号') && !q.title.includes('コード')) || q.title.includes('出張所名')));
+              if (isBranch) {
+                formValues[q.id] = name;
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const input = card.querySelector('input.form-control');
+                  if (input) input.value = name;
+                  clearError(q.id);
+                }
+              }
+            });
+          });
+        }
+
         function getQuestionApiConfig(q) {
           if (!q) return null;
           if (q.validation && q.validation.category === 'api' && q.validation.condition) {
@@ -990,21 +1325,26 @@
               condition: cond,
               isCorp: cond === 'corp_name',
               isInvoice: cond === 'invoice_number',
-              isBank: cond === 'bank_name'
+              isBank: cond === 'bank_name',
+              isBranch: cond === 'branch_name'
             };
           }
           if (q.type === 'text' && q.title) {
             const t = q.title;
             if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
-              return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isBank: false };
+              return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isBank: false, isBranch: false };
             }
             if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('屋号')) &&
                 !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな')) {
-              return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isBank: false };
+              return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isBank: false, isBranch: false };
             }
-            if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座')) ||
-                t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード'))) {
-              return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isBank: true };
+            if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座') && !t.includes('支店')) ||
+                t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード') && !t.includes('支店'))) {
+              return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isBank: true, isBranch: false };
+            }
+            if (t.includes('支店名') || (t.includes('支店') && !t.includes('コード') && !t.includes('番号')) ||
+                t.includes('出張所名') || (t.includes('店舗名') && !t.includes('コード'))) {
+              return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isBank: false, isBranch: true };
             }
           }
           return null;
@@ -1776,6 +2116,319 @@
           });
         }
 
+        function setupBankApiSearchField(q, container, initialVal) {
+          const inputGroup = document.createElement('div');
+          inputGroup.className = 'api-search-input-group';
+          inputGroup.style.cssText = 'display: flex; gap: 8px; align-items: center; position: relative; width: 100%;';
+
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-control';
+          input.placeholder = '銀行名を入力または検索 (例: 三菱UFJ銀行、みずほ銀行)';
+          input.value = initialVal || '';
+          input.style.flex = '1';
+          inputGroup.appendChild(input);
+
+          const searchBtn = document.createElement('button');
+          searchBtn.type = 'button';
+          searchBtn.className = 'btn-invoice-search';
+          searchBtn.style.cssText = 'white-space: nowrap; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer; background: var(--color-primary); color: #fff; border: none; border-radius: 4px; height: 38px; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;';
+          searchBtn.innerHTML = '🔍 検索';
+          inputGroup.appendChild(searchBtn);
+
+          const searchPanel = document.createElement('div');
+          searchPanel.className = 'bank-search-panel';
+          inputGroup.appendChild(searchPanel);
+
+          container.appendChild(inputGroup);
+
+          const badgeContainer = document.createElement('div');
+          badgeContainer.className = 'api-verified-badge';
+          badgeContainer.style.display = 'none';
+          container.appendChild(badgeContainer);
+
+          const executeBankSearch = (shouldShowPanel = true) => {
+            const rawVal = input.value.trim();
+            if (rawVal === '') {
+              searchPanel.style.display = 'none';
+              badgeContainer.style.display = 'none';
+              return;
+            }
+
+            let matches = [];
+            for (const [name, info] of Object.entries(BANK_DATABASE)) {
+              if (name.includes(rawVal) || rawVal.includes(name.replace('銀行', '')) || (info.code && info.code.includes(rawVal))) {
+                matches.push({ name, code: info.code, branches: info.branches });
+              }
+            }
+
+            if (matches.length === 0) {
+              const generatedCode = generateHashNum(rawVal + "bank").slice(0, 4);
+              matches.push({
+                name: rawVal.endsWith('銀行') ? rawVal : (rawVal + '銀行'),
+                code: generatedCode,
+                isDynamic: true
+              });
+            }
+
+            if (!shouldShowPanel || matches.length === 0) {
+              searchPanel.style.display = 'none';
+              return;
+            }
+
+            searchPanel.innerHTML = `
+              <div style="padding: 8px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 0.74rem; color: #334155; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
+                <span>🏦 全銀協 金融機関API候補 <span style="color: #64748b; font-weight: normal;">(${matches.length}件)</span></span>
+                <span style="font-size: 0.68rem; color: #0284c7; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">タップで選択</span>
+              </div>
+            `;
+
+            matches.forEach(item => {
+              const row = document.createElement('div');
+              row.className = 'bank-search-candidate-item';
+              row.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                  <span style="font-weight: 700; font-size: 0.88rem; color: var(--color-primary);">${escapeHtml(item.name)}</span>
+                  <span style="background: #e8f0fe; color: #1a73e8; font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; white-space: nowrap;">金融機関コード: ${item.code}</span>
+                </div>
+              `;
+
+              row.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                input.value = item.name;
+                formValues[q.id] = item.name;
+                clearError(q.id);
+                searchPanel.style.display = 'none';
+
+                badgeContainer.innerHTML = `
+                  <div style="margin-top: 6px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 8px 12px; border-radius: 8px; font-size: 0.78rem; line-height: 1.4;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+                      <span style="font-weight: 700; color: #166534; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;">
+                        <span>✓</span> 全銀協 金融機関実在確認済
+                      </span>
+                      <span style="font-size: 0.65rem; background: #dcfce7; color: #15803d; padding: 1px 6px; border-radius: 4px; font-weight: 600;">照会完了</span>
+                    </div>
+                    <div style="color: #1f2937; margin-top: 4px;">
+                      <span style="color: #4b5563; font-weight: 600;">金融機関名:</span> <strong>${escapeHtml(item.name)}</strong>
+                      <span style="margin-left: 8px; font-size: 0.72rem; color: #6b7280;">(コード: <span style="font-family: monospace; font-weight: 600;">${item.code}</span>)</span>
+                    </div>
+                  </div>
+                `;
+                badgeContainer.style.display = 'block';
+
+                autoFillBankCodeInView(item.code);
+              });
+
+              searchPanel.appendChild(row);
+            });
+
+            searchPanel.style.display = 'block';
+          };
+
+          let debounceTimer = null;
+          input.addEventListener('input', (e) => {
+            formValues[q.id] = e.target.value;
+            clearError(q.id);
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => executeBankSearch(true), 150);
+
+            const bInfo = findBankByName(e.target.value);
+            if (bInfo) {
+              autoFillBankCodeInView(bInfo.code);
+            }
+          });
+
+          input.addEventListener('focus', () => {
+            if (input.value.trim().length > 0) executeBankSearch(true);
+          });
+
+          searchBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            executeBankSearch(true);
+          });
+
+          document.addEventListener('click', (e) => {
+            if (!inputGroup.contains(e.target)) {
+              searchPanel.style.display = 'none';
+            }
+          });
+
+          if (initialVal) {
+            const b = findBankByName(initialVal);
+            if (b) {
+              badgeContainer.innerHTML = `
+                <div style="margin-top: 6px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 8px 12px; border-radius: 8px; font-size: 0.78rem;">
+                  <span style="font-weight: 700; color: #166534;">✓ 全銀協 金融機関実在確認済: ${escapeHtml(b.name)} (コード: ${b.code})</span>
+                </div>
+              `;
+              badgeContainer.style.display = 'block';
+            }
+          }
+        }
+
+        function setupBranchApiSearchField(q, container, initialVal) {
+          const inputGroup = document.createElement('div');
+          inputGroup.className = 'api-search-input-group';
+          inputGroup.style.cssText = 'position: relative; width: 100%;';
+
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-control';
+          input.placeholder = '支店名を入力または選択 (例: 本店、丸の内支店)';
+          input.value = initialVal || '';
+          inputGroup.appendChild(input);
+
+          const searchPanel = document.createElement('div');
+          searchPanel.className = 'branch-search-panel';
+          inputGroup.appendChild(searchPanel);
+
+          container.appendChild(inputGroup);
+
+          const badgeContainer = document.createElement('div');
+          badgeContainer.className = 'api-verified-badge';
+          badgeContainer.style.display = 'none';
+          container.appendChild(badgeContainer);
+
+          const executeBranchSearch = () => {
+            const bankName = getSelectedBankNameInView();
+            const bankInfo = findBankByName(bankName);
+            const filterText = input.value.trim();
+
+            if (!bankName) {
+              searchPanel.innerHTML = `
+                <div style="padding: 10px 12px; background: #fff8e1; border-bottom: 1px solid #ffe082; font-size: 0.75rem; color: #b78103; display: flex; align-items: center; gap: 6px;">
+                  <span>⚠️ 先に「銀行名」を入力または選択してください</span>
+                </div>
+              `;
+              searchPanel.style.display = 'block';
+              return;
+            }
+
+            if (!bankInfo || !bankInfo.branches) {
+              if (filterText) {
+                const genBranchCode = generateHashNum(bankName + filterText).slice(0, 3);
+                searchPanel.innerHTML = `
+                  <div style="padding: 8px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 0.74rem; color: #334155; font-weight: 600;">
+                    <span>🏢 ${escapeHtml(bankName)} の支店</span>
+                  </div>
+                  <div class="branch-search-candidate-item" style="padding: 8px 12px; cursor: pointer; font-size: 0.8rem; border-bottom: 1px solid rgba(0,0,0,0.05); transition: background-color 0.15s;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-weight: 700; color: var(--color-primary);">${escapeHtml(filterText)}</span>
+                      <span style="background: #e6f4ea; color: #137333; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: 600;">支店コード: ${genBranchCode}</span>
+                    </div>
+                  </div>
+                `;
+                const row = searchPanel.querySelector('.branch-search-candidate-item');
+                if (row) {
+                  row.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    input.value = filterText;
+                    formValues[q.id] = filterText;
+                    clearError(q.id);
+                    searchPanel.style.display = 'none';
+                    autoFillBranchCodeInView(genBranchCode);
+                  });
+                }
+                searchPanel.style.display = 'block';
+              } else {
+                searchPanel.style.display = 'none';
+              }
+              return;
+            }
+
+            let branchEntries = Object.entries(bankInfo.branches);
+            if (filterText) {
+              branchEntries = branchEntries.filter(([bName, bCode]) => bName.includes(filterText) || bCode.includes(filterText));
+            }
+
+            if (branchEntries.length > 0) {
+              searchPanel.innerHTML = `
+                <div style="padding: 8px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 0.74rem; color: #334155; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
+                  <span>🏢 ${escapeHtml(bankInfo.name)}の支店一覧 (${branchEntries.length}件)</span>
+                  <span style="font-size: 0.68rem; color: #0284c7; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">選択で支店番号を自動補完</span>
+                </div>
+              `;
+              branchEntries.forEach(([bName, bCode]) => {
+                const row = document.createElement('div');
+                row.className = 'branch-search-candidate-item';
+                row.innerHTML = `
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 700; font-size: 0.88rem; color: var(--color-primary);">${escapeHtml(bName)}</span>
+                    <span style="background: #e6f4ea; color: #137333; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: 600;">支店コード: ${bCode}</span>
+                  </div>
+                `;
+                row.addEventListener('click', (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  input.value = bName;
+                  formValues[q.id] = bName;
+                  clearError(q.id);
+                  searchPanel.style.display = 'none';
+
+                  badgeContainer.innerHTML = `
+                    <div style="margin-top: 6px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem;">
+                      <span style="font-weight: 700; color: #166534;">✓ 全銀協 支店確認済: ${escapeHtml(bName)} (支店コード: ${bCode})</span>
+                    </div>
+                  `;
+                  badgeContainer.style.display = 'block';
+
+                  autoFillBranchCodeInView(bCode);
+                });
+                searchPanel.appendChild(row);
+              });
+              searchPanel.style.display = 'block';
+            } else if (filterText) {
+              const genBranchCode = generateHashNum(bankInfo.name + filterText).slice(0, 3);
+              searchPanel.innerHTML = `
+                <div style="padding: 8px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 0.74rem; color: #334155; font-weight: 600;">
+                  <span>🏢 ${escapeHtml(bankInfo.name)} の支店</span>
+                </div>
+                <div class="branch-search-candidate-item" style="padding: 8px 12px; cursor: pointer; font-size: 0.8rem; border-bottom: 1px solid rgba(0,0,0,0.05); transition: background-color 0.15s;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 700; color: var(--color-primary);">${escapeHtml(filterText)}</span>
+                    <span style="background: #e6f4ea; color: #137333; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: 600;">支店コード: ${genBranchCode}</span>
+                  </div>
+                </div>
+              `;
+              const row = searchPanel.querySelector('.branch-search-candidate-item');
+              if (row) {
+                row.addEventListener('click', (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  input.value = filterText;
+                  formValues[q.id] = filterText;
+                  clearError(q.id);
+                  searchPanel.style.display = 'none';
+                  autoFillBranchCodeInView(genBranchCode);
+                });
+              }
+              searchPanel.style.display = 'block';
+            } else {
+              searchPanel.style.display = 'none';
+            }
+          };
+
+          let debounceTimer = null;
+          input.addEventListener('input', (e) => {
+            formValues[q.id] = e.target.value;
+            clearError(q.id);
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(executeBranchSearch, 150);
+          });
+
+          input.addEventListener('focus', () => {
+            executeBranchSearch();
+          });
+
+          document.addEventListener('click', (e) => {
+            if (!inputGroup.contains(e.target)) {
+              searchPanel.style.display = 'none';
+            }
+          });
+        }
+
         function renderInputField(q, container) {
           const val = formValues[q.id];
 
@@ -1788,15 +2441,51 @@
             } else if (apiConfig && apiConfig.isInvoice) {
               // インボイス登録番号 API連携（適格請求書発行事業者公表API連携 ＆ 照会ボタン ＆ 実在性検証）
               setupInvoiceApiSearchField(q, container, val);
+            } else if (apiConfig && apiConfig.isBank) {
+              // 🏦 全銀協 銀行名API連携（金融機関コード自動補完・双方向連動）
+              setupBankApiSearchField(q, container, val);
+            } else if (apiConfig && apiConfig.isBranch) {
+              // 🏢 全銀協 支店名API連携（支店コード自動補完・銀行名連動）
+              setupBranchApiSearchField(q, container, val);
             } else {
               const input = document.createElement('input');
               input.type = 'text';
               input.className = 'form-control';
               input.placeholder = '回答を入力...';
               input.value = val || '';
+
+              // 金融機関コード・支店番号の自動逆引き・補完ハンドラ
+              const isBankCode = q.title && (q.title.includes('金融機関コード') || (q.title.includes('銀行') && q.title.includes('コード')));
+              const isBranchCode = q.title && (q.title.includes('支店番号') || q.title.includes('支店コード') || (q.title.includes('店舗コード') || (q.title.includes('支店') && q.title.includes('番号'))));
+
+              if (isBankCode) {
+                input.placeholder = '4桁の金融機関コード (例: 0005)';
+              } else if (isBranchCode) {
+                input.placeholder = '3桁の支店番号 (例: 001)';
+              }
+
               input.addEventListener('input', (e) => {
-                formValues[q.id] = e.target.value;
+                const curVal = e.target.value;
+                formValues[q.id] = curVal;
                 clearError(q.id);
+
+                if (isBankCode && curVal.trim().length === 4) {
+                  const b = findBankByCode(curVal.trim());
+                  if (b) {
+                    autoFillBankNameInView(b.name);
+                  }
+                } else if (isBranchCode && curVal.trim().length === 3) {
+                  const currentBankName = getSelectedBankNameInView();
+                  const b = findBankByName(currentBankName);
+                  if (b && b.branches) {
+                    for (const [brName, brCode] of Object.entries(b.branches)) {
+                      if (brCode === curVal.trim()) {
+                        autoFillBranchNameInView(brName);
+                        break;
+                      }
+                    }
+                  }
+                }
               });
               container.appendChild(input);
 
@@ -2157,6 +2846,10 @@
                     const cleanInv = val.trim().toUpperCase();
                     rulePassed = /^T\d{13}$/.test(cleanInv) && (CORP_DATABASE.some(c => ('T' + c.num) === cleanInv) || isValidInvoiceCheckDigit(cleanInv));
                   }
+                } else if (v.condition === 'bank_name') {
+                  rulePassed = val.trim().length > 0;
+                } else if (v.condition === 'branch_name') {
+                  rulePassed = val.trim().length > 0;
                 }
               }
 
