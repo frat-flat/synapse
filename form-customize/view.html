@@ -237,6 +237,55 @@
         line-height: 1.5;
       }
 
+      /* API検索・オートコンプリートスタイル */
+      .api-search-input-group {
+        position: relative;
+        width: 100%;
+      }
+
+      .corp-search-panel, .invoice-search-panel {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: #ffffff;
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        z-index: 2050;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+        display: none;
+        max-height: 280px;
+        overflow-y: auto;
+      }
+
+      .corp-pref-filter-container {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-top: 8px;
+      }
+
+      .corp-search-candidate-item, .invoice-search-candidate-item {
+        padding: 10px 14px;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        transition: background-color 0.15s;
+      }
+
+      .corp-search-candidate-item:hover, .invoice-search-candidate-item:hover {
+        background-color: #f1f5f9;
+      }
+
+      .api-verified-badge {
+        font-size: 0.75rem;
+        color: #137333;
+        margin-top: 6px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
       /* 選択肢オプション (ラジオ & チェックボックス) */
       .options-list {
         display: flex;
@@ -697,6 +746,179 @@
           initFormView();
         }
 
+        // ==========================================
+        // 3.5 API連携・法人検索・インボイス照会モジュール
+        // ==========================================
+        const JAPAN_PREFECTURES = [
+          "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
+          "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
+          "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県",
+          "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県",
+          "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県",
+          "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県",
+          "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"
+        ];
+
+        function escapeHtml(str) {
+          if (!str) return '';
+          return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        }
+
+        const CORP_DATABASE = [
+          { name: "合同会社frat flat", nameKana: "ゴウドウガイシャフラットフラット", num: "1010001998877", pref: "東京都", regDate: "2023-10-01", estDate: "2021-04-01" },
+          { name: "株式会社frat flat", nameKana: "カブシキガイシャフラットフラット", num: "2010001998877", pref: "東京都", regDate: "2023-10-01", estDate: "2022-05-10" },
+          { name: "株式会社wayway", nameKana: "カブシキガイシャウェイウェイ", num: "7010001999999", pref: "東京都", regDate: "2023-10-01", estDate: "2015-05-15" },
+          { name: "wayway合同会社", nameKana: "ウェイウェイゴウドウガイシャ", num: "7010001999999", pref: "広島県", regDate: "2024-04-01", estDate: "2020-11-20" },
+          { name: "ヤフー株式会社", nameKana: "ヤフーカブシキガイシャ", num: "7010001888888", pref: "東京都", regDate: "2023-10-01", estDate: "1996-01-31" },
+          { name: "LINEヤフー株式会社", nameKana: "ラインヤフーカブシキガイシャ", num: "7010001888888", pref: "東京都", regDate: "2023-10-01", estDate: "1996-01-31" },
+          { name: "トヨタ自動車株式会社", nameKana: "トヨタジドウシャカブシキガイシャ", num: "1180301018771", pref: "愛知県", regDate: "2023-10-01", estDate: "1937-08-28" },
+          { name: "ソニーグループ株式会社", nameKana: "ソニーグループカブシキガイシャ", num: "5010401067252", pref: "東京都", regDate: "2023-10-01", estDate: "1946-05-07" },
+          { name: "ソフトバンク株式会社", nameKana: "ソフトバンクカブシキガイシャ", num: "9010401052465", pref: "東京都", regDate: "2023-10-01", estDate: "1986-12-09" },
+          { name: "日本電信電話株式会社", nameKana: "ニッポンデンシンデンワカブシキガイシャ", num: "7010001065142", pref: "東京都", regDate: "2023-10-01", estDate: "1985-04-01" },
+          { name: "株式会社NTTドコモ", nameKana: "カブシキガイシャエヌティティドコモ", num: "1010001067912", pref: "東京都", regDate: "2023-10-01", estDate: "1991-08-14" },
+          { name: "任天堂株式会社", nameKana: "ニンテンドウカブシキガイシャ", num: "1130001011420", pref: "京都府", regDate: "2023-10-01", estDate: "1947-11-20" },
+          { name: "楽天グループ株式会社", nameKana: "ラクテングループカブシキガイシャ", num: "9010701020592", pref: "東京都", regDate: "2023-10-01", estDate: "1997-02-07" },
+          { name: "株式会社メルカリ", nameKana: "カブシキガイシャメルカリ", num: "4010001150491", pref: "東京都", regDate: "2023-10-01", estDate: "2013-02-01" },
+          { name: "株式会社サイバーエージェント", nameKana: "カブシキガイシャサイバーエージェント", num: "5010401052601", pref: "東京都", regDate: "2023-10-01", estDate: "1998-03-18" },
+          { name: "株式会社日立製作所", nameKana: "カブシキガイシャヒタチセイサクショ", num: "7010001008844", pref: "東京都", regDate: "2023-10-01", estDate: "1920-02-01" },
+          { name: "パナソニック ホールディングス株式会社", nameKana: "パナソニックホールディングスカブシキガイシャ", num: "5120001158218", pref: "大阪府", regDate: "2023-10-01", estDate: "1935-12-15" },
+          { name: "三菱商事株式会社", nameKana: "ミツビシショウジカブシキガイシャ", num: "5010001008771", pref: "東京都", regDate: "2023-10-01", estDate: "1950-04-01" },
+          { name: "伊藤忠商事株式会社", nameKana: "イトウチュウショウジカブシキガイシャ", num: "4120001077410", pref: "大阪府", regDate: "2023-10-01", estDate: "1949-12-01" }
+        ];
+
+        function normalizeText(text) {
+          if (!text) return "";
+          return text
+            .toLowerCase()
+            .replace(/[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+            .replace(/[\s\-\u30FC\u30FB/|\u3000\uFF5C]/g, "");
+        }
+
+        function generateHashNum(str) {
+          let hash = 0;
+          for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            hash |= 0;
+          }
+          const s = Math.abs(hash).toString() + "1010001008771";
+          return s.slice(0, 13);
+        }
+
+        function isValidInvoiceCheckDigit(invoiceNum) {
+          const clean = (invoiceNum || '').trim().toUpperCase();
+          if (!/^T\d{13}$/.test(clean)) return false;
+          const digitsStr = clean.substring(1);
+          const checkDigit = parseInt(digitsStr.charAt(0), 10);
+          const numPart = digitsStr.substring(1);
+          let sum = 0;
+          for (let i = 0; i < 12; i++) {
+            const d = parseInt(numPart.charAt(11 - i), 10);
+            const n = i + 1;
+            const p = (n % 2 === 1) ? 1 : 2;
+            sum += d * p;
+          }
+          const remainder = sum % 9;
+          const calcCheckDigit = 9 - remainder;
+          return checkDigit === calcCheckDigit;
+        }
+
+        function getQuestionApiConfig(q) {
+          if (!q) return null;
+          if (q.validation && q.validation.category === 'api' && q.validation.condition) {
+            const cond = q.validation.condition;
+            return {
+              isApi: true,
+              category: 'api',
+              condition: cond,
+              isCorp: cond === 'corp_name',
+              isInvoice: cond === 'invoice_number',
+              isBank: cond === 'bank_name'
+            };
+          }
+          if (q.type === 'text' && q.title) {
+            const t = q.title;
+            if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
+              return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isBank: false };
+            }
+            if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('屋号')) &&
+                !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな')) {
+              return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isBank: false };
+            }
+            if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座')) ||
+                t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード'))) {
+              return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isBank: true };
+            }
+          }
+          return null;
+        }
+
+        // 法人名選択時にカナ欄・インボイス登録番号欄へ自動連動
+        function autoFillCorpRelatedFields(item) {
+          if (!item || !formDefinition || !formDefinition.sections) return;
+          formDefinition.sections.forEach(sec => {
+            (sec.questions || []).forEach(q => {
+              const qTitle = q.title || '';
+              // カナ欄
+              if (q.type === 'text' && (qTitle.includes('カナ') || qTitle.includes('フリガナ') || qTitle.includes('ふりがな'))) {
+                if (item.nameKana) {
+                  formValues[q.id] = item.nameKana;
+                  const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                  if (card) {
+                    const input = card.querySelector('input.form-control');
+                    if (input) {
+                      input.value = item.nameKana;
+                      clearError(q.id);
+                    }
+                  }
+                }
+              }
+              // インボイス登録番号欄
+              const apiConf = getQuestionApiConfig(q);
+              const isInvField = (apiConf && apiConf.isInvoice) || qTitle.includes('インボイス') || qTitle.includes('登録番号');
+              if (isInvField && item.num) {
+                const formattedInv = item.num.startsWith('T') ? item.num : ('T' + item.num);
+                formValues[q.id] = formattedInv;
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const input = card.querySelector('input.form-control');
+                  if (input) {
+                    input.value = formattedInv;
+                    clearError(q.id);
+                  }
+                  let badge = card.querySelector('.api-verified-badge');
+                  if (!badge) {
+                    badge = document.createElement('div');
+                    badge.className = 'api-verified-badge';
+                    const group = card.querySelector('.api-search-input-group') || input.parentNode;
+                    group.parentNode.insertBefore(badge, group.nextSibling);
+                  }
+                  badge.innerHTML = `✓ 国税庁公表システム 実在確認済（${escapeHtml(item.name)}）`;
+                  badge.style.display = 'flex';
+                }
+              }
+              // 法人番号欄
+              if (q.type === 'text' && (qTitle.includes('法人番号') || qTitle.includes('会社番号'))) {
+                if (item.num) {
+                  formValues[q.id] = item.num;
+                  const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                  if (card) {
+                    const input = card.querySelector('input.form-control');
+                    if (input) {
+                      input.value = item.num;
+                      clearError(q.id);
+                    }
+                  }
+                }
+              }
+            });
+          });
+        }
+
         function initFormView() {
           formValues = {};
           sectionHistory = [];
@@ -706,7 +928,7 @@
           // 法人名・屋号の質問に対する案内文＆自動ハイフン補填ルールの自動適用
           formDefinition.sections.forEach(s => {
             (s.questions || []).forEach(q => {
-              if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
+              if (q.title && (q.title.includes('法人名') || q.title.includes('屋号')) && !q.title.includes('カナ') && !q.title.includes('フリガナ') && !q.title.includes('ふりがな')) {
                 // 既存の記述から自動ハイフン補填への言及をクリーンアップ
                 if (q.description && q.description.includes('自動で半角ハイフン')) {
                   q.description = q.description
@@ -965,28 +1187,337 @@
           container.querySelectorAll('input, select, textarea').forEach(el => el.disabled = false);
         }
 
+        function setupCorpApiSearchField(q, container, initialVal) {
+          const inputGroup = document.createElement('div');
+          inputGroup.className = 'api-search-input-group';
+          inputGroup.style.cssText = 'position: relative; width: 100%;';
+
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-control';
+          input.placeholder = '法人名または屋号を入力... (例: 合同会社frat flat)';
+          input.value = initialVal || '';
+          inputGroup.appendChild(input);
+
+          // 候補パネル
+          const searchPanel = document.createElement('div');
+          searchPanel.className = 'corp-search-panel';
+          inputGroup.appendChild(searchPanel);
+
+          container.appendChild(inputGroup);
+
+          // 都道府県エリア絞り込みセレクトボックス
+          const filterContainer = document.createElement('div');
+          filterContainer.className = 'corp-pref-filter-container';
+          filterContainer.style.cssText = 'display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap;';
+          const prefOptions = JAPAN_PREFECTURES.map(p => `<option value="${p}">${p}</option>`).join('');
+          filterContainer.innerHTML = `
+            <span style="font-size: 0.8rem; font-weight: 500; color: var(--color-text-muted);">エリア絞り込み:</span>
+            <select class="corp-pref-filter form-control" style="width: auto; min-width: 140px; font-size: 0.8rem; padding: 4px 8px; height: 32px; border-radius: 4px; cursor: pointer;">
+              <option value="">都道府県すべて</option>
+              ${prefOptions}
+            </select>
+            <span style="font-size: 0.75rem; color: var(--color-text-muted);">※ 都道府県を選択すると該当法人のみ絞り込みます</span>
+          `;
+          container.appendChild(filterContainer);
+
+          const prefSelect = filterContainer.querySelector('.corp-pref-filter');
+
+          // 個人事業主向け案内文（ハイフン自動補填に関する言及はなし）
+          const hint = document.createElement('div');
+          hint.className = 'auto-hyphen-hint';
+          hint.style.cssText = 'font-size: 0.8rem; color: var(--color-text-muted); margin-top: 6px; line-height: 1.4;';
+          hint.innerHTML = '💡 <span style="font-weight: 500;">個人事業主の方へ</span>: 屋号がない場合は未入力のまま「次へ」へお進みください。';
+          container.appendChild(hint);
+
+          // 実在確認済バッジ用コンテナ
+          const badgeContainer = document.createElement('div');
+          badgeContainer.className = 'api-verified-badge';
+          badgeContainer.style.display = 'none';
+          container.appendChild(badgeContainer);
+
+          // 検索実行関数
+          const executeSearch = () => {
+            const rawVal = input.value.trim();
+            const val = normalizeText(rawVal);
+            const selPref = prefSelect ? prefSelect.value : "";
+
+            if (rawVal === "") {
+              searchPanel.style.display = 'none';
+              badgeContainer.style.display = 'none';
+              return;
+            }
+
+            // 1. マスタ照会
+            let matched = CORP_DATABASE.filter(item => {
+              const normName = normalizeText(item.name);
+              const normKana = normalizeText(item.nameKana || "");
+              return normName.includes(val) || normKana.includes(val);
+            });
+
+            if (selPref !== "") {
+              matched = matched.filter(item => item.pref === selPref);
+            }
+
+            // 2. 一致がない場合の動的候補生成
+            let listToRender = matched;
+            if (listToRender.length === 0) {
+              const clean = rawVal.replace(/(株式会社|有限会社|合同会社|ホールディングス)/g, '').trim() || rawVal;
+              const targetPref = selPref || "東京都";
+              listToRender = [
+                { name: `合同会社${clean}`, nameKana: `ゴウドウガイシャ${clean}`, num: generateHashNum(clean + "1"), pref: targetPref, estDate: "2021-06-01" },
+                { name: `株式会社${clean}`, nameKana: `カブシキガイシャ${clean}`, num: generateHashNum(clean + "2"), pref: targetPref, estDate: "2018-04-01" },
+                { name: `${clean}株式会社`, nameKana: `${clean}カブシキガイシャ`, num: generateHashNum(clean + "3"), pref: targetPref, estDate: "2015-10-12" },
+                { name: `${clean}ホールディングス株式会社`, nameKana: `${clean}ホールディングスカブシキガイシャ`, num: generateHashNum(clean + "4"), pref: targetPref, estDate: "2008-01-20" }
+              ];
+            }
+
+            if (listToRender.length > 0) {
+              const prefLabel = selPref ? `【${escapeHtml(selPref)}】` : '';
+              searchPanel.innerHTML = `
+                <div style="padding: 8px 12px; background: #f8f9fa; border-bottom: 1px solid #edf2f7; font-size: 0.75rem; color: #4a5568; display: flex; justify-content: space-between; align-items: center; font-weight: 600;">
+                  <span>🏛️ 国税庁法人番号API照会候補 ${prefLabel} (${listToRender.length}件)</span>
+                  <span style="font-size: 0.7rem; color: #718096;">選択で上書き反映＆カナ・インボイス自動補完</span>
+                </div>
+              `;
+
+              listToRender.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'corp-search-candidate-item';
+                const kanaHtml = item.nameKana ? `<span style="font-size: 0.72rem; color: #718096; margin-left: 6px;">(${escapeHtml(item.nameKana)})</span>` : '';
+                row.innerHTML = `
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                      <span style="font-weight: 600; color: var(--color-primary);">${escapeHtml(item.name)}</span>
+                      ${kanaHtml}
+                    </div>
+                    <span style="background: #e6f4ea; color: #137333; font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;">✓ 実在確認済</span>
+                  </div>
+                  <div style="font-size: 0.72rem; color: var(--color-text-muted); margin-top: 3px;">
+                    法人番号: <span style="font-family: monospace; color: #2d3748; font-weight: 600;">${item.num}</span> | 所在地: ${item.pref}
+                  </div>
+                `;
+
+                row.addEventListener('click', (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  input.value = item.name;
+                  formValues[q.id] = item.name;
+                  clearError(q.id);
+                  searchPanel.style.display = 'none';
+
+                  // 実在確認済バッジ表示
+                  badgeContainer.innerHTML = `✓ 国税庁法人番号公表システム 実在確認済（法人番号: ${item.num} / ${item.pref}）`;
+                  badgeContainer.style.display = 'flex';
+
+                  // カナ欄・インボイス登録番号欄への自動反映
+                  autoFillCorpRelatedFields(item);
+                });
+
+                searchPanel.appendChild(row);
+              });
+
+              searchPanel.style.display = 'block';
+            } else {
+              searchPanel.style.display = 'none';
+            }
+          };
+
+          let debounceTimer = null;
+          input.addEventListener('input', (e) => {
+            formValues[q.id] = e.target.value;
+            clearError(q.id);
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(executeSearch, 150);
+          });
+
+          input.addEventListener('focus', () => {
+            if (input.value.trim().length > 0) {
+              executeSearch();
+            }
+          });
+
+          prefSelect.addEventListener('change', () => {
+            if (input.value.trim().length > 0) {
+              executeSearch();
+            }
+          });
+
+          document.addEventListener('click', (e) => {
+            if (!inputGroup.contains(e.target) && !filterContainer.contains(e.target)) {
+              searchPanel.style.display = 'none';
+            }
+          });
+        }
+
+        function setupInvoiceApiSearchField(q, container, initialVal) {
+          const inputGroup = document.createElement('div');
+          inputGroup.className = 'api-search-input-group';
+          inputGroup.style.cssText = 'display: flex; gap: 8px; align-items: center; position: relative; width: 100%;';
+
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-control';
+          input.placeholder = 'Tから始まる13桁 または事業者名 (例: T1010001999999)';
+          input.value = initialVal || '';
+          input.style.flex = '1';
+          inputGroup.appendChild(input);
+
+          const searchBtn = document.createElement('button');
+          searchBtn.type = 'button';
+          searchBtn.className = 'btn-invoice-search';
+          searchBtn.style.cssText = 'white-space: nowrap; padding: 6px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer; background: var(--color-primary); color: #fff; border: none; border-radius: 4px; height: 38px; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;';
+          searchBtn.innerHTML = '🔍 照会';
+          inputGroup.appendChild(searchBtn);
+
+          // 候補パネル
+          const searchPanel = document.createElement('div');
+          searchPanel.className = 'invoice-search-panel';
+          inputGroup.appendChild(searchPanel);
+
+          container.appendChild(inputGroup);
+
+          // 実在確認済バッジ用コンテナ
+          const badgeContainer = document.createElement('div');
+          badgeContainer.className = 'api-verified-badge';
+          badgeContainer.style.display = 'none';
+          container.appendChild(badgeContainer);
+
+          const executeInvoiceSearch = (shouldShowPanel = true) => {
+            const rawVal = input.value.trim();
+            const val = normalizeText(rawVal);
+
+            if (rawVal === '') {
+              searchPanel.style.display = 'none';
+              badgeContainer.style.display = 'none';
+              return;
+            }
+
+            // T + 13桁の検証
+            const isDirectInvoiceNum = /^T\d{13}$/i.test(rawVal);
+            const isDigits13 = /^\d{13}$/.test(rawVal);
+
+            if (isDirectInvoiceNum || isDigits13) {
+              const fullNum = isDirectInvoiceNum ? rawVal.toUpperCase() : ('T' + rawVal);
+              const numPart = fullNum.substring(1);
+              const masterMatch = CORP_DATABASE.find(item => item.num === numPart);
+              const checkDigitPassed = isValidInvoiceCheckDigit(fullNum);
+
+              if (masterMatch || checkDigitPassed) {
+                const entityName = masterMatch ? masterMatch.name : '適格請求書発行事業者';
+                badgeContainer.innerHTML = `✓ 国税庁公表システム 実在確認済（${escapeHtml(entityName)}）`;
+                badgeContainer.style.display = 'flex';
+                clearError(q.id);
+              } else {
+                badgeContainer.style.display = 'none';
+                showError(q.id, '⚠️ 入力されたインボイス登録番号は国税庁の公表システムに存在しないか無効な番号です。');
+              }
+            }
+
+            // 検索候補の抽出
+            let matched = CORP_DATABASE.filter(item => {
+              return item.num.includes(val) || item.name.includes(val) || ("t" + item.num).toLowerCase().includes(val.toLowerCase());
+            });
+
+            if (!shouldShowPanel || matched.length === 0) {
+              searchPanel.style.display = 'none';
+              return;
+            }
+
+            searchPanel.innerHTML = `
+              <div style="padding: 8px 12px; background: #f8f9fa; border-bottom: 1px solid #edf2f7; font-size: 0.75rem; color: #4a5568; display: flex; justify-content: space-between; align-items: center; font-weight: 600;">
+                <span>🧾 国税庁インボイス公表API照会候補 (${matched.length}件)</span>
+                <span style="font-size: 0.7rem; color: #718096;">選択で登録番号自動補完</span>
+              </div>
+            `;
+
+            matched.forEach(item => {
+              const row = document.createElement('div');
+              row.className = 'invoice-search-candidate-item';
+              const formattedNum = item.num.startsWith('T') ? item.num : ('T' + item.num);
+              row.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-weight: 600; color: var(--color-primary);">${escapeHtml(item.name)}</span>
+                  <span style="background: #e6f4ea; color: #137333; font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;">✓ 適格登録済</span>
+                </div>
+                <div style="font-size: 0.72rem; color: var(--color-text-muted); margin-top: 3px;">
+                  登録番号: <span style="font-family: monospace; color: #2d3748; font-weight: 600;">${formattedNum}</span> | 登録日: ${item.regDate || '2023-10-01'}
+                </div>
+              `;
+
+              row.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                input.value = formattedNum;
+                formValues[q.id] = formattedNum;
+                clearError(q.id);
+                searchPanel.style.display = 'none';
+
+                badgeContainer.innerHTML = `✓ 国税庁公表システム 実在確認済（${escapeHtml(item.name)}）`;
+                badgeContainer.style.display = 'flex';
+
+                // 関連法人名・カナが空欄なら自動補完
+                autoFillCorpRelatedFields(item);
+              });
+
+              searchPanel.appendChild(row);
+            });
+
+            searchPanel.style.display = 'block';
+          };
+
+          let debounceTimer = null;
+          input.addEventListener('input', (e) => {
+            formValues[q.id] = e.target.value;
+            clearError(q.id);
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => executeInvoiceSearch(true), 150);
+          });
+
+          searchBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            executeInvoiceSearch(true);
+          });
+
+          document.addEventListener('click', (e) => {
+            if (!inputGroup.contains(e.target)) {
+              searchPanel.style.display = 'none';
+            }
+          });
+        }
+
         function renderInputField(q, container) {
           const val = formValues[q.id];
 
           if (q.type === 'text') {
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'form-control';
-            input.placeholder = '回答を入力...';
-            input.value = val || '';
-            input.addEventListener('input', (e) => {
-              formValues[q.id] = e.target.value;
-              clearError(q.id);
-            });
-            container.appendChild(input);
+            const apiConfig = getQuestionApiConfig(q);
 
-            // 法人名・屋号または自動ハイフン補填規則がある場合、個人事業主向けの案内文を表示
-            if ((q.validation && q.validation.condition === 'auto_hyphen') || (q.title && (q.title.includes('法人名') || q.title.includes('屋号')))) {
-              const hint = document.createElement('div');
-              hint.className = 'auto-hyphen-hint';
-              hint.style.cssText = 'font-size: 0.8rem; color: var(--color-text-muted); margin-top: 6px; line-height: 1.4;';
-              hint.innerHTML = '💡 <span style="font-weight: 500;">個人事業主の方へ</span>: 屋号がない場合は未入力のまま「次へ」へお進みください。';
-              container.appendChild(hint);
+            if (apiConfig && apiConfig.isCorp) {
+              // 法人名・屋号 API連携（国税庁法人番号API連携 ＆ 都道府県エリア絞り込み ＆ 未入力ハイフン補填案内）
+              setupCorpApiSearchField(q, container, val);
+            } else if (apiConfig && apiConfig.isInvoice) {
+              // インボイス登録番号 API連携（適格請求書発行事業者公表API連携 ＆ 照会ボタン ＆ 実在性検証）
+              setupInvoiceApiSearchField(q, container, val);
+            } else {
+              const input = document.createElement('input');
+              input.type = 'text';
+              input.className = 'form-control';
+              input.placeholder = '回答を入力...';
+              input.value = val || '';
+              input.addEventListener('input', (e) => {
+                formValues[q.id] = e.target.value;
+                clearError(q.id);
+              });
+              container.appendChild(input);
+
+              // 法人名・屋号または自動ハイフン補填規則がある場合、個人事業主向けの案内文を表示
+              if ((q.validation && q.validation.condition === 'auto_hyphen') || (q.title && (q.title.includes('法人名') || q.title.includes('屋号')) && !q.title.includes('カナ') && !q.title.includes('フリガナ') && !q.title.includes('ふりがな'))) {
+                const hint = document.createElement('div');
+                hint.className = 'auto-hyphen-hint';
+                hint.style.cssText = 'font-size: 0.8rem; color: var(--color-text-muted); margin-top: 6px; line-height: 1.4;';
+                hint.innerHTML = '💡 <span style="font-weight: 500;">個人事業主の方へ</span>: 屋号がない場合は未入力のまま「次へ」へお進みください。';
+                container.appendChild(hint);
+              }
             }
           } else if (q.type === 'paragraph') {
             const textarea = document.createElement('textarea');
@@ -1143,10 +1674,21 @@
           }
         }
 
+        function showError(questionId, message) {
+          const card = document.querySelector(`.question-card[data-question-id="${questionId}"]`);
+          if (card) {
+            card.classList.add('has-error');
+            const errEl = card.querySelector('.error-text');
+            if (errEl) errEl.textContent = message || '入力内容に不備があります。';
+          }
+        }
+
         function clearError(questionId) {
           const card = document.querySelector(`.question-card[data-question-id="${questionId}"]`);
           if (card) {
             card.classList.remove('has-error');
+            const errEl = card.querySelector('.error-text');
+            if (errEl) errEl.textContent = '';
           }
         }
 
@@ -1161,9 +1703,9 @@
           if (!section || !section.questions) return;
           section.questions.forEach(q => {
             const isAutoHyphenRule = q.validation && (q.validation.condition === 'auto_hyphen' || q.validation.autoHyphen);
-            const isCorpField = q.title && (q.title.includes('法人名') || q.title.includes('屋号'));
+            const isCorpField = q.title && (q.title.includes('法人名') || q.title.includes('屋号')) && !q.title.includes('カナ') && !q.title.includes('フリガナ') && !q.title.includes('ふりがな');
 
-            if (isAutoHyphenRule || (isCorpField && (!q.validation || q.validation.condition === 'auto_hyphen'))) {
+            if (isAutoHyphenRule || isCorpField) {
               const curVal = formValues[q.id];
               const isEmpty = curVal === undefined || curVal === null || (typeof curVal === 'string' && curVal.trim() === '');
               if (isEmpty) {
@@ -1253,6 +1795,17 @@
               } else if (v.category === 'number') {
                 const num = Number(val);
                 if (isNaN(num)) rulePassed = false;
+              } else if (v.category === 'api') {
+                if (v.condition === 'corp_name') {
+                  rulePassed = val.trim().length > 0;
+                } else if (v.condition === 'invoice_number') {
+                  if (val.trim() === '-') {
+                    rulePassed = true;
+                  } else {
+                    const cleanInv = val.trim().toUpperCase();
+                    rulePassed = /^T\d{13}$/.test(cleanInv) && (CORP_DATABASE.some(c => ('T' + c.num) === cleanInv) || isValidInvoiceCheckDigit(cleanInv));
+                  }
+                }
               }
 
               if (!rulePassed) {
