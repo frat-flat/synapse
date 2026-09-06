@@ -595,6 +595,9 @@
         <!-- 質問項目レンダリング領域 -->
         <div id="questions-container" style="display: flex; flex-direction: column; gap: 16px;"></div>
 
+        <!-- 途中送信＆次セクション確認ステップ領域 -->
+        <div id="partial-submit-step-container" style="display: none; flex-direction: column; gap: 16px;"></div>
+
         <!-- 操作ボタングループ -->
         <div class="action-buttons-row">
           <button type="button" id="btn-prev" class="btn btn-secondary" style="display: none;">
@@ -713,6 +716,7 @@
         const sectionDescEl = document.getElementById('section-desc');
 
         const questionsContainerEl = document.getElementById('questions-container');
+        const partialSubmitContainerEl = document.getElementById('partial-submit-step-container');
 
         const btnPrev = document.getElementById('btn-prev');
         const btnNext = document.getElementById('btn-next');
@@ -861,6 +865,15 @@
             return;
           }
 
+          // フォーム名の設定
+          document.title = formDefinition.title ? `${formDefinition.title} - フォーム回答` : 'フォーム回答';
+
+          loadingBox.style.display = 'none';
+          formContainer.style.display = 'flex';
+
+          // 初期化
+          initFormView();
+
           // 途中再開（res_id）指定時の入力復元
           const resId = search.get('res_id');
           if (resId) {
@@ -877,21 +890,13 @@
                     currentSectionId = resumeSec;
                   }
                   showResumeBanner(draft.registrationCode || resId);
+                  renderCurrentSection();
                 }
               }
             } catch(e) {
               console.warn('[View] Failed to restore draft session:', e);
             }
           }
-
-          // フォーム名の設定
-          document.title = formDefinition.title ? `${formDefinition.title} - フォーム回答` : 'フォーム回答';
-
-          loadingBox.style.display = 'none';
-          formContainer.style.display = 'flex';
-
-          // 初期化
-          initFormView();
         }
 
         // ==========================================
@@ -1130,6 +1135,7 @@
         // 4. セクション描画
         // ==========================================
         function renderCurrentSection() {
+          if (typeof hideIntermediateStep === 'function') hideIntermediateStep();
           const sections = formDefinition.sections;
           const sectionIndex = sections.findIndex(s => s.id === currentSectionId);
           if (sectionIndex === -1) return;
@@ -2176,11 +2182,273 @@
         // ==========================================
         // 7. 画面遷移 & 送信処理
         // ==========================================
+        function hideIntermediateStep() {
+          if (partialSubmitContainerEl) {
+            partialSubmitContainerEl.style.display = 'none';
+            partialSubmitContainerEl.innerHTML = '';
+          }
+          questionsContainerEl.style.display = 'flex';
+          const actionRow = document.querySelector('.action-buttons-row');
+          if (actionRow) actionRow.style.display = 'flex';
+        }
+
+        function isSectionPartialSubmit(section) {
+          if (!section) return false;
+          if (section.nextAction === 'partial_submit') return true;
+          const questions = section.questions || [];
+          for (const q of questions) {
+            if (['radio', 'select'].includes(q.type)) {
+              const val = formValues[q.id];
+              if (val) {
+                const opt = (q.options || []).find(o => o.label === val);
+                if (opt && opt.nextSectionId === 'partial_submit') return true;
+              }
+            }
+          }
+          return false;
+        }
+
+        function getResolvedNextSection(section) {
+          const sections = formDefinition.sections || [];
+          const curIdx = sections.findIndex(s => s.id === section.id);
+
+          const questions = section.questions || [];
+          for (const q of questions) {
+            if (['radio', 'select'].includes(q.type)) {
+              const val = formValues[q.id];
+              if (val) {
+                const opt = (q.options || []).find(o => o.label === val);
+                if (opt && opt.nextSectionId && opt.nextSectionId !== 'partial_submit') {
+                  if (opt.nextSectionId === 'submit') return null;
+                  const targetSec = sections.find(s => s.id === opt.nextSectionId);
+                  if (targetSec) return targetSec;
+                }
+              }
+            }
+          }
+
+          const act = section.nextAction;
+          if (act && !['next', 'partial_submit', 'submit'].includes(act)) {
+            const targetSec = sections.find(s => s.id === act);
+            if (targetSec) return targetSec;
+          }
+
+          if (curIdx !== -1 && curIdx < sections.length - 1) {
+            return sections[curIdx + 1];
+          }
+          return null;
+        }
+
+        function getQuestionTypeLabel(type) {
+          const map = {
+            'text': '📝 1行テキスト',
+            'paragraph': '📄 長文記述',
+            'radio': '🔘 選択式（単一）',
+            'checkbox': '☑ 選択式（複数）',
+            'select': '🔽 プルダウン選択',
+            'file': '📎 ファイル添付（画像・PDF等）',
+            'password': '🔑 パスワード',
+            'number': '🔢 数値入力',
+            'date': '📅 日付',
+            'email': '✉️ メールアドレス',
+            'tel': '📞 電話番号'
+          };
+          return map[type] || '✏️ 入力項目';
+        }
+
+        function showIntermediatePartialSubmitStep(currentSec, nextSec) {
+          if (!partialSubmitContainerEl) return;
+
+          questionsContainerEl.style.display = 'none';
+          const actionRow = document.querySelector('.action-buttons-row');
+          if (actionRow) actionRow.style.display = 'none';
+          if (sectionInfoCardEl) sectionInfoCardEl.style.display = 'none';
+
+          const sections = formDefinition.sections || [];
+          const curIdx = sections.findIndex(s => s.id === currentSec.id);
+          const nextIdx = sections.findIndex(s => s.id === nextSec.id);
+
+          if (sections.length > 1) {
+            progressContainerEl.style.display = 'flex';
+            const progress = Math.round(((curIdx + 1) / sections.length) * 100);
+            progressBarFillEl.style.width = `${progress}%`;
+            progressTextEl.textContent = `セクション ${curIdx + 1} 完了 ： 進め方・次セクションの確認`;
+          }
+
+          const nextQuestions = nextSec.questions || [];
+          let questionsListHtml = '';
+          if (nextQuestions.length === 0) {
+            questionsListHtml = `
+              <div style="padding: 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; color: #64748b; font-size: 0.85rem; text-align: center;">
+                このセクションに入力項目はありません（案内・確認セクションです）
+              </div>
+            `;
+          } else {
+            questionsListHtml = nextQuestions.map((q, qIndex) => {
+              const reqBadge = q.required 
+                ? '<span style="background: #fee2e2; color: #dc2626; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">必須</span>' 
+                : '<span style="background: #f1f5f9; color: #64748b; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">任意</span>';
+              const typeLabel = getQuestionTypeLabel(q.type);
+              const descHtml = q.description 
+                ? `<div style="font-size: 0.78rem; color: #64748b; margin-top: 4px; line-height: 1.4;">${renderRichTextWithLinks(q.description)}</div>` 
+                : '';
+
+              return `
+                <div class="next-sec-q-item" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                  <div style="flex: 1;">
+                    <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; display: flex; align-items: baseline; gap: 6px;">
+                      <span style="color: #64748b; font-size: 0.8rem; font-weight: 700;">Q${qIndex + 1}.</span>
+                      <span>${escapeHtml(q.title || '無題の質問')}</span>
+                    </div>
+                    ${descHtml}
+                  </div>
+                  <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;">
+                    ${reqBadge}
+                    <span style="font-size: 0.72rem; color: #475569; background: #f8fafc; border: 1px solid #cbd5e1; padding: 1px 6px; border-radius: 4px; white-space: nowrap;">${typeLabel}</span>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          }
+
+          const nextSecTitle = nextSec.title || `セクション ${nextIdx + 1}`;
+          const nextSecDesc = nextSec.description ? renderRichTextWithLinks(nextSec.description) : '';
+
+          partialSubmitContainerEl.innerHTML = `
+            <div class="partial-step-card" style="background: #ffffff; border: 1px solid var(--color-border); border-radius: var(--border-radius); padding: 28px 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+              <div style="text-align: center; margin-bottom: 24px;">
+                <div style="display: inline-flex; align-items: center; gap: 6px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 20px; margin-bottom: 10px;">
+                  <span>✓</span> セクション ${curIdx + 1} の入力が完了しました
+                </div>
+                <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--color-text-main); margin: 0 0 8px;">進め方をご確認ください</h2>
+                <p style="font-size: 0.88rem; color: var(--color-text-muted); margin: 0; line-height: 1.6;">
+                  このフォームは<strong>「途中送信」</strong>に対応しています。<br>
+                  次のセクションで入力する内容をご確認の上、<strong>「このまま次へ進む」</strong>か<strong>「ここで途中送信して再開リンクを発行する」</strong>かをお選びいただけます。
+                </p>
+              </div>
+
+              <!-- 次のセクションで入力する情報のご確認 -->
+              <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                  <span style="font-size: 0.78rem; font-weight: 700; color: #0284c7; background: #e0f2fe; padding: 2px 8px; border-radius: 4px;">
+                    📋 次のセクションで入力する情報
+                  </span>
+                  <span style="font-size: 0.75rem; color: #64748b;">
+                    全 ${nextQuestions.length} 項目
+                  </span>
+                </div>
+                <h3 style="font-size: 1.1rem; font-weight: 700; color: #1e293b; margin: 0 0 6px;">
+                  【セクション ${nextIdx + 1}】 ${escapeHtml(nextSecTitle)}
+                </h3>
+                ${nextSecDesc ? `<div style="font-size: 0.82rem; color: #64748b; margin-bottom: 14px; line-height: 1.5;">${nextSecDesc}</div>` : ''}
+
+                <div style="margin-top: 14px;">
+                  <div style="font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 8px; display: flex; align-items: center; gap: 4px;">
+                    <span>▼</span> 入力・添付が必要な項目一覧
+                  </div>
+                  <div style="max-height: 280px; overflow-y: auto; padding-right: 4px;">
+                    ${questionsListHtml}
+                  </div>
+                </div>
+              </div>
+
+              <!-- 進め方の選択UI -->
+              <div style="margin-top: 20px;">
+                <div style="font-size: 0.92rem; font-weight: 700; color: #1e293b; margin-bottom: 12px; text-align: center;">
+                  どちらの進め方にしますか？
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
+                  <!-- 選択肢A: 途中送信する -->
+                  <div id="btn-choice-partial-submit" style="background: #ffffff; border: 2px solid #3b82f6; border-radius: 8px; padding: 18px 16px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 6px rgba(59,130,246,0.1);">
+                    <div>
+                      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span style="font-size: 1.4rem;">💾</span>
+                        <div style="font-size: 0.95rem; font-weight: 700; color: #1d4ed8;">ここまでの内容で途中送信する</div>
+                      </div>
+                      <div style="font-size: 0.78rem; color: #4b5563; line-height: 1.5; margin-bottom: 14px;">
+                        手元に書類や情報がない場合におすすめです。これまでの回答を安全に保存し、<strong>8桁の確定登録コード</strong>と<strong>後からいつでも再開できる専用URL</strong>を発行します。
+                      </div>
+                    </div>
+                    <button type="button" class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 0.85rem; font-weight: 700; padding: 10px; background: #2563eb !important; border-color: #2563eb !important; cursor: pointer;">
+                      💾 途中送信して再開URLを発行
+                    </button>
+                  </div>
+
+                  <!-- 選択肢B: 次に進む -->
+                  <div id="btn-choice-continue-next" style="background: #ffffff; border: 2px solid #10b981; border-radius: 8px; padding: 18px 16px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 6px rgba(16,185,129,0.1);">
+                    <div>
+                      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span style="font-size: 1.4rem;">👉</span>
+                        <div style="font-size: 0.95rem; font-weight: 700; color: #047857;">このまま次のセクションに進む</div>
+                      </div>
+                      <div style="font-size: 0.78rem; color: #4b5563; line-height: 1.5; margin-bottom: 14px;">
+                        必要な情報や添付書類が手元に揃っている場合は、このまま続けて【${escapeHtml(nextSecTitle)}】の入力画面へ進んで回答を継続できます。
+                      </div>
+                    </div>
+                    <button type="button" class="btn btn-success" style="width: 100%; justify-content: center; font-size: 0.85rem; font-weight: 700; padding: 10px; background: #059669 !important; border-color: #059669 !important; cursor: pointer;">
+                      👉 このまま続けて回答する
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 戻るボタン -->
+                <div style="margin-top: 18px; text-align: center;">
+                  <button type="button" id="btn-choice-back-to-sec" class="btn btn-secondary btn-sm" style="font-size: 0.8rem; color: #64748b; background: transparent; border: 1px solid #cbd5e1; cursor: pointer;">
+                    ← 前のセクションの入力内容を修正する
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+
+          partialSubmitContainerEl.style.display = 'flex';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+
+          const partialChoiceCard = partialSubmitContainerEl.querySelector('#btn-choice-partial-submit');
+          if (partialChoiceCard) {
+            partialChoiceCard.onclick = (e) => {
+              e.preventDefault();
+              hideIntermediateStep();
+              submitForm(true);
+            };
+          }
+
+          const continueChoiceCard = partialSubmitContainerEl.querySelector('#btn-choice-continue-next');
+          if (continueChoiceCard) {
+            continueChoiceCard.onclick = (e) => {
+              e.preventDefault();
+              hideIntermediateStep();
+              sectionHistory.push(currentSectionId);
+              currentSectionId = nextSec.id;
+              renderCurrentSection();
+            };
+          }
+
+          const backBtn = partialSubmitContainerEl.querySelector('#btn-choice-back-to-sec');
+          if (backBtn) {
+            backBtn.onclick = (e) => {
+              e.preventDefault();
+              hideIntermediateStep();
+              renderCurrentSection();
+            };
+          }
+        }
+
         btnNext.addEventListener('click', () => {
           if (!validateCurrentSection()) return;
 
           const section = formDefinition.sections.find(s => s.id === currentSectionId);
           if (!section) return;
+
+          // 途中送信が設定されているセクション完了時の割り込み判定
+          if (isSectionPartialSubmit(section)) {
+            const nextSec = getResolvedNextSection(section);
+            if (nextSec) {
+              showIntermediatePartialSubmitStep(section, nextSec);
+              return;
+            }
+          }
 
           const nextAction = getSectionNextAction(section);
           if (nextAction === 'submit') {
@@ -2204,10 +2472,10 @@
           submitForm();
         });
 
-        function submitForm() {
+        function submitForm(forcePartial = null) {
           const section = formDefinition.sections.find(s => s.id === currentSectionId);
           const nextAction = section ? getSectionNextAction(section) : 'submit';
-          const isPartial = nextAction === 'partial_submit';
+          const isPartial = forcePartial !== null ? forcePartial : (nextAction === 'partial_submit');
 
           const submitData = {};
           formDefinition.sections.forEach(s => {
@@ -2293,9 +2561,44 @@
               </div>
               <div style="background: rgba(237, 242, 247, 0.7); border: 1px solid #cbd5e0; border-radius: 8px; padding: 12px; margin-bottom: 16px; text-align: left;">
                 <div style="font-size: 0.8rem; font-weight: 700; color: #4a5568; margin-bottom: 4px;">🔗 再開用URL</div>
-                <input type="text" readonly value="${escapeHtml(resumeUrl)}" style="width: 100%; box-sizing: border-box; font-size: 0.75rem; padding: 6px 8px; font-family: monospace; background: #fff; border: 1px solid #cbd5e0; border-radius: 4px;" onclick="this.select();" />
+                <div style="display: flex; gap: 6px;">
+                  <input type="text" id="resume-url-input" readonly value="${escapeHtml(resumeUrl)}" style="flex: 1; min-width: 0; box-sizing: border-box; font-size: 0.75rem; padding: 6px 8px; font-family: monospace; background: #fff; border: 1px solid #cbd5e0; border-radius: 4px;" onclick="this.select();" />
+                  <button type="button" id="btn-copy-resume-url" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 4px 12px; cursor: pointer; white-space: nowrap;">📋 コピー</button>
+                </div>
+                <div id="copy-resume-toast" style="display: none; font-size: 0.75rem; color: #16a34a; font-weight: 700; margin-top: 6px;">✓ 再開URLをコピーしました！</div>
               </div>
             `;
+
+            const copyBtn = successDesc.querySelector('#btn-copy-resume-url');
+            const toastEl = successDesc.querySelector('#copy-resume-toast');
+            if (copyBtn) {
+              copyBtn.onclick = () => {
+                const input = successDesc.querySelector('#resume-url-input');
+                const text = (input && input.value) ? input.value : resumeUrl;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                  navigator.clipboard.writeText(text).then(() => {
+                    if (toastEl) {
+                      toastEl.style.display = 'block';
+                      setTimeout(() => { toastEl.style.display = 'none'; }, 2500);
+                    }
+                  }).catch(() => {
+                    input.select();
+                    document.execCommand('copy');
+                    if (toastEl) {
+                      toastEl.style.display = 'block';
+                      setTimeout(() => { toastEl.style.display = 'none'; }, 2500);
+                    }
+                  });
+                } else {
+                  input.select();
+                  document.execCommand('copy');
+                  if (toastEl) {
+                    toastEl.style.display = 'block';
+                    setTimeout(() => { toastEl.style.display = 'none'; }, 2500);
+                  }
+                }
+              };
+            }
           } else {
             if (successTitle) successTitle.textContent = '回答を受け付けました';
             if (successDesc) successDesc.textContent = 'ご回答ありがとうございました。内容は正常に記録されました。';

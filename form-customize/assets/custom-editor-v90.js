@@ -4140,259 +4140,312 @@
   }
 
   // ============================================================================
-  // 【回答者向けセクション進め方・途中送信選択システム (v89)】
-  // 1. 途中送信をせずに最後まで回答して送信する
-  // 2. すぐに回答ができない場合は途中送信をして、次のセクションから始められるリンクを発行してください
-  // ※ フォーム作成者側で「途中送信をする」を設定した画面の後、
-  //    かつ次のセクションの回答内容（質問項目）を確認した後に末尾へ表示する
+  // 【回答者向けセクション進め方・途中送信＆次セクション確認画面システム (v90)】
+  // セクション完了時に「途中送信」が設定されている場合、勝手に次セクションへ進まず、
+  // 1. 次のセクションで入力する情報・書類の一覧を事前確認
+  // 2. 「途中送信して再開URLを発行」or「このまま次のセクションに進む」を選択
   // ============================================================================
   function renderFlowChoiceCardInPreview() {
-    const previewContainer = document.getElementById('preview-section-container');
-    if (!previewContainer) return;
-
+    // 過去の末尾注入カードを確実にクリーンアップ
     const existingCard = document.getElementById('preview-flow-choice-card');
+    if (existingCard) existingCard.remove();
+  }
+
+  function getPreviewQuestionTypeLabel(type) {
+    const map = {
+      'text': '📝 1行テキスト',
+      'paragraph': '📄 長文記述',
+      'radio': '🔘 選択式（単一）',
+      'checkbox': '☑ 選択式（複数）',
+      'select': '🔽 プルダウン選択',
+      'file': '📎 ファイル添付（画像・PDF等）',
+      'password': '🔑 パスワード',
+      'number': '🔢 数値入力',
+      'date': '📅 日付',
+      'email': '✉️ メールアドレス',
+      'tel': '📞 電話番号'
+    };
+    return map[type] || '✏️ 入力項目';
+  }
+
+  function isCurrentPreviewSectionPartialSubmit(section) {
+    if (!section) return false;
+    if (section.questions && window.V) {
+      for (const q of section.questions) {
+        if (['radio', 'select'].includes(q.type) && q.options) {
+          const val = window.V[q.id];
+          if (val) {
+            const opt = q.options.find(o => o.label === val);
+            if (opt && opt.nextSectionId === 'partial_submit') return true;
+          }
+        }
+      }
+    }
+    return section.nextAction === 'partial_submit';
+  }
+
+  function getPreviewResolvedNextSection(section) {
     const formData = window.L || window.G || window.n;
-    if (!formData || !formData.sections || formData.sections.length <= 1) {
-      if (existingCard) existingCard.remove();
-      return;
-    }
+    if (!formData || !formData.sections) return null;
+    const sections = formData.sections;
+    const curIdx = sections.findIndex(s => s.id === section.id);
 
-    const curR = window.R || (formData.sections[0] ? formData.sections[0].id : null);
-    const curIdx = formData.sections.findIndex(s => s.id === curR);
-
-    // セクション1（開始時）では選択肢は出さず「次へ」ボタンで進む
-    if (curIdx <= 0) {
-      if (existingCard) existingCard.remove();
-      const pt = document.getElementById('btn-preview-next');
-      const mt = document.getElementById('btn-preview-submit');
-      const ft = document.getElementById('btn-preview-back');
-      if (pt) {
-        pt.style.display = 'inline-flex';
-        pt.textContent = '次へ';
-      }
-      if (mt) mt.style.display = 'none';
-      if (ft) ft.style.display = 'none';
-      return;
-    }
-
-    // 「前へ」ボタンの表示保証
-    const ft = document.getElementById('btn-preview-back');
-    if (ft) ft.style.display = 'inline-flex';
-
-    // 直前のセクション（履歴スタックまたは1つ前のインデックス）を取得
-    let prevSec = null;
-    if (window.B && window.B.length > 0) {
-      const lastHistory = window.B[window.B.length - 1];
-      if (lastHistory && lastHistory.sectionId) {
-        prevSec = formData.sections.find(s => s.id === lastHistory.sectionId);
+    if (section.questions && window.V) {
+      for (const q of section.questions) {
+        if (['radio', 'select'].includes(q.type) && q.options) {
+          const val = window.V[q.id];
+          if (val) {
+            const opt = q.options.find(o => o.label === val);
+            if (opt && opt.nextSectionId && opt.nextSectionId !== 'partial_submit' && opt.nextSectionId !== 'submit') {
+              const target = sections.find(s => s.id === opt.nextSectionId);
+              if (target) return target;
+            }
+          }
+        }
       }
     }
-    if (!prevSec && curIdx > 0) {
-      prevSec = formData.sections[curIdx - 1];
+
+    const act = section.nextAction;
+    if (act && !['next', 'submit', 'partial_submit'].includes(act)) {
+      const target = sections.find(s => s.id === act);
+      if (target) return target;
     }
 
-    // フォーム作成者側で直前セクションに「途中送信をする」が設定されているか
-    const isPrevSecPartialSubmit = prevSec && (
-      prevSec.nextAction === 'partial_submit' ||
-      (prevSec.questions && prevSec.questions.some(q => 
-        q.options && q.options.some(opt => opt.nextSectionId === 'partial_submit')
-      ))
-    );
+    if (curIdx !== -1 && curIdx < sections.length - 1) {
+      return sections[curIdx + 1];
+    }
+    return null;
+  }
 
-    // 途中送信後の再開セッション（URLパラメータまたは保存rowId）であるか
-    const isResumeSession = !!(
-      window.currentResumeRowId ||
-      new URLSearchParams(window.location.search).get('res_id') ||
-      new URLSearchParams(window.location.search).get('resumeRowId')
-    );
+  function ensurePreviewPartialSubmitContainer() {
+    let container = document.getElementById('preview-partial-submit-step-container');
+    if (!container) {
+      const previewCard = document.querySelector('#panel-preview .preview-card:not(.success-card)');
+      if (previewCard) {
+        container = document.createElement('div');
+        container.id = 'preview-partial-submit-step-container';
+        container.className = 'partial-submit-step-wrapper';
+        container.style.display = 'none';
+        const actions = previewCard.querySelector('.preview-actions');
+        if (actions) {
+          previewCard.insertBefore(container, actions);
+        } else {
+          previewCard.appendChild(container);
+        }
+      }
+    }
+    return container;
+  }
 
-    // 作成者側で「途中送信をする」が設定された画面の後、または再開セッションでない場合はカードを表示しない
-    if (!isPrevSecPartialSubmit && !isResumeSession) {
-      if (existingCard) existingCard.remove();
-      const pt = document.getElementById('btn-preview-next');
-      const mt = document.getElementById('btn-preview-submit');
-      const isLastSec = curIdx === (formData.sections.length - 1);
-      if (pt) {
-        pt.style.display = isLastSec ? 'none' : 'inline-flex';
-        pt.textContent = '次へ';
-      }
-      if (mt) {
-        mt.style.display = isLastSec ? 'inline-flex' : 'none';
-        mt.textContent = '送信';
-        mt.className = 'btn btn-success';
-      }
-      return;
+  function hidePreviewIntermediateStep() {
+    const container = document.getElementById('preview-partial-submit-step-container');
+    if (container) {
+      container.style.display = 'none';
+      container.innerHTML = '';
+    }
+    const secContainer = document.getElementById('preview-section-container');
+    if (secContainer) secContainer.style.display = 'block';
+    const actions = document.querySelector('#panel-preview .preview-actions');
+    if (actions) actions.style.display = 'flex';
+  }
+
+  function showPreviewIntermediatePartialSubmitStep(currentSec, nextSec) {
+    const container = ensurePreviewPartialSubmitContainer();
+    if (!container) return;
+
+    const secContainer = document.getElementById('preview-section-container');
+    if (secContainer) secContainer.style.display = 'none';
+    const actions = document.querySelector('#panel-preview .preview-actions');
+    if (actions) actions.style.display = 'none';
+
+    const formData = window.L || window.G || window.n;
+    const sections = (formData && formData.sections) || [];
+    const curIdx = sections.findIndex(s => s.id === currentSec.id);
+    const nextIdx = sections.findIndex(s => s.id === nextSec.id);
+
+    // プログレスバーの更新
+    const ut = document.getElementById('preview-progress-bar');
+    const dt = document.getElementById('preview-progress-text');
+    if (ut && dt && sections.length > 0) {
+      const progress = Math.round(((curIdx + 1) / sections.length) * 100);
+      ut.style.width = `${progress}%`;
+      dt.textContent = `セクション ${curIdx + 1} 完了 ： 進め方・次セクションの確認`;
     }
 
-    const currentSec = formData.sections[curIdx];
-    const secTitle = currentSec ? (currentSec.title || `セクション ${curIdx + 1}`) : `セクション ${curIdx + 1}`;
-
-    if (existingCard) {
-      // 質問内容を回答者が確認した後に見せるため、常に質問カード群の最下部に保持
-      if (previewContainer.lastElementChild !== existingCard) {
-        previewContainer.appendChild(existingCard);
-      }
-      setupFlowChoiceInteractions(existingCard, currentSec, curIdx);
-      return;
-    }
-
-    const card = document.createElement('div');
-    card.id = 'preview-flow-choice-card';
-    card.className = 'preview-flow-choice-card';
-
-    card.innerHTML = `
-      <div class="flow-choice-header" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span class="flow-choice-badge-icon" title="進め方の分岐">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 12h5" />
-              <path d="M8 12c3.5 0 5-6 8.5-6h3.5" />
-              <path d="M17 3.5l3.5 2.5-3.5 2.5" />
-              <path d="M8 12c3.5 0 5 6 8.5 6h3.5" />
-              <path d="M17 15.5l3.5 2.5-3.5 2.5" />
-            </svg>
-          </span>
-          <span class="flow-choice-badge-title">上記の質問内容をご確認の上、このセクションの進め方を選択してください</span>
+    const nextQuestions = nextSec.questions || [];
+    let questionsListHtml = '';
+    if (nextQuestions.length === 0) {
+      questionsListHtml = `
+        <div style="padding: 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; color: #64748b; font-size: 0.85rem; text-align: center;">
+          このセクションに入力項目はありません（案内・確認セクションです）
         </div>
-        <button type="button" id="btn-open-flow-guide-modal" class="btn-flow-guide-trigger" title="図解付き詳細ガイドを見る">
-          <span>📖</span> 図解付き詳細ガイド
-        </button>
-      </div>
-      <div class="flow-choice-options-list">
-        <label class="flow-choice-label active" data-flow="continue">
-          <input type="radio" name="preview_flow_choice_radio" value="continue" checked>
-          <div class="flow-choice-content">
-            <div class="flow-choice-main-text">1. 途中送信をせずに最後まで回答して送信する</div>
-            <div class="flow-choice-sub-text">このまま「${escapeHtml(secTitle)}」の質問に回答し、最後まで進めます。</div>
+      `;
+    } else {
+      questionsListHtml = nextQuestions.map((q, qIndex) => {
+        const reqBadge = q.required 
+          ? '<span style="background: #fee2e2; color: #dc2626; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">必須</span>' 
+          : '<span style="background: #f1f5f9; color: #64748b; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">任意</span>';
+        const typeLabel = getPreviewQuestionTypeLabel(q.type);
+        const descHtml = q.description 
+          ? `<div style="font-size: 0.78rem; color: #64748b; margin-top: 4px; line-height: 1.4;">${escapeHtml(q.description)}</div>` 
+          : '';
+
+        return `
+          <div class="next-sec-q-item" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+            <div style="flex: 1;">
+              <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; display: flex; align-items: baseline; gap: 6px;">
+                <span style="color: #64748b; font-size: 0.8rem; font-weight: 700;">Q${qIndex + 1}.</span>
+                <span>${escapeHtml(q.title || '無題の質問')}</span>
+              </div>
+              ${descHtml}
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;">
+              ${reqBadge}
+              <span style="font-size: 0.72rem; color: #475569; background: #f8fafc; border: 1px solid #cbd5e1; padding: 1px 6px; border-radius: 4px; white-space: nowrap;">${typeLabel}</span>
+            </div>
           </div>
-        </label>
-        <label class="flow-choice-label" data-flow="partial_submit">
-          <input type="radio" name="preview_flow_choice_radio" value="partial_submit">
-          <div class="flow-choice-content">
-            <div class="flow-choice-main-text">2. すぐに回答ができない場合は途中送信をして、次のセクションから始められるリンクを発行してください</div>
-            <div class="flow-choice-sub-text">手元に書類や情報がない場合でも、ここまでの入力内容を安全に保存し、後からこのセクションから再開できるURLを発行します。</div>
+        `;
+      }).join('');
+    }
+
+    const nextSecTitle = nextSec.title || `セクション ${nextIdx + 1}`;
+    const nextSecDesc = nextSec.description ? escapeHtml(nextSec.description) : '';
+
+    container.innerHTML = `
+      <div class="partial-step-card" style="background: #ffffff; border: 1px solid var(--color-border); border-radius: var(--border-radius); padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px;">
+        <div style="text-align: center; margin-bottom: 22px;">
+          <div style="display: inline-flex; align-items: center; gap: 6px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 20px; margin-bottom: 10px;">
+            <span>✓</span> セクション ${curIdx + 1} の入力が完了しました
           </div>
-        </label>
-      </div>
-      <div id="flow-choice-partial-box" class="flow-choice-partial-box" style="display: none;">
-        <div class="partial-box-notice">
-          <span style="font-size: 1.1rem;">ℹ️</span>
-          <span>これまでのセクションの入力内容を保存して登録コードを確定し、<strong>「${escapeHtml(secTitle)}」から再開できる専用リンク</strong>を発行します。（このセクションの入力は後からでも可能です）</span>
+          <h2 style="font-size: 1.3rem; font-weight: 700; color: var(--color-text-main, #1e293b); margin: 0 0 8px;">進め方をご確認ください</h2>
+          <p style="font-size: 0.86rem; color: var(--color-text-muted, #64748b); margin: 0; line-height: 1.6;">
+            このフォームは<strong>「途中送信」</strong>に対応しています。<br>
+            次のセクションで入力する内容をご確認の上、<strong>「このまま次へ進む」</strong>か<strong>「ここで途中送信して再開リンクを発行する」</strong>かをお選びいただけます。
+          </p>
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-          <button type="button" id="btn-flow-partial-submit-now" class="btn btn-flow-partial-submit">
-            <span>💾</span> ここまでの内容で途中送信してリンクを発行する
-          </button>
-          <button type="button" id="btn-flow-partial-guide-link" class="btn-flow-guide-trigger" style="background:transparent; border-color:#d8b4fe; color:#7c3aed;">
-            <span>💡</span> 途中送信の仕組みを図解で見る
-          </button>
+
+        <!-- 次のセクションで入力する情報のご確認 -->
+        <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 18px; margin-bottom: 22px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+            <span style="font-size: 0.78rem; font-weight: 700; color: #0284c7; background: #e0f2fe; padding: 2px 8px; border-radius: 4px;">
+              📋 次のセクションで入力する情報
+            </span>
+            <span style="font-size: 0.75rem; color: #64748b;">
+              全 ${nextQuestions.length} 項目
+            </span>
+          </div>
+          <h3 style="font-size: 1.05rem; font-weight: 700; color: #1e293b; margin: 0 0 6px;">
+            【セクション ${nextIdx + 1}】 ${escapeHtml(nextSecTitle)}
+          </h3>
+          ${nextSecDesc ? `<div style="font-size: 0.82rem; color: #64748b; margin-bottom: 12px; line-height: 1.5;">${nextSecDesc}</div>` : ''}
+
+          <div style="margin-top: 12px;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 8px; display: flex; align-items: center; gap: 4px;">
+              <span>▼</span> 入力・添付が必要な項目一覧
+            </div>
+            <div style="max-height: 260px; overflow-y: auto; padding-right: 4px;">
+              ${questionsListHtml}
+            </div>
+          </div>
+        </div>
+
+        <!-- 進め方の選択UI -->
+        <div style="margin-top: 18px;">
+          <div style="font-size: 0.92rem; font-weight: 700; color: #1e293b; margin-bottom: 12px; text-align: center;">
+            どちらの進め方にしますか？
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
+            <!-- 選択肢A: 途中送信する -->
+            <div id="btn-preview-choice-partial-submit" style="background: #ffffff; border: 2px solid #3b82f6; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 6px rgba(59,130,246,0.1);">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 1.3rem;">💾</span>
+                  <div style="font-size: 0.92rem; font-weight: 700; color: #1d4ed8;">ここまでの内容で途中送信する</div>
+                </div>
+                <div style="font-size: 0.78rem; color: #4b5563; line-height: 1.5; margin-bottom: 14px;">
+                  手元に書類や情報がない場合におすすめです。これまでの回答を保存し、<strong>8桁の確定登録コード</strong>と<strong>後からいつでも再開できる専用URL</strong>を発行します。
+                </div>
+              </div>
+              <button type="button" class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 0.85rem; font-weight: 700; padding: 9px; background: #2563eb !important; border-color: #2563eb !important; cursor: pointer;">
+                💾 途中送信して再開URLを発行
+              </button>
+            </div>
+
+            <!-- 選択肢B: 次に進む -->
+            <div id="btn-preview-choice-continue-next" style="background: #ffffff; border: 2px solid #10b981; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 6px rgba(16,185,129,0.1);">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 1.3rem;">👉</span>
+                  <div style="font-size: 0.92rem; font-weight: 700; color: #047857;">このまま次のセクションに進む</div>
+                </div>
+                <div style="font-size: 0.78rem; color: #4b5563; line-height: 1.5; margin-bottom: 14px;">
+                  必要な情報や添付書類が手元に揃っている場合は、このまま続けて【${escapeHtml(nextSecTitle)}】の入力画面へ進んで回答を継続できます。
+                </div>
+              </div>
+              <button type="button" class="btn btn-success" style="width: 100%; justify-content: center; font-size: 0.85rem; font-weight: 700; padding: 9px; background: #059669 !important; border-color: #059669 !important; cursor: pointer;">
+                👉 このまま続けて回答する
+              </button>
+            </div>
+          </div>
+
+          <!-- 戻るボタン ＆ ガイドリンク -->
+          <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <button type="button" id="btn-preview-choice-back" class="btn btn-secondary btn-sm" style="font-size: 0.8rem; color: #64748b; background: transparent; border: 1px solid #cbd5e1; cursor: pointer;">
+              ← 前のセクションの入力内容を修正する
+            </button>
+            <button type="button" id="btn-preview-choice-guide" class="btn-flow-guide-trigger" style="font-size: 0.78rem; color: #7c3aed; background: transparent; border: 1px solid #d8b4fe; cursor: pointer; padding: 4px 10px; border-radius: 4px;">
+              <span>📖</span> 図解付き詳細ガイドを見る
+            </button>
+          </div>
         </div>
       </div>
     `;
 
-    // プレビューの質問内容を回答者が確認した後に見せるため、コンテナの末尾（最下部）に追加
-    previewContainer.appendChild(card);
+    container.style.display = 'block';
+    const previewContainer = document.querySelector('.preview-container');
+    if (previewContainer) previewContainer.scrollTop = 0;
 
-    setupFlowChoiceInteractions(card, currentSec, curIdx);
-  }
-
-  function setupFlowChoiceInteractions(card, currentSec, curIdx) {
-    const radios = card.querySelectorAll('input[name="preview_flow_choice_radio"]');
-    const labels = card.querySelectorAll('.flow-choice-label');
-    const partialBox = card.querySelector('#flow-choice-partial-box');
-    const partialBtn = card.querySelector('#btn-flow-partial-submit-now');
-    const pt = document.getElementById('btn-preview-next');
-    const mt = document.getElementById('btn-preview-submit');
-
-    const updateMode = (selectedMode) => {
-      labels.forEach(l => {
-        if (l.dataset.flow === selectedMode) {
-          l.classList.add('active');
-          const r = l.querySelector('input[type="radio"]');
-          if (r) r.checked = true;
-        } else {
-          l.classList.remove('active');
-        }
-      });
-
-      const formData = window.L || window.G || window.n;
-      const isLastSec = curIdx === (formData.sections.length - 1);
-
-      if (selectedMode === 'partial_submit') {
-        if (partialBox) partialBox.style.display = 'flex';
-        if (pt) pt.style.display = 'none';
-        if (mt) {
-          mt.style.display = 'inline-flex';
-          mt.textContent = '💾 途中送信して続きリンクを発行 ➔';
-          mt.className = 'btn btn-primary btn-partial-submit-mode';
-        }
-      } else {
-        if (partialBox) partialBox.style.display = 'none';
-        if (isLastSec) {
-          if (pt) pt.style.display = 'none';
-          if (mt) {
-            mt.style.display = 'inline-flex';
-            mt.textContent = '送信';
-            mt.className = 'btn btn-success';
-          }
-        } else {
-          if (pt) {
-            pt.style.display = 'inline-flex';
-            pt.textContent = '次へ';
-          }
-          if (mt) mt.style.display = 'none';
-        }
-      }
-    };
-
-    radios.forEach(radio => {
-      radio.onchange = (e) => {
-        updateMode(e.target.value);
-      };
-    });
-
-    // 初期状態は「1. 途中送信をせずに最後まで回答して送信する」
-    const currentChecked = card.querySelector('input[name="preview_flow_choice_radio"]:checked');
-    updateMode(currentChecked ? currentChecked.value : 'continue');
-
-    const triggerPartialSubmit = () => {
-      executeRespondentPartialSubmit(currentSec);
-    };
-
+    // クリックハンドラー登録
+    const partialBtn = container.querySelector('#btn-preview-choice-partial-submit');
     if (partialBtn) {
       partialBtn.onclick = (e) => {
         e.preventDefault();
-        e.stopPropagation();
-        triggerPartialSubmit();
+        hidePreviewIntermediateStep();
+        executeRespondentPartialSubmit(currentSec, nextSec);
       };
     }
 
-    if (mt && !mt._hasFlowChoiceHandler) {
-      mt._hasFlowChoiceHandler = true;
-      mt.addEventListener('click', (e) => {
-        const activeRadio = document.querySelector('input[name="preview_flow_choice_radio"]:checked');
-        if (activeRadio && activeRadio.value === 'partial_submit') {
-          e.preventDefault();
-          e.stopPropagation();
-          triggerPartialSubmit();
+    const continueBtn = container.querySelector('#btn-preview-choice-continue-next');
+    if (continueBtn) {
+      continueBtn.onclick = (e) => {
+        e.preventDefault();
+        hidePreviewIntermediateStep();
+        window.B = window.B || [];
+        window.B.push({ sectionId: window.R, startQuestionId: null });
+        window.R = nextSec.id;
+        if (typeof window.St === 'function') {
+          window.St();
         }
-      }, true);
+        const pCont = document.querySelector('.preview-container');
+        if (pCont) pCont.scrollTop = 0;
+      };
     }
 
-    // 📖 図解付き詳細ガイドモーダルの起動イベント
-    const guideBtn = card.querySelector('#btn-open-flow-guide-modal');
+    const backBtn = container.querySelector('#btn-preview-choice-back');
+    if (backBtn) {
+      backBtn.onclick = (e) => {
+        e.preventDefault();
+        hidePreviewIntermediateStep();
+        const pCont = document.querySelector('.preview-container');
+        if (pCont) pCont.scrollTop = 0;
+      };
+    }
+
+    const guideBtn = container.querySelector('#btn-preview-choice-guide');
     if (guideBtn) {
       guideBtn.onclick = (e) => {
         e.preventDefault();
-        e.stopPropagation();
-        openPartialSubmitGuideModal();
-      };
-    }
-    const guideSubLink = card.querySelector('#btn-flow-partial-guide-link');
-    if (guideSubLink) {
-      guideSubLink.onclick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
         openPartialSubmitGuideModal();
       };
     }
@@ -4589,16 +4642,31 @@
     if (!viewPath.startsWith('/')) viewPath = '/' + viewPath;
 
     const curIdx = window.W !== undefined ? window.W : (parseInt(localStorage.getItem('form_customize_active_index'), 10) || 0);
+    const secParam = sId ? `&resumeSec=${encodeURIComponent(sId)}` : '';
+
+    // 短縮URL (Google Forms短縮URL風: 例 https://synapse-wayway.vercel.app/f/0?res_id=...&resumeSec=...)
+    if (origin && (origin.includes('vercel.app') || !window.location.pathname.includes('form-customize/index.html'))) {
+      return `${origin}/f/${curIdx}?res_id=${encodeURIComponent(rId)}${secParam}`;
+    }
+
     const formObj = (window.U && window.U[curIdx]) || window.G;
     const formId = (formObj && formObj.id) ? formObj.id : `form_${curIdx}`;
-    const secParam = sId ? `&resumeSec=${encodeURIComponent(sId)}` : '';
     return `${origin}${viewPath}?id=${encodeURIComponent(formId)}&form_idx=${curIdx}&res_id=${encodeURIComponent(rId)}${secParam}`;
   }
 
-  function executeRespondentPartialSubmit(currentSec) {
+  function executeRespondentPartialSubmit(currentSec, nextSec = null) {
     const formData = window.L || window.G || window.n;
     const currentSecId = currentSec ? currentSec.id : window.R;
     const currentSecTitle = currentSec ? (currentSec.title || 'セクション') : 'セクション';
+
+    let nextSecId = nextSec ? nextSec.id : null;
+    if (!nextSecId && formData && formData.sections) {
+      const curIdx = formData.sections.findIndex(s => s.id === currentSecId);
+      if (curIdx !== -1 && curIdx < formData.sections.length - 1) {
+        nextSecId = formData.sections[curIdx + 1].id;
+      }
+    }
+    if (!nextSecId) nextSecId = currentSecId;
 
     window.V = window.V || {};
     const submitData = {};
@@ -4624,7 +4692,7 @@
       window.currentRegistrationCode = confirmedCode;
     }
 
-    const resumeUrl = getCleanViewResumeUrl(rowId, currentSecId);
+    const resumeUrl = getCleanViewResumeUrl(rowId, nextSecId);
 
     try {
       localStorage.setItem('form_draft_' + rowId, JSON.stringify({
@@ -4632,7 +4700,7 @@
         registrationCode: confirmedCode,
         data: submitData,
         currentSectionId: currentSecId,
-        nextSectionId: currentSecId
+        nextSectionId: nextSecId
       }));
     } catch (e) {}
 
@@ -4645,7 +4713,7 @@
         isPartialSubmit: true,
         rowId: rowId,
         currentSectionId: currentSecId,
-        nextSectionId: currentSecId
+        nextSectionId: nextSecId
       }, '*');
     }
 
@@ -4664,7 +4732,7 @@
       registrationCode: confirmedCode,
       isPartialSubmit: true,
       resumeUrl: resumeUrl,
-      nextSectionId: currentSecId,
+      nextSectionId: nextSecId,
       formTitle: (formData && formData.title) || '無題のフォーム'
     });
 
@@ -4763,6 +4831,7 @@
       if (typeof window.St === 'function' && !window.St._hasFlowChoiceWrapped) {
         const origSt = window.St;
         window.St = function() {
+          hidePreviewIntermediateStep();
           origSt();
           setTimeout(() => {
             renderFlowChoiceCardInPreview();
@@ -4773,12 +4842,50 @@
     };
     wrapStIfNeeded();
 
+    // キャプチャフェーズで #btn-preview-next のクリックを最優先フック
+    if (!window._hasPreviewNextCaptureHooked) {
+      window._hasPreviewNextCaptureHooked = true;
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('#btn-preview-next');
+        if (!btn) return;
+        const panelPreview = document.getElementById('panel-preview');
+        if (!panelPreview || (!panelPreview.classList.contains('active') && panelPreview.style.display === 'none')) return;
+
+        const formData = window.L || window.G || window.n;
+        if (!formData || !formData.sections) return;
+        const curR = window.R || (formData.sections[0] ? formData.sections[0].id : null);
+        const curSec = formData.sections.find(s => s.id === curR);
+        if (!curSec) return;
+
+        // バリデーション実行
+        if (typeof window.Ct === 'function') {
+          if (!window.Ct()) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            return;
+          }
+        }
+
+        // 途中送信が設定されているセクション完了時の割り込み
+        if (isCurrentPreviewSectionPartialSubmit(curSec)) {
+          const nextSec = getPreviewResolvedNextSection(curSec);
+          if (nextSec) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            showPreviewIntermediatePartialSubmitStep(curSec, nextSec);
+            return;
+          }
+        }
+      }, true);
+    }
+
     const originalZ = window.Z;
     if (originalZ) {
       window.Z = function(tabName) {
         originalZ(tabName);
         if (tabName === 'preview') {
           setTimeout(() => {
+            hidePreviewIntermediateStep();
             applyPreviewTheme();
             setupLiveAutocompleteEvents();
             evaluateLiveSkipLogic();
@@ -4804,6 +4911,7 @@
       const btn = e.target.closest('#btn-tab-preview') || e.target.closest('#btn-open-preview') || e.target.closest('#btn-panel-preview-refresh');
       if (btn) {
         setTimeout(() => {
+          hidePreviewIntermediateStep();
           injectDraftSavePanelToPreview();
           wrapStIfNeeded();
           renderFlowChoiceCardInPreview();
@@ -4814,6 +4922,7 @@
     // 「最初から回答する / もう一度回答する」クリック時のセッション状態初期化
     document.addEventListener('click', (e) => {
       if (e.target && e.target.id === 'btn-preview-reset') {
+        hidePreviewIntermediateStep();
         window.currentResumeRowId = null;
         window.currentRegistrationCode = null;
         const banner = document.getElementById('preview-resume-banner');
