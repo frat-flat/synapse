@@ -371,6 +371,32 @@
         box-shadow: 0 1px 3px rgba(0,0,0,0.2);
       }
 
+      /* バリデーション通知トースト */
+      .validation-toast {
+        position: fixed;
+        bottom: 28px;
+        left: 50%;
+        transform: translateX(-50%) translateY(80px);
+        background-color: #d93025;
+        color: #ffffff;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 0.92rem;
+        font-weight: 600;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        z-index: 9999;
+        opacity: 0;
+        transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1), opacity 0.25s;
+        pointer-events: none;
+      }
+      .validation-toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+
       /* 送信完了カード */
       .success-card {
         display: none;
@@ -518,6 +544,9 @@
         Powered by <strong style="color: var(--color-text-dark);">株式会社wayway [ヨサンダス]</strong>
       </footer>
     </div>
+
+    <!-- バリデーション通知トースト -->
+    <div id="validation-toast" class="validation-toast">⚠️ 未入力の必須項目があります</div>
 
     <!-- フォームデータ復元 & 回答処理エンジン -->
     <script>
@@ -764,8 +793,25 @@
           }
         }
 
+        // バリデーション等のトースト通知
+        let toastTimer = null;
+        function showToast(msg, type = 'error') {
+          const toast = document.getElementById('validation-toast');
+          if (!toast) return;
+          toast.textContent = msg;
+          toast.className = `validation-toast toast-${type} show`;
+          if (toastTimer) clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => {
+            toast.classList.remove('show');
+          }, 3500);
+        }
+
         // セクションの次のアクション（分岐またはデフォルト）判定
         function getSectionNextAction(section) {
+          const sections = formDefinition.sections || [];
+          const curIdx = sections.findIndex(s => s.id === section.id);
+
+          // 1. 質問ごとの選択肢分岐ルール（radio / select）
           const questions = section.questions || [];
           for (const q of questions) {
             if (['radio', 'select'].includes(q.type)) {
@@ -773,20 +819,36 @@
               if (val) {
                 const opt = (q.options || []).find(o => o.label === val);
                 if (opt && opt.nextSectionId) {
-                  return opt.nextSectionId;
+                  if (opt.nextSectionId === 'submit') return 'submit';
+                  const targetSec = sections.find(s => s.id === opt.nextSectionId);
+                  if (targetSec) return targetSec.id;
                 }
               }
             }
           }
 
-          if (section.nextAction) {
-            return section.nextAction;
+          // 2. セクション定義のアクション設定
+          const act = section.nextAction || 'next';
+          if (act === 'submit') return 'submit';
+          if (act === 'next' || act === 'partial_submit') {
+            const nextSec = (curIdx !== -1 && curIdx < sections.length - 1) ? sections[curIdx + 1] : null;
+            return nextSec ? nextSec.id : 'submit';
+          }
+          if (typeof act === 'string' && act.startsWith('q_')) {
+            const foundSec = sections.find(s => (s.questions || []).some(q => q.id === act));
+            if (foundSec) {
+              return (foundSec.id === section.id)
+                ? ((curIdx < sections.length - 1) ? sections[curIdx + 1].id : 'submit')
+                : foundSec.id;
+            }
+          }
+          if (sections.some(s => s.id === act)) {
+            return act;
           }
 
-          const sections = formDefinition.sections;
-          const idx = sections.findIndex(s => s.id === section.id);
-          if (idx !== -1 && idx < sections.length - 1) {
-            return sections[idx + 1].id;
+          // 3. デフォルト fallback：順番通りの次のセクション、無ければ submit
+          if (curIdx !== -1 && curIdx < sections.length - 1) {
+            return sections[curIdx + 1].id;
           }
           return 'submit';
         }
@@ -838,20 +900,22 @@
             inputContainer.appendChild(notice);
 
             // スクロール検知
-            scrollBox.addEventListener('scroll', () => {
-              if (scrollBox.scrollHeight - scrollBox.scrollTop - scrollBox.clientHeight < 5) {
+            const checkScrollBottom = () => {
+              if (scrollBox.scrollHeight - scrollBox.scrollTop - scrollBox.clientHeight < 30) {
                 formValues[q.id + '_scrolled'] = true;
                 notice.style.color = 'var(--color-success)';
                 notice.textContent = '✓ 内容を確認しました。選択肢にチェックを入れてください。';
                 enableQuestionInputs(inputContainer);
               }
-            });
+            };
+            scrollBox.addEventListener('scroll', checkScrollBottom);
 
             // 初期チェック
             setTimeout(() => {
-              if (scrollBox.scrollHeight <= scrollBox.clientHeight) {
+              if (scrollBox.scrollHeight <= scrollBox.clientHeight + 10) {
                 formValues[q.id + '_scrolled'] = true;
                 notice.style.display = 'none';
+                enableQuestionInputs(inputContainer);
               } else if (!formValues[q.id + '_scrolled']) {
                 disableQuestionInputs(inputContainer);
               }
@@ -926,6 +990,9 @@
               }
 
               input.addEventListener('change', () => {
+                if (q.scrollRequired) {
+                  formValues[q.id + '_scrolled'] = true;
+                }
                 if (q.type === 'radio') {
                   formValues[q.id] = opt.label;
                   list.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
@@ -1135,8 +1202,11 @@
             }
           });
 
-          if (!isValid && firstErrorCard) {
-            firstErrorCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (!isValid) {
+            if (firstErrorCard) {
+              firstErrorCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            showToast('⚠️ 未入力の必須項目、またはご確認が必要な項目があります');
           }
           return isValid;
         }
