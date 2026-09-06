@@ -3080,3 +3080,60 @@ input:-webkit-autofill:active {
   color: #94a3b8;
 }
 
+/* ===================================================
+   フローマップ ナビゲーションタブ アイコン (二手に分かれる分岐矢印)
+   =================================================== */
+.flowmap-tab-icon {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #2563eb;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.flowmap-tab-icon svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+  stroke: currentColor;
+  transition: stroke 0.15s ease;
+}
+
+/* ホバー時 */
+.nav-tab:hover .flowmap-tab-icon {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* アクティブ（選択中）タブ時 */
+.nav-tab.active .flowmap-tab-icon {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+/* ダークテーマ時 */
+.theme-dark .flowmap-tab-icon {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.theme-dark .nav-tab.active .flowmap-tab-icon {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+/* タブテキストの折り返し防止 */
+.nav-tab {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+.nav-tab .tab-text {
+  white-space: nowrap !important;
+}
+
+
