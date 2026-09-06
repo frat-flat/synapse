@@ -707,8 +707,16 @@
           formDefinition.sections.forEach(s => {
             (s.questions || []).forEach(q => {
               if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
+                // 既存の記述から自動ハイフン補填への言及をクリーンアップ
+                if (q.description && q.description.includes('自動で半角ハイフン')) {
+                  q.description = q.description
+                    .replace(/（自動で半角ハイフン「-」が補填されます）/g, '')
+                    .replace(/\(自動で半角ハイフン「-」が補填されます\)/g, '')
+                    .replace(/。自動で半角ハイフン「-」が補填されます/g, '')
+                    .trim();
+                }
                 if (!q.description || !q.description.includes('屋号がない場合')) {
-                  q.description = (q.description ? q.description + '\n' : '') + '※ 個人事業主の方で屋号がない場合は未入力のまま「次へ」へお進みください（自動で半角ハイフン「-」が補填されます）。';
+                  q.description = (q.description ? q.description + '\n' : '') + '※ 個人事業主の方で屋号がない場合は未入力のまま「次へ」へお進みください。';
                 }
                 if (!q.validation) {
                   q.validation = { category: 'text', condition: 'auto_hyphen', errorMessage: '' };
@@ -977,7 +985,7 @@
               const hint = document.createElement('div');
               hint.className = 'auto-hyphen-hint';
               hint.style.cssText = 'font-size: 0.8rem; color: var(--color-text-muted); margin-top: 6px; line-height: 1.4;';
-              hint.innerHTML = '💡 <span style="font-weight: 500;">個人事業主の方へ</span>: 屋号がない場合は未入力のまま「次へ」へお進みください（自動で半角ハイフン「-」が補填されます）。';
+              hint.innerHTML = '💡 <span style="font-weight: 500;">個人事業主の方へ</span>: 屋号がない場合は未入力のまま「次へ」へお進みください。';
               container.appendChild(hint);
             }
           } else if (q.type === 'paragraph') {

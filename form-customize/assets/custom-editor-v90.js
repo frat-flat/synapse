@@ -10096,7 +10096,16 @@
   // =========================================================================
   // 🏢 法人名・屋号の案内文 & 未入力時半角ハイフン自動補填入力規則機能
   // =========================================================================
-  const AUTO_HYPHEN_NOTICE_TEXT = '※ 個人事業主の方で屋号がない場合は、未入力のまま「次へ」へお進みください（自動で半角ハイフン「-」が補填されます）。';
+  const AUTO_HYPHEN_NOTICE_TEXT = '※ 個人事業主の方で屋号がない場合は、未入力のまま「次へ」へお進みください。';
+
+  function cleanHyphenNotice(text) {
+    if (!text) return text;
+    return text
+      .replace(/（自動で半角ハイフン「-」が補填されます）/g, '')
+      .replace(/\(自動で半角ハイフン「-」が補填されます\)/g, '')
+      .replace(/。自動で半角ハイフン「-」が補填されます/g, '')
+      .trim();
+  }
 
   // 1. バリデーション定義 (window.b) の拡張
   if (typeof window.b !== 'undefined') {
@@ -10159,6 +10168,13 @@
               form.sections.forEach(sec => {
                 (sec.questions || []).forEach(q => {
                   if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
+                    if (q.description) {
+                      const cleaned = cleanHyphenNotice(q.description);
+                      if (cleaned !== q.description) {
+                        q.description = cleaned;
+                        updated = true;
+                      }
+                    }
                     if (!q.description || !q.description.includes('屋号がない場合')) {
                       q.description = (q.description ? q.description + '\n' : '') + AUTO_HYPHEN_NOTICE_TEXT;
                       updated = true;
@@ -10183,10 +10199,16 @@
       form.sections.forEach(sec => {
         (sec.questions || []).forEach(q => {
           if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
+            if (q.description) {
+              q.description = cleanHyphenNotice(q.description);
+            }
             if (!q.description || !q.description.includes('屋号がない場合')) {
               q.description = (q.description ? q.description + '\n' : '') + AUTO_HYPHEN_NOTICE_TEXT;
-              const descInput = document.querySelector(`.q-desc-input[data-question-id="${q.id}"]`);
-              if (descInput && !descInput.value.includes('屋号がない場合')) {
+            }
+            const descInput = document.querySelector(`.q-desc-input[data-question-id="${q.id}"]`);
+            if (descInput) {
+              descInput.value = cleanHyphenNotice(descInput.value);
+              if (!descInput.value.includes('屋号がない場合')) {
                 descInput.value = q.description;
               }
             }
