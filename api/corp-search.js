@@ -40,6 +40,70 @@ function parseCSVLine(line) {
   return values;
 }
 
+// 半角英数字・記号を全角に変換するヘルパー（国税庁APIの登記商号表記揺れ対応）
+function toFullWidth(str) {
+  if (!str) return '';
+  return str
+    .replace(/[A-Za-z0-9]/g, s => String.fromCharCode(s.charCodeAt(0) + 0xFEE0))
+    .replace(/ /g, '　')
+    .replace(/-/g, '－');
+}
+
+// 国税庁APIを1回呼び出すヘルパー
+async function queryNtaApi(appId, searchName, prefCode) {
+  const params = new URLSearchParams({
+    id: appId,
+    name: searchName,
+    type: '02',
+    mode: '2',
+    target: '1',
+    history: '0',
+    close: '0'
+  });
+
+  if (prefCode) {
+    params.append('pref', prefCode);
+  }
+
+  const apiUrl = `https://api.houjin-bangou.nta.go.jp/4/name?${params.toString()}`;
+  const response = await fetch(apiUrl, {
+    method: 'GET',
+    headers: {
+      'Accept': 'text/csv, text/plain, */*'
+    }
+  });
+
+  if (!response.ok) return [];
+
+  const csvText = await response.text();
+  const lines = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
+  if (lines.length <= 1) return [];
+
+  const list = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    if (cols.length >= 10) {
+      const corpNum = cols[1]; // 法人番号 (13桁)
+      const corpName = cols[6]; // 商号又は名称
+      const prefName = cols[9]; // 都道府県
+      const cityName = cols[10] || ''; // 市区町村
+      const street = cols[11] || ''; // 丁目番地等
+      const fullAddress = `${prefName}${cityName}${street}`.trim();
+      const regDate = cols[22] || cols[4] || '';
+
+      list.push({
+        num: corpNum,
+        name: corpName,
+        pref: prefName,
+        address: fullAddress,
+        regDate: regDate,
+        invoiceNum: `T${corpNum}`
+      });
+    }
+  }
+  return list;
+}
+
 module.exports = async (req, res) => {
   // CORSヘッダーの設定
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -86,7 +150,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const queryName = name.trim();
+    const rawName = name.trim();
     let prefCode = '';
     if (pref) {
       const p = pref.trim();
@@ -97,73 +161,40 @@ module.exports = async (req, res) => {
       }
     }
 
-    // 国税庁Web-API (ver 4) の呼び出し
-    // type=02: CSV(UTF-8), mode=2: 部分一致, target=1: 登記上の商号・名称, history=0: 過去履歴なし, close=0: 閉鎖法人除く
-    const params = new URLSearchParams({
-      id: appId,
-      name: queryName,
-      type: '02',
-      mode: '2',
-      target: '1',
-      history: '0',
-      close: '0'
-    });
+    // 検索クエリのバリエーション構築（国税庁の登記商号は全角英数字で登録されているため）
+    const searchQueries = new Set();
+    searchQueries.add(rawName);
 
-    if (prefCode) {
-      params.append('pref', prefCode);
+    // 全角に変換したバージョン
+    const fullWidthName = toFullWidth(rawName);
+    if (fullWidthName !== rawName) {
+      searchQueries.add(fullWidthName);
     }
 
-    const apiUrl = `https://api.houjin-bangou.nta.go.jp/4/name?${params.toString()}`;
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'text/csv, text/plain, */*'
-      }
-    });
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => '');
-      return res.status(200).json({
-        success: false,
-        error: `NTA API error (${response.status}): ${errText}`,
-        fallback: true,
-        results: []
-      });
+    // 「合同会社」「株式会社」等の法人格を除去したコアワード
+    const cleanCore = rawName.replace(/(合同会社|株式会社|有限会社|合名会社|合資会社|ホールディングス|HD)/g, '').trim();
+    if (cleanCore && cleanCore.length >= 2) {
+      searchQueries.add(cleanCore);
+      searchQueries.add(toFullWidth(cleanCore));
     }
 
-    const csvText = await response.text();
-    const lines = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
+    // 国税庁APIへ並行リクエスト
+    const queryPromises = Array.from(searchQueries).slice(0, 4).map(q =>
+      queryNtaApi(appId, q, prefCode).catch(() => [])
+    );
 
-    if (lines.length <= 1) {
-      // 1行目はヘッダー情報、2行目以降がない場合は該当なし
-      return res.status(200).json({
-        success: true,
-        count: 0,
-        results: []
-      });
-    }
+    const responses = await Promise.all(queryPromises);
 
-    // 2行目以降のデータ行を解析
+    // 結果のマージ＆重複排除（法人番号 num をキーとする）
+    const seen = new Set();
     const results = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = parseCSVLine(lines[i]);
-      if (cols.length >= 10) {
-        const corpNum = cols[1]; // 法人番号 (13桁)
-        const corpName = cols[6]; // 商号又は名称
-        const prefName = cols[9]; // 都道府県
-        const cityName = cols[10] || ''; // 市区町村
-        const street = cols[11] || ''; // 丁目番地等
-        const fullAddress = `${prefName}${cityName}${street}`.trim();
-        const regDate = cols[22] || cols[4] || ''; // 番号指定年月日または更新年月日
 
-        results.push({
-          num: corpNum,
-          name: corpName,
-          pref: prefName,
-          address: fullAddress,
-          regDate: regDate,
-          invoiceNum: `T${corpNum}`
-        });
+    for (const list of responses) {
+      for (const item of list) {
+        if (!seen.has(item.num)) {
+          seen.add(item.num);
+          results.push(item);
+        }
       }
     }
 
