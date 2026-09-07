@@ -237,6 +237,59 @@
         line-height: 1.5;
       }
 
+      /* 前述と同じ（同上）自動入力連携スタイル */
+      .same-as-above-wrapper {
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        background: #f8fafc;
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        transition: all 0.2s ease;
+      }
+      .same-as-above-wrapper:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+      }
+      .same-as-above-label {
+        cursor: pointer;
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: var(--color-primary);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        user-select: none;
+        margin: 0;
+      }
+      .same-as-above-checkbox {
+        cursor: pointer;
+        width: 16px;
+        height: 16px;
+        accent-color: var(--color-primary);
+        margin: 0;
+      }
+      .same-as-above-badge {
+        font-size: 0.72rem;
+        color: #475569;
+        background: #e2e8f0;
+        padding: 2px 8px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-weight: 500;
+      }
+      .input-locked-same-as-above {
+        background-color: #f1f5f9 !important;
+        border-color: #cbd5e1 !important;
+        color: #475569 !important;
+        cursor: not-allowed !important;
+      }
+
       /* API検索・オートコンプリートスタイル */
       .api-search-input-group {
         position: relative;
@@ -722,6 +775,23 @@
         const btnNext = document.getElementById('btn-next');
         const btnSubmit = document.getElementById('btn-submit');
         const btnSubmitAnother = document.getElementById('btn-submit-another');
+
+        if (questionsContainerEl) {
+          questionsContainerEl.addEventListener('input', (e) => {
+            if (e.target.classList && e.target.classList.contains('same-as-above-checkbox')) return;
+            const card = e.target.closest('.question-card');
+            if (card && card.dataset.questionId) {
+              syncAllSameAsAboveForSource(card.dataset.questionId);
+            }
+          });
+          questionsContainerEl.addEventListener('change', (e) => {
+            if (e.target.classList && e.target.classList.contains('same-as-above-checkbox')) return;
+            const card = e.target.closest('.question-card');
+            if (card && card.dataset.questionId) {
+              syncAllSameAsAboveForSource(card.dataset.questionId);
+            }
+          });
+        }
 
         // ==========================================
         // 3. フォーム初期ロード
@@ -2027,6 +2097,134 @@
         }
 
         // ==========================================
+        // 4.5 「前述と同じ（同上）」自動入力連携エンジン
+        // ==========================================
+        let isSyncingSameAsAbove = false;
+
+        function getResolvedQuestionValue(sourceId) {
+          if (!sourceId) return '';
+          if (formValues[sourceId] !== undefined && formValues[sourceId] !== null && formValues[sourceId] !== '') {
+            return formValues[sourceId];
+          }
+          const card = document.querySelector(`.question-card[data-question-id="${sourceId}"]`);
+          if (card) {
+            const textInput = card.querySelector('input:not([type="checkbox"]):not([type="radio"]), textarea, select');
+            if (textInput && textInput.value) return textInput.value;
+            const checkedRadio = card.querySelector('input[type="radio"]:checked');
+            if (checkedRadio) return checkedRadio.value;
+            const checkedBoxes = Array.from(card.querySelectorAll('input[type="checkbox"]:not(.same-as-above-checkbox):checked')).map(cb => cb.value);
+            if (checkedBoxes.length > 0) return checkedBoxes;
+          }
+          return formValues[sourceId] || '';
+        }
+
+        function applyValueToQuestion(q, value) {
+          if (!q || !q.id) return;
+          formValues[q.id] = value;
+          clearError(q.id);
+
+          const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+          if (!card) return;
+
+          const wrapper = card.querySelector('.question-input-wrapper');
+          if (!wrapper) return;
+
+          // テキスト系（input, textarea）
+          const textInputs = wrapper.querySelectorAll('input:not(.same-as-above-checkbox):not([type="radio"]):not([type="checkbox"]):not([type="file"]), textarea');
+          textInputs.forEach(input => {
+            input.value = (value !== undefined && value !== null) ? value : '';
+          });
+
+          // セレクトボックス
+          const selects = wrapper.querySelectorAll('select:not(.corp-pref-filter)');
+          selects.forEach(sel => {
+            sel.value = (value !== undefined && value !== null) ? value : '';
+          });
+
+          // ラジオボタン
+          const radios = wrapper.querySelectorAll('input[type="radio"]');
+          if (radios.length > 0) {
+            radios.forEach(r => {
+              r.checked = (r.value === value);
+              const lbl = r.closest('.option-label');
+              if (lbl) {
+                if (r.checked) lbl.classList.add('selected');
+                else lbl.classList.remove('selected');
+              }
+            });
+          }
+
+          // チェックボックス
+          const checkboxes = wrapper.querySelectorAll('.options-list input[type="checkbox"]');
+          if (checkboxes.length > 0) {
+            const arr = Array.isArray(value) ? value : [value];
+            checkboxes.forEach(cb => {
+              cb.checked = arr.includes(cb.value);
+              const lbl = cb.closest('.option-label');
+              if (lbl) {
+                if (cb.checked) lbl.classList.add('selected');
+                else lbl.classList.remove('selected');
+              }
+            });
+          }
+        }
+
+        function setQuestionInputsLocked(questionId, isLocked) {
+          const card = document.querySelector(`.question-card[data-question-id="${questionId}"]`);
+          if (!card) return;
+
+          const wrapper = card.querySelector('.question-input-wrapper');
+          if (!wrapper) return;
+
+          const inputs = wrapper.querySelectorAll('input:not(.same-as-above-checkbox):not([type="file"]), textarea');
+          inputs.forEach(input => {
+            input.readOnly = isLocked;
+            if (isLocked) {
+              input.classList.add('input-locked-same-as-above');
+            } else {
+              input.classList.remove('input-locked-same-as-above');
+            }
+          });
+
+          const controls = wrapper.querySelectorAll('select:not(.corp-pref-filter), .options-list input[type="radio"], .options-list input[type="checkbox"], button');
+          controls.forEach(el => {
+            if (isLocked) {
+              el.style.pointerEvents = 'none';
+              el.style.opacity = '0.65';
+              el.tabIndex = -1;
+            } else {
+              el.style.pointerEvents = '';
+              el.style.opacity = '';
+              el.removeAttribute('tabindex');
+            }
+          });
+
+          const badge = card.querySelector('.same-as-above-badge');
+          if (badge) {
+            badge.style.display = isLocked ? 'inline-flex' : 'none';
+          }
+        }
+
+        function syncAllSameAsAboveForSource(sourceId) {
+          if (isSyncingSameAsAbove || !sourceId || !formDefinition || !formDefinition.sections) return;
+          isSyncingSameAsAbove = true;
+          try {
+            const srcVal = getResolvedQuestionValue(sourceId);
+            formDefinition.sections.forEach(sec => {
+              (sec.questions || []).forEach(tq => {
+                if (tq.sameAsAbove && tq.sameAsAbove.enabled && tq.sameAsAbove.sourceQuestionId === sourceId) {
+                  if (formValues[tq.id + '_is_same_as_above']) {
+                    applyValueToQuestion(tq, srcVal);
+                  }
+                }
+              });
+            });
+          } finally {
+            isSyncingSameAsAbove = false;
+          }
+        }
+
+        // ==========================================
         // 5. 質問カード生成
         // ==========================================
         function createQuestionCard(q, qIndex) {
@@ -2053,6 +2251,59 @@
             desc.className = 'question-desc';
             desc.innerHTML = renderRichTextWithLinks(q.description);
             card.appendChild(desc);
+          }
+
+          // 前述と同じ（同上）自動入力チェックボックス
+          if (q.sameAsAbove && q.sameAsAbove.enabled && q.sameAsAbove.sourceQuestionId) {
+            const sameWrap = document.createElement('div');
+            sameWrap.className = 'same-as-above-wrapper';
+
+            const sameLabel = document.createElement('label');
+            sameLabel.className = 'same-as-above-label';
+
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.className = 'same-as-above-checkbox';
+            chk.dataset.targetId = q.id;
+            chk.dataset.sourceId = q.sameAsAbove.sourceQuestionId;
+
+            const labelText = document.createElement('span');
+            labelText.textContent = q.sameAsAbove.label || '前述と同じ';
+
+            sameLabel.appendChild(chk);
+            sameLabel.appendChild(labelText);
+            sameWrap.appendChild(sameLabel);
+
+            const badge = document.createElement('span');
+            badge.className = 'same-as-above-badge';
+            badge.style.display = 'none';
+            badge.innerHTML = '🔒 自動入力・同期中';
+            sameWrap.appendChild(badge);
+
+            card.appendChild(sameWrap);
+
+            const isAlreadyChecked = !!formValues[q.id + '_is_same_as_above'];
+            chk.checked = isAlreadyChecked;
+
+            chk.addEventListener('change', () => {
+              if (chk.checked) {
+                formValues[q.id + '_is_same_as_above'] = true;
+                const srcVal = getResolvedQuestionValue(q.sameAsAbove.sourceQuestionId);
+                applyValueToQuestion(q, srcVal);
+                setQuestionInputsLocked(q.id, true);
+              } else {
+                formValues[q.id + '_is_same_as_above'] = false;
+                setQuestionInputsLocked(q.id, false);
+              }
+            });
+
+            if (isAlreadyChecked) {
+              setTimeout(() => {
+                const srcVal = getResolvedQuestionValue(q.sameAsAbove.sourceQuestionId);
+                applyValueToQuestion(q, srcVal);
+                setQuestionInputsLocked(q.id, true);
+              }, 10);
+            }
           }
 
           // 入力部
