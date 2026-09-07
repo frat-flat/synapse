@@ -49,6 +49,20 @@ function getOfficialBankName(bank) {
   return name;
 }
 
+function getOfficialBranchName(branch) {
+  if (!branch) return '';
+  const rawName = (typeof branch === 'string' ? branch : branch.name || '').trim();
+  if (!rawName) return '';
+
+  const suffixes = ['支店', '営業部', '出張所', '本店', '支社', '部', '所', '課', '室', '局', 'センター', 'オフィス', 'プラザ'];
+  for (const s of suffixes) {
+    if (rawName.endsWith(s)) {
+      return rawName;
+    }
+  }
+  return rawName + '支店';
+}
+
 async function getLatestBanks() {
   const now = Date.now();
   if (cachedBanks && (now - cachedBanksTime < CACHE_TTL_MS)) {
@@ -130,7 +144,7 @@ module.exports = async (req, res) => {
     return res.status(405).json({ success: false, error: 'Method Not Allowed' });
   }
 
-  const { query, name, code, bankCode, branch, all } = req.query || {};
+  const { query, q, name, code, bankCode, branch, all } = req.query || {};
 
   try {
     // 1. 支店一覧の検索リクエスト
@@ -141,18 +155,27 @@ module.exports = async (req, res) => {
 
       if (!branchQuery) {
         const shouldReturnAll = all === '1' || all === 'true';
+        const formatted = branchList.map(b => {
+          const off = getOfficialBranchName(b);
+          return {
+            ...b,
+            code: String(b.code || '').padStart(3, '0'),
+            officialName: off,
+            displayName: off
+          };
+        });
         return res.status(200).json({
           success: true,
           bankCode,
-          total: branchList.length,
-          branches: shouldReturnAll ? branchList : branchList.slice(0, 50)
+          total: formatted.length,
+          branches: shouldReturnAll ? formatted : formatted.slice(0, 50)
         });
       }
 
       const cleanBq = normalizeStr(branchQuery);
       const kataBq = hiraToKata(cleanBq);
       const hiraBq = kataToHira(cleanBq);
-      const cleanBqNoSuffix = cleanBq.replace(/支店|出張所|営業部|支社|本店/, '');
+      const cleanBqNoSuffix = cleanBq.replace(/支店|出張所|営業部|支社|本店|部|所|課|センター|オフィス/, '');
       const cleanBqIsDigit = /^\d+$/.test(cleanBq);
       const cleanCodePadded = cleanBqIsDigit ? cleanBq.padStart(3, '0') : '';
 
@@ -161,28 +184,58 @@ module.exports = async (req, res) => {
       const partialMatches = [];
 
       for (const b of branchList) {
+        const bCode = String(b.code || '').padStart(3, '0');
+        const officialName = getOfficialBranchName(b);
+        const bOffName = normalizeStr(officialName);
         const bName = normalizeStr(b.name);
         const bKana = normalizeStr(b.kana);
         const bHira = normalizeStr(b.hira);
-        const bCode = String(b.code || '').padStart(3, '0');
+
+        const branchObj = {
+          ...b,
+          code: bCode,
+          name: b.name,
+          officialName,
+          displayName: officialName
+        };
 
         // コード完全一致または名称・読み完全一致
-        if (bCode === cleanBq || (cleanCodePadded && bCode === cleanCodePadded) || bName === cleanBq || bKana === kataBq || bHira === hiraBq) {
-          exactMatches.push({ ...b, code: bCode });
+        if (
+          bCode === cleanBq ||
+          (cleanCodePadded && bCode === cleanCodePadded) ||
+          bOffName === cleanBq ||
+          bName === cleanBq ||
+          bKana === kataBq ||
+          bHira === hiraBq ||
+          bKana === cleanBq
+        ) {
+          exactMatches.push(branchObj);
           continue;
         }
         // コード前方一致または名称前方一致
-        if (bCode.startsWith(cleanBq) || bName.startsWith(cleanBq) || bKana.startsWith(kataBq)) {
-          prefixMatches.push({ ...b, code: bCode });
+        if (
+          bCode.startsWith(cleanBq) ||
+          bOffName.startsWith(cleanBq) ||
+          bName.startsWith(cleanBq) ||
+          bKana.startsWith(kataBq) ||
+          (cleanBqNoSuffix.length >= 1 && (bOffName.startsWith(cleanBqNoSuffix) || bName.startsWith(cleanBqNoSuffix)))
+        ) {
+          prefixMatches.push(branchObj);
           continue;
         }
         // 部分一致
-        if (bCode.includes(cleanBq) || bName.includes(cleanBq) || bKana.includes(kataBq) || bHira.includes(hiraBq)) {
-          partialMatches.push({ ...b, code: bCode });
+        if (
+          bCode.includes(cleanBq) ||
+          bOffName.includes(cleanBq) ||
+          bName.includes(cleanBq) ||
+          bKana.includes(kataBq) ||
+          bHira.includes(hiraBq)
+        ) {
+          partialMatches.push(branchObj);
           continue;
         }
-        if (cleanBqNoSuffix.length >= 1 && (bName.includes(cleanBqNoSuffix) || bKana.includes(cleanBqNoSuffix))) {
-          partialMatches.push({ ...b, code: bCode });
+        if (cleanBqNoSuffix.length >= 1 && (bOffName.includes(cleanBqNoSuffix) || bName.includes(cleanBqNoSuffix) || bKana.includes(cleanBqNoSuffix))) {
+          partialMatches.push(branchObj);
           continue;
         }
       }
@@ -200,7 +253,7 @@ module.exports = async (req, res) => {
     // 2. 金融機関（銀行）の検索リクエスト
     const banksObj = await getLatestBanks();
     const bankList = Object.values(banksObj);
-    const searchTarget = (query || name || code || '').trim();
+    const searchTarget = (query || q || name || code || '').trim();
 
     if (!searchTarget) {
       const sorted = [...bankList]

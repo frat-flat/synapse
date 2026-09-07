@@ -1232,6 +1232,20 @@
           return name;
         }
 
+        function getOfficialBranchName(branch) {
+          if (!branch) return '';
+          const rawName = (typeof branch === 'string' ? branch : branch.name || '').trim();
+          if (!rawName) return '';
+
+          const suffixes = ['支店', '営業部', '出張所', '本店', '支社', '部', '所', '課', '室', '局', 'センター', 'オフィス', 'プラザ'];
+          for (const s of suffixes) {
+            if (rawName.endsWith(s)) {
+              return rawName;
+            }
+          }
+          return rawName + '支店';
+        }
+
         // 全銀協 統一金融機関コード・支店コード 最新オープンデータ連携サービス (Zengin Code API)
         const BankDataService = {
           _banks: null,
@@ -1466,7 +1480,11 @@
               if (res.ok) {
                 const data = await res.json();
                 if (data && data.success && Array.isArray(data.branches)) {
-                  return data.branches;
+                  return data.branches.map(b => ({
+                    ...b,
+                    officialName: b.officialName || getOfficialBranchName(b),
+                    displayName: b.displayName || b.officialName || getOfficialBranchName(b)
+                  }));
                 }
               }
             } catch (e) {
@@ -1476,25 +1494,58 @@
             // 2. クライアントキャッシュでのフォールバック検索
             const branchesObj = await this.getBranches(cleanBankCode);
             const branchList = Object.values(branchesObj);
-            if (!rawVal) return branchList.slice(0, 50);
+            if (!rawVal) {
+              return branchList.slice(0, 50).map(b => ({
+                ...b,
+                code: String(b.code || '').padStart(3, '0'),
+                officialName: getOfficialBranchName(b),
+                displayName: getOfficialBranchName(b)
+              }));
+            }
 
             const cleanVal = rawVal.normalize('NFKC').toLowerCase();
-            const cleanNoSuffix = cleanVal.replace(/支店|出張所|営業部|支社|本店/, '');
+            const cleanNoSuffix = cleanVal.replace(/支店|出張所|営業部|支社|本店|部|所|課|センター|オフィス/, '');
             const isDigit = /^\d+$/.test(cleanVal);
             const cleanPadded = isDigit ? cleanVal.padStart(3, '0') : '';
 
-            return branchList.filter(b => {
+            const matched = [];
+            for (const b of branchList) {
+              const bCode = String(b.code || '').padStart(3, '0');
+              const officialName = getOfficialBranchName(b);
+              const bOffName = officialName.normalize('NFKC').toLowerCase();
               const bName = (b.name || '').normalize('NFKC').toLowerCase();
               const bKana = (b.kana || '').normalize('NFKC').toLowerCase();
               const bHira = (b.hira || '').normalize('NFKC').toLowerCase();
-              const bCode = String(b.code || '').padStart(3, '0');
 
-              if (bCode === cleanVal || (cleanPadded && bCode === cleanPadded)) return true;
-              if (isDigit && bCode.startsWith(cleanVal)) return true;
-              if (bName.includes(cleanVal) || bKana.includes(cleanVal) || bHira.includes(cleanVal)) return true;
-              if (cleanNoSuffix.length >= 1 && (bName.includes(cleanNoSuffix) || bKana.includes(cleanNoSuffix))) return true;
-              return false;
-            }).slice(0, 30);
+              const branchObj = {
+                ...b,
+                code: bCode,
+                officialName,
+                displayName: officialName
+              };
+
+              if (bCode === cleanVal || (cleanPadded && bCode === cleanPadded) || bOffName === cleanVal || bName === cleanVal || bKana === cleanVal || bHira === cleanVal) {
+                matched.push(branchObj);
+                continue;
+              }
+              if (isDigit && bCode.startsWith(cleanVal)) {
+                matched.push(branchObj);
+                continue;
+              }
+              if (bOffName.startsWith(cleanVal) || bName.startsWith(cleanVal) || bKana.startsWith(cleanVal)) {
+                matched.push(branchObj);
+                continue;
+              }
+              if (bOffName.includes(cleanVal) || bName.includes(cleanVal) || bKana.includes(cleanVal) || bHira.includes(cleanVal)) {
+                matched.push(branchObj);
+                continue;
+              }
+              if (cleanNoSuffix.length >= 1 && (bOffName.includes(cleanNoSuffix) || bName.includes(cleanNoSuffix) || bKana.includes(cleanNoSuffix))) {
+                matched.push(branchObj);
+                continue;
+              }
+            }
+            return matched.slice(0, 30);
           }
         };
 
@@ -1607,6 +1658,7 @@
 
         function autoFillBranchCodeInView(code, branchName) {
           if (!code || !formDefinition || !formDefinition.sections) return;
+          const officialBranchName = branchName ? getOfficialBranchName(branchName) : '';
           formDefinition.sections.forEach(sec => {
             (sec.questions || []).forEach(q => {
               const conf = getQuestionApiConfig(q);
@@ -1622,7 +1674,7 @@
                   if (badge) {
                     badge.innerHTML = `
                       <div style="margin-top: 6px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem;">
-                        <span style="font-weight: 700; color: #166534;">✓ 全銀協 支店確認済${branchName ? ': ' + escapeHtml(branchName) : ''} (支店コード: ${code})</span>
+                        <span style="font-weight: 700; color: #166534;">✓ 全銀協 支店確認済${officialBranchName ? ': ' + escapeHtml(officialBranchName) : ''} (支店コード: ${code})</span>
                       </div>
                     `;
                     badge.style.display = 'block';
@@ -1635,22 +1687,23 @@
 
         function autoFillBranchNameInView(name, branchCode) {
           if (!name || !formDefinition || !formDefinition.sections) return;
+          const officialName = getOfficialBranchName(name);
           formDefinition.sections.forEach(sec => {
             (sec.questions || []).forEach(q => {
               const conf = getQuestionApiConfig(q);
               const isBranch = (conf && conf.isBranch) || (q.title && (q.title.includes('支店名') || (q.title.includes('支店') && !q.title.includes('番号') && !q.title.includes('コード')) || q.title.includes('出張所名') || (q.title.includes('店舗名') && !q.title.includes('番号') && !q.title.includes('コード'))));
               if (isBranch) {
-                formValues[q.id] = name;
+                formValues[q.id] = officialName;
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
                 if (card) {
                   const input = card.querySelector('input.form-control');
-                  if (input) input.value = name;
+                  if (input) input.value = officialName;
                   clearError(q.id);
                   const badge = card.querySelector('.api-verified-badge');
                   if (badge) {
                     badge.innerHTML = `
                       <div style="margin-top: 6px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem;">
-                        <span style="font-weight: 700; color: #166534;">✓ 全銀協 支店確認済: ${escapeHtml(name)}${branchCode ? ' (支店コード: ' + branchCode + ')' : ''}</span>
+                        <span style="font-weight: 700; color: #166534;">✓ 全銀協 支店確認済: ${escapeHtml(officialName)}${branchCode ? ' (支店コード: ' + branchCode + ')' : ''}</span>
                       </div>
                     `;
                     badge.style.display = 'block';
@@ -2705,7 +2758,7 @@
                 </div>
               `;
               branchMatches.forEach(b => {
-                const bName = b.name;
+                const bName = b.displayName || b.officialName || getOfficialBranchName(b);
                 const bCode = String(b.code || '').padStart(3, '0');
                 const row = document.createElement('div');
                 row.className = 'branch-search-candidate-item';
@@ -2762,16 +2815,20 @@
               const b = findBankByName(currentBankName);
               if (b) {
                 BankDataService.searchBranches(b.code, cleanBn).then(matches => {
-                  const exact = (matches || []).find(m => m.name === cleanBn || m.name + '支店' === cleanBn || m.name === cleanBn + '支店');
+                  const exact = (matches || []).find(m => {
+                    const off = m.displayName || m.officialName || getOfficialBranchName(m);
+                    return off === cleanBn || m.name === cleanBn || m.name + '支店' === cleanBn || m.name === cleanBn + '支店';
+                  });
                   if (exact) {
+                    const exactOffName = exact.displayName || exact.officialName || getOfficialBranchName(exact);
                     const codePadded = String(exact.code || '').padStart(3, '0');
                     badgeContainer.innerHTML = `
                       <div style="margin-top: 6px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem;">
-                        <span style="font-weight: 700; color: #166534;">✓ 全銀協 支店確認済: ${escapeHtml(exact.name)} (支店コード: ${codePadded})</span>
+                        <span style="font-weight: 700; color: #166534;">✓ 全銀協 支店確認済: ${escapeHtml(exactOffName)} (支店コード: ${codePadded})</span>
                       </div>
                     `;
                     badgeContainer.style.display = 'block';
-                    autoFillBranchCodeInView(codePadded, exact.name);
+                    autoFillBranchCodeInView(codePadded, exactOffName);
                   }
                 }).catch(() => {});
               }
@@ -2861,7 +2918,7 @@
                 </div>
               `;
               branchMatches.forEach(b => {
-                const bName = b.name;
+                const bName = b.displayName || b.officialName || getOfficialBranchName(b);
                 const bCode = String(b.code || '').padStart(3, '0');
                 const row = document.createElement('div');
                 row.className = 'branch-search-candidate-item';
@@ -2919,13 +2976,14 @@
                 BankDataService.searchBranches(b.code, cleanBc).then(matches => {
                   const exact = (matches || []).find(m => String(m.code || '').padStart(3, '0') === cleanBc);
                   if (exact) {
+                    const exactOffName = exact.displayName || exact.officialName || getOfficialBranchName(exact);
                     badgeContainer.innerHTML = `
                       <div style="margin-top: 6px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem;">
-                        <span style="font-weight: 700; color: #166534;">✓ 全銀協 支店確認済: ${escapeHtml(exact.name)} (支店コード: ${cleanBc})</span>
+                        <span style="font-weight: 700; color: #166534;">✓ 全銀協 支店確認済: ${escapeHtml(exactOffName)} (支店コード: ${cleanBc})</span>
                       </div>
                     `;
                     badgeContainer.style.display = 'block';
-                    autoFillBranchNameInView(exact.name, cleanBc);
+                    autoFillBranchNameInView(exactOffName, cleanBc);
                   }
                 }).catch(() => {});
               }
@@ -2952,9 +3010,10 @@
               const cleanBc = String(initialVal).trim().padStart(3, '0');
               BankDataService.getBranches(b.code).then(branches => {
                 if (branches && branches[cleanBc]) {
+                  const offName = getOfficialBranchName(branches[cleanBc]);
                   badgeContainer.innerHTML = `
                     <div style="margin-top: 6px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem;">
-                      <span style="font-weight: 700; color: #166534;">✓ 全銀協 支店確認済: ${escapeHtml(branches[cleanBc].name)} (支店コード: ${cleanBc})</span>
+                      <span style="font-weight: 700; color: #166534;">✓ 全銀協 支店確認済: ${escapeHtml(offName)} (支店コード: ${cleanBc})</span>
                     </div>
                   `;
                   badgeContainer.style.display = 'block';
