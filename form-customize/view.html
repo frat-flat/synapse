@@ -1988,10 +1988,11 @@
             (sec.questions || []).forEach(q => {
               const qTitle = q.title || '';
 
-              // 1. カナ欄: 法人名でカナが登録されている場合のみ自動で補完。ない場合は空欄にして手動入力を必須とする
-              if (q.type === 'text' && (qTitle.includes('カナ') || qTitle.includes('フリガナ') || qTitle.includes('ふりがな')) && !qTitle.includes('代表')) {
+              // 1. カナ欄: 法人名でカナが登録されている場合のみ自動で補完（※代表者カナ、および口座名義・名義人カナは除外）
+              const isExcludedKana = qTitle.includes('代表') || qTitle.includes('口座') || qTitle.includes('名義');
+              if (q.type === 'text' && (qTitle.includes('カナ') || qTitle.includes('フリガナ') || qTitle.includes('ふりがな')) && !isExcludedKana) {
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
-                const input = card ? card.querySelector('input.form-control') : null;
+                const input = card ? (card.querySelector('input.form-control') || card.querySelector('input')) : null;
                 if (item.nameKana && item.nameKana.trim()) {
                   formValues[q.id] = item.nameKana.trim();
                   if (input) {

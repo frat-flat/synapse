@@ -7306,8 +7306,9 @@
       formData.sections.forEach(sec => {
         if (!sec.questions) return;
         sec.questions.forEach(q => {
-          // カナ項目
-          if (q.type === 'text' && (q.title.includes('カナ') || q.title.includes('フリガナ') || q.title.includes('ふりがな'))) {
+          // カナ項目（※代表者カナ、および口座名義・名義人カナは法人カナと連動させないため除外）
+          const isExcludedKana = q.title && (q.title.includes('代表') || q.title.includes('口座') || q.title.includes('名義'));
+          if (q.type === 'text' && (q.title.includes('カナ') || q.title.includes('フリガナ') || q.title.includes('ふりがな')) && !isExcludedKana) {
             if (item.nameKana && item.nameKana.trim()) {
               window.V[q.id] = item.nameKana.trim();
             } else {
@@ -7369,8 +7370,9 @@
         const selectEl = c.querySelector('select');
         if (!inputEl && !selectEl) return;
 
-        // ① カナ表記: 公的データに登録されている場合のみ自動で補完。ない場合は空欄にして手動入力を促す
-        if (title.includes('カナ') || title.includes('フリガナ') || title.includes('ふりがな')) {
+        // ① カナ表記: 公的データに登録されている場合のみ自動で補完（※代表者カナ、および口座名義・名義人カナは除外）
+        const isExcludedKana = title.includes('代表') || title.includes('口座') || title.includes('名義');
+        if ((title.includes('カナ') || title.includes('フリガナ') || title.includes('ふりがな')) && !isExcludedKana) {
           if (inputEl) {
             if (item.nameKana && item.nameKana.trim()) {
               inputEl.value = item.nameKana.trim();
