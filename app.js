@@ -35300,9 +35300,9 @@ function initMypageMemo() {
 // ==========================================
 function bringToFront(elm) {
   const notes = document.querySelectorAll('.floating-sticky-note');
-  let maxZ = 15000;
+  let maxZ = 100005;
   notes.forEach(n => {
-    const z = parseInt(n.style.zIndex) || 15000;
+    const z = parseInt(n.style.zIndex) || 100005;
     if (z > maxZ) maxZ = z;
   });
   elm.style.zIndex = maxZ + 1;
@@ -35320,8 +35320,10 @@ function updateStickyNoteState(memoId, data) {
   localStorage.setItem(key, JSON.stringify(states));
 }
 
-function saveStickyNoteState(memoId, x, y) {
-  updateStickyNoteState(memoId, { x, y });
+function saveStickyNoteState(memoId, x, y, isCollapsed) {
+  const updateData = { x, y };
+  if (isCollapsed !== undefined) updateData.isCollapsed = isCollapsed;
+  updateStickyNoteState(memoId, updateData);
 }
 
 function removeStickyNoteState(memoId) {
@@ -35331,49 +35333,134 @@ function removeStickyNoteState(memoId) {
   localStorage.setItem(key, JSON.stringify(states));
 }
 
-function makeElementDraggable(elm, header) {
-  let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-  header.onmousedown = dragMouseDown;
-
-  function dragMouseDown(e) {
-    if (e.target.classList.contains('sticky-note-close')) return;
-    
-    e = e || window.event;
-    e.preventDefault();
-    bringToFront(elm);
-    pos3 = e.clientX;
-    pos4 = e.clientY;
-    document.onmouseup = closeDragElement;
-    document.onmousemove = elementDrag;
+function toggleCollapse(elm) {
+  elm.classList.toggle('is-collapsed');
+  const isCollapsed = elm.classList.contains('is-collapsed');
+  const minBtn = elm.querySelector('.sticky-note-minimize-btn');
+  if (minBtn) {
+    minBtn.textContent = isCollapsed ? '＋' : '−';
+    minBtn.title = isCollapsed ? '付箋を展開' : '付箋を最小化';
   }
+  if (elm.dataset.memoId) {
+    updateStickyNoteState(elm.dataset.memoId, { isCollapsed });
+  }
+}
 
-  function elementDrag(e) {
-    e = e || window.event;
-    e.preventDefault();
-    pos1 = pos3 - e.clientX;
-    pos2 = pos4 - e.clientY;
-    pos3 = e.clientX;
-    pos4 = e.clientY;
+function makeElementDraggable(elm, header) {
+  let startX = 0, startY = 0;
+  let initialLeft = 0, initialTop = 0;
+  let isDragging = false;
+  let lastTapTime = 0;
 
-    let newTop = elm.offsetTop - pos2;
-    let newLeft = elm.offsetLeft - pos1;
+  header.style.touchAction = 'none';
+  header.style.userSelect = 'none';
+  header.style.webkitUserSelect = 'none';
 
-    const maxLeft = window.innerWidth - elm.offsetWidth;
-    const maxTop = window.innerHeight - elm.offsetHeight;
-    if (newLeft < 0) newLeft = 0;
+  // ドラッグ開始ハンドラ
+  const handleStart = (clientX, clientY, target) => {
+    if (target.closest('.sticky-note-close') || target.closest('.sticky-note-minimize-btn') || target.closest('.copy-btn') || target.closest('.toggle-pwd-btn') || target.closest('button')) {
+      return false;
+    }
+    bringToFront(elm);
+    isDragging = true;
+    startX = clientX;
+    startY = clientY;
+    initialLeft = elm.offsetLeft;
+    initialTop = elm.offsetTop;
+    elm.classList.add('is-dragging');
+    return true;
+  };
+
+  // ドラッグ中ハンドラ（画面境界クランプ）
+  const handleMove = (clientX, clientY) => {
+    if (!isDragging) return;
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+
+    let newLeft = initialLeft + dx;
+    let newTop = initialTop + dy;
+
+    const isMobile = window.innerWidth <= 768;
+    const bottomNavHeight = isMobile ? 64 : 0;
+    const minLeft = 4;
+    const maxLeft = Math.max(4, window.innerWidth - elm.offsetWidth - 4);
+    const minTop = 4;
+    const maxTop = Math.max(4, window.innerHeight - elm.offsetHeight - bottomNavHeight - 4);
+
+    if (newLeft < minLeft) newLeft = minLeft;
     if (newLeft > maxLeft) newLeft = maxLeft;
-    if (newTop < 0) newTop = 0;
+    if (newTop < minTop) newTop = minTop;
     if (newTop > maxTop) newTop = maxTop;
 
-    elm.style.top = newTop + "px";
-    elm.style.left = newLeft + "px";
-  }
+    elm.style.left = newLeft + 'px';
+    elm.style.top = newTop + 'px';
+  };
 
-  function closeDragElement() {
-    document.onmouseup = null;
-    document.onmousemove = null;
-    saveStickyNoteState(elm.dataset.memoId, elm.offsetLeft, elm.offsetTop);
-  }
+  // ドラッグ終了ハンドラ
+  const handleEnd = () => {
+    if (!isDragging) return;
+    isDragging = false;
+    elm.classList.remove('is-dragging');
+    if (elm.dataset.memoId) {
+      saveStickyNoteState(elm.dataset.memoId, elm.offsetLeft, elm.offsetTop, elm.classList.contains('is-collapsed'));
+    }
+  };
+
+  // マウスイベント (PC)
+  header.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return; // 左クリックのみ
+    if (handleStart(e.clientX, e.clientY, e.target)) {
+      e.preventDefault();
+      const onMouseMove = (me) => handleMove(me.clientX, me.clientY);
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        handleEnd();
+      };
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    }
+  });
+
+  // タッチイベント (スマホ・タブレット対応)
+  header.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+
+    // ダブルタップ検知（最小化・展開トグル）
+    const now = Date.now();
+    if (now - lastTapTime < 300) {
+      toggleCollapse(elm);
+      lastTapTime = 0;
+      if (e.cancelable) e.preventDefault();
+      return;
+    }
+    lastTapTime = now;
+
+    if (handleStart(touch.clientX, touch.clientY, e.target)) {
+      if (e.cancelable) e.preventDefault();
+      const onTouchMove = (te) => {
+        if (te.touches.length !== 1) return;
+        if (te.cancelable) te.preventDefault();
+        handleMove(te.touches[0].clientX, te.touches[0].clientY);
+      };
+      const onTouchEnd = () => {
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend', onTouchEnd);
+        document.removeEventListener('touchcancel', onTouchEnd);
+        handleEnd();
+      };
+      document.addEventListener('touchmove', onTouchMove, { passive: false });
+      document.addEventListener('touchend', onTouchEnd);
+      document.addEventListener('touchcancel', onTouchEnd);
+    }
+  }, { passive: false });
+
+  // PCでのダブルクリックでも最小化・展開トグル
+  header.addEventListener('dblclick', (e) => {
+    if (e.target.closest('button')) return;
+    toggleCollapse(elm);
+  });
 }
 
 function getMemosStorageKey() {
@@ -35497,24 +35584,41 @@ function createAccountStickyNote(account, x, y, index) {
   if (!container) return;
 
   const tempId = `temp_account_${Date.now()}_${index}`;
+  const isMobile = window.innerWidth <= 768;
+  const noteWidth = isMobile ? Math.min(260, window.innerWidth - 24) : 240;
+
+  if (isMobile) {
+    const count = container.children.length;
+    x = Math.max(12, Math.floor((window.innerWidth - noteWidth) / 2) + ((count % 3) * 10));
+    y = 70 + ((count % 5) * 20);
+  } else {
+    if (x + 240 > window.innerWidth) {
+      x = Math.max(10, window.innerWidth - 250);
+    }
+    if (y + 180 > window.innerHeight) {
+      y = Math.max(10, window.innerHeight - 220);
+    }
+  }
+
   const note = document.createElement('div');
   note.className = 'floating-sticky-note sticky-note-blue';
   note.dataset.memoId = tempId;
   note.style.left = `${x}px`;
   note.style.top = `${y}px`;
-  note.style.width = '240px';
+  note.style.width = isMobile ? `${noteWidth}px` : '240px';
   note.style.height = 'auto';
   note.style.pointerEvents = 'auto';
 
   note.innerHTML = `
     <div class="sticky-note-header" style="background: rgba(0,0,0,0.12); display: flex; align-items: center; justify-content: space-between; padding: 0.35rem 0.5rem;">
-      <div class="sticky-note-header-left" style="display: flex; align-items: center; gap: 0.25rem; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 140px;">
+      <div class="sticky-note-header-left" style="display: flex; align-items: center; gap: 0.25rem; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 130px;">
         <span>🔑</span>
         <span class="sticky-note-header-title" style="font-size: 0.78rem;">${account.name || '無題のサービス'}</span>
       </div>
       <div style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
         <span class="account-sticky-timer" style="font-size: 0.65rem; background: var(--bg-surface-elevated); padding: 0.05rem 0.25rem; border-radius: var(--radius-sm); color: var(--text-secondary); font-weight: bold;">30s</span>
-        <button class="sticky-note-close" title="閉じる" style="background: none; border: none; font-size: 0.85rem; cursor: pointer; color: var(--text-secondary); padding: 0;">✕</button>
+        <button class="sticky-note-minimize-btn" title="最小化/展開" style="background: none; border: none; font-size: 0.85rem; cursor: pointer; color: var(--text-secondary); padding: 0 4px; line-height: 1;">−</button>
+        <button class="sticky-note-close" title="閉じる" style="background: none; border: none; font-size: 0.85rem; cursor: pointer; color: var(--text-secondary); padding: 0 4px; line-height: 1;">✕</button>
       </div>
     </div>
     <div class="sticky-note-body" style="padding: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; height: auto;">
@@ -35560,7 +35664,15 @@ function createAccountStickyNote(account, x, y, index) {
 
   const header = note.querySelector('.sticky-note-header');
   const closeBtn = note.querySelector('.sticky-note-close');
+  const minBtn = note.querySelector('.sticky-note-minimize-btn');
   makeElementDraggable(note, header);
+
+  if (minBtn) {
+    minBtn.onclick = (e) => {
+      e.stopPropagation();
+      toggleCollapse(note);
+    };
+  }
 
   closeBtn.onclick = () => {
     note.remove();
@@ -35674,6 +35786,8 @@ function createFloatingStickyNote(memoId, initialData = null) {
   let title = '';
   let content = '';
   let color = 'yellow';
+  const isMobile = window.innerWidth <= 768;
+  const noteWidth = isMobile ? Math.min(280, window.innerWidth - 24) : 250;
   let x = 100 + (container.children.length * 20);
   let y = 100 + (container.children.length * 20);
 
@@ -35683,6 +35797,8 @@ function createFloatingStickyNote(memoId, initialData = null) {
     color = initialData.color || 'yellow';
     x = initialData.x;
     y = initialData.y;
+    if (x + 50 > window.innerWidth) x = Math.max(8, window.innerWidth - noteWidth - 8);
+    if (y + 40 > window.innerHeight) y = Math.max(8, window.innerHeight - 220);
   } else {
     const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
     const memo = memos.find(m => m.id === memoId);
@@ -35693,6 +35809,16 @@ function createFloatingStickyNote(memoId, initialData = null) {
       title = '無題のメモ';
       content = '';
     }
+    if (isMobile) {
+      const count = container.children.length;
+      x = Math.max(12, Math.floor((window.innerWidth - noteWidth) / 2) + ((count % 3) * 10));
+      y = 70 + ((count % 5) * 20);
+    } else {
+      x = 100 + (container.children.length * 20);
+      y = 100 + (container.children.length * 20);
+      if (x + 250 > window.innerWidth) x = Math.max(10, window.innerWidth - 260);
+      if (y + 250 > window.innerHeight) y = Math.max(10, window.innerHeight - 270);
+    }
   }
 
   const note = document.createElement('div');
@@ -35700,6 +35826,7 @@ function createFloatingStickyNote(memoId, initialData = null) {
   note.dataset.memoId = memoId;
   note.style.left = `${x}px`;
   note.style.top = `${y}px`;
+  note.style.width = isMobile ? `${noteWidth}px` : '250px';
 
   note.innerHTML = `
     <div class="sticky-note-header">
@@ -35707,7 +35834,10 @@ function createFloatingStickyNote(memoId, initialData = null) {
         <span class="sticky-note-pin-indicator" style="display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; color: var(--text-secondary);"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="#eab308" style="display: block; width: 13px; height: 13px; flex-shrink: 0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h9l6-6V5c0-1.1-.9-2-2-2zm-5 16V15h5l-5 5z"/></svg></span>
         <span class="sticky-note-header-title">${title}</span>
       </div>
-      <button class="sticky-note-close" title="付箋を閉じる">✕</button>
+      <div class="sticky-note-header-actions" style="display: flex; align-items: center; gap: 2px;">
+        <button class="sticky-note-minimize-btn" title="最小化/展開" style="background: none; border: none; font-size: 0.85rem; cursor: pointer; color: rgba(0,0,0,0.4); padding: 0 4px; line-height: 1; display: flex; align-items: center; justify-content: center;">−</button>
+        <button class="sticky-note-close" title="付箋を閉じる">✕</button>
+      </div>
     </div>
     <div class="sticky-note-body">
       <input type="text" class="sticky-note-title" placeholder="タイトル" value="${title}">
@@ -35726,11 +35856,23 @@ function createFloatingStickyNote(memoId, initialData = null) {
 
   const header = note.querySelector('.sticky-note-header');
   const closeBtn = note.querySelector('.sticky-note-close');
+  const minBtn = note.querySelector('.sticky-note-minimize-btn');
   const titleInput = note.querySelector('.sticky-note-title');
   const textarea = note.querySelector('.sticky-note-textarea');
   const colorBtns = note.querySelectorAll('.color-dot-btn');
 
   makeElementDraggable(note, header);
+
+  if (minBtn) {
+    minBtn.onclick = (e) => {
+      e.stopPropagation();
+      toggleCollapse(note);
+    };
+  }
+
+  if (initialData && initialData.isCollapsed) {
+    toggleCollapse(note);
+  }
 
   closeBtn.onclick = () => {
     note.remove();
@@ -35807,10 +35949,17 @@ function updateOriginalMemo(memoId, title, plainTextContent) {
 function initFloatingStickyNotes() {
   const key = 'synapse_floating_sticky_notes';
   const states = JSON.parse(localStorage.getItem(key)) || [];
+  const isMobile = window.innerWidth <= 768;
   states.forEach(state => {
     const memos = JSON.parse(localStorage.getItem(getMemosStorageKey())) || [];
     const memoExists = memos.some(m => m.id === state.id);
     if (memoExists) {
+      if (state.x !== undefined && state.y !== undefined) {
+        const noteWidth = isMobile ? Math.min(280, window.innerWidth - 24) : 250;
+        const noteHeight = isMobile ? 220 : 250;
+        state.x = Math.max(8, Math.min(state.x, window.innerWidth - noteWidth - 8));
+        state.y = Math.max(8, Math.min(state.y, window.innerHeight - noteHeight - (isMobile ? 64 : 8)));
+      }
       createFloatingStickyNote(state.id, state);
     } else {
       removeStickyNoteState(state.id);

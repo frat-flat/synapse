@@ -4585,44 +4585,66 @@ h3 {
 }
 
 /* ============================================================================
+/* ============================================================================
    📌 浮遊付箋（Sticky Notes）スタイル
    ============================================================================ */
 .floating-sticky-note {
-  position: absolute;
+  position: fixed !important;
   width: 250px;
   height: 250px;
   background: #fef08a; /* デフォルト：パステルイエロー */
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 6px;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  box-shadow: 0 10px 20px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 2px 4px rgba(255, 255, 255, 0.4);
   display: flex;
   flex-direction: column;
-  z-index: 15000;
-  transition: box-shadow 0.2s;
+  z-index: 100005;
+  transition: box-shadow 0.2s, height 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: auto;
   overflow: hidden;
   box-sizing: border-box;
+  touch-action: none;
 }
 
 .floating-sticky-note:hover {
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.18), 0 10px 10px -5px rgba(0, 0, 0, 0.06);
+}
+
+.floating-sticky-note.is-dragging {
+  box-shadow: 0 22px 35px -5px rgba(0, 0, 0, 0.32), 0 12px 18px -5px rgba(0, 0, 0, 0.18) !important;
+  opacity: 0.95;
+  transform: scale(1.02);
+  transition: none !important;
+}
+
+.floating-sticky-note.is-collapsed {
+  height: 32px !important;
+  min-height: 32px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18) !important;
+}
+
+.floating-sticky-note.is-collapsed .sticky-note-body,
+.floating-sticky-note.is-collapsed .sticky-note-color-selector {
+  display: none !important;
 }
 
 .sticky-note-header {
-  height: 28px;
-  background: rgba(0, 0, 0, 0.04);
+  height: 30px;
+  background: rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 0.4rem 0 0.5rem;
+  padding: 0 0.45rem 0 0.5rem;
   cursor: move;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  color: rgba(0, 0, 0, 0.5);
-  border-top-left-radius: 6px;
-  border-top-right-radius: 6px;
+  color: rgba(0, 0, 0, 0.6);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
   user-select: none;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  -webkit-user-select: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  touch-action: none;
 }
 
 .sticky-note-header-left {
@@ -4632,26 +4654,55 @@ h3 {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  max-width: 80%;
+  max-width: 75%;
 }
 
 .sticky-note-pin-indicator {
   font-size: 0.72rem;
 }
 
+.sticky-note-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.sticky-note-minimize-btn {
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.4);
+  padding: 2px 4px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xs);
+  transition: background 0.15s, color 0.15s;
+  touch-action: manipulation;
+}
+
+.sticky-note-minimize-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.8);
+}
+
 .sticky-note-close {
   cursor: pointer;
-  font-size: 0.8rem;
-  color: rgba(0, 0, 0, 0.35);
+  font-size: 0.85rem;
+  color: rgba(0, 0, 0, 0.4);
   font-weight: bold;
   border: none;
   background: none;
-  padding: 1px 5px;
+  padding: 2px 5px;
   border-radius: var(--radius-xs);
   transition: background 0.15s, color 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: manipulation;
 }
 
 .sticky-note-close:hover {
@@ -5988,6 +6039,49 @@ h3 {
   /* 検索バーのスマホ最適化 */
   #global-search-input {
     font-size: 16px !important; /* iOSでズームインしないよう16px以上 */
+  }
+
+  /* 5. 浮遊付箋（Sticky Notes）のスマホ表示・タッチ操作最適化 */
+  #floating-sticky-notes-container {
+    z-index: 100005 !important;
+  }
+
+  .floating-sticky-note {
+    width: min(280px, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100dvh - 120px) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 14px 28px -4px rgba(0, 0, 0, 0.22), 0 6px 12px -2px rgba(0, 0, 0, 0.12) !important;
+  }
+
+  .sticky-note-header {
+    height: 34px !important;
+    padding: 0 0.5rem !important;
+    touch-action: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+  }
+
+  .sticky-note-header-left {
+    font-size: 0.78rem !important;
+    max-width: 68% !important;
+  }
+
+  .sticky-note-minimize-btn {
+    min-width: 28px !important;
+    min-height: 28px !important;
+    font-size: 1rem !important;
+  }
+
+  .sticky-note-close {
+    min-width: 28px !important;
+    min-height: 28px !important;
+    font-size: 1.1rem !important;
+  }
+
+  .floating-sticky-note.is-collapsed {
+    height: 34px !important;
+    min-height: 34px !important;
   }
 }
 
