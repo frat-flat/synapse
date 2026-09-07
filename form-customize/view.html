@@ -185,6 +185,35 @@
         background-color: #fffbfa;
       }
 
+      /* 📁 質問グループカード */
+      .view-question-group-card {
+        background-color: rgba(240, 244, 249, 0.45);
+        border: 1.5px solid #cbd5e1;
+        border-radius: var(--border-radius);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        box-shadow: 0 1px 3px rgba(60,64,67,0.05);
+      }
+
+      .view-group-header {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--color-text-main);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #cbd5e1;
+      }
+
+      .view-question-group-card .question-card {
+        background-color: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        box-shadow: 0 1px 2px rgba(60,64,67,0.04);
+      }
+
       .question-title {
         font-size: 1.05rem;
         font-weight: 600;
@@ -2351,9 +2380,29 @@
           questionsContainerEl.innerHTML = '';
           const questions = section.questions || [];
 
+          let currentViewGrpEl = null;
+          let currentViewGrpId = null;
+
           questions.forEach((q, qIndex) => {
             const card = createQuestionCard(q, qIndex);
-            questionsContainerEl.appendChild(card);
+            if (q.groupId) {
+              if (!currentViewGrpEl || currentViewGrpId !== q.groupId) {
+                currentViewGrpId = q.groupId;
+                currentViewGrpEl = document.createElement('div');
+                currentViewGrpEl.className = 'view-question-group-card';
+                currentViewGrpEl.dataset.groupId = q.groupId;
+                const grpHeader = document.createElement('div');
+                grpHeader.className = 'view-group-header';
+                grpHeader.innerHTML = `<span>📁</span> <span>${escapeHtml(q.groupTitle || 'グループ')}</span>`;
+                currentViewGrpEl.appendChild(grpHeader);
+                questionsContainerEl.appendChild(currentViewGrpEl);
+              }
+              currentViewGrpEl.appendChild(card);
+            } else {
+              currentViewGrpEl = null;
+              currentViewGrpId = null;
+              questionsContainerEl.appendChild(card);
+            }
           });
 
           // セクション内スキップ（条件分岐）の初期評価
@@ -2368,6 +2417,7 @@
           // 上部へスムーススクロール
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+        window.renderCurrentSection = renderCurrentSection;
 
         // 次へ・送信ボタンのラベルおよび表示制御
         function updateNavButtons(section) {
