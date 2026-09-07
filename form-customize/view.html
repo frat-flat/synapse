@@ -742,7 +742,13 @@
             .replace(/'/g, '&#039;');
 
           // 2. 下線: <u>...</u> (エスケープされた &lt;u&gt;...&lt;/u&gt;)
-          escaped = escaped.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/gi, '<u style="text-decoration: underline;">$1</u>');
+          escaped = escaped.replace(/&lt;u\b.*?&gt;(.*?)&lt;\/u&gt;/gi, '<u style="text-decoration: underline;">$1</u>');
+
+          // 太字: <strong>...</strong>, <b>...</b>
+          escaped = escaped.replace(/&lt;(strong|b)\b.*?&gt;(.*?)&lt;\/\1&gt;/gi, '<strong>$2</strong>');
+
+          // 斜体: <em>...</em>, <i>...</i>
+          escaped = escaped.replace(/&lt;(em|i)\b.*?&gt;(.*?)&lt;\/\1&gt;/gi, '<em>$2</em>');
 
           // 3. 太字: **...**
           escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
