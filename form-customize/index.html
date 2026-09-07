@@ -52,23 +52,23 @@
         console.warn('[Antigravity] Failed to set default admin session:', e);
       }
 
-      // 🚀 キャッシュを100%強制回避して最新のCSSとJSをロードするインラインローダー (v99)
+      // 🚀 キャッシュを100%強制回避して最新のCSSとJSをロードするインラインローダー (v100)
       (function() {
         const ts = Date.now();
         
         // CSSの注入
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = './assets/custom-editor-v99.css?v=' + ts;
+        link.href = './assets/custom-editor-v100.css?v=' + ts;
         document.head.appendChild(link);
         
         // JS of injection
         const script = document.createElement('script');
-        script.src = './assets/custom-editor-v99.js?v=' + ts;
+        script.src = './assets/custom-editor-v100.js?v=' + ts;
         script.defer = true;
         document.head.appendChild(script);
         
-        console.log('[Antigravity Loader] Force loaded assets with timestamp (v99):', ts);
+        console.log('[Antigravity Loader] Force loaded assets with timestamp (v100):', ts);
       })();
     </script>
   </head>
