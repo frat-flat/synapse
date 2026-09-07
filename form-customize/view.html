@@ -208,6 +208,53 @@
         border-bottom: 2px solid #cbd5e1;
       }
 
+      .view-group-desc {
+        font-size: 0.88rem;
+        color: var(--color-text-muted);
+        line-height: 1.45;
+        margin-top: -6px;
+        margin-bottom: 6px;
+        white-space: pre-wrap;
+      }
+
+      .view-group-same-as-above-wrapper {
+        background: #eff6ff;
+        border: 1.5px solid #bfdbfe;
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        transition: all 0.2s ease;
+      }
+
+      .view-group-same-as-above-wrapper:hover {
+        background: #dbeafe;
+        border-color: #93c5fd;
+      }
+
+      .view-group-same-as-above-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #1e40af;
+        cursor: pointer;
+        user-select: none;
+        margin: 0;
+      }
+
+      .view-group-same-as-above-checkbox {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: #2563eb;
+        margin: 0;
+      }
+
       .view-question-group-card .question-card {
         background-color: var(--color-bg-card);
         border: 1px solid var(--color-border);
@@ -2391,10 +2438,69 @@
                 currentViewGrpEl = document.createElement('div');
                 currentViewGrpEl.className = 'view-question-group-card';
                 currentViewGrpEl.dataset.groupId = q.groupId;
+
                 const grpHeader = document.createElement('div');
                 grpHeader.className = 'view-group-header';
                 grpHeader.innerHTML = `<span>📁</span> <span>${escapeHtml(q.groupTitle || 'グループ')}</span>`;
                 currentViewGrpEl.appendChild(grpHeader);
+
+                // グループ説明文
+                if (q.groupDescription) {
+                  const grpDesc = document.createElement('div');
+                  grpDesc.className = 'view-group-desc';
+                  grpDesc.innerHTML = (typeof renderRichTextWithLinks === 'function') ? renderRichTextWithLinks(q.groupDescription) : escapeHtml(q.groupDescription);
+                  currentViewGrpEl.appendChild(grpDesc);
+                }
+
+                // グループ一括同上自動入力チェックボックス
+                const grpSameQ = (section.questions || []).find(item => item.groupId === q.groupId && item.sameAsAbove && item.sameAsAbove.enabled && (item.sameAsAbove.sourceType === 'group' || (item.sameAsAbove.sourceQuestionId && item.sameAsAbove.sourceQuestionId.startsWith('group:'))));
+                if (grpSameQ) {
+                  const srcGId = grpSameQ.sameAsAbove.sourceGroupId || grpSameQ.sameAsAbove.sourceQuestionId.replace('group:', '');
+                  const sameWrap = document.createElement('div');
+                  sameWrap.className = 'view-group-same-as-above-wrapper';
+
+                  const sameLabel = document.createElement('label');
+                  sameLabel.className = 'view-group-same-as-above-label';
+
+                  const chk = document.createElement('input');
+                  chk.type = 'checkbox';
+                  chk.className = 'view-group-same-as-above-checkbox same-as-above-checkbox';
+                  chk.dataset.targetGroupId = q.groupId;
+                  chk.dataset.sourceGroupId = srcGId;
+
+                  const labelText = document.createElement('span');
+                  labelText.textContent = grpSameQ.sameAsAbove.label || '前述のグループと同じ';
+
+                  sameLabel.appendChild(chk);
+                  sameLabel.appendChild(labelText);
+                  sameWrap.appendChild(sameLabel);
+
+                  const badge = document.createElement('span');
+                  badge.className = 'same-as-above-badge';
+                  badge.style.display = 'none';
+                  badge.innerHTML = '🔒 グループ一括自動入力・同期中';
+                  sameWrap.appendChild(badge);
+
+                  currentViewGrpEl.appendChild(sameWrap);
+
+                  const isGrpAlreadyChecked = !!formValues['group_' + q.groupId + '_is_same_as_above'];
+                  chk.checked = isGrpAlreadyChecked;
+
+                  chk.addEventListener('change', () => {
+                    const isChecked = chk.checked;
+                    formValues['group_' + q.groupId + '_is_same_as_above'] = isChecked;
+                    badge.style.display = isChecked ? 'inline-flex' : 'none';
+                    applyGroupSameAsAbove(q.groupId, srcGId, isChecked);
+                  });
+
+                  if (isGrpAlreadyChecked) {
+                    setTimeout(() => {
+                      badge.style.display = 'inline-flex';
+                      applyGroupSameAsAbove(q.groupId, srcGId, true);
+                    }, 20);
+                  }
+                }
+
                 questionsContainerEl.appendChild(currentViewGrpEl);
               }
               currentViewGrpEl.appendChild(card);
@@ -2525,8 +2631,78 @@
         // ==========================================
         let isSyncingSameAsAbove = false;
 
-        function getResolvedQuestionValue(sourceId) {
+        // グループに属する全設問を取得
+        function getGroupQuestions(groupId) {
+          if (!formDefinition || !formDefinition.sections || !groupId) return [];
+          const list = [];
+          formDefinition.sections.forEach(sec => {
+            (sec.questions || []).forEach(q => {
+              if (q.groupId === groupId) list.push(q);
+            });
+          });
+          return list;
+        }
+
+        // コピー元グループから、対象質問に適合する値を探索・解決する
+        function resolveValueFromGroupForQuestion(sourceGroupId, targetQ) {
+          const srcQuestions = getGroupQuestions(sourceGroupId);
+          if (srcQuestions.length === 0) return '';
+
+          // 1. 完全一致（タイトル）
+          const exactTitle = srcQuestions.find(sq => sq.title && targetQ.title && sq.title.trim() === targetQ.title.trim());
+          if (exactTitle) return getResolvedQuestionValue(exactTitle.id, exactTitle);
+
+          // 2. 代表的な住所・連絡先キーワードによるマッチング
+          const keywords = [
+            ['郵便番号', '〒'],
+            ['都道府県'],
+            ['市区町村', '市区郡', '市町村'],
+            ['番地', '丁目', '号'],
+            ['建物', 'マンション', 'アパート', '部屋'],
+            ['カナ', 'フリガナ', 'ふりがな'],
+            ['電話', 'TEL', 'tel'],
+            ['メール', 'Mail', 'mail', 'アドレス'],
+            ['会社名', '法人名', '名称', '組織名'],
+            ['代表者', '役職', '担当者']
+          ];
+
+          for (const kwList of keywords) {
+            const isTargetMatch = kwList.some(kw => (targetQ.title || '').includes(kw));
+            if (isTargetMatch) {
+              const matchedSrc = srcQuestions.find(sq => kwList.some(kw => (sq.title || '').includes(kw)));
+              if (matchedSrc) return getResolvedQuestionValue(matchedSrc.id, matchedSrc);
+            }
+          }
+
+          // 3. 同じ質問タイプ ＆ 同じ相対順序（インデックス）
+          if (targetQ.groupId) {
+            const targetGroupQuestions = getGroupQuestions(targetQ.groupId);
+            const targetIdx = targetGroupQuestions.findIndex(q => q.id === targetQ.id);
+            if (targetIdx !== -1 && srcQuestions[targetIdx]) {
+              return getResolvedQuestionValue(srcQuestions[targetIdx].id, srcQuestions[targetIdx]);
+            }
+          }
+
+          // 4. 単独テキスト項目（textareaなど）の場合: グループ全設問の値を結合して返す
+          if (!targetQ.groupId || targetQ.type === 'textarea') {
+            const combined = srcQuestions.map(sq => {
+              const val = getResolvedQuestionValue(sq.id, sq);
+              return val ? `${val}` : '';
+            }).filter(Boolean).join(' ');
+            return combined;
+          }
+
+          return '';
+        }
+
+        function getResolvedQuestionValue(sourceId, targetQ) {
           if (!sourceId) return '';
+          // グループ指定の場合
+          if (sourceId.startsWith('group:')) {
+            const srcGId = sourceId.replace('group:', '');
+            return targetQ ? resolveValueFromGroupForQuestion(srcGId, targetQ) : '';
+          }
+
           if (formValues[sourceId] !== undefined && formValues[sourceId] !== null && formValues[sourceId] !== '') {
             return formValues[sourceId];
           }
@@ -2629,15 +2805,47 @@
           }
         }
 
+        function applyGroupSameAsAbove(targetGroupId, sourceGroupId, isLocked) {
+          const targetQuestions = getGroupQuestions(targetGroupId);
+          targetQuestions.forEach(tq => {
+            formValues[tq.id + '_is_same_as_above'] = isLocked;
+            if (isLocked) {
+              const val = resolveValueFromGroupForQuestion(sourceGroupId, tq);
+              applyValueToQuestion(tq, val);
+              setQuestionInputsLocked(tq.id, true);
+            } else {
+              setQuestionInputsLocked(tq.id, false);
+            }
+          });
+        }
+
         function syncAllSameAsAboveForSource(sourceId) {
           if (isSyncingSameAsAbove || !sourceId || !formDefinition || !formDefinition.sections) return;
           isSyncingSameAsAbove = true;
           try {
-            const srcVal = getResolvedQuestionValue(sourceId);
+            // ソース質問が所属するグループIDを特定
+            let srcGroupId = null;
+            formDefinition.sections.forEach(sec => {
+              (sec.questions || []).forEach(q => {
+                if (q.id === sourceId && q.groupId) srcGroupId = q.groupId;
+              });
+            });
+
             formDefinition.sections.forEach(sec => {
               (sec.questions || []).forEach(tq => {
-                if (tq.sameAsAbove && tq.sameAsAbove.enabled && tq.sameAsAbove.sourceQuestionId === sourceId) {
+                if (!tq.sameAsAbove || !tq.sameAsAbove.enabled) return;
+
+                // 1. 個別質問がソース質問を指定している場合
+                if (tq.sameAsAbove.sourceQuestionId === sourceId) {
                   if (formValues[tq.id + '_is_same_as_above']) {
+                    const srcVal = getResolvedQuestionValue(sourceId, tq);
+                    applyValueToQuestion(tq, srcVal);
+                  }
+                }
+                // 2. グループ連動でソースグループ内の質問が変更された場合
+                else if (srcGroupId && (tq.sameAsAbove.sourceGroupId === srcGroupId || tq.sameAsAbove.sourceQuestionId === 'group:' + srcGroupId)) {
+                  if (formValues[tq.id + '_is_same_as_above'] || (tq.groupId && formValues['group_' + tq.groupId + '_is_same_as_above'])) {
+                    const srcVal = resolveValueFromGroupForQuestion(srcGroupId, tq);
                     applyValueToQuestion(tq, srcVal);
                   }
                 }
@@ -2875,7 +3083,9 @@
           }
 
           // 前述と同じ（同上）自動入力チェックボックス
-          if (q.sameAsAbove && q.sameAsAbove.enabled && q.sameAsAbove.sourceQuestionId) {
+          const isPartOfActiveGroupSame = q.groupId && getGroupQuestions(q.groupId).some(item => item.sameAsAbove && item.sameAsAbove.enabled && (item.sameAsAbove.sourceType === 'group' || (item.sameAsAbove.sourceQuestionId && item.sameAsAbove.sourceQuestionId.startsWith('group:'))));
+
+          if (!isPartOfActiveGroupSame && q.sameAsAbove && q.sameAsAbove.enabled && q.sameAsAbove.sourceQuestionId) {
             const sameWrap = document.createElement('div');
             sameWrap.className = 'same-as-above-wrapper';
 
@@ -2909,7 +3119,7 @@
             chk.addEventListener('change', () => {
               if (chk.checked) {
                 formValues[q.id + '_is_same_as_above'] = true;
-                const srcVal = getResolvedQuestionValue(q.sameAsAbove.sourceQuestionId);
+                const srcVal = getResolvedQuestionValue(q.sameAsAbove.sourceQuestionId, q);
                 applyValueToQuestion(q, srcVal);
                 setQuestionInputsLocked(q.id, true);
               } else {
@@ -2920,7 +3130,7 @@
 
             if (isAlreadyChecked) {
               setTimeout(() => {
-                const srcVal = getResolvedQuestionValue(q.sameAsAbove.sourceQuestionId);
+                const srcVal = getResolvedQuestionValue(q.sameAsAbove.sourceQuestionId, q);
                 applyValueToQuestion(q, srcVal);
                 setQuestionInputsLocked(q.id, true);
               }, 10);
