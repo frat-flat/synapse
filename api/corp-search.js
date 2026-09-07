@@ -92,12 +92,17 @@ async function queryNtaApi(appId, searchName, prefCode) {
       const regDate = cols[22] || cols[4] || '';
       // 項番35 (0始まりインデックス28): 商号又は名称のフリガナ（全角カタカナ。未登録の場合は空文字）
       const nameKana = (cols.length > 28 && cols[28]) ? cols[28].trim() : '';
+      // 項番16 (0始まりインデックス15): 国内所在地の郵便番号（半角数字7桁）
+      const postCode = (cols.length > 15 && cols[15]) ? cols[15].trim() : '';
 
       list.push({
         num: corpNum,
         name: corpName,
         nameKana: nameKana,
         pref: prefName,
+        cityName: cityName,
+        street: street,
+        postCode: postCode,
         address: fullAddress,
         regDate: regDate,
         invoiceNum: `T${corpNum}`

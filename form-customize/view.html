@@ -814,6 +814,19 @@
             formDefinition = await decodeFormData(dataParam);
           }
 
+          // 直接フォームデータ指定（テスト・埋め込み用）
+          if (!formDefinition) {
+            try {
+              const directForm = localStorage.getItem('synapse_form_data');
+              if (directForm) {
+                const parsed = JSON.parse(directForm);
+                if (parsed && (parsed.sections || parsed.id)) {
+                  formDefinition = parsed;
+                }
+              }
+            } catch(e) {}
+          }
+
           // フォールバック1: クラウドAPI（Supabase synapse_storage）からの取得（初見端末・別ブラウザ・モバイル端末対応）
           if (!formDefinition) {
             let formId = search.get('id');
@@ -838,8 +851,15 @@
                   if (apiJson.form) {
                     formDefinition = apiJson.form;
                   } else if (Array.isArray(apiJson.forms) && apiJson.forms.length > 0) {
-                    const idx = (formIdx !== null && formIdx !== '') ? parseInt(formIdx, 10) : 0;
-                    formDefinition = apiJson.forms[!isNaN(idx) && apiJson.forms[idx] ? idx : 0];
+                    let target = null;
+                    if (formId) {
+                      target = apiJson.forms.find(f => f && (f.id === formId || f.formId === formId));
+                    }
+                    if (!target && formIdx !== null && formIdx !== '') {
+                      const idx = parseInt(formIdx, 10);
+                      target = !isNaN(idx) && apiJson.forms[idx] ? apiJson.forms[idx] : null;
+                    }
+                    formDefinition = target || (!formId && (formIdx === null || formIdx === '') ? apiJson.forms[0] : null);
                   }
                 }
               }
@@ -874,7 +894,7 @@
                         const idx = parseInt(formIdx, 10);
                         if (!isNaN(idx) && forms[idx]) targetForm = forms[idx];
                       }
-                      formDefinition = targetForm || forms[0];
+                      formDefinition = targetForm || (!formId && (formIdx === null || formIdx === '') ? forms[0] : null);
                     }
                   }
                 }
@@ -993,26 +1013,157 @@
         }
 
         const CORP_DATABASE = [
-          { name: "合同会社frat flat", nameKana: "ゴウドウガイシャフラットフラット", num: "2240003007487", pref: "広島県", address: "広島県広島市中区南竹屋町1-21-202", regDate: "2021-04-01", estDate: "2021-04-01" },
-          { name: "合同会社ｆｒａｔ　ｆｌａｔ", nameKana: "ゴウドウガイシャフラットフラット", num: "2240003007487", pref: "広島県", address: "広島県広島市中区南竹屋町1-21-202", regDate: "2021-04-01", estDate: "2021-04-01" },
-          { name: "株式会社wayway", nameKana: "カブシキガイシャウェイウェイ", num: "7010001999999", pref: "東京都", address: "東京都千代田区麹町4丁目3-2", regDate: "2023-10-01", estDate: "2015-05-15" },
-          { name: "wayway合同会社", nameKana: "ウェイウェイゴウドウガイシャ", num: "7010001999999", pref: "広島県", address: "広島県広島市中区基町12-8", regDate: "2024-04-01", estDate: "2020-11-20" },
-          { name: "ヤフー株式会社", nameKana: "ヤフーカブシキガイシャ", num: "7010001888888", pref: "東京都", address: "東京都千代田区紀尾井町1-3 東京ガーデンテラス紀尾井町", regDate: "2023-10-01", estDate: "1996-01-31" },
-          { name: "LINEヤフー株式会社", nameKana: "ラインヤフーカブシキガイシャ", num: "7010001888888", pref: "東京都", address: "東京都千代田区紀尾井町1-3 東京ガーデンテラス紀尾井町", regDate: "2023-10-01", estDate: "1996-01-31" },
-          { name: "トヨタ自動車株式会社", nameKana: "トヨタジドウシャカブシキガイシャ", num: "1180301018771", pref: "愛知県", address: "愛知県豊田市トヨタ町1番地", regDate: "2023-10-01", estDate: "1937-08-28" },
-          { name: "ソニーグループ株式会社", nameKana: "ソニーグループカブシキガイシャ", num: "5010401067252", pref: "東京都", address: "東京都港区港南1丁目7-1", regDate: "2023-10-01", estDate: "1946-05-07" },
-          { name: "ソフトバンク株式会社", nameKana: "ソフトバンクカブシキガイシャ", num: "9010401052465", pref: "東京都", address: "東京都港区海岸1丁目7-1 東京ポートシティ竹芝", regDate: "2023-10-01", estDate: "1986-12-09" },
-          { name: "日本電信電話株式会社", nameKana: "ニッポンデンシンデンワカブシキガイシャ", num: "7010001065142", pref: "東京都", address: "東京都千代田区大手町1丁目5-1 大手町ファーストスクエア", regDate: "2023-10-01", estDate: "1985-04-01" },
-          { name: "株式会社NTTドコモ", nameKana: "カブシキガイシャエヌティティドコモ", num: "1010001067912", pref: "東京都", address: "東京都千代田区永田町2丁目11-1 山王パークタワー", regDate: "2023-10-01", estDate: "1991-08-14" },
-          { name: "任天堂株式会社", nameKana: "ニンテンドウカブシキガイシャ", num: "1130001011420", pref: "京都府", address: "京都府京都市南区上鳥羽鉾立町11番地1", regDate: "2023-10-01", estDate: "1947-11-20" },
-          { name: "楽天グループ株式会社", nameKana: "ラクテングループカブシキガイシャ", num: "9010701020592", pref: "東京都", address: "東京都世田谷区玉川1丁目14-1 楽天クリムゾンハウス", regDate: "2023-10-01", estDate: "1997-02-07" },
-          { name: "株式会社メルカリ", nameKana: "カブシキガイシャメルカリ", num: "4010001150491", pref: "東京都", address: "東京都港区六本木6丁目10-1 六本木ヒルズ森タワー", regDate: "2023-10-01", estDate: "2013-02-01" },
-          { name: "株式会社サイバーエージェント", nameKana: "カブシキガイシャサイバーエージェント", num: "5010401052601", pref: "東京都", address: "東京都渋谷区宇田川町40-1 Abema Towers", regDate: "2023-10-01", estDate: "1998-03-18" },
-          { name: "株式会社日立製作所", nameKana: "カブシキガイシャヒタチセイサクショ", num: "7010001008844", pref: "東京都", address: "東京都千代田区丸の内1丁目6-6", regDate: "2023-10-01", estDate: "1920-02-01" },
-          { name: "パナソニック ホールディングス株式会社", nameKana: "パナソニックホールディングスカブシキガイシャ", num: "5120001158218", pref: "大阪府", address: "大阪府門真市大字門真1006番地", regDate: "2023-10-01", estDate: "1935-12-15" },
-          { name: "三菱商事株式会社", nameKana: "ミツビシショウジカブシキガイシャ", num: "5010001008771", pref: "東京都", address: "東京都千代田区丸の内2丁目3-1", regDate: "2023-10-01", estDate: "1950-04-01" },
-          { name: "伊藤忠商事株式会社", nameKana: "イトウチュウショウジカブシキガイシャ", num: "4120001077410", pref: "大阪府", address: "大阪府大阪市北区梅田3丁目1-3", regDate: "2023-10-01", estDate: "1949-12-01" }
+          { name: "合同会社frat flat", nameKana: "ゴウドウガイシャフラットフラット", num: "2240003007487", pref: "広島県", cityName: "広島市中区", street: "南竹屋町1-21-202", postCode: "7300043", address: "広島県広島市中区南竹屋町1-21-202", regDate: "2021-04-01", estDate: "2021-04-01" },
+          { name: "合同会社ｆｒａｔ　ｆｌａｔ", nameKana: "ゴウドウガイシャフラットフラット", num: "2240003007487", pref: "広島県", cityName: "広島市中区", street: "南竹屋町1-21-202", postCode: "7300043", address: "広島県広島市中区南竹屋町1-21-202", regDate: "2021-04-01", estDate: "2021-04-01" },
+          { name: "株式会社wayway", nameKana: "カブシキガイシャウェイウェイ", num: "7010001999999", pref: "東京都", cityName: "千代田区", street: "麹町4丁目3-2", postCode: "1020083", address: "東京都千代田区麹町4丁目3-2", regDate: "2023-10-01", estDate: "2015-05-15" },
+          { name: "wayway合同会社", nameKana: "ウェイウェイゴウドウガイシャ", num: "7010001999999", pref: "広島県", cityName: "広島市中区", street: "基町12-8", postCode: "7300011", address: "広島県広島市中区基町12-8", regDate: "2024-04-01", estDate: "2020-11-20" },
+          { name: "ヤフー株式会社", nameKana: "ヤフーカブシキガイシャ", num: "7010001888888", pref: "東京都", cityName: "千代田区", street: "紀尾井町1-3 東京ガーデンテラス紀尾井町", postCode: "1028282", address: "東京都千代田区紀尾井町1-3 東京ガーデンテラス紀尾井町", regDate: "2023-10-01", estDate: "1996-01-31" },
+          { name: "LINEヤフー株式会社", nameKana: "ラインヤフーカブシキガイシャ", num: "7010001888888", pref: "東京都", cityName: "千代田区", street: "紀尾井町1-3 東京ガーデンテラス紀尾井町", postCode: "1028282", address: "東京都千代田区紀尾井町1-3 東京ガーデンテラス紀尾井町", regDate: "2023-10-01", estDate: "1996-01-31" },
+          { name: "トヨタ自動車株式会社", nameKana: "トヨタジドウシャカブシキガイシャ", num: "1180301018771", pref: "愛知県", cityName: "豊田市", street: "トヨタ町1番地", postCode: "4718571", address: "愛知県豊田市トヨタ町1番地", regDate: "2023-10-01", estDate: "1937-08-28" },
+          { name: "ソニーグループ株式会社", nameKana: "ソニーグループカブシキガイシャ", num: "5010401067252", pref: "東京都", cityName: "港区", street: "港南1丁目7-1", postCode: "1080075", address: "東京都港区港南1丁目7-1", regDate: "2023-10-01", estDate: "1946-05-07" },
+          { name: "ソフトバンク株式会社", nameKana: "ソフトバンクカブシキガイシャ", num: "9010401052465", pref: "東京都", cityName: "港区", street: "海岸1丁目7-1 東京ポートシティ竹芝", postCode: "1057529", address: "東京都港区海岸1丁目7-1 東京ポートシティ竹芝", regDate: "2023-10-01", estDate: "1986-12-09" },
+          { name: "日本電信電話株式会社", nameKana: "ニッポンデンシンデンワカブシキガイシャ", num: "7010001065142", pref: "東京都", cityName: "千代田区", street: "大手町1丁目5-1 大手町ファーストスクエア", postCode: "1008116", address: "東京都千代田区大手町1丁目5-1 大手町ファーストスクエア", regDate: "2023-10-01", estDate: "1985-04-01" },
+          { name: "株式会社NTTドコモ", nameKana: "カブシキガイシャエヌティティドコモ", num: "1010001067912", pref: "東京都", cityName: "千代田区", street: "永田町2丁目11-1 山王パークタワー", postCode: "1006150", address: "東京都千代田区永田町2丁目11-1 山王パークタワー", regDate: "2023-10-01", estDate: "1991-08-14" },
+          { name: "任天堂株式会社", nameKana: "ニンテンドウカブシキガイシャ", num: "1130001011420", pref: "京都府", cityName: "京都市南区", street: "上鳥羽鉾立町11番地1", postCode: "6018501", address: "京都府京都市南区上鳥羽鉾立町11番地1", regDate: "2023-10-01", estDate: "1947-11-20" },
+          { name: "楽天グループ株式会社", nameKana: "ラクテングループカブシキガイシャ", num: "9010701020592", pref: "東京都", cityName: "世田谷区", street: "玉川1丁目14-1 楽天クリムゾンハウス", postCode: "1580094", address: "東京都世田谷区玉川1丁目14-1 楽天クリムゾンハウス", regDate: "2023-10-01", estDate: "1997-02-07" },
+          { name: "株式会社メルカリ", nameKana: "カブシキガイシャメルカリ", num: "4010001150491", pref: "東京都", cityName: "港区", street: "六本木6丁目10-1 六本木ヒルズ森タワー", postCode: "1066118", address: "東京都港区六本木6丁目10-1 六本木ヒルズ森タワー", regDate: "2023-10-01", estDate: "2013-02-01" },
+          { name: "株式会社サイバーエージェント", nameKana: "カブシキガイシャサイバーエージェント", num: "5010401052601", pref: "東京都", cityName: "渋谷区", street: "宇田川町40-1 Abema Towers", postCode: "1500042", address: "東京都渋谷区宇田川町40-1 Abema Towers", regDate: "2023-10-01", estDate: "1998-03-18" },
+          { name: "株式会社日立製作所", nameKana: "カブシキガイシャヒタチセイサクショ", num: "7010001008844", pref: "東京都", cityName: "千代田区", street: "丸の内1丁目6-6", postCode: "1008280", address: "東京都千代田区丸の内1丁目6-6", regDate: "2023-10-01", estDate: "1920-02-01" },
+          { name: "パナソニック ホールディングス株式会社", nameKana: "パナソニックホールディングスカブシキガイシャ", num: "5120001158218", pref: "大阪府", cityName: "門真市", street: "大字門真1006番地", postCode: "5718501", address: "大阪府門真市大字門真1006番地", regDate: "2023-10-01", estDate: "1935-12-15" },
+          { name: "三菱商事株式会社", nameKana: "ミツビシショウジカブシキガイシャ", num: "5010001008771", pref: "東京都", cityName: "千代田区", street: "丸の内2丁目3-1", postCode: "1008086", address: "東京都千代田区丸の内2丁目3-1", regDate: "2023-10-01", estDate: "1950-04-01" },
+          { name: "伊藤忠商事株式会社", nameKana: "イトウチュウショウジカブシキガイシャ", num: "4120001077410", pref: "大阪府", cityName: "大阪市北区", street: "梅田3丁目1-3", postCode: "5308677", address: "大阪府大阪市北区梅田3丁目1-3", regDate: "2023-10-01", estDate: "1949-12-01" }
         ];
+
+        // 📮 日本の住所文字列を高精度に【都道府県】【市区町村】【町名・番地】【建物名・部屋番号】にパース
+        function parseJapaneseAddress(fullAddr, prefHint, cityHint, streetHint) {
+          let pref = (prefHint || '').trim();
+          let city = (cityHint || '').trim();
+          let street = (streetHint || '').trim();
+          let building = '';
+          let rest = (fullAddr || '').trim();
+
+          // 1. 都道府県の特定
+          if (!pref) {
+            const prefMatch = rest.match(/^(東京都|北海道|京都府|大阪府|.{2,3}県)/);
+            if (prefMatch) {
+              pref = prefMatch[1];
+              rest = rest.substring(pref.length).trim();
+            }
+          } else if (rest.startsWith(pref)) {
+            rest = rest.substring(pref.length).trim();
+          }
+
+          // 2. 市区町村の特定
+          if (!city) {
+            const cityMatch = rest.match(/^([^市区町村]+?郡[^市区町村]+?[町村]|[^市区町村]+?市[^市区町村]+?区|[^市区町村]+?[市区町村])/);
+            if (cityMatch) {
+              city = cityMatch[1];
+              rest = rest.substring(city.length).trim();
+            }
+          } else if (rest.startsWith(city)) {
+            rest = rest.substring(city.length).trim();
+          }
+
+          // 3. 町名・番地 と 建物名・部屋番号の分離
+          const targetStreet = street || rest;
+          const parsed = parseStreetAndBuilding(targetStreet);
+          street = parsed.street;
+          building = parsed.building;
+
+          return { pref, city, street, building };
+        }
+
+        // 町名・番地文字列から建物名・部屋番号を分離するヘルパー
+        function parseStreetAndBuilding(streetStr) {
+          if (!streetStr) return { street: '', building: '' };
+          const raw = streetStr.trim();
+
+          // 1. スペース（全角・半角）で区切られている場合は最優先
+          const spaceIdx = raw.search(/[\s　]+/);
+          if (spaceIdx !== -1) {
+            return {
+              street: raw.substring(0, spaceIdx).trim(),
+              building: raw.substring(spaceIdx).trim()
+            };
+          }
+
+          // 2. 建物キーワード（ビル、マンション、タワー等）での分割
+          const bldKeywords = ['ビル', 'マンション', 'タワー', 'レジデンス', 'コート', 'プラザ', 'ハイツ', 'コーポ', 'メゾン', 'ヒルズ', 'スクエア', 'センター', 'オフィス', '館', 'ハウス', 'フロア', '階', 'F', '号室'];
+          for (const kw of bldKeywords) {
+            const idx = raw.indexOf(kw);
+            if (idx > 0) {
+              const before = raw.substring(0, idx);
+              if (/[\d０-９]/.test(before)) {
+                const numEndMatch = before.match(/^(.+?[\d０-９]+(?:丁目|番地?|号|[-－ー‐][\d０-９]+)*(?:番地?|号)?)(.*)$/);
+                if (numEndMatch && numEndMatch[2]) {
+                  return {
+                    street: numEndMatch[1].trim(),
+                    building: (numEndMatch[2] + raw.substring(idx)).trim()
+                  };
+                } else {
+                  return {
+                    street: before.trim(),
+                    building: raw.substring(idx).trim()
+                  };
+                }
+              }
+            }
+          }
+
+          // 3. アラビア数字を含む番地の後に続く英字・カタカナ・漢字文字列
+          const m = raw.match(/^(.+?[\d０-９]+(?:丁目|番地?|号|[-－ー‐][\d０-９]+)*(?:番地?|号)?)([^\d０-９丁目番地号\-－ー‐\s].*)$/);
+          if (m && m[2]) {
+            return {
+              street: m[1].trim(),
+              building: m[2].trim()
+            };
+          }
+
+          return { street: raw, building: '' };
+        }
+
+        // 📮 郵便番号（7桁）から住所をリアルタイム照会（ZipCloud API連携＋内蔵キャッシュ）
+        const zipCache = {
+          "1500002": { pref: "東京都", city: "渋谷区", street: "渋谷" },
+          "1000001": { pref: "東京都", city: "千代田区", street: "千代田" },
+          "1000005": { pref: "東京都", city: "千代田区", street: "丸の内" },
+          "1020083": { pref: "東京都", city: "千代田区", street: "麹町" },
+          "7300012": { pref: "広島県", city: "広島市中区", street: "上八丁堀" },
+          "7300013": { pref: "広島県", city: "広島市中区", street: "八丁堀" },
+          "7300043": { pref: "広島県", city: "広島市中区", street: "南竹屋町" },
+          "5300001": { pref: "大阪府", city: "大阪市北区", street: "梅田" }
+        };
+
+        async function lookupAddressFromZip(zipCode) {
+          if (!zipCode) return null;
+          const cleanZip = zipCode.replace(/[^\d]/g, '');
+          if (cleanZip.length !== 7) return null;
+
+          if (zipCache[cleanZip]) {
+            return zipCache[cleanZip];
+          }
+
+          try {
+            const resp = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${cleanZip}`);
+            if (resp.ok) {
+              const data = await resp.json();
+              if (data && data.results && data.results.length > 0) {
+                const r = data.results[0];
+                const resObj = {
+                  pref: r.address1 || '',
+                  city: r.address2 || '',
+                  street: r.address3 || ''
+                };
+                zipCache[cleanZip] = resObj;
+                return resObj;
+              }
+            }
+          } catch (e) {
+            console.warn('ZipCloud API fetch error:', e);
+          }
+
+          return zipCache[cleanZip] || null;
+        }
 
         function normalizeText(text) {
           if (!text) return "";
@@ -1792,7 +1943,7 @@
               isApi: true,
               category: 'api',
               condition: cond,
-              isCorp: cond === 'corp_name',
+              isCorp: cond === 'corp_name' || cond === 'company_name',
               isInvoice: cond === 'invoice_number',
               isBank: cond === 'bank_name',
               isBranch: cond === 'branch_name',
@@ -1824,14 +1975,21 @@
           return null;
         }
 
-        // 法人名選択時にカナ欄・インボイス登録番号欄へ自動連動
+        // 法人名選択時にカナ欄・インボイス登録番号欄・郵便番号・4分割住所欄へ自動連動
         function autoFillCorpRelatedFields(item) {
           if (!item || !formDefinition || !formDefinition.sections) return;
+
+          // 住所の4分割パース
+          const parsedAddr = parseJapaneseAddress(item.address || '', item.pref, item.cityName, item.street);
+          const rawZip = (item.postCode || '').replace(/[^\d]/g, '');
+          const formattedZip = rawZip.length === 7 ? `${rawZip.substring(0, 3)}-${rawZip.substring(3)}` : rawZip;
+
           formDefinition.sections.forEach(sec => {
             (sec.questions || []).forEach(q => {
               const qTitle = q.title || '';
-              // カナ欄: 法人名でカナが登録されている場合のみ自動で補完。ない場合は空欄にして手動入力を必須とする
-              if (q.type === 'text' && (qTitle.includes('カナ') || qTitle.includes('フリガナ') || qTitle.includes('ふりがな'))) {
+
+              // 1. カナ欄: 法人名でカナが登録されている場合のみ自動で補完。ない場合は空欄にして手動入力を必須とする
+              if (q.type === 'text' && (qTitle.includes('カナ') || qTitle.includes('フリガナ') || qTitle.includes('ふりがな')) && !qTitle.includes('代表')) {
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
                 const input = card ? card.querySelector('input.form-control') : null;
                 if (item.nameKana && item.nameKana.trim()) {
@@ -1848,7 +2006,8 @@
                   }
                 }
               }
-              // インボイス登録番号欄
+
+              // 2. インボイス登録番号欄
               const apiConf = getQuestionApiConfig(q);
               const isInvField = (apiConf && apiConf.isInvoice) || qTitle.includes('インボイス') || qTitle.includes('登録番号');
               if (isInvField && item.num) {
@@ -1872,7 +2031,8 @@
                   badge.style.display = 'flex';
                 }
               }
-              // 法人番号欄
+
+              // 3. 法人番号欄
               if (q.type === 'text' && (qTitle.includes('法人番号') || qTitle.includes('会社番号'))) {
                 if (item.num) {
                   formValues[q.id] = item.num;
@@ -1883,6 +2043,144 @@
                       input.value = item.num;
                       clearError(q.id);
                     }
+                  }
+                }
+              }
+
+              // 4. 郵便番号欄
+              if (q.type === 'text' && (qTitle.includes('郵便番号') || qTitle.toLowerCase().includes('zip'))) {
+                const zipToFill = formattedZip || (rawZip.length === 7 ? rawZip : '');
+                if (zipToFill) {
+                  formValues[q.id] = zipToFill;
+                  const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                  if (card) {
+                    const input = card.querySelector('input.form-control');
+                    if (input) {
+                      input.value = zipToFill;
+                      clearError(q.id);
+                    }
+                  }
+                }
+              }
+
+              // 5. 都道府県欄（セレクトまたはテキスト）
+              if (qTitle.includes('都道府県')) {
+                if (parsedAddr.pref) {
+                  formValues[q.id] = parsedAddr.pref;
+                  const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                  if (card) {
+                    const selectEl = card.querySelector('select.form-control');
+                    const inputEl = card.querySelector('input.form-control');
+                    if (selectEl) {
+                      selectEl.value = parsedAddr.pref;
+                      clearError(q.id);
+                    } else if (inputEl) {
+                      inputEl.value = parsedAddr.pref;
+                      clearError(q.id);
+                    }
+                  }
+                }
+              }
+
+              // 6. 市区町村欄
+              if (qTitle.includes('市区町村') || (qTitle.includes('市') && qTitle.includes('区') && !qTitle.includes('番地'))) {
+                if (parsedAddr.city) {
+                  formValues[q.id] = parsedAddr.city;
+                  const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                  if (card) {
+                    const inputEl = card.querySelector('input.form-control');
+                    if (inputEl) {
+                      inputEl.value = parsedAddr.city;
+                      clearError(q.id);
+                    }
+                  }
+                }
+              }
+
+              // 7. 町名・番地欄（建物名を含まない枠）
+              const isStreetOnly = (qTitle.includes('町名') || qTitle.includes('番地') || qTitle.includes('丁目')) && !qTitle.includes('建物');
+              if (isStreetOnly) {
+                if (parsedAddr.street) {
+                  formValues[q.id] = parsedAddr.street;
+                  const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                  if (card) {
+                    const inputEl = card.querySelector('input.form-control');
+                    if (inputEl) {
+                      inputEl.value = parsedAddr.street;
+                      clearError(q.id);
+                    }
+                  }
+                }
+              }
+
+              // 8. 建物名・部屋番号欄
+              const isBuildingField = qTitle.includes('建物') || qTitle.includes('マンション') || qTitle.includes('ビル') || qTitle.includes('部屋番号');
+              if (isBuildingField) {
+                formValues[q.id] = parsedAddr.building || '';
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const inputEl = card.querySelector('input.form-control');
+                  if (inputEl) {
+                    inputEl.value = parsedAddr.building || '';
+                    clearError(q.id);
+                  }
+                }
+              }
+
+              // 9. 旧来の単一住所枠（町名・番地・建物名が1つにまとまっている場合への後方互換）
+              const isLegacyCombinedStreet = (qTitle.includes('町名') || qTitle.includes('番地')) && qTitle.includes('建物');
+              if (isLegacyCombinedStreet) {
+                const combined = `${parsedAddr.street} ${parsedAddr.building}`.trim();
+                formValues[q.id] = combined;
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const inputEl = card.querySelector('input.form-control');
+                  if (inputEl) {
+                    inputEl.value = combined;
+                    clearError(q.id);
+                  }
+                }
+              }
+            });
+          });
+        }
+
+        // 📮 郵便番号からの住所自動補完ハンドラ（公開回答画面 view.html 用）
+        function autoFillAddressFromZipInView(addr) {
+          if (!addr || !formDefinition || !formDefinition.sections) return;
+          formDefinition.sections.forEach(sec => {
+            (sec.questions || []).forEach(q => {
+              const qTitle = q.title || '';
+              // 都道府県
+              if (qTitle.includes('都道府県') && addr.pref) {
+                formValues[q.id] = addr.pref;
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const sel = card.querySelector('select');
+                  const inp = card.querySelector('input');
+                  if (sel) { sel.value = addr.pref; clearError(q.id); }
+                  else if (inp) { inp.value = addr.pref; clearError(q.id); }
+                }
+              }
+              // 市区町村
+              if ((qTitle.includes('市区町村') || (qTitle.includes('市') && qTitle.includes('区') && !qTitle.includes('番地'))) && addr.city) {
+                formValues[q.id] = addr.city;
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const inp = card.querySelector('input');
+                  if (inp) { inp.value = addr.city; clearError(q.id); }
+                }
+              }
+              // 町名・番地
+              const isStreetField = qTitle.includes('町名') || qTitle.includes('番地');
+              if (isStreetField && addr.street) {
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const inp = card.querySelector('input');
+                  if (inp && (!inp.value || inp.value === addr.street)) {
+                    inp.value = addr.street;
+                    formValues[q.id] = addr.street;
+                    clearError(q.id);
                   }
                 }
               }
@@ -2459,6 +2757,9 @@
                     nameKana: item.nameKana || "",
                     num: item.num,
                     pref: item.pref,
+                    cityName: item.cityName || "",
+                    street: item.street || "",
+                    postCode: item.postCode || "",
                     address: item.address || "",
                     regDate: item.regDate || ""
                   }));
@@ -2491,10 +2792,10 @@
               const clean = rawVal.replace(/(株式会社|有限会社|合同会社|ホールディングス)/g, '').trim() || rawVal;
               const targetPref = selPref || "東京都";
               listToRender = [
-                { name: `合同会社${clean}`, nameKana: `ゴウドウガイシャ${clean}`, num: generateHashNum(clean + "1"), pref: targetPref, address: `${targetPref}中央区銀座1丁目`, estDate: "2021-06-01" },
-                { name: `株式会社${clean}`, nameKana: `カブシキガイシャ${clean}`, num: generateHashNum(clean + "2"), pref: targetPref, address: `${targetPref}千代田区丸の内2丁目`, estDate: "2018-04-01" },
-                { name: `${clean}株式会社`, nameKana: ``, num: generateHashNum(clean + "3"), pref: targetPref, address: `${targetPref}港区六本木3丁目`, estDate: "2015-10-12" },
-                { name: `${clean}ホールディングス株式会社`, nameKana: ``, num: generateHashNum(clean + "4"), pref: targetPref, address: `${targetPref}新宿区西新宿2丁目`, estDate: "2008-01-20" }
+                { name: `合同会社${clean}`, nameKana: `ゴウドウガイシャ${clean}`, num: generateHashNum(clean + "1"), pref: targetPref, cityName: "中央区", street: "銀座1丁目", postCode: "1040061", address: `${targetPref}中央区銀座1丁目`, estDate: "2021-06-01" },
+                { name: `株式会社${clean}`, nameKana: `カブシキガイシャ${clean}`, num: generateHashNum(clean + "2"), pref: targetPref, cityName: "千代田区", street: "丸の内2丁目", postCode: "1000005", address: `${targetPref}千代田区丸の内2丁目`, estDate: "2018-04-01" },
+                { name: `${clean}株式会社`, nameKana: ``, num: generateHashNum(clean + "3"), pref: targetPref, cityName: "港区", street: "六本木3丁目", postCode: "1060032", address: `${targetPref}港区六本木3丁目`, estDate: "2015-10-12" },
+                { name: `${clean}ホールディングス株式会社`, nameKana: ``, num: generateHashNum(clean + "4"), pref: targetPref, cityName: "新宿区", street: "西新宿2丁目", postCode: "1600023", address: `${targetPref}新宿区西新宿2丁目`, estDate: "2008-01-20" }
               ];
             }
 
@@ -3302,16 +3603,21 @@
               input.placeholder = '回答を入力...';
               input.value = val || '';
 
-              // 金融機関コード・支店番号の自動逆引き・補完ハンドラ
+              // 金融機関コード・支店番号・郵便番号の自動逆引き・補完ハンドラ
               const isBankCode = q.title && (q.title.includes('金融機関コード') || (q.title.includes('銀行') && q.title.includes('コード')));
               const isBranchCode = q.title && (q.title.includes('支店番号') || q.title.includes('支店コード') || (q.title.includes('店舗コード') || (q.title.includes('支店') && q.title.includes('番号'))));
+              const isZipCode = q.title && (q.title.includes('郵便番号') || q.title.toLowerCase().includes('zip'));
 
               if (isBankCode) {
                 input.placeholder = '4桁の金融機関コード (例: 0005)';
               } else if (isBranchCode) {
                 input.placeholder = '3桁の支店番号 (例: 001)';
+              } else if (isZipCode) {
+                input.placeholder = '例: 100-0001 または 1000001';
+                input.maxLength = 8;
               }
 
+              let zipLookupTimer = null;
               input.addEventListener('input', (e) => {
                 const curVal = e.target.value;
                 formValues[q.id] = curVal;
@@ -3340,6 +3646,17 @@
                         autoFillBranchNameInView(branches[cleanBc].name);
                       }
                     }).catch(() => {});
+                  }
+                } else if (isZipCode) {
+                  const cleanZip = curVal.replace(/[^\d]/g, '');
+                  if (cleanZip.length === 7) {
+                    clearTimeout(zipLookupTimer);
+                    zipLookupTimer = setTimeout(async () => {
+                      const addr = await lookupAddressFromZip(cleanZip);
+                      if (addr) {
+                        autoFillAddressFromZipInView(addr);
+                      }
+                    }, 100);
                   }
                 }
               });
