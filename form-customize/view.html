@@ -1935,6 +1935,21 @@
           });
         }
 
+        function convertHiraganaToKatakana(str) {
+          if (!str) return '';
+          return str.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+        }
+
+        const ACCOUNT_HOLDER_KANA_REGEX = /^[ァ-ヶｦ-ﾟー\-()（）.\．\・\s　]+$/;
+
+        function isAccountHolderKanaField(q) {
+          if (!q) return false;
+          const t = (q.title || '').trim();
+          const isHolder = t.includes('口座名義') || t.includes('名義人') || (t.includes('口座') && t.includes('名義'));
+          const isKana = t.includes('カナ') || t.includes('フリガナ') || t.includes('ふりがな') || (q.validation && q.validation.category === 'regex' && /^[ァ-ヶ]/.test(q.validation.value || ''));
+          return isHolder && (isKana || !t.includes('漢字'));
+        }
+
         function getQuestionApiConfig(q) {
           if (!q) return null;
           if (q.validation && q.validation.category === 'api' && q.validation.condition) {
@@ -3604,10 +3619,11 @@
               input.placeholder = '回答を入力...';
               input.value = val || '';
 
-              // 金融機関コード・支店番号・郵便番号の自動逆引き・補完ハンドラ
+              // 金融機関コード・支店番号・郵便番号・口座名義（カナ）の自動逆引き・補完ハンドラ
               const isBankCode = q.title && (q.title.includes('金融機関コード') || (q.title.includes('銀行') && q.title.includes('コード')));
               const isBranchCode = q.title && (q.title.includes('支店番号') || q.title.includes('支店コード') || (q.title.includes('店舗コード') || (q.title.includes('支店') && q.title.includes('番号'))));
               const isZipCode = q.title && (q.title.includes('郵便番号') || q.title.toLowerCase().includes('zip'));
+              const isAccountHolderKana = isAccountHolderKanaField(q);
 
               if (isBankCode) {
                 input.placeholder = '4桁の金融機関コード (例: 0005)';
@@ -3616,13 +3632,33 @@
               } else if (isZipCode) {
                 input.placeholder = '例: 100-0001 または 1000001';
                 input.maxLength = 8;
+              } else if (isAccountHolderKana) {
+                input.placeholder = '例: カ）ヤマダ タロウ';
               }
 
               let zipLookupTimer = null;
               input.addEventListener('input', (e) => {
-                const curVal = e.target.value;
+                let curVal = e.target.value;
+
+                if (isAccountHolderKana) {
+                  const converted = convertHiraganaToKatakana(curVal);
+                  if (converted !== curVal) {
+                    curVal = converted;
+                    input.value = curVal;
+                  }
+                  if (curVal.trim() && curVal.trim() !== '-') {
+                    if (!ACCOUNT_HOLDER_KANA_REGEX.test(curVal)) {
+                      showError(q.id, '口座名義はカナと（）.のみで入力してください（例: カ）ヤマダ タロウ）。');
+                    } else {
+                      clearError(q.id);
+                    }
+                  } else {
+                    clearError(q.id);
+                  }
+                }
+
                 formValues[q.id] = curVal;
-                clearError(q.id);
+                if (!isAccountHolderKana) clearError(q.id);
 
                 if (isBankCode && curVal.trim().length === 4) {
                   const b = findBankByCode(curVal.trim());
@@ -3661,6 +3697,20 @@
                   }
                 }
               });
+
+              if (isAccountHolderKana) {
+                input.addEventListener('blur', () => {
+                  const val = input.value.trim();
+                  if (val && val !== '-') {
+                    if (!ACCOUNT_HOLDER_KANA_REGEX.test(val)) {
+                      showError(q.id, '口座名義はカナと（）.のみで入力してください（例: カ）ヤマダ タロウ）。');
+                    } else {
+                      clearError(q.id);
+                    }
+                  }
+                });
+              }
+
               container.appendChild(input);
 
               // 法人名・屋号または自動ハイフン補填規則がある場合、個人事業主向けの案内文を表示
@@ -3994,45 +4044,65 @@
             }
 
             // 4. バリデーションルールチェック
-            if (val && typeof val === 'string' && q.validation) {
-              const v = q.validation;
-              let rulePassed = true;
-              if (val.trim() === '-') {
-                rulePassed = true; // 自動補填された半角ハイフン「-」は全ルール通過
-              } else if (v.category === 'text') {
-                if (v.condition === 'email') {
-                  rulePassed = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
-                } else if (v.condition === 'url') {
-                  rulePassed = /^https?:\/\/[^\s]+$/.test(val);
-                } else if (v.condition === 'auto_hyphen') {
-                  rulePassed = true; // 自動ハイフン補填規則は形式問わずパス
-                }
-              } else if (v.category === 'number') {
-                const num = Number(val);
-                if (isNaN(num)) rulePassed = false;
-              } else if (v.category === 'api') {
-                if (v.condition === 'corp_name') {
-                  rulePassed = val.trim().length > 0;
-                } else if (v.condition === 'invoice_number') {
-                  if (val.trim() === '-') {
-                    rulePassed = true;
-                  } else {
-                    const cleanInv = val.trim().toUpperCase();
-                    rulePassed = /^T\d{13}$/.test(cleanInv) && (CORP_DATABASE.some(c => ('T' + c.num) === cleanInv) || isValidInvoiceCheckDigit(cleanInv));
-                  }
-                } else if (v.condition === 'bank_name') {
-                  rulePassed = val.trim().length > 0;
-                } else if (v.condition === 'branch_name') {
-                  rulePassed = val.trim().length > 0;
+            if (val && typeof val === 'string') {
+              const isAccountHolderKana = isAccountHolderKanaField(q);
+              if (isAccountHolderKana && val.trim() !== '-') {
+                if (!ACCOUNT_HOLDER_KANA_REGEX.test(val.trim())) {
+                  card.classList.add('has-error');
+                  if (errorTextEl) errorTextEl.textContent = '口座名義はカナと（）.のみで入力してください（例: カ）ヤマダ タロウ）。';
+                  isValid = false;
+                  if (!firstErrorCard) firstErrorCard = card;
+                  return;
                 }
               }
 
-              if (!rulePassed) {
-                card.classList.add('has-error');
-                if (errorTextEl) errorTextEl.textContent = v.errorMessage || '正しい形式で入力してください。';
-                isValid = false;
-                if (!firstErrorCard) firstErrorCard = card;
-                return;
+              if (q.validation) {
+                const v = q.validation;
+                let rulePassed = true;
+                if (val.trim() === '-') {
+                  rulePassed = true; // 自動補填された半角ハイフン「-」は全ルール通過
+                } else if (v.category === 'text') {
+                  if (v.condition === 'email') {
+                    rulePassed = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+                  } else if (v.condition === 'url') {
+                    rulePassed = /^https?:\/\/[^\s]+$/.test(val);
+                  } else if (v.condition === 'auto_hyphen') {
+                    rulePassed = true; // 自動ハイフン補填規則は形式問わずパス
+                  }
+                } else if (v.category === 'number') {
+                  const num = Number(val);
+                  if (isNaN(num)) rulePassed = false;
+                } else if (v.category === 'regex' && v.value) {
+                  try {
+                    const reg = new RegExp(v.value);
+                    rulePassed = reg.test(val);
+                  } catch (e) {
+                    console.error('Regex validation error:', e);
+                  }
+                } else if (v.category === 'api') {
+                  if (v.condition === 'corp_name') {
+                    rulePassed = val.trim().length > 0;
+                  } else if (v.condition === 'invoice_number') {
+                    if (val.trim() === '-') {
+                      rulePassed = true;
+                    } else {
+                      const cleanInv = val.trim().toUpperCase();
+                      rulePassed = /^T\d{13}$/.test(cleanInv) && (CORP_DATABASE.some(c => ('T' + c.num) === cleanInv) || isValidInvoiceCheckDigit(cleanInv));
+                    }
+                  } else if (v.condition === 'bank_name') {
+                    rulePassed = val.trim().length > 0;
+                  } else if (v.condition === 'branch_name') {
+                    rulePassed = val.trim().length > 0;
+                  }
+                }
+
+                if (!rulePassed) {
+                  card.classList.add('has-error');
+                  if (errorTextEl) errorTextEl.textContent = v.errorMessage || '正しい形式で入力してください。';
+                  isValid = false;
+                  if (!firstErrorCard) firstErrorCard = card;
+                  return;
+                }
               }
             }
           });
