@@ -730,20 +730,61 @@
           }
         }
 
-        // リッチテキストリンク化ヘルパー
+        // リッチテキスト・書式・リンク化ヘルパー（太字・斜体・下線・Markdownリンク・生URL対応）
         function renderRichTextWithLinks(text) {
           if (!text) return '';
+          // 1. HTMLエスケープ（XSS対策）
           let escaped = text
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
-          
-          // [label](url) -> <a href="url" target="_blank">label</a>
-          escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-          // 生URL -> <a href="url">url</a>
-          escaped = escaped.replace(/(^|[^"'])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+
+          // 2. 下線: <u>...</u> (エスケープされた &lt;u&gt;...&lt;/u&gt;)
+          escaped = escaped.replace(/&lt;u&gt;(.*?)&lt;\/u&gt;/gi, '<u style="text-decoration: underline;">$1</u>');
+
+          // 3. 太字: **...**
+          escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+          // 4. 斜体: *...* (太字と干渉しないよう単一のアスタリスク)
+          escaped = escaped.replace(/(^|[^*])\*([^*]+?)\*([^*]|$)/g, '$1<em>$2</em>$3');
+
+          // 5. Markdown形式リンク: [ラベル](URL) および全角 ［ラベル］（URL）
+          escaped = escaped.replace(/[\[［]([^\]］\n\r]+)[\]］][\(（]([^\s\)\<\>"）]+)[\)）]/g, (match, label, rawUrl) => {
+            let url = rawUrl.replace(/[！-～]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).trim();
+            if (!/^(https?:\/\/|\/|mailto:|tel:)/i.test(url)) {
+              if (/^[\w.-]+\.[a-z]{2,}/i.test(url)) {
+                url = 'https://' + url;
+              } else {
+                return match;
+              }
+            }
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="rich-embedded-link" style="color:var(--color-primary, #0056b3); text-decoration:underline; font-weight:500; cursor:pointer;" onclick="event.stopPropagation();">${label}</a>`;
+          });
+
+          // 6. 既存の <a>, <strong>, <em>, <u> タグを一時保護
+          const protectedTags = [];
+          escaped = escaped.replace(/<(a|strong|em|u)\b[^>]*>(.*?)<\/\1>/gi, (match) => {
+            protectedTags.push(match);
+            return `___TAG_PLACEHOLDER_${protectedTags.length - 1}___`;
+          });
+
+          // 7. 生URL（http/https）の自動リンク化
+          escaped = escaped.replace(/(https?:\/\/[^\s<]+)/gi, (match) => {
+            let cleanUrl = match.replace(/([.,!?:;)\]]+)$/, '');
+            let trail = match.slice(cleanUrl.length);
+            return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="rich-embedded-link" style="color:var(--color-primary, #0056b3); text-decoration:underline; font-weight:500; cursor:pointer;" onclick="event.stopPropagation();">${cleanUrl}</a>${trail}`;
+          });
+
+          // 8. 保護したタグを復元
+          escaped = escaped.replace(/___TAG_PLACEHOLDER_(\d+)___/g, (match, idx) => {
+            return protectedTags[parseInt(idx, 10)];
+          });
+
+          // 9. 改行を <br> に変換
+          escaped = escaped.replace(/\r\n|\r|\n/g, '<br>');
+
           return escaped;
         }
 
