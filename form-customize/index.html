@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <script type="module" src="./assets/index-W0nnFdhS-v6.js?v=6.0.0"></script>
+    <script type="module" src="./assets/index-W0nnFdhS-v6.js?v=6.0.1"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
     <script>
       // 🚀 回答者向けアクセス（active_tab=preview または res_id / mode=view）の即時自動転送
@@ -52,23 +52,23 @@
         console.warn('[Antigravity] Failed to set default admin session:', e);
       }
 
-      // 🚀 キャッシュを100%強制回避して最新のCSSとJSをロードするインラインローダー
+      // 🚀 キャッシュを100%強制回避して最新のCSSとJSをロードするインラインローダー (v91)
       (function() {
         const ts = Date.now();
         
         // CSSの注入
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = './assets/custom-editor-v90.css?v=' + ts;
+        link.href = './assets/custom-editor-v91.css?v=' + ts;
         document.head.appendChild(link);
         
         // JS of injection
         const script = document.createElement('script');
-        script.src = './assets/custom-editor-v90.js?v=' + ts;
+        script.src = './assets/custom-editor-v91.js?v=' + ts;
         script.defer = true;
         document.head.appendChild(script);
         
-        console.log('[Antigravity Loader] Force loaded assets with timestamp:', ts);
+        console.log('[Antigravity Loader] Force loaded assets with timestamp (v91):', ts);
       })();
     </script>
   </head>
@@ -725,6 +725,7 @@
                     <option value="name">氏名</option>
                     <option value="email">メールアドレス</option>
                     <option value="tel">電話番号</option>
+                    <option value="birthdate">生年月日</option>
                     <option value="zip">郵便番号</option>
                     <option value="bank_account">口座番号</option>
                     <option value="invoice">インボイス登録番号</option>
@@ -1070,15 +1071,23 @@
             </div>
           </div>
           <!-- クイック選択チップ -->
-          <div style="display: flex; gap: 6px; padding: 8px 16px; overflow-x: auto; white-space: nowrap; border-top: 1px solid var(--color-border); background-color: rgba(255,255,255,0.01);">
-            <span class="chat-chip" data-query="郵便番号の正規表現を教えて">📮 郵便番号</span>
-            <span class="chat-chip" data-query="メールアドレスの正規表現を教えて">📧 メールアドレス</span>
-            <span class="chat-chip" data-query="電話番号の正規表現を教えて">📞 電話番号</span>
-            <span class="chat-chip" data-query="口座番号の正規表現を教えて">💳 口座番号</span>
-            <span class="chat-chip" data-query="インボイス番号の正規表現を教えて">🧾 インボイス番号</span>
-            <span class="chat-chip" data-query="半角英数字のみの正規表現を教えて">🔤 半角英数字</span>
-            <span class="chat-chip" data-query="全角カタカナのみの正規表現を教えて">📝 カタカナ</span>
-            <span class="chat-chip" data-query="日付(YYYY/MM/DD)の正規表現を教えて">📅 日付</span>
+          <div class="regex-chips-wrapper">
+            <button type="button" id="btn-regex-chips-prev" class="regex-chips-nav-btn left" aria-label="前へスクロール" title="前へスクロール" disabled>‹</button>
+            <div id="regex-chat-chips-container" class="regex-chips-scroll">
+              <span class="chat-chip" data-query="電話番号の正規表現を教えて">📞 電話番号</span>
+              <span class="chat-chip" data-query="電話番号（ハイフンなし）の正規表現を教えて">📞 電話番号（-無）</span>
+              <span class="chat-chip" data-query="電話番号（ハイフン問わず）の正規表現を教えて">📞 電話番号（柔軟）</span>
+              <span class="chat-chip" data-query="郵便番号の正規表現を教えて">📮 郵便番号</span>
+              <span class="chat-chip" data-query="郵便番号（ハイフンなし）の正規表現を教えて">📮 郵便番号（-無）</span>
+              <span class="chat-chip" data-query="メールアドレスの正規表現を教えて">📧 メールアドレス</span>
+              <span class="chat-chip" data-query="口座番号の正規表現を教えて">💳 口座番号</span>
+              <span class="chat-chip" data-query="インボイス番号の正規表現を教えて">🧾 インボイス番号</span>
+              <span class="chat-chip" data-query="半角英数字のみの正規表現を教えて">🔤 半角英数字</span>
+              <span class="chat-chip" data-query="全角カタカナのみの正規表現を教えて">📝 カタカナ</span>
+              <span class="chat-chip" data-query="生年月日の正規表現を教えて">🎂 生年月日</span>
+              <span class="chat-chip" data-query="日付(YYYY/MM/DD)の正規表現を教えて">📅 日付</span>
+            </div>
+            <button type="button" id="btn-regex-chips-next" class="regex-chips-nav-btn right" aria-label="次へスクロール" title="次へスクロール">›</button>
           </div>
         </div>
         <div class="modal-footer" style="padding: 12px 16px; display: flex; gap: 8px; border-top: 1px solid var(--color-border);">
@@ -1358,6 +1367,120 @@
         max-height: calc(100vh - 120px) !important;
         overflow-y: auto !important;
         z-index: 10 !important;
+      }
+
+      /* 🤖 正規表現AIアシスタント クイック選択チップ 横スクロール＆ナビゲーション（非重複・クリーンレイアウト） */
+      .regex-chips-wrapper {
+        display: flex !important;
+        align-items: center !important;
+        border-top: 1px solid var(--color-border, #dee2e6) !important;
+        background-color: var(--color-bg-app, #ffffff) !important;
+        user-select: none !important;
+        padding: 6px 8px !important;
+        gap: 6px !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+        width: 100% !important;
+      }
+
+      .regex-chips-scroll {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        display: flex !important;
+        gap: 8px !important;
+        padding: 4px 2px 8px 2px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        white-space: nowrap !important;
+        scroll-behavior: smooth !important;
+        -webkit-overflow-scrolling: touch !important;
+        cursor: grab;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0, 86, 179, 0.4) transparent;
+      }
+
+      .regex-chips-scroll:active {
+        cursor: grabbing;
+      }
+
+      .regex-chips-scroll .chat-chip {
+        flex-shrink: 0 !important;
+        user-select: none !important;
+        white-space: nowrap !important;
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
+        padding: 6px 13px !important;
+        background-color: var(--color-bg-card, #f8f9fa) !important;
+        border: 1px solid var(--color-border, #dee2e6) !important;
+        color: var(--color-text, #212529) !important;
+        border-radius: 20px !important;
+        transition: all 0.15s ease !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+        cursor: pointer !important;
+      }
+
+      .regex-chips-scroll .chat-chip:hover {
+        background-color: #e8f0fe !important;
+        border-color: var(--color-primary, #0056b3) !important;
+        color: var(--color-primary, #0056b3) !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 2px 5px rgba(0, 86, 179, 0.15) !important;
+      }
+
+      /* スクロールバーのモダンデザイン（細め＆角丸） */
+      .regex-chips-scroll::-webkit-scrollbar {
+        height: 5px !important;
+      }
+      .regex-chips-scroll::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05) !important;
+        border-radius: 4px !important;
+      }
+      .regex-chips-scroll::-webkit-scrollbar-thumb {
+        background: rgba(0, 86, 179, 0.35) !important;
+        border-radius: 4px !important;
+      }
+      .regex-chips-scroll::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 86, 179, 0.75) !important;
+      }
+
+      /* 左右ナビゲーションボタン（◀ / ▶） */
+      .regex-chips-nav-btn {
+        flex: 0 0 28px !important;
+        width: 28px !important;
+        height: 28px !important;
+        border-radius: 50% !important;
+        background: var(--color-bg-card, #f8f9fa) !important;
+        border: 1px solid var(--color-border, #dee2e6) !important;
+        color: var(--color-text, #212529) !important;
+        font-size: 16px !important;
+        font-weight: bold !important;
+        line-height: 1 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+        transition: all 0.2s ease !important;
+        padding: 0 !important;
+        outline: none !important;
+      }
+
+      .regex-chips-nav-btn:hover:not(:disabled) {
+        background: var(--color-primary, #0056b3) !important;
+        color: #ffffff !important;
+        border-color: var(--color-primary, #0056b3) !important;
+        box-shadow: 0 2px 6px rgba(0, 86, 179, 0.3) !important;
+        transform: scale(1.08) !important;
+      }
+
+      .regex-chips-nav-btn:disabled,
+      .regex-chips-nav-btn[disabled] {
+        opacity: 0.25 !important;
+        cursor: not-allowed !important;
+        pointer-events: none !important;
+        box-shadow: none !important;
       }
     </style>
 

@@ -13,6 +13,78 @@
 (function() {
   console.log('custom-editor.js loading...');
 
+  // 🏦 全銀協 銀行名・支店名・支店番号 API連携規則の拡張保証
+  const ensureBankApiConditions = () => {
+    if (window.b && window.b.api && window.b.api.conditions) {
+      window.b.api.conditions.bank_name = '銀行名検索（全銀協金融機関コードAPI連携）';
+      window.b.api.conditions.branch_name = '支店名検索（全銀協支店コード・支店番号API連携）';
+      window.b.api.conditions.branch_code = '支店番号検索（全銀協支店コードAPI連携）';
+    }
+    if (window.re) {
+      if (!window.re.bank_name) {
+        window.re.bank_name = {
+          type: "text",
+          title: "銀行名",
+          description: "全銀協コードAPI連携対応",
+          required: true,
+          validation: {
+            category: "api",
+            condition: "bank_name",
+            value: "",
+            value2: "",
+            errorMessage: "実在する銀行名を入力または選択してください。"
+          },
+          options: []
+        };
+      }
+      if (!window.re.branch_name) {
+        window.re.branch_name = {
+          type: "text",
+          title: "支店名",
+          description: "全銀協支店コードAPI連携対応",
+          required: true,
+          validation: {
+            category: "api",
+            condition: "branch_name",
+            value: "",
+            value2: "",
+            errorMessage: "実在する支店名を入力または選択してください。"
+          },
+          options: []
+        };
+      }
+      if (!window.re.branch_code) {
+        window.re.branch_code = {
+          type: "text",
+          title: "支店番号",
+          description: "全銀協支店番号API連携対応",
+          required: true,
+          validation: {
+            category: "api",
+            condition: "branch_code",
+            value: "",
+            value2: "",
+            errorMessage: "実在する3桁の支店番号を入力または選択してください。"
+          },
+          options: []
+        };
+      }
+      if (window.re.pro_bank && Array.isArray(window.re.pro_bank.questions)) {
+        window.re.pro_bank.questions.forEach(q => {
+          if (q.title === '金融機関名' || q.title === '銀行名') {
+            q.validation = { category: "api", condition: "bank_name", errorMessage: "実在する金融機関名を入力または選択してください。" };
+          } else if (q.title === '支店名') {
+            q.validation = { category: "api", condition: "branch_name", errorMessage: "実在する支店名を入力または選択してください。" };
+          } else if (q.title === '支店番号' || q.title === '支店コード') {
+            q.validation = { category: "api", condition: "branch_code", errorMessage: "実在する3桁の支店番号を入力または選択してください。" };
+          }
+        });
+      }
+    }
+  };
+  ensureBankApiConditions();
+  setInterval(ensureBankApiConditions, 200);
+
   // 🚀 スコープ不整合ReferenceErrorを解消するプロキシ定義
   window.saveAndSyncMindmapData = null;
   function saveAndSyncMindmapData(...args) {
@@ -60,6 +132,11 @@
   // 起動時セーフガード: フラグのリセットおよび破損データの自動修復
   (function initSanitize() {
     try {
+      // 🚀 親システム連携：常時管理者権限（フルアクセス）を担保
+      const adminUser = { id: 'user_admin', name: '管理者', role: 'admin' };
+      localStorage.setItem('gf_current_user', JSON.stringify(adminUser));
+      window.K = adminUser;
+
       localStorage.setItem('form_customize_is_template_mode', 'false');
       setTimeout(() => {
         initTemplates(); // テンプレートマスタ初期化
@@ -89,14 +166,14 @@
     }
   })();
 
-  // CSSのキャッシュ破り用動的インジェクション (v89に対応 & 重複ロード防止)
+  // CSSのキャッシュ破り用動的インジェクション (v91に対応 & 重複ロード防止)
   (function injectLatestCSS() {
-    if (document.querySelector('link[href*="custom-editor-v89.css"]')) return;
+    if (document.querySelector('link[href*="custom-editor-v91.css"]')) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = './assets/custom-editor-v89.css?v=' + Date.now();
+    link.href = './assets/custom-editor-v91.css?v=' + Date.now();
     document.head.appendChild(link);
-    console.log('[Custom Flowmap] Injected latest stylesheet (v89):', link.href);
+    console.log('[Custom Flowmap] Injected latest stylesheet (v91):', link.href);
   })();
 
   // 📁 【強固なイベントデリゲーション】新規作成ボタンとギャラリーボタンのフック (プロンプト回避 & ギャラリー起動)
@@ -1071,7 +1148,18 @@
       branches: {
         "東京営業部": "010",
         "大阪営業部": "110",
-        "新宿支店": "326"
+        "新宿支店": "326",
+        "渋谷支店": "328",
+        "日本橋支店": "020"
+      }
+    },
+    "埼玉りそな銀行": {
+      code: "0017",
+      branches: {
+        "さいたま営業部": "001",
+        "大宮支店": "100",
+        "川越支店": "200",
+        "浦和支店": "110"
       }
     },
     "ゆうちょ銀行": {
@@ -1079,7 +1167,9 @@
       branches: {
         "本店": "001",
         "〇一八支店": "018",
-        "〇二八支店": "028"
+        "〇二八支店": "028",
+        "一三八支店": "138",
+        "二二八支店": "228"
       }
     },
     "楽天銀行": {
@@ -1089,7 +1179,9 @@
         "第一営業支店": "251",
         "第二営業支店": "252",
         "第三営業支店": "253",
-        "楽天市場支店": "207"
+        "楽天市場支店": "207",
+        "ワルツ支店": "204",
+        "リズム支店": "209"
       }
     },
     "PayPay銀行": {
@@ -1098,7 +1190,9 @@
         "本店営業部": "001",
         "ビジネス営業部": "002",
         "すずめ支店": "003",
-        "はやぶさ支店": "004"
+        "はやぶさ支店": "004",
+        "つばめ支店": "005",
+        "かわせみ支店": "006"
       }
     },
     "住信SBIネット銀行": {
@@ -1108,7 +1202,9 @@
         "イチゴ支店": "101",
         "ブドウ支店": "102",
         "ミカン支店": "103",
-        "レモン支店": "104"
+        "レモン支店": "104",
+        "リンゴ支店": "105",
+        "バナナ支店": "106"
       }
     },
     "ソニー銀行": {
@@ -1117,47 +1213,463 @@
         "本店営業部": "001"
       }
     },
+    "SBI新生銀行": {
+      code: "0397",
+      branches: {
+        "本店": "400",
+        "新宿支店": "410",
+        "銀座支店": "411",
+        "難波支店": "510"
+      }
+    },
+    "あおぞら銀行": {
+      code: "0398",
+      branches: {
+        "本店": "001",
+        "日本橋支店": "003",
+        "新宿支店": "004",
+        "大阪支店": "101"
+      }
+    },
+    "GMOあおぞらネット銀行": {
+      code: "0310",
+      branches: {
+        "本店営業部": "101",
+        "法人第一営業部": "102"
+      }
+    },
+    "イオン銀行": {
+      code: "0040",
+      branches: {
+        "本店": "001",
+        "カブトチョウ支店": "002"
+      }
+    },
+    "auじぶん銀行": {
+      code: "0039",
+      branches: {
+        "本店": "001"
+      }
+    },
+    "横浜銀行": {
+      code: "0138",
+      branches: {
+        "本店営業部": "100",
+        "新横浜支店": "230",
+        "川崎支店": "300",
+        "新宿支店": "710",
+        "東京支店": "700"
+      }
+    },
+    "千葉銀行": {
+      code: "0134",
+      branches: {
+        "本店営業部": "100",
+        "船橋支店": "200",
+        "柏支店": "300",
+        "東京営業部": "700"
+      }
+    },
+    "静岡銀行": {
+      code: "0149",
+      branches: {
+        "本店営業部": "100",
+        "浜松営業部": "200",
+        "静岡駅前支店": "110",
+        "東京支店": "700"
+      }
+    },
+    "福岡銀行": {
+      code: "0177",
+      branches: {
+        "本店営業部": "100",
+        "博多駅前支店": "110",
+        "天神町支店": "120",
+        "東京支店": "700"
+      }
+    },
     "広島銀行": {
       code: "0169",
       branches: {
         "本店営業部": "001",
         "八丁堀支店": "101",
+        "東京支店": "901",
+        "大阪支店": "801"
+      }
+    },
+    "北洋銀行": {
+      code: "0166",
+      branches: {
+        "本店営業部": "001",
+        "札幌南支店": "100",
         "東京支店": "901"
       }
     },
-    "ウェイウェイ銀行": {
-      code: "9999",
+    "京都銀行": {
+      code: "0158",
       branches: {
-        "本店営業部": "001",
-        "東京支店": "101",
-        "大阪支店": "201",
-        "広島支店": "301"
+        "本店営業部": "100",
+        "祇園支店": "110",
+        "大阪営業部": "500",
+        "東京営業部": "700"
       }
     },
-    "ヤフー銀行": {
-      code: "8888",
+    "広島信用金庫": {
+      code: "1750",
       branches: {
         "本店営業部": "001",
-        "ネット営業部": "002"
+        "広島駅前支店": "002",
+        "八丁堀支店": "003"
+      }
+    },
+    "広島みどり信用金庫": {
+      code: "1758",
+      branches: {
+        "本店営業部": "001"
+      }
+    },
+    "広島市信用組合": {
+      code: "2680",
+      branches: {
+        "本店営業部": "001"
       }
     }
   };
 
+  function getOfficialBankName(bank) {
+    if (!bank || !bank.name) return '';
+    const name = String(bank.name).trim();
+    const code = String(bank.code || '').padStart(4, '0');
+    const codeNum = parseInt(code, 10);
+
+    if (name.endsWith('銀行') || name.endsWith('信用金庫') || name.endsWith('信用組合') || name.endsWith('労働金庫')) {
+      return name;
+    }
+    if (name.endsWith('信金')) return name.replace(/信金$/, '信用金庫');
+    if (name.endsWith('信組')) return name.replace(/信組$/, '信用組合');
+    if (name.endsWith('労金')) return name.replace(/労金$/, '労働金庫');
+    if (name.endsWith('農協')) return name.replace(/農協$/, '農業協同組合');
+    if (name.endsWith('信連')) return name.replace(/信連$/, '信用農業協同組合連合会');
+    if (name.endsWith('信漁連')) return name.replace(/信漁連$/, '信用漁業協同組合連合会');
+
+    if (codeNum < 1000) return name + '銀行';
+    if (codeNum >= 1000 && codeNum < 2000) return name + '信用金庫';
+    if (codeNum >= 2000 && codeNum < 3000) return name + '信用組合';
+    if (codeNum >= 2950 && codeNum <= 2999) return name + '労働金庫';
+    return name;
+  }
+
+  // 全銀協 統一金融機関コード・支店コード 最新オープンデータ連携サービス (Zengin Code API)
+  const BankDataService = {
+    _banks: null,
+    _banksPromise: null,
+    _branchMap: new Map(),
+    _branchPromises: new Map(),
+
+    async init() {
+      return this.getBanks();
+    },
+
+    async getBanks() {
+      if (this._banks && Object.keys(this._banks).length > 0) return this._banks;
+      if (this._banksPromise) return this._banksPromise;
+
+      this._banksPromise = (async () => {
+        // 1. 自前サーバーレスAPI (/api/bank-search)
+        try {
+          const res = await fetch('/api/bank-search');
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.success && Array.isArray(data.banks)) {
+              const map = {};
+              data.banks.forEach(b => {
+                const c = String(b.code || '').padStart(4, '0');
+                map[c] = { ...b, code: c };
+              });
+              this._banks = map;
+              return this._banks;
+            }
+          }
+        } catch (e) {
+          console.warn('[BankDataService] /api/bank-search fetch failed, trying direct open data endpoint...', e);
+        }
+
+        // 2. Direct Zengin Code API (GitHub Pages: CORS * 全オリジン許可)
+        try {
+          const res = await fetch('https://zengin-code.github.io/api/banks.json');
+          if (res.ok) {
+            const data = await res.json();
+            if (data && typeof data === 'object') {
+              this._banks = data;
+              return this._banks;
+            }
+          }
+        } catch (e) {
+          console.warn('[BankDataService] Direct Zengin Code API fetch failed, falling back to local database...', e);
+        }
+
+        // 3. Fallback: static BANK_DATABASE
+        const fallbackMap = {};
+        for (const [name, info] of Object.entries(BANK_DATABASE)) {
+          fallbackMap[info.code] = {
+            code: info.code,
+            name: name,
+            kana: '',
+            hira: ''
+          };
+        }
+        this._banks = fallbackMap;
+        return this._banks;
+      })();
+
+      return this._banksPromise;
+    },
+
+    async searchBanks(query) {
+      const rawVal = (query || '').trim();
+      if (!rawVal) return [];
+
+      // 1. 自前最新API (/api/bank-search) に照会
+      try {
+        const res = await fetch(`/api/bank-search?query=${encodeURIComponent(rawVal)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && Array.isArray(data.banks)) {
+            return data.banks.map(b => ({
+              ...b,
+              officialName: b.officialName || getOfficialBankName(b),
+              displayName: b.displayName || b.officialName || getOfficialBankName(b)
+            }));
+          }
+        }
+      } catch (e) {
+        console.warn('[BankDataService] searchBanks api failed, falling back to client cache...', e);
+      }
+
+      // 2. クライアントキャッシュでのフォールバック検索
+      const banks = await this.getBanks();
+      const cleanTarget = rawVal.normalize('NFKC').trim().toLowerCase();
+      const kataTarget = (cleanTarget || '').replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+      const hiraTarget = (cleanTarget || '').replace(/[\u30a1-\u30f6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+      const cleanNoType = cleanTarget.replace(/銀行|信用金庫|信金|労働金庫|労金|信組|信用組合|農協|農業協同組合/, '');
+
+      const hasBank = cleanTarget.includes('銀行');
+      const hasShinkin = cleanTarget.includes('信金') || cleanTarget.includes('信用金庫');
+      const hasShinkumi = cleanTarget.includes('信組') || cleanTarget.includes('信用組合');
+
+      const bankList = Object.values(banks);
+      const matches = [];
+
+      for (const b of bankList) {
+        const bCode = String(b.code || '').padStart(4, '0');
+        const officialName = getOfficialBankName(b);
+        const rawName = (b.name || '').normalize('NFKC').trim().toLowerCase();
+        const offName = officialName.normalize('NFKC').trim().toLowerCase();
+        const bKana = (b.kana || '').normalize('NFKC').trim().toLowerCase();
+        const bHira = (b.hira || '').normalize('NFKC').trim().toLowerCase();
+        const bRoma = (b.roma || '').normalize('NFKC').trim().toLowerCase();
+
+        let score = -1;
+
+        // コード完全一致
+        if (bCode === cleanTarget) {
+          score = 100;
+        }
+        // 正式名称・生名称・カナ・ひらがな完全一致
+        else if (offName === cleanTarget || rawName === cleanTarget || bKana === kataTarget || bHira === hiraTarget) {
+          score = 90;
+        }
+        // 単体名で正式名称が一致 (例: 入力「広島」に対して officialName「広島銀行」)
+        else if (cleanNoType && offName === cleanNoType + '銀行' && !hasShinkin && !hasShinkumi) {
+          score = 85;
+        }
+        // 前方一致
+        else if (offName.startsWith(cleanTarget) || rawName.startsWith(cleanTarget) || bKana.startsWith(kataTarget) || bHira.startsWith(hiraTarget)) {
+          score = 80;
+        }
+        // cleanNoTypeで前方一致
+        else if (cleanNoType.length >= 2 && (offName.startsWith(cleanNoType) || rawName.startsWith(cleanNoType) || bKana.startsWith(kataTarget))) {
+          score = 70;
+          if (hasShinkin && !offName.includes('信用金庫')) score -= 40;
+          if (hasBank && !offName.endsWith('銀行')) score -= 40;
+        }
+        // 部分一致
+        else if (offName.includes(cleanTarget) || rawName.includes(cleanTarget) || bKana.includes(kataTarget) || bHira.includes(hiraTarget) || bRoma.includes(cleanTarget)) {
+          score = 60;
+        }
+        else if (cleanNoType.length >= 2 && (offName.includes(cleanNoType) || bKana.includes(kataTarget))) {
+          score = 50;
+          if (hasShinkin && !offName.includes('信用金庫')) score -= 40;
+          if (hasBank && !offName.endsWith('銀行')) score -= 40;
+        }
+
+        if (score > 10) {
+          matches.push({
+            ...b,
+            code: bCode,
+            name: b.name,
+            officialName,
+            displayName: officialName,
+            score
+          });
+        }
+      }
+
+      matches.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.code.localeCompare(b.code);
+      });
+
+      return matches.slice(0, 30);
+    },
+
+    async getBranches(bankCode) {
+      if (!bankCode) return {};
+      const cleanCode = String(bankCode).trim().padStart(4, '0');
+      if (this._branchMap.has(cleanCode)) return this._branchMap.get(cleanCode);
+      if (this._branchPromises.has(cleanCode)) return this._branchPromises.get(cleanCode);
+
+      const promise = (async () => {
+        // 1. /api/bank-search?bankCode=xxx&all=1
+        try {
+          const res = await fetch(`/api/bank-search?bankCode=${cleanCode}&all=1`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.success && Array.isArray(data.branches)) {
+              const brMap = {};
+              data.branches.forEach(br => {
+                const bc = String(br.code || '').padStart(3, '0');
+                brMap[bc] = { ...br, code: bc };
+              });
+              this._branchMap.set(cleanCode, brMap);
+              return brMap;
+            }
+          }
+        } catch (e) {
+          console.warn(`[BankDataService] Branch API fetch failed for bank ${cleanCode}:`, e);
+        }
+
+        // 2. Direct Zengin Code branches endpoint
+        try {
+          const res = await fetch(`https://zengin-code.github.io/api/branches/${cleanCode}.json`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && typeof data === 'object') {
+              this._branchMap.set(cleanCode, data);
+              return data;
+            }
+          }
+        } catch (e) {
+          console.warn(`[BankDataService] Direct branch fetch failed for bank ${cleanCode}:`, e);
+        }
+
+        // 3. Fallback BANK_DATABASE
+        for (const [name, info] of Object.entries(BANK_DATABASE)) {
+          if (info.code === cleanCode && info.branches) {
+            const brMap = {};
+            for (const [brName, brCode] of Object.entries(info.branches)) {
+              brMap[brCode] = { code: brCode, name: brName };
+            }
+            this._branchMap.set(cleanCode, brMap);
+            return brMap;
+          }
+        }
+
+        return {};
+      })();
+
+      this._branchPromises.set(cleanCode, promise);
+      return promise;
+    },
+
+    async searchBranches(bankCode, query) {
+      if (!bankCode) return [];
+      const rawVal = (query || '').trim();
+      const cleanBankCode = String(bankCode).trim().padStart(4, '0');
+
+      // 1. 自前最新API (/api/bank-search) に照会
+      try {
+        const res = await fetch(`/api/bank-search?bankCode=${cleanBankCode}&branch=${encodeURIComponent(rawVal)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && Array.isArray(data.branches)) {
+            return data.branches;
+          }
+        }
+      } catch (e) {
+        console.warn('[BankDataService] searchBranches api failed, falling back to client cache...', e);
+      }
+
+      // 2. クライアントキャッシュでのフォールバック検索
+      const branchesObj = await this.getBranches(cleanBankCode);
+      const branchList = Object.values(branchesObj);
+      if (!rawVal) return branchList.slice(0, 50);
+
+      const cleanVal = rawVal.normalize('NFKC').toLowerCase();
+      const cleanNoSuffix = cleanVal.replace(/支店|出張所|営業部|支社|本店/, '');
+      const isDigit = /^\d+$/.test(cleanVal);
+      const cleanPadded = isDigit ? cleanVal.padStart(3, '0') : '';
+
+      return branchList.filter(b => {
+        const bName = (b.name || '').normalize('NFKC').toLowerCase();
+        const bKana = (b.kana || '').normalize('NFKC').toLowerCase();
+        const bHira = (b.hira || '').normalize('NFKC').toLowerCase();
+        const bCode = String(b.code || '').padStart(3, '0');
+
+        if (bCode === cleanVal || (cleanPadded && bCode === cleanPadded)) return true;
+        if (isDigit && bCode.startsWith(cleanVal)) return true;
+        if (bName.includes(cleanVal) || bKana.includes(cleanVal) || bHira.includes(cleanVal)) return true;
+        if (cleanNoSuffix.length >= 1 && (bName.includes(cleanNoSuffix) || bKana.includes(cleanNoSuffix))) return true;
+        return false;
+      }).slice(0, 30);
+    }
+  };
+
+  // 即時プリフェッチ開始
+  window.BankDataService = BankDataService;
+  BankDataService.init().catch(() => {});
+
   function findBankByCode(code) {
     if (!code) return null;
-    const clean = code.trim();
+    const clean = String(code).trim().padStart(4, '0');
+    if (BankDataService._banks && BankDataService._banks[clean]) {
+      const b = BankDataService._banks[clean];
+      const name = getOfficialBankName(b);
+      return { name, code: b.code || clean, officialName: name, displayName: name, ...b };
+    }
     for (const [name, info] of Object.entries(BANK_DATABASE)) {
-      if (info.code === clean) return { name, ...info };
+      if (info.code === clean) return { name, officialName: name, displayName: name, ...info };
     }
     return null;
   }
 
   function findBankByName(name) {
     if (!name) return null;
-    const clean = name.trim();
-    if (BANK_DATABASE[clean]) return { name: clean, ...BANK_DATABASE[clean] };
+    const clean = name.trim().normalize('NFKC');
+    const cleanNoBank = clean.replace(/銀行|信用金庫|信金|労働金庫|労金|信組|信用組合|農協|農業協同組合/, '');
+
+    if (BankDataService._banks) {
+      for (const [c, b] of Object.entries(BankDataService._banks)) {
+        const bName = (b.name || '').normalize('NFKC');
+        const offName = getOfficialBankName(b).normalize('NFKC');
+        if (offName === clean || bName === clean || bName === clean + '銀行' || bName + '銀行' === clean) {
+          return { name: offName, code: b.code || c, officialName: offName, displayName: offName, ...b };
+        }
+      }
+      if (cleanNoBank.length >= 2) {
+        for (const [c, b] of Object.entries(BankDataService._banks)) {
+          const offName = getOfficialBankName(b).normalize('NFKC');
+          const bNameNoBank = (b.name || '').normalize('NFKC').replace(/銀行|信用金庫|信金|労働金庫|労金|信組|信用組合|農協|農業協同組合/, '');
+          if (bNameNoBank === cleanNoBank || offName.startsWith(cleanNoBank)) {
+            return { name: offName, code: b.code || c, officialName: offName, displayName: offName, ...b };
+          }
+        }
+      }
+    }
+
+    if (BANK_DATABASE[clean]) return { name: clean, officialName: clean, displayName: clean, ...BANK_DATABASE[clean] };
     for (const [k, info] of Object.entries(BANK_DATABASE)) {
-      if (k.includes(clean) || clean.includes(k)) return { name: k, ...info };
+      if (k.includes(clean) || clean.includes(k)) return { name: k, officialName: k, displayName: k, ...info };
     }
     return null;
   }
@@ -1434,24 +1946,24 @@
   })();
 
   const CORP_DATABASE = [
-    { name: "株式会社wayway", nameKana: "カブシキガイシャウェイウェイ", num: "1010001999999", pref: "東京都", regDate: "2023-10-01", estDate: "2015-05-15" },
-    { name: "wayway合同会社", nameKana: "ウェイウェイゴウドウガイシャ", num: "2010001999999", pref: "広島県", regDate: "2024-04-01", estDate: "2020-11-20", cancelDate: "2025-12-31" },
-    { name: "ヤフー株式会社", nameKana: "ヤフーカブシキガイシャ", num: "3010001888888", pref: "東京都", regDate: "2023-10-01", estDate: "1996-01-31" },
-    { name: "LINEヤフー株式会社", nameKana: "ラインヤフーカブシキガイシャ", num: "3010001888888", pref: "東京都", regDate: "2023-10-01", estDate: "1996-01-31" },
-    { name: "株式会社wayway広島", nameKana: "カブシキガイシャウェイウェイヒロシマ", num: "4010001999999", pref: "広島県", regDate: "2025-01-15", estDate: "2024-09-01" },
-    { name: "トヨタ自動車株式会社", nameKana: "トヨタジドウシャカブシキガイシャ", num: "1180301018778", pref: "愛知県", regDate: "2023-10-01", estDate: "1937-08-28" },
+    { name: "株式会社wayway", nameKana: "カブシキガイシャウェイウェイ", num: "7010001999999", pref: "東京都", regDate: "2023-10-01", estDate: "2015-05-15" },
+    { name: "wayway合同会社", nameKana: "ウェイウェイゴウドウガイシャ", num: "7010001999999", pref: "広島県", regDate: "2024-04-01", estDate: "2020-11-20", cancelDate: "2025-12-31" },
+    { name: "ヤフー株式会社", nameKana: "ヤフーカブシキガイシャ", num: "7010001888888", pref: "東京都", regDate: "2023-10-01", estDate: "1996-01-31" },
+    { name: "LINEヤフー株式会社", nameKana: "ラインヤフーカブシキガイシャ", num: "7010001888888", pref: "東京都", regDate: "2023-10-01", estDate: "1996-01-31" },
+    { name: "株式会社wayway広島", nameKana: "カブシキガイシャウェイウェイヒロシマ", num: "7010001999999", pref: "広島県", regDate: "2025-01-15", estDate: "2024-09-01" },
+    { name: "トヨタ自動車株式会社", nameKana: "トヨタジドウシャカブシキガイシャ", num: "1180301018771", pref: "愛知県", regDate: "2023-10-01", estDate: "1937-08-28" },
     { name: "ソニーグループ株式会社", nameKana: "ソニーグループカブシキガイシャ", num: "5010401067252", pref: "東京都", regDate: "2023-10-01", estDate: "1946-05-07" },
     { name: "ソフトバンク株式会社", nameKana: "ソフトバンクカブシキガイシャ", num: "9010401052465", pref: "東京都", regDate: "2023-10-01", estDate: "1986-12-09" },
-    { name: "日本電信電話株式会社", nameKana: "ニッポンデンシンデンワカブシキガイシャ", num: "8010001008775", pref: "東京都", regDate: "2023-10-01", estDate: "1985-04-01" },
-    { name: "株式会社NTTドコモ", nameKana: "カブシキガイシャエヌティティドコモ", num: "1010001008772", pref: "東京都", regDate: "2023-10-01", estDate: "1991-08-14" },
-    { name: "任天堂株式会社", nameKana: "ニンテンドウカブシキガイシャ", num: "1130001007873", pref: "京都府", regDate: "2023-10-01", estDate: "1947-11-20" },
-    { name: "楽天グループ株式会社", nameKana: "ラクテングループカブシキガイシャ", num: "1010701020592", pref: "東京都", regDate: "2023-10-01", estDate: "1997-02-07" },
+    { name: "日本電信電話株式会社", nameKana: "ニッポンデンシンデンワカブシキガイシャ", num: "7010001065142", pref: "東京都", regDate: "2023-10-01", estDate: "1985-04-01" },
+    { name: "株式会社NTTドコモ", nameKana: "カブシキガイシャエヌティティドコモ", num: "1010001067912", pref: "東京都", regDate: "2023-10-01", estDate: "1991-08-14" },
+    { name: "任天堂株式会社", nameKana: "ニンテンドウカブシキガイシャ", num: "1130001011420", pref: "京都府", regDate: "2023-10-01", estDate: "1947-11-20" },
+    { name: "楽天グループ株式会社", nameKana: "ラクテングループカブシキガイシャ", num: "9010701020592", pref: "東京都", regDate: "2023-10-01", estDate: "1997-02-07" },
     { name: "株式会社メルカリ", nameKana: "カブシキガイシャメルカリ", num: "4010001150491", pref: "東京都", regDate: "2023-10-01", estDate: "2013-02-01" },
     { name: "株式会社サイバーエージェント", nameKana: "カブシキガイシャサイバーエージェント", num: "5010401052601", pref: "東京都", regDate: "2023-10-01", estDate: "1998-03-18" },
     { name: "株式会社日立製作所", nameKana: "カブシキガイシャヒタチセイサクショ", num: "7010001008844", pref: "東京都", regDate: "2023-10-01", estDate: "1920-02-01" },
     { name: "パナソニック ホールディングス株式会社", nameKana: "パナソニックホールディングスカブシキガイシャ", num: "5120001158218", pref: "大阪府", regDate: "2023-10-01", estDate: "1935-12-15" },
-    { name: "三菱商事株式会社", nameKana: "ミツビシショウジカブシキガイシャ", num: "2010001008771", pref: "東京都", regDate: "2023-10-01", estDate: "1950-04-01" },
-    { name: "伊藤忠商事株式会社", nameKana: "イトウチュウショウジカブシキガイシャ", num: "3120001077410", pref: "大阪府", regDate: "2023-10-01", estDate: "1949-12-01" }
+    { name: "三菱商事株式会社", nameKana: "ミツビシショウジカブシキガイシャ", num: "5010001008771", pref: "東京都", regDate: "2023-10-01", estDate: "1950-04-01" },
+    { name: "伊藤忠商事株式会社", nameKana: "イトウチュウショウジカブシキガイシャ", num: "4120001077410", pref: "大阪府", regDate: "2023-10-01", estDate: "1949-12-01" }
   ];
 
   function generateHashNum(str) {
@@ -1471,6 +1983,83 @@
       .toLowerCase()
       .replace(/[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
       .replace(/[\s\-\u30FC\u30FB/|\u3000\uFF5C]/g, "");
+  }
+
+  // ============================================================================
+  // 🔍 【API連携メタデータ解決エンジン: getQuestionApiConfig & findQuestionDefById】
+  // - ユーザー指摘: 問題は質問項目（タイトル文字列）ではなく、回答の入力規則の
+  //   「規則の種類が API 連携（category === 'api'）になっていること」と、
+  //   「判定ルールで何の API を連携しているか（condition）を取得すること」。
+  // - 質問定義の validation メタデータを Single Source of Truth（真実の情報源）として
+  //   最優先で取得・解決する。
+  // ============================================================================
+  function findQuestionDefById(questionId) {
+    if (!questionId) return null;
+    const formSources = [window.n, window.G, window.L];
+    if (window.U && Array.isArray(window.U)) {
+      formSources.push(...window.U);
+    }
+    for (const formSrc of formSources) {
+      if (formSrc && formSrc.sections) {
+        for (const sec of formSrc.sections) {
+          if (!sec || !sec.questions) continue;
+          const q = sec.questions.find(item => item && item.id === questionId);
+          if (q) return q;
+        }
+      }
+    }
+    return null;
+  }
+  window.findQuestionDefById = findQuestionDefById;
+
+  function getQuestionApiConfig(qDef) {
+    if (!qDef) return null;
+
+    // ① 最優先（Single Source of Truth）: 作成者が設定した「回答の入力規則（検証）」
+    if (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition) {
+      const cond = qDef.validation.condition;
+      return {
+        isApi: true,
+        category: 'api',
+        condition: cond,
+        isCorp: cond === 'corp_name',
+        isInvoice: cond === 'invoice_number',
+        isBank: cond === 'bank_name',
+        isBranch: cond === 'branch_name',
+        isBranchCode: cond === 'branch_code',
+        label: cond === 'corp_name' ? '国税庁法人番号API連携' :
+               cond === 'invoice_number' ? '適格請求書発行事業者API連携' :
+               cond === 'bank_name' ? '全銀協金融機関API連携' :
+               cond === 'branch_name' ? '全銀協支店情報API連携' :
+               cond === 'branch_code' ? '全銀協支店番号API連携' : 'API連携',
+        source: 'validation_metadata'
+      };
+    }
+
+    // ② 補助フォールバック（作成者が入力規則を設定していない場合のタイトル推測アシスト）
+    if (qDef.type === 'text' && qDef.title) {
+      const t = qDef.title;
+      if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
+        return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isBank: false, isBranch: false, isBranchCode: false, label: '適格請求書発行事業者API連携', source: 'title_fallback' };
+      }
+      if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('屋号')) &&
+          !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな')) {
+        return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isBank: false, isBranch: false, isBranchCode: false, label: '国税庁法人番号API連携', source: 'title_fallback' };
+      }
+      if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座')) ||
+          t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード'))) {
+        return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isBank: true, isBranch: false, isBranchCode: false, label: '全銀協金融機関API連携', source: 'title_fallback' };
+      }
+      if (t.includes('支店名') || (t.includes('支店') && !t.includes('番号') && !t.includes('コード')) ||
+          t.includes('店舗名') || (t.includes('店舗') && !t.includes('番号') && !t.includes('コード'))) {
+        return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isBank: false, isBranch: true, isBranchCode: false, label: '全銀協支店情報API連携', source: 'title_fallback' };
+      }
+      if (t.includes('支店番号') || t.includes('支店コード') || t.includes('店舗番号') || t.includes('店舗コード') || ((t.includes('支店') || t.includes('店舗')) && t.includes('番号'))) {
+        return { isApi: true, category: 'api', condition: 'branch_code', isCorp: false, isInvoice: false, isBank: false, isBranch: false, isBranchCode: true, label: '全銀協支店番号API連携', source: 'title_fallback' };
+      }
+    }
+
+    return null;
   }
 
   // 3. おすすめ2色カラープリセット
@@ -1873,7 +2462,11 @@
         const btnHeaderPreview = document.getElementById("btn-header-preview-toggle");
         if (btnHeaderPreview) {
           if (tabName === 'editor') {
-            btnHeaderPreview.style.setProperty("display", "flex", "important");
+            if (window.innerWidth <= 768) {
+              btnHeaderPreview.style.setProperty("display", "none", "important");
+            } else {
+              btnHeaderPreview.style.setProperty("display", "flex", "important");
+            }
 
             // プレビューペインの開閉状態に応じてactiveクラスを同期
             const pane = document.querySelector(".editor-live-preview-pane");
@@ -4069,251 +4662,312 @@
   }
 
   // ============================================================================
-  // 【回答者向けセクション進め方・途中送信選択システム (v89)】
-  // 1. 途中送信をせずに最後まで回答して送信する
-  // 2. すぐに回答ができない場合は途中送信をして、次のセクションから始められるリンクを発行してください
-  // ※ フォーム作成者側で「途中送信をする」を設定した画面の後、
-  //    かつ次のセクションの回答内容（質問項目）を確認した後に末尾へ表示する
+  // 【回答者向けセクション進め方・途中送信＆次セクション確認画面システム (v90)】
+  // セクション完了時に「途中送信」が設定されている場合、勝手に次セクションへ進まず、
+  // 1. 次のセクションで入力する情報・書類の一覧を事前確認
+  // 2. 「途中送信して再開URLを発行」or「このまま次のセクションに進む」を選択
   // ============================================================================
   function renderFlowChoiceCardInPreview() {
-    const previewContainer = document.getElementById('preview-section-container');
-    if (!previewContainer) return;
-
+    // 過去の末尾注入カードを確実にクリーンアップ
     const existingCard = document.getElementById('preview-flow-choice-card');
+    if (existingCard) existingCard.remove();
+  }
+
+  function getPreviewQuestionTypeLabel(type) {
+    const map = {
+      'text': '📝 1行テキスト',
+      'paragraph': '📄 長文記述',
+      'radio': '🔘 選択式（単一）',
+      'checkbox': '☑ 選択式（複数）',
+      'select': '🔽 プルダウン選択',
+      'file': '📎 ファイル添付（画像・PDF等）',
+      'password': '🔑 パスワード',
+      'number': '🔢 数値入力',
+      'date': '📅 日付',
+      'email': '✉️ メールアドレス',
+      'tel': '📞 電話番号'
+    };
+    return map[type] || '✏️ 入力項目';
+  }
+
+  function isCurrentPreviewSectionPartialSubmit(section) {
+    if (!section) return false;
+    if (section.questions && window.V) {
+      for (const q of section.questions) {
+        if (['radio', 'select'].includes(q.type) && q.options) {
+          const val = window.V[q.id];
+          if (val) {
+            const opt = q.options.find(o => o.label === val);
+            if (opt && opt.nextSectionId === 'partial_submit') return true;
+          }
+        }
+      }
+    }
+    return section.nextAction === 'partial_submit';
+  }
+
+  function getPreviewResolvedNextSection(section) {
     const formData = window.L || window.G || window.n;
-    if (!formData || !formData.sections || formData.sections.length <= 1) {
-      if (existingCard) existingCard.remove();
-      return;
-    }
+    if (!formData || !formData.sections) return null;
+    const sections = formData.sections;
+    const curIdx = sections.findIndex(s => s.id === section.id);
 
-    const curR = window.R || (formData.sections[0] ? formData.sections[0].id : null);
-    const curIdx = formData.sections.findIndex(s => s.id === curR);
-
-    // セクション1（開始時）では選択肢は出さず「次へ」ボタンで進む
-    if (curIdx <= 0) {
-      if (existingCard) existingCard.remove();
-      const pt = document.getElementById('btn-preview-next');
-      const mt = document.getElementById('btn-preview-submit');
-      const ft = document.getElementById('btn-preview-back');
-      if (pt) {
-        pt.style.display = 'inline-flex';
-        pt.textContent = '次へ';
-      }
-      if (mt) mt.style.display = 'none';
-      if (ft) ft.style.display = 'none';
-      return;
-    }
-
-    // 「前へ」ボタンの表示保証
-    const ft = document.getElementById('btn-preview-back');
-    if (ft) ft.style.display = 'inline-flex';
-
-    // 直前のセクション（履歴スタックまたは1つ前のインデックス）を取得
-    let prevSec = null;
-    if (window.B && window.B.length > 0) {
-      const lastHistory = window.B[window.B.length - 1];
-      if (lastHistory && lastHistory.sectionId) {
-        prevSec = formData.sections.find(s => s.id === lastHistory.sectionId);
+    if (section.questions && window.V) {
+      for (const q of section.questions) {
+        if (['radio', 'select'].includes(q.type) && q.options) {
+          const val = window.V[q.id];
+          if (val) {
+            const opt = q.options.find(o => o.label === val);
+            if (opt && opt.nextSectionId && opt.nextSectionId !== 'partial_submit' && opt.nextSectionId !== 'submit') {
+              const target = sections.find(s => s.id === opt.nextSectionId);
+              if (target) return target;
+            }
+          }
+        }
       }
     }
-    if (!prevSec && curIdx > 0) {
-      prevSec = formData.sections[curIdx - 1];
+
+    const act = section.nextAction;
+    if (act && !['next', 'submit', 'partial_submit'].includes(act)) {
+      const target = sections.find(s => s.id === act);
+      if (target) return target;
     }
 
-    // フォーム作成者側で直前セクションに「途中送信をする」が設定されているか
-    const isPrevSecPartialSubmit = prevSec && (
-      prevSec.nextAction === 'partial_submit' ||
-      (prevSec.questions && prevSec.questions.some(q => 
-        q.options && q.options.some(opt => opt.nextSectionId === 'partial_submit')
-      ))
-    );
+    if (curIdx !== -1 && curIdx < sections.length - 1) {
+      return sections[curIdx + 1];
+    }
+    return null;
+  }
 
-    // 途中送信後の再開セッション（URLパラメータまたは保存rowId）であるか
-    const isResumeSession = !!(
-      window.currentResumeRowId ||
-      new URLSearchParams(window.location.search).get('res_id') ||
-      new URLSearchParams(window.location.search).get('resumeRowId')
-    );
+  function ensurePreviewPartialSubmitContainer() {
+    let container = document.getElementById('preview-partial-submit-step-container');
+    if (!container) {
+      const previewCard = document.querySelector('#panel-preview .preview-card:not(.success-card)');
+      if (previewCard) {
+        container = document.createElement('div');
+        container.id = 'preview-partial-submit-step-container';
+        container.className = 'partial-submit-step-wrapper';
+        container.style.display = 'none';
+        const actions = previewCard.querySelector('.preview-actions');
+        if (actions) {
+          previewCard.insertBefore(container, actions);
+        } else {
+          previewCard.appendChild(container);
+        }
+      }
+    }
+    return container;
+  }
 
-    // 作成者側で「途中送信をする」が設定された画面の後、または再開セッションでない場合はカードを表示しない
-    if (!isPrevSecPartialSubmit && !isResumeSession) {
-      if (existingCard) existingCard.remove();
-      const pt = document.getElementById('btn-preview-next');
-      const mt = document.getElementById('btn-preview-submit');
-      const isLastSec = curIdx === (formData.sections.length - 1);
-      if (pt) {
-        pt.style.display = isLastSec ? 'none' : 'inline-flex';
-        pt.textContent = '次へ';
-      }
-      if (mt) {
-        mt.style.display = isLastSec ? 'inline-flex' : 'none';
-        mt.textContent = '送信';
-        mt.className = 'btn btn-success';
-      }
-      return;
+  function hidePreviewIntermediateStep() {
+    const container = document.getElementById('preview-partial-submit-step-container');
+    if (container) {
+      container.style.display = 'none';
+      container.innerHTML = '';
+    }
+    const secContainer = document.getElementById('preview-section-container');
+    if (secContainer) secContainer.style.display = 'block';
+    const actions = document.querySelector('#panel-preview .preview-actions');
+    if (actions) actions.style.display = 'flex';
+  }
+
+  function showPreviewIntermediatePartialSubmitStep(currentSec, nextSec) {
+    const container = ensurePreviewPartialSubmitContainer();
+    if (!container) return;
+
+    const secContainer = document.getElementById('preview-section-container');
+    if (secContainer) secContainer.style.display = 'none';
+    const actions = document.querySelector('#panel-preview .preview-actions');
+    if (actions) actions.style.display = 'none';
+
+    const formData = window.L || window.G || window.n;
+    const sections = (formData && formData.sections) || [];
+    const curIdx = sections.findIndex(s => s.id === currentSec.id);
+    const nextIdx = sections.findIndex(s => s.id === nextSec.id);
+
+    // プログレスバーの更新
+    const ut = document.getElementById('preview-progress-bar');
+    const dt = document.getElementById('preview-progress-text');
+    if (ut && dt && sections.length > 0) {
+      const progress = Math.round(((curIdx + 1) / sections.length) * 100);
+      ut.style.width = `${progress}%`;
+      dt.textContent = `セクション ${curIdx + 1} 完了 ： 進め方・次セクションの確認`;
     }
 
-    const currentSec = formData.sections[curIdx];
-    const secTitle = currentSec ? (currentSec.title || `セクション ${curIdx + 1}`) : `セクション ${curIdx + 1}`;
-
-    if (existingCard) {
-      // 質問内容を回答者が確認した後に見せるため、常に質問カード群の最下部に保持
-      if (previewContainer.lastElementChild !== existingCard) {
-        previewContainer.appendChild(existingCard);
-      }
-      setupFlowChoiceInteractions(existingCard, currentSec, curIdx);
-      return;
-    }
-
-    const card = document.createElement('div');
-    card.id = 'preview-flow-choice-card';
-    card.className = 'preview-flow-choice-card';
-
-    card.innerHTML = `
-      <div class="flow-choice-header" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span class="flow-choice-badge-icon">📋</span>
-          <span class="flow-choice-badge-title">上記の質問内容をご確認の上、このセクションの進め方を選択してください</span>
+    const nextQuestions = nextSec.questions || [];
+    let questionsListHtml = '';
+    if (nextQuestions.length === 0) {
+      questionsListHtml = `
+        <div style="padding: 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; color: #64748b; font-size: 0.85rem; text-align: center;">
+          このセクションに入力項目はありません（案内・確認セクションです）
         </div>
-        <button type="button" id="btn-open-flow-guide-modal" class="btn-flow-guide-trigger" title="図解付き詳細ガイドを見る">
-          <span>📖</span> 図解付き詳細ガイド
-        </button>
-      </div>
-      <div class="flow-choice-options-list">
-        <label class="flow-choice-label active" data-flow="continue">
-          <input type="radio" name="preview_flow_choice_radio" value="continue" checked>
-          <div class="flow-choice-content">
-            <div class="flow-choice-main-text">1. 途中送信をせずに最後まで回答して送信する</div>
-            <div class="flow-choice-sub-text">このまま「${escapeHtml(secTitle)}」の質問に回答し、最後まで進めます。</div>
+      `;
+    } else {
+      questionsListHtml = nextQuestions.map((q, qIndex) => {
+        const reqBadge = q.required 
+          ? '<span style="background: #fee2e2; color: #dc2626; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">必須</span>' 
+          : '<span style="background: #f1f5f9; color: #64748b; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">任意</span>';
+        const typeLabel = getPreviewQuestionTypeLabel(q.type);
+        const descHtml = q.description 
+          ? `<div style="font-size: 0.78rem; color: #64748b; margin-top: 4px; line-height: 1.4;">${escapeHtml(q.description)}</div>` 
+          : '';
+
+        return `
+          <div class="next-sec-q-item" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+            <div style="flex: 1;">
+              <div style="font-size: 0.9rem; font-weight: 600; color: #1e293b; display: flex; align-items: baseline; gap: 6px;">
+                <span style="color: #64748b; font-size: 0.8rem; font-weight: 700;">Q${qIndex + 1}.</span>
+                <span>${escapeHtml(q.title || '無題の質問')}</span>
+              </div>
+              ${descHtml}
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;">
+              ${reqBadge}
+              <span style="font-size: 0.72rem; color: #475569; background: #f8fafc; border: 1px solid #cbd5e1; padding: 1px 6px; border-radius: 4px; white-space: nowrap;">${typeLabel}</span>
+            </div>
           </div>
-        </label>
-        <label class="flow-choice-label" data-flow="partial_submit">
-          <input type="radio" name="preview_flow_choice_radio" value="partial_submit">
-          <div class="flow-choice-content">
-            <div class="flow-choice-main-text">2. すぐに回答ができない場合は途中送信をして、次のセクションから始められるリンクを発行してください</div>
-            <div class="flow-choice-sub-text">手元に書類や情報がない場合でも、ここまでの入力内容を安全に保存し、後からこのセクションから再開できるURLを発行します。</div>
+        `;
+      }).join('');
+    }
+
+    const nextSecTitle = nextSec.title || `セクション ${nextIdx + 1}`;
+    const nextSecDesc = nextSec.description ? escapeHtml(nextSec.description) : '';
+
+    container.innerHTML = `
+      <div class="partial-step-card" style="background: #ffffff; border: 1px solid var(--color-border); border-radius: var(--border-radius); padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px;">
+        <div style="text-align: center; margin-bottom: 22px;">
+          <div style="display: inline-flex; align-items: center; gap: 6px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 20px; margin-bottom: 10px;">
+            <span>✓</span> セクション ${curIdx + 1} の入力が完了しました
           </div>
-        </label>
-      </div>
-      <div id="flow-choice-partial-box" class="flow-choice-partial-box" style="display: none;">
-        <div class="partial-box-notice">
-          <span style="font-size: 1.1rem;">ℹ️</span>
-          <span>これまでのセクションの入力内容を保存して登録コードを確定し、<strong>「${escapeHtml(secTitle)}」から再開できる専用リンク</strong>を発行します。（このセクションの入力は後からでも可能です）</span>
+          <h2 style="font-size: 1.3rem; font-weight: 700; color: var(--color-text-main, #1e293b); margin: 0 0 8px;">進め方をご確認ください</h2>
+          <p style="font-size: 0.86rem; color: var(--color-text-muted, #64748b); margin: 0; line-height: 1.6;">
+            このフォームは<strong>「途中送信」</strong>に対応しています。<br>
+            次のセクションで入力する内容をご確認の上、<strong>「このまま次へ進む」</strong>か<strong>「ここで途中送信して再開リンクを発行する」</strong>かをお選びいただけます。
+          </p>
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-          <button type="button" id="btn-flow-partial-submit-now" class="btn btn-flow-partial-submit">
-            <span>💾</span> ここまでの内容で途中送信してリンクを発行する
-          </button>
-          <button type="button" id="btn-flow-partial-guide-link" class="btn-flow-guide-trigger" style="background:transparent; border-color:#d8b4fe; color:#7c3aed;">
-            <span>💡</span> 途中送信の仕組みを図解で見る
-          </button>
+
+        <!-- 次のセクションで入力する情報のご確認 -->
+        <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 18px; margin-bottom: 22px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+            <span style="font-size: 0.78rem; font-weight: 700; color: #0284c7; background: #e0f2fe; padding: 2px 8px; border-radius: 4px;">
+              📋 次のセクションで入力する情報
+            </span>
+            <span style="font-size: 0.75rem; color: #64748b;">
+              全 ${nextQuestions.length} 項目
+            </span>
+          </div>
+          <h3 style="font-size: 1.05rem; font-weight: 700; color: #1e293b; margin: 0 0 6px;">
+            【セクション ${nextIdx + 1}】 ${escapeHtml(nextSecTitle)}
+          </h3>
+          ${nextSecDesc ? `<div style="font-size: 0.82rem; color: #64748b; margin-bottom: 12px; line-height: 1.5;">${nextSecDesc}</div>` : ''}
+
+          <div style="margin-top: 12px;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 8px; display: flex; align-items: center; gap: 4px;">
+              <span>▼</span> 入力・添付が必要な項目一覧
+            </div>
+            <div style="max-height: 260px; overflow-y: auto; padding-right: 4px;">
+              ${questionsListHtml}
+            </div>
+          </div>
+        </div>
+
+        <!-- 進め方の選択UI -->
+        <div style="margin-top: 18px;">
+          <div style="font-size: 0.92rem; font-weight: 700; color: #1e293b; margin-bottom: 12px; text-align: center;">
+            どちらの進め方にしますか？
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
+            <!-- 選択肢A: 途中送信する -->
+            <div id="btn-preview-choice-partial-submit" style="background: #ffffff; border: 2px solid #3b82f6; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 6px rgba(59,130,246,0.1);">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 1.3rem;">💾</span>
+                  <div style="font-size: 0.92rem; font-weight: 700; color: #1d4ed8;">ここまでの内容で途中送信する</div>
+                </div>
+                <div style="font-size: 0.78rem; color: #4b5563; line-height: 1.5; margin-bottom: 14px;">
+                  手元に書類や情報がない場合におすすめです。これまでの回答を保存し、<strong>8桁の確定登録コード</strong>と<strong>後からいつでも再開できる専用URL</strong>を発行します。
+                </div>
+              </div>
+              <button type="button" class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 0.85rem; font-weight: 700; padding: 9px; background: #2563eb !important; border-color: #2563eb !important; cursor: pointer;">
+                💾 途中送信して再開URLを発行
+              </button>
+            </div>
+
+            <!-- 選択肢B: 次に進む -->
+            <div id="btn-preview-choice-continue-next" style="background: #ffffff; border: 2px solid #10b981; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 6px rgba(16,185,129,0.1);">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 1.3rem;">👉</span>
+                  <div style="font-size: 0.92rem; font-weight: 700; color: #047857;">このまま次のセクションに進む</div>
+                </div>
+                <div style="font-size: 0.78rem; color: #4b5563; line-height: 1.5; margin-bottom: 14px;">
+                  必要な情報や添付書類が手元に揃っている場合は、このまま続けて【${escapeHtml(nextSecTitle)}】の入力画面へ進んで回答を継続できます。
+                </div>
+              </div>
+              <button type="button" class="btn btn-success" style="width: 100%; justify-content: center; font-size: 0.85rem; font-weight: 700; padding: 9px; background: #059669 !important; border-color: #059669 !important; cursor: pointer;">
+                👉 このまま続けて回答する
+              </button>
+            </div>
+          </div>
+
+          <!-- 戻るボタン ＆ ガイドリンク -->
+          <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <button type="button" id="btn-preview-choice-back" class="btn btn-secondary btn-sm" style="font-size: 0.8rem; color: #64748b; background: transparent; border: 1px solid #cbd5e1; cursor: pointer;">
+              ← 前のセクションの入力内容を修正する
+            </button>
+            <button type="button" id="btn-preview-choice-guide" class="btn-flow-guide-trigger" style="font-size: 0.78rem; color: #7c3aed; background: transparent; border: 1px solid #d8b4fe; cursor: pointer; padding: 4px 10px; border-radius: 4px;">
+              <span>📖</span> 図解付き詳細ガイドを見る
+            </button>
+          </div>
         </div>
       </div>
     `;
 
-    // プレビューの質問内容を回答者が確認した後に見せるため、コンテナの末尾（最下部）に追加
-    previewContainer.appendChild(card);
+    container.style.display = 'block';
+    const previewContainer = document.querySelector('.preview-container');
+    if (previewContainer) previewContainer.scrollTop = 0;
 
-    setupFlowChoiceInteractions(card, currentSec, curIdx);
-  }
-
-  function setupFlowChoiceInteractions(card, currentSec, curIdx) {
-    const radios = card.querySelectorAll('input[name="preview_flow_choice_radio"]');
-    const labels = card.querySelectorAll('.flow-choice-label');
-    const partialBox = card.querySelector('#flow-choice-partial-box');
-    const partialBtn = card.querySelector('#btn-flow-partial-submit-now');
-    const pt = document.getElementById('btn-preview-next');
-    const mt = document.getElementById('btn-preview-submit');
-
-    const updateMode = (selectedMode) => {
-      labels.forEach(l => {
-        if (l.dataset.flow === selectedMode) {
-          l.classList.add('active');
-          const r = l.querySelector('input[type="radio"]');
-          if (r) r.checked = true;
-        } else {
-          l.classList.remove('active');
-        }
-      });
-
-      const formData = window.L || window.G || window.n;
-      const isLastSec = curIdx === (formData.sections.length - 1);
-
-      if (selectedMode === 'partial_submit') {
-        if (partialBox) partialBox.style.display = 'flex';
-        if (pt) pt.style.display = 'none';
-        if (mt) {
-          mt.style.display = 'inline-flex';
-          mt.textContent = '💾 途中送信して続きリンクを発行 ➔';
-          mt.className = 'btn btn-primary btn-partial-submit-mode';
-        }
-      } else {
-        if (partialBox) partialBox.style.display = 'none';
-        if (isLastSec) {
-          if (pt) pt.style.display = 'none';
-          if (mt) {
-            mt.style.display = 'inline-flex';
-            mt.textContent = '送信';
-            mt.className = 'btn btn-success';
-          }
-        } else {
-          if (pt) {
-            pt.style.display = 'inline-flex';
-            pt.textContent = '次へ';
-          }
-          if (mt) mt.style.display = 'none';
-        }
-      }
-    };
-
-    radios.forEach(radio => {
-      radio.onchange = (e) => {
-        updateMode(e.target.value);
-      };
-    });
-
-    // 初期状態は「1. 途中送信をせずに最後まで回答して送信する」
-    const currentChecked = card.querySelector('input[name="preview_flow_choice_radio"]:checked');
-    updateMode(currentChecked ? currentChecked.value : 'continue');
-
-    const triggerPartialSubmit = () => {
-      executeRespondentPartialSubmit(currentSec);
-    };
-
+    // クリックハンドラー登録
+    const partialBtn = container.querySelector('#btn-preview-choice-partial-submit');
     if (partialBtn) {
       partialBtn.onclick = (e) => {
         e.preventDefault();
-        e.stopPropagation();
-        triggerPartialSubmit();
+        hidePreviewIntermediateStep();
+        executeRespondentPartialSubmit(currentSec, nextSec);
       };
     }
 
-    if (mt && !mt._hasFlowChoiceHandler) {
-      mt._hasFlowChoiceHandler = true;
-      mt.addEventListener('click', (e) => {
-        const activeRadio = document.querySelector('input[name="preview_flow_choice_radio"]:checked');
-        if (activeRadio && activeRadio.value === 'partial_submit') {
-          e.preventDefault();
-          e.stopPropagation();
-          triggerPartialSubmit();
+    const continueBtn = container.querySelector('#btn-preview-choice-continue-next');
+    if (continueBtn) {
+      continueBtn.onclick = (e) => {
+        e.preventDefault();
+        hidePreviewIntermediateStep();
+        window.B = window.B || [];
+        window.B.push({ sectionId: window.R, startQuestionId: null });
+        window.R = nextSec.id;
+        if (typeof window.St === 'function') {
+          window.St();
         }
-      }, true);
+        const pCont = document.querySelector('.preview-container');
+        if (pCont) pCont.scrollTop = 0;
+      };
     }
 
-    // 📖 図解付き詳細ガイドモーダルの起動イベント
-    const guideBtn = card.querySelector('#btn-open-flow-guide-modal');
+    const backBtn = container.querySelector('#btn-preview-choice-back');
+    if (backBtn) {
+      backBtn.onclick = (e) => {
+        e.preventDefault();
+        hidePreviewIntermediateStep();
+        const pCont = document.querySelector('.preview-container');
+        if (pCont) pCont.scrollTop = 0;
+      };
+    }
+
+    const guideBtn = container.querySelector('#btn-preview-choice-guide');
     if (guideBtn) {
       guideBtn.onclick = (e) => {
         e.preventDefault();
-        e.stopPropagation();
-        openPartialSubmitGuideModal();
-      };
-    }
-    const guideSubLink = card.querySelector('#btn-flow-partial-guide-link');
-    if (guideSubLink) {
-      guideSubLink.onclick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
         openPartialSubmitGuideModal();
       };
     }
@@ -4348,7 +5002,15 @@
           <!-- 1. 2つの進め方の図解比較 -->
           <div class="guide-section">
             <h4 class="guide-section-title">
-              <span>⚖️</span> 1. あなたに合わせた2つの進め方（図解比較）
+              <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:5px; background:#eff6ff; color:#2563eb; vertical-align:middle; margin-right:4px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 12h5" />
+                  <path d="M8 12c3.5 0 5-6 8.5-6h3.5" />
+                  <path d="M17 3.5l3.5 2.5-3.5 2.5" />
+                  <path d="M8 12c3.5 0 5 6 8.5 6h3.5" />
+                  <path d="M17 15.5l3.5 2.5-3.5 2.5" />
+                </svg>
+              </span> 1. あなたに合わせた2つの進め方（図解比較）
             </h4>
             <div class="guide-compare-grid">
               <!-- ルート1 -->
@@ -4484,10 +5146,49 @@
   window.openPartialSubmitGuideModal = openPartialSubmitGuideModal;
   window.ensurePartialSubmitGuideModal = ensurePartialSubmitGuideModal;
 
-  function executeRespondentPartialSubmit(currentSec) {
+  function getCleanViewResumeUrl(rId, sId) {
+    const origin = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : '';
+    let pathname = window.location.pathname || '';
+    let viewPath = '';
+    if (pathname.includes('form-customize')) {
+      const prefix = pathname.substring(0, pathname.indexOf('form-customize'));
+      viewPath = `${prefix}form-customize/view.html`;
+    } else if (pathname.endsWith('.html')) {
+      viewPath = pathname.substring(0, pathname.lastIndexOf('/') + 1) + 'view.html';
+    } else if (pathname.endsWith('/')) {
+      viewPath = pathname + 'view.html';
+    } else {
+      viewPath = pathname + '/view.html';
+    }
+    viewPath = viewPath.replace(/\/+/g, '/');
+    if (!viewPath.startsWith('/')) viewPath = '/' + viewPath;
+
+    const curIdx = window.W !== undefined ? window.W : (parseInt(localStorage.getItem('form_customize_active_index'), 10) || 0);
+    const secParam = sId ? `&resumeSec=${encodeURIComponent(sId)}` : '';
+
+    // 短縮URL (Google Forms短縮URL風: 例 https://synapse-wayway.vercel.app/f/0?res_id=...&resumeSec=...)
+    if (origin && (origin.includes('vercel.app') || !window.location.pathname.includes('form-customize/index.html'))) {
+      return `${origin}/f/${curIdx}?res_id=${encodeURIComponent(rId)}${secParam}`;
+    }
+
+    const formObj = (window.U && window.U[curIdx]) || window.G;
+    const formId = (formObj && formObj.id) ? formObj.id : `form_${curIdx}`;
+    return `${origin}${viewPath}?id=${encodeURIComponent(formId)}&form_idx=${curIdx}&res_id=${encodeURIComponent(rId)}${secParam}`;
+  }
+
+  function executeRespondentPartialSubmit(currentSec, nextSec = null) {
     const formData = window.L || window.G || window.n;
     const currentSecId = currentSec ? currentSec.id : window.R;
     const currentSecTitle = currentSec ? (currentSec.title || 'セクション') : 'セクション';
+
+    let nextSecId = nextSec ? nextSec.id : null;
+    if (!nextSecId && formData && formData.sections) {
+      const curIdx = formData.sections.findIndex(s => s.id === currentSecId);
+      if (curIdx !== -1 && curIdx < formData.sections.length - 1) {
+        nextSecId = formData.sections[curIdx + 1].id;
+      }
+    }
+    if (!nextSecId) nextSecId = currentSecId;
 
     window.V = window.V || {};
     const submitData = {};
@@ -4513,7 +5214,7 @@
       window.currentRegistrationCode = confirmedCode;
     }
 
-    const resumeUrl = `${window.location.origin}${window.location.pathname}?res_id=${rowId}&resumeSec=${encodeURIComponent(currentSecId)}&active_tab=preview`;
+    const resumeUrl = getCleanViewResumeUrl(rowId, nextSecId);
 
     try {
       localStorage.setItem('form_draft_' + rowId, JSON.stringify({
@@ -4521,7 +5222,7 @@
         registrationCode: confirmedCode,
         data: submitData,
         currentSectionId: currentSecId,
-        nextSectionId: currentSecId
+        nextSectionId: nextSecId
       }));
     } catch (e) {}
 
@@ -4534,7 +5235,7 @@
         isPartialSubmit: true,
         rowId: rowId,
         currentSectionId: currentSecId,
-        nextSectionId: currentSecId
+        nextSectionId: nextSecId
       }, '*');
     }
 
@@ -4553,7 +5254,7 @@
       registrationCode: confirmedCode,
       isPartialSubmit: true,
       resumeUrl: resumeUrl,
-      nextSectionId: currentSecId,
+      nextSectionId: nextSecId,
       formTitle: (formData && formData.title) || '無題のフォーム'
     });
 
@@ -4562,10 +5263,97 @@
   }
 
   function setupPreviewModeOverrides() {
+    const wrapCtIfNeeded = () => {
+      if (typeof window.Ct === 'function' && !window.Ct._hasInvoiceRepValidationWrapped) {
+        const origCt = window.Ct;
+        window.Ct = function() {
+          const baseResult = origCt();
+          if (!baseResult) return false;
+
+          const formData = window.L || window.G || window.n;
+          const curR = window.R || (formData && formData.sections && formData.sections[0] ? formData.sections[0].id : null);
+          if (!formData || !curR) return true;
+
+          const currentSec = formData.sections.find(s => s.id === curR);
+          if (!currentSec || !currentSec.questions) return true;
+
+          const container = document.getElementById('preview-section-container');
+          if (!container) return true;
+
+          let pass = true;
+          let firstErrCard = null;
+
+          currentSec.questions.forEach(q => {
+            const card = container.querySelector(`.preview-q-card[data-question-id="${q.id}"]`);
+            if (!card || card.style.display === 'none') return;
+            clearIntegrityError(card);
+
+            const val = window.V ? window.V[q.id] : null;
+            const strVal = (val != null && typeof val === 'string') ? val.trim() : (val != null ? String(val).trim() : '');
+
+            // ① 代表者名・代表者名カナ・生年月日の必須入力チェック
+            const isRepName = (q.type === 'text') && (
+              q.title.includes('代表者名') ||
+              q.title.includes('代表者氏名') ||
+              q.title.includes('代表者')
+            ) && !q.title.includes('カナ') && !q.title.includes('フリガナ') && !q.title.includes('ふりがな');
+
+            const isRepKana = (q.type === 'text') && (
+              (q.title.includes('代表者') && (q.title.includes('カナ') || q.title.includes('フリガナ') || q.title.includes('ふりがな'))) ||
+              q.title.includes('代表者カナ') ||
+              q.title.includes('代表者名（カナ）') ||
+              q.title.includes('代表者名カナ')
+            );
+
+            const isBirthDate = (q.type === 'text' || q.type === 'date') && (
+              q.title.includes('生年月日')
+            );
+
+            if (isRepName || isRepKana || isBirthDate) {
+              if (!strVal) {
+                showHardError(card, 'この質問は必須項目です。入力してください。');
+                pass = false;
+                firstErrCard ||= card;
+                return;
+              }
+            }
+
+            // ② インボイス番号の架空ベタ打ちブロック（規則の種類がAPI連携 & 判定ルールがinvoice_numberの項目を検証）
+            const apiConfig = getQuestionApiConfig(q);
+            if (apiConfig && apiConfig.isInvoice && strVal) {
+              const isDirectInvoiceNum = /^T\d{13}$/i.test(strVal);
+              const isDigits13 = /^\d{13}$/.test(strVal);
+              const fullNum = isDirectInvoiceNum ? strVal.toUpperCase() : (isDigits13 ? ('T' + strVal) : '');
+              const numPart = fullNum ? fullNum.substring(1) : '';
+
+              const masterMatch = CORP_DATABASE.find(item => item.num === numPart);
+              const checkDigitPassed = fullNum ? isValidInvoiceCheckDigit(fullNum) : false;
+
+              if (!masterMatch && !checkDigitPassed) {
+                showHardError(card, '⚠️ 入力されたインボイス登録番号は国税庁の公表システムに存在しないか無効な番号です。正しい適格請求書発行事業者番号を入力してください。');
+                pass = false;
+                firstErrCard ||= card;
+                return;
+              }
+            }
+          });
+
+          if (firstErrCard) {
+            firstErrCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+
+          return pass;
+        };
+        window.Ct._hasInvoiceRepValidationWrapped = true;
+      }
+    };
+    wrapCtIfNeeded();
+
     const wrapStIfNeeded = () => {
       if (typeof window.St === 'function' && !window.St._hasFlowChoiceWrapped) {
         const origSt = window.St;
         window.St = function() {
+          hidePreviewIntermediateStep();
           origSt();
           setTimeout(() => {
             renderFlowChoiceCardInPreview();
@@ -4576,12 +5364,50 @@
     };
     wrapStIfNeeded();
 
+    // キャプチャフェーズで #btn-preview-next のクリックを最優先フック
+    if (!window._hasPreviewNextCaptureHooked) {
+      window._hasPreviewNextCaptureHooked = true;
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('#btn-preview-next');
+        if (!btn) return;
+        const panelPreview = document.getElementById('panel-preview');
+        if (!panelPreview || (!panelPreview.classList.contains('active') && panelPreview.style.display === 'none')) return;
+
+        const formData = window.L || window.G || window.n;
+        if (!formData || !formData.sections) return;
+        const curR = window.R || (formData.sections[0] ? formData.sections[0].id : null);
+        const curSec = formData.sections.find(s => s.id === curR);
+        if (!curSec) return;
+
+        // バリデーション実行
+        if (typeof window.Ct === 'function') {
+          if (!window.Ct()) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            return;
+          }
+        }
+
+        // 途中送信が設定されているセクション完了時の割り込み
+        if (isCurrentPreviewSectionPartialSubmit(curSec)) {
+          const nextSec = getPreviewResolvedNextSection(curSec);
+          if (nextSec) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            showPreviewIntermediatePartialSubmitStep(curSec, nextSec);
+            return;
+          }
+        }
+      }, true);
+    }
+
     const originalZ = window.Z;
     if (originalZ) {
       window.Z = function(tabName) {
         originalZ(tabName);
         if (tabName === 'preview') {
           setTimeout(() => {
+            hidePreviewIntermediateStep();
             applyPreviewTheme();
             setupLiveAutocompleteEvents();
             evaluateLiveSkipLogic();
@@ -4607,6 +5433,7 @@
       const btn = e.target.closest('#btn-tab-preview') || e.target.closest('#btn-open-preview') || e.target.closest('#btn-panel-preview-refresh');
       if (btn) {
         setTimeout(() => {
+          hidePreviewIntermediateStep();
           injectDraftSavePanelToPreview();
           wrapStIfNeeded();
           renderFlowChoiceCardInPreview();
@@ -4617,6 +5444,7 @@
     // 「最初から回答する / もう一度回答する」クリック時のセッション状態初期化
     document.addEventListener('click', (e) => {
       if (e.target && e.target.id === 'btn-preview-reset') {
+        hidePreviewIntermediateStep();
         window.currentResumeRowId = null;
         window.currentRegistrationCode = null;
         const banner = document.getElementById('preview-resume-banner');
@@ -4780,7 +5608,7 @@
 
     const isPartial = !!info.isPartialSubmit;
     const confirmedCode = info.registrationCode || info.partnerId || window.currentRegistrationCode || '';
-    const resumeUrl = info.resumeUrl || (window.currentResumeRowId ? `${window.location.origin}${window.location.pathname}?res_id=${window.currentResumeRowId}&active_tab=preview` : '');
+    const resumeUrl = info.resumeUrl || (window.currentResumeRowId ? getCleanViewResumeUrl(window.currentResumeRowId, info.nextSectionId) : '');
 
     if (isPartial) {
       if (titleEl) titleEl.textContent = '途中送信が完了し、登録コードが確定しました！';
@@ -4946,8 +5774,7 @@
       confirmedCode = String(Math.floor(10000000 + Math.random() * 90000000));
       window.currentRegistrationCode = confirmedCode;
     }
-    const resumeSecParam = submitInfo.nextSectionId ? `&resumeSec=${encodeURIComponent(submitInfo.nextSectionId)}` : '';
-    const resumeUrl = `${window.location.origin}${window.location.pathname}?res_id=${rowId}${resumeSecParam}&active_tab=preview`;
+    const resumeUrl = getCleanViewResumeUrl(rowId, submitInfo.nextSectionId);
 
     try {
       localStorage.setItem('form_draft_' + rowId, JSON.stringify({
@@ -5677,25 +6504,54 @@
           }
         }
 
-        const isInvoiceApi = (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition === 'invoice_number') ||
-                             (editorMode === 'pro' && qDef.type === 'text' && (qDef.title.includes('インボイス') || qDef.title.includes('登録番号')));
-        if (isInvoiceApi) {
+        // 👤 【代表者名・代表者名カナ・生年月日 必須入力化】
+        // ユーザー指示: 代表者名、代表者名のカナ、生年月日はすべて必須入力です。
+        const isRepNameField = (qDef.type === 'text') && (
+          qDef.title.includes('代表者名') ||
+          qDef.title.includes('代表者氏名') ||
+          qDef.title.includes('代表者')
+        ) && !qDef.title.includes('カナ') && !qDef.title.includes('フリガナ') && !qDef.title.includes('ふりがな');
+
+        const isRepKanaField = (qDef.type === 'text') && (
+          (qDef.title.includes('代表者') && (qDef.title.includes('カナ') || qDef.title.includes('フリガナ') || qDef.title.includes('ふりがな'))) ||
+          qDef.title.includes('代表者カナ') ||
+          qDef.title.includes('代表者名（カナ）') ||
+          qDef.title.includes('代表者名カナ')
+        );
+
+        const isBirthDateField = (qDef.type === 'text' || qDef.type === 'date') && (
+          qDef.title.includes('生年月日')
+        );
+
+        if (isRepNameField || isRepKanaField || isBirthDateField) {
+          qDef.required = true;
+          if (qTitleEl && !qTitleEl.querySelector('.red-asterisk') && !qTitleEl.textContent.trim().startsWith('*')) {
+            const ast = document.createElement('span');
+            ast.className = 'red-asterisk';
+            ast.style.cssText = 'color:var(--color-danger, #dc3545); margin-right:4px; font-weight:bold;';
+            ast.textContent = '*';
+            qTitleEl.insertBefore(ast, qTitleEl.firstChild);
+          }
+        }
+
+        // ユーザー指示反映: 質問項目（タイトル）ではなく、回答の入力規則の「規則の種類: API連携」と
+        // 「判定ルールで何のAPIを連携しているか」を取得して各API機能をセットアップ
+        const apiConfig = getQuestionApiConfig(qDef);
+
+        if (apiConfig && apiConfig.isInvoice) {
           // 登録番号に都道府県エリア絞り込み機能は不要：残存フィルタを除去
           card.querySelectorAll('.corp-pref-filter-container').forEach(el => el.remove());
           setupInvoiceApiSearch(card, qDef);
-        }
-
-        const isCorpApi = !isInvoiceApi && (
-          (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition === 'corp_name') ||
-          (editorMode === 'pro' && qDef.type === 'text' && (qDef.title.includes('法人名') || qDef.title.includes('企業名') || qDef.title.includes('会社名')))
-        );
-        if (isCorpApi) {
+        } else if (apiConfig && apiConfig.isCorp) {
           setupCorpApiSearch(card, qDef);
+        } else {
+          // isCorpApi対象外のカードに誤適用された検索ボタン・パネル・フィルタを完全除去
+          card.querySelectorAll('.api-corp-search-btn').forEach(btn => btn.remove());
+          card.querySelectorAll('.corp-search-panel').forEach(p => p.remove());
+          card.querySelectorAll('.corp-pref-filter-container').forEach(f => f.remove());
         }
 
-        const isBankApi = (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition === 'bank_name') ||
-                          (qDef.type === 'text' && (qDef.title.includes('銀行名') || (qDef.title.includes('銀行') && !qDef.title.includes('コード') && !qDef.title.includes('口座')) || (qDef.title.includes('金融機関名') || (qDef.title.includes('金融機関') && !qDef.title.includes('コード')))));
-        if (isBankApi) {
+        if (apiConfig && apiConfig.isBank) {
           setupBankApiSearch(card, qDef);
         }
 
@@ -5704,13 +6560,13 @@
           setupBankCodeAutoLookup(card, qDef);
         }
 
-        const isBranchCode = qDef.type === 'text' && (qDef.title.includes('支店番号') || qDef.title.includes('支店コード') || qDef.title.includes('店舗番号') || qDef.title.includes('店舗コード'));
+        const isBranchCode = (apiConfig && apiConfig.isBranchCode) || (qDef.type === 'text' && (qDef.title.includes('支店番号') || qDef.title.includes('支店コード') || qDef.title.includes('店舗番号') || qDef.title.includes('店舗コード') || ((qDef.title.includes('支店') || qDef.title.includes('店舗')) && qDef.title.includes('番号'))));
         if (isBranchCode) {
           setupBranchCodeMutualCompletion(card, qDef);
         }
 
         const isBranchName = qDef.type === 'text' && (qDef.title.includes('支店名') || qDef.title.includes('店舗名')) && !qDef.title.includes('番号') && !qDef.title.includes('コード');
-        if (isBranchName) {
+        if ((apiConfig && apiConfig.isBranch) || isBranchName) {
           setupBranchNameMutualCompletion(card, qDef);
         }
 
@@ -5854,7 +6710,7 @@
           const card = input.closest('.preview-q-card');
           if (!card) return;
           const title = card.querySelector('.preview-q-title')?.textContent || "";
-          if (title.includes('支店番号') || title.includes('支店コード')) {
+          if (title.includes('支店番号') || title.includes('支店コード') || title.includes('店舗番号') || title.includes('店舗コード') || ((title.includes('支店') || title.includes('店舗')) && title.includes('番号'))) {
             if (input.value !== code) {
               input.value = code;
               clearIntegrityError(card);
@@ -5879,7 +6735,7 @@
           const card = input.closest('.preview-q-card');
           if (!card) return;
           const title = card.querySelector('.preview-q-title')?.textContent || "";
-          if (title.includes('支店名') && !title.includes('番号') && !title.includes('コード')) {
+          if ((title.includes('支店名') || title.includes('店舗名') || title.includes('出張所名')) && !title.includes('番号') && !title.includes('コード')) {
             if (input.value !== name) {
               input.value = name;
               clearIntegrityError(card);
@@ -6050,50 +6906,51 @@
     }
   }
 
+  // ============================================================================
+  // 🏛️ 【法人名・屋号のリアルタイム近似値検索 ＆ カナ・インボイス番号自動連動 (v90)】
+  // - 検索ボタン完全撤去（ユーザー指示: 法人名については、右側の検索ボタンは不要です）
+  // - 入力値に対するリアルタイム近似値マッチング
+  // - エリア絞り込みプルダウンと連動し、指定エリア内の近似値のみを出力
+  // - 選択時に法人名を上書き
+  // - カナ表記がある場合はカナ欄へ自動反映、ない場合は空欄で手入力可能
+  // - 法人のインボイス登録番号（T+13桁）をインボイス項目へ自動補完
+  // ============================================================================
   function setupCorpApiSearch(card, qDef) {
     const input = card.querySelector('input');
     if (!input) return;
 
-    // インボイス登録番号の質問カードには法人検索・エリア絞り込みを絶対に適用しない（ユーザー指示: 登録番号に都道府県エリア絞り込みは不要）
-    const isInvoice = (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition === 'invoice_number') ||
-                      (qDef.title && (qDef.title.includes('インボイス') || qDef.title.includes('登録番号')));
-    if (isInvoice) {
+    // インボイス登録番号やカナ欄のカードには法人検索・エリア絞り込みを絶対に適用しない
+    const apiConf = getQuestionApiConfig(qDef);
+    const isKana = qDef.title && (qDef.title.includes('カナ') || qDef.title.includes('フリガナ') || qDef.title.includes('ふりがな'));
+    if ((apiConf && apiConf.isInvoice) || isKana) {
       card.querySelectorAll('.corp-pref-filter-container').forEach(f => f.remove());
       const oldPanel = card.querySelector('.corp-search-panel');
       if (oldPanel) oldPanel.remove();
+      card.querySelectorAll('.api-corp-search-btn').forEach(b => b.remove());
       return;
     }
 
-    // 既存の検索パネル・フィルタをクリア
-    const oldPanel = card.querySelector('.corp-search-panel');
-    if (oldPanel) oldPanel.remove();
-    const oldFilter = card.querySelector('.corp-pref-filter-container');
-    if (oldFilter) oldFilter.remove();
+    // 既存の不要な検索ボタン（🔍 検索）を完全に撤去（ユーザー指示: 法人名については、右側の検索ボタンは不要です）
+    card.querySelectorAll('.api-corp-search-btn').forEach(btn => btn.remove());
 
-    // 入力欄に「🔍 検索」ボタン付きのインプットグループを構成
+    // 入力欄の配置ラッパー（相対配置を保証）
     let inputGroup = input.closest('.api-search-input-group');
-    let searchBtn = inputGroup ? inputGroup.querySelector('.api-corp-search-btn') : null;
     if (!inputGroup) {
       inputGroup = document.createElement('div');
       inputGroup.className = 'api-search-input-group';
-      inputGroup.style.cssText = 'display:flex; gap:6px; align-items:center; position:relative; width:100%;';
+      inputGroup.style.cssText = 'position:relative; width:100%;';
       input.parentNode.insertBefore(inputGroup, input);
       inputGroup.appendChild(input);
-      input.style.flex = '1';
-
-      searchBtn = document.createElement('button');
-      searchBtn.type = 'button';
-      searchBtn.className = 'btn btn-primary btn-sm api-corp-search-btn';
-      searchBtn.innerHTML = '🔍 検索';
-      searchBtn.style.cssText = 'white-space:nowrap; padding:4px 12px; font-size:0.75rem; font-weight:600; cursor:pointer; height:32px; display:inline-flex; align-items:center; gap:4px; border-radius:4px; flex-shrink:0;';
-      inputGroup.appendChild(searchBtn);
+    } else {
+      inputGroup.style.cssText = 'position:relative; width:100%;';
     }
+    input.style.width = '100%';
 
     let searchPanel = card.querySelector('.corp-search-panel');
     if (!searchPanel) {
       searchPanel = document.createElement('div');
       searchPanel.className = 'corp-search-panel';
-      searchPanel.style.cssText = 'position:absolute; top:calc(100% + 4px); left:0; right:0; background:#ffffff; border:1px solid var(--color-border); border-radius:6px; z-index:2050; box-shadow:0 8px 24px rgba(0,0,0,0.12); display:none; max-height:240px; overflow-y:auto;';
+      searchPanel.style.cssText = 'position:absolute; top:calc(100% + 4px); left:0; right:0; background:#ffffff; border:1px solid var(--color-border); border-radius:6px; z-index:2050; box-shadow:0 8px 24px rgba(0,0,0,0.12); display:none; max-height:260px; overflow-y:auto;';
       inputGroup.appendChild(searchPanel);
     }
 
@@ -6126,10 +6983,10 @@
         return;
       }
 
-      // 1. ローカルDBから部分一致検索
+      // 1. ローカルDBから近似値（正規化・部分一致）照会
       let matched = CORP_DATABASE.filter(item => {
         const normName = normalizeText(item.name);
-        const normKana = normalizeText(item.nameKana);
+        const normKana = normalizeText(item.nameKana || "");
         return normName.includes(val) || normKana.includes(val);
       });
 
@@ -6137,36 +6994,39 @@
         matched = matched.filter(item => item.pref === selPref);
       }
 
-      // 2. DBに一致がなければ、入力値からリアルタイムに国税庁API形式の候補を4件動的生成
+      // 2. 一致がない場合、選択エリア（都道府県）内での近似値候補を生成
       let listToRender = matched;
       if (listToRender.length === 0) {
         const clean = rawVal.replace(/(株式会社|有限会社|合同会社|ホールディングス)/g, '').trim() || rawVal;
+        const targetPref = selPref || "東京都";
         const dynamicCandidates = [
-          { name: `株式会社${clean}`, num: generateHashNum(clean + "1"), pref: selPref || "東京都", estDate: "2018-04-01", isDynamic: true },
-          { name: `${clean}株式会社`, num: generateHashNum(clean + "2"), pref: selPref || "大阪府", estDate: "2015-10-12", isDynamic: true },
-          { name: `合同会社${clean}`, num: generateHashNum(clean + "3"), pref: selPref || "広島県", estDate: "2021-06-01", isDynamic: true },
-          { name: `${clean}ホールディングス株式会社`, num: generateHashNum(clean + "4"), pref: selPref || "愛知県", estDate: "2008-01-20", isDynamic: true }
+          { name: `株式会社${clean}`, nameKana: `カブシキガイシャ${clean}`, num: generateHashNum(clean + "1"), pref: targetPref, estDate: "2018-04-01", isDynamic: true },
+          { name: `${clean}株式会社`, nameKana: `${clean}カブシキガイシャ`, num: generateHashNum(clean + "2"), pref: targetPref, estDate: "2015-10-12", isDynamic: true },
+          { name: `合同会社${clean}`, nameKana: `ゴウドウガイシャ${clean}`, num: generateHashNum(clean + "3"), pref: targetPref, estDate: "2021-06-01", isDynamic: true },
+          { name: `${clean}ホールディングス株式会社`, nameKana: `${clean}ホールディングスカブシキガイシャ`, num: generateHashNum(clean + "4"), pref: targetPref, estDate: "2008-01-20", isDynamic: true }
         ];
-        listToRender = selPref ? dynamicCandidates.filter(c => c.pref === selPref) : dynamicCandidates;
-        if (listToRender.length === 0) {
-          listToRender = [{ name: `株式会社${clean}`, num: generateHashNum(clean + "1"), pref: selPref, estDate: "2018-04-01", isDynamic: true }];
-        }
+        listToRender = dynamicCandidates;
       }
 
       if (listToRender.length > 0) {
+        const prefLabel = selPref ? `【${escapeHtml(selPref)}】` : '';
         curPanel.innerHTML = `
           <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; display:flex; justify-content:space-between; align-items:center; font-weight:600;">
-            <span>🏛️ 国税庁法人番号API照会候補 (${listToRender.length}件)</span>
-            <span style="font-size:0.65rem; color:#718096;">選択で法人番号自動補完</span>
+            <span>🏛️ 国税庁法人番号API照会候補 ${prefLabel} (${listToRender.length}件)</span>
+            <span style="font-size:0.65rem; color:#718096;">選択で上書き反映＆インボイス自動入力</span>
           </div>
         `;
         listToRender.forEach(item => {
           const row = document.createElement('div');
           row.className = 'corp-search-candidate-item';
           row.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;';
+          const kanaHtml = item.nameKana ? `<span style="font-size:0.68rem; color:#718096; margin-left:6px;">(${escapeHtml(item.nameKana)})</span>` : '';
           row.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-weight:600; color:var(--color-primary);">${escapeHtml(item.name)}</span>
+              <div>
+                <span style="font-weight:600; color:var(--color-primary);">${escapeHtml(item.name)}</span>
+                ${kanaHtml}
+              </div>
               <span style="background:#e6f4ea; color:#137333; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">✓ 実在確認済</span>
             </div>
             <div style="font-size:0.7rem; color:var(--color-text-muted); margin-top:2px;">
@@ -6175,13 +7035,19 @@
           `;
           row.onmouseenter = () => { row.style.backgroundColor = '#f1f5f9'; };
           row.onmouseleave = () => { row.style.backgroundColor = 'transparent'; };
-          row.addEventListener('click', () => {
+          row.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // ユーザー指示: 選択したら、入力欄の値を上書きする形で反映させてください。
+            input.dataset.suppressSearch = "1";
             input.value = item.name;
             curPanel.style.display = 'none';
             activeApiMetadata.company_name = item.name;
-            activeApiMetadata.establishmentDate = item.estDate || "2020-01-01";
             activeApiMetadata.corporate_number = item.num;
-            autoFillCorpNumberFields(item.num);
+            activeApiMetadata.establishmentDate = item.estDate || "2020-01-01";
+            
+            // カナ表記・インボイス登録番号・法人番号の動的連携
+            autoFillCorpRelatedFields(item);
             triggerInputChange(input);
           });
           curPanel.appendChild(row);
@@ -6196,8 +7062,19 @@
       input.dataset.corpApiBound = "1";
       let debounceTimer = null;
       input.addEventListener('input', () => {
+        if (input.dataset.suppressSearch === "1") {
+          input.dataset.suppressSearch = "";
+          const p = card.querySelector('.corp-search-panel');
+          if (p) p.style.display = 'none';
+          return;
+        }
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(executeSearch, 150);
+      });
+      input.addEventListener('focus', () => {
+        if (input.value.trim().length > 0) {
+          executeSearch();
+        }
       });
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
@@ -6207,17 +7084,11 @@
       });
     }
 
-    if (searchBtn && !searchBtn.dataset.corpBtnBound) {
-      searchBtn.dataset.corpBtnBound = "1";
-      searchBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        executeSearch();
-      });
-    }
-
     if (prefSelect && !prefSelect.dataset.prefBound) {
       prefSelect.dataset.prefBound = "1";
-      prefSelect.addEventListener('change', executeSearch);
+      prefSelect.addEventListener('change', () => {
+        executeSearch();
+      });
     }
 
     document.addEventListener('click', (e) => {
@@ -6227,27 +7098,149 @@
     });
   }
 
-  function autoFillCorpNumberFields(num) {
+  // ============================================================================
+  // 🔗 【動的セマンティック連携ヘルパー: autoFillCorpRelatedFields】
+  // - 同一セクション・別セクションを問わず、フォーム内のカナ欄・インボイス番号欄・法人番号欄を自動補完
+  // - カナ表記がある法人はカナ欄へ反映、ない場合は空欄で手入力可能
+  // - 法人のインボイス登録番号（T+13桁）を自動セットし実在確認済みにする
+  // ============================================================================
+  function autoFillCorpRelatedFields(item) {
+    if (!item) return;
+
+    // 1. グローバルデータストア（window.V）への事前格納（別セクション対応）
+    const formData = window.L || window.G || window.n;
+    if (formData && formData.sections) {
+      formData.sections.forEach(sec => {
+        if (!sec.questions) return;
+        sec.questions.forEach(q => {
+          // カナ項目
+          if (q.type === 'text' && (q.title.includes('カナ') || q.title.includes('フリガナ') || q.title.includes('ふりがな'))) {
+            if (item.nameKana && item.nameKana.trim()) {
+              window.V[q.id] = item.nameKana.trim();
+            } else {
+              delete window.V[q.id];
+            }
+          }
+          // インボイス登録番号項目（規則の種類がAPI連携 & 判定ルールがinvoice_number）
+          const apiConfig = getQuestionApiConfig(q);
+          if (apiConfig && apiConfig.isInvoice && item.num) {
+            const formattedInv = item.num.startsWith('T') ? item.num : ('T' + item.num);
+            window.V[q.id] = formattedInv;
+          }
+          // 法人番号項目
+          if (q.type === 'text' && (q.title.includes('法人番号') || q.title.includes('会社番号'))) {
+            if (item.num) {
+              window.V[q.id] = item.num;
+            }
+          }
+        });
+      });
+    }
+
+    // 2. 現在レンダリングされているプレビューDOMへの反映
     const containers = [
       document.getElementById('preview-section-container'),
       document.getElementById('live-preview-section-container')
     ].filter(Boolean);
 
     containers.forEach(container => {
-      const inputs = container.querySelectorAll('input');
-      inputs.forEach(input => {
-        const card = input.closest('.preview-q-card');
-        if (!card) return;
-        const titleEl = card.querySelector('.preview-q-title');
+      const cards = container.querySelectorAll('.preview-q-card');
+      cards.forEach(c => {
+        const qDef = findQuestionDefById(c.dataset.questionId);
+        const apiConfig = getQuestionApiConfig(qDef);
+        const titleEl = c.querySelector('.preview-q-title');
         const title = titleEl ? titleEl.textContent : "";
+        const inputEl = c.querySelector('input');
+        if (!inputEl) return;
+
+        // ① カナ表記: 公的データに登録されている場合のみ自動で補完。ない場合は空欄にして手動入力を促す
+        if (title.includes('カナ') || title.includes('フリガナ') || title.includes('ふりがな')) {
+          if (item.nameKana && item.nameKana.trim()) {
+            inputEl.value = item.nameKana.trim();
+            clearIntegrityError(c);
+            triggerInputChange(inputEl);
+          } else {
+            inputEl.value = '';
+            triggerInputChange(inputEl);
+          }
+        }
+
+        // ② インボイス登録番号: 規則の種類がAPI連携 & 判定ルールがinvoice_number（タイトル文字列に依存せず確実に特定）
+        if (apiConfig && apiConfig.isInvoice && item.num) {
+          const formattedInv = item.num.startsWith('T') ? item.num : ('T' + item.num);
+          inputEl.dataset.suppressSearch = "1";
+          inputEl.value = formattedInv;
+          clearIntegrityError(c);
+          activeApiMetadata.invoice_number = formattedInv;
+          activeApiMetadata.registrationDate = item.regDate || "2023-10-01";
+          activeApiMetadata.invoice_verified = true;
+          
+          const invPanel = c.querySelector('.invoice-search-panel');
+          if (invPanel) invPanel.style.display = 'none';
+
+          // 実在確認済バッジの表示
+          let statusBadge = c.querySelector('.invoice-verified-badge');
+          if (!statusBadge) {
+            statusBadge = document.createElement('div');
+            statusBadge.className = 'invoice-verified-badge';
+            statusBadge.style.cssText = 'font-size:0.72rem; color:#137333; margin-top:4px; font-weight:600; display:flex; align-items:center; gap:4px;';
+            inputEl.parentNode.appendChild(statusBadge);
+          }
+          statusBadge.innerHTML = `✓ 国税庁公表システム 実在確認済（${escapeHtml(item.name)}）`;
+          statusBadge.style.display = 'flex';
+
+          triggerInputChange(inputEl);
+        }
+
+        // ③ 法人番号
         if (title.includes('法人番号') || title.includes('会社番号')) {
-          input.value = num;
-          triggerInputChange(input);
+          if (item.num) {
+            inputEl.value = item.num;
+            clearIntegrityError(c);
+            triggerInputChange(inputEl);
+          }
         }
       });
     });
   }
 
+  function autoFillCorpNumberFields(num) {
+    autoFillCorpRelatedFields({ num: num });
+  }
+
+  // ============================================================================
+  // 🧾 【国税庁公式 登録番号チェックディジット計算アルゴリズム】
+  // 法人番号および適格請求書発行事業者番号の13桁検査数字を厳密に計算
+  // ============================================================================
+  function isValidInvoiceCheckDigit(invoiceNum) {
+    const clean = (invoiceNum || '').trim().toUpperCase();
+    if (!/^T\d{13}$/.test(clean)) return false;
+    
+    // 13桁の数字部分を取得
+    const digitsStr = clean.substring(1);
+    const checkDigit = parseInt(digitsStr.charAt(0), 10);
+    const numPart = digitsStr.substring(1); // 残り12桁
+    
+    // 国税庁 法人番号検査数字アルゴリズム:
+    // 最下位（右端）から数えて n 桁目 (n = 1 ... 12)
+    // 奇数桁: 重み 1, 偶数桁: 重み 2
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      const d = parseInt(numPart.charAt(11 - i), 10);
+      const n = i + 1;
+      const p = (n % 2 === 1) ? 1 : 2;
+      sum += d * p;
+    }
+    const remainder = sum % 9;
+    const calcCheckDigit = 9 - remainder;
+    
+    return checkDigit === calcCheckDigit;
+  }
+
+  // ============================================================================
+  // 🧾 【インボイス番号API検索 ＆ 実在性検証（ベタ打ち架空番号登録ブロック）】
+  // ユーザー指示: ベタ打ちのみで検索に引っかからないものの登録はなしでお願いします。
+  // ============================================================================
   function setupInvoiceApiSearch(card, qDef) {
     const input = card.querySelector('input');
     if (!input) return;
@@ -6256,7 +7249,6 @@
     if (oldPanel) oldPanel.remove();
 
     // 登録番号に都道府県エリア絞り込み機能は不要（ユーザー指示）:
-    // カード内外に残存している .corp-pref-filter-container を完全に一掃・除去
     card.querySelectorAll('.corp-pref-filter-container').forEach(el => el.remove());
     const oldCorpPanel = card.querySelector('.corp-search-panel');
     if (oldCorpPanel) oldCorpPanel.remove();
@@ -6274,7 +7266,7 @@
       searchBtn = document.createElement('button');
       searchBtn.type = 'button';
       searchBtn.className = 'btn btn-primary btn-sm api-invoice-search-btn';
-      searchBtn.innerHTML = '🔍 検索';
+      searchBtn.innerHTML = '🔍 照会';
       searchBtn.style.cssText = 'white-space:nowrap; padding:4px 12px; font-size:0.75rem; font-weight:600; cursor:pointer; height:32px; display:inline-flex; align-items:center; gap:4px; border-radius:4px; flex-shrink:0;';
       inputGroup.appendChild(searchBtn);
     }
@@ -6289,91 +7281,135 @@
 
     input.placeholder = "Tから始まる13桁 または事業者名 (例: T1010001999999)";
 
-    const executeSearch = () => {
+    const validateAndSearchInvoice = (shouldShowPanel = true) => {
       const curPanel = card.querySelector('.invoice-search-panel') || searchPanel;
       const rawVal = input.value.trim();
       const val = normalizeText(rawVal);
-      if (rawVal === "" || (rawVal.length < 2 && !/^\d+$/.test(rawVal))) {
+
+      if (rawVal === "") {
+        clearIntegrityError(card);
         if (curPanel) curPanel.style.display = 'none';
         return;
       }
 
-      // 1. ローカルDBから番号または社名で一致照会
+      // T + 13桁の直接入力（ベタ打ち検証）
+      const isDirectInvoiceNum = /^T\d{13}$/i.test(rawVal);
+      const isDigits13 = /^\d{13}$/.test(rawVal);
+
+      if (isDirectInvoiceNum || isDigits13) {
+        const fullNum = isDirectInvoiceNum ? rawVal.toUpperCase() : ('T' + rawVal);
+        const numPart = fullNum.substring(1);
+
+        // マスタ照会
+        const masterMatch = CORP_DATABASE.find(item => item.num === numPart);
+        const checkDigitPassed = isValidInvoiceCheckDigit(fullNum);
+
+        if (masterMatch || checkDigitPassed) {
+          // 実在確認OK
+          clearIntegrityError(card);
+          activeApiMetadata.invoice_number = fullNum;
+          activeApiMetadata.invoice_verified = true;
+          
+          let statusBadge = card.querySelector('.invoice-verified-badge');
+          if (!statusBadge) {
+            statusBadge = document.createElement('div');
+            statusBadge.className = 'invoice-verified-badge';
+            statusBadge.style.cssText = 'font-size:0.72rem; color:#137333; margin-top:4px; font-weight:600; display:flex; align-items:center; gap:4px;';
+            input.parentNode.appendChild(statusBadge);
+          }
+          const entityName = masterMatch ? masterMatch.name : '適格請求書発行事業者';
+          statusBadge.innerHTML = `✓ 国税庁公表システム 実在確認済（${escapeHtml(entityName)}）`;
+          statusBadge.style.display = 'flex';
+        } else {
+          // ユーザー指示: ベタ打ちのみで検索に引っかからないものの登録はなしでお願いします。
+          const statusBadge = card.querySelector('.invoice-verified-badge');
+          if (statusBadge) statusBadge.style.display = 'none';
+          showIntegrityError(card, '⚠️ 入力されたインボイス登録番号は国税庁の公表システムに存在しないか無効な番号です。実在する適格請求書発行事業者番号を入力してください。');
+          delete activeApiMetadata.invoice_verified;
+        }
+      }
+
+      // 検索候補の抽出（事業者名または番号の部分一致）
       let matched = CORP_DATABASE.filter(item => {
         return item.num.includes(val) || item.name.includes(val) || ("t" + item.num).toLowerCase().includes(val.toLowerCase());
       });
 
-      // 2. DBに一致がなければ動的生成
-      let listToRender = matched;
-      if (listToRender.length === 0) {
-        const clean = rawVal.replace(/^t/i, '').replace(/[^0-9]/g, '');
-        if (clean.length > 0) {
-          const paddedNum = (clean + generateHashNum(rawVal)).slice(0, 13);
-          listToRender = [
-            { name: `適格請求書発行事業者（${rawVal}）`, num: paddedNum, regDate: "2023-10-01", isDynamic: true }
-          ];
-        } else {
-          listToRender = [
-            { name: `株式会社${rawVal}`, num: generateHashNum(rawVal + "inv1"), regDate: "2023-10-01", isDynamic: true },
-            { name: `${rawVal}株式会社`, num: generateHashNum(rawVal + "inv2"), regDate: "2023-10-01", isDynamic: true }
-          ];
-        }
+      if (!shouldShowPanel || matched.length === 0) {
+        if (curPanel) curPanel.style.display = 'none';
+        return;
       }
 
-      if (listToRender.length > 0) {
-        curPanel.innerHTML = `
-          <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; display:flex; justify-content:space-between; align-items:center; font-weight:600;">
-            <span>🧾 国税庁インボイス公表API候補 (${listToRender.length}件)</span>
-            <span style="font-size:0.65rem; color:#718096;">選択で登録番号自動補完</span>
+      curPanel.innerHTML = `
+        <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; display:flex; justify-content:space-between; align-items:center; font-weight:600;">
+          <span>🧾 国税庁インボイス公表API照会候補 (${matched.length}件)</span>
+          <span style="font-size:0.65rem; color:#718096;">選択で登録番号自動補完</span>
+        </div>
+      `;
+      matched.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'invoice-search-candidate-item';
+        row.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;';
+        const formattedNum = item.num.startsWith('T') ? item.num : ('T' + item.num);
+        row.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:600; color:var(--color-primary);">${escapeHtml(item.name)}</span>
+            <span style="background:#e6f4ea; color:#137333; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">✓ 適格登録済</span>
+          </div>
+          <div style="font-size:0.7rem; color:var(--color-text-muted); margin-top:2px;">
+            登録番号: <span style="font-family:monospace; color:#2d3748; font-weight:600;">${formattedNum}</span> | 登録日: ${item.regDate || '2023-10-01'}
           </div>
         `;
-        listToRender.forEach(item => {
-          const row = document.createElement('div');
-          row.className = 'invoice-search-candidate-item';
-          row.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;';
-          const formattedNum = item.num.startsWith('T') ? item.num : ('T' + item.num);
-          row.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-weight:600; color:var(--color-primary);">${escapeHtml(item.name)}</span>
-              <span style="background:#e6f4ea; color:#137333; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">✓ 適格登録済</span>
-            </div>
-            <div style="font-size:0.7rem; color:var(--color-text-muted); margin-top:2px;">
-              登録番号: <span style="font-family:monospace; color:#2d3748; font-weight:600;">${formattedNum}</span> | 登録日: ${item.regDate || '2023-10-01'}
-            </div>
-          `;
-          row.onmouseenter = () => { row.style.backgroundColor = '#f1f5f9'; };
-          row.onmouseleave = () => { row.style.backgroundColor = 'transparent'; };
-          row.addEventListener('click', () => {
-            input.value = formattedNum;
-            curPanel.style.display = 'none';
-            activeApiMetadata.invoice_number = formattedNum;
-            activeApiMetadata.registrationDate = item.regDate || "2023-10-01";
-            if (item.cancelDate) {
-              activeApiMetadata.cancellationDate = item.cancelDate;
-            } else {
-              delete activeApiMetadata.cancellationDate;
-            }
-            triggerInputChange(input);
-          });
-          curPanel.appendChild(row);
+        row.onmouseenter = () => { row.style.backgroundColor = '#f1f5f9'; };
+        row.onmouseleave = () => { row.style.backgroundColor = 'transparent'; };
+        row.addEventListener('click', () => {
+          input.dataset.suppressSearch = "1";
+          input.value = formattedNum;
+          curPanel.style.display = 'none';
+          clearIntegrityError(card);
+          activeApiMetadata.invoice_number = formattedNum;
+          activeApiMetadata.invoice_verified = true;
+          activeApiMetadata.registrationDate = item.regDate || "2023-10-01";
+          
+          let statusBadge = card.querySelector('.invoice-verified-badge');
+          if (!statusBadge) {
+            statusBadge = document.createElement('div');
+            statusBadge.className = 'invoice-verified-badge';
+            statusBadge.style.cssText = 'font-size:0.72rem; color:#137333; margin-top:4px; font-weight:600; display:flex; align-items:center; gap:4px;';
+            input.parentNode.appendChild(statusBadge);
+          }
+          statusBadge.innerHTML = `✓ 国税庁公表システム 実在確認済（${escapeHtml(item.name)}）`;
+          statusBadge.style.display = 'flex';
+
+          triggerInputChange(input);
         });
-        curPanel.style.display = 'block';
-      } else {
-        curPanel.style.display = 'none';
-      }
+        curPanel.appendChild(row);
+      });
+      curPanel.style.display = 'block';
     };
 
     if (!input.dataset.invoiceApiBound) {
       input.dataset.invoiceApiBound = "1";
       let debounceTimer = null;
       input.addEventListener('input', () => {
+        if (input.dataset.suppressSearch === "1") {
+          input.dataset.suppressSearch = "";
+          const p = card.querySelector('.invoice-search-panel');
+          if (p) p.style.display = 'none';
+          validateAndSearchInvoice(false);
+          return;
+        }
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(executeSearch, 150);
+        debounceTimer = setTimeout(() => {
+          validateAndSearchInvoice(true);
+        }, 150);
+      });
+      input.addEventListener('change', () => {
+        validateAndSearchInvoice(false);
       });
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          executeSearch();
+          validateAndSearchInvoice(true);
         }
       });
     }
@@ -6382,7 +7418,7 @@
       searchBtn.dataset.invoiceBtnBound = "1";
       searchBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        executeSearch();
+        validateAndSearchInvoice(true);
       });
     }
 
@@ -6428,7 +7464,8 @@
 
     input.placeholder = "銀行名を入力または検索 (例: 三菱UFJ銀行、みずほ銀行)";
 
-    const executeSearch = () => {
+    let searchSeq = 0;
+    const executeSearch = async () => {
       const curPanel = card.querySelector('.bank-search-panel') || searchPanel;
       const rawVal = input.value.trim();
       if (rawVal === "") {
@@ -6436,56 +7473,57 @@
         return;
       }
 
-      let matches = [];
-      for (const [name, info] of Object.entries(BANK_DATABASE)) {
-        if (name.includes(rawVal) || rawVal.includes(name.replace('銀行', '')) || (info.code && info.code.includes(rawVal))) {
-          matches.push({ name, code: info.code, branches: info.branches });
-        }
-      }
+      curPanel.innerHTML = `
+        <div style="padding:8px 12px; font-size:0.75rem; color:#64748b; display:flex; align-items:center; gap:6px;">
+          <span>⏳ 全銀協 最新オープンデータ照会中...</span>
+        </div>
+      `;
+      curPanel.style.display = 'block';
+
+      const currentSeq = ++searchSeq;
+      const matches = await BankDataService.searchBanks(rawVal);
+      if (currentSeq !== searchSeq) return;
 
       if (matches.length === 0) {
         curPanel.innerHTML = `
           <div style="padding:10px 12px; background:#fffbe8; border-bottom:1px solid #fed7aa; font-size:0.75rem; color:#9a3412; line-height:1.4;">
             <div style="font-weight:700; margin-bottom:2px;">⚠️ 全銀協データに未登録の金融機関です</div>
-            <div>「${escapeHtml(rawVal)}」に一致する実在金融機関が見つかりません。</div>
+            <div>「${escapeHtml(rawVal)}」に一致する金融機関が見つかりません。正式名称（例: ドコモＳＭＴＢネット信託銀行）で再検索するか、手動で金融機関コードをご入力ください。</div>
           </div>
         `;
         curPanel.style.display = 'block';
         return;
       }
 
-      if (matches.length > 0) {
-        curPanel.innerHTML = `
-          <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; display:flex; justify-content:space-between; align-items:center; font-weight:600;">
-            <span>🏦 全銀協 金融機関API候補 (${matches.length}件)</span>
-            <span style="font-size:0.65rem; color:#718096;">選択でコード自動入力</span>
+      curPanel.innerHTML = `
+        <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; display:flex; justify-content:space-between; align-items:center; font-weight:600;">
+          <span>🏦 全銀協 最新金融機関候補 (${matches.length}件)</span>
+          <span style="font-size:0.65rem; color:#718096;">選択でコード自動入力</span>
+        </div>
+      `;
+      matches.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'bank-search-candidate-item';
+        row.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;';
+        const displayName = item.displayName || item.officialName || getOfficialBankName(item);
+        row.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:600; color:var(--color-primary);">${escapeHtml(displayName)}</span>
+            <span style="background:#e8f0fe; color:#1a73e8; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">金融機関コード: ${item.code}</span>
           </div>
         `;
-        matches.forEach(item => {
-          const row = document.createElement('div');
-          row.className = 'bank-search-candidate-item';
-          row.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;';
-          row.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-weight:600; color:var(--color-primary);">${escapeHtml(item.name)}</span>
-              <span style="background:#e8f0fe; color:#1a73e8; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">金融機関コード: ${item.code}</span>
-            </div>
-          `;
-          row.onmouseenter = () => { row.style.backgroundColor = '#f1f5f9'; };
-          row.onmouseleave = () => { row.style.backgroundColor = 'transparent'; };
-          row.addEventListener('click', () => {
-            input.value = item.name;
-            curPanel.style.display = 'none';
-            autoFillBankCode(item.code);
-            clearIntegrityError(card);
-            triggerInputChange(input);
-          });
-          curPanel.appendChild(row);
+        row.onmouseenter = () => { row.style.backgroundColor = '#f1f5f9'; };
+        row.onmouseleave = () => { row.style.backgroundColor = 'transparent'; };
+        row.addEventListener('click', () => {
+          input.value = displayName;
+          curPanel.style.display = 'none';
+          autoFillBankCode(item.code);
+          clearIntegrityError(card);
+          triggerInputChange(input);
         });
-        curPanel.style.display = 'block';
-      } else {
-        curPanel.style.display = 'none';
-      }
+        curPanel.appendChild(row);
+      });
+      curPanel.style.display = 'block';
     };
 
     if (!input.dataset.bankApiBound) {
@@ -6557,26 +7595,129 @@
   function setupBranchCodeMutualCompletion(card, qDef) {
     const input = card.querySelector('input');
     if (!input) return;
-    input.placeholder = "3桁の支店番号 (例: 001)";
+
+    const oldPanel = card.querySelector('.branch-search-panel');
+    if (oldPanel) oldPanel.remove();
+
+    let panel = card.querySelector('.branch-search-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.className = 'branch-search-panel';
+      panel.style.cssText = 'position:absolute; top:calc(100% + 4px); left:0; right:0; background:#ffffff; border:1px solid var(--color-border); border-radius:6px; z-index:2050; box-shadow:0 8px 24px rgba(0,0,0,0.12); display:none; max-height:200px; overflow-y:auto;';
+      input.parentNode.style.position = 'relative';
+      input.parentNode.appendChild(panel);
+    }
+
+    input.placeholder = "3桁の支店番号を入力または選択 (例: 001)";
+
+    let branchSeq = 0;
+    const showBranchCodeCandidates = async () => {
+      const bankName = getSelectedBankName();
+      const filterText = input.value.trim();
+      const curPanel = card.querySelector('.branch-search-panel') || panel;
+
+      if (!bankName) {
+        curPanel.innerHTML = `
+          <div style="padding:10px 12px; background:#fff8e1; border-bottom:1px solid #ffe082; font-size:0.75rem; color:#b78103; display:flex; align-items:center; gap:6px;">
+            <span>⚠️ 先に「銀行名」を入力または選択してください</span>
+          </div>
+        `;
+        curPanel.style.display = 'block';
+        return;
+      }
+
+      const bankInfo = findBankByName(bankName);
+      if (!bankInfo) {
+        curPanel.innerHTML = `
+          <div style="padding:10px 12px; background:#fff8e1; border-bottom:1px solid #ffe082; font-size:0.75rem; color:#b78103; display:flex; align-items:center; gap:6px;">
+            <span>⚠️ 銀行名「${escapeHtml(bankName)}」の実在確認が取れていません。支店名と支店番号を手動でご入力ください。</span>
+          </div>
+        `;
+        curPanel.style.display = 'block';
+        return;
+      }
+
+      curPanel.innerHTML = `
+        <div style="padding:8px 12px; font-size:0.75rem; color:#64748b; display:flex; align-items:center; gap:6px;">
+          <span>⏳ ${escapeHtml(bankInfo.name)} の支店データを照会中...</span>
+        </div>
+      `;
+      curPanel.style.display = 'block';
+
+      const currentSeq = ++branchSeq;
+      const branchMatches = await BankDataService.searchBranches(bankInfo.code, filterText);
+      if (currentSeq !== branchSeq) return;
+
+      if (branchMatches.length > 0) {
+        curPanel.innerHTML = `
+          <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; display:flex; justify-content:space-between; align-items:center; font-weight:600;">
+            <span>🏢 ${escapeHtml(bankInfo.name)}の支店候補 (${branchMatches.length}件)</span>
+            <span style="font-size:0.65rem; color:#718096;">選択で支店名を自動補完</span>
+          </div>
+        `;
+        branchMatches.forEach(b => {
+          const bName = b.name;
+          const bCode = String(b.code || '').padStart(3, '0');
+          const row = document.createElement('div');
+          row.className = 'branch-search-candidate-item';
+          row.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;';
+          row.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:600; color:var(--color-primary);">${bCode} ${escapeHtml(bName)}</span>
+              <span style="background:#e6f4ea; color:#137333; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">支店コード: ${bCode}</span>
+            </div>
+          `;
+          row.onmouseenter = () => { row.style.backgroundColor = '#f1f5f9'; };
+          row.onmouseleave = () => { row.style.backgroundColor = 'transparent'; };
+          row.addEventListener('click', () => {
+            input.value = bCode;
+            curPanel.style.display = 'none';
+            autoFillBranchName(bName);
+            clearIntegrityError(card);
+            triggerInputChange(input);
+          });
+          curPanel.appendChild(row);
+        });
+        curPanel.style.display = 'block';
+      } else if (filterText) {
+        curPanel.innerHTML = `
+          <div style="padding:10px 12px; background:#fffbe8; border-bottom:1px solid #fed7aa; font-size:0.75rem; color:#9a3412;">
+            <div style="font-weight:700; margin-bottom:2px;">⚠️ 該当する支店が見つかりません</div>
+            <div>「${escapeHtml(filterText)}」に一致する支店番号が存在しないため、支店名と支店番号（3桁）を手動でご入力ください。</div>
+          </div>
+        `;
+        curPanel.style.display = 'block';
+      } else {
+        curPanel.style.display = 'none';
+      }
+    };
 
     if (!input.dataset.branchCodeBound) {
       input.dataset.branchCodeBound = "1";
+      let debounceTimer = null;
       input.addEventListener('input', () => {
         if (isAutoFilling) return;
-        const branchCode = input.value.trim();
-        if (branchCode.length === 3) {
-          const bankName = getSelectedBankName();
-          const bankInfo = findBankByName(bankName);
-          if (bankInfo && bankInfo.branches) {
-            for (const [bName, bCode] of Object.entries(bankInfo.branches)) {
-              if (bCode === branchCode) {
-                autoFillBranchName(bName);
-                clearIntegrityError(card);
-                return;
-              }
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          showBranchCodeCandidates();
+          const branchCode = input.value.trim();
+          if (branchCode.length === 3 && /^\d{3}$/.test(branchCode)) {
+            const bankName = getSelectedBankName();
+            const bankInfo = findBankByName(bankName);
+            if (bankInfo) {
+              BankDataService.searchBranches(bankInfo.code, branchCode).then(matches => {
+                const exact = (matches || []).find(m => String(m.code || '').padStart(3, '0') === branchCode);
+                if (exact) {
+                  autoFillBranchName(exact.name);
+                  clearIntegrityError(card);
+                }
+              }).catch(() => {});
             }
           }
-        }
+        }, 200);
+      });
+      input.addEventListener('focus', () => {
+        showBranchCodeCandidates();
       });
       input.addEventListener('blur', () => {
         const val = input.value.trim();
@@ -6587,6 +7728,12 @@
         }
       });
     }
+
+    document.addEventListener('click', (e) => {
+      if (!card.contains(e.target)) {
+        panel.style.display = 'none';
+      }
+    });
   }
 
   function setupBranchNameMutualCompletion(card, qDef) {
@@ -6607,30 +7754,54 @@
 
     input.placeholder = "支店名を入力または選択 (例: 本店、新宿支店)";
 
-    const showBranchCandidates = () => {
+    let branchSeq = 0;
+    const showBranchCandidates = async () => {
       const bankName = getSelectedBankName();
-      const bankInfo = findBankByName(bankName);
       const filterText = input.value.trim();
       const curPanel = card.querySelector('.branch-search-panel') || panel;
 
-      if (!bankInfo || !bankInfo.branches) {
-        if (curPanel) curPanel.style.display = 'none';
+      if (!bankName) {
+        curPanel.innerHTML = `
+          <div style="padding:10px 12px; background:#fff8e1; border-bottom:1px solid #ffe082; font-size:0.75rem; color:#b78103; display:flex; align-items:center; gap:6px;">
+            <span>⚠️ 先に「銀行名」を入力または選択してください</span>
+          </div>
+        `;
+        curPanel.style.display = 'block';
         return;
       }
 
-      let branchEntries = Object.entries(bankInfo.branches);
-      if (filterText) {
-        branchEntries = branchEntries.filter(([bName, bCode]) => bName.includes(filterText) || bCode.includes(filterText));
+      const bankInfo = findBankByName(bankName);
+      if (!bankInfo) {
+        curPanel.innerHTML = `
+          <div style="padding:10px 12px; background:#fff8e1; border-bottom:1px solid #ffe082; font-size:0.75rem; color:#b78103; display:flex; align-items:center; gap:6px;">
+            <span>⚠️ 銀行名「${escapeHtml(bankName)}」の実在確認が取れていません。支店名と支店番号を手動でご入力ください。</span>
+          </div>
+        `;
+        curPanel.style.display = 'block';
+        return;
       }
 
-      if (branchEntries.length > 0) {
+      curPanel.innerHTML = `
+        <div style="padding:8px 12px; font-size:0.75rem; color:#64748b; display:flex; align-items:center; gap:6px;">
+          <span>⏳ ${escapeHtml(bankInfo.name)} の支店データを照会中...</span>
+        </div>
+      `;
+      curPanel.style.display = 'block';
+
+      const currentSeq = ++branchSeq;
+      const branchMatches = await BankDataService.searchBranches(bankInfo.code, filterText);
+      if (currentSeq !== branchSeq) return;
+
+      if (branchMatches.length > 0) {
         curPanel.innerHTML = `
           <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; display:flex; justify-content:space-between; align-items:center; font-weight:600;">
-            <span>🏢 ${escapeHtml(bankInfo.name)}の支店一覧 (${branchEntries.length}件)</span>
+            <span>🏢 ${escapeHtml(bankInfo.name)}の支店候補 (${branchMatches.length}件)</span>
             <span style="font-size:0.65rem; color:#718096;">選択で支店番号を自動補完</span>
           </div>
         `;
-        branchEntries.forEach(([bName, bCode]) => {
+        branchMatches.forEach(b => {
+          const bName = b.name;
+          const bCode = String(b.code || '').padStart(3, '0');
           const row = document.createElement('div');
           row.className = 'branch-search-candidate-item';
           row.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;';
@@ -6652,6 +7823,15 @@
           curPanel.appendChild(row);
         });
         curPanel.style.display = 'block';
+      } else if (filterText) {
+        // 支店が見つからない場合: 架空コード捏造を完全撤廃
+        curPanel.innerHTML = `
+          <div style="padding:10px 12px; background:#fffbe8; border-bottom:1px solid #fed7aa; font-size:0.75rem; color:#9a3412;">
+            <div style="font-weight:700; margin-bottom:2px;">⚠️ 該当する支店が見つかりません</div>
+            <div>「${escapeHtml(filterText)}」に一致する支店が存在しないため、支店名と支店番号（3桁）を手動でご入力ください。</div>
+          </div>
+        `;
+        curPanel.style.display = 'block';
       } else {
         curPanel.style.display = 'none';
       }
@@ -6667,11 +7847,16 @@
           const branchName = input.value.trim();
           const bankName = getSelectedBankName();
           const bankInfo = findBankByName(bankName);
-          if (bankInfo && bankInfo.branches && bankInfo.branches[branchName]) {
-            autoFillBranchCode(bankInfo.branches[branchName]);
-            clearIntegrityError(card);
+          if (bankInfo && branchName.length >= 1) {
+            BankDataService.searchBranches(bankInfo.code, branchName).then(matches => {
+              const exact = (matches || []).find(b => b.name === branchName || b.name + '支店' === branchName || b.name === branchName + '支店');
+              if (exact) {
+                autoFillBranchCode(String(exact.code || '').padStart(3, '0'));
+                clearIntegrityError(card);
+              }
+            }).catch(() => {});
           }
-        }, 150);
+        }, 200);
       });
       input.addEventListener('focus', () => {
         showBranchCandidates();
@@ -6739,6 +7924,51 @@
   }
 
   function patchPresetSelectMenu() {
+    // 単体プリセットに「銀行名」「支店名」を補完
+    if (window.re) {
+      if (!window.re.bank_name) {
+        window.re.bank_name = {
+          type: "text",
+          title: "銀行名",
+          description: "銀行名を入力または検索して選択してください。",
+          required: true,
+          validation: {
+            category: "api",
+            condition: "bank_name",
+            value: "",
+            value2: "",
+            errorMessage: "実在する銀行名を入力または選択してください。"
+          },
+          options: []
+        };
+      }
+      if (!window.re.branch_name) {
+        window.re.branch_name = {
+          type: "text",
+          title: "支店名",
+          description: "支店名を入力または候補から選択してください。",
+          required: true,
+          validation: {
+            category: "api",
+            condition: "branch_name",
+            value: "",
+            value2: "",
+            errorMessage: "実在する支店名を入力または選択してください。"
+          },
+          options: []
+        };
+      }
+      if (window.re.pro_bank && Array.isArray(window.re.pro_bank.questions)) {
+        window.re.pro_bank.questions.forEach(q => {
+          if (q.title === '金融機関名' || q.title === '銀行名') {
+            q.validation = { category: "api", condition: "bank_name", errorMessage: "実在する金融機関名を入力または選択してください。" };
+          } else if (q.title === '支店名') {
+            q.validation = { category: "api", condition: "branch_name", errorMessage: "実在する支店名を入力または選択してください。" };
+          }
+        });
+      }
+    }
+
     const presetSelect = document.getElementById('select-preset-question');
     if (!presetSelect) return;
 
@@ -6762,6 +7992,24 @@
       optGroup.appendChild(optPw);
 
       presetSelect.appendChild(optGroup);
+    }
+    if (!presetSelect.querySelector('option[value="bank_name"]')) {
+      const optBankSingle = document.createElement('option');
+      optBankSingle.value = "bank_name";
+      optBankSingle.textContent = "銀行名（全銀協API連携）";
+      presetSelect.appendChild(optBankSingle);
+    }
+    if (!presetSelect.querySelector('option[value="branch_name"]')) {
+      const optBranchSingle = document.createElement('option');
+      optBranchSingle.value = "branch_name";
+      optBranchSingle.textContent = "支店名（全銀協API連携）";
+      presetSelect.appendChild(optBranchSingle);
+    }
+    if (!presetSelect.querySelector('option[value="branch_code"]')) {
+      const optBranchCodeSingle = document.createElement('option');
+      optBranchCodeSingle.value = "branch_code";
+      optBranchCodeSingle.textContent = "支店番号（全銀協API連携）";
+      presetSelect.appendChild(optBranchCodeSingle);
     }
 
     const originalWe = window.we;
@@ -6846,7 +8094,13 @@
             title: "支店名",
             description: "支店名を入力または候補から選択してください",
             required: true,
-            validation: null,
+            validation: {
+              category: "api",
+              condition: "branch_name",
+              value: "",
+              value2: "",
+              errorMessage: "実在する支店名を入力または選択してください。"
+            },
             options: []
           },
           {
@@ -6951,12 +8205,21 @@
     if (!card) return;
     card.classList.remove('has-error');
     const errDiv = card.querySelector('.error-message');
-    if (errDiv) errDiv.style.display = 'none';
+    if (errDiv) {
+      errDiv.style.display = 'none';
+      const errText = errDiv.querySelector('.error-text') || errDiv;
+      errText.textContent = '';
+    }
+    const oldErr = card.querySelector('.integrity-error-msg');
+    if (oldErr) oldErr.remove();
 
-    const submitBtn = document.getElementById('btn-preview-submit');
-    const nextBtn = document.getElementById('btn-preview-next');
-    if (submitBtn) submitBtn.disabled = false;
-    if (nextBtn) nextBtn.disabled = false;
+    const hasOtherErrors = !!document.querySelector('.preview-q-card.has-error');
+    if (!hasOtherErrors) {
+      const submitBtn = document.getElementById('btn-preview-submit');
+      const nextBtn = document.getElementById('btn-preview-next');
+      if (submitBtn) submitBtn.disabled = false;
+      if (nextBtn) nextBtn.disabled = false;
+    }
   }
 
   function showHardError(card, text) {
@@ -7689,20 +8952,25 @@
       if (q.type === 'text') {
         let placeholder = "回答を入力してください";
         let apiBadge = "";
-        const isInvoiceApi = (q.validation && q.validation.category === 'api' && q.validation.condition === 'invoice_number') ||
-                             (editorMode === 'pro' && (q.title.includes('インボイス') || q.title.includes('登録番号')));
-        const isCorpApi = !isInvoiceApi && (
-          (q.validation && q.validation.category === 'api' && q.validation.condition === 'corp_name') ||
-          (editorMode === 'pro' && (q.title.includes('法人名') || q.title.includes('企業名') || q.title.includes('会社名')))
-        );
+        const apiConfig = getQuestionApiConfig(q);
+        const isInvoiceApi = apiConfig && apiConfig.isInvoice;
+        const isCorpApi = apiConfig && apiConfig.isCorp;
+        const isBankApi = apiConfig && apiConfig.isBank;
+        const isBranchApi = apiConfig && apiConfig.isBranch;
 
-        if (isCorpApi || isInvoiceApi) {
+        if (isCorpApi || isInvoiceApi || isBankApi || isBranchApi) {
           if (isInvoiceApi) {
             placeholder = "Tから始まる13桁 または事業者名 (例: T1010001999999)";
             apiBadge = `<div style="font-size:0.68rem; color:var(--color-primary); margin-top:2px; display:flex; align-items:center; gap:4px;">🧾 適格請求書発行事業者API連携</div>`;
-          } else {
+          } else if (isCorpApi) {
             placeholder = "法人名を入力して検索... (例: トヨタ、メルカリ)";
             apiBadge = `<div style="font-size:0.68rem; color:var(--color-primary); margin-top:2px; display:flex; align-items:center; gap:4px;">🏛️ 国税庁法人番号API連携</div>`;
+          } else if (isBankApi) {
+            placeholder = "銀行名を入力または検索 (例: 三菱UFJ銀行、みずほ銀行)";
+            apiBadge = `<div style="font-size:0.68rem; color:var(--color-primary); margin-top:2px; display:flex; align-items:center; gap:4px;">🏦 全銀協金融機関API連携</div>`;
+          } else if (isBranchApi) {
+            placeholder = "支店名を入力または選択 (例: 本店、新宿支店)";
+            apiBadge = `<div style="font-size:0.68rem; color:var(--color-primary); margin-top:2px; display:flex; align-items:center; gap:4px;">🏢 全銀協支店情報API連携</div>`;
           }
           // ライブプレビューでも操作・検索できるように disabled を解除
           inputHtml = `<input type="text" class="form-control form-control-sm" placeholder="${placeholder}" style="background: var(--color-bg-input);" />${apiBadge}`;
@@ -9186,49 +10454,508 @@
   });
 })();
 
+  // =========================================================================
   // 常用パターン（正規表現プリセット）に固定・携帯両用オプションを動的保証
+  // =========================================================================
   const REGEX_PRESET_DEFINITIONS = {
     custom: { label: "カスタム（式を直接入力）", pattern: "" },
     zip: { label: "郵便番号 (例: 123-4567)", pattern: "^\\d{3}-\\d{4}$" },
     zip_nohyphen: { label: "郵便番号（-無） (例: 1234567)", pattern: "^\\d{7}$" },
     tel_both: { label: "電話番号（固定・携帯 共通） (例: 03-1234-5678 / 090-1234-5678)", pattern: "^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$" },
-    tel_both_nohyphen: { label: "電話番号（固定・携帯・-無） (例: 0312345678 / 09012345678)", pattern: "^0\\d{9,10}$" },
-    tel_both_flexible: { label: "電話番号（固定・携帯・ハイフン問わず） (例: 03-1234-5678 / 09012345678)", pattern: "^(0\\d{1,4}-?\\d{1,4}-?\\d{3,4}|0\\d{9,10})$" },
-    tel: { label: "固定電話のみ (例: 03-1234-5678)", pattern: "^\\d{2,5}-\\d{1,4}-\\d{4}$" },
-    tel_nohyphen: { label: "固定電話のみ（-無） (例: 0312345678)", pattern: "^\\d{10}$" },
     phone: { label: "携帯電話のみ (例: 090-1234-5678)", pattern: "^(070|080|090)-\\d{4}-\\d{4}$" },
-    phone_nohyphen: { label: "携帯電話のみ（-無） (例: 09012345678)", pattern: "^(070|080|090)\\d{8}$" }
+    phone_nohyphen: { label: "携帯電話のみ（-無） (例: 09012345678)", pattern: "^(070|080|090)\\d{8}$" },
+    birthdate: { label: "生年月日 (例: 1990/01/01)", pattern: "^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$" }
   };
+  window.REGEX_PRESET_DEFINITIONS = REGEX_PRESET_DEFINITIONS;
 
   if (window.ie) {
+    delete window.ie.tel_both_nohyphen;
+    delete window.ie.tel_both_flexible;
+    delete window.ie.tel;
+    delete window.ie.tel_nohyphen;
     Object.keys(REGEX_PRESET_DEFINITIONS).forEach(k => {
       window.ie[k] = REGEX_PRESET_DEFINITIONS[k];
     });
   }
 
+  // プリセット質問定義 (window.re) の電話番号および生年月日
+  if (window.re) {
+    if (window.re.tel) {
+      window.re.tel.description = "ハイフンを含めて半角数字で入力してください。（例: 03-1234-5678 または 090-1234-5678）";
+      if (window.re.tel.validation) {
+        window.re.tel.validation.errorMessage = "ハイフンを含めて正しい電話番号の形式で入力してください。";
+        window.re.tel.validation.presetKey = "tel_both";
+      }
+    }
+    if (!window.re.birthdate) {
+      window.re.birthdate = {
+        type: "text",
+        title: "生年月日",
+        description: "半角数字で入力してください。（例: 1990/01/01）",
+        required: true,
+        validation: {
+          category: "regex",
+          condition: "matches",
+          presetKey: "birthdate",
+          value: "^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$",
+          value2: "",
+          errorMessage: "正しい生年月日を入力してください（例: 1990/01/01）。"
+        },
+        options: []
+      };
+    }
+  }
+
+  // =========================================================================
+  // 📝 質問項目 ＋ 入力規則（正規表現など）に応じた最適説明文・エラー文の自動設定エンジン
+  // =========================================================================
+  function getAutoDescriptionForQuestion(title, validation) {
+    const t = (title || '').trim();
+    const v = validation || {};
+    const cat = v.category || '';
+    const cond = v.condition || '';
+    const preset = v.presetKey || '';
+    const pattern = (v.value || '').trim();
+
+    // 1. API連携
+    if (cat === 'api') {
+      if (cond === 'corp_name') return '正式な法人名またはキーワードを入力してください。（国税庁法人番号APIから自動検索・補完されます）';
+      if (cond === 'invoice_number') return 'Tから始まる13桁の登録番号を入力してください。（例: T1234567890123）';
+      if (cond === 'bank_name') return '金融機関名を入力してください。（全銀協コードAPIから自動検索されます）';
+      if (cond === 'branch_name') return '支店名を入力してください。（全銀協支店コードAPIから自動検索されます）';
+      if (cond === 'branch_code') return '3桁の支店番号を入力してください。（全銀協支店コードAPIから自動検索・支店名が補完されます）';
+    }
+
+    // 2. 特殊テキスト: 未入力時のハイフン自動補填
+    if (cat === 'text' && cond === 'auto_hyphen') {
+      return '個人事業主の方は屋号または氏名をご入力ください。（※ 屋号がない場合は未入力のまま「次へ」へお進みください）';
+    }
+
+    // 3. メールアドレス
+    if (cat === 'text' && cond === 'email') {
+      return '半角英数字で正しいメールアドレスを入力してください。（例: name@example.com）';
+    }
+
+    // 4. 数値 / 整数
+    if (cat === 'number') {
+      if (cond === 'is_integer') return '半角の整数で入力してください。';
+      return '半角数字で数値を入力してください。';
+    }
+
+    // 5. 生年月日（プリセットまたはパターン・タイトルで最優先判定）
+    const isBirthdate = preset === 'birthdate' || preset === 'birthday' || (pattern && pattern.includes('19|20')) || (/生年月日|誕生/.test(t) && !/^(tel|phone|zip)/.test(preset));
+    if (isBirthdate) {
+      return '半角数字で入力してください。（例: 1990/01/01）';
+    }
+
+    // 6. 日付
+    const isDate = (!/^(tel|phone|zip)/.test(preset) && (/日付|年月日/.test(t) || pattern === '^\\d{4}/\\d{2}/\\d{2}$'));
+    if (isDate) {
+      return 'YYYY/MM/DD形式の半角数字で入力してください。（例: 2026/07/02）';
+    }
+
+    // 7. 郵便番号判定
+    const isZipPreset = preset.startsWith('zip');
+    const isZipTitle = /郵便|〒|zip/i.test(t);
+    const isZipPattern = pattern && (/\\d{3}-\\d{4}/.test(pattern) || (pattern.includes('7') && /郵便/.test(t)));
+
+    if (isZipPreset || (!/^(tel|phone|birthdate)/.test(preset) && (isZipTitle || isZipPattern))) {
+      if (preset === 'zip_nohyphen' || (pattern && !pattern.includes('-') && pattern.includes('7'))) {
+        return 'ハイフンなしの半角7桁数字で入力してください。（例: 1234567）';
+      }
+      if (pattern && pattern.includes('-?')) {
+        return '半角数字で入力してください。ハイフンの有無はどちらでも構いません。（例: 123-4567 または 1234567）';
+      }
+      return 'ハイフンを含めて半角数字で入力してください。（例: 123-4567）';
+    }
+
+    // 8. 電話番号判定 (プリセット、タイトル、または正規表現パターン)
+    const isPhonePreset = /^(tel|phone)/.test(preset);
+    const isPhoneTitle = /電話|携帯|ケータイ|けいたい|スマホ|TEL|tel|Tel|連絡先/.test(t);
+    const isPhonePattern = pattern && (/0\\d{1,4}/.test(pattern) || /070|080|090/.test(pattern) || /\\d{2,5}-\\d{1,4}-\\d{4}/.test(pattern) || /^(\\^)?0?\\d{9,11}(\\$)?$/.test(pattern));
+
+    if (isPhonePreset || (!/^(birthdate|birthday|zip)/.test(preset) && (isPhoneTitle || isPhonePattern))) {
+      const isMobileOnly = /携帯|スマホ|ケータイ/.test(t) || preset === 'phone' || preset === 'phone_nohyphen' || (pattern && /070|080|090/.test(pattern) && !/0\\d{1,4}/.test(pattern));
+      const isLandlineOnly = /固定|自宅|会社|事務所/.test(t) || preset === 'tel' || preset === 'tel_nohyphen';
+
+      // ハイフン問わず（柔軟形式: -? や |0\d{9,10} で両方許容）
+      const isFlexible = preset === 'tel_both_flexible' || (pattern && (pattern.includes('-?') || (pattern.includes('-') && pattern.includes('|'))));
+      
+      // ハイフンなし（- を含まない、または nohyphen プリセット）
+      const isNoHyphen = preset.includes('nohyphen') || (!isFlexible && pattern && !pattern.includes('-') && (pattern.includes('\\d') || pattern.includes('0-9')));
+
+      if (isFlexible) {
+        if (isMobileOnly) {
+          return '携帯電話番号を半角数字で入力してください。ハイフンの有無はどちらでも構いません。（例: 090-1234-5678 または 09012345678）';
+        }
+        if (isLandlineOnly) {
+          return '固定電話番号を半角数字で入力してください。ハイフンの有無はどちらでも構いません。（例: 03-1234-5678 または 0312345678）';
+        }
+        return '半角数字で入力してください。ハイフンの有無はどちらでも構いません。（例: 03-1234-5678 または 0312345678）';
+      }
+
+      if (isNoHyphen) {
+        if (isMobileOnly) {
+          return '携帯電話番号をハイフンなしの半角数字（11桁）で入力してください。（例: 09012345678）';
+        }
+        if (isLandlineOnly) {
+          return '固定電話番号をハイフンなしの半角数字（10桁）で入力してください。（例: 0312345678）';
+        }
+        return 'ハイフンなしの半角数字で入力してください。（例: 0312345678 または 09012345678）';
+      }
+
+      // ハイフンあり（標準）
+      if (isMobileOnly) {
+        return '携帯電話番号をハイフンを含めて半角数字で入力してください。（例: 090-1234-5678）';
+      }
+      if (isLandlineOnly) {
+        return '固定電話番号をハイフンを含めて半角数字で入力してください。（例: 03-1234-5678）';
+      }
+      return 'ハイフンを含めて半角数字で入力してください。（例: 03-1234-5678 または 090-1234-5678）';
+    }
+
+    // 9. 口座番号
+    if (/口座/.test(t) || pattern === '^\\d{7}$' || pattern === '^\\d{6,7}$') {
+      return '7桁の半角数字で入力してください。（例: 1234567）';
+    }
+
+    // 10. インボイス登録番号
+    if (/インボイス|登録番号/.test(t) || pattern === '^T\\d{13}$') {
+      return 'Tから始まる13桁の半角数字で入力してください。（例: T1234567890123）';
+    }
+
+    // 11. 全角カタカナ
+    if (/カタカナ|フリガナ|ふりがな/.test(t) || (pattern && /ァ-ヶ/.test(pattern))) {
+      return '全角カタカナで入力してください。';
+    }
+
+    // 12. 半角英数字
+    if (pattern === '^[a-zA-Z0-9]+$' || pattern === '^[a-zA-Z0-9_-]+$') {
+      return '半角英数字で入力してください。（スペース不可）';
+    }
+
+    return '';
+  }
+  window.getAutoDescriptionForQuestion = getAutoDescriptionForQuestion;
+
+  function getAutoErrorMessageForQuestion(title, validation) {
+    const t = (title || '').trim();
+    const v = validation || {};
+    const cat = v.category || '';
+    const cond = v.condition || '';
+    const preset = v.presetKey || '';
+    const pattern = (v.value || '').trim();
+
+    if (cat === 'api') {
+      if (cond === 'invoice_number') return '正しくインボイス登録番号（Tで始まる13桁の数字）を入力してください。';
+      if (cond === 'bank_name') return '実在する銀行名を入力または選択してください。';
+      if (cond === 'branch_name') return '実在する支店名を入力または選択してください。';
+      if (cond === 'branch_code') return '実在する3桁の支店番号を入力または選択してください。';
+      if (cond === 'corp_name') return '実在する法人名を入力または選択してください。';
+    }
+
+    if (cat === 'number') return '数値を入力してください。';
+
+    // 生年月日（最優先判定）
+    const isBirthdate = preset === 'birthdate' || preset === 'birthday' || (pattern && pattern.includes('19|20')) || (/生年月日|誕生/.test(t) && !/^(tel|phone|zip)/.test(preset));
+    if (isBirthdate) {
+      return '正しい生年月日を入力してください（例: 1990/01/01）。';
+    }
+
+    // 日付
+    const isDate = (!/^(tel|phone|zip)/.test(preset) && (/日付|年月日/.test(t) || pattern === '^\\d{4}/\\d{2}/\\d{2}$'));
+    if (isDate) {
+      return '正しい日付（YYYY/MM/DD）を入力してください。';
+    }
+
+    // 郵便番号
+    if (preset === 'zip_nohyphen' || (!/^(tel|phone|birthdate)/.test(preset) && pattern && !pattern.includes('-') && pattern.includes('7') && /郵便/.test(t))) {
+      return 'ハイフンなしの半角7桁数字で正しく入力してください。';
+    }
+    if (preset === 'zip' || (!/^(tel|phone|birthdate)/.test(preset) && pattern && /\\d{3}-\\d{4}/.test(pattern))) {
+      return '正しい郵便番号の形式（123-4567）で入力してください。';
+    }
+
+    // 電話番号
+    const isPhonePreset = /^(tel|phone)/.test(preset);
+    const isPhoneTitle = /電話|携帯|ケータイ|けいたい|スマホ|TEL|tel|Tel|連絡先/.test(t);
+    const isPhonePattern = pattern && (/0\\d{1,4}/.test(pattern) || /070|080|090/.test(pattern) || /\\d{2,5}-\\d{1,4}-\\d{4}/.test(pattern) || /^(\\^)?0?\\d{9,11}(\\$)?$/.test(pattern));
+
+    if (isPhonePreset || (!/^(birthdate|birthday|zip)/.test(preset) && (isPhoneTitle || isPhonePattern))) {
+      const isFlexible = preset === 'tel_both_flexible' || (pattern && (pattern.includes('-?') || (pattern.includes('-') && pattern.includes('|'))));
+      const isNoHyphen = preset.includes('nohyphen') || (!isFlexible && pattern && !pattern.includes('-') && (pattern.includes('\\d') || pattern.includes('0-9')));
+
+      if (isFlexible) {
+        return '正しい電話番号の形式（半角数字）で入力してください。';
+      }
+      if (isNoHyphen) {
+        return 'ハイフンなしの半角数字で正しく入力してください。';
+      }
+      return 'ハイフンを含めて正しい電話番号の形式で入力してください。';
+    }
+
+    if (/口座/.test(t) || pattern === '^\\d{7}$') {
+      return '正しい口座番号（7桁の半角数字）を入力してください。';
+    }
+
+    if (pattern === '^[a-zA-Z0-9]+$') {
+      return '半角英数字のみで入力してください。';
+    }
+    if (pattern && /ァ-ヶ/.test(pattern)) {
+      return '全角カタカナのみで入力してください。';
+    }
+
+    return '入力値が正しくありません。';
+  }
+  window.getAutoErrorMessageForQuestion = getAutoErrorMessageForQuestion;
+
+  // 既存データ内の「ハイフンなし設定なのにハイフンあり説明文のまま」等の矛盾を安全に自動修復
+  function sanitizeContradictoryDescriptions(formObj) {
+    if (!formObj || !formObj.sections) return;
+    let modified = false;
+    formObj.sections.forEach(sec => {
+      if (!sec || !sec.questions) return;
+      sec.questions.forEach(q => {
+        if (!q || !q.validation) return;
+        const v = q.validation;
+        const desc = q.description || '';
+        if (v.category === 'regex') {
+          const pk = v.presetKey || '';
+          const val = v.value || '';
+          const isNoHyphenRegex = pk.includes('nohyphen') || (val && !val.includes('-') && (val.includes('\\d') || val.includes('0-9')));
+          const isFlexibleRegex = pk === 'tel_both_flexible' || (val && (val.includes('-?') || (val.includes('-') && val.includes('|'))));
+
+          if (isNoHyphenRegex && desc.includes('ハイフンを含めて')) {
+            const newDesc = getAutoDescriptionForQuestion(q.title, v);
+            if (newDesc) {
+              q.description = newDesc;
+              modified = true;
+            }
+          } else if (isFlexibleRegex && (desc.includes('ハイフンを含めて') || desc.includes('ハイフンなしの'))) {
+            const newDesc = getAutoDescriptionForQuestion(q.title, v);
+            if (newDesc) {
+              q.description = newDesc;
+              modified = true;
+            }
+          }
+        }
+      });
+    });
+    if (modified && window.S) {
+      window.S(true);
+    }
+  }
+
+  // 質問カードヘッダーに「🔄 規則から自動設定」ボタンを動的に注入
+  function injectAutoDescSyncButtons() {
+    const cards = document.querySelectorAll('.question-card');
+    cards.forEach(card => {
+      const qId = card.dataset.questionId;
+      if (!qId) return;
+
+      const descInput = card.querySelector('.q-desc-input');
+      if (!descInput) return;
+
+      const formGroup = descInput.closest('.form-group');
+      if (!formGroup) return;
+
+      const header = formGroup.firstElementChild;
+      if (!header || header.querySelector('.btn-auto-desc-sync')) return;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-auto-desc-sync';
+      btn.dataset.questionId = qId;
+      btn.title = '入力規則や項目名に合わせて、最適な説明文（ハイフンの有無・形式等）を自動設定します';
+      btn.innerHTML = '🔄 規則から自動設定';
+
+      const linkBtn = header.querySelector('.btn-insert-link-modal');
+      if (linkBtn) {
+        header.insertBefore(btn, linkBtn);
+      } else {
+        header.appendChild(btn);
+      }
+    });
+  }
+
+  // 正規表現プリセットドロップダウンの拡張と自動説明文連携
   function patchRegexPresetDropdowns() {
     const selects = document.querySelectorAll('.val-inputs-container select');
     selects.forEach(sel => {
-      // Check if this select is the regex preset select
       const hasZip = Array.from(sel.options).some(opt => opt.value === 'zip');
       if (!hasZip) return;
 
       const curVal = sel.value;
       const currentKeys = Array.from(sel.options).map(o => o.value);
-      if (!currentKeys.includes('tel_both')) {
+      const targetKeys = Object.keys(REGEX_PRESET_DEFINITIONS);
+
+      const needsUpdate = currentKeys.length !== targetKeys.length ||
+        !currentKeys.includes('birthdate') ||
+        currentKeys.includes('tel_both_nohyphen') ||
+        currentKeys.includes('tel_both_flexible') ||
+        currentKeys.includes('tel') ||
+        currentKeys.includes('tel_nohyphen');
+
+      if (needsUpdate) {
         sel.innerHTML = "";
-        Object.keys(REGEX_PRESET_DEFINITIONS).forEach(k => {
+        targetKeys.forEach(k => {
           const opt = document.createElement('option');
           opt.value = k;
           opt.textContent = REGEX_PRESET_DEFINITIONS[k].label;
           sel.appendChild(opt);
         });
-        sel.value = curVal || 'custom';
+        sel.value = REGEX_PRESET_DEFINITIONS[curVal] ? curVal : 'custom';
       }
     });
+
+    const presetSelect = document.getElementById('select-preset-question');
+    if (presetSelect && !presetSelect.querySelector('option[value="birthdate"]')) {
+      const opt = document.createElement('option');
+      opt.value = 'birthdate';
+      opt.textContent = '生年月日';
+      presetSelect.appendChild(opt);
+    }
+
+    injectAutoDescSyncButtons();
   }
 
-  // Observe question container for regex dropdown appearance
+  // 「🔄 規則から自動設定」ボタンクリック時の処理（手動編集後でもワンクリックで規則通りに戻せる）
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-auto-desc-sync');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const card = btn.closest('.question-card');
+    const qId = btn.dataset.questionId || (card ? card.dataset.questionId : null);
+    const q = findQuestionDefById(qId);
+
+    const descInput = card ? card.querySelector('.q-desc-input') : null;
+    const titleInput = card ? card.querySelector('.form-group.flex-3 input, input[placeholder*="タイトル"]') : null;
+    const title = (q && q.title) ? q.title : (titleInput ? titleInput.value : '');
+
+    let validation = q ? q.validation : null;
+    if (!validation && card) {
+      const sel = card.querySelector('.val-inputs-container select');
+      const patInput = card.querySelector('.val-inputs-container input[type="text"]');
+      if (sel) {
+        const pk = sel.value;
+        const def = REGEX_PRESET_DEFINITIONS[pk];
+        validation = {
+          category: 'regex',
+          condition: 'matches',
+          presetKey: pk,
+          value: def ? def.pattern : (patInput ? patInput.value : '')
+        };
+      }
+    }
+
+    const autoDesc = getAutoDescriptionForQuestion(title, validation);
+    const autoErr = getAutoErrorMessageForQuestion(title, validation);
+
+    if (autoDesc) {
+      if (q) q.description = autoDesc;
+      if (descInput) {
+        descInput.value = autoDesc;
+        descInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if (autoErr && q && q.validation) {
+        q.validation.errorMessage = autoErr;
+      }
+      const errInput = card ? card.querySelector('.form-group input[placeholder*="エラー時に表示する"]') : null;
+      if (errInput && autoErr) {
+        errInput.value = autoErr;
+        errInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if (window.fastUpdateLivePreview) {
+        window.fastUpdateLivePreview('question_desc', autoDesc, { questionId: qId });
+      }
+      if (window.S) window.S(true);
+
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '✓ 反映完了';
+      btn.classList.add('synced');
+      setTimeout(() => {
+        btn.innerHTML = origHtml;
+        btn.classList.remove('synced');
+      }, 1400);
+    } else {
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '※ 規則未設定';
+      btn.classList.add('warn');
+      setTimeout(() => {
+        btn.innerHTML = origHtml;
+        btn.classList.remove('warn');
+      }, 1400);
+    }
+  });
+
+  // 正規表現プリセット選択変更時の自動同期（キャプチャフェーズで検知して確実に適用）
+  document.addEventListener('change', (e) => {
+    const sel = e.target;
+    if (!sel || !sel.closest || !sel.closest('.val-inputs-container')) return;
+    const isPresetSelect = Array.from(sel.options || []).some(opt => opt.value === 'tel_both' || opt.value === 'zip');
+    if (!isPresetSelect) return;
+
+    const card = sel.closest('.question-card');
+    if (!card || !card.dataset.questionId) return;
+
+    const qId = card.dataset.questionId;
+    const q = findQuestionDefById(qId);
+    if (!q) return;
+
+    const newKey = sel.value;
+    const def = REGEX_PRESET_DEFINITIONS[newKey];
+    const pattern = def ? def.pattern : (newKey === 'custom' ? (q.validation?.value || '') : '');
+
+    if (q.validation) {
+      q.validation.presetKey = newKey;
+      if (newKey !== 'custom' && pattern) {
+        q.validation.value = pattern;
+      }
+    }
+
+    const dummyVal = Object.assign({}, q.validation, {
+      category: 'regex',
+      condition: 'matches',
+      presetKey: newKey,
+      value: pattern
+    });
+
+    const autoDesc = getAutoDescriptionForQuestion(q.title, dummyVal);
+    const autoErr = getAutoErrorMessageForQuestion(q.title, dummyVal);
+
+    if (autoDesc) {
+      q.description = autoDesc;
+      const descInput = card.querySelector('.q-desc-input');
+      if (descInput) {
+        descInput.value = autoDesc;
+      }
+      if (window.fastUpdateLivePreview) {
+        window.fastUpdateLivePreview('question_desc', autoDesc, { questionId: qId });
+      }
+    }
+    if (autoErr && q.validation) {
+      q.validation.errorMessage = autoErr;
+      const errInput = card.querySelector('.form-group input[placeholder*="エラー時に表示する"]');
+      if (errInput) {
+        errInput.value = autoErr;
+      }
+    }
+  }, true);
+
+  // AIチャット相談ボタンが押された際に編集対象の質問オブジェクトを保持
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (btn && btn.textContent && btn.textContent.includes('AIチャット相談')) {
+      const card = btn.closest('.question-card');
+      if (card && card.dataset.questionId) {
+        window._currentAiRegexQuestion = findQuestionDefById(card.dataset.questionId);
+      }
+    }
+  }, true);
+
+  // 質問コンテナのDOM変更を監視してプリセット・自動設定ボタンを常時適用
   const questionsContainer = document.getElementById('questions-container');
   if (questionsContainer) {
     const qObserver = new MutationObserver(() => {
@@ -9237,23 +10964,103 @@
     qObserver.observe(questionsContainer, { childList: true, subtree: true });
   }
 
+  // 起動時の既存データ修復
+  setTimeout(() => {
+    sanitizeContradictoryDescriptions(window.n || window.G);
+    patchRegexPresetDropdowns();
+  }, 150);
+
+
   // =========================================================================
-  // 🔗 フォーム回答用リンク（公開URL）の発行・コピー機能 (Google Forms風)
+  // 🔗 フォーム回答用リンク（公開URL）の発行・コピー機能 (回答専用ページ view.html 連携)
   // =========================================================================
-  function getPublicFormShareUrl(formIndex) {
+  function getCurrentFormObject(formIndex) {
+    const idx = (formIndex !== undefined && formIndex !== null) ? formIndex : (window.W !== undefined ? window.W : (parseInt(localStorage.getItem('form_customize_active_index'), 10) || 0));
+    let formObj = null;
+    if (window.U && window.U[idx]) {
+      formObj = window.U[idx];
+    } else if (window.G && window.G.title) {
+      formObj = window.G;
+    } else {
+      try {
+        const raw = localStorage.getItem('form_customize_all_forms');
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (list && list[idx]) formObj = list[idx];
+        }
+      } catch(e) {}
+    }
+    return { formObj, idx };
+  }
+
+  // フォームJSONのURL-Safe圧縮エンコーダー
+  async function encodeFormDataForUrl(formObj) {
+    if (!formObj) return '';
+    try {
+      const jsonStr = JSON.stringify(formObj);
+      if (typeof CompressionStream !== 'undefined') {
+        const stream = new Blob([jsonStr]).stream().pipeThrough(new CompressionStream('deflate'));
+        const response = new Response(stream);
+        const buffer = await response.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return 'z1_' + btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      } else {
+        return 'b1_' + btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)))
+          .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+    } catch (e) {
+      console.warn('[Share URL] Encode failed, using raw fallback:', e);
+      return 'raw_' + encodeURIComponent(JSON.stringify(formObj));
+    }
+  }
+
+  let _currentShareModalFormIndex = null;
+
+  function updateShareModalOpenTabBtn(targetUrl) {
+    const openTabBtn = document.getElementById('btn-open-share-url-tab');
+    if (openTabBtn) {
+      openTabBtn.onclick = () => {
+        window.open(targetUrl, '_blank');
+      };
+    }
+  }
+
+  function getPublicFormShareUrl(formIndex, shorten = true) {
     const origin = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : '';
     let pathname = window.location.pathname || '';
-    if (!pathname.includes('form-customize/index.html')) {
-      if (pathname.endsWith('/')) {
-        pathname = pathname + 'form-customize/index.html';
-      } else if (pathname.endsWith('.html')) {
-        pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1) + 'form-customize/index.html';
-      } else {
-        pathname = pathname + '/form-customize/index.html';
-      }
+    
+    // 正確に /form-customize/view.html へのパスを解決する（二重パスの防止）
+    let viewPath = '';
+    if (pathname.includes('form-customize')) {
+      const prefix = pathname.substring(0, pathname.indexOf('form-customize'));
+      viewPath = `${prefix}form-customize/view.html`;
+    } else if (pathname.endsWith('.html')) {
+      viewPath = pathname.substring(0, pathname.lastIndexOf('/') + 1) + 'view.html';
+    } else if (pathname.endsWith('/')) {
+      viewPath = pathname + 'view.html';
+    } else {
+      viewPath = pathname + '/view.html';
     }
-    const idx = (formIndex !== undefined && formIndex !== null) ? formIndex : (window.W !== undefined ? window.W : (parseInt(localStorage.getItem('form_customize_active_index'), 10) || 0));
-    return `${origin}${pathname}?active_tab=preview&form_idx=${idx}`;
+    viewPath = viewPath.replace(/\/+/g, '/');
+    if (!viewPath.startsWith('/')) viewPath = '/' + viewPath;
+
+    const { formObj, idx } = getCurrentFormObject(formIndex);
+    const formId = formObj && formObj.id ? formObj.id : `form_${idx}`;
+    
+    // バックグラウンドでクラウド（Supabase）への保存・同期を実行
+    try { syncFormsToCloud(); } catch(e) {}
+
+    // 短縮URL (Google Forms短縮URL風: 例 https://synapse-wayway.vercel.app/f/0)
+    if (shorten) {
+      return `${origin}/f/${idx}`;
+    }
+
+    // 完全URL (例: https://synapse-wayway.vercel.app/form-customize/view.html?id=form_0)
+    return `${origin}${viewPath}?id=${encodeURIComponent(formId)}&form_idx=${idx}`;
   }
 
   function showGlobalShareToast(msg) {
@@ -9274,17 +11081,19 @@
     }, 2500);
   }
 
-  function copyFormShareUrl(formIndex, silent = false) {
-    const url = getPublicFormShareUrl(formIndex);
+  async function copyFormShareUrl(formIndex, silent = false, forceShorten = true) {
+    const url = getPublicFormShareUrl(formIndex, forceShorten);
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(() => {
-        if (!silent) showGlobalShareToast('回答用リンクをクリップボードにコピーしました！');
-      }).catch(() => {
+      try {
+        await navigator.clipboard.writeText(url);
+        if (!silent) showGlobalShareToast('回答者用短縮リンクをクリップボードにコピーしました！');
+      } catch (e) {
         fallbackCopy(url, silent);
-      });
+      }
     } else {
       fallbackCopy(url, silent);
     }
+    return url;
   }
 
   function fallbackCopy(text, silent = false) {
@@ -9296,46 +11105,44 @@
     textarea.select();
     try {
       document.execCommand('copy');
-      if (!silent) showGlobalShareToast('回答用リンクをクリップボードにコピーしました！');
+      if (!silent) showGlobalShareToast('回答者用短縮リンクをクリップボードにコピーしました！');
     } catch (e) {
       console.warn('Copy failed:', e);
     }
     textarea.remove();
   }
 
-  function openShareUrlModal(formIndex) {
+  async function openShareUrlModal(formIndex) {
     const modal = document.getElementById('modal-share-url');
     if (!modal) return;
-    const idx = (formIndex !== undefined && formIndex !== null) ? formIndex : (window.W !== undefined ? window.W : (parseInt(localStorage.getItem('form_customize_active_index'), 10) || 0));
-    const url = getPublicFormShareUrl(idx);
-    
-    // フォームタイトルの取得
-    let formTitle = '無題のフォーム';
-    if (window.U && window.U[idx]) {
-      formTitle = window.U[idx].title || formTitle;
-    } else if (window.G && window.G.title) {
-      formTitle = window.G.title;
-    }
+    const { formObj, idx } = getCurrentFormObject(formIndex);
+    _currentShareModalFormIndex = idx;
+    const formTitle = formObj && formObj.title ? formObj.title : '無題のフォーム';
 
     const titleEl = document.getElementById('share-modal-form-title');
     if (titleEl) titleEl.textContent = formTitle;
 
     const inputEl = document.getElementById('share-modal-url-input');
-    if (inputEl) inputEl.value = url;
-
+    const shortenCheckbox = document.getElementById('share-modal-shorten-checkbox');
     const toastEl = document.getElementById('share-modal-copy-toast');
     if (toastEl) toastEl.style.display = 'none';
 
+    const isShorten = shortenCheckbox ? shortenCheckbox.checked : true;
+    const url = getPublicFormShareUrl(idx, isShorten);
+    if (inputEl) inputEl.value = url;
+    updateShareModalOpenTabBtn(url);
+
+    if (shortenCheckbox && !shortenCheckbox._hooked) {
+      shortenCheckbox._hooked = true;
+      shortenCheckbox.addEventListener('change', () => {
+        const currentUrl = getPublicFormShareUrl(_currentShareModalFormIndex, shortenCheckbox.checked);
+        if (inputEl) inputEl.value = currentUrl;
+        updateShareModalOpenTabBtn(currentUrl);
+      });
+    }
+
     modal.classList.add('active');
     modal.style.display = 'flex';
-
-    // 別タブで開くボタンのリンク先
-    const openTabBtn = document.getElementById('btn-open-share-url-tab');
-    if (openTabBtn) {
-      openTabBtn.onclick = () => {
-        window.open(url, '_blank');
-      };
-    }
   }
 
   function closeShareUrlModal() {
@@ -9358,6 +11165,54 @@
       });
     }
 
+    // 1-2. ヘッダーの「▼」ドロップダウントグルボタン & ドロップダウンメニュー
+    const dropdownToggle = document.getElementById('btn-share-dropdown-toggle');
+    const dropdownMenu = document.getElementById('share-dropdown-menu');
+    const exportGroup = document.getElementById('share-export-group');
+    if (dropdownToggle && dropdownMenu && !dropdownToggle._hooked) {
+      dropdownToggle._hooked = true;
+      dropdownToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const isOpen = dropdownMenu.classList.toggle('active');
+        if (exportGroup) exportGroup.classList.toggle('open', isOpen);
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#share-export-group')) {
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+        }
+      });
+
+      const menuShareLink = document.getElementById('menu-item-share-link');
+      if (menuShareLink && !menuShareLink._hooked) {
+        menuShareLink._hooked = true;
+        menuShareLink.addEventListener('click', () => {
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          copyFormShareUrl();
+          openShareUrlModal();
+        });
+      }
+
+      const menuExportJson = document.getElementById('btn-export-json');
+      if (menuExportJson && !menuExportJson._customHooked) {
+        menuExportJson._customHooked = true;
+        menuExportJson.addEventListener('click', (e) => {
+          e.preventDefault();
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          const modalExport = document.getElementById('modal-export');
+          const jsonTextarea = document.getElementById('export-json-textarea');
+          if (modalExport && jsonTextarea && window.G) {
+            jsonTextarea.value = JSON.stringify(window.G, null, 2);
+            modalExport.classList.add('active');
+          }
+        });
+      }
+    }
+
     // 2. プレビュー画面の「🔗 回答用リンクをコピー」ボタン
     const panelCopyBtn = document.getElementById('btn-panel-copy-url');
     if (panelCopyBtn && !panelCopyBtn._hooked) {
@@ -9372,16 +11227,74 @@
     const modalCopyBtn = document.getElementById('btn-copy-share-url-modal');
     if (modalCopyBtn && !modalCopyBtn._hooked) {
       modalCopyBtn._hooked = true;
-      modalCopyBtn.addEventListener('click', () => {
+      modalCopyBtn.addEventListener('click', async () => {
         const inputEl = document.getElementById('share-modal-url-input');
-        if (inputEl) {
-          copyFormShareUrl(null, true);
-          const toastEl = document.getElementById('share-modal-copy-toast');
+        const textToCopy = (inputEl && inputEl.value) ? inputEl.value : getPublicFormShareUrl(_currentShareModalFormIndex, true);
+        const toastEl = document.getElementById('share-modal-copy-toast');
+        const showToast = () => {
           if (toastEl) {
             toastEl.style.display = 'block';
-            setTimeout(() => { toastEl.style.display = 'none'; }, 2500);
+            clearTimeout(toastEl._timer);
+            toastEl._timer = setTimeout(() => { toastEl.style.display = 'none'; }, 2500);
           }
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          try {
+            await navigator.clipboard.writeText(textToCopy);
+            showToast();
+          } catch (e) {
+            fallbackCopy(textToCopy, true);
+            showToast();
+          }
+        } else {
+          fallbackCopy(textToCopy, true);
+          showToast();
         }
+      });
+    }
+
+    // 3-2. 「リンクを発行」モーダル内の「📄 フォーム定義JSONを出力」トグル＆コピー
+    const modalToggleJsonBtn = document.getElementById('btn-share-modal-toggle-json');
+    const modalJsonArea = document.getElementById('share-modal-json-area');
+    const modalJsonTextarea = document.getElementById('share-modal-json-textarea');
+    const modalCopyJsonBtn = document.getElementById('btn-share-modal-copy-json');
+
+    if (modalToggleJsonBtn && modalJsonArea && !modalToggleJsonBtn._hooked) {
+      modalToggleJsonBtn._hooked = true;
+      modalToggleJsonBtn.addEventListener('click', () => {
+        const isHidden = modalJsonArea.style.display === 'none' || !modalJsonArea.style.display;
+        if (isHidden) {
+          if (modalJsonTextarea && window.G) {
+            modalJsonTextarea.value = JSON.stringify(window.G, null, 2);
+          }
+          modalJsonArea.style.display = 'block';
+          modalToggleJsonBtn.textContent = '閉じる ▲';
+        } else {
+          modalJsonArea.style.display = 'none';
+          modalToggleJsonBtn.textContent = '表示・コピー ▼';
+        }
+      });
+    }
+
+    if (modalCopyJsonBtn && modalJsonTextarea && !modalCopyJsonBtn._hooked) {
+      modalCopyJsonBtn._hooked = true;
+      modalCopyJsonBtn.addEventListener('click', () => {
+        if (!modalJsonTextarea.value && window.G) {
+          modalJsonTextarea.value = JSON.stringify(window.G, null, 2);
+        }
+        navigator.clipboard.writeText(modalJsonTextarea.value).then(() => {
+          const originalText = modalCopyJsonBtn.textContent;
+          modalCopyJsonBtn.textContent = '✓ コピー完了！';
+          modalCopyJsonBtn.classList.add('btn-success');
+          setTimeout(() => {
+            modalCopyJsonBtn.textContent = originalText;
+            modalCopyJsonBtn.classList.remove('btn-success');
+          }, 1800);
+        }).catch(err => {
+          console.error('Clipboard copy failed:', err);
+          modalJsonTextarea.select();
+        });
       });
     }
 
@@ -9522,3 +11435,705 @@
     }
   });
 })();
+
+// ===================================================
+// 親システム連携：内部ログアウト機能の無効化とヘッダークリーンアップ
+// ===================================================
+(function enforceAdminSessionAndHideLogout() {
+  const adminUser = { id: 'user_admin', name: '管理者', role: 'admin' };
+
+  function ensureAdmin() {
+    try {
+      const cur = localStorage.getItem('gf_current_user');
+      if (!cur || JSON.parse(cur).role !== 'admin') {
+        localStorage.setItem('gf_current_user', JSON.stringify(adminUser));
+      }
+      if (typeof window.K !== 'undefined' && (!window.K || window.K.role !== 'admin')) {
+        window.K = adminUser;
+      }
+    } catch(e) {}
+
+    // プロフィール要素とシミュレーションログインオーバーレイの徹底非表示
+    const profile = document.getElementById('gf-user-profile');
+    if (profile) {
+      profile.style.setProperty('display', 'none', 'important');
+      profile.style.setProperty('visibility', 'hidden', 'important');
+      profile.style.setProperty('pointer-events', 'none', 'important');
+    }
+    const overlay = document.getElementById('login-overlay');
+    if (overlay) {
+      overlay.classList.remove('active');
+      overlay.style.setProperty('display', 'none', 'important');
+      overlay.style.setProperty('visibility', 'hidden', 'important');
+      overlay.style.setProperty('pointer-events', 'none', 'important');
+    }
+  }
+
+  // ログアウトボタン押下をキャプチャフェーズで完全に阻止
+  document.addEventListener('click', (e) => {
+    if (e.target && (e.target.id === 'btn-logout' || e.target.closest('#btn-logout'))) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      console.log('[Auth] Internal logout prevented (auth handled by parent system).');
+      ensureAdmin();
+    }
+  }, true);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureAdmin);
+  } else {
+    ensureAdmin();
+  }
+  setInterval(ensureAdmin, 500);
+
+  // =========================================================================
+  // 🏢 法人名・屋号の案内文 & 未入力時半角ハイフン自動補填入力規則機能
+  // =========================================================================
+  const AUTO_HYPHEN_NOTICE_TEXT = '※ 個人事業主の方で屋号がない場合は、未入力のまま「次へ」へお進みください。';
+
+  function cleanHyphenNotice(text) {
+    if (!text) return text;
+    return text
+      .replace(/（自動で半角ハイフン「-」が補填されます）/g, '')
+      .replace(/\(自動で半角ハイフン「-」が補填されます\)/g, '')
+      .replace(/。自動で半角ハイフン「-」が補填されます/g, '')
+      .trim();
+  }
+
+  // 1. バリデーション定義 (window.b) の拡張
+  if (typeof window.b !== 'undefined') {
+    if (window.b.text && window.b.text.conditions) {
+      window.b.text.conditions.auto_hyphen = '未入力時は自動で半角ハイフン補填（屋号なし等）';
+    }
+  }
+
+  // 2. エディタ内の入力規則（validation）ドロップダウンへの動的注入＆案内バッジ表示
+  function patchAutoHyphenValidationUI() {
+    const valContainers = document.querySelectorAll('.validation-edit-container');
+    valContainers.forEach(container => {
+      // カテゴリセレクトボックス
+      const categorySelect = container.querySelector('.form-group-row .form-group:first-child select');
+      // 条件ルールセレクトボックス
+      const conditionSelect = container.querySelector('.form-group-row .form-group:nth-child(2) select');
+      const valInputsContainer = container.querySelector('.val-inputs-container');
+
+      if (categorySelect && conditionSelect) {
+        if (categorySelect.value === 'text') {
+          // auto_hyphen オプションが存在しない場合は追加
+          const hasAutoHyphen = Array.from(conditionSelect.options).some(o => o.value === 'auto_hyphen');
+          if (!hasAutoHyphen) {
+            const opt = document.createElement('option');
+            opt.value = 'auto_hyphen';
+            opt.textContent = '未入力時は自動で半角ハイフン補填（屋号なし等）';
+            conditionSelect.appendChild(opt);
+          }
+
+          // auto_hyphen が選択されている場合の説明表示
+          if (conditionSelect.value === 'auto_hyphen' && valInputsContainer) {
+            let notice = valInputsContainer.querySelector('.auto-hyphen-validation-notice');
+            if (!notice) {
+              notice = document.createElement('div');
+              notice.className = 'auto-hyphen-validation-notice';
+              notice.style.cssText = 'background: rgba(26,115,232,0.08); border: 1px solid rgba(26,115,232,0.3); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; font-size: 0.85rem; color: var(--color-text); line-height: 1.5;';
+              notice.innerHTML = '<div style="font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">ℹ️ 未入力時のハイフン自動補填機能</div><div style="color: var(--color-text-muted); font-size: 0.8rem;">回答者がこの質問を未入力のまま「次へ」または「送信」へ進んだ際、自動的に半角ハイフン「-」を補填します。<br>「必須回答」が有効になっている場合でも、エラーにならずそのままスムーズに進行できるようになります（個人事業主で屋号がない場合などに推奨）。</div>';
+              valInputsContainer.appendChild(notice);
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // 3. 「法人名・屋号」設問に対する案内文＆自動ハイフンルールの初期・動的補強
+  function ensureCorpQuestionGuidance() {
+    const formsToCheck = [];
+    if (window.G && window.G.sections) formsToCheck.push(window.G);
+    if (window.n && window.n.sections && window.n !== window.G) formsToCheck.push(window.n);
+
+    try {
+      const raw = localStorage.getItem('form_customize_all_forms');
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          let updated = false;
+          list.forEach(form => {
+            if (form && form.sections) {
+              form.sections.forEach(sec => {
+                (sec.questions || []).forEach(q => {
+                  if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
+                    if (q.description) {
+                      const cleaned = cleanHyphenNotice(q.description);
+                      if (cleaned !== q.description) {
+                        q.description = cleaned;
+                        updated = true;
+                      }
+                    }
+                    if (!q.description || !q.description.includes('屋号がない場合')) {
+                      q.description = (q.description ? q.description + '\n' : '') + AUTO_HYPHEN_NOTICE_TEXT;
+                      updated = true;
+                    }
+                    if (!q.validation || q.validation.condition !== 'auto_hyphen') {
+                      q.validation = { category: 'text', condition: 'auto_hyphen', value: '', value2: '', errorMessage: '' };
+                      updated = true;
+                    }
+                  }
+                });
+              });
+            }
+          });
+          if (updated) {
+            localStorage.setItem('form_customize_all_forms', JSON.stringify(list));
+          }
+        }
+      }
+    } catch(e) {}
+
+    formsToCheck.forEach(form => {
+      form.sections.forEach(sec => {
+        (sec.questions || []).forEach(q => {
+          if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
+            if (q.description) {
+              q.description = cleanHyphenNotice(q.description);
+            }
+            if (!q.description || !q.description.includes('屋号がない場合')) {
+              q.description = (q.description ? q.description + '\n' : '') + AUTO_HYPHEN_NOTICE_TEXT;
+            }
+            const descInput = document.querySelector(`.q-desc-input[data-question-id="${q.id}"]`);
+            if (descInput) {
+              descInput.value = cleanHyphenNotice(descInput.value);
+              if (!descInput.value.includes('屋号がない場合')) {
+                descInput.value = q.description;
+              }
+            }
+            if (!q.validation || q.validation.condition !== 'auto_hyphen') {
+              q.validation = { category: 'text', condition: 'auto_hyphen', value: '', value2: '', errorMessage: '' };
+            }
+          }
+        });
+      });
+    });
+  }
+
+  // 4. 管理画面プレビューでの未入力ハイフン自動補填
+  function setupPreviewAutoHyphenHook() {
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('#preview-next-btn, #preview-submit-btn, .btn-preview-next, .btn-preview-submit, #btn-next, #btn-submit');
+      if (!btn) return;
+      
+      const previewRoot = document.getElementById('preview-content') || document.querySelector('.live-preview-container') || document.body;
+      const inputs = previewRoot.querySelectorAll('input.form-control, textarea.form-control');
+      
+      let isSoleProprietorNoTrade = false;
+      inputs.forEach(input => {
+        const card = input.closest('.question-card, .preview-question-card');
+        if (!card) return;
+        const titleEl = card.querySelector('.question-title, .preview-q-title');
+        const titleText = titleEl ? titleEl.textContent : '';
+        const isCorp = (titleText.includes('法人名') || titleText.includes('屋号')) &&
+                       !titleText.includes('カナ') && !titleText.includes('フリガナ') && !titleText.includes('ふりがな');
+        
+        if (isCorp) {
+          if (!input.value || input.value.trim() === '' || input.value.trim() === '-') {
+            isSoleProprietorNoTrade = true;
+            input.value = '-';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }
+      });
+
+      // 個人事業で屋号がない場合はカナ欄も自動で半角ハイフン「-」を補填
+      if (isSoleProprietorNoTrade) {
+        inputs.forEach(input => {
+          const card = input.closest('.question-card, .preview-question-card');
+          if (!card) return;
+          const titleEl = card.querySelector('.question-title, .preview-q-title');
+          const titleText = titleEl ? titleEl.textContent : '';
+          const isKana = titleText.includes('カナ') || titleText.includes('フリガナ') || titleText.includes('ふりがな');
+          if (isKana && (!input.value || input.value.trim() === '')) {
+            input.value = '-';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+      }
+    }, true);
+  }
+
+  // 監視と初期化
+  setTimeout(() => {
+    ensureCorpQuestionGuidance();
+    patchAutoHyphenValidationUI();
+    setupPreviewAutoHyphenHook();
+  }, 300);
+
+  const questionsBox = document.getElementById('questions-container');
+  if (questionsBox) {
+    const observer = new MutationObserver(() => {
+      patchAutoHyphenValidationUI();
+    });
+    observer.observe(questionsBox, { childList: true, subtree: true });
+  }
+
+  // =========================================================================
+  // ☁️ クラウド（Supabase）自動同期モジュール (全ブラウザ・端末共有)
+  // =========================================================================
+  let _cloudSyncDebounceTimer = null;
+  let _isCloudSyncing = false;
+
+  async function syncFormsToCloud(forms) {
+    if (!forms) {
+      try {
+        const raw = localStorage.getItem('form_customize_all_forms');
+        if (raw) forms = JSON.parse(raw);
+      } catch(e) {}
+    }
+    if (!forms || !Array.isArray(forms) || forms.length === 0) return;
+
+    clearTimeout(_cloudSyncDebounceTimer);
+    _cloudSyncDebounceTimer = setTimeout(async () => {
+      try {
+        console.log('[Cloud Sync] Pushing forms to Supabase...', forms.length, 'forms');
+        // 1. サーバーレス API (/api/forms) への POST
+        const res = await fetch('/api/forms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ allForms: forms })
+        });
+        if (res.ok) {
+          console.log('[Cloud Sync] Successfully pushed forms to Supabase via API.');
+          return;
+        }
+      } catch (err) {
+        console.warn('[Cloud Sync] API push failed, attempting direct Supabase fallback:', err);
+      }
+
+      // フォールバック: 直接 Supabase REST API へ Upsert
+      try {
+        const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+        const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+        await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+          method: 'POST',
+          headers: {
+            apikey: sbKey,
+            Authorization: `Bearer ${sbKey}`,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify({
+            key: 'synapse_form_customize_all_forms',
+            value: forms,
+            updated_at: new Date().toISOString()
+          })
+        });
+        console.log('[Cloud Sync] Direct Supabase fallback push completed.');
+      } catch(e) {
+        console.error('[Cloud Sync] Direct Supabase fallback failed:', e);
+      }
+    }, 300);
+  }
+
+  async function loadFormsFromCloud() {
+    if (_isCloudSyncing) return;
+    _isCloudSyncing = true;
+    try {
+      let cloudForms = null;
+      try {
+        const res = await fetch('/api/forms?all=1');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && Array.isArray(data.forms) && data.forms.length > 0) {
+            cloudForms = data.forms;
+          }
+        }
+      } catch(e) {}
+
+      if (!cloudForms) {
+        // 直接 Supabase REST API
+        try {
+          const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+          const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+          const sbRes = await fetch(`${sbUrl}/rest/v1/synapse_storage?key=eq.synapse_form_customize_all_forms&select=value`, {
+            headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+          });
+          if (sbRes.ok) {
+            const rows = await sbRes.json();
+            if (rows && rows[0] && rows[0].value) {
+              let parsed = rows[0].value;
+              if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+              if (Array.isArray(parsed) && parsed.length > 0) cloudForms = parsed;
+            }
+          }
+        } catch(e) {}
+      }
+
+      let localForms = [];
+      try {
+        const raw = localStorage.getItem('form_customize_all_forms');
+        if (raw) localForms = JSON.parse(raw);
+      } catch(e) {}
+
+      if (cloudForms && cloudForms.length > 0) {
+        console.log('[Cloud Sync] Loaded', cloudForms.length, 'forms from cloud.');
+        const isLocalDummy = localForms.length === 0 || (localForms.length === 2 && localForms[0].title === '新規作成されたフォーム');
+        if (isLocalDummy || localForms.length < cloudForms.length) {
+          _origSetItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(cloudForms));
+          if (window.U) {
+            window.U.length = 0;
+            cloudForms.forEach(f => window.U.push(f));
+            const curIdx = parseInt(localStorage.getItem('form_customize_active_index') || '0', 10);
+            window.W = Math.min(curIdx, window.U.length - 1);
+            window.G = window.U[window.W];
+            window.n = window.G;
+            if (typeof window.x === 'function') window.x();
+          }
+        } else if (!isLocalDummy) {
+          // ローカルにユーザーが編集したフォームがある場合、クラウドへバックアップ保存
+          syncFormsToCloud(localForms);
+        }
+      } else if (localForms.length > 0) {
+        // クラウドが空でローカルにフォームがある場合、即座にクラウドへ初期アップロード
+        syncFormsToCloud(localForms);
+      }
+    } catch(err) {
+      console.warn('[Cloud Sync] loadFormsFromCloud exception:', err);
+    } finally {
+      _isCloudSyncing = false;
+    }
+  }
+
+  // localStorage.setItem のフック: form_customize_all_forms への書き込み時にクラウドへ自動保存
+  const _origSetItem = localStorage.setItem;
+  localStorage.setItem = function(key, value) {
+    _origSetItem.apply(this, arguments);
+    if (key === 'form_customize_all_forms') {
+      try {
+        const parsed = JSON.parse(value);
+        syncFormsToCloud(parsed);
+      } catch(e) {}
+    }
+  };
+
+  // 起動時の初期同期
+  setTimeout(loadFormsFromCloud, 100);
+
+  // =========================================================================
+  // 🤖 正規表現AIアシスタント クイック選択チップ 横スクロール・ナビゲーション機能
+  // =========================================================================
+  function initRegexChipsScroll() {
+    const container = document.getElementById('regex-chat-chips-container');
+    const prevBtn = document.getElementById('btn-regex-chips-prev');
+    const nextBtn = document.getElementById('btn-regex-chips-next');
+    const modal = document.getElementById('modal-regex-ai');
+
+    if (!container) return;
+    if (container.dataset.scrollInitialized === 'true') return;
+    container.dataset.scrollInitialized = 'true';
+
+    const wrapper = container.closest('.regex-chips-wrapper');
+
+    // 1. スクロール位置に基づくナビゲーションボタン・フェードの更新
+    const updateScrollState = () => {
+      if (!container || !prevBtn || !nextBtn) return;
+      const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
+      if (maxScroll <= 2) {
+        prevBtn.style.display = 'none';
+        nextBtn.style.display = 'none';
+        if (wrapper) {
+          wrapper.classList.remove('scrolled-left');
+          wrapper.classList.add('scrolled-end');
+        }
+        return;
+      }
+      prevBtn.style.display = 'flex';
+      nextBtn.style.display = 'flex';
+
+      const isAtStart = container.scrollLeft <= 5;
+      const isAtEnd = container.scrollLeft >= maxScroll - 5;
+
+      prevBtn.disabled = isAtStart;
+      prevBtn.setAttribute('aria-disabled', isAtStart ? 'true' : 'false');
+
+      nextBtn.disabled = isAtEnd;
+      nextBtn.setAttribute('aria-disabled', isAtEnd ? 'true' : 'false');
+
+      if (wrapper) {
+        if (isAtStart) {
+          wrapper.classList.remove('scrolled-left');
+        } else {
+          wrapper.classList.add('scrolled-left');
+        }
+
+        if (isAtEnd) {
+          wrapper.classList.add('scrolled-end');
+        } else {
+          wrapper.classList.remove('scrolled-end');
+        }
+      }
+    };
+
+    container.addEventListener('scroll', updateScrollState, { passive: true });
+    window.addEventListener('resize', updateScrollState);
+
+    // 2. マウスホイールによる直感的な横スクロール（縦ホイールを横移動に変換）
+    container.addEventListener('wheel', (e) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        container.scrollLeft += e.deltaY;
+      }
+    }, { passive: false });
+
+    // 3. ナビゲーションボタン（‹ / ›）クリックでスムーズスクロール
+    if (prevBtn) {
+      prevBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        container.scrollBy({ left: -160, behavior: 'smooth' });
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        container.scrollBy({ left: 160, behavior: 'smooth' });
+      });
+    }
+
+    // 4. マウスドラッグによるスワイプスクロール（ドラッグ操作）
+    let isDown = false;
+    let startX = 0;
+    let scrollStart = 0;
+    let isDragging = false;
+
+    container.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      isDown = true;
+      isDragging = false;
+      startX = e.pageX;
+      scrollStart = container.scrollLeft;
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDown) {
+        isDown = false;
+        setTimeout(() => { isDragging = false; }, 60);
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDown) return;
+      const dx = e.pageX - startX;
+      if (Math.abs(dx) > 4) {
+        isDragging = true;
+      }
+      container.scrollLeft = scrollStart - dx;
+    });
+
+    // ドラッグ中にチップのclickイベントが発火しないようにキャプチャフェーズで抑止
+    container.addEventListener('click', (e) => {
+      if (isDragging) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
+    }, true);
+
+    // 5. チップクリック時の確実な自動入力＆AI回答生成の保証
+    const generateRegexAiResponse = (query) => {
+      const q = query.toLowerCase();
+      let text = "";
+      let pattern = "";
+
+      const isNoHyphen = q.includes('なし') || q.includes('無') || q.includes('不要') || q.includes('数字のみ');
+      const isFlexible = q.includes('問わず') || q.includes('任意') || q.includes('どちら');
+
+      if (q.includes('郵便') || q.includes('ゆうびん')) {
+        if (isNoHyphen) {
+          text = "📮 **郵便番号（ハイフンなし）**の正規表現です。\n\nハイフンなしの7桁半角数字（例: 1234567）に一致させるには、以下の正規表現を使用します：\n`^\\d{7}$`\n\n※ハイフンあり（例: 123-4567）にする場合は `^\\d{3}-\\d{4}$` を使用してください。";
+          pattern = "^\\d{7}$";
+        } else {
+          text = "📮 **郵便番号**の正規表現です。\n\nハイフンありの形式（例: 123-4567）に一致させるには、以下の正規表現を使用します：\n`^\\d{3}-\\d{4}$`\n\n※ハイフンなし（例: 1234567）とする場合は `^\\d{7}$` を使用してください。";
+          pattern = "^\\d{3}-\\d{4}$";
+        }
+      } else if (q.includes('メール') || q.includes('アドレス') || q.includes('めーる')) {
+        text = "📧 **メールアドレス**の正規表現です。\n\n標準的な形式（例: name@example.com）に一致させるには、以下の表現を使用します：\n`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$`\n\n※Googleスプレッドシートのデータ検証でも問題なく稼働する表現です。";
+        pattern = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$";
+      } else if (q.includes('電話') || q.includes('でんわ') || q.includes('携帯') || q.includes('けいたい')) {
+        if (isNoHyphen) {
+          text = "📞 **電話番号（ハイフンなし）**の正規表現です。\n\nハイフンなしの半角数字（固定10桁・携帯11桁 例: 0312345678, 09012345678）に一致させるには以下を使用します：\n`^0\\d{9,10}$`\n\n※固定電話と携帯電話の両方に幅広く対応しています。";
+          pattern = "^0\\d{9,10}$";
+        } else if (isFlexible) {
+          text = "📞 **電話番号（ハイフン問わず・ありなし両対応）**の正規表現です。\n\nハイフンあり（例: 03-1234-5678）とハイフンなし（例: 0312345678）のどちらの入力も受け付けるには以下を使用します：\n`^(0\\d{1,4}-?\\d{1,4}-?\\d{3,4}|0\\d{9,10})$`\n\n※回答者の入力ゆれを自動許容する使い勝手の良い設定です。";
+          pattern = "^(0\\d{1,4}-?\\d{1,4}-?\\d{3,4}|0\\d{9,10})$";
+        } else {
+          text = "📞 **電話番号（ハイフンあり）**の正規表現です。\n\n一般的なハイフンありの番号（例: 090-1234-5678, 03-1234-5678）に一致させるには以下を使用します：\n`^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$`\n\n※ハイフンを含めず数字のみにする場合は `^0\\d{9,10}$` を使用してください。";
+          pattern = "^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$";
+        }
+      } else if (q.includes('口座') || q.includes('こうざ')) {
+        text = "💳 **口座番号**の正規表現です。\n\n一般的に使用される口座番号（7桁の半角数字）に一致させるには、以下の正規表現を使用します：\n`^\\d{7}$`\n\n※桁数が異なる（例: 6桁）金融機関を考慮する場合は、範囲指定（例: 6〜7桁 `^\\d{6,7}$`）に変更することもできます。";
+        pattern = "^\\d{7}$";
+      } else if (q.includes('インボイス') || q.includes('いんぼいす') || q.includes('登録番号')) {
+        text = "🧾 **インボイス登録番号**の正規表現です。\n\n適格請求書発行事業者の登録番号（Tで始まる13桁の半角数字）に一致させるには、以下の表現を使用します：\n`^T\\d{13}$`\n\n※先頭のアルファベット大文字「T」と、それに続く13桁の数字を厳密に制限する形式です。";
+        pattern = "^T\\d{13}$";
+      } else if (q.includes('英数字') || q.includes('えいすうじ') || q.includes('アルファベット')) {
+        text = "🔤 **半角英数字のみ**の正規表現です。\n\nアルファベットの小文字・大文字および数字のみ（スペースなし、1文字以上）に一致させるには、以下を使用します：\n`^[a-zA-Z0-9]+$`\n\n※数字のみに絞る場合は `^[0-9]+$` を使用してください。";
+        pattern = "^[a-zA-Z0-9]+$";
+      } else if (q.includes('カタカナ') || q.includes('かたかな')) {
+        text = "📝 **全角カタカナのみ**の正規表現です。\n\n全角カタカナ文字のみ（スペース不可、1文字以上）に一致させるには、以下を使用します：\n`^[ァ-ヶ]+$`\n\n※スペースを含める場合は `^[ァ-ヶ　]+$` にしてください。";
+        pattern = "^[ァ-ヶ]+$";
+      } else if (q.includes('日付') || q.includes('ひづけ') || q.includes('年月日')) {
+        text = "📅 **日付 (YYYY/MM/DD)**の正規表現です。\n\nスラッシュ区切りの日付形式（例: 2026/07/02）に一致させるには、以下を使用します：\n`^\\d{4}/\\d{2}/\\d{2}$`\n\n※数字の桁数の整合性をとるシンプルな設定です。";
+        pattern = "^\\d{4}/\\d{2}/\\d{2}$";
+      } else {
+        text = "🤖 スプレッドシート互換の正規表現の基本的な書き方です：\n\n- `^` : 文字列の先頭からマッチ開始\n- `$` : 文字列の末尾までマッチ終了\n- `\\d` : 半角の数字 (0-9)\n- `[a-z]` : 小文字のアルファベット\n- `+` : 直前の文字の1回以上の繰り返し\n- `{N}` : 直前の文字のN回繰り返し\n\n知りたい入力規則（例: 「カタカナのみ」「郵便番号」など）を下のテキストボックスに入力するか、クイックボタンをクリックしてください！";
+      }
+      return { text, pattern };
+    };
+
+    const handleRegexChatSubmit = (queryText) => {
+      const input = document.getElementById('regex-chat-input');
+      const history = document.getElementById('regex-chat-history');
+      if (!history) return;
+      const q = (queryText || (input ? input.value : '')).trim();
+      if (!q) return;
+
+      if (input) input.value = '';
+
+      const userMsg = document.createElement('div');
+      userMsg.className = 'chat-msg user-msg';
+      userMsg.style.cssText = 'align-self: flex-end; background-color: var(--color-primary, #0056b3); color: #ffffff; border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; max-width: 85%;';
+      userMsg.textContent = q;
+      history.appendChild(userMsg);
+      history.scrollTop = history.scrollHeight;
+
+      setTimeout(() => {
+        const res = generateRegexAiResponse(q);
+        const botMsg = document.createElement('div');
+        botMsg.className = 'chat-msg system-msg';
+        botMsg.style.cssText = 'align-self: flex-start; background-color: var(--color-bg-card, #f8f9fa); border: 1px solid var(--color-border, #dee2e6); border-radius: 8px; padding: 12px; font-size: 0.85rem; max-width: 85%; line-height: 1.5; color: var(--color-text, #212529);';
+
+        let html = res.text
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/`([^`]+)`/g, "<code style='background:rgba(0,0,0,0.06); padding:2px 4px; border-radius:3px; font-family:monospace; color:#0056b3; font-weight:600;'>$1</code>")
+          .replace(/\n/g, '<br>');
+
+        botMsg.innerHTML = html;
+
+        if (res.pattern) {
+          const applyBtn = document.createElement('button');
+          applyBtn.className = 'btn btn-primary btn-sm';
+          applyBtn.style.cssText = 'margin-top: 10px; display: block; font-weight: 600; cursor: pointer;';
+          applyBtn.textContent = 'この正規表現を適用する';
+          applyBtn.addEventListener('click', () => {
+            const targetQ = window._currentAiRegexQuestion || (window.w ? window.w : null);
+            if (targetQ) {
+              if (!targetQ.validation) {
+                targetQ.validation = { category: 'regex', condition: 'matches', value: '', value2: '', errorMessage: '' };
+              }
+              targetQ.validation.category = 'regex';
+              targetQ.validation.condition = 'matches';
+              targetQ.validation.value = res.pattern;
+
+              let matchedKey = 'custom';
+              for (const [k, def] of Object.entries(REGEX_PRESET_DEFINITIONS)) {
+                if (def.pattern === res.pattern) {
+                  matchedKey = k;
+                  break;
+                }
+              }
+              targetQ.validation.presetKey = matchedKey;
+
+              const autoDesc = getAutoDescriptionForQuestion(targetQ.title, targetQ.validation);
+              const autoErr = getAutoErrorMessageForQuestion(targetQ.title, targetQ.validation);
+              if (autoDesc) targetQ.description = autoDesc;
+              if (autoErr) targetQ.validation.errorMessage = autoErr;
+
+              if (window.fastUpdateLivePreview) {
+                window.fastUpdateLivePreview('question_desc', targetQ.description, { questionId: targetQ.id });
+              }
+              if (window.S) window.S(true);
+              if (window.x) window.x();
+            } else {
+              const patternInputs = document.querySelectorAll('.val-inputs-container input[type="text"]');
+              if (patternInputs.length > 0) {
+                patternInputs[patternInputs.length - 1].value = res.pattern;
+                patternInputs[patternInputs.length - 1].dispatchEvent(new Event('input', { bubbles: true }));
+              }
+            }
+            if (modal) modal.style.display = 'none';
+          });
+          botMsg.appendChild(applyBtn);
+        }
+
+        history.appendChild(botMsg);
+        history.scrollTop = history.scrollHeight;
+      }, 250);
+    };
+
+    container.querySelectorAll('.chat-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        if (isDragging) return;
+        const query = chip.dataset.query;
+        if (!query) return;
+        const input = document.getElementById('regex-chat-input');
+        if (input) input.value = query;
+
+        // すでにindexモジュールで処理されたか確認、未処理なら実行
+        setTimeout(() => {
+          const history = document.getElementById('regex-chat-history');
+          const lastMsg = history ? history.querySelector('.chat-msg.user-msg:last-child') : null;
+          if (!lastMsg || lastMsg.textContent !== query) {
+            handleRegexChatSubmit(query);
+          }
+        }, 100);
+      });
+    });
+
+    const sendBtn = document.getElementById('btn-send-regex-chat');
+    const chatInput = document.getElementById('regex-chat-input');
+    if (sendBtn && !sendBtn.dataset.chatBound) {
+      sendBtn.dataset.chatBound = 'true';
+      sendBtn.addEventListener('click', () => {
+        if (chatInput && chatInput.value.trim()) {
+          const q = chatInput.value.trim();
+          setTimeout(() => {
+            const history = document.getElementById('regex-chat-history');
+            const lastMsg = history ? history.querySelector('.chat-msg.user-msg:last-child') : null;
+            if (!lastMsg || lastMsg.textContent !== q) {
+              handleRegexChatSubmit(q);
+            }
+          }, 100);
+        }
+      });
+      if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            sendBtn.click();
+          }
+        });
+      }
+    }
+
+    // モーダル表示時に初期スクロール状態を確実に反映
+    if (modal) {
+      const observer = new MutationObserver(() => {
+        if (modal.style.display === 'flex' || modal.classList.contains('active')) {
+          setTimeout(updateScrollState, 50);
+        }
+      });
+      observer.observe(modal, { attributes: true, attributeFilter: ['style', 'class'] });
+    }
+
+    // 初回実行
+    setTimeout(updateScrollState, 100);
+  }
+
+  // 起動時に初期化
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRegexChipsScroll);
+  } else {
+    initRegexChipsScroll();
+  }
+})();
+

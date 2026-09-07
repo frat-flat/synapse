@@ -13,11 +13,12 @@
 (function() {
   console.log('custom-editor.js loading...');
 
-  // 🏦 全銀協 銀行名・支店名 API連携規則の拡張保証
+  // 🏦 全銀協 銀行名・支店名・支店番号 API連携規則の拡張保証
   const ensureBankApiConditions = () => {
     if (window.b && window.b.api && window.b.api.conditions) {
       window.b.api.conditions.bank_name = '銀行名検索（全銀協金融機関コードAPI連携）';
       window.b.api.conditions.branch_name = '支店名検索（全銀協支店コード・支店番号API連携）';
+      window.b.api.conditions.branch_code = '支店番号検索（全銀協支店コードAPI連携）';
     }
     if (window.re) {
       if (!window.re.bank_name) {
@@ -52,12 +53,30 @@
           options: []
         };
       }
+      if (!window.re.branch_code) {
+        window.re.branch_code = {
+          type: "text",
+          title: "支店番号",
+          description: "全銀協支店番号API連携対応",
+          required: true,
+          validation: {
+            category: "api",
+            condition: "branch_code",
+            value: "",
+            value2: "",
+            errorMessage: "実在する3桁の支店番号を入力または選択してください。"
+          },
+          options: []
+        };
+      }
       if (window.re.pro_bank && Array.isArray(window.re.pro_bank.questions)) {
         window.re.pro_bank.questions.forEach(q => {
           if (q.title === '金融機関名' || q.title === '銀行名') {
             q.validation = { category: "api", condition: "bank_name", errorMessage: "実在する金融機関名を入力または選択してください。" };
           } else if (q.title === '支店名') {
             q.validation = { category: "api", condition: "branch_name", errorMessage: "実在する支店名を入力または選択してください。" };
+          } else if (q.title === '支店番号' || q.title === '支店コード') {
+            q.validation = { category: "api", condition: "branch_code", errorMessage: "実在する3桁の支店番号を入力または選択してください。" };
           }
         });
       }
@@ -1295,39 +1314,362 @@
         "東京営業部": "700"
       }
     },
-    "ウェイウェイ銀行": {
-      code: "9999",
+    "広島信用金庫": {
+      code: "1750",
       branches: {
         "本店営業部": "001",
-        "東京支店": "101",
-        "大阪支店": "201",
-        "広島支店": "301"
+        "広島駅前支店": "002",
+        "八丁堀支店": "003"
       }
     },
-    "ヤフー銀行": {
-      code: "8888",
+    "広島みどり信用金庫": {
+      code: "1758",
       branches: {
-        "本店営業部": "001",
-        "ネット営業部": "002"
+        "本店営業部": "001"
+      }
+    },
+    "広島市信用組合": {
+      code: "2680",
+      branches: {
+        "本店営業部": "001"
       }
     }
   };
 
+  function getOfficialBankName(bank) {
+    if (!bank || !bank.name) return '';
+    const name = String(bank.name).trim();
+    const code = String(bank.code || '').padStart(4, '0');
+    const codeNum = parseInt(code, 10);
+
+    if (name.endsWith('銀行') || name.endsWith('信用金庫') || name.endsWith('信用組合') || name.endsWith('労働金庫')) {
+      return name;
+    }
+    if (name.endsWith('信金')) return name.replace(/信金$/, '信用金庫');
+    if (name.endsWith('信組')) return name.replace(/信組$/, '信用組合');
+    if (name.endsWith('労金')) return name.replace(/労金$/, '労働金庫');
+    if (name.endsWith('農協')) return name.replace(/農協$/, '農業協同組合');
+    if (name.endsWith('信連')) return name.replace(/信連$/, '信用農業協同組合連合会');
+    if (name.endsWith('信漁連')) return name.replace(/信漁連$/, '信用漁業協同組合連合会');
+
+    if (codeNum < 1000) return name + '銀行';
+    if (codeNum >= 1000 && codeNum < 2000) return name + '信用金庫';
+    if (codeNum >= 2000 && codeNum < 3000) return name + '信用組合';
+    if (codeNum >= 2950 && codeNum <= 2999) return name + '労働金庫';
+    return name;
+  }
+
+  // 全銀協 統一金融機関コード・支店コード 最新オープンデータ連携サービス (Zengin Code API)
+  const BankDataService = {
+    _banks: null,
+    _banksPromise: null,
+    _branchMap: new Map(),
+    _branchPromises: new Map(),
+
+    async init() {
+      return this.getBanks();
+    },
+
+    async getBanks() {
+      if (this._banks && Object.keys(this._banks).length > 0) return this._banks;
+      if (this._banksPromise) return this._banksPromise;
+
+      this._banksPromise = (async () => {
+        // 1. 自前サーバーレスAPI (/api/bank-search)
+        try {
+          const res = await fetch('/api/bank-search');
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.success && Array.isArray(data.banks)) {
+              const map = {};
+              data.banks.forEach(b => {
+                const c = String(b.code || '').padStart(4, '0');
+                map[c] = { ...b, code: c };
+              });
+              this._banks = map;
+              return this._banks;
+            }
+          }
+        } catch (e) {
+          console.warn('[BankDataService] /api/bank-search fetch failed, trying direct open data endpoint...', e);
+        }
+
+        // 2. Direct Zengin Code API (GitHub Pages: CORS * 全オリジン許可)
+        try {
+          const res = await fetch('https://zengin-code.github.io/api/banks.json');
+          if (res.ok) {
+            const data = await res.json();
+            if (data && typeof data === 'object') {
+              this._banks = data;
+              return this._banks;
+            }
+          }
+        } catch (e) {
+          console.warn('[BankDataService] Direct Zengin Code API fetch failed, falling back to local database...', e);
+        }
+
+        // 3. Fallback: static BANK_DATABASE
+        const fallbackMap = {};
+        for (const [name, info] of Object.entries(BANK_DATABASE)) {
+          fallbackMap[info.code] = {
+            code: info.code,
+            name: name,
+            kana: '',
+            hira: ''
+          };
+        }
+        this._banks = fallbackMap;
+        return this._banks;
+      })();
+
+      return this._banksPromise;
+    },
+
+    async searchBanks(query) {
+      const rawVal = (query || '').trim();
+      if (!rawVal) return [];
+
+      // 1. 自前最新API (/api/bank-search) に照会
+      try {
+        const res = await fetch(`/api/bank-search?query=${encodeURIComponent(rawVal)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && Array.isArray(data.banks)) {
+            return data.banks.map(b => ({
+              ...b,
+              officialName: b.officialName || getOfficialBankName(b),
+              displayName: b.displayName || b.officialName || getOfficialBankName(b)
+            }));
+          }
+        }
+      } catch (e) {
+        console.warn('[BankDataService] searchBanks api failed, falling back to client cache...', e);
+      }
+
+      // 2. クライアントキャッシュでのフォールバック検索
+      const banks = await this.getBanks();
+      const cleanTarget = rawVal.normalize('NFKC').trim().toLowerCase();
+      const kataTarget = (cleanTarget || '').replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+      const hiraTarget = (cleanTarget || '').replace(/[\u30a1-\u30f6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+      const cleanNoType = cleanTarget.replace(/銀行|信用金庫|信金|労働金庫|労金|信組|信用組合|農協|農業協同組合/, '');
+
+      const hasBank = cleanTarget.includes('銀行');
+      const hasShinkin = cleanTarget.includes('信金') || cleanTarget.includes('信用金庫');
+      const hasShinkumi = cleanTarget.includes('信組') || cleanTarget.includes('信用組合');
+
+      const bankList = Object.values(banks);
+      const matches = [];
+
+      for (const b of bankList) {
+        const bCode = String(b.code || '').padStart(4, '0');
+        const officialName = getOfficialBankName(b);
+        const rawName = (b.name || '').normalize('NFKC').trim().toLowerCase();
+        const offName = officialName.normalize('NFKC').trim().toLowerCase();
+        const bKana = (b.kana || '').normalize('NFKC').trim().toLowerCase();
+        const bHira = (b.hira || '').normalize('NFKC').trim().toLowerCase();
+        const bRoma = (b.roma || '').normalize('NFKC').trim().toLowerCase();
+
+        let score = -1;
+
+        // コード完全一致
+        if (bCode === cleanTarget) {
+          score = 100;
+        }
+        // 正式名称・生名称・カナ・ひらがな完全一致
+        else if (offName === cleanTarget || rawName === cleanTarget || bKana === kataTarget || bHira === hiraTarget) {
+          score = 90;
+        }
+        // 単体名で正式名称が一致 (例: 入力「広島」に対して officialName「広島銀行」)
+        else if (cleanNoType && offName === cleanNoType + '銀行' && !hasShinkin && !hasShinkumi) {
+          score = 85;
+        }
+        // 前方一致
+        else if (offName.startsWith(cleanTarget) || rawName.startsWith(cleanTarget) || bKana.startsWith(kataTarget) || bHira.startsWith(hiraTarget)) {
+          score = 80;
+        }
+        // cleanNoTypeで前方一致
+        else if (cleanNoType.length >= 2 && (offName.startsWith(cleanNoType) || rawName.startsWith(cleanNoType) || bKana.startsWith(kataTarget))) {
+          score = 70;
+          if (hasShinkin && !offName.includes('信用金庫')) score -= 40;
+          if (hasBank && !offName.endsWith('銀行')) score -= 40;
+        }
+        // 部分一致
+        else if (offName.includes(cleanTarget) || rawName.includes(cleanTarget) || bKana.includes(kataTarget) || bHira.includes(hiraTarget) || bRoma.includes(cleanTarget)) {
+          score = 60;
+        }
+        else if (cleanNoType.length >= 2 && (offName.includes(cleanNoType) || bKana.includes(kataTarget))) {
+          score = 50;
+          if (hasShinkin && !offName.includes('信用金庫')) score -= 40;
+          if (hasBank && !offName.endsWith('銀行')) score -= 40;
+        }
+
+        if (score > 10) {
+          matches.push({
+            ...b,
+            code: bCode,
+            name: b.name,
+            officialName,
+            displayName: officialName,
+            score
+          });
+        }
+      }
+
+      matches.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.code.localeCompare(b.code);
+      });
+
+      return matches.slice(0, 30);
+    },
+
+    async getBranches(bankCode) {
+      if (!bankCode) return {};
+      const cleanCode = String(bankCode).trim().padStart(4, '0');
+      if (this._branchMap.has(cleanCode)) return this._branchMap.get(cleanCode);
+      if (this._branchPromises.has(cleanCode)) return this._branchPromises.get(cleanCode);
+
+      const promise = (async () => {
+        // 1. /api/bank-search?bankCode=xxx&all=1
+        try {
+          const res = await fetch(`/api/bank-search?bankCode=${cleanCode}&all=1`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.success && Array.isArray(data.branches)) {
+              const brMap = {};
+              data.branches.forEach(br => {
+                const bc = String(br.code || '').padStart(3, '0');
+                brMap[bc] = { ...br, code: bc };
+              });
+              this._branchMap.set(cleanCode, brMap);
+              return brMap;
+            }
+          }
+        } catch (e) {
+          console.warn(`[BankDataService] Branch API fetch failed for bank ${cleanCode}:`, e);
+        }
+
+        // 2. Direct Zengin Code branches endpoint
+        try {
+          const res = await fetch(`https://zengin-code.github.io/api/branches/${cleanCode}.json`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && typeof data === 'object') {
+              this._branchMap.set(cleanCode, data);
+              return data;
+            }
+          }
+        } catch (e) {
+          console.warn(`[BankDataService] Direct branch fetch failed for bank ${cleanCode}:`, e);
+        }
+
+        // 3. Fallback BANK_DATABASE
+        for (const [name, info] of Object.entries(BANK_DATABASE)) {
+          if (info.code === cleanCode && info.branches) {
+            const brMap = {};
+            for (const [brName, brCode] of Object.entries(info.branches)) {
+              brMap[brCode] = { code: brCode, name: brName };
+            }
+            this._branchMap.set(cleanCode, brMap);
+            return brMap;
+          }
+        }
+
+        return {};
+      })();
+
+      this._branchPromises.set(cleanCode, promise);
+      return promise;
+    },
+
+    async searchBranches(bankCode, query) {
+      if (!bankCode) return [];
+      const rawVal = (query || '').trim();
+      const cleanBankCode = String(bankCode).trim().padStart(4, '0');
+
+      // 1. 自前最新API (/api/bank-search) に照会
+      try {
+        const res = await fetch(`/api/bank-search?bankCode=${cleanBankCode}&branch=${encodeURIComponent(rawVal)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && Array.isArray(data.branches)) {
+            return data.branches;
+          }
+        }
+      } catch (e) {
+        console.warn('[BankDataService] searchBranches api failed, falling back to client cache...', e);
+      }
+
+      // 2. クライアントキャッシュでのフォールバック検索
+      const branchesObj = await this.getBranches(cleanBankCode);
+      const branchList = Object.values(branchesObj);
+      if (!rawVal) return branchList.slice(0, 50);
+
+      const cleanVal = rawVal.normalize('NFKC').toLowerCase();
+      const cleanNoSuffix = cleanVal.replace(/支店|出張所|営業部|支社|本店/, '');
+      const isDigit = /^\d+$/.test(cleanVal);
+      const cleanPadded = isDigit ? cleanVal.padStart(3, '0') : '';
+
+      return branchList.filter(b => {
+        const bName = (b.name || '').normalize('NFKC').toLowerCase();
+        const bKana = (b.kana || '').normalize('NFKC').toLowerCase();
+        const bHira = (b.hira || '').normalize('NFKC').toLowerCase();
+        const bCode = String(b.code || '').padStart(3, '0');
+
+        if (bCode === cleanVal || (cleanPadded && bCode === cleanPadded)) return true;
+        if (isDigit && bCode.startsWith(cleanVal)) return true;
+        if (bName.includes(cleanVal) || bKana.includes(cleanVal) || bHira.includes(cleanVal)) return true;
+        if (cleanNoSuffix.length >= 1 && (bName.includes(cleanNoSuffix) || bKana.includes(cleanNoSuffix))) return true;
+        return false;
+      }).slice(0, 30);
+    }
+  };
+
+  // 即時プリフェッチ開始
+  window.BankDataService = BankDataService;
+  BankDataService.init().catch(() => {});
+
   function findBankByCode(code) {
     if (!code) return null;
-    const clean = code.trim();
+    const clean = String(code).trim().padStart(4, '0');
+    if (BankDataService._banks && BankDataService._banks[clean]) {
+      const b = BankDataService._banks[clean];
+      const name = getOfficialBankName(b);
+      return { name, code: b.code || clean, officialName: name, displayName: name, ...b };
+    }
     for (const [name, info] of Object.entries(BANK_DATABASE)) {
-      if (info.code === clean) return { name, ...info };
+      if (info.code === clean) return { name, officialName: name, displayName: name, ...info };
     }
     return null;
   }
 
   function findBankByName(name) {
     if (!name) return null;
-    const clean = name.trim();
-    if (BANK_DATABASE[clean]) return { name: clean, ...BANK_DATABASE[clean] };
+    const clean = name.trim().normalize('NFKC');
+    const cleanNoBank = clean.replace(/銀行|信用金庫|信金|労働金庫|労金|信組|信用組合|農協|農業協同組合/, '');
+
+    if (BankDataService._banks) {
+      for (const [c, b] of Object.entries(BankDataService._banks)) {
+        const bName = (b.name || '').normalize('NFKC');
+        const offName = getOfficialBankName(b).normalize('NFKC');
+        if (offName === clean || bName === clean || bName === clean + '銀行' || bName + '銀行' === clean) {
+          return { name: offName, code: b.code || c, officialName: offName, displayName: offName, ...b };
+        }
+      }
+      if (cleanNoBank.length >= 2) {
+        for (const [c, b] of Object.entries(BankDataService._banks)) {
+          const offName = getOfficialBankName(b).normalize('NFKC');
+          const bNameNoBank = (b.name || '').normalize('NFKC').replace(/銀行|信用金庫|信金|労働金庫|労金|信組|信用組合|農協|農業協同組合/, '');
+          if (bNameNoBank === cleanNoBank || offName.startsWith(cleanNoBank)) {
+            return { name: offName, code: b.code || c, officialName: offName, displayName: offName, ...b };
+          }
+        }
+      }
+    }
+
+    if (BANK_DATABASE[clean]) return { name: clean, officialName: clean, displayName: clean, ...BANK_DATABASE[clean] };
     for (const [k, info] of Object.entries(BANK_DATABASE)) {
-      if (k.includes(clean) || clean.includes(k)) return { name: k, ...info };
+      if (k.includes(clean) || clean.includes(k)) return { name: k, officialName: k, displayName: k, ...info };
     }
     return null;
   }
@@ -1653,18 +1995,22 @@
   // ============================================================================
   function findQuestionDefById(questionId) {
     if (!questionId) return null;
-    const formSources = [window.L, window.G, window.n];
+    const formSources = [window.n, window.G, window.L];
+    if (window.U && Array.isArray(window.U)) {
+      formSources.push(...window.U);
+    }
     for (const formSrc of formSources) {
       if (formSrc && formSrc.sections) {
         for (const sec of formSrc.sections) {
-          if (!sec.questions) continue;
-          const q = sec.questions.find(item => item.id === questionId);
+          if (!sec || !sec.questions) continue;
+          const q = sec.questions.find(item => item && item.id === questionId);
           if (q) return q;
         }
       }
     }
     return null;
   }
+  window.findQuestionDefById = findQuestionDefById;
 
   function getQuestionApiConfig(qDef) {
     if (!qDef) return null;
@@ -1680,10 +2026,12 @@
         isInvoice: cond === 'invoice_number',
         isBank: cond === 'bank_name',
         isBranch: cond === 'branch_name',
+        isBranchCode: cond === 'branch_code',
         label: cond === 'corp_name' ? '国税庁法人番号API連携' :
                cond === 'invoice_number' ? '適格請求書発行事業者API連携' :
                cond === 'bank_name' ? '全銀協金融機関API連携' :
-               cond === 'branch_name' ? '全銀協支店情報API連携' : 'API連携',
+               cond === 'branch_name' ? '全銀協支店情報API連携' :
+               cond === 'branch_code' ? '全銀協支店番号API連携' : 'API連携',
         source: 'validation_metadata'
       };
     }
@@ -1692,19 +2040,22 @@
     if (qDef.type === 'text' && qDef.title) {
       const t = qDef.title;
       if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
-        return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isBank: false, isBranch: false, label: '適格請求書発行事業者API連携', source: 'title_fallback' };
+        return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isBank: false, isBranch: false, isBranchCode: false, label: '適格請求書発行事業者API連携', source: 'title_fallback' };
       }
       if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('屋号')) &&
           !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな')) {
-        return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isBank: false, isBranch: false, label: '国税庁法人番号API連携', source: 'title_fallback' };
+        return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isBank: false, isBranch: false, isBranchCode: false, label: '国税庁法人番号API連携', source: 'title_fallback' };
       }
       if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座')) ||
           t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード'))) {
-        return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isBank: true, isBranch: false, label: '全銀協金融機関API連携', source: 'title_fallback' };
+        return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isBank: true, isBranch: false, isBranchCode: false, label: '全銀協金融機関API連携', source: 'title_fallback' };
       }
       if (t.includes('支店名') || (t.includes('支店') && !t.includes('番号') && !t.includes('コード')) ||
           t.includes('店舗名') || (t.includes('店舗') && !t.includes('番号') && !t.includes('コード'))) {
-        return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isBank: false, isBranch: true, label: '全銀協支店情報API連携', source: 'title_fallback' };
+        return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isBank: false, isBranch: true, isBranchCode: false, label: '全銀協支店情報API連携', source: 'title_fallback' };
+      }
+      if (t.includes('支店番号') || t.includes('支店コード') || t.includes('店舗番号') || t.includes('店舗コード') || ((t.includes('支店') || t.includes('店舗')) && t.includes('番号'))) {
+        return { isApi: true, category: 'api', condition: 'branch_code', isCorp: false, isInvoice: false, isBank: false, isBranch: false, isBranchCode: true, label: '全銀協支店番号API連携', source: 'title_fallback' };
       }
     }
 
@@ -6209,7 +6560,7 @@
           setupBankCodeAutoLookup(card, qDef);
         }
 
-        const isBranchCode = qDef.type === 'text' && (qDef.title.includes('支店番号') || qDef.title.includes('支店コード') || qDef.title.includes('店舗番号') || qDef.title.includes('店舗コード'));
+        const isBranchCode = (apiConfig && apiConfig.isBranchCode) || (qDef.type === 'text' && (qDef.title.includes('支店番号') || qDef.title.includes('支店コード') || qDef.title.includes('店舗番号') || qDef.title.includes('店舗コード') || ((qDef.title.includes('支店') || qDef.title.includes('店舗')) && qDef.title.includes('番号'))));
         if (isBranchCode) {
           setupBranchCodeMutualCompletion(card, qDef);
         }
@@ -6359,7 +6710,7 @@
           const card = input.closest('.preview-q-card');
           if (!card) return;
           const title = card.querySelector('.preview-q-title')?.textContent || "";
-          if (title.includes('支店番号') || title.includes('支店コード')) {
+          if (title.includes('支店番号') || title.includes('支店コード') || title.includes('店舗番号') || title.includes('店舗コード') || ((title.includes('支店') || title.includes('店舗')) && title.includes('番号'))) {
             if (input.value !== code) {
               input.value = code;
               clearIntegrityError(card);
@@ -6384,7 +6735,7 @@
           const card = input.closest('.preview-q-card');
           if (!card) return;
           const title = card.querySelector('.preview-q-title')?.textContent || "";
-          if (title.includes('支店名') && !title.includes('番号') && !title.includes('コード')) {
+          if ((title.includes('支店名') || title.includes('店舗名') || title.includes('出張所名')) && !title.includes('番号') && !title.includes('コード')) {
             if (input.value !== name) {
               input.value = name;
               clearIntegrityError(card);
@@ -7113,7 +7464,8 @@
 
     input.placeholder = "銀行名を入力または検索 (例: 三菱UFJ銀行、みずほ銀行)";
 
-    const executeSearch = () => {
+    let searchSeq = 0;
+    const executeSearch = async () => {
       const curPanel = card.querySelector('.bank-search-panel') || searchPanel;
       const rawVal = input.value.trim();
       if (rawVal === "") {
@@ -7121,54 +7473,57 @@
         return;
       }
 
-      let matches = [];
-      for (const [name, info] of Object.entries(BANK_DATABASE)) {
-        if (name.includes(rawVal) || rawVal.includes(name.replace('銀行', '')) || (info.code && info.code.includes(rawVal))) {
-          matches.push({ name, code: info.code, branches: info.branches });
-        }
-      }
+      curPanel.innerHTML = `
+        <div style="padding:8px 12px; font-size:0.75rem; color:#64748b; display:flex; align-items:center; gap:6px;">
+          <span>⏳ 全銀協 最新オープンデータ照会中...</span>
+        </div>
+      `;
+      curPanel.style.display = 'block';
+
+      const currentSeq = ++searchSeq;
+      const matches = await BankDataService.searchBanks(rawVal);
+      if (currentSeq !== searchSeq) return;
 
       if (matches.length === 0) {
-        const generatedCode = generateHashNum(rawVal + "bank").slice(0, 4);
-        matches.push({
-          name: rawVal.endsWith('銀行') ? rawVal : (rawVal + '銀行'),
-          code: generatedCode,
-          isDynamic: true
-        });
-      }
-
-      if (matches.length > 0) {
         curPanel.innerHTML = `
-          <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; display:flex; justify-content:space-between; align-items:center; font-weight:600;">
-            <span>🏦 全銀協 金融機関API候補 (${matches.length}件)</span>
-            <span style="font-size:0.65rem; color:#718096;">選択でコード自動入力</span>
+          <div style="padding:10px 12px; background:#fffbe8; border-bottom:1px solid #fed7aa; font-size:0.75rem; color:#9a3412; line-height:1.4;">
+            <div style="font-weight:700; margin-bottom:2px;">⚠️ 全銀協データに未登録の金融機関です</div>
+            <div>「${escapeHtml(rawVal)}」に一致する金融機関が見つかりません。正式名称（例: ドコモＳＭＴＢネット信託銀行）で再検索するか、手動で金融機関コードをご入力ください。</div>
           </div>
         `;
-        matches.forEach(item => {
-          const row = document.createElement('div');
-          row.className = 'bank-search-candidate-item';
-          row.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;';
-          row.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-weight:600; color:var(--color-primary);">${escapeHtml(item.name)}</span>
-              <span style="background:#e8f0fe; color:#1a73e8; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">金融機関コード: ${item.code}</span>
-            </div>
-          `;
-          row.onmouseenter = () => { row.style.backgroundColor = '#f1f5f9'; };
-          row.onmouseleave = () => { row.style.backgroundColor = 'transparent'; };
-          row.addEventListener('click', () => {
-            input.value = item.name;
-            curPanel.style.display = 'none';
-            autoFillBankCode(item.code);
-            clearIntegrityError(card);
-            triggerInputChange(input);
-          });
-          curPanel.appendChild(row);
-        });
         curPanel.style.display = 'block';
-      } else {
-        curPanel.style.display = 'none';
+        return;
       }
+
+      curPanel.innerHTML = `
+        <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; display:flex; justify-content:space-between; align-items:center; font-weight:600;">
+          <span>🏦 全銀協 最新金融機関候補 (${matches.length}件)</span>
+          <span style="font-size:0.65rem; color:#718096;">選択でコード自動入力</span>
+        </div>
+      `;
+      matches.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'bank-search-candidate-item';
+        row.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;';
+        const displayName = item.displayName || item.officialName || getOfficialBankName(item);
+        row.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:600; color:var(--color-primary);">${escapeHtml(displayName)}</span>
+            <span style="background:#e8f0fe; color:#1a73e8; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">金融機関コード: ${item.code}</span>
+          </div>
+        `;
+        row.onmouseenter = () => { row.style.backgroundColor = '#f1f5f9'; };
+        row.onmouseleave = () => { row.style.backgroundColor = 'transparent'; };
+        row.addEventListener('click', () => {
+          input.value = displayName;
+          curPanel.style.display = 'none';
+          autoFillBankCode(item.code);
+          clearIntegrityError(card);
+          triggerInputChange(input);
+        });
+        curPanel.appendChild(row);
+      });
+      curPanel.style.display = 'block';
     };
 
     if (!input.dataset.bankApiBound) {
@@ -7240,26 +7595,129 @@
   function setupBranchCodeMutualCompletion(card, qDef) {
     const input = card.querySelector('input');
     if (!input) return;
-    input.placeholder = "3桁の支店番号 (例: 001)";
+
+    const oldPanel = card.querySelector('.branch-search-panel');
+    if (oldPanel) oldPanel.remove();
+
+    let panel = card.querySelector('.branch-search-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.className = 'branch-search-panel';
+      panel.style.cssText = 'position:absolute; top:calc(100% + 4px); left:0; right:0; background:#ffffff; border:1px solid var(--color-border); border-radius:6px; z-index:2050; box-shadow:0 8px 24px rgba(0,0,0,0.12); display:none; max-height:200px; overflow-y:auto;';
+      input.parentNode.style.position = 'relative';
+      input.parentNode.appendChild(panel);
+    }
+
+    input.placeholder = "3桁の支店番号を入力または選択 (例: 001)";
+
+    let branchSeq = 0;
+    const showBranchCodeCandidates = async () => {
+      const bankName = getSelectedBankName();
+      const filterText = input.value.trim();
+      const curPanel = card.querySelector('.branch-search-panel') || panel;
+
+      if (!bankName) {
+        curPanel.innerHTML = `
+          <div style="padding:10px 12px; background:#fff8e1; border-bottom:1px solid #ffe082; font-size:0.75rem; color:#b78103; display:flex; align-items:center; gap:6px;">
+            <span>⚠️ 先に「銀行名」を入力または選択してください</span>
+          </div>
+        `;
+        curPanel.style.display = 'block';
+        return;
+      }
+
+      const bankInfo = findBankByName(bankName);
+      if (!bankInfo) {
+        curPanel.innerHTML = `
+          <div style="padding:10px 12px; background:#fff8e1; border-bottom:1px solid #ffe082; font-size:0.75rem; color:#b78103; display:flex; align-items:center; gap:6px;">
+            <span>⚠️ 銀行名「${escapeHtml(bankName)}」の実在確認が取れていません。支店名と支店番号を手動でご入力ください。</span>
+          </div>
+        `;
+        curPanel.style.display = 'block';
+        return;
+      }
+
+      curPanel.innerHTML = `
+        <div style="padding:8px 12px; font-size:0.75rem; color:#64748b; display:flex; align-items:center; gap:6px;">
+          <span>⏳ ${escapeHtml(bankInfo.name)} の支店データを照会中...</span>
+        </div>
+      `;
+      curPanel.style.display = 'block';
+
+      const currentSeq = ++branchSeq;
+      const branchMatches = await BankDataService.searchBranches(bankInfo.code, filterText);
+      if (currentSeq !== branchSeq) return;
+
+      if (branchMatches.length > 0) {
+        curPanel.innerHTML = `
+          <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; display:flex; justify-content:space-between; align-items:center; font-weight:600;">
+            <span>🏢 ${escapeHtml(bankInfo.name)}の支店候補 (${branchMatches.length}件)</span>
+            <span style="font-size:0.65rem; color:#718096;">選択で支店名を自動補完</span>
+          </div>
+        `;
+        branchMatches.forEach(b => {
+          const bName = b.name;
+          const bCode = String(b.code || '').padStart(3, '0');
+          const row = document.createElement('div');
+          row.className = 'branch-search-candidate-item';
+          row.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;';
+          row.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:600; color:var(--color-primary);">${bCode} ${escapeHtml(bName)}</span>
+              <span style="background:#e6f4ea; color:#137333; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">支店コード: ${bCode}</span>
+            </div>
+          `;
+          row.onmouseenter = () => { row.style.backgroundColor = '#f1f5f9'; };
+          row.onmouseleave = () => { row.style.backgroundColor = 'transparent'; };
+          row.addEventListener('click', () => {
+            input.value = bCode;
+            curPanel.style.display = 'none';
+            autoFillBranchName(bName);
+            clearIntegrityError(card);
+            triggerInputChange(input);
+          });
+          curPanel.appendChild(row);
+        });
+        curPanel.style.display = 'block';
+      } else if (filterText) {
+        curPanel.innerHTML = `
+          <div style="padding:10px 12px; background:#fffbe8; border-bottom:1px solid #fed7aa; font-size:0.75rem; color:#9a3412;">
+            <div style="font-weight:700; margin-bottom:2px;">⚠️ 該当する支店が見つかりません</div>
+            <div>「${escapeHtml(filterText)}」に一致する支店番号が存在しないため、支店名と支店番号（3桁）を手動でご入力ください。</div>
+          </div>
+        `;
+        curPanel.style.display = 'block';
+      } else {
+        curPanel.style.display = 'none';
+      }
+    };
 
     if (!input.dataset.branchCodeBound) {
       input.dataset.branchCodeBound = "1";
+      let debounceTimer = null;
       input.addEventListener('input', () => {
         if (isAutoFilling) return;
-        const branchCode = input.value.trim();
-        if (branchCode.length === 3) {
-          const bankName = getSelectedBankName();
-          const bankInfo = findBankByName(bankName);
-          if (bankInfo && bankInfo.branches) {
-            for (const [bName, bCode] of Object.entries(bankInfo.branches)) {
-              if (bCode === branchCode) {
-                autoFillBranchName(bName);
-                clearIntegrityError(card);
-                return;
-              }
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          showBranchCodeCandidates();
+          const branchCode = input.value.trim();
+          if (branchCode.length === 3 && /^\d{3}$/.test(branchCode)) {
+            const bankName = getSelectedBankName();
+            const bankInfo = findBankByName(bankName);
+            if (bankInfo) {
+              BankDataService.searchBranches(bankInfo.code, branchCode).then(matches => {
+                const exact = (matches || []).find(m => String(m.code || '').padStart(3, '0') === branchCode);
+                if (exact) {
+                  autoFillBranchName(exact.name);
+                  clearIntegrityError(card);
+                }
+              }).catch(() => {});
             }
           }
-        }
+        }, 200);
+      });
+      input.addEventListener('focus', () => {
+        showBranchCodeCandidates();
       });
       input.addEventListener('blur', () => {
         const val = input.value.trim();
@@ -7270,6 +7728,12 @@
         }
       });
     }
+
+    document.addEventListener('click', (e) => {
+      if (!card.contains(e.target)) {
+        panel.style.display = 'none';
+      }
+    });
   }
 
   function setupBranchNameMutualCompletion(card, qDef) {
@@ -7290,9 +7754,9 @@
 
     input.placeholder = "支店名を入力または選択 (例: 本店、新宿支店)";
 
-    const showBranchCandidates = () => {
+    let branchSeq = 0;
+    const showBranchCandidates = async () => {
       const bankName = getSelectedBankName();
-      const bankInfo = findBankByName(bankName);
       const filterText = input.value.trim();
       const curPanel = card.querySelector('.branch-search-panel') || panel;
 
@@ -7306,50 +7770,38 @@
         return;
       }
 
-      if (!bankInfo || !bankInfo.branches) {
-        if (filterText) {
-          const genBranchCode = generateHashNum(bankName + filterText).slice(0, 3);
-          curPanel.innerHTML = `
-            <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; font-weight:600;">
-              <span>🏢 ${escapeHtml(bankName)} の支店</span>
-            </div>
-            <div class="branch-search-candidate-item" style="padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;">
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-weight:600; color:var(--color-primary);">${escapeHtml(filterText)}</span>
-                <span style="background:#e6f4ea; color:#137333; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">支店コード: ${genBranchCode}</span>
-              </div>
-            </div>
-          `;
-          const row = curPanel.querySelector('.branch-search-candidate-item');
-          if (row) {
-            row.addEventListener('click', () => {
-              input.value = filterText;
-              curPanel.style.display = 'none';
-              autoFillBranchCode(genBranchCode);
-              clearIntegrityError(card);
-              triggerInputChange(input);
-            });
-          }
-          curPanel.style.display = 'block';
-        } else {
-          curPanel.style.display = 'none';
-        }
+      const bankInfo = findBankByName(bankName);
+      if (!bankInfo) {
+        curPanel.innerHTML = `
+          <div style="padding:10px 12px; background:#fff8e1; border-bottom:1px solid #ffe082; font-size:0.75rem; color:#b78103; display:flex; align-items:center; gap:6px;">
+            <span>⚠️ 銀行名「${escapeHtml(bankName)}」の実在確認が取れていません。支店名と支店番号を手動でご入力ください。</span>
+          </div>
+        `;
+        curPanel.style.display = 'block';
         return;
       }
 
-      let branchEntries = Object.entries(bankInfo.branches);
-      if (filterText) {
-        branchEntries = branchEntries.filter(([bName, bCode]) => bName.includes(filterText) || bCode.includes(filterText));
-      }
+      curPanel.innerHTML = `
+        <div style="padding:8px 12px; font-size:0.75rem; color:#64748b; display:flex; align-items:center; gap:6px;">
+          <span>⏳ ${escapeHtml(bankInfo.name)} の支店データを照会中...</span>
+        </div>
+      `;
+      curPanel.style.display = 'block';
 
-      if (branchEntries.length > 0) {
+      const currentSeq = ++branchSeq;
+      const branchMatches = await BankDataService.searchBranches(bankInfo.code, filterText);
+      if (currentSeq !== branchSeq) return;
+
+      if (branchMatches.length > 0) {
         curPanel.innerHTML = `
           <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; display:flex; justify-content:space-between; align-items:center; font-weight:600;">
-            <span>🏢 ${escapeHtml(bankInfo.name)}の支店一覧 (${branchEntries.length}件)</span>
+            <span>🏢 ${escapeHtml(bankInfo.name)}の支店候補 (${branchMatches.length}件)</span>
             <span style="font-size:0.65rem; color:#718096;">選択で支店番号を自動補完</span>
           </div>
         `;
-        branchEntries.forEach(([bName, bCode]) => {
+        branchMatches.forEach(b => {
+          const bName = b.name;
+          const bCode = String(b.code || '').padStart(3, '0');
           const row = document.createElement('div');
           row.className = 'branch-search-candidate-item';
           row.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;';
@@ -7372,28 +7824,13 @@
         });
         curPanel.style.display = 'block';
       } else if (filterText) {
-        const genBranchCode = generateHashNum(bankInfo.name + filterText).slice(0, 3);
+        // 支店が見つからない場合: 架空コード捏造を完全撤廃
         curPanel.innerHTML = `
-          <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; font-weight:600;">
-            <span>🏢 ${escapeHtml(bankInfo.name)} の支店</span>
-          </div>
-          <div class="branch-search-candidate-item" style="padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-weight:600; color:var(--color-primary);">${escapeHtml(filterText)}</span>
-              <span style="background:#e6f4ea; color:#137333; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">支店コード: ${genBranchCode}</span>
-            </div>
+          <div style="padding:10px 12px; background:#fffbe8; border-bottom:1px solid #fed7aa; font-size:0.75rem; color:#9a3412;">
+            <div style="font-weight:700; margin-bottom:2px;">⚠️ 該当する支店が見つかりません</div>
+            <div>「${escapeHtml(filterText)}」に一致する支店が存在しないため、支店名と支店番号（3桁）を手動でご入力ください。</div>
           </div>
         `;
-        const row = curPanel.querySelector('.branch-search-candidate-item');
-        if (row) {
-          row.addEventListener('click', () => {
-            input.value = filterText;
-            curPanel.style.display = 'none';
-            autoFillBranchCode(genBranchCode);
-            clearIntegrityError(card);
-            triggerInputChange(input);
-          });
-        }
         curPanel.style.display = 'block';
       } else {
         curPanel.style.display = 'none';
@@ -7410,11 +7847,16 @@
           const branchName = input.value.trim();
           const bankName = getSelectedBankName();
           const bankInfo = findBankByName(bankName);
-          if (bankInfo && bankInfo.branches && bankInfo.branches[branchName]) {
-            autoFillBranchCode(bankInfo.branches[branchName]);
-            clearIntegrityError(card);
+          if (bankInfo && branchName.length >= 1) {
+            BankDataService.searchBranches(bankInfo.code, branchName).then(matches => {
+              const exact = (matches || []).find(b => b.name === branchName || b.name + '支店' === branchName || b.name === branchName + '支店');
+              if (exact) {
+                autoFillBranchCode(String(exact.code || '').padStart(3, '0'));
+                clearIntegrityError(card);
+              }
+            }).catch(() => {});
           }
-        }, 150);
+        }, 200);
       });
       input.addEventListener('focus', () => {
         showBranchCandidates();
@@ -7562,6 +8004,12 @@
       optBranchSingle.value = "branch_name";
       optBranchSingle.textContent = "支店名（全銀協API連携）";
       presetSelect.appendChild(optBranchSingle);
+    }
+    if (!presetSelect.querySelector('option[value="branch_code"]')) {
+      const optBranchCodeSingle = document.createElement('option');
+      optBranchCodeSingle.value = "branch_code";
+      optBranchCodeSingle.textContent = "支店番号（全銀協API連携）";
+      presetSelect.appendChild(optBranchCodeSingle);
     }
 
     const originalWe = window.we;
@@ -10006,49 +10454,508 @@
   });
 })();
 
+  // =========================================================================
   // 常用パターン（正規表現プリセット）に固定・携帯両用オプションを動的保証
+  // =========================================================================
   const REGEX_PRESET_DEFINITIONS = {
     custom: { label: "カスタム（式を直接入力）", pattern: "" },
     zip: { label: "郵便番号 (例: 123-4567)", pattern: "^\\d{3}-\\d{4}$" },
     zip_nohyphen: { label: "郵便番号（-無） (例: 1234567)", pattern: "^\\d{7}$" },
     tel_both: { label: "電話番号（固定・携帯 共通） (例: 03-1234-5678 / 090-1234-5678)", pattern: "^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$" },
-    tel_both_nohyphen: { label: "電話番号（固定・携帯・-無） (例: 0312345678 / 09012345678)", pattern: "^0\\d{9,10}$" },
-    tel_both_flexible: { label: "電話番号（固定・携帯・ハイフン問わず） (例: 03-1234-5678 / 09012345678)", pattern: "^(0\\d{1,4}-?\\d{1,4}-?\\d{3,4}|0\\d{9,10})$" },
-    tel: { label: "固定電話のみ (例: 03-1234-5678)", pattern: "^\\d{2,5}-\\d{1,4}-\\d{4}$" },
-    tel_nohyphen: { label: "固定電話のみ（-無） (例: 0312345678)", pattern: "^\\d{10}$" },
     phone: { label: "携帯電話のみ (例: 090-1234-5678)", pattern: "^(070|080|090)-\\d{4}-\\d{4}$" },
-    phone_nohyphen: { label: "携帯電話のみ（-無） (例: 09012345678)", pattern: "^(070|080|090)\\d{8}$" }
+    phone_nohyphen: { label: "携帯電話のみ（-無） (例: 09012345678)", pattern: "^(070|080|090)\\d{8}$" },
+    birthdate: { label: "生年月日 (例: 1990/01/01)", pattern: "^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$" }
   };
+  window.REGEX_PRESET_DEFINITIONS = REGEX_PRESET_DEFINITIONS;
 
   if (window.ie) {
+    delete window.ie.tel_both_nohyphen;
+    delete window.ie.tel_both_flexible;
+    delete window.ie.tel;
+    delete window.ie.tel_nohyphen;
     Object.keys(REGEX_PRESET_DEFINITIONS).forEach(k => {
       window.ie[k] = REGEX_PRESET_DEFINITIONS[k];
     });
   }
 
+  // プリセット質問定義 (window.re) の電話番号および生年月日
+  if (window.re) {
+    if (window.re.tel) {
+      window.re.tel.description = "ハイフンを含めて半角数字で入力してください。（例: 03-1234-5678 または 090-1234-5678）";
+      if (window.re.tel.validation) {
+        window.re.tel.validation.errorMessage = "ハイフンを含めて正しい電話番号の形式で入力してください。";
+        window.re.tel.validation.presetKey = "tel_both";
+      }
+    }
+    if (!window.re.birthdate) {
+      window.re.birthdate = {
+        type: "text",
+        title: "生年月日",
+        description: "半角数字で入力してください。（例: 1990/01/01）",
+        required: true,
+        validation: {
+          category: "regex",
+          condition: "matches",
+          presetKey: "birthdate",
+          value: "^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$",
+          value2: "",
+          errorMessage: "正しい生年月日を入力してください（例: 1990/01/01）。"
+        },
+        options: []
+      };
+    }
+  }
+
+  // =========================================================================
+  // 📝 質問項目 ＋ 入力規則（正規表現など）に応じた最適説明文・エラー文の自動設定エンジン
+  // =========================================================================
+  function getAutoDescriptionForQuestion(title, validation) {
+    const t = (title || '').trim();
+    const v = validation || {};
+    const cat = v.category || '';
+    const cond = v.condition || '';
+    const preset = v.presetKey || '';
+    const pattern = (v.value || '').trim();
+
+    // 1. API連携
+    if (cat === 'api') {
+      if (cond === 'corp_name') return '正式な法人名またはキーワードを入力してください。（国税庁法人番号APIから自動検索・補完されます）';
+      if (cond === 'invoice_number') return 'Tから始まる13桁の登録番号を入力してください。（例: T1234567890123）';
+      if (cond === 'bank_name') return '金融機関名を入力してください。（全銀協コードAPIから自動検索されます）';
+      if (cond === 'branch_name') return '支店名を入力してください。（全銀協支店コードAPIから自動検索されます）';
+      if (cond === 'branch_code') return '3桁の支店番号を入力してください。（全銀協支店コードAPIから自動検索・支店名が補完されます）';
+    }
+
+    // 2. 特殊テキスト: 未入力時のハイフン自動補填
+    if (cat === 'text' && cond === 'auto_hyphen') {
+      return '個人事業主の方は屋号または氏名をご入力ください。（※ 屋号がない場合は未入力のまま「次へ」へお進みください）';
+    }
+
+    // 3. メールアドレス
+    if (cat === 'text' && cond === 'email') {
+      return '半角英数字で正しいメールアドレスを入力してください。（例: name@example.com）';
+    }
+
+    // 4. 数値 / 整数
+    if (cat === 'number') {
+      if (cond === 'is_integer') return '半角の整数で入力してください。';
+      return '半角数字で数値を入力してください。';
+    }
+
+    // 5. 生年月日（プリセットまたはパターン・タイトルで最優先判定）
+    const isBirthdate = preset === 'birthdate' || preset === 'birthday' || (pattern && pattern.includes('19|20')) || (/生年月日|誕生/.test(t) && !/^(tel|phone|zip)/.test(preset));
+    if (isBirthdate) {
+      return '半角数字で入力してください。（例: 1990/01/01）';
+    }
+
+    // 6. 日付
+    const isDate = (!/^(tel|phone|zip)/.test(preset) && (/日付|年月日/.test(t) || pattern === '^\\d{4}/\\d{2}/\\d{2}$'));
+    if (isDate) {
+      return 'YYYY/MM/DD形式の半角数字で入力してください。（例: 2026/07/02）';
+    }
+
+    // 7. 郵便番号判定
+    const isZipPreset = preset.startsWith('zip');
+    const isZipTitle = /郵便|〒|zip/i.test(t);
+    const isZipPattern = pattern && (/\\d{3}-\\d{4}/.test(pattern) || (pattern.includes('7') && /郵便/.test(t)));
+
+    if (isZipPreset || (!/^(tel|phone|birthdate)/.test(preset) && (isZipTitle || isZipPattern))) {
+      if (preset === 'zip_nohyphen' || (pattern && !pattern.includes('-') && pattern.includes('7'))) {
+        return 'ハイフンなしの半角7桁数字で入力してください。（例: 1234567）';
+      }
+      if (pattern && pattern.includes('-?')) {
+        return '半角数字で入力してください。ハイフンの有無はどちらでも構いません。（例: 123-4567 または 1234567）';
+      }
+      return 'ハイフンを含めて半角数字で入力してください。（例: 123-4567）';
+    }
+
+    // 8. 電話番号判定 (プリセット、タイトル、または正規表現パターン)
+    const isPhonePreset = /^(tel|phone)/.test(preset);
+    const isPhoneTitle = /電話|携帯|ケータイ|けいたい|スマホ|TEL|tel|Tel|連絡先/.test(t);
+    const isPhonePattern = pattern && (/0\\d{1,4}/.test(pattern) || /070|080|090/.test(pattern) || /\\d{2,5}-\\d{1,4}-\\d{4}/.test(pattern) || /^(\\^)?0?\\d{9,11}(\\$)?$/.test(pattern));
+
+    if (isPhonePreset || (!/^(birthdate|birthday|zip)/.test(preset) && (isPhoneTitle || isPhonePattern))) {
+      const isMobileOnly = /携帯|スマホ|ケータイ/.test(t) || preset === 'phone' || preset === 'phone_nohyphen' || (pattern && /070|080|090/.test(pattern) && !/0\\d{1,4}/.test(pattern));
+      const isLandlineOnly = /固定|自宅|会社|事務所/.test(t) || preset === 'tel' || preset === 'tel_nohyphen';
+
+      // ハイフン問わず（柔軟形式: -? や |0\d{9,10} で両方許容）
+      const isFlexible = preset === 'tel_both_flexible' || (pattern && (pattern.includes('-?') || (pattern.includes('-') && pattern.includes('|'))));
+      
+      // ハイフンなし（- を含まない、または nohyphen プリセット）
+      const isNoHyphen = preset.includes('nohyphen') || (!isFlexible && pattern && !pattern.includes('-') && (pattern.includes('\\d') || pattern.includes('0-9')));
+
+      if (isFlexible) {
+        if (isMobileOnly) {
+          return '携帯電話番号を半角数字で入力してください。ハイフンの有無はどちらでも構いません。（例: 090-1234-5678 または 09012345678）';
+        }
+        if (isLandlineOnly) {
+          return '固定電話番号を半角数字で入力してください。ハイフンの有無はどちらでも構いません。（例: 03-1234-5678 または 0312345678）';
+        }
+        return '半角数字で入力してください。ハイフンの有無はどちらでも構いません。（例: 03-1234-5678 または 0312345678）';
+      }
+
+      if (isNoHyphen) {
+        if (isMobileOnly) {
+          return '携帯電話番号をハイフンなしの半角数字（11桁）で入力してください。（例: 09012345678）';
+        }
+        if (isLandlineOnly) {
+          return '固定電話番号をハイフンなしの半角数字（10桁）で入力してください。（例: 0312345678）';
+        }
+        return 'ハイフンなしの半角数字で入力してください。（例: 0312345678 または 09012345678）';
+      }
+
+      // ハイフンあり（標準）
+      if (isMobileOnly) {
+        return '携帯電話番号をハイフンを含めて半角数字で入力してください。（例: 090-1234-5678）';
+      }
+      if (isLandlineOnly) {
+        return '固定電話番号をハイフンを含めて半角数字で入力してください。（例: 03-1234-5678）';
+      }
+      return 'ハイフンを含めて半角数字で入力してください。（例: 03-1234-5678 または 090-1234-5678）';
+    }
+
+    // 9. 口座番号
+    if (/口座/.test(t) || pattern === '^\\d{7}$' || pattern === '^\\d{6,7}$') {
+      return '7桁の半角数字で入力してください。（例: 1234567）';
+    }
+
+    // 10. インボイス登録番号
+    if (/インボイス|登録番号/.test(t) || pattern === '^T\\d{13}$') {
+      return 'Tから始まる13桁の半角数字で入力してください。（例: T1234567890123）';
+    }
+
+    // 11. 全角カタカナ
+    if (/カタカナ|フリガナ|ふりがな/.test(t) || (pattern && /ァ-ヶ/.test(pattern))) {
+      return '全角カタカナで入力してください。';
+    }
+
+    // 12. 半角英数字
+    if (pattern === '^[a-zA-Z0-9]+$' || pattern === '^[a-zA-Z0-9_-]+$') {
+      return '半角英数字で入力してください。（スペース不可）';
+    }
+
+    return '';
+  }
+  window.getAutoDescriptionForQuestion = getAutoDescriptionForQuestion;
+
+  function getAutoErrorMessageForQuestion(title, validation) {
+    const t = (title || '').trim();
+    const v = validation || {};
+    const cat = v.category || '';
+    const cond = v.condition || '';
+    const preset = v.presetKey || '';
+    const pattern = (v.value || '').trim();
+
+    if (cat === 'api') {
+      if (cond === 'invoice_number') return '正しくインボイス登録番号（Tで始まる13桁の数字）を入力してください。';
+      if (cond === 'bank_name') return '実在する銀行名を入力または選択してください。';
+      if (cond === 'branch_name') return '実在する支店名を入力または選択してください。';
+      if (cond === 'branch_code') return '実在する3桁の支店番号を入力または選択してください。';
+      if (cond === 'corp_name') return '実在する法人名を入力または選択してください。';
+    }
+
+    if (cat === 'number') return '数値を入力してください。';
+
+    // 生年月日（最優先判定）
+    const isBirthdate = preset === 'birthdate' || preset === 'birthday' || (pattern && pattern.includes('19|20')) || (/生年月日|誕生/.test(t) && !/^(tel|phone|zip)/.test(preset));
+    if (isBirthdate) {
+      return '正しい生年月日を入力してください（例: 1990/01/01）。';
+    }
+
+    // 日付
+    const isDate = (!/^(tel|phone|zip)/.test(preset) && (/日付|年月日/.test(t) || pattern === '^\\d{4}/\\d{2}/\\d{2}$'));
+    if (isDate) {
+      return '正しい日付（YYYY/MM/DD）を入力してください。';
+    }
+
+    // 郵便番号
+    if (preset === 'zip_nohyphen' || (!/^(tel|phone|birthdate)/.test(preset) && pattern && !pattern.includes('-') && pattern.includes('7') && /郵便/.test(t))) {
+      return 'ハイフンなしの半角7桁数字で正しく入力してください。';
+    }
+    if (preset === 'zip' || (!/^(tel|phone|birthdate)/.test(preset) && pattern && /\\d{3}-\\d{4}/.test(pattern))) {
+      return '正しい郵便番号の形式（123-4567）で入力してください。';
+    }
+
+    // 電話番号
+    const isPhonePreset = /^(tel|phone)/.test(preset);
+    const isPhoneTitle = /電話|携帯|ケータイ|けいたい|スマホ|TEL|tel|Tel|連絡先/.test(t);
+    const isPhonePattern = pattern && (/0\\d{1,4}/.test(pattern) || /070|080|090/.test(pattern) || /\\d{2,5}-\\d{1,4}-\\d{4}/.test(pattern) || /^(\\^)?0?\\d{9,11}(\\$)?$/.test(pattern));
+
+    if (isPhonePreset || (!/^(birthdate|birthday|zip)/.test(preset) && (isPhoneTitle || isPhonePattern))) {
+      const isFlexible = preset === 'tel_both_flexible' || (pattern && (pattern.includes('-?') || (pattern.includes('-') && pattern.includes('|'))));
+      const isNoHyphen = preset.includes('nohyphen') || (!isFlexible && pattern && !pattern.includes('-') && (pattern.includes('\\d') || pattern.includes('0-9')));
+
+      if (isFlexible) {
+        return '正しい電話番号の形式（半角数字）で入力してください。';
+      }
+      if (isNoHyphen) {
+        return 'ハイフンなしの半角数字で正しく入力してください。';
+      }
+      return 'ハイフンを含めて正しい電話番号の形式で入力してください。';
+    }
+
+    if (/口座/.test(t) || pattern === '^\\d{7}$') {
+      return '正しい口座番号（7桁の半角数字）を入力してください。';
+    }
+
+    if (pattern === '^[a-zA-Z0-9]+$') {
+      return '半角英数字のみで入力してください。';
+    }
+    if (pattern && /ァ-ヶ/.test(pattern)) {
+      return '全角カタカナのみで入力してください。';
+    }
+
+    return '入力値が正しくありません。';
+  }
+  window.getAutoErrorMessageForQuestion = getAutoErrorMessageForQuestion;
+
+  // 既存データ内の「ハイフンなし設定なのにハイフンあり説明文のまま」等の矛盾を安全に自動修復
+  function sanitizeContradictoryDescriptions(formObj) {
+    if (!formObj || !formObj.sections) return;
+    let modified = false;
+    formObj.sections.forEach(sec => {
+      if (!sec || !sec.questions) return;
+      sec.questions.forEach(q => {
+        if (!q || !q.validation) return;
+        const v = q.validation;
+        const desc = q.description || '';
+        if (v.category === 'regex') {
+          const pk = v.presetKey || '';
+          const val = v.value || '';
+          const isNoHyphenRegex = pk.includes('nohyphen') || (val && !val.includes('-') && (val.includes('\\d') || val.includes('0-9')));
+          const isFlexibleRegex = pk === 'tel_both_flexible' || (val && (val.includes('-?') || (val.includes('-') && val.includes('|'))));
+
+          if (isNoHyphenRegex && desc.includes('ハイフンを含めて')) {
+            const newDesc = getAutoDescriptionForQuestion(q.title, v);
+            if (newDesc) {
+              q.description = newDesc;
+              modified = true;
+            }
+          } else if (isFlexibleRegex && (desc.includes('ハイフンを含めて') || desc.includes('ハイフンなしの'))) {
+            const newDesc = getAutoDescriptionForQuestion(q.title, v);
+            if (newDesc) {
+              q.description = newDesc;
+              modified = true;
+            }
+          }
+        }
+      });
+    });
+    if (modified && window.S) {
+      window.S(true);
+    }
+  }
+
+  // 質問カードヘッダーに「🔄 規則から自動設定」ボタンを動的に注入
+  function injectAutoDescSyncButtons() {
+    const cards = document.querySelectorAll('.question-card');
+    cards.forEach(card => {
+      const qId = card.dataset.questionId;
+      if (!qId) return;
+
+      const descInput = card.querySelector('.q-desc-input');
+      if (!descInput) return;
+
+      const formGroup = descInput.closest('.form-group');
+      if (!formGroup) return;
+
+      const header = formGroup.firstElementChild;
+      if (!header || header.querySelector('.btn-auto-desc-sync')) return;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-auto-desc-sync';
+      btn.dataset.questionId = qId;
+      btn.title = '入力規則や項目名に合わせて、最適な説明文（ハイフンの有無・形式等）を自動設定します';
+      btn.innerHTML = '🔄 規則から自動設定';
+
+      const linkBtn = header.querySelector('.btn-insert-link-modal');
+      if (linkBtn) {
+        header.insertBefore(btn, linkBtn);
+      } else {
+        header.appendChild(btn);
+      }
+    });
+  }
+
+  // 正規表現プリセットドロップダウンの拡張と自動説明文連携
   function patchRegexPresetDropdowns() {
     const selects = document.querySelectorAll('.val-inputs-container select');
     selects.forEach(sel => {
-      // Check if this select is the regex preset select
       const hasZip = Array.from(sel.options).some(opt => opt.value === 'zip');
       if (!hasZip) return;
 
       const curVal = sel.value;
       const currentKeys = Array.from(sel.options).map(o => o.value);
-      if (!currentKeys.includes('tel_both')) {
+      const targetKeys = Object.keys(REGEX_PRESET_DEFINITIONS);
+
+      const needsUpdate = currentKeys.length !== targetKeys.length ||
+        !currentKeys.includes('birthdate') ||
+        currentKeys.includes('tel_both_nohyphen') ||
+        currentKeys.includes('tel_both_flexible') ||
+        currentKeys.includes('tel') ||
+        currentKeys.includes('tel_nohyphen');
+
+      if (needsUpdate) {
         sel.innerHTML = "";
-        Object.keys(REGEX_PRESET_DEFINITIONS).forEach(k => {
+        targetKeys.forEach(k => {
           const opt = document.createElement('option');
           opt.value = k;
           opt.textContent = REGEX_PRESET_DEFINITIONS[k].label;
           sel.appendChild(opt);
         });
-        sel.value = curVal || 'custom';
+        sel.value = REGEX_PRESET_DEFINITIONS[curVal] ? curVal : 'custom';
       }
     });
+
+    const presetSelect = document.getElementById('select-preset-question');
+    if (presetSelect && !presetSelect.querySelector('option[value="birthdate"]')) {
+      const opt = document.createElement('option');
+      opt.value = 'birthdate';
+      opt.textContent = '生年月日';
+      presetSelect.appendChild(opt);
+    }
+
+    injectAutoDescSyncButtons();
   }
 
-  // Observe question container for regex dropdown appearance
+  // 「🔄 規則から自動設定」ボタンクリック時の処理（手動編集後でもワンクリックで規則通りに戻せる）
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-auto-desc-sync');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const card = btn.closest('.question-card');
+    const qId = btn.dataset.questionId || (card ? card.dataset.questionId : null);
+    const q = findQuestionDefById(qId);
+
+    const descInput = card ? card.querySelector('.q-desc-input') : null;
+    const titleInput = card ? card.querySelector('.form-group.flex-3 input, input[placeholder*="タイトル"]') : null;
+    const title = (q && q.title) ? q.title : (titleInput ? titleInput.value : '');
+
+    let validation = q ? q.validation : null;
+    if (!validation && card) {
+      const sel = card.querySelector('.val-inputs-container select');
+      const patInput = card.querySelector('.val-inputs-container input[type="text"]');
+      if (sel) {
+        const pk = sel.value;
+        const def = REGEX_PRESET_DEFINITIONS[pk];
+        validation = {
+          category: 'regex',
+          condition: 'matches',
+          presetKey: pk,
+          value: def ? def.pattern : (patInput ? patInput.value : '')
+        };
+      }
+    }
+
+    const autoDesc = getAutoDescriptionForQuestion(title, validation);
+    const autoErr = getAutoErrorMessageForQuestion(title, validation);
+
+    if (autoDesc) {
+      if (q) q.description = autoDesc;
+      if (descInput) {
+        descInput.value = autoDesc;
+        descInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if (autoErr && q && q.validation) {
+        q.validation.errorMessage = autoErr;
+      }
+      const errInput = card ? card.querySelector('.form-group input[placeholder*="エラー時に表示する"]') : null;
+      if (errInput && autoErr) {
+        errInput.value = autoErr;
+        errInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if (window.fastUpdateLivePreview) {
+        window.fastUpdateLivePreview('question_desc', autoDesc, { questionId: qId });
+      }
+      if (window.S) window.S(true);
+
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '✓ 反映完了';
+      btn.classList.add('synced');
+      setTimeout(() => {
+        btn.innerHTML = origHtml;
+        btn.classList.remove('synced');
+      }, 1400);
+    } else {
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '※ 規則未設定';
+      btn.classList.add('warn');
+      setTimeout(() => {
+        btn.innerHTML = origHtml;
+        btn.classList.remove('warn');
+      }, 1400);
+    }
+  });
+
+  // 正規表現プリセット選択変更時の自動同期（キャプチャフェーズで検知して確実に適用）
+  document.addEventListener('change', (e) => {
+    const sel = e.target;
+    if (!sel || !sel.closest || !sel.closest('.val-inputs-container')) return;
+    const isPresetSelect = Array.from(sel.options || []).some(opt => opt.value === 'tel_both' || opt.value === 'zip');
+    if (!isPresetSelect) return;
+
+    const card = sel.closest('.question-card');
+    if (!card || !card.dataset.questionId) return;
+
+    const qId = card.dataset.questionId;
+    const q = findQuestionDefById(qId);
+    if (!q) return;
+
+    const newKey = sel.value;
+    const def = REGEX_PRESET_DEFINITIONS[newKey];
+    const pattern = def ? def.pattern : (newKey === 'custom' ? (q.validation?.value || '') : '');
+
+    if (q.validation) {
+      q.validation.presetKey = newKey;
+      if (newKey !== 'custom' && pattern) {
+        q.validation.value = pattern;
+      }
+    }
+
+    const dummyVal = Object.assign({}, q.validation, {
+      category: 'regex',
+      condition: 'matches',
+      presetKey: newKey,
+      value: pattern
+    });
+
+    const autoDesc = getAutoDescriptionForQuestion(q.title, dummyVal);
+    const autoErr = getAutoErrorMessageForQuestion(q.title, dummyVal);
+
+    if (autoDesc) {
+      q.description = autoDesc;
+      const descInput = card.querySelector('.q-desc-input');
+      if (descInput) {
+        descInput.value = autoDesc;
+      }
+      if (window.fastUpdateLivePreview) {
+        window.fastUpdateLivePreview('question_desc', autoDesc, { questionId: qId });
+      }
+    }
+    if (autoErr && q.validation) {
+      q.validation.errorMessage = autoErr;
+      const errInput = card.querySelector('.form-group input[placeholder*="エラー時に表示する"]');
+      if (errInput) {
+        errInput.value = autoErr;
+      }
+    }
+  }, true);
+
+  // AIチャット相談ボタンが押された際に編集対象の質問オブジェクトを保持
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (btn && btn.textContent && btn.textContent.includes('AIチャット相談')) {
+      const card = btn.closest('.question-card');
+      if (card && card.dataset.questionId) {
+        window._currentAiRegexQuestion = findQuestionDefById(card.dataset.questionId);
+      }
+    }
+  }, true);
+
+  // 質問コンテナのDOM変更を監視してプリセット・自動設定ボタンを常時適用
   const questionsContainer = document.getElementById('questions-container');
   if (questionsContainer) {
     const qObserver = new MutationObserver(() => {
@@ -10056,6 +10963,13 @@
     });
     qObserver.observe(questionsContainer, { childList: true, subtree: true });
   }
+
+  // 起動時の既存データ修復
+  setTimeout(() => {
+    sanitizeContradictoryDescriptions(window.n || window.G);
+    patchRegexPresetDropdowns();
+  }, 150);
+
 
   // =========================================================================
   // 🔗 フォーム回答用リンク（公開URL）の発行・コピー機能 (回答専用ページ view.html 連携)
@@ -10902,5 +11816,324 @@
 
   // 起動時の初期同期
   setTimeout(loadFormsFromCloud, 100);
+
+  // =========================================================================
+  // 🤖 正規表現AIアシスタント クイック選択チップ 横スクロール・ナビゲーション機能
+  // =========================================================================
+  function initRegexChipsScroll() {
+    const container = document.getElementById('regex-chat-chips-container');
+    const prevBtn = document.getElementById('btn-regex-chips-prev');
+    const nextBtn = document.getElementById('btn-regex-chips-next');
+    const modal = document.getElementById('modal-regex-ai');
+
+    if (!container) return;
+    if (container.dataset.scrollInitialized === 'true') return;
+    container.dataset.scrollInitialized = 'true';
+
+    const wrapper = container.closest('.regex-chips-wrapper');
+
+    // 1. スクロール位置に基づくナビゲーションボタン・フェードの更新
+    const updateScrollState = () => {
+      if (!container || !prevBtn || !nextBtn) return;
+      const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
+      if (maxScroll <= 2) {
+        prevBtn.style.display = 'none';
+        nextBtn.style.display = 'none';
+        if (wrapper) {
+          wrapper.classList.remove('scrolled-left');
+          wrapper.classList.add('scrolled-end');
+        }
+        return;
+      }
+      prevBtn.style.display = 'flex';
+      nextBtn.style.display = 'flex';
+
+      const isAtStart = container.scrollLeft <= 5;
+      const isAtEnd = container.scrollLeft >= maxScroll - 5;
+
+      prevBtn.disabled = isAtStart;
+      prevBtn.setAttribute('aria-disabled', isAtStart ? 'true' : 'false');
+
+      nextBtn.disabled = isAtEnd;
+      nextBtn.setAttribute('aria-disabled', isAtEnd ? 'true' : 'false');
+
+      if (wrapper) {
+        if (isAtStart) {
+          wrapper.classList.remove('scrolled-left');
+        } else {
+          wrapper.classList.add('scrolled-left');
+        }
+
+        if (isAtEnd) {
+          wrapper.classList.add('scrolled-end');
+        } else {
+          wrapper.classList.remove('scrolled-end');
+        }
+      }
+    };
+
+    container.addEventListener('scroll', updateScrollState, { passive: true });
+    window.addEventListener('resize', updateScrollState);
+
+    // 2. マウスホイールによる直感的な横スクロール（縦ホイールを横移動に変換）
+    container.addEventListener('wheel', (e) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        container.scrollLeft += e.deltaY;
+      }
+    }, { passive: false });
+
+    // 3. ナビゲーションボタン（‹ / ›）クリックでスムーズスクロール
+    if (prevBtn) {
+      prevBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        container.scrollBy({ left: -160, behavior: 'smooth' });
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        container.scrollBy({ left: 160, behavior: 'smooth' });
+      });
+    }
+
+    // 4. マウスドラッグによるスワイプスクロール（ドラッグ操作）
+    let isDown = false;
+    let startX = 0;
+    let scrollStart = 0;
+    let isDragging = false;
+
+    container.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      isDown = true;
+      isDragging = false;
+      startX = e.pageX;
+      scrollStart = container.scrollLeft;
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDown) {
+        isDown = false;
+        setTimeout(() => { isDragging = false; }, 60);
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDown) return;
+      const dx = e.pageX - startX;
+      if (Math.abs(dx) > 4) {
+        isDragging = true;
+      }
+      container.scrollLeft = scrollStart - dx;
+    });
+
+    // ドラッグ中にチップのclickイベントが発火しないようにキャプチャフェーズで抑止
+    container.addEventListener('click', (e) => {
+      if (isDragging) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
+    }, true);
+
+    // 5. チップクリック時の確実な自動入力＆AI回答生成の保証
+    const generateRegexAiResponse = (query) => {
+      const q = query.toLowerCase();
+      let text = "";
+      let pattern = "";
+
+      const isNoHyphen = q.includes('なし') || q.includes('無') || q.includes('不要') || q.includes('数字のみ');
+      const isFlexible = q.includes('問わず') || q.includes('任意') || q.includes('どちら');
+
+      if (q.includes('郵便') || q.includes('ゆうびん')) {
+        if (isNoHyphen) {
+          text = "📮 **郵便番号（ハイフンなし）**の正規表現です。\n\nハイフンなしの7桁半角数字（例: 1234567）に一致させるには、以下の正規表現を使用します：\n`^\\d{7}$`\n\n※ハイフンあり（例: 123-4567）にする場合は `^\\d{3}-\\d{4}$` を使用してください。";
+          pattern = "^\\d{7}$";
+        } else {
+          text = "📮 **郵便番号**の正規表現です。\n\nハイフンありの形式（例: 123-4567）に一致させるには、以下の正規表現を使用します：\n`^\\d{3}-\\d{4}$`\n\n※ハイフンなし（例: 1234567）とする場合は `^\\d{7}$` を使用してください。";
+          pattern = "^\\d{3}-\\d{4}$";
+        }
+      } else if (q.includes('メール') || q.includes('アドレス') || q.includes('めーる')) {
+        text = "📧 **メールアドレス**の正規表現です。\n\n標準的な形式（例: name@example.com）に一致させるには、以下の表現を使用します：\n`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$`\n\n※Googleスプレッドシートのデータ検証でも問題なく稼働する表現です。";
+        pattern = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$";
+      } else if (q.includes('電話') || q.includes('でんわ') || q.includes('携帯') || q.includes('けいたい')) {
+        if (isNoHyphen) {
+          text = "📞 **電話番号（ハイフンなし）**の正規表現です。\n\nハイフンなしの半角数字（固定10桁・携帯11桁 例: 0312345678, 09012345678）に一致させるには以下を使用します：\n`^0\\d{9,10}$`\n\n※固定電話と携帯電話の両方に幅広く対応しています。";
+          pattern = "^0\\d{9,10}$";
+        } else if (isFlexible) {
+          text = "📞 **電話番号（ハイフン問わず・ありなし両対応）**の正規表現です。\n\nハイフンあり（例: 03-1234-5678）とハイフンなし（例: 0312345678）のどちらの入力も受け付けるには以下を使用します：\n`^(0\\d{1,4}-?\\d{1,4}-?\\d{3,4}|0\\d{9,10})$`\n\n※回答者の入力ゆれを自動許容する使い勝手の良い設定です。";
+          pattern = "^(0\\d{1,4}-?\\d{1,4}-?\\d{3,4}|0\\d{9,10})$";
+        } else {
+          text = "📞 **電話番号（ハイフンあり）**の正規表現です。\n\n一般的なハイフンありの番号（例: 090-1234-5678, 03-1234-5678）に一致させるには以下を使用します：\n`^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$`\n\n※ハイフンを含めず数字のみにする場合は `^0\\d{9,10}$` を使用してください。";
+          pattern = "^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$";
+        }
+      } else if (q.includes('口座') || q.includes('こうざ')) {
+        text = "💳 **口座番号**の正規表現です。\n\n一般的に使用される口座番号（7桁の半角数字）に一致させるには、以下の正規表現を使用します：\n`^\\d{7}$`\n\n※桁数が異なる（例: 6桁）金融機関を考慮する場合は、範囲指定（例: 6〜7桁 `^\\d{6,7}$`）に変更することもできます。";
+        pattern = "^\\d{7}$";
+      } else if (q.includes('インボイス') || q.includes('いんぼいす') || q.includes('登録番号')) {
+        text = "🧾 **インボイス登録番号**の正規表現です。\n\n適格請求書発行事業者の登録番号（Tで始まる13桁の半角数字）に一致させるには、以下の表現を使用します：\n`^T\\d{13}$`\n\n※先頭のアルファベット大文字「T」と、それに続く13桁の数字を厳密に制限する形式です。";
+        pattern = "^T\\d{13}$";
+      } else if (q.includes('英数字') || q.includes('えいすうじ') || q.includes('アルファベット')) {
+        text = "🔤 **半角英数字のみ**の正規表現です。\n\nアルファベットの小文字・大文字および数字のみ（スペースなし、1文字以上）に一致させるには、以下を使用します：\n`^[a-zA-Z0-9]+$`\n\n※数字のみに絞る場合は `^[0-9]+$` を使用してください。";
+        pattern = "^[a-zA-Z0-9]+$";
+      } else if (q.includes('カタカナ') || q.includes('かたかな')) {
+        text = "📝 **全角カタカナのみ**の正規表現です。\n\n全角カタカナ文字のみ（スペース不可、1文字以上）に一致させるには、以下を使用します：\n`^[ァ-ヶ]+$`\n\n※スペースを含める場合は `^[ァ-ヶ　]+$` にしてください。";
+        pattern = "^[ァ-ヶ]+$";
+      } else if (q.includes('日付') || q.includes('ひづけ') || q.includes('年月日')) {
+        text = "📅 **日付 (YYYY/MM/DD)**の正規表現です。\n\nスラッシュ区切りの日付形式（例: 2026/07/02）に一致させるには、以下を使用します：\n`^\\d{4}/\\d{2}/\\d{2}$`\n\n※数字の桁数の整合性をとるシンプルな設定です。";
+        pattern = "^\\d{4}/\\d{2}/\\d{2}$";
+      } else {
+        text = "🤖 スプレッドシート互換の正規表現の基本的な書き方です：\n\n- `^` : 文字列の先頭からマッチ開始\n- `$` : 文字列の末尾までマッチ終了\n- `\\d` : 半角の数字 (0-9)\n- `[a-z]` : 小文字のアルファベット\n- `+` : 直前の文字の1回以上の繰り返し\n- `{N}` : 直前の文字のN回繰り返し\n\n知りたい入力規則（例: 「カタカナのみ」「郵便番号」など）を下のテキストボックスに入力するか、クイックボタンをクリックしてください！";
+      }
+      return { text, pattern };
+    };
+
+    const handleRegexChatSubmit = (queryText) => {
+      const input = document.getElementById('regex-chat-input');
+      const history = document.getElementById('regex-chat-history');
+      if (!history) return;
+      const q = (queryText || (input ? input.value : '')).trim();
+      if (!q) return;
+
+      if (input) input.value = '';
+
+      const userMsg = document.createElement('div');
+      userMsg.className = 'chat-msg user-msg';
+      userMsg.style.cssText = 'align-self: flex-end; background-color: var(--color-primary, #0056b3); color: #ffffff; border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; max-width: 85%;';
+      userMsg.textContent = q;
+      history.appendChild(userMsg);
+      history.scrollTop = history.scrollHeight;
+
+      setTimeout(() => {
+        const res = generateRegexAiResponse(q);
+        const botMsg = document.createElement('div');
+        botMsg.className = 'chat-msg system-msg';
+        botMsg.style.cssText = 'align-self: flex-start; background-color: var(--color-bg-card, #f8f9fa); border: 1px solid var(--color-border, #dee2e6); border-radius: 8px; padding: 12px; font-size: 0.85rem; max-width: 85%; line-height: 1.5; color: var(--color-text, #212529);';
+
+        let html = res.text
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/`([^`]+)`/g, "<code style='background:rgba(0,0,0,0.06); padding:2px 4px; border-radius:3px; font-family:monospace; color:#0056b3; font-weight:600;'>$1</code>")
+          .replace(/\n/g, '<br>');
+
+        botMsg.innerHTML = html;
+
+        if (res.pattern) {
+          const applyBtn = document.createElement('button');
+          applyBtn.className = 'btn btn-primary btn-sm';
+          applyBtn.style.cssText = 'margin-top: 10px; display: block; font-weight: 600; cursor: pointer;';
+          applyBtn.textContent = 'この正規表現を適用する';
+          applyBtn.addEventListener('click', () => {
+            const targetQ = window._currentAiRegexQuestion || (window.w ? window.w : null);
+            if (targetQ) {
+              if (!targetQ.validation) {
+                targetQ.validation = { category: 'regex', condition: 'matches', value: '', value2: '', errorMessage: '' };
+              }
+              targetQ.validation.category = 'regex';
+              targetQ.validation.condition = 'matches';
+              targetQ.validation.value = res.pattern;
+
+              let matchedKey = 'custom';
+              for (const [k, def] of Object.entries(REGEX_PRESET_DEFINITIONS)) {
+                if (def.pattern === res.pattern) {
+                  matchedKey = k;
+                  break;
+                }
+              }
+              targetQ.validation.presetKey = matchedKey;
+
+              const autoDesc = getAutoDescriptionForQuestion(targetQ.title, targetQ.validation);
+              const autoErr = getAutoErrorMessageForQuestion(targetQ.title, targetQ.validation);
+              if (autoDesc) targetQ.description = autoDesc;
+              if (autoErr) targetQ.validation.errorMessage = autoErr;
+
+              if (window.fastUpdateLivePreview) {
+                window.fastUpdateLivePreview('question_desc', targetQ.description, { questionId: targetQ.id });
+              }
+              if (window.S) window.S(true);
+              if (window.x) window.x();
+            } else {
+              const patternInputs = document.querySelectorAll('.val-inputs-container input[type="text"]');
+              if (patternInputs.length > 0) {
+                patternInputs[patternInputs.length - 1].value = res.pattern;
+                patternInputs[patternInputs.length - 1].dispatchEvent(new Event('input', { bubbles: true }));
+              }
+            }
+            if (modal) modal.style.display = 'none';
+          });
+          botMsg.appendChild(applyBtn);
+        }
+
+        history.appendChild(botMsg);
+        history.scrollTop = history.scrollHeight;
+      }, 250);
+    };
+
+    container.querySelectorAll('.chat-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        if (isDragging) return;
+        const query = chip.dataset.query;
+        if (!query) return;
+        const input = document.getElementById('regex-chat-input');
+        if (input) input.value = query;
+
+        // すでにindexモジュールで処理されたか確認、未処理なら実行
+        setTimeout(() => {
+          const history = document.getElementById('regex-chat-history');
+          const lastMsg = history ? history.querySelector('.chat-msg.user-msg:last-child') : null;
+          if (!lastMsg || lastMsg.textContent !== query) {
+            handleRegexChatSubmit(query);
+          }
+        }, 100);
+      });
+    });
+
+    const sendBtn = document.getElementById('btn-send-regex-chat');
+    const chatInput = document.getElementById('regex-chat-input');
+    if (sendBtn && !sendBtn.dataset.chatBound) {
+      sendBtn.dataset.chatBound = 'true';
+      sendBtn.addEventListener('click', () => {
+        if (chatInput && chatInput.value.trim()) {
+          const q = chatInput.value.trim();
+          setTimeout(() => {
+            const history = document.getElementById('regex-chat-history');
+            const lastMsg = history ? history.querySelector('.chat-msg.user-msg:last-child') : null;
+            if (!lastMsg || lastMsg.textContent !== q) {
+              handleRegexChatSubmit(q);
+            }
+          }, 100);
+        }
+      });
+      if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            sendBtn.click();
+          }
+        });
+      }
+    }
+
+    // モーダル表示時に初期スクロール状態を確実に反映
+    if (modal) {
+      const observer = new MutationObserver(() => {
+        if (modal.style.display === 'flex' || modal.classList.contains('active')) {
+          setTimeout(updateScrollState, 50);
+        }
+      });
+      observer.observe(modal, { attributes: true, attributeFilter: ['style', 'class'] });
+    }
+
+    // 初回実行
+    setTimeout(updateScrollState, 100);
+  }
+
+  // 起動時に初期化
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRegexChipsScroll);
+  } else {
+    initRegexChipsScroll();
+  }
 })();
 
