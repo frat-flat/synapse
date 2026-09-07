@@ -4836,3 +4836,30 @@ button.btn-sec-reorder {
   gap: 8px;
   font-size: 0.75rem;
 }
+
+/* 🚫 操作不能で邪魔になっていた「👉 選択時の遷移先」バッジを完全撤去 */
+.option-transition-label {
+  display: none !important;
+}
+
+/* 選択肢行内のレイアウト最適化（テキスト入力欄と分岐先プルダウンの可読性・操作性向上） */
+.option-edit-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+.option-edit-row input[type="text"] {
+  flex: 2 !important;
+  min-width: 120px !important;
+}
+
+.option-edit-row select.option-branch-select,
+.option-edit-row select.option-transition-select {
+  flex: 1.5 !important;
+  min-width: 200px !important;
+  max-width: 360px !important;
+  font-size: 0.82rem !important;
+}
+

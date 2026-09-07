@@ -12474,12 +12474,14 @@
       if (select) {
         select.setAttribute('data-styled', 'true');
         select.classList.add('form-control', 'option-transition-select');
-        select.style.width = '180px';
+        select.style.flex = '1.3';
+        select.style.minWidth = '220px';
+        select.style.maxWidth = '360px';
         select.style.display = 'inline-block';
         select.style.marginLeft = '8px';
-        select.style.padding = '2px 8px';
-        select.style.fontSize = '0.75rem';
-        select.style.height = '28px';
+        select.style.padding = '4px 8px';
+        select.style.fontSize = '0.8rem';
+        select.style.height = '34px';
 
         // プレースホルダー（空値）のテキストを分かりやすく変更
         const firstOpt = select.querySelector('option[value=""]');
@@ -12487,20 +12489,9 @@
           firstOpt.textContent = '既定の動作（次のセクション）';
         }
 
-        // 左側にバッジ/ラベルを挿入
-        const label = document.createElement('span');
-        label.className = 'badge badge-secondary option-transition-label';
-        label.textContent = '👉 選択時の遷移先';
-        label.style.fontSize = '0.7rem';
-        label.style.marginLeft = '12px';
-        label.style.backgroundColor = '#edf2f7';
-        label.style.color = '#4a5568';
-        label.style.padding = '4px 8px';
-        label.style.borderRadius = '4px';
-        label.style.border = '1px solid #cbd5e0';
-
-        // select の手前にラベルを挿入
-        parent.insertBefore(label, select);
+        // 不要な「👉 選択時の遷移先」バッジがあれば削除して幅を確保
+        const existingLabel = parent.querySelector('.option-transition-label');
+        if (existingLabel) existingLabel.remove();
       }
     });
 
