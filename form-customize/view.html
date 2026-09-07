@@ -444,6 +444,14 @@
         display: flex;
       }
 
+      /* セクション内スキップ（条件分岐）スタイル */
+      .question-card.q-card-disabled {
+        opacity: 0.45;
+        pointer-events: none;
+        filter: grayscale(80%);
+        background-color: #f8fafc;
+      }
+
       /* アクションボタン（前へ・次へ・送信） */
       .action-buttons-row {
         display: flex;
@@ -783,6 +791,7 @@
             if (card && card.dataset.questionId) {
               syncAllSameAsAboveForSource(card.dataset.questionId);
             }
+            applySectionSkipLogic();
           });
           questionsContainerEl.addEventListener('change', (e) => {
             if (e.target.classList && e.target.classList.contains('same-as-above-checkbox')) return;
@@ -790,6 +799,7 @@
             if (card && card.dataset.questionId) {
               syncAllSameAsAboveForSource(card.dataset.questionId);
             }
+            applySectionSkipLogic();
           });
         }
 
@@ -2299,6 +2309,9 @@
             questionsContainerEl.appendChild(card);
           });
 
+          // セクション内スキップ（条件分岐）の初期評価
+          applySectionSkipLogic(section);
+
           // ボタン表示切り替え
           btnPrev.style.display = sectionHistory.length > 0 ? 'inline-flex' : 'none';
 
@@ -2536,6 +2549,203 @@
           } finally {
             isSyncingSameAsAbove = false;
           }
+        }
+
+        // ==========================================
+        // 4.6 セクション内スキップ（条件分岐・書式ルール）評価エンジン
+        // ==========================================
+        function evaluateSkipCondition(answer, condition, val1, val2) {
+          condition = condition || 'equals';
+          const v1 = (val1 !== undefined && val1 !== null) ? val1.toString().trim() : '';
+          const v2 = (val2 !== undefined && val2 !== null) ? val2.toString().trim() : '';
+
+          let isAnswerEmpty = false;
+          let answerStr = '';
+          if (answer === undefined || answer === null) {
+            isAnswerEmpty = true;
+            answerStr = '';
+          } else if (Array.isArray(answer)) {
+            isAnswerEmpty = (answer.length === 0);
+            answerStr = answer.join(', ').trim();
+          } else {
+            answerStr = answer.toString().trim();
+            isAnswerEmpty = (answerStr === '');
+          }
+
+          switch (condition) {
+            case 'is_empty':
+              return isAnswerEmpty;
+            case 'is_not_empty':
+              return !isAnswerEmpty;
+
+            case 'text_contains':
+              if (v1 === '') return false;
+              if (Array.isArray(answer)) {
+                return answer.some(item => (item || '').toString().toLowerCase().includes(v1.toLowerCase()));
+              }
+              return answerStr.toLowerCase().includes(v1.toLowerCase());
+
+            case 'text_not_contains':
+              if (v1 === '') return false;
+              if (Array.isArray(answer)) {
+                return !answer.some(item => (item || '').toString().toLowerCase().includes(v1.toLowerCase()));
+              }
+              return !answerStr.toLowerCase().includes(v1.toLowerCase());
+
+            case 'text_starts_with':
+              if (v1 === '') return false;
+              return answerStr.toLowerCase().startsWith(v1.toLowerCase());
+
+            case 'text_ends_with':
+              if (v1 === '') return false;
+              return answerStr.toLowerCase().endsWith(v1.toLowerCase());
+
+            case 'text_equals':
+              return answerStr === v1;
+
+            case 'date_is': {
+              if (isAnswerEmpty || v1 === '') return false;
+              const dA = new Date(answerStr).getTime();
+              const dT = new Date(v1).getTime();
+              return !isNaN(dA) && !isNaN(dT) && dA === dT;
+            }
+            case 'date_before': {
+              if (isAnswerEmpty || v1 === '') return false;
+              const dA = new Date(answerStr).getTime();
+              const dT = new Date(v1).getTime();
+              return !isNaN(dA) && !isNaN(dT) && dA < dT;
+            }
+            case 'date_after': {
+              if (isAnswerEmpty || v1 === '') return false;
+              const dA = new Date(answerStr).getTime();
+              const dT = new Date(v1).getTime();
+              return !isNaN(dA) && !isNaN(dT) && dA > dT;
+            }
+
+            case 'greater_than': {
+              if (isAnswerEmpty || v1 === '') return false;
+              const numA = parseFloat(answerStr.replace(/,/g, ''));
+              const numT = parseFloat(v1.replace(/,/g, ''));
+              return !isNaN(numA) && !isNaN(numT) && numA > numT;
+            }
+            case 'greater_than_or_equal': {
+              if (isAnswerEmpty || v1 === '') return false;
+              const numA = parseFloat(answerStr.replace(/,/g, ''));
+              const numT = parseFloat(v1.replace(/,/g, ''));
+              return !isNaN(numA) && !isNaN(numT) && numA >= numT;
+            }
+            case 'less_than': {
+              if (isAnswerEmpty || v1 === '') return false;
+              const numA = parseFloat(answerStr.replace(/,/g, ''));
+              const numT = parseFloat(v1.replace(/,/g, ''));
+              return !isNaN(numA) && !isNaN(numT) && numA < numT;
+            }
+            case 'less_than_or_equal': {
+              if (isAnswerEmpty || v1 === '') return false;
+              const numA = parseFloat(answerStr.replace(/,/g, ''));
+              const numT = parseFloat(v1.replace(/,/g, ''));
+              return !isNaN(numA) && !isNaN(numT) && numA <= numT;
+            }
+            case 'equals': {
+              if (isAnswerEmpty && v1 === '') return false;
+              if (Array.isArray(answer)) {
+                return answer.includes(v1);
+              }
+              const numA = parseFloat(answerStr.replace(/,/g, ''));
+              const numT = parseFloat(v1.replace(/,/g, ''));
+              if (!isNaN(numA) && !isNaN(numT) && answerStr === numA.toString() && v1 === numT.toString()) {
+                return numA === numT;
+              }
+              return answerStr === v1;
+            }
+            case 'not_equals': {
+              if (isAnswerEmpty) return false;
+              if (Array.isArray(answer)) {
+                return !answer.includes(v1);
+              }
+              const numA = parseFloat(answerStr.replace(/,/g, ''));
+              const numT = parseFloat(v1.replace(/,/g, ''));
+              if (!isNaN(numA) && !isNaN(numT) && answerStr === numA.toString() && v1 === numT.toString()) {
+                return numA !== numT;
+              }
+              return answerStr !== v1;
+            }
+            case 'between': {
+              if (isAnswerEmpty || v1 === '' || v2 === '') return false;
+              const numA = parseFloat(answerStr.replace(/,/g, ''));
+              const min = parseFloat(v1.replace(/,/g, ''));
+              const max = parseFloat(v2.replace(/,/g, ''));
+              if (!isNaN(numA) && !isNaN(min) && !isNaN(max)) {
+                return numA >= min && numA <= max;
+              }
+              const dA = new Date(answerStr).getTime();
+              const dMin = new Date(v1).getTime();
+              const dMax = new Date(v2).getTime();
+              if (!isNaN(dA) && !isNaN(dMin) && !isNaN(dMax)) {
+                return dA >= dMin && dA <= dMax;
+              }
+              return false;
+            }
+            case 'not_between': {
+              if (isAnswerEmpty || v1 === '' || v2 === '') return false;
+              const numA = parseFloat(answerStr.replace(/,/g, ''));
+              const min = parseFloat(v1.replace(/,/g, ''));
+              const max = parseFloat(v2.replace(/,/g, ''));
+              if (!isNaN(numA) && !isNaN(min) && !isNaN(max)) {
+                return numA < min || numA > max;
+              }
+              const dA = new Date(answerStr).getTime();
+              const dMin = new Date(v1).getTime();
+              const dMax = new Date(v2).getTime();
+              if (!isNaN(dA) && !isNaN(dMin) && !isNaN(dMax)) {
+                return dA < dMin || dA > dMax;
+              }
+              return false;
+            }
+            default:
+              return answerStr !== '' && answerStr === v1;
+          }
+        }
+
+        function applySectionSkipLogic(section) {
+          if (!section && formDefinition && formDefinition.sections) {
+            section = formDefinition.sections.find(s => s.id === currentSectionId);
+          }
+          if (!section || !section.questions) return;
+
+          section.questions.forEach(q => {
+            const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+            if (!card) return;
+
+            if (q.skipLogic && q.skipLogic.dependsOn) {
+              const depId = q.skipLogic.dependsOn;
+              const triggerVal = q.skipLogic.value;
+              const triggerVal2 = q.skipLogic.value2;
+              const condition = q.skipLogic.condition || 'equals';
+              const action = q.skipLogic.action || 'disable';
+
+              const answer = getResolvedQuestionValue(depId);
+              const isTriggered = evaluateSkipCondition(answer, condition, triggerVal, triggerVal2);
+
+              if (isTriggered) {
+                if (action === 'disable') {
+                  card.classList.add('q-card-disabled');
+                  const inputs = card.querySelectorAll('input:not(.same-as-above-checkbox), textarea, select, button');
+                  inputs.forEach(inp => inp.disabled = true);
+                } else {
+                  card.style.display = 'none';
+                }
+                clearError(q.id);
+              } else {
+                card.classList.remove('q-card-disabled');
+                const inputs = card.querySelectorAll('input:not(.same-as-above-checkbox), textarea, select, button');
+                inputs.forEach(inp => inp.disabled = false);
+                if (action === 'hide') {
+                  card.style.display = '';
+                }
+              }
+            }
+          });
         }
 
         // ==========================================
@@ -3964,6 +4174,11 @@
           (section.questions || []).forEach(q => {
             const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
             if (!card) return;
+
+            // セクション内スキップで非表示または非活性になっている質問は検証をスキップ
+            if (card.style.display === 'none' || card.classList.contains('q-card-disabled')) {
+              return;
+            }
 
             const errorTextEl = card.querySelector('.error-text');
             card.classList.remove('has-error');
