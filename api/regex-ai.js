@@ -87,10 +87,12 @@ module.exports = async (req, res) => {
     const modelName = 'gemini-1.5-flash';
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
+    const refererHeader = req.headers.referer || req.headers.origin || 'https://synapse-wayway.vercel.app/';
     const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Referer': refererHeader
       },
       body: JSON.stringify({
         systemInstruction: {
