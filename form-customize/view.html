@@ -2483,8 +2483,11 @@
 
                   currentViewGrpEl.appendChild(sameWrap);
 
-                  const isGrpAlreadyChecked = !!formValues['group_' + q.groupId + '_is_same_as_above'];
-                  chk.checked = isGrpAlreadyChecked;
+                  const isGrpChecked = (formValues['group_' + q.groupId + '_is_same_as_above'] !== undefined)
+                    ? !!formValues['group_' + q.groupId + '_is_same_as_above']
+                    : true;
+                  chk.checked = isGrpChecked;
+                  formValues['group_' + q.groupId + '_is_same_as_above'] = isGrpChecked;
 
                   chk.addEventListener('change', () => {
                     const isChecked = chk.checked;
@@ -2493,9 +2496,9 @@
                     applyGroupSameAsAbove(q.groupId, srcGId, isChecked);
                   });
 
-                  if (isGrpAlreadyChecked) {
+                  if (isGrpChecked) {
+                    badge.style.display = 'inline-flex';
                     setTimeout(() => {
-                      badge.style.display = 'inline-flex';
                       applyGroupSameAsAbove(q.groupId, srcGId, true);
                     }, 20);
                   }
@@ -2814,6 +2817,9 @@
               applyValueToQuestion(tq, val);
               setQuestionInputsLocked(tq.id, true);
             } else {
+              // 回答者がチェックを外した場合は入力値をクリアして空欄にする
+              applyValueToQuestion(tq, '');
+              delete formValues[tq.id];
               setQuestionInputsLocked(tq.id, false);
             }
           });
