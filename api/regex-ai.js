@@ -92,6 +92,7 @@ module.exports = async (req, res) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
         'Referer': refererHeader
       },
       body: JSON.stringify({
