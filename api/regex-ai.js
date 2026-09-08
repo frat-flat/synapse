@@ -85,28 +85,49 @@ module.exports = async (req, res) => {
 
     // 4. Gemini API 呼び出し
     const modelName = 'gemini-1.5-flash';
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
-    const refererHeader = req.headers.referer || req.headers.origin || 'https://synapse-wayway.vercel.app/';
-    const response = await fetch(geminiUrl, {
+    const requestPayload = {
+      systemInstruction: {
+        parts: [{ text: systemInstructionText }]
+      },
+      contents: contents,
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 1000,
+        responseMimeType: 'application/json'
+      }
+    };
+
+    // 標準的な呼び出し（x-goog-api-key + クエリパラメータ）
+    let response = await fetch(`${geminiUrl}?key=${encodeURIComponent(apiKey)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-        'Referer': refererHeader
+        'x-goog-api-key': apiKey
       },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: systemInstructionText }]
-        },
-        contents: contents,
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 1000,
-          responseMimeType: 'application/json'
-        }
-      })
+      body: JSON.stringify(requestPayload)
     });
+
+    // もしHTTPリファラー制限エラー（referer <empty> are blocked）の場合のみ、Refererヘッダーを付与して再試行
+    if (!response.ok && response.status === 403) {
+      try {
+        const errCloned = await response.clone().text();
+        if (errCloned.includes('referer') || errCloned.includes('Referer')) {
+          response = await fetch(`${geminiUrl}?key=${encodeURIComponent(apiKey)}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+              'Referer': req.headers.referer || req.headers.origin || 'https://synapse-wayway.vercel.app/'
+            },
+            body: JSON.stringify(requestPayload)
+          });
+        }
+      } catch (retryErr) {
+        console.warn('Retry with referer failed:', retryErr);
+      }
+    }
 
     if (!response.ok) {
       const errBody = await response.text();
