@@ -15445,9 +15445,11 @@
           // 何らかのAPI側エラー
           finishAndScroll();
           const fallback = generateRegexAiResponse(q);
+          const errorDetail = data.detail ? `<div style="font-size:0.75rem; color:#c5221f; margin-top:2px; word-break:break-all; font-family:monospace;">${escapeHtml(data.detail)}</div>` : '';
           const banner = `<div style="background: rgba(234, 67, 53, 0.1); border-left: 3px solid #ea4335; padding: 6px 10px; margin-bottom: 8px; font-size: 0.8rem; border-radius: 4px; color: var(--color-text);">
-            ⚠️ <strong>Gemini APIエラー（ローカル簡易辞書で回答中）</strong>: ${data.message || '通信エラー'}<br>
-            <a href="javascript:void(0)" id="btn-prompt-gemini-key" style="color:#1a73e8; text-decoration:underline; font-weight:600; margin-top:3px; display:inline-block;">🔑 APIキーを再設定する</a>
+            ⚠️ <strong>Gemini APIエラー（ローカル簡易辞書で回答中）</strong>: ${escapeHtml(data.message || '通信エラー')}<br>
+            ${errorDetail}
+            <a href="javascript:void(0)" id="btn-prompt-gemini-key" style="color:#1a73e8; text-decoration:underline; font-weight:600; margin-top:3px; display:inline-block;">🔑 APIキーをブラウザに再設定して試す</a>
           </div>`;
           renderBotResponse(formatRegexMarkdown(fallback.text), fallback.pattern || '', banner);
           window._regexChatHistory.push({ role: 'model', text: fallback.text });

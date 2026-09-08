@@ -108,12 +108,20 @@ module.exports = async (req, res) => {
     if (!response.ok) {
       const errBody = await response.text();
       console.error('[Gemini API Error]', response.status, errBody);
+      let detailMsg = '';
+      try {
+        const parsedErr = JSON.parse(errBody);
+        detailMsg = parsedErr.error?.message || errBody;
+      } catch (e) {
+        detailMsg = errBody;
+      }
       return res.status(200).json({
         success: false,
         isConfigured: true,
         error: 'GEMINI_API_REQUEST_FAILED',
         status: response.status,
-        message: 'Gemini APIとの通信中にエラーが発生しました。'
+        message: 'Gemini APIとの通信中にエラーが発生しました。',
+        detail: detailMsg
       });
     }
 
