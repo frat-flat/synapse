@@ -14841,6 +14841,10 @@
   let _isCloudSyncing = false;
 
   async function syncFormsToCloud(forms) {
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      console.log('[Cloud Sync] Skipped on local development environment (localhost).');
+      return;
+    }
     if (!forms) {
       try {
         const raw = localStorage.getItem('form_customize_all_forms');
@@ -14894,6 +14898,10 @@
 
   async function loadFormsFromCloud() {
     if (_isCloudSyncing) return;
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      console.log('[Cloud Sync] loadFormsFromCloud skipped on local development environment (localhost).');
+      return;
+    }
     _isCloudSyncing = true;
     try {
       let cloudForms = null;
@@ -14934,8 +14942,26 @@
 
       if (cloudForms && cloudForms.length > 0) {
         console.log('[Cloud Sync] Loaded', cloudForms.length, 'forms from cloud.');
+        
+        // 破壊的事故防止: ローカルにユーザーが作成した質問が多数ある場合、クラウドが初期状態（1問のみ等）なら上書きを阻止
+        const countQuestions = (formsList) => {
+          if (!Array.isArray(formsList)) return 0;
+          return formsList.reduce((sum, f) => {
+            if (!f || !f.sections) return sum;
+            return sum + f.sections.reduce((s2, sec) => s2 + (sec.questions ? sec.questions.length : 0), 0);
+          }, 0);
+        };
+        const localQCount = countQuestions(localForms);
+        const cloudQCount = countQuestions(cloudForms);
+
+        if (localQCount > 3 && cloudQCount <= 1) {
+          console.warn('[Cloud Sync] Safety Guard: Prevented overwriting richer local forms with blank cloud data.');
+          syncFormsToCloud(localForms);
+          return;
+        }
+
         const isLocalDummy = localForms.length === 0 || (localForms.length === 2 && localForms[0].title === '新規作成されたフォーム');
-        if (isLocalDummy || localForms.length < cloudForms.length) {
+        if (isLocalDummy || localForms.length < cloudForms.length || (cloudQCount > localQCount)) {
           _origSetItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(cloudForms));
           if (window.U) {
             window.U.length = 0;
