@@ -2087,12 +2087,14 @@
           if (!q) return null;
           if (q.validation && q.validation.category === 'api' && q.validation.condition) {
             const cond = q.validation.condition;
+            const isZipMatch = cond === 'zip_code' || cond === 'zip';
             return {
               isApi: true,
               category: 'api',
               condition: cond,
               isCorp: cond === 'corp_name' || cond === 'company_name',
               isInvoice: cond === 'invoice_number',
+              isZip: isZipMatch,
               isBank: cond === 'bank_name',
               isBranch: cond === 'branch_name',
               isBranchCode: cond === 'branch_code'
@@ -2100,24 +2102,27 @@
           }
           if (q.type === 'text' && q.title) {
             const t = q.title;
+            if (t.includes('郵便番号') || t.toLowerCase().includes('zip')) {
+              return { isApi: true, category: 'api', condition: 'zip_code', isCorp: false, isInvoice: false, isZip: true, isBank: false, isBranch: false, isBranchCode: false };
+            }
             if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
-              return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isBank: false, isBranch: false, isBranchCode: false };
+              return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isZip: false, isBank: false, isBranch: false, isBranchCode: false };
             }
             if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('屋号')) &&
                 !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな')) {
-              return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isBank: false, isBranch: false, isBranchCode: false };
+              return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: false };
             }
             if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座') && !t.includes('支店')) ||
                 t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード') && !t.includes('支店'))) {
-              return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isBank: true, isBranch: false, isBranchCode: false };
+              return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isZip: false, isBank: true, isBranch: false, isBranchCode: false };
             }
             if (t.includes('支店名') || (t.includes('支店') && !t.includes('コード') && !t.includes('番号')) ||
                 t.includes('出張所名') || (t.includes('店舗名') && !t.includes('コード') && !t.includes('番号'))) {
-              return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isBank: false, isBranch: true, isBranchCode: false };
+              return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: true, isBranchCode: false };
             }
             if (t.includes('支店番号') || t.includes('支店コード') || t.includes('店舗番号') || t.includes('店舗コード') ||
                 ((t.includes('支店') || t.includes('店舗')) && t.includes('番号'))) {
-              return { isApi: true, category: 'api', condition: 'branch_code', isCorp: false, isInvoice: false, isBank: false, isBranch: false, isBranchCode: true };
+              return { isApi: true, category: 'api', condition: 'branch_code', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: true };
             }
           }
           return null;
@@ -4145,7 +4150,7 @@
               // 金融機関コード・支店番号・郵便番号・口座名義（カナ）の自動逆引き・補完ハンドラ
               const isBankCode = q.title && (q.title.includes('金融機関コード') || (q.title.includes('銀行') && q.title.includes('コード')));
               const isBranchCode = q.title && (q.title.includes('支店番号') || q.title.includes('支店コード') || (q.title.includes('店舗コード') || (q.title.includes('支店') && q.title.includes('番号'))));
-              const isZipCode = q.title && (q.title.includes('郵便番号') || q.title.toLowerCase().includes('zip'));
+              const isZipCode = (apiConfig && apiConfig.isZip) || (q.title && (q.title.includes('郵便番号') || q.title.toLowerCase().includes('zip')));
               const isAccountHolderKana = isAccountHolderKanaField(q);
 
               if (isBankCode) {
@@ -4617,6 +4622,9 @@
                       const cleanInv = val.trim().toUpperCase();
                       rulePassed = /^T\d{13}$/.test(cleanInv) && (CORP_DATABASE.some(c => ('T' + c.num) === cleanInv) || isValidInvoiceCheckDigit(cleanInv));
                     }
+                  } else if (v.condition === 'zip_code' || v.condition === 'zip') {
+                    const cleanZip = val.replace(/[^\d]/g, '');
+                    rulePassed = cleanZip.length === 7;
                   } else if (v.condition === 'bank_name') {
                     rulePassed = val.trim().length > 0;
                   } else if (v.condition === 'branch_name') {

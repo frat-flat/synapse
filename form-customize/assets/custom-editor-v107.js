@@ -13,9 +13,12 @@
 (function() {
   console.log('custom-editor.js loading...');
 
-  // 🏦 全銀協 銀行名・支店名・支店番号 API連携規則の拡張保証
-  const ensureBankApiConditions = () => {
+  // 🌐 API連携規則（国税庁・インボイス・郵便番号・全銀協）の拡張保証
+  const ensureApiConditions = () => {
     if (window.b && window.b.api && window.b.api.conditions) {
+      window.b.api.conditions.corp_name = '法人名検索（国税庁法人番号API連携）';
+      window.b.api.conditions.invoice_number = 'インボイス登録番号（適格請求書発行事業者API連携）';
+      window.b.api.conditions.zip_code = '郵便番号検索（郵便番号住所検索API連携）';
       window.b.api.conditions.bank_name = '銀行名検索（全銀協金融機関コードAPI連携）';
       window.b.api.conditions.branch_name = '支店名検索（全銀協支店コード・支店番号API連携）';
       window.b.api.conditions.branch_code = '支店番号検索（全銀協支店コードAPI連携）';
@@ -82,8 +85,8 @@
       }
     }
   };
-  ensureBankApiConditions();
-  setInterval(ensureBankApiConditions, 200);
+  ensureApiConditions();
+  setInterval(ensureApiConditions, 200);
 
   // 🚀 スコープ不整合ReferenceErrorを解消するプロキシ定義
   window.saveAndSyncMindmapData = null;
@@ -2197,17 +2200,20 @@
     if (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition) {
       const cond = qDef.validation.condition;
       const isCorpMatch = cond === 'corp_name' || cond === 'company_name';
+      const isZipMatch = cond === 'zip_code' || cond === 'zip';
       return {
         isApi: true,
         category: 'api',
         condition: cond,
         isCorp: isCorpMatch,
         isInvoice: cond === 'invoice_number',
+        isZip: isZipMatch,
         isBank: cond === 'bank_name',
         isBranch: cond === 'branch_name',
         isBranchCode: cond === 'branch_code',
         label: isCorpMatch ? '国税庁法人番号API連携' :
                cond === 'invoice_number' ? '適格請求書発行事業者API連携' :
+               isZipMatch ? '郵便番号住所検索API連携' :
                cond === 'bank_name' ? '全銀協金融機関API連携' :
                cond === 'branch_name' ? '全銀協支店情報API連携' :
                cond === 'branch_code' ? '全銀協支店番号API連携' : 'API連携',
@@ -2218,23 +2224,26 @@
     // ② 補助フォールバック（作成者が入力規則を設定していない場合のタイトル推測アシスト）
     if (qDef.type === 'text' && qDef.title) {
       const t = qDef.title;
+      if (t.includes('郵便番号') || t.toLowerCase().includes('zip')) {
+        return { isApi: true, category: 'api', condition: 'zip_code', isCorp: false, isInvoice: false, isZip: true, isBank: false, isBranch: false, isBranchCode: false, label: '郵便番号住所検索API連携', source: 'title_fallback' };
+      }
       if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
-        return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isBank: false, isBranch: false, isBranchCode: false, label: '適格請求書発行事業者API連携', source: 'title_fallback' };
+        return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isZip: false, isBank: false, isBranch: false, isBranchCode: false, label: '適格請求書発行事業者API連携', source: 'title_fallback' };
       }
       if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('屋号')) &&
           !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな')) {
-        return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isBank: false, isBranch: false, isBranchCode: false, label: '国税庁法人番号API連携', source: 'title_fallback' };
+        return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: false, label: '国税庁法人番号API連携', source: 'title_fallback' };
       }
       if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座')) ||
           t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード'))) {
-        return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isBank: true, isBranch: false, isBranchCode: false, label: '全銀協金融機関API連携', source: 'title_fallback' };
+        return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isZip: false, isBank: true, isBranch: false, isBranchCode: false, label: '全銀協金融機関API連携', source: 'title_fallback' };
       }
       if (t.includes('支店名') || (t.includes('支店') && !t.includes('番号') && !t.includes('コード')) ||
           t.includes('店舗名') || (t.includes('店舗') && !t.includes('番号') && !t.includes('コード'))) {
-        return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isBank: false, isBranch: true, isBranchCode: false, label: '全銀協支店情報API連携', source: 'title_fallback' };
+        return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: true, isBranchCode: false, label: '全銀協支店情報API連携', source: 'title_fallback' };
       }
       if (t.includes('支店番号') || t.includes('支店コード') || t.includes('店舗番号') || t.includes('店舗コード') || ((t.includes('支店') || t.includes('店舗')) && t.includes('番号'))) {
-        return { isApi: true, category: 'api', condition: 'branch_code', isCorp: false, isInvoice: false, isBank: false, isBranch: false, isBranchCode: true, label: '全銀協支店番号API連携', source: 'title_fallback' };
+        return { isApi: true, category: 'api', condition: 'branch_code', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: true, label: '全銀協支店番号API連携', source: 'title_fallback' };
       }
     }
 
@@ -7014,12 +7023,14 @@
           }
         }
 
-        if (qDef.type === 'text' && (normalizeText(qDef.title).includes('郵便') || normalizeText(qDef.title).includes('zip'))) {
+        const apiCfg = getQuestionApiConfig(qDef);
+        const isZipQuestion = (apiCfg && apiCfg.isZip) || (qDef.type === 'text' && (normalizeText(qDef.title).includes('郵便') || normalizeText(qDef.title).includes('zip')));
+        if (isZipQuestion) {
           const zipInput = card.querySelector('input');
           if (zipInput && !zipInput.dataset.zipBound) {
             zipInput.dataset.zipBound = "1";
-            zipInput.maxLength = 7;
-            zipInput.placeholder = "例: 7300013";
+            zipInput.maxLength = 8;
+            zipInput.placeholder = "例: 123-4567 または 1234567";
             
             let zipLookupTimer = null;
             zipInput.addEventListener('input', (e) => {
@@ -11337,6 +11348,56 @@
     });
   }
 
+  function injectValidationNoticeEnhancements() {
+    const containers = document.querySelectorAll('.validation-edit-container');
+    containers.forEach(container => {
+      const selects = container.querySelectorAll('.form-group-row select');
+      if (selects.length < 2) return;
+      const catSelect = selects[0];
+      const ruleSelect = selects[1];
+      if (catSelect.value !== 'api') return;
+
+      // 1. zip_code option がない場合は追加
+      if (!ruleSelect.querySelector('option[value="zip_code"]')) {
+        const opt = document.createElement('option');
+        opt.value = 'zip_code';
+        opt.textContent = '郵便番号検索（郵便番号住所検索API連携）';
+        const bankOpt = ruleSelect.querySelector('option[value="bank_name"]');
+        if (bankOpt) {
+          ruleSelect.insertBefore(opt, bankOpt);
+        } else {
+          ruleSelect.appendChild(opt);
+        }
+      }
+
+      // 2. 判定ルール変更時の自動エラーメッセージ補正
+      if (!ruleSelect.dataset.zipChangeBound) {
+        ruleSelect.dataset.zipChangeBound = '1';
+        ruleSelect.addEventListener('change', () => {
+          if (ruleSelect.value === 'zip_code') {
+            const errInput = container.querySelector('input.form-control[placeholder*="エラー時に表示するテキスト"]');
+            if (errInput && (!errInput.value || errInput.value.includes('法人名') || errInput.value.includes('銀行名') || errInput.value.includes('支店'))) {
+              errInput.value = '正しい郵便番号（7桁の半角数字）を入力してください。';
+              errInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          }
+        });
+      }
+
+      // 3. 判定ルールが zip_code の場合の案内ボックス同期
+      if (ruleSelect.value === 'zip_code') {
+        const notice = container.querySelector('.api-validation-notice');
+        if (notice && notice.dataset.zipNoticeBound !== 'zip_code') {
+          notice.dataset.zipNoticeBound = 'zip_code';
+          notice.innerHTML = `
+            <div style="font-weight:600; margin-bottom:4px; display:flex; align-items:center; gap:6px;">📮 郵便番号・住所検索API連携（ZipCloud連携）</div>
+            <div style="color:var(--color-text-muted); font-size:0.8rem;">回答者が7桁の郵便番号を入力する際、実在する住所（都道府県・市区町村・町域）をリアルタイム検索・自動補完します。</div>
+          `;
+        }
+      }
+    });
+  }
+
   function setupEditorRenderHooks() {
     setupBtnAddGroup();
 
@@ -11349,6 +11410,7 @@
         injectRichTextToolbars();
         injectQuestionGroupSystem(sec);
         injectDnDSystem();
+        injectValidationNoticeEnhancements();
       };
     }
 
@@ -11361,6 +11423,7 @@
         injectRichTextToolbars();
         injectQuestionGroupSystem();
         injectDnDSystem();
+        injectValidationNoticeEnhancements();
       };
     }
 
@@ -11369,6 +11432,7 @@
       injectRichTextToolbars();
       injectQuestionGroupSystem();
       injectDnDSystem();
+      injectValidationNoticeEnhancements();
       const activeSectionEditor = document.getElementById('active-section-editor');
       if (activeSectionEditor && activeSectionEditor.style.display !== 'none') {
         const metaEdit = activeSectionEditor.querySelector('.section-meta-edit');
