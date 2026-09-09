@@ -15403,34 +15403,94 @@
       try {
         const clientApiKey = localStorage.getItem('synapse_gemini_api_key') || '';
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000);
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-        const response = await fetch('/api/regex-ai', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            message: q,
-            history: window._regexChatHistory.slice(-6),
-            clientApiKey: clientApiKey
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          throw new Error(`Server returned HTTP ${response.status}`);
+        // APIエンドポイントの解決（ローカル環境やfile:プロトコルでも本番APIへ通信可能に）
+        let apiEndpoint = '/api/regex-ai';
+        if (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          apiEndpoint = 'https://synapse-wayway.vercel.app/api/regex-ai';
         }
 
-        const data = await response.json();
+        let data = null;
+        let fetchFailed = false;
+        let fetchErrorMsg = '';
 
-        if (data.success && data.reply) {
+        try {
+          const response = await fetch(apiEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              message: q,
+              history: window._regexChatHistory.slice(-6),
+              clientApiKey: clientApiKey
+            }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            throw new Error(`Server HTTP ${response.status}`);
+          }
+          data = await response.json();
+        } catch (serverErr) {
+          fetchFailed = true;
+          fetchErrorMsg = serverErr.message || '通信タイムアウトまたはネットワーク障害';
+          console.warn('[Regex AI Assistant] Server endpoint failed, checking direct Gemini client fallback:', serverErr);
+
+          // 🌟 直接Gemini APIフォールバック: クライアント側にAPIキーがある場合は直接Google Gemini APIを呼ぶ
+          if (clientApiKey) {
+            try {
+              const directModel = 'gemini-1.5-flash';
+              const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${directModel}:generateContent?key=${encodeURIComponent(clientApiKey)}`;
+              const sysPrompt = `あなたはWebフォームおよびGoogleスプレッドシートのRE2正規表現に特化した親切なAIアシスタントです。必ず以下のJSON形式のみを出力してください: {"reply": "丁寧な解説", "pattern": "^正規表現パターン$"}`;
+              
+              const directResp = await fetch(directUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-goog-api-key': clientApiKey
+                },
+                body: JSON.stringify({
+                  systemInstruction: { parts: [{ text: sysPrompt }] },
+                  contents: [{ role: 'user', parts: [{ text: q }] }],
+                  generationConfig: { temperature: 0.2, maxOutputTokens: 1000, responseMimeType: 'application/json' }
+                })
+              });
+              if (directResp.ok) {
+                const directJson = await directResp.json();
+                const partText = directJson.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (partText) {
+                  const parsed = JSON.parse(partText);
+                  data = {
+                    success: true,
+                    reply: parsed.reply || partText,
+                    pattern: parsed.pattern || ''
+                  };
+                  fetchFailed = false;
+                }
+              } else {
+                const dErrText = await directResp.text();
+                try {
+                  const dErrJson = JSON.parse(dErrText);
+                  fetchErrorMsg = dErrJson.error?.message || dErrText;
+                } catch(e) {
+                  fetchErrorMsg = dErrText;
+                }
+              }
+            } catch (directErr) {
+              console.warn('[Regex AI Assistant] Direct Gemini call also failed:', directErr);
+            }
+          }
+        }
+
+        if (data && data.success && data.reply) {
           // Gemini APIからの完全な回答
           finishAndScroll();
           renderBotResponse(formatRegexMarkdown(data.reply), data.pattern || '');
           window._regexChatHistory.push({ role: 'model', text: data.reply });
-        } else if (data.isConfigured === false) {
+        } else if (data && data.isConfigured === false) {
           // APIキー未設定 → ローカル辞書へ安全にフォールバック
           finishAndScroll();
           const fallback = generateRegexAiResponse(q);
@@ -15441,7 +15501,7 @@
           </div>`;
           renderBotResponse(formatRegexMarkdown(fallback.text), fallback.pattern || '', banner);
           window._regexChatHistory.push({ role: 'model', text: fallback.text });
-        } else {
+        } else if (data) {
           // 何らかのAPI側エラー
           finishAndScroll();
           const fallback = generateRegexAiResponse(q);
@@ -15453,18 +15513,17 @@
           </div>`;
           renderBotResponse(formatRegexMarkdown(fallback.text), fallback.pattern || '', banner);
           window._regexChatHistory.push({ role: 'model', text: fallback.text });
+        } else {
+          // 通信エラー（ローカル辞書へ安全にフォールバック）
+          finishAndScroll();
+          const fallback = generateRegexAiResponse(q);
+          const banner = `<div style="background: rgba(234, 67, 53, 0.1); border-left: 3px solid #ea4335; padding: 6px 10px; margin-bottom: 8px; font-size: 0.8rem; border-radius: 4px; color: var(--color-text);">
+            ⚠️ <strong>通信エラー（ローカル簡易辞書で回答中）</strong>: ${escapeHtml(fetchErrorMsg)}<br>
+            <a href="javascript:void(0)" id="btn-prompt-gemini-key" style="color:#1a73e8; text-decoration:underline; font-weight:600; margin-top:3px; display:inline-block;">🔑 APIキーを設定して再試行</a>
+          </div>`;
+          renderBotResponse(formatRegexMarkdown(fallback.text), fallback.pattern || '', banner);
+          window._regexChatHistory.push({ role: 'model', text: fallback.text });
         }
-      } catch (err) {
-        console.warn('[Regex AI Assistant] Gemini API fetch failed, falling back to local dictionary:', err);
-        finishAndScroll();
-        const fallback = generateRegexAiResponse(q);
-        const banner = `<div style="background: rgba(234, 67, 53, 0.1); border-left: 3px solid #ea4335; padding: 6px 10px; margin-bottom: 8px; font-size: 0.8rem; border-radius: 4px; color: var(--color-text);">
-          ⚠️ <strong>通信エラー（ローカル簡易辞書で回答中）</strong><br>
-          <a href="javascript:void(0)" id="btn-prompt-gemini-key" style="color:#1a73e8; text-decoration:underline; font-weight:600; margin-top:3px; display:inline-block;">🔑 APIキーを設定して再試行</a>
-        </div>`;
-        renderBotResponse(formatRegexMarkdown(fallback.text), fallback.pattern || '', banner);
-        window._regexChatHistory.push({ role: 'model', text: fallback.text });
-      }
 
       history.scrollTop = history.scrollHeight;
     };
