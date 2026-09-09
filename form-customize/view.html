@@ -5077,6 +5077,83 @@
             if (successDesc) successDesc.textContent = 'ご回答ありがとうございました。内容は正常に記録されました。';
           }
 
+          // 4. 回答控えメールの自動送信（autoReply: true のメールアドレス項目宛て）
+          try {
+            let autoReplyEmail = null;
+            formDefinition.sections.forEach(s => {
+              (s.questions || []).forEach(q => {
+                if (q.autoReply || q.sendCopy) {
+                  const val = formValues[q.id];
+                  if (val && typeof val === 'string' && val.includes('@')) {
+                    autoReplyEmail = val.trim();
+                  }
+                }
+              });
+            });
+
+            if (autoReplyEmail) {
+              console.log('[AutoReply Mail] Sending response copy to:', autoReplyEmail);
+
+              // メール本文HTMLの生成
+              let questionsHtml = '<table style="width:100%; border-collapse:collapse; margin-top:16px; font-family:sans-serif; font-size:14px;">';
+              questionsHtml += '<tr style="background:#f1f5f9; border-bottom:2px solid #cbd5e1;"><th style="padding:10px 12px; text-align:left; color:#334155; width:35%;">質問項目</th><th style="padding:10px 12px; text-align:left; color:#334155;">ご回答内容</th></tr>';
+              
+              formDefinition.sections.forEach(s => {
+                (s.questions || []).forEach(q => {
+                  const qVal = formValues[q.id];
+                  if (qVal !== undefined && qVal !== null && qVal !== '') {
+                    const displayVal = Array.isArray(qVal) ? qVal.join(', ') : String(qVal);
+                    questionsHtml += `<tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:10px 12px; color:#475569; font-weight:600; vertical-align:top; background:#fafafa;">${escapeHtml(q.title || '項目')}</td><td style="padding:10px 12px; color:#0f172a; white-space:pre-wrap; vertical-align:top;">${escapeHtml(displayVal)}</td></tr>`;
+                  }
+                });
+              });
+              questionsHtml += '</table>';
+
+              const mailHtml = `
+                <div style="font-family:sans-serif; max-width:640px; margin:0 auto; padding:24px; color:#1e293b; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px;">
+                  <div style="border-bottom:2px solid #3b82f6; padding-bottom:12px; margin-bottom:20px;">
+                    <h2 style="margin:0 0 6px 0; color:#1e3a8a; font-size:20px;">${escapeHtml(formDefinition.title || 'フォーム回答控え')}</h2>
+                    <p style="margin:0; font-size:13px; color:#64748b;">ご回答いただき誠にありがとうございました。以下の内容で受け付けいたしました。</p>
+                  </div>
+                  <div style="background:#f8fafc; padding:12px 16px; border-radius:6px; margin-bottom:16px; font-size:13px; color:#475569;">
+                    <div><strong>受付日時:</strong> ${new Date().toLocaleString('ja-JP')}</div>
+                    ${confirmedCode ? `<div><strong>受付番号:</strong> <span style="font-family:monospace; font-weight:700; color:#2563eb;">${escapeHtml(confirmedCode)}</span></div>` : ''}
+                  </div>
+                  <h3 style="font-size:15px; margin:20px 0 8px 0; color:#334155;">■ ご回答内容</h3>
+                  ${questionsHtml}
+                  <div style="margin-top:32px; padding-top:16px; border-top:1px solid #e2e8f0; font-size:12px; color:#94a3b8; text-align:center;">
+                    ※本メールは送信控えとして自動配信されています。
+                  </div>
+                </div>
+              `;
+
+              fetch('/api/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  to: autoReplyEmail,
+                  subject: `【${formDefinition.title || 'フォーム'}】ご回答内容の控え`,
+                  html: mailHtml,
+                  text: `ご回答ありがとうございました。\n\n【${formDefinition.title || 'フォーム'}】\n受付日時: ${new Date().toLocaleString('ja-JP')}\n\n※本メールは送信控えです。`
+                })
+              }).then(res => res.json()).then(data => {
+                console.log('[AutoReply Mail Result]', data);
+              }).catch(err => {
+                console.warn('[AutoReply Mail Error]', err);
+              });
+
+              // 送信完了画面への案内文追加
+              const autoreplyNotice = document.createElement('div');
+              autoreplyNotice.style.cssText = 'margin: 16px 0; padding: 12px 16px; background: rgba(46, 125, 50, 0.08); border: 1.5px solid #2e7d32; border-radius: 8px; font-size: 0.85rem; color: #1e4620; text-align: center;';
+              autoreplyNotice.innerHTML = `📨 ご入力いただいたメールアドレス（<strong>${escapeHtml(autoReplyEmail)}</strong>）宛てに、回答内容の控えを送信しました。`;
+              if (successDesc) {
+                successDesc.appendChild(autoreplyNotice);
+              }
+            }
+          } catch(emailErr) {
+            console.warn('[AutoReply Mail Warning]', emailErr);
+          }
+
           formContainer.style.display = 'none';
           successCard.style.display = 'block';
           window.scrollTo({ top: 0, behavior: 'smooth' });

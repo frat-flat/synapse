@@ -8711,10 +8711,65 @@
       presetSelect.appendChild(optBranchCodeSingle);
     }
 
+    // ✉️ メールアドレス（2種類: 通常 / 回答控え自動送信）
+    if (window.re) {
+      if (!window.re.email) {
+        window.re.email = {
+          type: "text",
+          title: "メールアドレス",
+          description: "ご連絡可能なメールアドレスを入力してください。",
+          required: true,
+          autoReply: false,
+          validation: {
+            category: "text",
+            condition: "email",
+            value: "",
+            value2: "",
+            errorMessage: "有効なメールアドレスを入力してください。"
+          },
+          options: []
+        };
+      } else {
+        window.re.email.autoReply = false;
+      }
+
+      window.re.email_autoreply = {
+        type: "text",
+        title: "メールアドレス",
+        description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。",
+        required: true,
+        autoReply: true,
+        validation: {
+          category: "text",
+          condition: "email",
+          value: "",
+          value2: "",
+          errorMessage: "有効なメールアドレスを入力してください。"
+        },
+        options: []
+      };
+    }
+
+    // プリセットセレクトボックス内の表示名調整
+    const optEmail = presetSelect.querySelector('option[value="email"]');
+    if (optEmail) {
+      optEmail.textContent = "✉️ メールアドレス（通常・入力のみ）";
+      if (!presetSelect.querySelector('option[value="email_autoreply"]')) {
+        const optAutoreply = document.createElement('option');
+        optAutoreply.value = "email_autoreply";
+        optAutoreply.textContent = "📨 メールアドレス（回答控えを自動送信）";
+        if (optEmail.nextSibling) {
+          presetSelect.insertBefore(optAutoreply, optEmail.nextSibling);
+        } else {
+          presetSelect.appendChild(optAutoreply);
+        }
+      }
+    }
+
     const originalWe = window.we;
     const selectChanger = (e) => {
       const val = e.target.value;
-      if (!val.startsWith('pro_')) return;
+      if (!val.startsWith('pro_') && val !== 'email_autoreply') return;
 
       e.stopPropagation();
       e.preventDefault();
@@ -8727,6 +8782,36 @@
       if (!activeSec) return;
 
       const baseTime = Date.now();
+
+      if (val === 'email_autoreply') {
+        const isSingleInitialQ = activeSec.questions.length === 1 &&
+          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
+          !activeSec.questions[0].required && !activeSec.questions[0].validation;
+        if (isSingleInitialQ) {
+          activeSec.questions = [];
+        }
+        activeSec.questions.push({
+          id: `q_email_${baseTime}`,
+          type: "text",
+          title: "メールアドレス",
+          description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。",
+          required: true,
+          autoReply: true,
+          validation: {
+            category: "text",
+            condition: "email",
+            value: "",
+            value2: "",
+            errorMessage: "有効なメールアドレスを入力してください。"
+          },
+          options: []
+        });
+        e.target.value = '';
+        if (window.S) window.S(true);
+        if (window.x) window.x();
+        renderLivePreview();
+        return;
+      }
 
       if (val === 'pro_corp_address') {
         const isSingleInitialQ = activeSec.questions.length === 1 &&
@@ -8927,7 +9012,7 @@
 
     presetSelect.removeEventListener('change', window.we);
     presetSelect.addEventListener('change', (e) => {
-      if (e.target.value.startsWith('pro_')) {
+      if (e.target.value.startsWith('pro_') || e.target.value === 'email_autoreply') {
         selectChanger(e);
       } else {
         if (typeof originalWe === 'function') {
@@ -8940,9 +9025,9 @@
     });
   }
 
-  // グローバルキャプチャフェーズでも確実に pro_ プリセットを検知
+  // グローバルキャプチャフェーズでも確実に pro_ および email_autoreply プリセットを検知
   document.addEventListener('change', (e) => {
-    if (e.target && e.target.id === 'select-preset-question' && e.target.value && e.target.value.startsWith('pro_')) {
+    if (e.target && e.target.id === 'select-preset-question' && e.target.value && (e.target.value.startsWith('pro_') || e.target.value === 'email_autoreply')) {
       const activeSec = (window.n && window.n.sections) ? (window.n.sections.find(s => s.id === window.r) || window.n.sections[0]) : null;
       if (!activeSec) return;
       window.r = activeSec.id;
@@ -9139,6 +9224,29 @@
         activeSec.questions.push(
           { id: `q_pw_${baseTime}`, type: "password", title: "パスワード", description: "伏せ字で表示されます", required: true }
         );
+      } else if (val === 'email_autoreply') {
+        const isSingleInitialQ = activeSec.questions.length === 1 &&
+          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
+          !activeSec.questions[0].required && !activeSec.questions[0].validation;
+        if (isSingleInitialQ) {
+          activeSec.questions = [];
+        }
+        activeSec.questions.push({
+          id: `q_email_${baseTime}`,
+          type: "text",
+          title: "メールアドレス",
+          description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。",
+          required: true,
+          autoReply: true,
+          validation: {
+            category: "text",
+            condition: "email",
+            value: "",
+            value2: "",
+            errorMessage: "有効なメールアドレスを入力してください。"
+          },
+          options: []
+        });
       }
 
       e.target.value = "";
@@ -11398,6 +11506,82 @@
     });
   }
 
+  // 📨 メールアドレス質問（通常 / 回答控え自動送信）の設定トグル
+  function injectEmailAutoReplyToggle() {
+    const cards = document.querySelectorAll('.question-card');
+    cards.forEach(card => {
+      const qId = card.dataset.questionId;
+      if (!qId) return;
+      const q = findQuestionDefById(qId);
+      if (!q) return;
+
+      const v = q.validation || {};
+      const isEmailVal = (v.category === 'text' && v.condition === 'email') || (v.category === 'regex' && v.presetKey === 'email') || (v.value && v.value.includes('@'));
+      const isEmailTitle = /メール|email|mail/i.test(q.title || '');
+      const isEmailQuestion = isEmailVal || isEmailTitle || q.autoReply !== undefined;
+
+      let existing = card.querySelector('.email-autoreply-toggle-container');
+
+      if (!isEmailQuestion) {
+        if (existing) existing.remove();
+        return;
+      }
+
+      const isChecked = !!q.autoReply;
+
+      if (!existing) {
+        existing = document.createElement('div');
+        existing.className = 'email-autoreply-toggle-container';
+        existing.style.cssText = 'margin-top: 12px; margin-bottom: 6px; padding: 10px 12px; background: rgba(26, 115, 232, 0.06); border: 1px solid rgba(26, 115, 232, 0.25); border-radius: 6px;';
+        
+        const valContainer = card.querySelector('.validation-edit-container');
+        if (valContainer) {
+          valContainer.parentNode.insertBefore(existing, valContainer);
+        } else {
+          const actions = card.querySelector('.question-card-actions');
+          if (actions) {
+            actions.parentNode.insertBefore(existing, actions);
+          } else {
+            card.appendChild(existing);
+          }
+        }
+      }
+
+      if (existing.dataset.boundAutoReply === (isChecked ? '1' : '0')) return;
+      existing.dataset.boundAutoReply = isChecked ? '1' : '0';
+
+      existing.innerHTML = `
+        <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; font-weight: 600; color: var(--color-text); margin: 0;">
+          <input type="checkbox" class="chk-email-autoreply" ${isChecked ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px;" />
+          <span>📨 回答送信後にこのアドレス宛てに回答内容の控えを自動送信する</span>
+        </label>
+        <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-left: 24px; margin-top: 4px; line-height: 1.4;">
+          ${isChecked 
+            ? '<span style="color:#1a73e8; font-weight:600;">✅【回答控え自動送信が有効】</span> 回答者がフォームを送信完了した際、入力内容のまとめメールがこのメールアドレス宛てに自動配信されます。' 
+            : '<span style="color:var(--color-text-muted);">⚪【通常のメールアドレス】</span> 入力のみ行われ、回答控えメールの自動送信は行われません。'}
+        </div>
+      `;
+
+      const chk = existing.querySelector('.chk-email-autoreply');
+      if (chk) {
+        chk.addEventListener('change', (e) => {
+          q.autoReply = e.target.checked;
+          if (q.autoReply) {
+            if (!q.description || q.description === '説明（任意）' || q.description === 'ご連絡可能なメールアドレスを入力してください。') {
+              q.description = 'ご回答内容の控えをこのメールアドレス宛てにお送りします。';
+              const descInput = card.querySelector('.q-desc-input');
+              if (descInput) descInput.value = q.description;
+            }
+          }
+          if (window.S) window.S(true);
+          existing.dataset.boundAutoReply = q.autoReply ? '1' : '0';
+          injectEmailAutoReplyToggle();
+          if (window.renderLivePreview) window.renderLivePreview();
+        });
+      }
+    });
+  }
+
   function setupEditorRenderHooks() {
     setupBtnAddGroup();
 
@@ -11405,12 +11589,14 @@
     if (originalLe) {
       window.le = function(sec) {
         originalLe(sec);
+        patchPresetSelectMenu();
         renderLivePreview();
         injectSectionEnhancements(sec);
         injectRichTextToolbars();
         injectQuestionGroupSystem(sec);
         injectDnDSystem();
         injectValidationNoticeEnhancements();
+        injectEmailAutoReplyToggle();
       };
     }
 
@@ -11418,21 +11604,27 @@
     if (originalX) {
       window.x = function() {
         originalX();
+        patchPresetSelectMenu();
         renderLivePreview();
         injectSectionEnhancements();
         injectRichTextToolbars();
         injectQuestionGroupSystem();
         injectDnDSystem();
         injectValidationNoticeEnhancements();
+        injectEmailAutoReplyToggle();
       };
     }
 
     // アクティブセクション編集画面が表示されているときの一時保存UI・途中送信UIおよび書式ツールバー、DnDの自律維持
     setInterval(() => {
+      patchPresetSelectMenu();
+      if (typeof syncWindowIe === 'function') syncWindowIe();
+      if (typeof patchRegexPresetDropdowns === 'function') patchRegexPresetDropdowns();
       injectRichTextToolbars();
       injectQuestionGroupSystem();
       injectDnDSystem();
       injectValidationNoticeEnhancements();
+      injectEmailAutoReplyToggle();
       const activeSectionEditor = document.getElementById('active-section-editor');
       if (activeSectionEditor && activeSectionEditor.style.display !== 'none') {
         const metaEdit = activeSectionEditor.querySelector('.section-meta-edit');
@@ -12121,7 +12313,8 @@
           // ライブプレビューでも操作・検索できるように disabled を解除
           inputHtml = `<input type="text" class="form-control form-control-sm" placeholder="${placeholder}" style="background: var(--color-bg-input);" />${apiBadge}`;
         } else {
-          inputHtml = `<input type="text" class="form-control form-control-sm" placeholder="${placeholder}" disabled style="opacity: 0.8; background: var(--color-bg-input);" />`;
+          const autoReplyBadge = q.autoReply ? `<div style="font-size:0.68rem; color:#1a73e8; margin-top:3px; display:flex; align-items:center; gap:4px; font-weight:600;">📨 回答送信後に回答の控えが届きます</div>` : '';
+          inputHtml = `<input type="text" class="form-control form-control-sm" placeholder="${placeholder}" disabled style="opacity: 0.8; background: var(--color-bg-input);" />${autoReplyBadge}`;
         }
       } else if (q.type === 'textarea' || q.type === 'paragraph') {
         inputHtml = `<textarea class="form-control form-control-sm" rows="2" placeholder="自由回答を入力してください" disabled style="opacity: 0.8; background: var(--color-bg-input);"></textarea>`;
@@ -13674,14 +13867,15 @@
     zip: { label: "郵便番号 (例: 123-4567)", pattern: "^\\d{3}-\\d{4}$" },
     zip_nohyphen: { label: "郵便番号（-無） (例: 1234567)", pattern: "^\\d{7}$" },
     tel_both: { label: "電話番号（固定・携帯 共通） (例: 03-1234-5678 / 090-1234-5678)", pattern: "^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$" },
+    tel_both_nohyphen: { label: "電話番号（固定・携帯 共通）（-無） (例: 0312345678 / 09012345678)", pattern: "^0\\d{9,10}$" },
     phone: { label: "携帯電話のみ (例: 090-1234-5678)", pattern: "^(070|080|090)-\\d{4}-\\d{4}$" },
     phone_nohyphen: { label: "携帯電話のみ（-無） (例: 09012345678)", pattern: "^(070|080|090)\\d{8}$" },
+    email: { label: "メールアドレス (例: name@example.com)", pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" },
     birthdate: { label: "生年月日 (例: 1990/01/01)", pattern: "^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$" }
   };
   window.REGEX_PRESET_DEFINITIONS = REGEX_PRESET_DEFINITIONS;
 
   if (window.ie) {
-    delete window.ie.tel_both_nohyphen;
     delete window.ie.tel_both_flexible;
     delete window.ie.tel;
     delete window.ie.tel_nohyphen;
@@ -13744,7 +13938,7 @@
     }
 
     // 3. メールアドレス
-    if (cat === 'text' && cond === 'email') {
+    if ((cat === 'text' && cond === 'email') || preset === 'email' || (pattern && pattern.includes('@') && pattern.includes('[a-zA-Z]'))) {
       return '半角英数字で正しいメールアドレスを入力してください。（例: name@example.com）';
     }
 
@@ -13921,6 +14115,11 @@
       return '正しい口座番号（7桁の半角数字）を入力してください。';
     }
 
+    // メールアドレス
+    if (preset === 'email' || (pattern && pattern.includes('@') && pattern.includes('[a-zA-Z]'))) {
+      return '正しいメールアドレスの形式で入力してください（例: name@example.com）。';
+    }
+
     if (pattern === '^[a-zA-Z0-9]+$') {
       return '半角英数字のみで入力してください。';
     }
@@ -14001,8 +14200,20 @@
     });
   }
 
+  function syncWindowIe() {
+    if (window.ie) {
+      delete window.ie.tel_both_flexible;
+      delete window.ie.tel;
+      delete window.ie.tel_nohyphen;
+      Object.keys(REGEX_PRESET_DEFINITIONS).forEach(k => {
+        window.ie[k] = REGEX_PRESET_DEFINITIONS[k];
+      });
+    }
+  }
+
   // 正規表現プリセットドロップダウンの拡張と自動説明文連携
   function patchRegexPresetDropdowns() {
+    syncWindowIe();
     const selects = document.querySelectorAll('.val-inputs-container select');
     selects.forEach(sel => {
       const hasZip = Array.from(sel.options).some(opt => opt.value === 'zip');
@@ -14014,10 +14225,8 @@
 
       const needsUpdate = currentKeys.length !== targetKeys.length ||
         !currentKeys.includes('birthdate') ||
-        currentKeys.includes('tel_both_nohyphen') ||
-        currentKeys.includes('tel_both_flexible') ||
-        currentKeys.includes('tel') ||
-        currentKeys.includes('tel_nohyphen');
+        !currentKeys.includes('email') ||
+        !currentKeys.includes('tel_both_nohyphen');
 
       if (needsUpdate) {
         sel.innerHTML = "";
@@ -14115,6 +14324,7 @@
 
   // 正規表現プリセット選択変更時の自動同期（キャプチャフェーズで検知して確実に適用）
   document.addEventListener('change', (e) => {
+    syncWindowIe();
     const sel = e.target;
     if (!sel || !sel.closest || !sel.closest('.val-inputs-container')) return;
     const isPresetSelect = Array.from(sel.options || []).some(opt => opt.value === 'tel_both' || opt.value === 'zip');
@@ -14136,6 +14346,11 @@
       if (newKey !== 'custom' && pattern) {
         q.validation.value = pattern;
       }
+    }
+
+    const patternInput = card.querySelector('.val-inputs-container input[type="text"]');
+    if (patternInput && pattern) {
+      patternInput.value = pattern;
     }
 
     const dummyVal = Object.assign({}, q.validation, {
@@ -15524,6 +15739,12 @@
           renderBotResponse(formatRegexMarkdown(fallback.text), fallback.pattern || '', banner);
           window._regexChatHistory.push({ role: 'model', text: fallback.text });
         }
+      } catch (outerErr) {
+        console.error('[Regex AI Assistant] Unexpected error in handleRegexChatSubmit:', outerErr);
+        finishAndScroll();
+        const fallback = generateRegexAiResponse(q);
+        renderBotResponse(formatRegexMarkdown(fallback.text), fallback.pattern || '');
+      }
 
       history.scrollTop = history.scrollHeight;
     };
