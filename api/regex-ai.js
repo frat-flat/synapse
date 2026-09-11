@@ -35,11 +35,24 @@ module.exports = async (req, res) => {
       }
     }
 
-    // 1. APIキーの解決（環境変数優先、クライアントからの指定があれば予備として利用）
-    const apiKey =
+    // 1. APIキーの解決（環境変数優先、大文字小文字の揺れにも対応）
+    let envKey =
       process.env.GEMINI_API_KEY ||
+      process.env.Gemini_API_Key ||
       process.env.GOOGLE_GEMINI_API_KEY ||
-      process.env.GOOGLE_API_KEY ||
+      process.env.GOOGLE_API_KEY;
+
+    if (!envKey) {
+      const matchedKey = Object.keys(process.env).find(k =>
+        /^gemini.*api.*key$/i.test(k) || /^google.*gemini.*key$/i.test(k)
+      );
+      if (matchedKey) {
+        envKey = process.env[matchedKey];
+      }
+    }
+
+    const apiKey =
+      envKey ||
       (typeof clientApiKey === 'string' && clientApiKey.trim() ? clientApiKey.trim() : null);
 
     if (!apiKey) {
