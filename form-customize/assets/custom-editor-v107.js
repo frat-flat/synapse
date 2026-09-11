@@ -17329,6 +17329,94 @@
     valErrorInput.value = val.errorMessage || '';
   }
 
+  function renderAiRecommendationBox(advice) {
+    const recBox = document.getElementById('drawer-ai-recommendation-box');
+    if (!recBox || !advice) return;
+    recBox.innerHTML = `
+      <div class="ai-rec-title">${escapeHtml(advice.recommendationTitle || 'AI推奨設定')}</div>
+      <div class="ai-rec-desc">${escapeHtml(advice.explanation || '')}</div>
+      <ul class="ai-rec-list">
+        ${(advice.items || []).map(item => `<li>${item}</li>`).join('')}
+      </ul>
+    `;
+  }
+
+  async function fetchDynamicGeminiDiagnosis(q) {
+    if (!q) return;
+    const qId = q.id;
+    const sparkleBadge = document.querySelector('.ai-sparkle-badge');
+    if (sparkleBadge) {
+      sparkleBadge.className = 'ai-sparkle-badge is-thinking';
+      sparkleBadge.innerHTML = '🤖 AIが文脈を思考中...';
+    }
+
+    try {
+      // フォーム内の他の質問を収集
+      const otherQuestions = [];
+      const rootForm = window.F || window.n || window.G || window.L;
+      if (rootForm && rootForm.sections) {
+        rootForm.sections.forEach(s => {
+          (s.questions || []).forEach(item => {
+            if (item && item.id !== qId) {
+              otherQuestions.push({
+                id: item.id,
+                title: item.title || '',
+                type: item.type || 'text'
+              });
+            }
+          });
+        });
+      }
+
+      // エンドポイント決定（同一オリジン /api/regex-ai）
+      const endpoint = '/api/regex-ai';
+
+      const clientApiKey = localStorage.getItem('synapse_gemini_api_key') || '';
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'diagnose_question',
+          question: {
+            id: q.id,
+            title: q.title || '',
+            type: q.type || 'text',
+            description: q.description || ''
+          },
+          otherQuestions: otherQuestions,
+          clientApiKey: clientApiKey
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error(`API responded with ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data && data.success && data.advice && _activeDrawerQuestionId === qId) {
+        _currentAiAdvice = data.advice;
+        renderAiRecommendationBox(_currentAiAdvice);
+
+        if (sparkleBadge) {
+          sparkleBadge.className = 'ai-sparkle-badge is-dynamic';
+          sparkleBadge.innerHTML = '✨ AI動的診断完了';
+        }
+      } else {
+        if (sparkleBadge) {
+          sparkleBadge.className = 'ai-sparkle-badge';
+          sparkleBadge.innerHTML = '✨ リアルタイム診断';
+        }
+      }
+    } catch (err) {
+      console.warn('[AI Concierge] Dynamic Gemini diagnosis fallback to local:', err);
+      if (sparkleBadge) {
+        sparkleBadge.className = 'ai-sparkle-badge';
+        sparkleBadge.innerHTML = '✨ リアルタイム診断';
+      }
+    }
+  }
+
   // 4. ドロワーを開く
   function openQuestionSettingsDrawer(questionId) {
     ensureQuestionSettingsDrawerDom();
@@ -17349,19 +17437,15 @@
     const typeLabels = { text: '記述式 (短文)', paragraph: '記述式 (長文)', radio: 'ラジオボタン', checkbox: 'チェックボックス', select: 'プルダウン', file: 'ファイル' };
     typeBadge.textContent = typeLabels[q.type] || q.type;
 
-    // AIコンシェルジュの診断
+    // AIコンシェルジュの診断（まずローカルルールを0秒即時表示）
     _currentAiAdvice = analyzeQuestionForAiConcierge(q);
-    const recBox = document.getElementById('drawer-ai-recommendation-box');
-    recBox.innerHTML = `
-      <div class="ai-rec-title">${escapeHtml(_currentAiAdvice.recommendationTitle)}</div>
-      <div class="ai-rec-desc">${escapeHtml(_currentAiAdvice.explanation)}</div>
-      <ul class="ai-rec-list">
-        ${_currentAiAdvice.items.map(item => `<li>${item}</li>`).join('')}
-      </ul>
-    `;
+    renderAiRecommendationBox(_currentAiAdvice);
     const btnApplyAi = document.getElementById('btn-apply-ai-rec');
     btnApplyAi.classList.remove('applied');
     btnApplyAi.innerHTML = '✨ おすすめ設定を一括適用';
+
+    // 並行して教育プロンプトを注入したGeminiによる動的推論診断を実行
+    fetchDynamicGeminiDiagnosis(q);
 
     // カラム統一
     const unifyToggle = document.getElementById('drawer-unify-column-toggle');
