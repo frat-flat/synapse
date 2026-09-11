@@ -26,6 +26,13 @@ module.exports = async (req, res) => {
   try {
     const { mode, question, otherQuestions, message, history = [], clientApiKey } = req.body || {};
 
+    if (mode === 'list_models') {
+      const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
+      const listRes = await fetch(listUrl);
+      const listData = await listRes.json();
+      return res.status(200).json({ success: listRes.ok, listData });
+    }
+
     if (mode !== 'diagnose_question') {
       if (!message || typeof message !== 'string' || message.trim().length === 0) {
         return res.status(400).json({
