@@ -178,7 +178,7 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
     }
 
     // 4. Gemini API 呼び出し
-    const candidateModels = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite'];
+    const candidateModels = ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.7-flash'];
     let lastErrorBody = '';
     let lastStatus = 500;
     let response = null;
