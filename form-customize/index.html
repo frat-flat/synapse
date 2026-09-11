@@ -379,7 +379,22 @@
                   
                   <!-- 2. フォームのタイトル -->
                   <div class="form-group" style="margin: 0;">
-                    <label for="editor-form-title" style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 4px;">フォームのタイトル</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;">
+                      <label for="editor-form-title" style="font-size: 0.75rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">フォームのタイトル</label>
+                      <div class="title-size-control-group" style="display: flex; align-items: center; gap: 4px;">
+                        <span style="font-size: 0.7rem; color: var(--color-text-muted); white-space: nowrap;">文字サイズ:</span>
+                        <select id="editor-title-font-size" class="form-control form-control-sm" style="width: auto; height: 26px; font-size: 0.72rem; padding: 1px 6px; cursor: pointer; border-radius: 4px;">
+                          <option value="small">S (小)</option>
+                          <option value="medium">M (中)</option>
+                          <option value="large" selected>L (大)</option>
+                          <option value="custom">カスタム</option>
+                        </select>
+                        <div id="editor-title-size-custom-container" style="display: none; align-items: center; gap: 2px;">
+                          <input type="number" id="editor-title-size-custom-val" class="form-control form-control-sm" style="width: 55px; height: 26px; font-size: 0.72rem; padding: 1px 4px;" min="10" max="100" value="28" />
+                          <span style="font-size: 0.7rem; color: var(--color-text-muted);">px</span>
+                        </div>
+                      </div>
+                    </div>
                     <input type="text" id="editor-form-title" class="form-control title-input" placeholder="フォームのタイトルを入力..." />
                   </div>
 

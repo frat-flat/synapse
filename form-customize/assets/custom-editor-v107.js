@@ -361,6 +361,76 @@
 
   const DEFAULT_TEMPLATES = [
     {
+      title: "法人・個人自動分岐ハイブリッド申請書",
+      description: "申請区分（法人 / 個人・個人事業主）に応じて自動でセクションを切り替え、同一カラムに統合集約するプロ用テンプレートです。",
+      category: "business",
+      stripeColor: "#0284c7",
+      sections: [
+        {
+          id: "sec_hybrid_branch_1",
+          title: "申請区分の選択",
+          description: "申請区分（契約種別）を選択してください。選択内容に応じて次に入力する情報が自動的に切り替わります。",
+          nextAction: "branch",
+          questions: [
+            {
+              id: "q_hybrid_applicant_type",
+              type: "radio",
+              title: "申請区分をお選びください",
+              description: "該当する区分をお選びください",
+              required: true,
+              dataKey: "applicant_type",
+              options: [
+                { label: "🏢 法人として申請", nextSectionId: "sec_hybrid_corp_2" },
+                { label: "👤 個人・個人事業主として申請", nextSectionId: "sec_hybrid_indiv_3" }
+              ]
+            }
+          ]
+        },
+        {
+          id: "sec_hybrid_corp_2",
+          title: "法人情報の入力",
+          description: "法人の基本情報および代表者情報をご入力ください。",
+          nextAction: "submit",
+          questions: [
+            { id: "q_hc_corp_name", type: "text", title: "法人名", description: "法人名を入力して候補から選択してください（国税庁法人番号API照会）", required: true, dataKey: "company_name", validation: { category: "api", condition: "corp_name", errorMessage: "実在する法人名を入力または選択してください。" }, options: [] },
+            { id: "q_hc_corp_kana", type: "text", title: "法人名（カナ）", description: "全角カタカナで入力してください。法人名検索から自動反映されます。", required: true, dataKey: "company_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "company_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
+            { id: "q_hc_zip", type: "text", title: "郵便番号", description: "法人選択で自動入力されます（7桁半角数字）", required: true, dataKey: "zip_code", validation: { category: "regex", condition: "matches", value: "^[0-9]{3}-?[0-9]{4}$", presetKey: "zip", errorMessage: "郵便番号を7桁で入力してください。" }, options: [] },
+            { id: "q_hc_pref", type: "select", title: "都道府県", description: "本店所在地の都道府県を選択してください", required: true, dataKey: "pref", options: JAPAN_PREFECTURES.map(p => ({ label: p })) },
+            { id: "q_hc_city", type: "text", title: "市区町村", required: true, dataKey: "city", options: [] },
+            { id: "q_hc_street", type: "text", title: "町名・番地", required: true, dataKey: "street", options: [] },
+            { id: "q_hc_building", type: "text", title: "建物名・部屋番号", description: "ビル名・階数・部屋番号等がある場合はご入力ください", required: false, dataKey: "building", options: [] },
+            { id: "q_hc_rep_name", type: "text", title: "代表者名", description: "代表取締役の氏名を入力してください（例: 山田 太郎）", required: true, dataKey: "representative_name", options: [] },
+            { id: "q_hc_rep_kana", type: "text", title: "代表者名（カナ）", description: "代表取締役のフリガナを全角カタカナで入力してください", required: true, dataKey: "representative_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "representative_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
+            { id: "q_hc_email", type: "text", title: "メールアドレス", description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。", required: true, autoReply: true, dataKey: "email", validation: { category: "text", condition: "email", errorMessage: "有効なメールアドレスを入力してください。" }, options: [] },
+            { id: "q_hc_tel", type: "text", title: "電話番号", description: "半角数字（ハイフンなし）で入力してください（例: 0312345678）", required: true, dataKey: "tel", validation: { category: "regex", condition: "matches", value: "^0\\d{9,10}$", presetKey: "tel_no_hyphen", errorMessage: "半角数字（10桁または11桁・ハイフンなし）で入力してください。" }, options: [] },
+            { id: "q_hc_tax_status", type: "radio", title: "税務区分・インボイス登録状況", description: "該当する税務区分を選択してください。法人名選択時に登録が確認された場合は「インボイス登録事業者である。」が自動選択されます。", required: true, dataKey: "tax_invoice_status", options: [{ label: "非課税事業者である。" }, { label: "課税事業者でインボイスは未登録である。" }, { label: "インボイス登録事業者である。" }] },
+            { id: "q_hc_invoice_num", type: "text", title: "インボイス登録番号", description: "T＋13桁の半角数字。法人選択時に国税庁適格請求書発行事業者公表システムへ自動照合されます。", required: false, dataKey: "invoice_number", validation: { category: "api", condition: "invoice_number", errorMessage: "実在する有効なインボイス登録番号（T+13桁）を入力してください。" }, skipLogic: { dependsOn: "q_hc_tax_status", condition: "not_equals", value: "インボイス登録事業者である。", action: "hide" }, options: [] }
+          ]
+        },
+        {
+          id: "sec_hybrid_indiv_3",
+          title: "個人・個人事業主情報の入力",
+          description: "個人事業主または個人の基本情報をご入力ください。",
+          nextAction: "submit",
+          questions: [
+            { id: "q_hi_rep_name", type: "text", title: "氏名（代表者名）", description: "氏名（漢字）を入力してください（例: 山田 太郎）", required: true, dataKey: "representative_name", options: [] },
+            { id: "q_hi_rep_kana", type: "text", title: "氏名（カナ）", description: "氏名のフリガナを全角カタカナで入力してください", required: true, dataKey: "representative_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "representative_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
+            { id: "q_hi_trade_name", type: "text", title: "屋号", description: "屋号をお持ちの場合のみ入力してください（屋号がない場合は空欄のままで進めます）", required: false, dataKey: "company_name", options: [] },
+            { id: "q_hi_trade_kana", type: "text", title: "屋号（カナ）", description: "※屋号を入力された場合は、屋号のフリガナ（全角カタカナ）も必ず入力してください。", required: false, dataKey: "company_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "company_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
+            { id: "q_hi_zip", type: "text", title: "郵便番号", description: "7桁半角数字を入力すると住所を自動補完します（例: 150-0041）", required: true, dataKey: "zip_code", validation: { category: "regex", condition: "matches", value: "^[0-9]{3}-?[0-9]{4}$", presetKey: "zip", errorMessage: "郵便番号を7桁で入力してください。" }, options: [] },
+            { id: "q_hi_pref", type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, dataKey: "pref", options: JAPAN_PREFECTURES.map(p => ({ label: p })) },
+            { id: "q_hi_city", type: "text", title: "市区町村", required: true, dataKey: "city", options: [] },
+            { id: "q_hi_street", type: "text", title: "町名・番地", description: "自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。", required: true, dataKey: "street", options: [] },
+            { id: "q_hi_building", type: "text", title: "建物名・部屋番号", description: "マンション名・アパート名・部屋番号等がある場合はご入力ください", required: false, dataKey: "building", options: [] },
+            { id: "q_hi_email", type: "text", title: "メールアドレス", description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。", required: true, autoReply: true, dataKey: "email", validation: { category: "text", condition: "email", errorMessage: "有効なメールアドレスを入力してください。" }, options: [] },
+            { id: "q_hi_tel", type: "text", title: "電話番号", description: "半角数字（ハイフンなし）で入力してください（例: 09012345678）", required: true, dataKey: "tel", validation: { category: "regex", condition: "matches", value: "^0\\d{9,10}$", presetKey: "tel_no_hyphen", errorMessage: "半角数字（10桁または11桁・ハイフンなし）で入力してください。" }, options: [] },
+            { id: "q_hi_tax_status", type: "radio", title: "税務区分・インボイス登録状況", description: "該当する税務区分を選択してください。「インボイス登録事業者である。」を選択された場合は登録番号の入力とAPI照合を行います。", required: true, dataKey: "tax_invoice_status", options: [{ label: "非課税事業者である。" }, { label: "課税事業者でインボイスは未登録である。" }, { label: "インボイス登録事業者である。" }] },
+            { id: "q_hi_invoice_num", type: "text", title: "インボイス登録番号", description: "T＋13桁の半角数字を入力してください（国税庁公表システムへ照合します）。", required: false, dataKey: "invoice_number", validation: { category: "api", condition: "invoice_number", errorMessage: "国税庁公表システムに登録された有効なインボイス登録番号を入力してください。" }, skipLogic: { dependsOn: "q_hi_tax_status", condition: "not_equals", value: "インボイス登録事業者である。", action: "hide" }, options: [] }
+          ]
+        }
+      ]
+    },
+    {
       title: "連絡先情報",
       description: "連絡先情報を収集するためのフォームです。",
       category: "personal",
@@ -2176,7 +2246,7 @@
   // ============================================================================
   function findQuestionDefById(questionId) {
     if (!questionId) return null;
-    const formSources = [window.n, window.G, window.L];
+    const formSources = [window.F, window.n, window.G, window.L];
     if (window.U && Array.isArray(window.U)) {
       formSources.push(...window.U);
     }
@@ -3682,6 +3752,7 @@
         container.style.display = "none";
       }
     };
+    prefillFontSize('editor-title-font-size', 'editor-title-size-custom-container', 'editor-title-size-custom-val', g.appearance.fontSizes.title);
     prefillFontSize('editor-pro-size-title', 'editor-pro-size-title-custom-container', 'editor-pro-size-title-custom-val', g.appearance.fontSizes.title);
     prefillFontSize('editor-pro-size-section', 'editor-pro-size-section-custom-container', 'editor-pro-size-section-custom-val', g.appearance.fontSizes.section);
     prefillFontSize('editor-pro-size-label', 'editor-pro-size-label-custom-container', 'editor-pro-size-label-custom-val', g.appearance.fontSizes.label);
@@ -4456,6 +4527,41 @@
           container.style.setProperty("display", "none", "important");
           window.G.appearance.fontSizes[key] = selectVal;
         }
+
+        // タイトルフォントサイズ変更時のパートナーコントロールとの双方向同期
+        if (key === 'title') {
+          const partnerSelectId = (selectId === 'editor-title-font-size') ? 'editor-pro-size-title' : 'editor-title-font-size';
+          const partnerContainerId = (selectId === 'editor-title-font-size') ? 'editor-pro-size-title-custom-container' : 'editor-title-size-custom-container';
+          const partnerValId = (selectId === 'editor-title-font-size') ? 'editor-pro-size-title-custom-val' : 'editor-title-size-custom-val';
+          const pSelect = document.getElementById(partnerSelectId);
+          const pContainer = document.getElementById(partnerContainerId);
+          const pInput = document.getElementById(partnerValId);
+          if (pSelect && pSelect.value !== selectVal) {
+            pSelect.value = selectVal;
+          }
+          if (pInput && input && pInput.value !== input.value) {
+            pInput.value = input.value;
+          }
+          if (pContainer) {
+            pContainer.style.setProperty("display", selectVal === 'custom' ? 'flex' : 'none', "important");
+          }
+
+          // エディタ入力欄自身の文字サイズスタイルも連動
+          const titleInput = document.getElementById('editor-form-title');
+          if (titleInput) {
+            if (selectVal === 'custom') {
+              const px = parseInt(input.value) || 24;
+              titleInput.style.fontSize = `${Math.min(Math.max(px, 14), 28)}px`;
+            } else if (selectVal === 'small') {
+              titleInput.style.fontSize = '1.05rem';
+            } else if (selectVal === 'medium') {
+              titleInput.style.fontSize = '1.2rem';
+            } else {
+              titleInput.style.fontSize = '1.35rem';
+            }
+          }
+        }
+
         renderLivePreview();
         applyPreviewTheme();
       };
@@ -4464,6 +4570,7 @@
       input.addEventListener('input', updateVal);
     };
 
+    bindFontSizeControl('editor-title-font-size', 'editor-title-size-custom-container', 'editor-title-size-custom-val', 'title');
     bindFontSizeControl('editor-pro-size-title', 'editor-pro-size-title-custom-container', 'editor-pro-size-title-custom-val', 'title');
     bindFontSizeControl('editor-pro-size-section', 'editor-pro-size-section-custom-container', 'editor-pro-size-section-custom-val', 'section');
     bindFontSizeControl('editor-pro-size-label', 'editor-pro-size-label-custom-container', 'editor-pro-size-label-custom-val', 'label');
@@ -8662,13 +8769,28 @@
     const presetSelect = document.getElementById('select-preset-question');
     if (!presetSelect) return;
 
-    if (!presetSelect.querySelector('option[value="pro_corp_address"]') || !presetSelect.querySelector('option[value="pro_address"]')) {
+    if (!presetSelect.querySelector('option[value="pro_corp_info"]') || !presetSelect.querySelector('option[value="pro_individual_info"]')) {
       // 既存のoptGroupがあれば除去して再作成
-      const existingGroup = presetSelect.querySelector('optgroup[label*="郵便・銀行・PW"]');
+      const existingGroup = presetSelect.querySelector('optgroup[label*="郵便・銀行・PW"], optgroup[label*="プロプリセット"]');
       if (existingGroup) existingGroup.remove();
 
       const optGroup = document.createElement('optgroup');
-      optGroup.label = "🏢 郵便・銀行・PW 必須プリセット";
+      optGroup.label = "🚀 ビジネス・本人確認 プロプリセット";
+
+      const optCorpInfo = document.createElement('option');
+      optCorpInfo.value = "pro_corp_info";
+      optCorpInfo.textContent = "🏢 法人情報一括セット（法人名・カナ・代表者・所在地・税務区分3択・インボイス）";
+      optGroup.appendChild(optCorpInfo);
+
+      const optIndivInfo = document.createElement('option');
+      optIndivInfo.value = "pro_individual_info";
+      optIndivInfo.textContent = "👤 個人・個人事業主情報一括セット（氏名・カナ・屋号・住所・税務区分3択・インボイス）";
+      optGroup.appendChild(optIndivInfo);
+
+      const optHybrid = document.createElement('option');
+      optHybrid.value = "pro_branch_hybrid";
+      optHybrid.textContent = "🔀 法人・個人自動分岐セット（汎用ハイブリッド・カラム共通化）";
+      optGroup.appendChild(optHybrid);
 
       const optCorpAddr = document.createElement('option');
       optCorpAddr.value = "pro_corp_address";
@@ -8766,30 +8888,505 @@
       }
     }
 
-    const originalWe = window.we;
-    const selectChanger = (e) => {
-      const val = e.target.value;
-      if (!val.startsWith('pro_') && val !== 'email_autoreply') return;
+    function buildCorpInfoQuestions(baseTime = Date.now(), corpGrpId = `grp_corp_info_${baseTime}`, corpGrpTitle = '法人情報') {
+      const taxStatusQId = `q_tax_status_${baseTime + 11}`;
+      return [
+        {
+          id: `q_corp_name_${baseTime}`,
+          type: "text",
+          title: "法人名",
+          description: "法人名を入力して候補から選択してください（国税庁法人番号API照会）",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "company_name",
+          validation: {
+            category: "api",
+            condition: "corp_name",
+            value: "",
+            value2: "",
+            errorMessage: "実在する法人名を入力または選択してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_corp_kana_${baseTime + 1}`,
+          type: "text",
+          title: "法人名（カナ）",
+          description: "全角カタカナで入力してください。法人名検索から自動反映されます。",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "company_kana",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^[ァ-ヶｦ-ﾟー\\s　]+$",
+            presetKey: "company_kana",
+            value2: "",
+            errorMessage: "全角カタカナで入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_zip_${baseTime + 2}`,
+          type: "text",
+          title: "郵便番号",
+          description: "法人選択で自動入力されます（7桁半角数字）",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "zip_code",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^[0-9]{3}-?[0-9]{4}$",
+            presetKey: "zip",
+            value2: "",
+            errorMessage: "郵便番号を7桁で入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_pref_${baseTime + 3}`,
+          type: "select",
+          title: "都道府県",
+          description: "本店所在地の都道府県を選択してください",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "pref",
+          options: JAPAN_PREFECTURES.map(p => ({ label: p }))
+        },
+        {
+          id: `q_city_${baseTime + 4}`,
+          type: "text",
+          title: "市区町村",
+          description: "",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "city",
+          options: []
+        },
+        {
+          id: `q_street_${baseTime + 5}`,
+          type: "text",
+          title: "町名・番地",
+          description: "",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "street",
+          options: []
+        },
+        {
+          id: `q_building_${baseTime + 6}`,
+          type: "text",
+          title: "建物名・部屋番号",
+          description: "ビル名・階数・部屋番号等がある場合はご入力ください",
+          required: false,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "building",
+          options: []
+        },
+        {
+          id: `q_rep_name_${baseTime + 7}`,
+          type: "text",
+          title: "代表者名",
+          description: "代表取締役の氏名を入力してください（例: 山田 太郎）",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "representative_name",
+          options: []
+        },
+        {
+          id: `q_rep_kana_${baseTime + 8}`,
+          type: "text",
+          title: "代表者名（カナ）",
+          description: "代表取締役のフリガナを全角カタカナで入力してください",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "representative_kana",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^[ァ-ヶｦ-ﾟー\\s　]+$",
+            presetKey: "representative_kana",
+            value2: "",
+            errorMessage: "全角カタカナで入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_email_${baseTime + 9}`,
+          type: "text",
+          title: "メールアドレス",
+          description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。",
+          required: true,
+          autoReply: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "email",
+          validation: {
+            category: "text",
+            condition: "email",
+            value: "",
+            value2: "",
+            errorMessage: "有効なメールアドレスを入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_tel_${baseTime + 10}`,
+          type: "text",
+          title: "電話番号",
+          description: "半角数字（ハイフンなし）で入力してください（例: 0312345678）",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "tel",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^0\\d{9,10}$",
+            presetKey: "tel_no_hyphen",
+            value2: "",
+            errorMessage: "半角数字（10桁または11桁・ハイフンなし）で入力してください。"
+          },
+          options: []
+        },
+        {
+          id: taxStatusQId,
+          type: "radio",
+          title: "税務区分・インボイス登録状況",
+          description: "該当する税務区分を選択してください。法人名選択時に登録が確認された場合は「インボイス登録事業者である。」が自動選択されます。",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "tax_invoice_status",
+          options: [
+            { label: "非課税事業者である。" },
+            { label: "課税事業者でインボイスは未登録である。" },
+            { label: "インボイス登録事業者である。" }
+          ]
+        },
+        {
+          id: `q_invoice_num_${baseTime + 12}`,
+          type: "text",
+          title: "インボイス登録番号",
+          description: "T＋13桁の半角数字。法人選択時に国税庁適格請求書発行事業者公表システムへ自動照合されます。",
+          required: false,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "invoice_number",
+          validation: {
+            category: "api",
+            condition: "invoice_number",
+            value: "",
+            value2: "",
+            errorMessage: "実在する有効なインボイス登録番号（T+13桁）を入力してください。"
+          },
+          skipLogic: {
+            dependsOn: taxStatusQId,
+            condition: "not_equals",
+            value: "インボイス登録事業者である。",
+            action: "hide"
+          },
+          options: []
+        }
+      ];
+    }
 
-      e.stopPropagation();
-      e.preventDefault();
+    function buildIndivInfoQuestions(baseTime = Date.now(), indivGrpId = `grp_indiv_info_${baseTime}`, indivGrpTitle = '個人・個人事業主情報') {
+      const taxStatusQId = `q_tax_status_${baseTime + 11}`;
+      return [
+        {
+          id: `q_rep_name_${baseTime}`,
+          type: "text",
+          title: "氏名（代表者名）",
+          description: "氏名（漢字）を入力してください（例: 山田 太郎）",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "representative_name",
+          options: []
+        },
+        {
+          id: `q_rep_kana_${baseTime + 1}`,
+          type: "text",
+          title: "氏名（カナ）",
+          description: "氏名のフリガナを全角カタカナで入力してください",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "representative_kana",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^[ァ-ヶｦ-ﾟー\\s　]+$",
+            presetKey: "representative_kana",
+            value2: "",
+            errorMessage: "全角カタカナで入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_trade_name_${baseTime + 2}`,
+          type: "text",
+          title: "屋号",
+          description: "屋号をお持ちの場合のみ入力してください（屋号がない場合は空欄のままで進めます）",
+          required: false,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "company_name",
+          options: []
+        },
+        {
+          id: `q_trade_kana_${baseTime + 3}`,
+          type: "text",
+          title: "屋号（カナ）",
+          description: "※屋号を入力された場合は、屋号のフリガナ（全角カタカナ）も必ず入力してください。",
+          required: false,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "company_kana",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^[ァ-ヶｦ-ﾟー\\s　]+$",
+            presetKey: "company_kana",
+            value2: "",
+            errorMessage: "全角カタカナで入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_zip_${baseTime + 4}`,
+          type: "text",
+          title: "郵便番号",
+          description: "7桁半角数字を入力すると住所を自動補完します（例: 150-0041）",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "zip_code",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^[0-9]{3}-?[0-9]{4}$",
+            presetKey: "zip",
+            value2: "",
+            errorMessage: "郵便番号を7桁で入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_pref_${baseTime + 5}`,
+          type: "select",
+          title: "都道府県",
+          description: "お住まいの都道府県を選択してください",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "pref",
+          options: JAPAN_PREFECTURES.map(p => ({ label: p }))
+        },
+        {
+          id: `q_city_${baseTime + 6}`,
+          type: "text",
+          title: "市区町村",
+          description: "",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "city",
+          options: []
+        },
+        {
+          id: `q_street_${baseTime + 7}`,
+          type: "text",
+          title: "町名・番地",
+          description: "自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "street",
+          options: []
+        },
+        {
+          id: `q_building_${baseTime + 8}`,
+          type: "text",
+          title: "建物名・部屋番号",
+          description: "マンション名・アパート名・部屋番号等がある場合はご入力ください",
+          required: false,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "building",
+          options: []
+        },
+        {
+          id: `q_email_${baseTime + 9}`,
+          type: "text",
+          title: "メールアドレス",
+          description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。",
+          required: true,
+          autoReply: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "email",
+          validation: {
+            category: "text",
+            condition: "email",
+            value: "",
+            value2: "",
+            errorMessage: "有効なメールアドレスを入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_tel_${baseTime + 10}`,
+          type: "text",
+          title: "電話番号",
+          description: "半角数字（ハイフンなし）で入力してください（例: 09012345678）",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "tel",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^0\\d{9,10}$",
+            presetKey: "tel_no_hyphen",
+            value2: "",
+            errorMessage: "半角数字（10桁または11桁・ハイフンなし）で入力してください。"
+          },
+          options: []
+        },
+        {
+          id: taxStatusQId,
+          type: "radio",
+          title: "税務区分・インボイス登録状況",
+          description: "該当する税務区分を選択してください。「インボイス登録事業者である。」を選択された場合は登録番号の入力とAPI照合を行います。",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "tax_invoice_status",
+          options: [
+            { label: "非課税事業者である。" },
+            { label: "課税事業者でインボイスは未登録である。" },
+            { label: "インボイス登録事業者である。" }
+          ]
+        },
+        {
+          id: `q_invoice_num_${baseTime + 12}`,
+          type: "text",
+          title: "インボイス登録番号",
+          description: "T＋13桁の半角数字を入力してください（国税庁公表システムへ照合します）。",
+          required: false,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "invoice_number",
+          validation: {
+            category: "api",
+            condition: "invoice_number",
+            value: "",
+            value2: "",
+            errorMessage: "国税庁公表システムに登録された有効なインボイス登録番号を入力してください。"
+          },
+          skipLogic: {
+            dependsOn: taxStatusQId,
+            condition: "not_equals",
+            value: "インボイス登録事業者である。",
+            action: "hide"
+          },
+          options: []
+        }
+      ];
+    }
+    window.buildCorpInfoQuestions = buildCorpInfoQuestions;
+    window.buildIndivInfoQuestions = buildIndivInfoQuestions;
 
-      let activeSec = window.n && window.n.sections ? window.n.sections.find(s => s.id === window.r) : null;
-      if (!activeSec && window.n && window.n.sections && window.n.sections.length > 0) {
-        activeSec = window.n.sections[0];
-        window.r = activeSec.id;
+    function executeApplyPreset(val, activeSec, baseTime) {
+      if (!val) return;
+
+      if (val === 'pro_branch_hybrid') {
+        const secCorpId = `sec_corp_${baseTime + 1}`;
+        const secIndivId = `sec_indiv_${baseTime + 2}`;
+
+        const branchSec = {
+          id: `sec_branch_${baseTime}`,
+          title: "申請区分の選択",
+          description: "申請区分（契約種別）を選択してください。選択内容に応じて次に入力する情報が自動的に切り替わります。",
+          nextAction: "branch",
+          questions: [
+            {
+              id: `q_branch_type_${baseTime}`,
+              type: "radio",
+              title: "申請区分をお選びください",
+              description: "該当する区分をお選びください",
+              required: true,
+              dataKey: "applicant_type",
+              options: [
+                { label: "🏢 法人として申請", nextSectionId: secCorpId },
+                { label: "👤 個人・個人事業主として申請", nextSectionId: secIndivId }
+              ]
+            }
+          ]
+        };
+
+        const corpSec = {
+          id: secCorpId,
+          title: "法人情報の入力",
+          description: "法人の基本情報および代表者情報をご入力ください。",
+          nextAction: "submit",
+          questions: buildCorpInfoQuestions(baseTime + 10, `grp_corp_${baseTime + 10}`, '法人情報')
+        };
+
+        const indivSec = {
+          id: secIndivId,
+          title: "個人・個人事業主情報の入力",
+          description: "個人事業主または個人の基本情報をご入力ください。",
+          nextAction: "submit",
+          questions: buildIndivInfoQuestions(baseTime + 20, `grp_indiv_${baseTime + 20}`, '個人・個人事業主情報')
+        };
+
+        if (!window.n.sections) window.n.sections = [];
+        const isSingleInitialSec = window.n.sections.length <= 1 &&
+          (!window.n.sections[0] || !window.n.sections[0].questions || window.n.sections[0].questions.length <= 1);
+        if (isSingleInitialSec) {
+          window.n.sections = [branchSec, corpSec, indivSec];
+        } else {
+          window.n.sections.push(branchSec, corpSec, indivSec);
+        }
+        window.r = branchSec.id;
+        if (window.le) window.le(branchSec);
+        if (window.S) window.S(true);
+        if (window.x) window.x();
+        renderLivePreview();
+        return;
       }
+
       if (!activeSec) return;
 
-      const baseTime = Date.now();
+      const isSingleInitialQ = activeSec.questions.length === 1 &&
+        (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
+        !activeSec.questions[0].required && !activeSec.questions[0].validation;
+      if (isSingleInitialQ) {
+        activeSec.questions = [];
+      }
 
-      if (val === 'email_autoreply') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
+      if (val === 'pro_corp_info') {
+        const corpGrpId = `grp_corp_info_${baseTime}`;
+        const corpGrpTitle = '法人情報';
+        activeSec.questions.push(...buildCorpInfoQuestions(baseTime, corpGrpId, corpGrpTitle));
+      } else if (val === 'pro_individual_info') {
+        const indivGrpId = `grp_indiv_info_${baseTime}`;
+        const indivGrpTitle = '個人・個人事業主情報';
+        activeSec.questions.push(...buildIndivInfoQuestions(baseTime, indivGrpId, indivGrpTitle));
+      } else if (val === 'email_autoreply') {
         activeSec.questions.push({
           id: `q_email_${baseTime}`,
           type: "text",
@@ -8797,6 +9394,7 @@
           description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。",
           required: true,
           autoReply: true,
+          dataKey: "email",
           validation: {
             category: "text",
             condition: "email",
@@ -8806,21 +9404,7 @@
           },
           options: []
         });
-        e.target.value = '';
-        if (window.S) window.S(true);
-        if (window.x) window.x();
-        renderLivePreview();
-        return;
-      }
-
-      if (val === 'pro_corp_address') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
-
+      } else if (val === 'pro_corp_address') {
         const corpGrpId = `grp_corp_${baseTime}`;
         const corpGrpTitle = '法人住所';
         activeSec.questions.push(
@@ -8832,6 +9416,7 @@
             required: true,
             groupId: corpGrpId,
             groupTitle: corpGrpTitle,
+            dataKey: "company_name",
             validation: {
               category: "api",
               condition: "corp_name",
@@ -8841,38 +9426,24 @@
             },
             options: []
           },
-          { id: `q_zip_${baseTime + 1}`, type: "text", title: "郵便番号", description: "法人選択または7桁入力で住所を自動補完します", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_pref_${baseTime + 2}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_city_${baseTime + 3}`, type: "text", title: "市区町村", description: "", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_street_${baseTime + 4}`, type: "text", title: "町名・番地", description: "", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_building_${baseTime + 5}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: corpGrpId, groupTitle: corpGrpTitle }
+          { id: `q_zip_${baseTime + 1}`, type: "text", title: "郵便番号", description: "法人選択または7桁入力で住所を自動補完します", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "zip_code" },
+          { id: `q_pref_${baseTime + 2}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "pref" },
+          { id: `q_city_${baseTime + 3}`, type: "text", title: "市区町村", description: "", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "city" },
+          { id: `q_street_${baseTime + 4}`, type: "text", title: "町名・番地", description: "", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "street" },
+          { id: `q_building_${baseTime + 5}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "building" }
         );
       } else if (val === 'pro_address') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
-
         const addrGrpId = `grp_addr_${baseTime}`;
         const addrGrpTitle = '住所';
         const addrGrpDesc = 'ご住所を入力してください';
         activeSec.questions.push(
-          { id: `q_zip_${baseTime}`, type: "text", title: "郵便番号", description: "7桁半角数字を入力すると住所を自動補完します", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_pref_${baseTime + 1}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_city_${baseTime + 2}`, type: "text", title: "市区町村", description: "", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_street_${baseTime + 3}`, type: "text", title: "町名・番地", description: "", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_building_${baseTime + 4}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc }
+          { id: `q_zip_${baseTime}`, type: "text", title: "郵便番号", description: "7桁半角数字を入力すると住所を自動補完します", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "zip_code" },
+          { id: `q_pref_${baseTime + 1}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "pref" },
+          { id: `q_city_${baseTime + 2}`, type: "text", title: "市区町村", description: "", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "city" },
+          { id: `q_street_${baseTime + 3}`, type: "text", title: "町名・番地", description: "", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "street" },
+          { id: `q_building_${baseTime + 4}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "building" }
         );
       } else if (val === 'pro_bank') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
-
         const bankGrpId = `grp_bank_${baseTime}`;
         const bankGrpTitle = '銀行口座';
         activeSec.questions.push(
@@ -8884,6 +9455,7 @@
             required: true,
             groupId: bankGrpId,
             groupTitle: bankGrpTitle,
+            dataKey: "bank_name",
             validation: {
               category: "api",
               condition: "bank_name",
@@ -8901,6 +9473,7 @@
             required: true,
             groupId: bankGrpId,
             groupTitle: bankGrpTitle,
+            dataKey: "bank_code",
             validation: {
               category: "regex",
               condition: "matches",
@@ -8919,6 +9492,7 @@
             required: true,
             groupId: bankGrpId,
             groupTitle: bankGrpTitle,
+            dataKey: "branch_code",
             validation: {
               category: "regex",
               condition: "matches",
@@ -8937,6 +9511,7 @@
             required: true,
             groupId: bankGrpId,
             groupTitle: bankGrpTitle,
+            dataKey: "branch_name",
             validation: {
               category: "api",
               condition: "branch_name",
@@ -8954,6 +9529,7 @@
             required: true,
             groupId: bankGrpId,
             groupTitle: bankGrpTitle,
+            dataKey: "account_type",
             validation: null,
             options: [
               { label: "普通" },
@@ -8969,6 +9545,7 @@
             required: true,
             groupId: bankGrpId,
             groupTitle: bankGrpTitle,
+            dataKey: "account_number",
             validation: {
               category: "regex",
               condition: "matches",
@@ -8987,6 +9564,7 @@
             required: true,
             groupId: bankGrpId,
             groupTitle: bankGrpTitle,
+            dataKey: "account_holder_kana",
             validation: {
               category: "regex",
               condition: "matches",
@@ -9000,14 +9578,33 @@
         );
       } else if (val === 'pro_password') {
         activeSec.questions.push(
-          { id: `q_pw_${baseTime}`, type: "password", title: "パスワード", description: "伏せ字で表示されます", required: true }
+          { id: `q_pw_${baseTime}`, type: "password", title: "パスワード", description: "伏せ字で表示されます", required: true, dataKey: "password" }
         );
       }
 
-      e.target.value = "";
-      if (window.S) window.S();
+      if (window.le && activeSec) window.le(activeSec);
+      if (window.S) window.S(true);
       if (window.x) window.x();
       renderLivePreview();
+    }
+
+    const originalWe = window.we;
+    const selectChanger = (e) => {
+      const val = e.target.value;
+      if (!val.startsWith('pro_') && val !== 'email_autoreply') return;
+
+      e.stopPropagation();
+      e.preventDefault();
+
+      let activeSec = window.n && window.n.sections ? window.n.sections.find(s => s.id === window.r) : null;
+      if (!activeSec && window.n && window.n.sections && window.n.sections.length > 0) {
+        activeSec = window.n.sections[0];
+        window.r = activeSec.id;
+      }
+
+      const baseTime = Date.now();
+      e.target.value = "";
+      executeApplyPreset(val, activeSec, baseTime);
     };
 
     presetSelect.removeEventListener('change', window.we);
@@ -9029,234 +9626,17 @@
   document.addEventListener('change', (e) => {
     if (e.target && e.target.id === 'select-preset-question' && e.target.value && (e.target.value.startsWith('pro_') || e.target.value === 'email_autoreply')) {
       const activeSec = (window.n && window.n.sections) ? (window.n.sections.find(s => s.id === window.r) || window.n.sections[0]) : null;
-      if (!activeSec) return;
-      window.r = activeSec.id;
+      if (activeSec) {
+        window.r = activeSec.id;
+      }
 
       const val = e.target.value;
       const baseTime = Date.now();
-
-      if (val === 'pro_corp_address') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
-
-        const corpGrpId = `grp_corp_${baseTime}`;
-        const corpGrpTitle = '法人住所';
-        activeSec.questions.push(
-          {
-            id: `q_corp_name_${baseTime}`,
-            type: "text",
-            title: "法人名・屋号",
-            description: "法人名を入力して候補から選択してください（個人事業主の方は直接入力可能です）",
-            required: true,
-            groupId: corpGrpId,
-            groupTitle: corpGrpTitle,
-            validation: {
-              category: "api",
-              condition: "corp_name",
-              value: "",
-              value2: "",
-              errorMessage: "実在する法人名を入力または選択してください。"
-            },
-            options: []
-          },
-          { id: `q_zip_${baseTime + 1}`, type: "text", title: "郵便番号", description: "法人選択または7桁入力で住所を自動補完します", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_pref_${baseTime + 2}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_city_${baseTime + 3}`, type: "text", title: "市区町村", description: "", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_street_${baseTime + 4}`, type: "text", title: "町名・番地", description: "", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_building_${baseTime + 5}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: corpGrpId, groupTitle: corpGrpTitle }
-        );
-      } else if (val === 'pro_address') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
-
-        const addrGrpId = `grp_addr_${baseTime}`;
-        const addrGrpTitle = '住所';
-        const addrGrpDesc = 'ご住所を入力してください';
-        activeSec.questions.push(
-          { id: `q_zip_${baseTime}`, type: "text", title: "郵便番号", description: "7桁半角数字を入力すると住所を自動補完します", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_pref_${baseTime + 1}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_city_${baseTime + 2}`, type: "text", title: "市区町村", description: "", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_street_${baseTime + 3}`, type: "text", title: "町名・番地", description: "", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_building_${baseTime + 4}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc }
-        );
-      } else if (val === 'pro_bank') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
-
-        const bankGrpId = `grp_bank_${baseTime}`;
-        const bankGrpTitle = '銀行口座';
-        activeSec.questions.push(
-          {
-            id: `q_bank_name_${baseTime}`,
-            type: "text",
-            title: "銀行名",
-            description: "銀行名を入力または検索して選択してください",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "api",
-              condition: "bank_name",
-              value: "",
-              value2: "",
-              errorMessage: "実在する銀行名を入力または選択してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_bank_code_${baseTime}`,
-            type: "text",
-            title: "金融機関コード",
-            description: "銀行名を選択すると自動入力されます（半角数字4桁）",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "regex",
-              condition: "matches",
-              value: "^[0-9]{4}$",
-              presetKey: "custom",
-              value2: "",
-              errorMessage: "半角数字4桁で入力してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_branch_code_${baseTime}`,
-            type: "text",
-            title: "支店番号",
-            description: "3桁の半角数字を入力すると支店名が補完されます",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "regex",
-              condition: "matches",
-              value: "^[0-9]{3}$",
-              presetKey: "custom",
-              value2: "",
-              errorMessage: "半角数字3桁で入力してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_branch_name_${baseTime}`,
-            type: "text",
-            title: "支店名",
-            description: "支店名を入力または候補から選択してください",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "api",
-              condition: "branch_name",
-              value: "",
-              value2: "",
-              errorMessage: "実在する支店名を入力または選択してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_account_type_${baseTime}`,
-            type: "radio",
-            title: "口座種別",
-            description: "口座の種別を選択してください",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: null,
-            options: [
-              { label: "普通" },
-              { label: "当座" },
-              { label: "貯蓄" }
-            ]
-          },
-          {
-            id: `q_account_number_${baseTime}`,
-            type: "text",
-            title: "口座番号",
-            description: "7桁の半角数字で入力してください（例: 1234567）",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "regex",
-              condition: "matches",
-              value: "^[0-9]{7}$",
-              presetKey: "custom",
-              value2: "",
-              errorMessage: "正しい口座番号（7桁の半角数字）を入力してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_account_holder_${baseTime}`,
-            type: "text",
-            title: "口座名義（カナ）",
-            description: "カナ、カッコ（）、ドット（.）で入力してください（例: カ）ヤマダ タロウ）",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "regex",
-              condition: "matches",
-              value: "^[ァ-ヶｦ-ﾟー\\-()（）.\\．\\・\\s　]+$",
-              presetKey: "account_holder_kana",
-              value2: "",
-              errorMessage: "口座名義はカナと（）.のみで入力してください。"
-            },
-            options: []
-          }
-        );
-      } else if (val === 'pro_password') {
-        activeSec.questions.push(
-          { id: `q_pw_${baseTime}`, type: "password", title: "パスワード", description: "伏せ字で表示されます", required: true }
-        );
-      } else if (val === 'email_autoreply') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
-        activeSec.questions.push({
-          id: `q_email_${baseTime}`,
-          type: "text",
-          title: "メールアドレス",
-          description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。",
-          required: true,
-          autoReply: true,
-          validation: {
-            category: "text",
-            condition: "email",
-            value: "",
-            value2: "",
-            errorMessage: "有効なメールアドレスを入力してください。"
-          },
-          options: []
-        });
-      }
-
       e.target.value = "";
       e.stopPropagation();
       e.preventDefault();
 
-      if (window.le && activeSec) window.le(activeSec);
-      if (window.S) window.S();
-      if (window.x) window.x();
-      renderLivePreview();
+      executeApplyPreset(val, activeSec, baseTime);
     }
   }, true);
 
@@ -15915,4 +16295,1202 @@
   } else {
     ensureCompactOptionsContainers();
   }
+
+  // =========================================================================
+  // ⚙️ 質問設定の2層分離（詳細設定スライドドロワー）＆ 案内用AIコンシェルジュ
+  // =========================================================================
+
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  let _activeDrawerQuestionId = null;
+  let _currentAiAdvice = null;
+
+  // バリデーションの短縮ラベル取得
+  function getValidationShortLabel(v) {
+    if (!v) return '';
+    const cat = v.category || '';
+    const cond = v.condition || '';
+    if (cat === 'text') {
+      if (cond === 'email') return 'メールアドレス';
+      if (cond === 'url') return 'URL';
+      if (cond === 'auto_hyphen') return '屋号ハイフン補填';
+      return 'テキスト';
+    }
+    if (cat === 'api') {
+      if (cond === 'corp_name') return '国税庁法人API';
+      if (cond === 'invoice_number') return 'インボイス照合';
+      if (cond === 'zip_code') return '郵便番号検索';
+      if (cond === 'bank_name') return '全銀協銀行検索';
+      if (cond === 'branch_name') return '全銀協支店検索';
+      return 'API連携';
+    }
+    if (cat === 'regex') {
+      if (v.presetKey === 'tel_both' || cond === 'tel') return '電話番号';
+      if (v.presetKey === 'birthdate') return '生年月日';
+      if (v.presetKey === 'zip' || v.presetKey === 'zip_nohyphen') return '郵便番号';
+      if (v.presetKey === 'account_holder_kana') return '口座名義カナ';
+      return '正規表現';
+    }
+    if (cat === 'number') return '数値';
+    if (cat === 'length') return '文字数制限';
+    return '入力規則';
+  }
+
+  // 1. 質問カードの超軽量化 & バッジ・詳細設定ボタン注入
+  function injectQuestionCardCompactStylesAndBadges() {
+    const qCards = document.querySelectorAll('#questions-container .question-card');
+    if (!qCards || qCards.length === 0) return;
+
+    qCards.forEach(card => {
+      const qId = card.dataset.questionId;
+      if (!qId) return;
+
+      const q = findQuestionDefById(qId);
+      if (!q) return;
+
+      // 1. 軽量化クラスの付与
+      if (!card.classList.contains('compact-settings')) {
+        card.classList.add('compact-settings');
+      }
+
+      // 2. メディア添付チェックボックスの親form-groupを特定してクラス付与（CSSで隠すため）
+      const formGroups = card.querySelectorAll(':scope > .form-group');
+      formGroups.forEach(fg => {
+        if (fg.textContent && fg.textContent.includes('説明用メディア') && !fg.classList.contains('question-card-media-toggle-group')) {
+          fg.classList.add('question-card-media-toggle-group');
+        }
+      });
+
+      // 3. 設定バッジエリアの管理
+      let badgesWrap = card.querySelector('.question-card-badges');
+      if (!badgesWrap) {
+        badgesWrap = document.createElement('div');
+        badgesWrap.className = 'question-card-badges';
+
+        const actions = card.querySelector('.question-card-actions');
+        if (actions) {
+          actions.parentNode.insertBefore(badgesWrap, actions);
+        } else {
+          card.appendChild(badgesWrap);
+        }
+      }
+
+      // バッジの動的再描画
+      const badgeSignature = [
+        q.dataKey || '',
+        q.validation ? `${q.validation.category}:${q.validation.condition}:${q.validation.presetKey || ''}` : '',
+        q.autoReply ? 'autoreply' : '',
+        (q.media && q.media.url) ? 'media' : '',
+        q.scrollRequired ? 'scroll' : ''
+      ].join('|');
+
+      if (badgesWrap.dataset.lastSignature !== badgeSignature) {
+        badgesWrap.dataset.lastSignature = badgeSignature;
+        badgesWrap.innerHTML = '';
+
+        let badgeCount = 0;
+
+        // ① カラム統一（dataKey）バッジ
+        if (q.dataKey) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-datakey';
+          b.innerHTML = `🏷️ 列: <strong>${escapeHtml(q.dataKey)}</strong>`;
+          b.title = '他の質問と同一の列名で保存されます（クリックで詳細設定）';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+          badgeCount++;
+        }
+
+        // ② 入力規則バッジ
+        if (q.validation) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-validation';
+          b.innerHTML = `🛡️ ${escapeHtml(getValidationShortLabel(q.validation))}`;
+          b.title = '回答の入力規則が有効です（クリックで詳細設定）';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+          badgeCount++;
+        }
+
+        // ③ 回答控え自動送信バッジ
+        if (q.autoReply) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-autoreply';
+          b.innerHTML = `📨 回答控え有効`;
+          b.title = '送信後にこのメール宛に控えが届きます（クリックで詳細設定）';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+          badgeCount++;
+        }
+
+        // ④ 説明用メディアバッジ
+        if (q.media && q.media.url) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-media';
+          b.innerHTML = `📎 メディア添付`;
+          b.title = '画像または動画が添付されています（クリックで詳細設定）';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+          badgeCount++;
+        }
+
+        // ⑤ 規約スクロール必須バッジ
+        if (q.scrollRequired) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-scroll';
+          b.innerHTML = `📜 規約ロック`;
+          b.title = '最下部スクロール必須ロックが有効です（クリックで詳細設定）';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+          badgeCount++;
+        }
+
+        // 未設定時
+        if (badgeCount === 0) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-unset';
+          b.innerHTML = `⚙️ 詳細設定を開く`;
+          b.title = '入力規則やカラム統一などを設定します';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+        }
+      }
+
+      // 4. アクション行に「⚙️ 詳細設定」ボタンを注入
+      const actions = card.querySelector('.question-card-actions');
+      if (actions && !actions.querySelector('.btn-open-q-drawer')) {
+        const btnDrawer = document.createElement('button');
+        btnDrawer.type = 'button';
+        btnDrawer.className = 'btn-open-q-drawer';
+        btnDrawer.innerHTML = '⚙️ 詳細設定';
+        btnDrawer.title = 'カラム統一、入力規則、メール控えなどの詳細設定を開く';
+        btnDrawer.dataset.questionId = qId;
+        btnDrawer.dataset.qid = qId;
+        btnDrawer.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openQuestionSettingsDrawer(qId);
+        });
+
+        // 削除ボタンや移動ボタンの手前に配置
+        const actionBtns = actions.querySelector('.question-action-buttons');
+        if (actionBtns) {
+          actionBtns.insertBefore(btnDrawer, actionBtns.firstChild);
+        } else {
+          actions.appendChild(btnDrawer);
+        }
+      }
+    });
+  }
+
+  // 2. AIコンシェルジュによる質問意図の自動解析
+  function analyzeQuestionForAiConcierge(q) {
+    const title = (q.title || '').trim();
+    const lower = title.toLowerCase();
+
+    // 他のセクションの質問一覧を取得して相関関係（法人 vs 屋号など）を検出
+    const allQuestions = [];
+    const rootForm = window.F || window.n || window.G || window.L;
+    if (rootForm && rootForm.sections) {
+      rootForm.sections.forEach(s => {
+        (s.questions || []).forEach(otherQ => {
+          if (otherQ && otherQ.id !== q.id) allQuestions.push(otherQ);
+        });
+      });
+    }
+
+    // 1. メールアドレス
+    if (lower.includes('メール') || lower.includes('mail') || lower.includes('アドレス')) {
+      return {
+        type: 'email',
+        recommendationTitle: '✉️ メールアドレス（控え自動送信 & email列統合）',
+        explanation: 'メールアドレス形式の検証を適用し、送信後に自動で回答控えメールを届ける設定をおすすめします。',
+        dataKey: 'email',
+        unifyColumn: true,
+        validation: {
+          category: 'text',
+          condition: 'email',
+          value: '',
+          value2: '',
+          errorMessage: '有効なメールアドレスを入力してください。'
+        },
+        autoReply: true,
+        items: [
+          'データベース出力列名: <strong>email</strong> に統一',
+          '入力規則: <strong>テキスト ➔ メールアドレス</strong>（自動判定）',
+          '回答控えメール: <strong>自動配信をON</strong> に設定'
+        ]
+      };
+    }
+
+    // 2. 法人名 / 会社名
+    if (lower.includes('法人名') || lower.includes('会社名') || lower.includes('企業名') || lower.includes('商号')) {
+      return {
+        type: 'corp_name',
+        recommendationTitle: '🏛️ 法人名検索（国税庁API連携 & company_name列統合）',
+        explanation: '国税庁法人番号APIによるリアルタイム検索と、DB列「company_name」への統一をおすすめします。',
+        dataKey: 'company_name',
+        unifyColumn: true,
+        validation: {
+          category: 'api',
+          condition: 'corp_name',
+          value: '',
+          value2: '',
+          errorMessage: '実在する法人名を入力または選択してください。'
+        },
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>company_name</strong> に統一',
+          '入力規則: <strong>API連携 ➔ 国税庁法人番号API</strong>',
+          'エラー表示: 実在する法人名を選択してください'
+        ]
+      };
+    }
+
+    // 3. 屋号
+    if (lower.includes('屋号')) {
+      const hasCorp = allQuestions.some(oq => (oq.title || '').includes('法人名') || (oq.title || '').includes('会社名'));
+      const exp = hasCorp 
+        ? '別セクションの「法人名」と同一の列名「company_name」に一本化し、屋号がない場合の自動ハイフン補填を設定することを推奨します。'
+        : '個人事業主の屋号として未入力時の自動ハイフン補填を有効化し、列名「company_name」に統一することをおすすめします。';
+      return {
+        type: 'trade_name',
+        recommendationTitle: '🏢 屋号（法人名と同一列 company_name に一本化）',
+        explanation: exp,
+        dataKey: 'company_name',
+        unifyColumn: true,
+        validation: {
+          category: 'text',
+          condition: 'auto_hyphen',
+          value: '',
+          value2: '',
+          errorMessage: ''
+        },
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>company_name</strong> に統一（法人名と合流）',
+          '入力規則: <strong>未入力時は自動で半角ハイフン補填（屋号なし対応）</strong>'
+        ]
+      };
+    }
+
+    // 4. 電話番号
+    if (lower.includes('電話') || lower.includes('tel') || lower.includes('携帯') || lower.includes('スマホ')) {
+      return {
+        type: 'tel',
+        recommendationTitle: '📞 電話番号（固定・携帯共通バリデーション & tel列統合）',
+        explanation: '固定電話と携帯電話の双方に対応した正規表現チェックと、DB列「tel」への統一をおすすめします。',
+        dataKey: 'tel',
+        unifyColumn: true,
+        validation: {
+          category: 'regex',
+          condition: 'matches',
+          value: '^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$',
+          presetKey: 'tel_both',
+          value2: '',
+          errorMessage: '正しい電話番号の形式で入力してください。'
+        },
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>tel</strong> に統一',
+          '入力規則: <strong>正規表現（固定・携帯共通ハイフン形式）</strong>'
+        ]
+      };
+    }
+
+    // 5. 郵便番号
+    if (lower.includes('郵便') || lower.includes('〒') || lower.includes('zip')) {
+      return {
+        type: 'zip',
+        recommendationTitle: '📮 郵便番号（ZipCloud連携 & zip_code列統合）',
+        explanation: '郵便番号から都道府県・市区町村を自動入力するAPI連携と、列「zip_code」への統一をおすすめします。',
+        dataKey: 'zip_code',
+        unifyColumn: true,
+        validation: {
+          category: 'api',
+          condition: 'zip_code',
+          value: '',
+          value2: '',
+          errorMessage: '正しい郵便番号（7桁の半角数字）を入力してください。'
+        },
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>zip_code</strong> に統一',
+          '入力規則: <strong>API連携 ➔ 郵便番号検索（ZipCloud連携）</strong>'
+        ]
+      };
+    }
+
+    // 6. 代表者名 / 氏名
+    if (lower.includes('代表') || lower.includes('氏名') || lower.includes('名前') || lower.includes('name')) {
+      const isKana = lower.includes('カナ') || lower.includes('フリガナ');
+      const key = isKana ? 'representative_kana' : 'representative_name';
+      return {
+        type: 'representative',
+        recommendationTitle: isKana ? '👤 氏名カナ（representative_kana列統合）' : '👤 氏名（representative_name列統合）',
+        explanation: `代表取締役氏名や個人事業主氏名をDB列「${key}」に集約することをおすすめします。`,
+        dataKey: key,
+        unifyColumn: true,
+        validation: null,
+        autoReply: false,
+        items: [
+          `データベース出力列名: <strong>${key}</strong> に統一`
+        ]
+      };
+    }
+
+    // 7. インボイス / 登録番号
+    if (lower.includes('インボイス') || lower.includes('登録番号') || lower.includes('invoice')) {
+      return {
+        type: 'invoice',
+        recommendationTitle: '🧾 インボイス登録番号（公表システムAPI照合 & invoice_number列統合）',
+        explanation: 'T+13桁の登録番号を国税庁公表システムと照合し、列「invoice_number」に統一することをおすすめします。',
+        dataKey: 'invoice_number',
+        unifyColumn: true,
+        validation: {
+          category: 'api',
+          condition: 'invoice_number',
+          value: '',
+          value2: '',
+          errorMessage: '正しくインボイス登録番号（Tで始まる13桁の数字）を入力してください。'
+        },
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>invoice_number</strong> に統一',
+          '入力規則: <strong>API連携 ➔ インボイス登録番号（国税庁照合）</strong>'
+        ]
+      };
+    }
+
+    // 8. 住所 / 番地
+    if (lower.includes('住所') || lower.includes('所在地') || lower.includes('番地') || lower.includes('町名')) {
+      return {
+        type: 'address',
+        recommendationTitle: '📍 住所・番地（street列統合）',
+        explanation: '法人所在地と個人の住所を共通のDB列「street」に一本化することをおすすめします。',
+        dataKey: 'street',
+        unifyColumn: true,
+        validation: null,
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>street</strong> に統一'
+        ]
+      };
+    }
+
+    // 9. 生年月日
+    if (lower.includes('生年月日') || lower.includes('誕生') || lower.includes('birth')) {
+      return {
+        type: 'birthdate',
+        recommendationTitle: '🎂 生年月日（birthdate列統合 & 日付書式判定）',
+        explanation: 'YYYY/MM/DD形式の書式チェックと、列「birthdate」への統一をおすすめします。',
+        dataKey: 'birthdate',
+        unifyColumn: true,
+        validation: {
+          category: 'regex',
+          condition: 'matches',
+          value: '^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$',
+          presetKey: 'birthdate',
+          value2: '',
+          errorMessage: '正しい生年月日を入力してください（例: 1990/01/01）。'
+        },
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>birthdate</strong> に統一',
+          '入力規則: <strong>正規表現（YYYY/MM/DD形式）</strong>'
+        ]
+      };
+    }
+
+    // 汎用
+    return {
+      type: 'generic',
+      recommendationTitle: '⚙️ 基本設定',
+      explanation: '他の質問とDB列を統一したい場合は「カラムの統一」をONにし、適切な列キーを指定してください。',
+      dataKey: '',
+      unifyColumn: false,
+      validation: null,
+      autoReply: false,
+      items: [
+        '必要に応じて入力規則やカラム統一を設定してください'
+      ]
+    };
+  }
+
+  // 3. ドロワー DOM の生成
+  function ensureQuestionSettingsDrawerDom() {
+    if (document.getElementById('question-settings-drawer')) return;
+
+    // オーバーレイ
+    const backdrop = document.createElement('div');
+    backdrop.id = 'question-settings-drawer-backdrop';
+    backdrop.className = 'question-settings-drawer-backdrop';
+    document.body.appendChild(backdrop);
+
+    // ドロワー本体
+    const drawer = document.createElement('div');
+    drawer.id = 'question-settings-drawer';
+    drawer.className = 'question-settings-drawer';
+    drawer.setAttribute('aria-hidden', 'true');
+    drawer.innerHTML = `
+      <div class="drawer-header">
+        <div class="drawer-header-left">
+          <span class="drawer-header-icon">⚙️</span>
+          <div class="drawer-header-titles">
+            <h3 id="drawer-q-title" class="drawer-q-title">質問詳細設定</h3>
+            <span id="drawer-q-type-badge" class="drawer-q-type-badge">記述式</span>
+          </div>
+        </div>
+        <button type="button" id="btn-close-q-drawer" class="drawer-close-btn" title="閉じる">✕</button>
+      </div>
+
+      <div class="drawer-body">
+        <!-- 1. 🤖 案内用AIコンシェルジュ -->
+        <div id="drawer-ai-panel" class="drawer-section ai-concierge-panel">
+          <div class="ai-concierge-header">
+            <span class="ai-concierge-title">🤖 案内用AIコンシェルジュ</span>
+            <span class="ai-sparkle-badge">✨ リアルタイム診断</span>
+          </div>
+          <div id="drawer-ai-recommendation-box" class="ai-recommendation-box"></div>
+          <div class="ai-actions-row">
+            <button type="button" id="btn-apply-ai-rec" class="ai-apply-btn">✨ おすすめ設定を一括適用</button>
+            <button type="button" id="btn-toggle-ai-chat" class="ai-chat-toggle-btn">💬 AIに相談する</button>
+          </div>
+          <div id="drawer-ai-chat-container" class="ai-chat-container" style="display: none;">
+            <div id="drawer-ai-chat-messages" class="ai-chat-messages">
+              <div class="ai-chat-msg bot">こんにちは！質問の入力規則やカラム統一について何でもご質問ください。</div>
+            </div>
+            <div class="ai-chat-input-row">
+              <input type="text" id="drawer-ai-chat-input" class="form-control form-control-sm" placeholder="AIに質問・相談を入力..." />
+              <button type="button" id="btn-send-drawer-ai-chat" class="btn btn-primary btn-sm">送信</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 🏷️ データベース出力列（カラム）の統一設定 -->
+        <div class="drawer-section">
+          <div class="drawer-section-title">🏷️ データベース出力列（カラム）の統一設定</div>
+          <div class="drawer-section-desc">
+            別セクションの質問（例: 法人名と屋号、法人住所と個人住所）でも、同一の列名（dataKey）を設定するとDBや集計シートで1列に集約されます。
+          </div>
+          
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-unify-column-toggle" />
+            <span>他の質問と出力列（カラム）を統一する</span>
+          </label>
+
+          <div id="drawer-column-unified-box" style="display: none; margin-top: 10px;">
+            <label class="drawer-field-label">共通カラム（列キー）の選択</label>
+            <select id="drawer-column-select" class="form-control form-control-sm">
+              <option value="company_name">🏢 法人名・屋号 (company_name)</option>
+              <option value="company_kana">🏢 法人名カナ・屋号カナ (company_kana)</option>
+              <option value="representative_name">👤 代表者名・氏名 (representative_name)</option>
+              <option value="representative_kana">👤 代表者カナ・氏名カナ (representative_kana)</option>
+              <option value="zip_code">📮 郵便番号 (zip_code)</option>
+              <option value="pref">📍 都道府県 (pref)</option>
+              <option value="city">📍 市区町村 (city)</option>
+              <option value="street">📍 町名・番地 (street)</option>
+              <option value="building">📍 建物名・部屋番号 (building)</option>
+              <option value="email">✉️ メールアドレス (email)</option>
+              <option value="tel">📞 電話番号 (tel)</option>
+              <option value="tax_invoice_status">🧾 税務区分・インボイス状況 (tax_invoice_status)</option>
+              <option value="invoice_number">🧾 インボイス登録番号 (invoice_number)</option>
+              <option value="__custom__">✏️ 自由入力（カスタムキー）</option>
+            </select>
+
+            <div id="drawer-custom-key-wrap" style="margin-top: 8px;">
+              <input type="text" id="drawer-column-key-input" class="form-control form-control-sm" placeholder="半角英数字（例: company_name）" />
+            </div>
+
+            <div class="drawer-chips-wrap" style="margin-top: 8px;">
+              <span class="drawer-chip" data-key="company_name">🏢 法人名・屋号</span>
+              <span class="drawer-chip" data-key="street">📍 住所・番地</span>
+              <span class="drawer-chip" data-key="representative_name">👤 代表者・氏名</span>
+              <span class="drawer-chip" data-key="email">✉️ メール</span>
+              <span class="drawer-chip" data-key="tel">📞 電話番号</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 🛡️ 回答の入力規則（検証・バリデーション） -->
+        <div class="drawer-section">
+          <div class="drawer-section-title">🛡️ 回答の入力規則（検証・バリデーション）</div>
+          
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-validation-toggle" />
+            <span>回答の入力規則を有効にする</span>
+          </label>
+
+          <div id="drawer-validation-fields" style="display: none; margin-top: 10px;">
+            <div class="drawer-field-row">
+              <div class="drawer-field-col">
+                <label class="drawer-field-label">規則の種類</label>
+                <select id="drawer-val-category" class="form-control form-control-sm">
+                  <option value="text">テキスト</option>
+                  <option value="regex">正規表現</option>
+                  <option value="number">数値</option>
+                  <option value="api">API連携</option>
+                  <option value="length">長さ</option>
+                </select>
+              </div>
+              <div class="drawer-field-col">
+                <label class="drawer-field-label">判定ルール</label>
+                <select id="drawer-val-condition" class="form-control form-control-sm"></select>
+              </div>
+            </div>
+
+            <div id="drawer-val-pattern-row" style="margin-top: 8px; display: none;">
+              <div class="drawer-field-row">
+                <div class="drawer-field-col">
+                  <label class="drawer-field-label">常用パターン</label>
+                  <select id="drawer-val-preset" class="form-control form-control-sm"></select>
+                </div>
+                <div class="drawer-field-col">
+                  <label class="drawer-field-label">正規表現パターン</label>
+                  <input type="text" id="drawer-val-pattern" class="form-control form-control-sm" placeholder="^[0-9]+$" />
+                </div>
+              </div>
+            </div>
+
+            <div id="drawer-val-api-notice" class="drawer-help-text" style="display: none; margin-top: 8px; padding: 8px 10px; background: rgba(26,115,232,0.08); border-radius: 6px; border: 1px solid rgba(26,115,232,0.25);"></div>
+
+            <div style="margin-top: 8px;">
+              <label class="drawer-field-label">カスタムエラーメッセージ</label>
+              <input type="text" id="drawer-val-error-msg" class="form-control form-control-sm" placeholder="エラー時に表示するテキスト" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 📨 回答控えメール設定 -->
+        <div class="drawer-section" id="drawer-autoreply-section">
+          <div class="drawer-section-title">📨 回答控えメール自動送信</div>
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-autoreply-toggle" />
+            <span>回答送信後にこのアドレス宛に回答内容の控えを自動送信する</span>
+          </label>
+          <div class="drawer-help-text">
+            ※ この質問に入力されたメールアドレス宛に、回答完了直後に控えメールが自動配信されます。
+          </div>
+        </div>
+
+        <!-- 5. 📎 説明用メディア添付 -->
+        <div class="drawer-section">
+          <div class="drawer-section-title">📎 説明用メディア添付</div>
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-media-toggle" />
+            <span>説明用メディア（画像・動画・ファイル）を添付する</span>
+          </label>
+          <div id="drawer-media-fields" style="display: none; margin-top: 10px;">
+            <label class="drawer-field-label">メディア種別とURL</label>
+            <div style="display: flex; gap: 6px;">
+              <select id="drawer-media-type" class="form-control form-control-sm" style="width: 100px;">
+                <option value="image">画像</option>
+                <option value="video">動画</option>
+              </select>
+              <input type="text" id="drawer-media-url" class="form-control form-control-sm" placeholder="https://example.com/sample.png" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. 📜 スクロール必須（規約同意ロック） -->
+        <div class="drawer-section" id="drawer-scroll-section">
+          <div class="drawer-section-title">📜 スクロール必須（規約同意ロック）</div>
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-scroll-toggle" />
+            <span>最下部までスクロールするまで回答をロックする</span>
+          </label>
+          <div id="drawer-scroll-fields" style="display: none; margin-top: 10px;">
+            <label class="drawer-field-label">スクロール表示する本文・規約テキスト</label>
+            <textarea id="drawer-scroll-text" class="form-control form-control-sm" rows="3" placeholder="【利用規約】ここに規約本文を入力してください..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer-footer">
+        <button type="button" id="btn-save-close-q-drawer" class="btn btn-primary" style="width: 100%;">完了して閉じる</button>
+      </div>
+    `;
+
+    document.body.appendChild(drawer);
+
+    // イベントバインド
+    const closeBtn = drawer.querySelector('#btn-close-q-drawer');
+    const saveCloseBtn = drawer.querySelector('#btn-save-close-q-drawer');
+    closeBtn.addEventListener('click', closeQuestionSettingsDrawer);
+    saveCloseBtn.addEventListener('click', closeQuestionSettingsDrawer);
+    backdrop.addEventListener('click', closeQuestionSettingsDrawer);
+
+    // ESCキー対応
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && drawer.classList.contains('is-open')) {
+        closeQuestionSettingsDrawer();
+      }
+    });
+
+    // カラム統一切り替え
+    const unifyToggle = drawer.querySelector('#drawer-unify-column-toggle');
+    const unifiedBox = drawer.querySelector('#drawer-column-unified-box');
+    const columnSelect = drawer.querySelector('#drawer-column-select');
+    const customKeyInput = drawer.querySelector('#drawer-column-key-input');
+    const chipsWrap = drawer.querySelector('.drawer-chips-wrap');
+
+    unifyToggle.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      if (unifyToggle.checked) {
+        unifiedBox.style.display = 'block';
+        if (!q.dataKey) {
+          const defKey = suggestDefaultDataKey(q.title);
+          q.dataKey = defKey;
+          customKeyInput.value = defKey;
+          syncColumnSelectWithKey(defKey);
+        }
+      } else {
+        unifiedBox.style.display = 'none';
+        delete q.dataKey;
+      }
+      persistDrawerChanges();
+    });
+
+    columnSelect.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      const val = columnSelect.value;
+      if (val === '__custom__') {
+        customKeyInput.focus();
+      } else {
+        q.dataKey = val;
+        customKeyInput.value = val;
+        persistDrawerChanges();
+      }
+    });
+
+    customKeyInput.addEventListener('input', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      const val = customKeyInput.value.trim();
+      q.dataKey = val;
+      syncColumnSelectWithKey(val);
+      persistDrawerChanges();
+    });
+
+    chipsWrap.querySelectorAll('.drawer-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const q = findQuestionDefById(_activeDrawerQuestionId);
+        if (!q) return;
+        const key = chip.dataset.key;
+        unifyToggle.checked = true;
+        unifiedBox.style.display = 'block';
+        q.dataKey = key;
+        customKeyInput.value = key;
+        syncColumnSelectWithKey(key);
+        persistDrawerChanges();
+      });
+    });
+
+    // バリデーション切り替え
+    const valToggle = drawer.querySelector('#drawer-validation-toggle');
+    const valFields = drawer.querySelector('#drawer-validation-fields');
+    const valCatSelect = drawer.querySelector('#drawer-val-category');
+    const valCondSelect = drawer.querySelector('#drawer-val-condition');
+    const valPatternRow = drawer.querySelector('#drawer-val-pattern-row');
+    const valPresetSelect = drawer.querySelector('#drawer-val-preset');
+    const valPatternInput = drawer.querySelector('#drawer-val-pattern');
+    const valApiNotice = drawer.querySelector('#drawer-val-api-notice');
+    const valErrorInput = drawer.querySelector('#drawer-val-error-msg');
+
+    valToggle.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      if (valToggle.checked) {
+        valFields.style.display = 'block';
+        if (!q.validation) {
+          q.validation = { category: 'text', condition: 'email', value: '', value2: '', errorMessage: '有効なメールアドレスを入力してください。' };
+        }
+        syncDrawerValidationInputs(q.validation);
+      } else {
+        valFields.style.display = 'none';
+        q.validation = null;
+      }
+      persistDrawerChanges();
+    });
+
+    valCatSelect.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      const cat = valCatSelect.value;
+      const defErr = cat === 'number' ? '数値を入力してください。' : (cat === 'api' ? '実在する候補を選択してください。' : '入力値が正しくありません。');
+      const bObj = window.b && window.b[cat] ? window.b[cat] : null;
+      const firstCond = bObj ? Object.keys(bObj.conditions)[0] : 'email';
+
+      q.validation = { category: cat, condition: firstCond, value: '', value2: '', errorMessage: defErr };
+      if (cat === 'regex') q.validation.presetKey = 'custom';
+
+      syncDrawerValidationConditionOptions(cat, firstCond);
+      syncDrawerValidationPatternAndNotice(q.validation);
+      valErrorInput.value = defErr;
+      persistDrawerChanges();
+    });
+
+    valCondSelect.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.validation) return;
+      q.validation.condition = valCondSelect.value;
+      q.validation.value = '';
+      q.validation.value2 = '';
+      if (q.validation.category === 'api') {
+        const c = q.validation.condition;
+        q.validation.errorMessage = c === 'zip_code' ? '正しい郵便番号（7桁の半角数字）を入力してください。'
+          : (c === 'invoice_number' ? '正しくインボイス登録番号（Tで始まる13桁の数字）を入力してください。'
+          : (c === 'bank_name' ? '実在する銀行名を入力または選択してください。'
+          : (c === 'branch_name' ? '実在する支店名を入力または選択してください。'
+          : '実在する法人名を入力または選択してください。')));
+        valErrorInput.value = q.validation.errorMessage;
+      }
+      syncDrawerValidationPatternAndNotice(q.validation);
+      persistDrawerChanges();
+    });
+
+    valPresetSelect.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.validation) return;
+      const pk = valPresetSelect.value;
+      q.validation.presetKey = pk;
+      if (pk !== 'custom' && window.ie && window.ie[pk]) {
+        q.validation.value = window.ie[pk].pattern;
+        valPatternInput.value = q.validation.value;
+      }
+      if (window.getAutoErrorMessageForQuestion) {
+        const er = window.getAutoErrorMessageForQuestion(q.title, q.validation);
+        if (er) {
+          q.validation.errorMessage = er;
+          valErrorInput.value = er;
+        }
+      }
+      persistDrawerChanges();
+    });
+
+    valPatternInput.addEventListener('input', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.validation) return;
+      q.validation.value = valPatternInput.value;
+      q.validation.presetKey = 'custom';
+      valPresetSelect.value = 'custom';
+      persistDrawerChanges();
+    });
+
+    valErrorInput.addEventListener('input', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.validation) return;
+      q.validation.errorMessage = valErrorInput.value;
+      persistDrawerChanges();
+    });
+
+    // 回答控えメール
+    const autoReplyToggle = drawer.querySelector('#drawer-autoreply-toggle');
+    autoReplyToggle.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      q.autoReply = autoReplyToggle.checked;
+      persistDrawerChanges();
+    });
+
+    // メディア添付
+    const mediaToggle = drawer.querySelector('#drawer-media-toggle');
+    const mediaFields = drawer.querySelector('#drawer-media-fields');
+    const mediaType = drawer.querySelector('#drawer-media-type');
+    const mediaUrl = drawer.querySelector('#drawer-media-url');
+
+    mediaToggle.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      if (mediaToggle.checked) {
+        mediaFields.style.display = 'block';
+        q.media = { type: mediaType.value, url: mediaUrl.value };
+      } else {
+        mediaFields.style.display = 'none';
+        delete q.media;
+      }
+      persistDrawerChanges();
+    });
+
+    mediaType.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.media) return;
+      q.media.type = mediaType.value;
+      persistDrawerChanges();
+    });
+
+    mediaUrl.addEventListener('input', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.media) return;
+      q.media.url = mediaUrl.value;
+      persistDrawerChanges();
+    });
+
+    // スクロール規約ロック
+    const scrollToggle = drawer.querySelector('#drawer-scroll-toggle');
+    const scrollFields = drawer.querySelector('#drawer-scroll-fields');
+    const scrollText = drawer.querySelector('#drawer-scroll-text');
+
+    scrollToggle.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      if (scrollToggle.checked) {
+        scrollFields.style.display = 'block';
+        q.scrollRequired = true;
+        if (!q.scrollText) q.scrollText = '【利用規約】最下部までスクロールされるまで、回答コントロールはロックされます。';
+        scrollText.value = q.scrollText;
+      } else {
+        scrollFields.style.display = 'none';
+        delete q.scrollRequired;
+      }
+      persistDrawerChanges();
+    });
+
+    scrollText.addEventListener('input', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      q.scrollText = scrollText.value;
+      persistDrawerChanges();
+    });
+
+    // AIコンシェルジュ：おすすめ一括適用ボタン
+    const btnApplyAi = drawer.querySelector('#btn-apply-ai-rec');
+    btnApplyAi.addEventListener('click', () => {
+      if (!_currentAiAdvice) return;
+      applyAiAdviceToActiveQuestion(_currentAiAdvice);
+    });
+
+    // AIチャットトグル & 送信
+    const btnToggleAiChat = drawer.querySelector('#btn-toggle-ai-chat');
+    const chatContainer = drawer.querySelector('#drawer-ai-chat-container');
+    const chatInput = drawer.querySelector('#drawer-ai-chat-input');
+    const btnSendAiChat = drawer.querySelector('#btn-send-drawer-ai-chat');
+
+    btnToggleAiChat.addEventListener('click', () => {
+      const isShowing = chatContainer.style.display !== 'none';
+      chatContainer.style.display = isShowing ? 'none' : 'flex';
+      if (!isShowing) chatInput.focus();
+    });
+
+    const handleSendChat = async () => {
+      const text = chatInput.value.trim();
+      if (!text) return;
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      const chatMessages = drawer.querySelector('#drawer-ai-chat-messages');
+
+      // ユーザー発言追加
+      const userMsg = document.createElement('div');
+      userMsg.className = 'ai-chat-msg user';
+      userMsg.textContent = text;
+      chatMessages.appendChild(userMsg);
+      chatInput.value = '';
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      // ボット返答プレースホルダー
+      const botMsg = document.createElement('div');
+      botMsg.className = 'ai-chat-msg bot';
+      botMsg.innerHTML = '<span class="ai-sparkle-icon">✨</span> 考え中...';
+      chatMessages.appendChild(botMsg);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      try {
+        const clientApiKey = localStorage.getItem('synapse_gemini_api_key') || '';
+        const systemPrompt = `あなたはSynapse組織統制型フォームビルダーの専属AIコンシェルジュです。質問「${q ? q.title : ''}」の設計や入力規則、カラム統一（dataKey）について、初心者にもわかりやすく親切に日本語でアドバイスしてください。`;
+        const res = await fetch('/api/regex-ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: `${systemPrompt}\nユーザーの相談: ${text}`,
+            userKey: clientApiKey
+          })
+        });
+        const data = await res.json();
+        if (data && data.text) {
+          botMsg.innerHTML = data.text.replace(/\n/g, '<br>');
+        } else {
+          // フォールバック
+          botMsg.textContent = `質問「${q ? q.title : ''}」について：業務用途に合わせて「カラム統一」で列名を統一するか、入力規則で正しい形式を担保するのがおすすめです。`;
+        }
+      } catch (err) {
+        botMsg.textContent = `質問「${q ? q.title : ''}」について：業務用途に合わせて「カラム統一」で列名を統一するか、入力規則で正しい形式を担保するのがおすすめです。`;
+      }
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    };
+
+    btnSendAiChat.addEventListener('click', handleSendChat);
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleSendChat();
+    });
+  }
+
+  function syncColumnSelectWithKey(key) {
+    const columnSelect = document.getElementById('drawer-column-select');
+    if (!columnSelect) return;
+    const hasOption = Array.from(columnSelect.options).some(o => o.value === key);
+    if (hasOption) {
+      columnSelect.value = key;
+    } else {
+      columnSelect.value = '__custom__';
+    }
+  }
+
+  function suggestDefaultDataKey(title) {
+    const t = (title || '').toLowerCase();
+    if (t.includes('法人') || t.includes('会社') || t.includes('屋号')) return 'company_name';
+    if (t.includes('メール') || t.includes('mail')) return 'email';
+    if (t.includes('電話') || t.includes('tel')) return 'tel';
+    if (t.includes('郵便') || t.includes('〒')) return 'zip_code';
+    if (t.includes('代表') || t.includes('氏名') || t.includes('名前')) return 'representative_name';
+    if (t.includes('住所') || t.includes('所在地') || t.includes('番地')) return 'street';
+    if (t.includes('インボイス') || t.includes('登録番号')) return 'invoice_number';
+    return 'custom_field';
+  }
+
+  function syncDrawerValidationConditionOptions(category, currentCondition) {
+    const valCondSelect = document.getElementById('drawer-val-condition');
+    if (!valCondSelect) return;
+    valCondSelect.innerHTML = '';
+    const bObj = window.b && window.b[category] ? window.b[category] : null;
+    if (bObj && bObj.conditions) {
+      Object.keys(bObj.conditions).forEach(condKey => {
+        const opt = document.createElement('option');
+        opt.value = condKey;
+        opt.textContent = bObj.conditions[condKey];
+        valCondSelect.appendChild(opt);
+      });
+      valCondSelect.value = currentCondition || Object.keys(bObj.conditions)[0];
+    }
+  }
+
+  function syncDrawerValidationPatternAndNotice(val) {
+    const patternRow = document.getElementById('drawer-val-pattern-row');
+    const apiNotice = document.getElementById('drawer-val-api-notice');
+    const presetSelect = document.getElementById('drawer-val-preset');
+    const patternInput = document.getElementById('drawer-val-pattern');
+    if (!patternRow || !apiNotice) return;
+
+    if (!val) {
+      patternRow.style.display = 'none';
+      apiNotice.style.display = 'none';
+      return;
+    }
+
+    if (val.category === 'regex') {
+      patternRow.style.display = 'block';
+      apiNotice.style.display = 'none';
+      presetSelect.innerHTML = '';
+      if (window.ie) {
+        Object.keys(window.ie).forEach(k => {
+          const opt = document.createElement('option');
+          opt.value = k;
+          opt.textContent = window.ie[k].label;
+          presetSelect.appendChild(opt);
+        });
+      }
+      presetSelect.value = val.presetKey || 'custom';
+      patternInput.value = val.value || '';
+    } else if (val.category === 'api') {
+      patternRow.style.display = 'none';
+      apiNotice.style.display = 'block';
+      const c = val.condition;
+      if (c === 'corp_name') {
+        apiNotice.innerHTML = '🏛️ <strong>国税庁法人番号API連携</strong>: 実在する法人名・所在地をリアルタイム検索・自動補完します。';
+      } else if (c === 'invoice_number') {
+        apiNotice.innerHTML = '🧾 <strong>国税庁適格請求書API連携</strong>: T+13桁の登録番号を公表システムと照会・補完します。';
+      } else if (c === 'zip_code') {
+        apiNotice.innerHTML = '📮 <strong>ZipCloud API連携</strong>: 郵便番号から都道府県・市区町村・町域を自動検索・補完します。';
+      } else {
+        apiNotice.innerHTML = '🏦 <strong>全銀協API連携</strong>: 実在する金融機関コードや支店情報を自動検索します。';
+      }
+    } else {
+      patternRow.style.display = 'none';
+      apiNotice.style.display = 'none';
+    }
+  }
+
+  function syncDrawerValidationInputs(val) {
+    const valCatSelect = document.getElementById('drawer-val-category');
+    const valErrorInput = document.getElementById('drawer-val-error-msg');
+    if (!valCatSelect || !val) return;
+
+    valCatSelect.value = val.category || 'text';
+    syncDrawerValidationConditionOptions(val.category, val.condition);
+    syncDrawerValidationPatternAndNotice(val);
+    valErrorInput.value = val.errorMessage || '';
+  }
+
+  // 4. ドロワーを開く
+  function openQuestionSettingsDrawer(questionId) {
+    ensureQuestionSettingsDrawerDom();
+    const q = findQuestionDefById(questionId);
+    if (!q) {
+      console.warn('[QuestionSettingsDrawer] Question not found for id:', questionId);
+      return;
+    }
+
+    _activeDrawerQuestionId = questionId;
+
+    const drawer = document.getElementById('question-settings-drawer');
+    const backdrop = document.getElementById('question-settings-drawer-backdrop');
+    const titleEl = document.getElementById('drawer-q-title');
+    const typeBadge = document.getElementById('drawer-q-type-badge');
+
+    titleEl.textContent = q.title || '無題の質問';
+    const typeLabels = { text: '記述式 (短文)', paragraph: '記述式 (長文)', radio: 'ラジオボタン', checkbox: 'チェックボックス', select: 'プルダウン', file: 'ファイル' };
+    typeBadge.textContent = typeLabels[q.type] || q.type;
+
+    // AIコンシェルジュの診断
+    _currentAiAdvice = analyzeQuestionForAiConcierge(q);
+    const recBox = document.getElementById('drawer-ai-recommendation-box');
+    recBox.innerHTML = `
+      <div class="ai-rec-title">${escapeHtml(_currentAiAdvice.recommendationTitle)}</div>
+      <div class="ai-rec-desc">${escapeHtml(_currentAiAdvice.explanation)}</div>
+      <ul class="ai-rec-list">
+        ${_currentAiAdvice.items.map(item => `<li>${item}</li>`).join('')}
+      </ul>
+    `;
+    const btnApplyAi = document.getElementById('btn-apply-ai-rec');
+    btnApplyAi.classList.remove('applied');
+    btnApplyAi.innerHTML = '✨ おすすめ設定を一括適用';
+
+    // カラム統一
+    const unifyToggle = document.getElementById('drawer-unify-column-toggle');
+    const unifiedBox = document.getElementById('drawer-column-unified-box');
+    const customKeyInput = document.getElementById('drawer-column-key-input');
+    unifyToggle.checked = !!q.dataKey;
+    unifiedBox.style.display = q.dataKey ? 'block' : 'none';
+    customKeyInput.value = q.dataKey || '';
+    syncColumnSelectWithKey(q.dataKey || '');
+
+    // バリデーション
+    const valToggle = document.getElementById('drawer-validation-toggle');
+    const valFields = document.getElementById('drawer-validation-fields');
+    valToggle.checked = !!q.validation;
+    valFields.style.display = q.validation ? 'block' : 'none';
+    if (q.validation) {
+      syncDrawerValidationInputs(q.validation);
+    }
+
+    // 回答控えメール
+    const autoReplyToggle = document.getElementById('drawer-autoreply-toggle');
+    autoReplyToggle.checked = !!q.autoReply;
+
+    // メディア
+    const mediaToggle = document.getElementById('drawer-media-toggle');
+    const mediaFields = document.getElementById('drawer-media-fields');
+    const mediaType = document.getElementById('drawer-media-type');
+    const mediaUrl = document.getElementById('drawer-media-url');
+    mediaToggle.checked = !!(q.media && q.media.url);
+    mediaFields.style.display = (q.media && q.media.url) ? 'block' : 'none';
+    if (q.media) {
+      mediaType.value = q.media.type || 'image';
+      mediaUrl.value = q.media.url || '';
+    } else {
+      mediaUrl.value = '';
+    }
+
+    // スクロール規約
+    const scrollToggle = document.getElementById('drawer-scroll-toggle');
+    const scrollFields = document.getElementById('drawer-scroll-fields');
+    const scrollText = document.getElementById('drawer-scroll-text');
+    scrollToggle.checked = !!q.scrollRequired;
+    scrollFields.style.display = q.scrollRequired ? 'block' : 'none';
+    scrollText.value = q.scrollText || '';
+
+    // 表示アニメーション
+    drawer.classList.add('is-open');
+    backdrop.classList.add('is-open');
+    drawer.setAttribute('aria-hidden', 'false');
+  }
+
+  // 5. ドロワーを閉じる
+  function closeQuestionSettingsDrawer() {
+    const drawer = document.getElementById('question-settings-drawer');
+    const backdrop = document.getElementById('question-settings-drawer-backdrop');
+    if (!drawer) return;
+
+    drawer.classList.remove('is-open');
+    if (backdrop) backdrop.classList.remove('is-open');
+    drawer.setAttribute('aria-hidden', 'true');
+
+    persistDrawerChanges();
+    injectQuestionCardCompactStylesAndBadges();
+    _activeDrawerQuestionId = null;
+  }
+  window.openQuestionSettingsDrawer = openQuestionSettingsDrawer;
+  window.closeQuestionSettingsDrawer = closeQuestionSettingsDrawer;
+
+  // AIのおすすめ一括適用
+  function applyAiAdviceToActiveQuestion(advice) {
+    const q = findQuestionDefById(_activeDrawerQuestionId);
+    if (!q || !advice) return;
+
+    // 1. カラム統一
+    if (advice.unifyColumn && advice.dataKey) {
+      q.dataKey = advice.dataKey;
+      const unifyToggle = document.getElementById('drawer-unify-column-toggle');
+      const unifiedBox = document.getElementById('drawer-column-unified-box');
+      const customKeyInput = document.getElementById('drawer-column-key-input');
+      unifyToggle.checked = true;
+      unifiedBox.style.display = 'block';
+      customKeyInput.value = advice.dataKey;
+      syncColumnSelectWithKey(advice.dataKey);
+    }
+
+    // 2. バリデーション
+    const valToggle = document.getElementById('drawer-validation-toggle');
+    const valFields = document.getElementById('drawer-validation-fields');
+    if (advice.validation) {
+      q.validation = JSON.parse(JSON.stringify(advice.validation));
+      valToggle.checked = true;
+      valFields.style.display = 'block';
+      syncDrawerValidationInputs(q.validation);
+    } else {
+      q.validation = null;
+      valToggle.checked = false;
+      valFields.style.display = 'none';
+    }
+
+    // 3. 回答控えメール
+    const autoReplyToggle = document.getElementById('drawer-autoreply-toggle');
+    q.autoReply = !!advice.autoReply;
+    autoReplyToggle.checked = !!advice.autoReply;
+
+    // 保存とフィードバック
+    persistDrawerChanges();
+
+    const btnApplyAi = document.getElementById('btn-apply-ai-rec');
+    btnApplyAi.classList.add('applied');
+    btnApplyAi.innerHTML = '✓ おすすめ設定を適用しました！';
+    setTimeout(() => {
+      btnApplyAi.classList.remove('applied');
+      btnApplyAi.innerHTML = '✨ おすすめ設定を一括適用';
+    }, 2000);
+  }
+
+  // 変更の永続化とライブ同期
+  function persistDrawerChanges() {
+    if (window.S) window.S();
+    if (typeof renderLivePreview === 'function') renderLivePreview();
+    injectQuestionCardCompactStylesAndBadges();
+  }
+
+  // 監視と初期化ループへの登録
+  setInterval(injectQuestionCardCompactStylesAndBadges, 250);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectQuestionCardCompactStylesAndBadges);
+  } else {
+    injectQuestionCardCompactStylesAndBadges();
+  }
 })();
+

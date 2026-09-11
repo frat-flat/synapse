@@ -2128,7 +2128,7 @@
           return null;
         }
 
-        // 法人名選択時にカナ欄・インボイス登録番号欄・郵便番号・4分割住所欄へ自動連動
+        // 法人名選択時にカナ欄・インボイス登録番号欄・郵便番号・4分割住所欄・税務区分へ自動連動
         function autoFillCorpRelatedFields(item) {
           if (!item || !formDefinition || !formDefinition.sections) return;
 
@@ -2141,9 +2141,24 @@
             (sec.questions || []).forEach(q => {
               const qTitle = q.title || '';
 
-              // 1. カナ欄: 法人名でカナが登録されている場合のみ自動で補完（※代表者カナ、および口座名義・名義人カナは除外）
-              const isExcludedKana = qTitle.includes('代表') || qTitle.includes('口座') || qTitle.includes('名義');
-              if (q.type === 'text' && (qTitle.includes('カナ') || qTitle.includes('フリガナ') || qTitle.includes('ふりがな')) && !isExcludedKana) {
+              // 0. 法人名欄
+              const isCorpNameField = (q.dataKey === 'company_name') || ((qTitle.includes('法人名') || qTitle.includes('会社名')) && !qTitle.includes('カナ') && !qTitle.includes('フリガナ') && !qTitle.includes('ふりがな'));
+              if (isCorpNameField && item.name) {
+                formValues[q.id] = item.name.trim();
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const input = card.querySelector('.api-search-input-group input') || card.querySelector('input.form-control') || card.querySelector('input');
+                  if (input) {
+                    input.value = item.name.trim();
+                    clearError(q.id);
+                  }
+                }
+              }
+
+              // 1. カナ欄: 法人名でカナが登録されている場合のみ自動で補完（※代表者カナ、および口座名義・名義人カナ・屋号は除外）
+              const isExcludedKana = qTitle.includes('代表') || qTitle.includes('口座') || qTitle.includes('名義') || qTitle.includes('屋号');
+              const isCorpKana = (q.dataKey === 'company_kana') || ((qTitle.includes('カナ') || qTitle.includes('フリガナ') || qTitle.includes('ふりがな')) && !isExcludedKana);
+              if (q.type === 'text' && isCorpKana) {
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
                 const input = card ? (card.querySelector('input.form-control') || card.querySelector('input')) : null;
                 if (item.nameKana && item.nameKana.trim()) {
@@ -2161,9 +2176,27 @@
                 }
               }
 
-              // 2. インボイス登録番号欄
+              // 2. 税務区分・インボイス登録状況（ラジオ3択）の自動連動
+              const isTaxInvoiceField = (q.dataKey === 'tax_invoice_status') || qTitle.includes('税務区分') || (qTitle.includes('インボイス') && qTitle.includes('登録状況')) || (qTitle.includes('課税事業者') && q.type === 'radio');
+              if (isTaxInvoiceField && item.num) {
+                const targetLabel = "インボイス登録事業者である。";
+                formValues[q.id] = targetLabel;
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  card.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
+                  const radio = card.querySelector(`input[type="radio"][value="${targetLabel}"]`);
+                  if (radio) {
+                    radio.checked = true;
+                    const optLabel = radio.closest('.option-label');
+                    if (optLabel) optLabel.classList.add('selected');
+                  }
+                  clearError(q.id);
+                }
+              }
+
+              // 3. インボイス登録番号欄
               const apiConf = getQuestionApiConfig(q);
-              const isInvField = (apiConf && apiConf.isInvoice) || qTitle.includes('インボイス') || qTitle.includes('登録番号');
+              const isInvField = (q.dataKey === 'invoice_number') || (apiConf && apiConf.isInvoice) || (qTitle.includes('インボイス') && (qTitle.includes('番号') || qTitle.includes('登録')));
               if (isInvField && item.num) {
                 const formattedInv = item.num.startsWith('T') ? item.num : ('T' + item.num);
                 formValues[q.id] = formattedInv;
@@ -2178,16 +2211,20 @@
                   if (!badge) {
                     badge = document.createElement('div');
                     badge.className = 'api-verified-badge';
-                    const group = card.querySelector('.api-search-input-group') || input.parentNode;
-                    group.parentNode.insertBefore(badge, group.nextSibling);
+                    const group = card.querySelector('.api-search-input-group') || (input ? input.parentNode : null);
+                    if (group && group.parentNode) {
+                      group.parentNode.insertBefore(badge, group.nextSibling);
+                    } else {
+                      card.appendChild(badge);
+                    }
                   }
                   badge.innerHTML = `✓ 国税庁公表システム 実在確認済（${escapeHtml(item.name)}）`;
                   badge.style.display = 'flex';
                 }
               }
 
-              // 3. 法人番号欄
-              if (q.type === 'text' && (qTitle.includes('法人番号') || qTitle.includes('会社番号'))) {
+              // 4. 法人番号欄
+              if (q.type === 'text' && (q.dataKey === 'corp_number' || qTitle.includes('法人番号') || qTitle.includes('会社番号'))) {
                 if (item.num) {
                   formValues[q.id] = item.num;
                   const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
@@ -2201,8 +2238,8 @@
                 }
               }
 
-              // 4. 郵便番号欄
-              if (q.type === 'text' && (qTitle.includes('郵便番号') || qTitle.toLowerCase().includes('zip'))) {
+              // 5. 郵便番号欄
+              if (q.type === 'text' && (q.dataKey === 'zip_code' || qTitle.includes('郵便番号') || qTitle.toLowerCase().includes('zip'))) {
                 const zipToFill = formattedZip || (rawZip.length === 7 ? rawZip : '');
                 if (zipToFill) {
                   formValues[q.id] = zipToFill;
@@ -2217,8 +2254,8 @@
                 }
               }
 
-              // 5. 都道府県欄（セレクトまたはテキスト）
-              if (qTitle.includes('都道府県')) {
+              // 6. 都道府県欄（セレクトまたはテキスト）
+              if (q.dataKey === 'pref' || qTitle.includes('都道府県')) {
                 if (parsedAddr.pref) {
                   formValues[q.id] = parsedAddr.pref;
                   const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
@@ -2236,8 +2273,8 @@
                 }
               }
 
-              // 6. 市区町村欄
-              if (qTitle.includes('市区町村') || (qTitle.includes('市') && qTitle.includes('区') && !qTitle.includes('番地'))) {
+              // 7. 市区町村欄
+              if (q.dataKey === 'city' || qTitle.includes('市区町村') || (qTitle.includes('市') && qTitle.includes('区') && !qTitle.includes('番地'))) {
                 if (parsedAddr.city) {
                   formValues[q.id] = parsedAddr.city;
                   const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
@@ -2251,8 +2288,8 @@
                 }
               }
 
-              // 7. 町名・番地欄（建物名を含まない枠）
-              const isStreetOnly = (qTitle.includes('町名') || qTitle.includes('番地') || qTitle.includes('丁目')) && !qTitle.includes('建物');
+              // 8. 町名・番地欄（建物名を含まない枠）
+              const isStreetOnly = (q.dataKey === 'street') || ((qTitle.includes('町名') || qTitle.includes('番地') || qTitle.includes('丁目')) && !qTitle.includes('建物'));
               if (isStreetOnly) {
                 if (parsedAddr.street) {
                   formValues[q.id] = parsedAddr.street;
@@ -2267,8 +2304,8 @@
                 }
               }
 
-              // 8. 建物名・部屋番号欄
-              const isBuildingField = qTitle.includes('建物') || qTitle.includes('マンション') || qTitle.includes('ビル') || qTitle.includes('部屋番号');
+              // 9. 建物名・部屋番号欄
+              const isBuildingField = (q.dataKey === 'building') || qTitle.includes('建物') || qTitle.includes('マンション') || qTitle.includes('ビル') || qTitle.includes('部屋番号');
               if (isBuildingField) {
                 formValues[q.id] = parsedAddr.building || '';
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
@@ -2281,7 +2318,7 @@
                 }
               }
 
-              // 9. 旧来の単一住所枠（町名・番地・建物名が1つにまとまっている場合への後方互換）
+              // 10. 旧来の単一住所枠（町名・番地・建物名が1つにまとまっている場合への後方互換）
               const isLegacyCombinedStreet = (qTitle.includes('町名') || qTitle.includes('番地')) && qTitle.includes('建物');
               if (isLegacyCombinedStreet) {
                 const combined = `${parsedAddr.street} ${parsedAddr.building}`.trim();
@@ -2297,7 +2334,11 @@
               }
             });
           });
+
+          // スキップ・表示条件（インボイス番号の表示トグル等）を即時再計算
+          applySectionSkipLogic();
         }
+        window.autoFillCorpRelatedFields = autoFillCorpRelatedFields;
 
         // 📮 郵便番号からの住所自動補完ハンドラ（公開回答画面 view.html 用）
         function autoFillAddressFromZipInView(addr) {
@@ -2372,6 +2413,21 @@
 
           // ヘッダー情報描画
           formTitleEl.textContent = formDefinition.title || '無題のフォーム';
+          const titleFontSize = (formDefinition.appearance && formDefinition.appearance.fontSizes && formDefinition.appearance.fontSizes.title)
+            || formDefinition.titleFontSize
+            || (formDefinition.fontSizes && formDefinition.fontSizes.title);
+          if (titleFontSize) {
+            if (String(titleFontSize).startsWith('custom:')) {
+              const px = parseInt(String(titleFontSize).split(':')[1]) || 28;
+              formTitleEl.style.fontSize = `${px}px`;
+            } else if (titleFontSize === 'small') {
+              formTitleEl.style.fontSize = '1.35rem';
+            } else if (titleFontSize === 'medium') {
+              formTitleEl.style.fontSize = '1.65rem';
+            } else if (titleFontSize === 'large') {
+              formTitleEl.style.fontSize = '2.1rem';
+            }
+          }
           if (formDefinition.subtitle) {
             formSubtitleEl.textContent = formDefinition.subtitle;
             formSubtitleEl.style.display = 'block';
@@ -2714,6 +2770,20 @@
           if (formValues[sourceId] !== undefined && formValues[sourceId] !== null && formValues[sourceId] !== '') {
             return formValues[sourceId];
           }
+
+          // dataKey または title による検索フォールバック
+          if (formDefinition && formDefinition.sections) {
+            for (const s of formDefinition.sections) {
+              for (const sq of (s.questions || [])) {
+                if (sq.dataKey === sourceId || sq.id === sourceId || sq.title === sourceId) {
+                  if (formValues[sq.id] !== undefined && formValues[sq.id] !== null && formValues[sq.id] !== '') {
+                    return formValues[sq.id];
+                  }
+                }
+              }
+            }
+          }
+
           const card = document.querySelector(`.question-card[data-question-id="${sourceId}"]`);
           if (card) {
             const textInput = card.querySelector('input:not([type="checkbox"]):not([type="radio"]), textarea, select');
@@ -3033,6 +3103,26 @@
             const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
             if (!card) return;
 
+            // 🎯 税務区分3択とインボイス登録番号の表示連動制御
+            const isInvoiceField = (q.dataKey === 'invoice_number') ||
+              ((q.title || '').includes('インボイス') && ((q.title || '').includes('番号') || (q.title || '').includes('登録')));
+            if (isInvoiceField) {
+              const taxQ = (section.questions || []).find(cq => cq.dataKey === 'tax_invoice_status' || (cq.title || '').includes('税務区分') || (cq.title || '').includes('インボイス登録状況'));
+              if (taxQ) {
+                const currentTaxVal = formValues[taxQ.id] || getResolvedQuestionValue(taxQ.id);
+                if (currentTaxVal === 'インボイス登録事業者である。') {
+                  card.style.display = 'block';
+                  card.classList.remove('q-card-disabled');
+                  const inputs = card.querySelectorAll('input:not(.same-as-above-checkbox), textarea, select, button');
+                  inputs.forEach(inp => inp.disabled = false);
+                } else {
+                  card.style.display = 'none';
+                  clearError(q.id);
+                }
+                return;
+              }
+            }
+
             if (q.skipLogic && q.skipLogic.dependsOn) {
               const depId = q.skipLogic.dependsOn;
               const triggerVal = q.skipLogic.value;
@@ -3063,6 +3153,7 @@
             }
           });
         }
+        window.applySectionSkipLogic = applySectionSkipLogic;
 
         // ==========================================
         // 5. 質問カード生成
@@ -3071,6 +3162,11 @@
           const card = document.createElement('div');
           card.className = 'question-card';
           card.dataset.questionId = q.id;
+          card.setAttribute('data-question-title', q.title || '');
+          if (q.dataKey) {
+            card.setAttribute('data-key', q.dataKey);
+            card.dataset.dataKey = q.dataKey;
+          }
 
           // タイトル
           const title = document.createElement('div');
@@ -3198,6 +3294,13 @@
           card.appendChild(inputContainer);
           card.appendChild(errorMsg);
 
+          if (q.dataKey) {
+            card.querySelectorAll('input:not(.same-as-above-checkbox), select:not(.corp-pref-filter), textarea').forEach(el => {
+              el.setAttribute('data-key', q.dataKey);
+              el.dataset.dataKey = q.dataKey;
+            });
+          }
+
           return card;
         }
 
@@ -3305,7 +3408,8 @@
                     street: item.street || "",
                     postCode: item.postCode || "",
                     address: item.address || "",
-                    regDate: item.regDate || ""
+                    regDate: item.regDate || "",
+                    invoiceNum: item.invoiceNum || (item.num ? `T${item.num}` : "")
                   }));
                   isLiveApi = true;
                 }
@@ -4533,34 +4637,81 @@
               }
             }
 
-            // 2-2. カナ入力必須チェック
-            // ユーザー要件: 法人名でカナが登録されている場合のみ自動で補完。ない場合は入力しないとエラー。
-            // 個人事業で屋号がない場合は自動で半角ハイフンの補完がされるのでエラーにならない。
-            const isKanaField = q.title && (q.title.includes('カナ') || q.title.includes('フリガナ') || q.title.includes('ふりがな'));
-            if (isKanaField) {
-              // 法人名・屋号がハイフン以外で入力されているかチェック
-              let corpVal = '';
-              if (formDefinition && formDefinition.sections) {
-                formDefinition.sections.forEach(s => {
-                  (s.questions || []).forEach(cq => {
-                    const isCorp = cq.title && (cq.title.includes('法人名') || cq.title.includes('屋号')) &&
-                                   !cq.title.includes('カナ') && !cq.title.includes('フリガナ') && !cq.title.includes('ふりがな');
-                    if (isCorp && formValues[cq.id]) {
-                      corpVal = String(formValues[cq.id]).trim();
-                    }
-                  });
-                });
-              }
+            // 2-2. 屋号とカナの連動チェック（個人・個人事業主）
+            const isTradeKanaField = (q.dataKey === 'company_kana' && (q.title || '').includes('屋号')) ||
+                                     ((q.title || '').includes('屋号') && ((q.title || '').includes('カナ') || (q.title || '').includes('フリガナ')));
+            if (isTradeKanaField) {
+              const tradeQ = (section.questions || []).find(cq => (cq.dataKey === 'company_name' && (cq.title || '').includes('屋号')) ||
+                                                                  ((cq.title || '').includes('屋号') && !(cq.title || '').includes('カナ') && !(cq.title || '').includes('フリガナ')));
+              const tradeVal = tradeQ && formValues[tradeQ.id] ? String(formValues[tradeQ.id]).trim() : '';
+              const isTradeEntered = tradeVal !== '' && tradeVal !== '-';
+              const isKanaEmpty = val === undefined || val === null || (typeof val === 'string' && val.trim() === '') || val === '-';
 
+              if (isTradeEntered && isKanaEmpty) {
+                card.classList.add('has-error');
+                if (errorTextEl) errorTextEl.textContent = '屋号を入力された場合は、屋号のカナ（全角カタカナ）を入力してください。';
+                isValid = false;
+                if (!firstErrorCard) firstErrorCard = card;
+                return;
+              } else if (!isTradeEntered && isKanaEmpty) {
+                // 屋号が未入力の場合はカナも空でOK、エラーにしない
+                clearError(q.id);
+              }
+            }
+
+            // 2-3. 法人名カナ入力必須チェック
+            const isCorpKanaField = (q.dataKey === 'company_kana' && !(q.title || '').includes('屋号')) ||
+                                    (!isTradeKanaField && q.title && (q.title.includes('法人名') && (q.title.includes('カナ') || q.title.includes('フリガナ'))));
+            if (isCorpKanaField) {
+              const corpQ = (section.questions || []).find(cq => (cq.dataKey === 'company_name' && !(cq.title || '').includes('屋号')) ||
+                                                                 (cq.title && cq.title.includes('法人名') && !cq.title.includes('カナ') && !cq.title.includes('フリガナ')));
+              const corpVal = corpQ && formValues[corpQ.id] ? String(formValues[corpQ.id]).trim() : '';
               const isCorpEntered = corpVal !== '' && corpVal !== '-';
-              const isKanaEmpty = val === undefined || val === null || (typeof val === 'string' && val.trim() === '');
-              
+              const isKanaEmpty = val === undefined || val === null || (typeof val === 'string' && val.trim() === '') || val === '-';
+
               if (isCorpEntered && isKanaEmpty) {
                 card.classList.add('has-error');
                 if (errorTextEl) errorTextEl.textContent = 'カナの登録がない法人のため、フリガナを入力してください。';
                 isValid = false;
                 if (!firstErrorCard) firstErrorCard = card;
                 return;
+              }
+            }
+
+            // 2-4. 町名・番地入力時の番地（数字）未入力防止チェック
+            const isStreetAddressField = (q.dataKey === 'street') ||
+              (((q.title || '').includes('町名') || (q.title || '').includes('番地')) && !(q.title || '').includes('建物'));
+            if (isStreetAddressField && val && typeof val === 'string' && val.trim() !== '' && val.trim() !== '-') {
+              const hasDigits = /[0-9０-９]/.test(val);
+              if (!hasDigits) {
+                card.classList.add('has-error');
+                if (errorTextEl) errorTextEl.textContent = '番地・号（数字）まで正しく入力してください。町域のみでは送信できません。';
+                isValid = false;
+                if (!firstErrorCard) firstErrorCard = card;
+                return;
+              }
+            }
+
+            // 2-5. 税務区分「インボイス登録事業者である。」選択時の番号必須チェック
+            const isInvNumField = (q.dataKey === 'invoice_number') ||
+              ((q.title || '').includes('インボイス') && ((q.title || '').includes('番号') || (q.title || '').includes('登録')));
+            if (isInvNumField) {
+              const taxQ = (section.questions || []).find(cq => cq.dataKey === 'tax_invoice_status' || (cq.title || '').includes('税務区分') || (cq.title || '').includes('インボイス登録状況'));
+              if (taxQ) {
+                const taxVal = formValues[taxQ.id];
+                if (taxVal !== 'インボイス登録事業者である。') {
+                  // 非課税事業者または未登録課税事業者はインボイス番号の入力不要
+                  clearError(q.id);
+                  return;
+                }
+                // インボイス登録事業者の場合は番号必須
+                if (!val || typeof val !== 'string' || val.trim() === '' || val.trim() === '-') {
+                  card.classList.add('has-error');
+                  if (errorTextEl) errorTextEl.textContent = '「インボイス登録事業者である。」を選択された場合は、インボイス登録番号（T+13桁）を入力してください。';
+                  isValid = false;
+                  if (!firstErrorCard) firstErrorCard = card;
+                  return;
+                }
               }
             }
 
@@ -4651,6 +4802,7 @@
           }
           return isValid;
         }
+        window.validateCurrentSection = validateCurrentSection;
 
         // ==========================================
         // 7. 画面遷移 & 送信処理
@@ -4954,7 +5106,11 @@
           formDefinition.sections.forEach(s => {
             (s.questions || []).forEach(q => {
               if (formValues[q.id] !== undefined && formValues[q.id] !== '') {
-                submitData[q.title || q.id] = formValues[q.id];
+                const key = q.dataKey || q.title || q.id;
+                submitData[key] = formValues[q.id];
+                if (q.title && q.title !== key) {
+                  submitData[q.title] = formValues[q.id];
+                }
               }
             });
           });
