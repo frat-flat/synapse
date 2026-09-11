@@ -178,8 +178,11 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
     }
 
     // 4. Gemini API 呼び出し
-    const modelName = 'gemini-1.5-flash';
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+    const candidateModels = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite'];
+    let lastErrorBody = '';
+    let lastStatus = 500;
+    let response = null;
+    let successfulModel = '';
 
     const requestPayload = {
       systemInstruction: {
@@ -193,51 +196,62 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
       }
     };
 
-    // 標準的な呼び出し（x-goog-api-key + クエリパラメータ）
-    let response = await fetch(`${geminiUrl}?key=${encodeURIComponent(apiKey)}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey
-      },
-      body: JSON.stringify(requestPayload)
-    });
+    for (const modelName of candidateModels) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
-    // もしHTTPリファラー制限エラー（referer <empty> are blocked）の場合のみ、Refererヘッダーを付与して再試行
-    if (!response.ok && response.status === 403) {
-      try {
-        const errCloned = await response.clone().text();
-        if (errCloned.includes('referer') || errCloned.includes('Referer')) {
-          response = await fetch(`${geminiUrl}?key=${encodeURIComponent(apiKey)}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey,
-              'Referer': req.headers.referer || req.headers.origin || 'https://synapse-wayway.vercel.app/'
-            },
-            body: JSON.stringify(requestPayload)
-          });
+      let resTry = await fetch(`${geminiUrl}?key=${encodeURIComponent(apiKey)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey
+        },
+        body: JSON.stringify(requestPayload)
+      });
+
+      // もしHTTPリファラー制限エラー（referer <empty> are blocked）の場合のみ、Refererヘッダーを付与して再試行
+      if (!resTry.ok && resTry.status === 403) {
+        try {
+          const errCloned = await resTry.clone().text();
+          if (errCloned.includes('referer') || errCloned.includes('Referer')) {
+            resTry = await fetch(`${geminiUrl}?key=${encodeURIComponent(apiKey)}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
+                'Referer': req.headers.referer || req.headers.origin || 'https://synapse-wayway.vercel.app/'
+              },
+              body: JSON.stringify(requestPayload)
+            });
+          }
+        } catch (retryErr) {
+          console.warn('Retry with referer failed:', retryErr);
         }
-      } catch (retryErr) {
-        console.warn('Retry with referer failed:', retryErr);
+      }
+
+      if (resTry.ok) {
+        response = resTry;
+        successfulModel = modelName;
+        break;
+      } else {
+        lastStatus = resTry.status;
+        lastErrorBody = await resTry.text();
+        console.warn(`[Gemini API] Model ${modelName} failed with ${resTry.status}:`, lastErrorBody);
       }
     }
 
-    if (!response.ok) {
-      const errBody = await response.text();
-      console.error('[Gemini API Error]', response.status, errBody);
+    if (!response || !response.ok) {
       let detailMsg = '';
       try {
-        const parsedErr = JSON.parse(errBody);
-        detailMsg = parsedErr.error?.message || errBody;
+        const parsedErr = JSON.parse(lastErrorBody);
+        detailMsg = parsedErr.error?.message || lastErrorBody;
       } catch (e) {
-        detailMsg = errBody;
+        detailMsg = lastErrorBody;
       }
       return res.status(200).json({
         success: false,
         isConfigured: true,
         error: 'GEMINI_API_REQUEST_FAILED',
-        status: response.status,
+        status: lastStatus,
         message: 'Gemini APIとの通信中にエラーが発生しました。',
         detail: detailMsg
       });
@@ -276,7 +290,7 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
       return res.status(200).json({
         success: true,
         isConfigured: true,
-        model: modelName,
+        model: successfulModel,
         advice: parsedResult
       });
     }
@@ -284,7 +298,7 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
     return res.status(200).json({
       success: true,
       isConfigured: true,
-      model: modelName,
+      model: successfulModel,
       reply: parsedResult.reply || '',
       pattern: parsedResult.pattern || ''
     });
