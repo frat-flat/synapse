@@ -26,14 +26,7 @@ module.exports = async (req, res) => {
   try {
     const { mode, question, otherQuestions, message, history = [], clientApiKey } = req.body || {};
 
-    if (mode === 'list_models') {
-      const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
-      const listRes = await fetch(listUrl);
-      const listData = await listRes.json();
-      return res.status(200).json({ success: listRes.ok, listData });
-    }
-
-    if (mode !== 'diagnose_question') {
+    if (mode !== 'diagnose_question' && mode !== 'list_models') {
       if (!message || typeof message !== 'string' || message.trim().length === 0) {
         return res.status(400).json({
           success: false,
@@ -69,6 +62,13 @@ module.exports = async (req, res) => {
         error: 'GEMINI_API_KEY_NOT_CONFIGURED',
         message: 'Vercelの環境変数に GEMINI_API_KEY が設定されていません。'
       });
+    }
+
+    if (mode === 'list_models') {
+      const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
+      const listRes = await fetch(listUrl);
+      const listData = await listRes.json();
+      return res.status(200).json({ success: listRes.ok, listData });
     }
 
     // 2. システムプロンプトおよびプロンプトの構築
