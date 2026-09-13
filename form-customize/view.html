@@ -69,6 +69,81 @@
         padding: 32px 32px 24px;
         box-shadow: 0 1px 2px rgba(60,64,67,0.1);
         position: relative;
+        transition: all 0.2s ease;
+      }
+
+      /* 枠スタイルバリエーション */
+      .form-header-card.header-style-card-accent-top {
+        background-color: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-top: 8px solid var(--color-primary);
+        border-radius: var(--border-radius);
+        box-shadow: 0 1px 2px rgba(60,64,67,0.1);
+      }
+      .form-header-card.header-style-card-simple {
+        background-color: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-top: 1px solid var(--color-border);
+        border-radius: var(--border-radius);
+        box-shadow: 0 1px 2px rgba(60,64,67,0.1);
+      }
+      .form-header-card.header-style-card-accent-left {
+        background-color: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-top: 1px solid var(--color-border);
+        border-left: 8px solid var(--color-primary);
+        border-radius: var(--border-radius);
+        box-shadow: 0 1px 2px rgba(60,64,67,0.1);
+      }
+      .form-header-card.header-style-card-shadow {
+        background-color: var(--color-bg-card);
+        border: 1px solid rgba(0,0,0,0.04);
+        border-radius: 16px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+      }
+      .form-header-card.header-style-frameless {
+        background-color: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        padding: 16px 8px 8px !important;
+      }
+      .form-header-card.header-style-frameless-underline {
+        background-color: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        padding: 16px 8px 12px !important;
+      }
+      .form-header-card.header-style-frameless-underline #form-title {
+        border-bottom: 3px solid var(--color-primary);
+        padding-bottom: 10px;
+        margin-bottom: 14px;
+        display: inline-block;
+      }
+
+      /* 配置（アライメント） */
+      .form-header-card.header-align-left {
+        text-align: left;
+      }
+      .form-header-card.header-align-left .estimated-time {
+        margin: 14px 0 0;
+      }
+      .form-header-card.header-align-center {
+        text-align: center;
+      }
+      .form-header-card.header-align-center .estimated-time {
+        margin: 14px auto 0;
+      }
+      .form-header-card.header-align-center #form-desc {
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .form-header-card.header-align-right {
+        text-align: right;
+      }
+      .form-header-card.header-align-right .estimated-time {
+        margin: 14px 0 0 auto;
       }
 
       .form-header-card h1 {
@@ -723,8 +798,8 @@
       <div id="form-container" style="display: none; flex-direction: column; gap: 16px;">
         <!-- ヘッダーカード -->
         <header class="form-header-card" id="form-header-card">
-          <div id="form-subtitle" class="form-subtitle" style="display: none;"></div>
           <h1 id="form-title">無題のフォーム</h1>
+          <div id="form-subtitle" class="form-subtitle" style="display: none;"></div>
           <div id="form-desc" class="form-desc"></div>
           <div id="form-time-badge" class="estimated-time" style="display: none;">
             <span>⏱️</span>
@@ -901,6 +976,7 @@
         const errorBox = document.getElementById('error-box');
         const formContainer = document.getElementById('form-container');
         const successCard = document.getElementById('success-card');
+        const formHeaderCardEl = document.getElementById('form-header-card');
 
         const formTitleEl = document.getElementById('form-title');
         const formSubtitleEl = document.getElementById('form-subtitle');
@@ -2489,6 +2565,32 @@
             formTimeBadgeEl.style.display = 'inline-flex';
           } else {
             formTimeBadgeEl.style.display = 'none';
+          }
+
+          // ヘッダーデザイン（枠パターン・文字配置・サブタイトル位置）の適用
+          const headerStyle = formDefinition.headerStyle || 'card-accent-top';
+          const headerAlign = formDefinition.headerAlign || 'left';
+          const subtitlePosition = formDefinition.subtitlePosition || 'below';
+
+          formHeaderCardEl.classList.remove(
+            'header-style-card-accent-top',
+            'header-style-card-simple',
+            'header-style-card-accent-left',
+            'header-style-card-shadow',
+            'header-style-frameless',
+            'header-style-frameless-underline',
+            'header-align-left',
+            'header-align-center',
+            'header-align-right'
+          );
+          formHeaderCardEl.classList.add(`header-style-${headerStyle}`);
+          formHeaderCardEl.classList.add(`header-align-${headerAlign}`);
+
+          // サブタイトルの位置調整（タイトルの上 or タイトルの下）
+          if (subtitlePosition === 'above') {
+            formHeaderCardEl.insertBefore(formSubtitleEl, formTitleEl);
+          } else {
+            formHeaderCardEl.insertBefore(formSubtitleEl, formDescEl);
           }
 
           // 最初のセクションを描画

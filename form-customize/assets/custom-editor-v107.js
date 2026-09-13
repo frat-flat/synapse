@@ -3661,7 +3661,8 @@
       const proKeys = [
         'appearance', 'header', 'announcement', 'displayMode', 'progressIndicator',
         'showLogo', 'headerImage', 'headerImageScale', 'headerImagePosition', 'headerImagePositionX',
-        'logoType', 'logoPosition', 'logoImageUrl', 'useHeaderImage', 'useBgImage', 'bgTheme', 'bgCustomUrl'
+        'logoType', 'logoPosition', 'logoImageUrl', 'useHeaderImage', 'useBgImage', 'bgTheme', 'bgCustomUrl',
+        'headerStyle', 'headerAlign', 'subtitlePosition'
       ];
       if (!preserveCurrentMode && savedForm.editorMode !== undefined) {
         window.G.editorMode = savedForm.editorMode;
@@ -3704,6 +3705,9 @@
     if (window.G.useHeaderImage === undefined) window.G.useHeaderImage = false;
     if (window.G.useBgImage === undefined) window.G.useBgImage = false;
     if (window.G.bgTheme === undefined) window.G.bgTheme = "";
+    if (window.G.headerStyle === undefined) window.G.headerStyle = "card-accent-top";
+    if (window.G.headerAlign === undefined) window.G.headerAlign = "left";
+    if (window.G.subtitlePosition === undefined) window.G.subtitlePosition = "below";
 
     const g = window.G;
 
@@ -3728,6 +3732,20 @@
     document.getElementById('editor-pro-title').value = g.header.title || "";
     document.getElementById('editor-pro-subtitle').value = (g.header && g.header.subtitle) ? g.header.subtitle : (g.subtitle || "");
     document.getElementById('editor-pro-disclaimer').value = g.header.disclaimer || "";
+
+    // タイトル枠スタイル・文字配置・サブタイトル位置のプレフィル
+    const headerStyleEl = document.getElementById('editor-header-style');
+    if (headerStyleEl) headerStyleEl.value = g.headerStyle || 'card-accent-top';
+
+    const headerAlignVal = g.headerAlign || 'left';
+    const headerAlignEl = document.getElementById('editor-header-align');
+    if (headerAlignEl) headerAlignEl.value = headerAlignVal;
+    document.querySelectorAll('.btn-header-align').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-align') === headerAlignVal);
+    });
+
+    const subtitlePosEl = document.getElementById('editor-subtitle-position');
+    if (subtitlePosEl) subtitlePosEl.value = g.subtitlePosition || 'below';
 
     document.getElementById('editor-pro-display-mode').value = g.displayMode;
     document.getElementById('editor-pro-progress-indicator').value = g.progressIndicator;
@@ -4520,6 +4538,43 @@
     bindChange('editor-pro-display-mode', v => window.G.displayMode = v);
     bindChange('editor-pro-progress-indicator', v => window.G.progressIndicator = v);
 
+    bindChange('editor-header-style', v => {
+      window.G.headerStyle = v;
+      if (window.U && window.U[window.W]) window.U[window.W].headerStyle = v;
+      if (window.n) window.n.headerStyle = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    document.querySelectorAll('.btn-header-align').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const align = btn.getAttribute('data-align') || 'left';
+        document.querySelectorAll('.btn-header-align').forEach(b => b.classList.toggle('active', b === btn));
+        const hiddenAlign = document.getElementById('editor-header-align');
+        if (hiddenAlign) hiddenAlign.value = align;
+        window.G.headerAlign = align;
+        if (window.U && window.U[window.W]) window.U[window.W].headerAlign = align;
+        if (window.n) window.n.headerAlign = align;
+        applyPreviewTheme();
+        renderLivePreview();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      });
+    });
+
+    bindChange('editor-subtitle-position', v => {
+      window.G.subtitlePosition = v;
+      if (window.U && window.U[window.W]) window.U[window.W].subtitlePosition = v;
+      if (window.n) window.n.subtitlePosition = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
     bindInput('editor-pro-contrast', v => {
       window.G.appearance.contrast = parseInt(v, 10);
       const basePreset = COLOR_PRESETS[window.G.appearance.colorPreset];
@@ -4827,6 +4882,35 @@
       } else {
         subtitleP.textContent = "";
         subtitleP.style.display = 'none';
+      }
+    }
+
+    // 枠スタイル・配置・サブタイトル位置の適用
+    const headerStyle = g.headerStyle || 'card-accent-top';
+    const headerAlign = g.headerAlign || 'left';
+    const subtitlePosition = g.subtitlePosition || 'below';
+
+    previewCard.classList.remove(
+      'header-style-card-accent-top',
+      'header-style-card-simple',
+      'header-style-card-accent-left',
+      'header-style-card-shadow',
+      'header-style-frameless',
+      'header-style-frameless-underline'
+    );
+    previewCard.classList.add(`header-style-${headerStyle}`);
+
+    const previewFormHeader = document.getElementById('preview-form-header');
+    if (previewFormHeader) {
+      previewFormHeader.classList.remove('header-align-left', 'header-align-center', 'header-align-right');
+      previewFormHeader.classList.add(`header-align-${headerAlign}`);
+
+      if (subtitleP && previewTitle && previewDesc) {
+        if (subtitlePosition === 'above') {
+          previewFormHeader.insertBefore(subtitleP, previewTitle);
+        } else {
+          previewFormHeader.insertBefore(subtitleP, previewDesc);
+        }
       }
     }
 
@@ -12517,6 +12601,36 @@
 
     if (liveDescP) liveDescP.innerHTML = renderRichTextWithLinks(isPro ? proDescVal : currentFormDesc);
 
+    // ライブプレビューの枠スタイル・配置・サブタイトル位置の適用
+    const liveFormHeader = document.getElementById('live-preview-form-header');
+    if (liveFormHeader) {
+      const headerStyle = g.headerStyle || 'card-accent-top';
+      const headerAlign = g.headerAlign || 'left';
+      const subtitlePosition = g.subtitlePosition || 'below';
+
+      liveFormHeader.classList.remove(
+        'header-style-card-accent-top',
+        'header-style-card-simple',
+        'header-style-card-accent-left',
+        'header-style-card-shadow',
+        'header-style-frameless',
+        'header-style-frameless-underline',
+        'header-align-left',
+        'header-align-center',
+        'header-align-right'
+      );
+      liveFormHeader.classList.add(`header-style-${headerStyle}`);
+      liveFormHeader.classList.add(`header-align-${headerAlign}`);
+
+      if (liveSubtitleP && liveTitleH && liveDescP) {
+        if (subtitlePosition === 'above') {
+          liveFormHeader.insertBefore(liveSubtitleP, liveTitleH);
+        } else {
+          liveFormHeader.insertBefore(liveSubtitleP, liveDescP);
+        }
+      }
+    }
+
     // ライブプレビューのヘッダー画像表示制御
     const liveHeaderImgContainer = document.getElementById('live-preview-header-image-container');
     const liveHeaderImg = document.getElementById('live-preview-header-image');
@@ -13206,6 +13320,46 @@
         }
       }
     });
+
+    panel.addEventListener('change', (e) => {
+      const t = e.target;
+      if (!t) return;
+      if (t.id === 'editor-header-style') {
+        if (window.G) window.G.headerStyle = t.value;
+        if (window.n) window.n.headerStyle = t.value;
+        if (window.U && window.U[window.W]) window.U[window.W].headerStyle = t.value;
+        applyPreviewTheme();
+        renderLivePreview();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      } else if (t.id === 'editor-subtitle-position') {
+        if (window.G) window.G.subtitlePosition = t.value;
+        if (window.n) window.n.subtitlePosition = t.value;
+        if (window.U && window.U[window.W]) window.U[window.W].subtitlePosition = t.value;
+        applyPreviewTheme();
+        renderLivePreview();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      }
+    });
+
+    panel.addEventListener('click', (e) => {
+      const alignBtn = e.target.closest('.btn-header-align');
+      if (alignBtn) {
+        e.preventDefault();
+        const align = alignBtn.getAttribute('data-align') || 'left';
+        document.querySelectorAll('.btn-header-align').forEach(b => b.classList.toggle('active', b === alignBtn));
+        const hiddenAlign = document.getElementById('editor-header-align');
+        if (hiddenAlign) hiddenAlign.value = align;
+        if (window.G) window.G.headerAlign = align;
+        if (window.n) window.n.headerAlign = align;
+        if (window.U && window.U[window.W]) window.U[window.W].headerAlign = align;
+        applyPreviewTheme();
+        renderLivePreview();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      }
+    });
   }
   setupLiveEditorInputDelegation();
   if (document.readyState === 'loading') {
@@ -13588,10 +13742,13 @@
       
       const idx = parseInt(activeIndex);
       if (allForms[idx]) {
-        const oldFormCopy = JSON.parse(JSON.stringify(allForms[idx]));
-        
         allForms[idx].title = window.G.title;
+        allForms[idx].subtitle = (window.G.header && window.G.header.subtitle) ? window.G.header.subtitle : (window.G.subtitle || '');
         allForms[idx].sections = window.G.sections;
+        
+        if (window.G.headerStyle !== undefined) allForms[idx].headerStyle = window.G.headerStyle;
+        if (window.G.headerAlign !== undefined) allForms[idx].headerAlign = window.G.headerAlign;
+        if (window.G.subtitlePosition !== undefined) allForms[idx].subtitlePosition = window.G.subtitlePosition;
         
         if (window.G.editorMode !== undefined) allForms[idx].editorMode = window.G.editorMode;
         if (window.G.header !== undefined) allForms[idx].header = window.G.header;
@@ -15039,6 +15196,9 @@
       title: (f.title || '').trim(),
       subtitle: (f.subtitle || '').trim(),
       description: (f.description || '').trim(),
+      headerStyle: f.headerStyle || 'card-accent-top',
+      headerAlign: f.headerAlign || 'left',
+      subtitlePosition: f.subtitlePosition || 'below',
       sections: (f.sections || []).map(sec => ({
         id: sec.id,
         title: (sec.title || '').trim(),
@@ -15081,9 +15241,13 @@
       title: formObj.title || '無題のフォーム',
       subtitle: formObj.subtitle || '',
       description: formObj.description || '',
+      headerStyle: formObj.headerStyle || 'card-accent-top',
+      headerAlign: formObj.headerAlign || 'left',
+      subtitlePosition: formObj.subtitlePosition || 'below',
       sections: JSON.parse(JSON.stringify(formObj.sections || [])),
       theme: formObj.theme ? JSON.parse(JSON.stringify(formObj.theme)) : null,
       settings: formObj.settings ? JSON.parse(JSON.stringify(formObj.settings)) : null,
+      appearance: formObj.appearance ? JSON.parse(JSON.stringify(formObj.appearance)) : null,
       estimatedTime: formObj.estimatedTime || null,
       publishedVersion: nextVersion,
       publishedAt: new Date().toISOString()

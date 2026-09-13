@@ -5559,4 +5559,97 @@ button.btn-sec-reorder {
   100% { opacity: 0.65; transform: scale(0.97); }
 }
 
+/* ==========================================================================
+   🎨 フォームタイトル枠デザイン ＆ 文字配置 アライメント スタイル
+   ========================================================================== */
+.btn-header-align {
+  background: var(--color-bg-input, #ffffff);
+  color: var(--color-text-muted, #666);
+  border: 1px solid var(--color-border, #ccc);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-header-align:hover {
+  background: rgba(0, 86, 179, 0.08);
+  color: var(--color-primary, #0056b3);
+}
+.btn-header-align.active {
+  background: var(--color-primary, #0056b3) !important;
+  color: #ffffff !important;
+  border-color: var(--color-primary, #0056b3) !important;
+  font-weight: 600;
+}
+
+/* PCプレビューカードの枠スタイル */
+#preview-card.header-style-card-accent-top {
+  border-top: 6px solid var(--color-primary) !important;
+  border-left: 1px solid var(--color-border) !important;
+  border-right: 1px solid var(--color-border) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+  background-color: var(--color-bg-card) !important;
+}
+#preview-card.header-style-card-simple {
+  border-top: 1px solid var(--color-border) !important;
+  border-left: 1px solid var(--color-border) !important;
+  border-right: 1px solid var(--color-border) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+  background-color: var(--color-bg-card) !important;
+}
+#preview-card.header-style-card-accent-left {
+  border-top: 1px solid var(--color-border) !important;
+  border-left: 6px solid var(--color-primary) !important;
+  border-right: 1px solid var(--color-border) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+  background-color: var(--color-bg-card) !important;
+}
+#preview-card.header-style-card-shadow {
+  border: 1px solid rgba(0,0,0,0.04) !important;
+  box-shadow: 0 10px 32px rgba(0,0,0,0.12) !important;
+  background-color: var(--color-bg-card) !important;
+}
+#preview-card.header-style-frameless {
+  border: 1px dashed var(--color-border) !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+#preview-card.header-style-frameless-underline {
+  border: 1px dashed var(--color-border) !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+#preview-card.header-style-frameless-underline #preview-form-title {
+  border-bottom: 3px solid var(--color-primary);
+  padding-bottom: 8px;
+  display: inline-block;
+}
+
+/* モバイルライブプレビュー枠スタイル */
+#live-preview-form-header.header-style-frameless-underline #live-preview-form-title {
+  border-bottom: 2px solid var(--color-primary);
+  padding-bottom: 4px;
+  display: inline-block;
+}
+
+/* プレビュー文字配置（アライメント） */
+#preview-form-header.header-align-left {
+  text-align: left !important;
+}
+#preview-form-header.header-align-center {
+  text-align: center !important;
+}
+#preview-form-header.header-align-right {
+  text-align: right !important;
+}
+
+#live-preview-form-header.header-align-left {
+  text-align: left !important;
+}
+#live-preview-form-header.header-align-center {
+  text-align: center !important;
+}
+#live-preview-form-header.header-align-right {
+  text-align: right !important;
+}
+
+
 

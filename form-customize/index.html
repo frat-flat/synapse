@@ -402,12 +402,47 @@
                     <input type="text" id="editor-form-title" class="form-control title-input" placeholder="フォームのタイトルを入力..." />
                   </div>
 
+                  <!-- タイトル枠デザイン ＆ 文字配置 -->
+                  <div class="form-group-row" style="display: flex; gap: 10px; margin: 4px 0;">
+                    <!-- タイトル枠デザイン -->
+                    <div class="form-group flex-1" style="margin: 0;">
+                      <label for="editor-header-style" style="font-size: 0.72rem; color: var(--color-text-muted); margin-bottom: 3px; font-weight: 600; display: block;">🎨 タイトル枠デザイン</label>
+                      <select id="editor-header-style" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
+                        <option value="card-accent-top">枠あり（上部アクセント）[標準]</option>
+                        <option value="card-simple">枠あり（シンプル枠）</option>
+                        <option value="card-accent-left">枠あり（左ラインアクセント）</option>
+                        <option value="card-shadow">枠あり（浮き出しシャドウ）</option>
+                        <option value="frameless">枠なし（シンプル透過）</option>
+                        <option value="frameless-underline">枠なし（タイトル下線アクセント）</option>
+                      </select>
+                    </div>
+                    <!-- 文字配置 -->
+                    <div class="form-group flex-1" style="margin: 0;">
+                      <label style="font-size: 0.72rem; color: var(--color-text-muted); margin-bottom: 3px; font-weight: 600; display: block;">📐 ヘッダー文字の配置</label>
+                      <div class="header-align-btn-group" style="display: flex; gap: 3px; height: 28px;">
+                        <button type="button" class="btn btn-sm btn-header-align active" data-align="left" style="flex: 1; padding: 2px 4px; font-size: 0.7rem; border-radius: 4px; border: 1px solid var(--color-border);" title="左揃え">⬅️ 左</button>
+                        <button type="button" class="btn btn-sm btn-header-align" data-align="center" style="flex: 1; padding: 2px 4px; font-size: 0.7rem; border-radius: 4px; border: 1px solid var(--color-border);" title="中央揃え">⏺️ 中央</button>
+                        <button type="button" class="btn btn-sm btn-header-align" data-align="right" style="flex: 1; padding: 2px 4px; font-size: 0.7rem; border-radius: 4px; border: 1px solid var(--color-border);" title="右揃え">➡️ 右</button>
+                      </div>
+                      <input type="hidden" id="editor-header-align" value="left" />
+                    </div>
+                  </div>
+
                   <!-- 3. サブタイトル (プロ版限定) -->
                   <div class="form-group pro-only-field" id="pro-subtitle-container" style="display: none; margin: 0;">
-                    <label for="editor-pro-subtitle" style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 4px; margin-top: 6px;">
-                      <span>✏️ サブタイトル</span>
-                      <span style="font-size: 0.65rem; background: rgba(0, 86, 179, 0.1); color: #0056b3; padding: 1px 4px; border-radius: 3px; font-weight: 700;">プロ版 💎</span>
-                    </label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; margin-top: 6px;">
+                      <label for="editor-pro-subtitle" style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--color-text-muted); margin: 0;">
+                        <span>✏️ サブタイトル</span>
+                        <span style="font-size: 0.65rem; background: rgba(0, 86, 179, 0.1); color: #0056b3; padding: 1px 4px; border-radius: 3px; font-weight: 700;">プロ版 💎</span>
+                      </label>
+                      <div style="display: flex; align-items: center; gap: 4px;">
+                        <span style="font-size: 0.68rem; color: var(--color-text-muted);">表示位置:</span>
+                        <select id="editor-subtitle-position" class="form-control form-control-sm" style="width: auto; height: 24px; font-size: 0.7rem; padding: 0 4px; cursor: pointer;">
+                          <option value="below" selected>タイトルの下（標準）</option>
+                          <option value="above">タイトルの上（キャッチ）</option>
+                        </select>
+                      </div>
+                    </div>
                     <input type="text" id="editor-pro-subtitle" class="form-control form-control-sm" placeholder="例: 運営代行 お申し込みフォーム" />
                   </div>
 
@@ -904,7 +939,7 @@
       <!-- 3. フォーム回答プレビュー画面 -->
       <section id="panel-preview" class="tab-panel">
         <div class="preview-container">
-          <div class="preview-card">
+          <div class="preview-card" id="preview-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 8px;">
               <div class="preview-badge" style="margin-bottom: 0;">プレビューモード</div>
               <div style="display: flex; align-items: center; gap: 8px;">
