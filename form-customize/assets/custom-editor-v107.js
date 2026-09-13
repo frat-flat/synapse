@@ -8720,174 +8720,6 @@
     };
   }
 
-  function patchPresetSelectMenu() {
-    // 単体プリセットに「銀行名」「支店名」を補完
-    if (window.re) {
-      if (!window.re.bank_name) {
-        window.re.bank_name = {
-          type: "text",
-          title: "銀行名",
-          description: "銀行名を入力または検索して選択してください。",
-          required: true,
-          validation: {
-            category: "api",
-            condition: "bank_name",
-            value: "",
-            value2: "",
-            errorMessage: "実在する銀行名を入力または選択してください。"
-          },
-          options: []
-        };
-      }
-      if (!window.re.branch_name) {
-        window.re.branch_name = {
-          type: "text",
-          title: "支店名",
-          description: "支店名を入力または候補から選択してください。",
-          required: true,
-          validation: {
-            category: "api",
-            condition: "branch_name",
-            value: "",
-            value2: "",
-            errorMessage: "実在する支店名を入力または選択してください。"
-          },
-          options: []
-        };
-      }
-      if (window.re.pro_bank && Array.isArray(window.re.pro_bank.questions)) {
-        window.re.pro_bank.questions.forEach(q => {
-          if (q.title === '金融機関名' || q.title === '銀行名') {
-            q.validation = { category: "api", condition: "bank_name", errorMessage: "実在する金融機関名を入力または選択してください。" };
-          } else if (q.title === '支店名') {
-            q.validation = { category: "api", condition: "branch_name", errorMessage: "実在する支店名を入力または選択してください。" };
-          }
-        });
-      }
-    }
-
-    const presetSelect = document.getElementById('select-preset-question');
-    if (!presetSelect) return;
-
-    if (!presetSelect.querySelector('option[value="pro_corp_info"]') || !presetSelect.querySelector('option[value="pro_individual_info"]')) {
-      // 既存のoptGroupがあれば除去して再作成
-      const existingGroup = presetSelect.querySelector('optgroup[label*="郵便・銀行・PW"], optgroup[label*="プロプリセット"]');
-      if (existingGroup) existingGroup.remove();
-
-      const optGroup = document.createElement('optgroup');
-      optGroup.label = "🚀 ビジネス・本人確認 プロプリセット";
-
-      const optCorpInfo = document.createElement('option');
-      optCorpInfo.value = "pro_corp_info";
-      optCorpInfo.textContent = "🏢 法人情報一括セット（法人名・カナ・代表者・所在地・税務区分3択・インボイス）";
-      optGroup.appendChild(optCorpInfo);
-
-      const optIndivInfo = document.createElement('option');
-      optIndivInfo.value = "pro_individual_info";
-      optIndivInfo.textContent = "👤 個人・個人事業主情報一括セット（氏名・カナ・屋号・住所・税務区分3択・インボイス）";
-      optGroup.appendChild(optIndivInfo);
-
-      const optHybrid = document.createElement('option');
-      optHybrid.value = "pro_branch_hybrid";
-      optHybrid.textContent = "🔀 法人・個人自動分岐セット（汎用ハイブリッド・カラム共通化）";
-      optGroup.appendChild(optHybrid);
-
-      const optCorpAddr = document.createElement('option');
-      optCorpAddr.value = "pro_corp_address";
-      optCorpAddr.textContent = "🏢 法人住所一括セット（法人検索・住所分割・郵便番号自動補完）";
-      optGroup.appendChild(optCorpAddr);
-
-      const optAddr = document.createElement('option');
-      optAddr.value = "pro_address";
-      optAddr.textContent = "📮 住所入力一括セット（郵便番号から住所自動補完・個人/一般向け）";
-      optGroup.appendChild(optAddr);
-
-      const optBank = document.createElement('option');
-      optBank.value = "pro_bank";
-      optBank.textContent = "銀行口座（コード・支店自動補完一括セット）";
-      optGroup.appendChild(optBank);
-
-      const optPw = document.createElement('option');
-      optPw.value = "pro_password";
-      optPw.textContent = "パスワード入力（確認用・目のマーク同期一括セット）";
-      optGroup.appendChild(optPw);
-
-      presetSelect.appendChild(optGroup);
-    }
-    if (!presetSelect.querySelector('option[value="bank_name"]')) {
-      const optBankSingle = document.createElement('option');
-      optBankSingle.value = "bank_name";
-      optBankSingle.textContent = "銀行名（全銀協API連携）";
-      presetSelect.appendChild(optBankSingle);
-    }
-    if (!presetSelect.querySelector('option[value="branch_name"]')) {
-      const optBranchSingle = document.createElement('option');
-      optBranchSingle.value = "branch_name";
-      optBranchSingle.textContent = "支店名（全銀協API連携）";
-      presetSelect.appendChild(optBranchSingle);
-    }
-    if (!presetSelect.querySelector('option[value="branch_code"]')) {
-      const optBranchCodeSingle = document.createElement('option');
-      optBranchCodeSingle.value = "branch_code";
-      optBranchCodeSingle.textContent = "支店番号（全銀協API連携）";
-      presetSelect.appendChild(optBranchCodeSingle);
-    }
-
-    // ✉️ メールアドレス（2種類: 通常 / 回答控え自動送信）
-    if (window.re) {
-      if (!window.re.email) {
-        window.re.email = {
-          type: "text",
-          title: "メールアドレス",
-          description: "ご連絡可能なメールアドレスを入力してください。",
-          required: true,
-          autoReply: false,
-          validation: {
-            category: "text",
-            condition: "email",
-            value: "",
-            value2: "",
-            errorMessage: "有効なメールアドレスを入力してください。"
-          },
-          options: []
-        };
-      } else {
-        window.re.email.autoReply = false;
-      }
-
-      window.re.email_autoreply = {
-        type: "text",
-        title: "メールアドレス",
-        description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。",
-        required: true,
-        autoReply: true,
-        validation: {
-          category: "text",
-          condition: "email",
-          value: "",
-          value2: "",
-          errorMessage: "有効なメールアドレスを入力してください。"
-        },
-        options: []
-      };
-    }
-
-    // プリセットセレクトボックス内の表示名調整
-    const optEmail = presetSelect.querySelector('option[value="email"]');
-    if (optEmail) {
-      optEmail.textContent = "✉️ メールアドレス（通常・入力のみ）";
-      if (!presetSelect.querySelector('option[value="email_autoreply"]')) {
-        const optAutoreply = document.createElement('option');
-        optAutoreply.value = "email_autoreply";
-        optAutoreply.textContent = "📨 メールアドレス（回答控えを自動送信）";
-        if (optEmail.nextSibling) {
-          presetSelect.insertBefore(optAutoreply, optEmail.nextSibling);
-        } else {
-          presetSelect.appendChild(optAutoreply);
-        }
-      }
-    }
-
     function buildCorpInfoQuestions(baseTime = Date.now(), corpGrpId = `grp_corp_info_${baseTime}`, corpGrpTitle = '法人情報') {
       const taxStatusQId = `q_tax_status_${baseTime + 11}`;
       return [
@@ -9588,6 +9420,178 @@
       renderLivePreview();
     }
 
+  window.buildCorpInfoQuestions = buildCorpInfoQuestions;
+  window.buildIndivInfoQuestions = buildIndivInfoQuestions;
+  window.executeApplyPreset = executeApplyPreset;
+
+  function patchPresetSelectMenu() {
+    // 単体プリセットに「銀行名」「支店名」を補完
+    if (window.re) {
+      if (!window.re.bank_name) {
+        window.re.bank_name = {
+          type: "text",
+          title: "銀行名",
+          description: "銀行名を入力または検索して選択してください。",
+          required: true,
+          validation: {
+            category: "api",
+            condition: "bank_name",
+            value: "",
+            value2: "",
+            errorMessage: "実在する銀行名を入力または選択してください。"
+          },
+          options: []
+        };
+      }
+      if (!window.re.branch_name) {
+        window.re.branch_name = {
+          type: "text",
+          title: "支店名",
+          description: "支店名を入力または候補から選択してください。",
+          required: true,
+          validation: {
+            category: "api",
+            condition: "branch_name",
+            value: "",
+            value2: "",
+            errorMessage: "実在する支店名を入力または選択してください。"
+          },
+          options: []
+        };
+      }
+      if (window.re.pro_bank && Array.isArray(window.re.pro_bank.questions)) {
+        window.re.pro_bank.questions.forEach(q => {
+          if (q.title === '金融機関名' || q.title === '銀行名') {
+            q.validation = { category: "api", condition: "bank_name", errorMessage: "実在する金融機関名を入力または選択してください。" };
+          } else if (q.title === '支店名') {
+            q.validation = { category: "api", condition: "branch_name", errorMessage: "実在する支店名を入力または選択してください。" };
+          }
+        });
+      }
+    }
+
+    const presetSelect = document.getElementById('select-preset-question');
+    if (!presetSelect) return;
+
+    if (!presetSelect.querySelector('option[value="pro_corp_info"]') || !presetSelect.querySelector('option[value="pro_individual_info"]')) {
+      // 既存のoptGroupがあれば除去して再作成
+      const existingGroup = presetSelect.querySelector('optgroup[label*="郵便・銀行・PW"], optgroup[label*="プロプリセット"]');
+      if (existingGroup) existingGroup.remove();
+
+      const optGroup = document.createElement('optgroup');
+      optGroup.label = "🚀 ビジネス・本人確認 プロプリセット";
+
+      const optCorpInfo = document.createElement('option');
+      optCorpInfo.value = "pro_corp_info";
+      optCorpInfo.textContent = "🏢 法人情報一括セット（法人名・カナ・代表者・所在地・税務区分3択・インボイス）";
+      optGroup.appendChild(optCorpInfo);
+
+      const optIndivInfo = document.createElement('option');
+      optIndivInfo.value = "pro_individual_info";
+      optIndivInfo.textContent = "👤 個人・個人事業主情報一括セット（氏名・カナ・屋号・住所・税務区分3択・インボイス）";
+      optGroup.appendChild(optIndivInfo);
+
+      const optHybrid = document.createElement('option');
+      optHybrid.value = "pro_branch_hybrid";
+      optHybrid.textContent = "🔀 法人・個人自動分岐セット（汎用ハイブリッド・カラム共通化）";
+      optGroup.appendChild(optHybrid);
+
+      const optCorpAddr = document.createElement('option');
+      optCorpAddr.value = "pro_corp_address";
+      optCorpAddr.textContent = "🏢 法人住所一括セット（法人検索・住所分割・郵便番号自動補完）";
+      optGroup.appendChild(optCorpAddr);
+
+      const optAddr = document.createElement('option');
+      optAddr.value = "pro_address";
+      optAddr.textContent = "📮 住所入力一括セット（郵便番号から住所自動補完・個人/一般向け）";
+      optGroup.appendChild(optAddr);
+
+      const optBank = document.createElement('option');
+      optBank.value = "pro_bank";
+      optBank.textContent = "銀行口座（コード・支店自動補完一括セット）";
+      optGroup.appendChild(optBank);
+
+      const optPw = document.createElement('option');
+      optPw.value = "pro_password";
+      optPw.textContent = "パスワード入力（確認用・目のマーク同期一括セット）";
+      optGroup.appendChild(optPw);
+
+      presetSelect.appendChild(optGroup);
+    }
+    if (!presetSelect.querySelector('option[value="bank_name"]')) {
+      const optBankSingle = document.createElement('option');
+      optBankSingle.value = "bank_name";
+      optBankSingle.textContent = "銀行名（全銀協API連携）";
+      presetSelect.appendChild(optBankSingle);
+    }
+    if (!presetSelect.querySelector('option[value="branch_name"]')) {
+      const optBranchSingle = document.createElement('option');
+      optBranchSingle.value = "branch_name";
+      optBranchSingle.textContent = "支店名（全銀協API連携）";
+      presetSelect.appendChild(optBranchSingle);
+    }
+    if (!presetSelect.querySelector('option[value="branch_code"]')) {
+      const optBranchCodeSingle = document.createElement('option');
+      optBranchCodeSingle.value = "branch_code";
+      optBranchCodeSingle.textContent = "支店番号（全銀協API連携）";
+      presetSelect.appendChild(optBranchCodeSingle);
+    }
+
+    // ✉️ メールアドレス（2種類: 通常 / 回答控え自動送信）
+    if (window.re) {
+      if (!window.re.email) {
+        window.re.email = {
+          type: "text",
+          title: "メールアドレス",
+          description: "ご連絡可能なメールアドレスを入力してください。",
+          required: true,
+          autoReply: false,
+          validation: {
+            category: "text",
+            condition: "email",
+            value: "",
+            value2: "",
+            errorMessage: "有効なメールアドレスを入力してください。"
+          },
+          options: []
+        };
+      } else {
+        window.re.email.autoReply = false;
+      }
+
+      window.re.email_autoreply = {
+        type: "text",
+        title: "メールアドレス",
+        description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。",
+        required: true,
+        autoReply: true,
+        validation: {
+          category: "text",
+          condition: "email",
+          value: "",
+          value2: "",
+          errorMessage: "有効なメールアドレスを入力してください。"
+        },
+        options: []
+      };
+    }
+
+    // プリセットセレクトボックス内の表示名調整
+    const optEmail = presetSelect.querySelector('option[value="email"]');
+    if (optEmail) {
+      optEmail.textContent = "✉️ メールアドレス（通常・入力のみ）";
+      if (!presetSelect.querySelector('option[value="email_autoreply"]')) {
+        const optAutoreply = document.createElement('option');
+        optAutoreply.value = "email_autoreply";
+        optAutoreply.textContent = "📨 メールアドレス（回答控えを自動送信）";
+        if (optEmail.nextSibling) {
+          presetSelect.insertBefore(optAutoreply, optEmail.nextSibling);
+        } else {
+          presetSelect.appendChild(optAutoreply);
+        }
+      }
+    }
+
     const originalWe = window.we;
     const selectChanger = (e) => {
       const val = e.target.value;
@@ -9604,7 +9608,11 @@
 
       const baseTime = Date.now();
       e.target.value = "";
-      executeApplyPreset(val, activeSec, baseTime);
+      if (typeof executeApplyPreset === 'function') {
+        executeApplyPreset(val, activeSec, baseTime);
+      } else if (typeof window.executeApplyPreset === 'function') {
+        window.executeApplyPreset(val, activeSec, baseTime);
+      }
     };
 
     presetSelect.removeEventListener('change', window.we);
