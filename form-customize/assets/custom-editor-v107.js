@@ -7667,7 +7667,10 @@
 
     const prefSelect = filterContainer.querySelector('.corp-pref-filter');
 
-    const executeSearch = () => {
+    let searchSeq = 0;
+
+    const executeSearch = async () => {
+      const currentSeq = ++searchSeq;
       const curPanel = card.querySelector('.corp-search-panel') || searchPanel;
       const rawVal = input.value.trim();
       const val = normalizeText(rawVal);
@@ -7678,36 +7681,72 @@
         return;
       }
 
-      // 1. ローカルDBから近似値（正規化・部分一致）照会
-      let matched = CORP_DATABASE.filter(item => {
-        const normName = normalizeText(item.name);
-        const normKana = normalizeText(item.nameKana || "");
-        return normName.includes(val) || normKana.includes(val);
-      });
-
-      if (selPref !== "") {
-        matched = matched.filter(item => item.pref === selPref);
+      // 検索中ローディング表示
+      if (curPanel) {
+        curPanel.innerHTML = `
+          <div style="padding:10px 12px; font-size:0.75rem; color:#718096; display:flex; align-items:center; gap:8px;">
+            <div style="width:14px; height:14px; border:2px solid #cbd5e0; border-top-color:#2b6cb0; border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+            <span>🏛️ 国税庁法人番号APIを照会中...</span>
+          </div>
+        `;
+        curPanel.style.display = 'block';
       }
 
-      // 2. 一致がない場合、選択エリア（都道府県）内での近似値候補を生成
-      let listToRender = matched;
-      if (listToRender.length === 0) {
-        const clean = rawVal.replace(/(株式会社|有限会社|合同会社|ホールディングス)/g, '').trim() || rawVal;
-        const targetPref = selPref || "東京都";
-        const dynamicCandidates = [
-          { name: `株式会社${clean}`, nameKana: `カブシキガイシャ${clean}`, num: generateHashNum(clean + "1"), pref: targetPref, estDate: "2018-04-01", isDynamic: true },
-          { name: `${clean}株式会社`, nameKana: `${clean}カブシキガイシャ`, num: generateHashNum(clean + "2"), pref: targetPref, estDate: "2015-10-12", isDynamic: true },
-          { name: `合同会社${clean}`, nameKana: `ゴウドウガイシャ${clean}`, num: generateHashNum(clean + "3"), pref: targetPref, estDate: "2021-06-01", isDynamic: true },
-          { name: `${clean}ホールディングス株式会社`, nameKana: `${clean}ホールディングスカブシキガイシャ`, num: generateHashNum(clean + "4"), pref: targetPref, estDate: "2008-01-20", isDynamic: true }
-        ];
-        listToRender = dynamicCandidates;
+      let listToRender = [];
+      let isLiveApi = false;
+
+      // 1. 国税庁中継API (/api/corp-search) の非同期呼出
+      try {
+        let apiUrl = `/api/corp-search?name=${encodeURIComponent(rawVal)}&pref=${encodeURIComponent(selPref)}`;
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') {
+          apiUrl = `https://synapse-wayway.vercel.app/api/corp-search?name=${encodeURIComponent(rawVal)}&pref=${encodeURIComponent(selPref)}`;
+        }
+        const res = await fetch(apiUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.results) && data.results.length > 0) {
+            listToRender = data.results.map(item => ({
+              name: item.name,
+              nameKana: item.nameKana || "",
+              num: item.num,
+              pref: item.pref,
+              cityName: item.cityName || "",
+              street: item.street || "",
+              postCode: item.postCode || "",
+              address: item.address || "",
+              regDate: item.regDate || "",
+              invoiceNum: item.invoiceNum || (item.num ? `T${item.num}` : "")
+            }));
+            isLiveApi = true;
+          }
+        }
+      } catch (err) {
+        console.warn('[setupCorpApiSearch] Live API failed, falling back to local master:', err);
+      }
+
+      // 新しい検索リクエストが既に開始されていたら破棄
+      if (currentSeq !== searchSeq) return;
+
+      // 2. API通信不能・オフライン時のみ内蔵マスタにフォールバック
+      if (!isLiveApi && listToRender.length === 0) {
+        let matched = CORP_DATABASE.filter(item => {
+          const normName = normalizeText(item.name);
+          const normKana = normalizeText(item.nameKana || "");
+          return normName.includes(val) || normKana.includes(val);
+        });
+
+        if (selPref !== "") {
+          matched = matched.filter(item => item.pref === selPref);
+        }
+        listToRender = matched;
       }
 
       if (listToRender.length > 0) {
         const prefLabel = selPref ? `【${escapeHtml(selPref)}】` : '';
+        const statusBadge = isLiveApi ? '🏛️ 国税庁公式照会データ' : '🏛️ 法人番号照会候補';
         curPanel.innerHTML = `
           <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; display:flex; justify-content:space-between; align-items:center; font-weight:600;">
-            <span>🏛️ 国税庁法人番号API照会候補 ${prefLabel} (${listToRender.length}件)</span>
+            <span>${statusBadge} ${prefLabel} (${listToRender.length}件)</span>
             <span style="font-size:0.65rem; color:#718096;">選択で上書き反映＆インボイス自動入力</span>
           </div>
         `;
@@ -7716,6 +7755,8 @@
           row.className = 'corp-search-candidate-item';
           row.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;';
           const kanaHtml = item.nameKana ? `<span style="font-size:0.68rem; color:#718096; margin-left:6px;">(${escapeHtml(item.nameKana)})</span>` : '';
+          const addressText = item.address || `${item.pref || ''}${item.cityName || ''}${item.street || ''}`.trim() || item.pref || '';
+          const addressLabel = addressText ? ` | 所在地: ${escapeHtml(addressText)}` : '';
           row.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <div>
@@ -7725,7 +7766,7 @@
               <span style="background:#e6f4ea; color:#137333; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">✓ 実在確認済</span>
             </div>
             <div style="font-size:0.7rem; color:var(--color-text-muted); margin-top:2px;">
-              法人番号: <span style="font-family:monospace; color:#2d3748; font-weight:600;">${item.num}</span> | 所在地: ${item.pref}
+              法人番号: <span style="font-family:monospace; color:#2d3748; font-weight:600;">${item.num}</span>${addressLabel}
             </div>
           `;
           row.onmouseenter = () => { row.style.backgroundColor = '#f1f5f9'; };
@@ -7739,9 +7780,9 @@
             curPanel.style.display = 'none';
             activeApiMetadata.company_name = item.name;
             activeApiMetadata.corporate_number = item.num;
-            activeApiMetadata.establishmentDate = item.estDate || "2020-01-01";
+            activeApiMetadata.establishmentDate = item.estDate || item.regDate || "2020-01-01";
             
-            // カナ表記・インボイス登録番号・法人番号の動的連携
+            // カナ表記・インボイス登録番号・法人番号・住所等の動的連携
             autoFillCorpRelatedFields(item);
             triggerInputChange(input);
           });
@@ -7749,7 +7790,13 @@
         });
         curPanel.style.display = 'block';
       } else {
-        curPanel.style.display = 'none';
+        const prefLabel = selPref ? `【${escapeHtml(selPref)}】` : '';
+        curPanel.innerHTML = `
+          <div style="padding:12px; font-size:0.75rem; color:#718096; text-align:center;">
+            国税庁API照会: 一致する法人情報が見つかりませんでした ${prefLabel}
+          </div>
+        `;
+        curPanel.style.display = 'block';
       }
     };
 
@@ -7764,7 +7811,7 @@
           return;
         }
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(executeSearch, 150);
+        debounceTimer = setTimeout(executeSearch, 250);
       });
       input.addEventListener('focus', () => {
         if (input.value.trim().length > 0) {

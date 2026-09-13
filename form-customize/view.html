@@ -3393,11 +3393,16 @@
             let isLiveApi = false;
 
             // 1. バックエンド中継API (/api/corp-search) の非同期呼出
+            let apiCalled = false;
             try {
-              const apiUrl = `/api/corp-search?name=${encodeURIComponent(rawVal)}&pref=${encodeURIComponent(selPref)}`;
+              let apiUrl = `/api/corp-search?name=${encodeURIComponent(rawVal)}&pref=${encodeURIComponent(selPref)}`;
+              if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') {
+                apiUrl = `https://synapse-wayway.vercel.app/api/corp-search?name=${encodeURIComponent(rawVal)}&pref=${encodeURIComponent(selPref)}`;
+              }
               const res = await fetch(apiUrl);
               if (res.ok) {
                 const data = await res.json();
+                apiCalled = true;
                 if (data.success && Array.isArray(data.results) && data.results.length > 0) {
                   listToRender = data.results.map(item => ({
                     name: item.name,
@@ -3421,8 +3426,8 @@
             // 新しい検索リクエストが開始されていたら破棄
             if (currentSeq !== searchSeq) return;
 
-            // 2. API未接続または結果0件時は内蔵マスタにフォールバック
-            if (listToRender.length === 0) {
+            // 2. API未接続時のみ内蔵マスタにフォールバック
+            if (!apiCalled && listToRender.length === 0) {
               let matched = CORP_DATABASE.filter(item => {
                 const normName = normalizeText(item.name);
                 const normKana = normalizeText(item.nameKana || "");
@@ -3433,18 +3438,6 @@
                 matched = matched.filter(item => item.pref === selPref);
               }
               listToRender = matched;
-            }
-
-            // 3. マスタにも一致がない場合の動的候補生成
-            if (listToRender.length === 0) {
-              const clean = rawVal.replace(/(株式会社|有限会社|合同会社|ホールディングス)/g, '').trim() || rawVal;
-              const targetPref = selPref || "東京都";
-              listToRender = [
-                { name: `合同会社${clean}`, nameKana: `ゴウドウガイシャ${clean}`, num: generateHashNum(clean + "1"), pref: targetPref, cityName: "中央区", street: "銀座1丁目", postCode: "1040061", address: `${targetPref}中央区銀座1丁目`, estDate: "2021-06-01" },
-                { name: `株式会社${clean}`, nameKana: `カブシキガイシャ${clean}`, num: generateHashNum(clean + "2"), pref: targetPref, cityName: "千代田区", street: "丸の内2丁目", postCode: "1000005", address: `${targetPref}千代田区丸の内2丁目`, estDate: "2018-04-01" },
-                { name: `${clean}株式会社`, nameKana: ``, num: generateHashNum(clean + "3"), pref: targetPref, cityName: "港区", street: "六本木3丁目", postCode: "1060032", address: `${targetPref}港区六本木3丁目`, estDate: "2015-10-12" },
-                { name: `${clean}ホールディングス株式会社`, nameKana: ``, num: generateHashNum(clean + "4"), pref: targetPref, cityName: "新宿区", street: "西新宿2丁目", postCode: "1600023", address: `${targetPref}新宿区西新宿2丁目`, estDate: "2008-01-20" }
-              ];
             }
 
             if (listToRender.length > 0) {
