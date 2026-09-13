@@ -3936,7 +3936,27 @@
     }
   }
 
-  // 🔙 共通ヘッダーの「←（戻る）」ボタンの表示状態を動的に切り替える
+  // 🔗 共通ヘッダーの「リンクを発行」ボタングループの表示状態を動的に切り替える
+  function updateHeaderShareButtons(tabName) {
+    try {
+      const shareGroup = document.getElementById('share-export-group');
+      if (shareGroup) {
+        // ホーム（ダッシュボード）やテンプレート一覧画面では非表示、個別フォーム作業中（editor, flow, preview等）のみ表示
+        const isEditingActiveForm = tabName && tabName !== 'dashboard' && tabName !== 'templates';
+        if (isEditingActiveForm) {
+          shareGroup.style.setProperty('display', 'inline-flex', 'important');
+          shareGroup.classList.remove('hidden');
+        } else {
+          shareGroup.style.setProperty('display', 'none', 'important');
+          shareGroup.classList.add('hidden');
+        }
+      }
+    } catch(e) {
+      console.error('[ShareButtons] Failed to update state:', e);
+    }
+  }
+
+  // 🔙 共通ヘッダーの「←（戻る）」ボタンおよびアクションの表示状態を動的に切り替える
   function updateHeaderBackButton(tabName) {
     try {
       const backBtn = document.getElementById('btn-back-to-dashboard');
@@ -3947,6 +3967,9 @@
           backBtn.style.setProperty('display', 'none', 'important');
         }
       }
+
+      // 🔗 「リンクを発行」ボタングループの表示状態の動的切り替え
+      updateHeaderShareButtons(tabName);
     } catch(e) {
       console.error('[BackButton] Failed to update state:', e);
     }
@@ -15027,6 +15050,12 @@
   }
 
   function initShareUrlFeature() {
+    // 初期タブに応じた表示切り替え（ホーム表示時は非表示）
+    const initialTab = localStorage.getItem('form_customize_active_tab') || 'dashboard';
+    if (typeof updateHeaderShareButtons === 'function') {
+      updateHeaderShareButtons(initialTab);
+    }
+
     // 1. ヘッダーの「🔗 リンクを発行」ボタン
     const shareBtn = document.getElementById('btn-share-form-url');
     if (shareBtn && !shareBtn._hooked) {

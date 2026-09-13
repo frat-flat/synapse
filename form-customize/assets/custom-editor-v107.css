@@ -3077,11 +3077,16 @@ input:-webkit-autofill:active {
    =================================================== */
 .share-export-btn-group {
   position: relative;
-  display: inline-flex !important;
+  display: inline-flex;
   align-items: stretch;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   margin-right: 8px;
+}
+
+.share-export-btn-group.hidden,
+.share-export-btn-group[style*="display: none"] {
+  display: none !important;
 }
 
 .share-export-btn-group .btn-share-link {
