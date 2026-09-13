@@ -1105,6 +1105,18 @@
               }
               localStorage.setItem('form_customize_all_forms', JSON.stringify(currentCached));
             } catch(e) {}
+
+            // 🌿 Gitブランチ型 環境分離: 本番環境（main）では確定公開スナップショット（publishedSnapshot）を配信
+            if (!window.IS_TEST_ENV && formDefinition.publishedSnapshot && formDefinition.publishedSnapshot.sections && formDefinition.publishedSnapshot.sections.length > 0) {
+              const snapshot = formDefinition.publishedSnapshot;
+              formDefinition = {
+                ...snapshot,
+                id: formDefinition.id || snapshot.id,
+                formId: formDefinition.formId || snapshot.formId,
+                publishedVersion: formDefinition.publishedVersion || snapshot.publishedVersion || 1,
+                isPublishedSnapshot: true
+              };
+            }
           }
 
           if (!formDefinition || !formDefinition.sections || formDefinition.sections.length === 0) {

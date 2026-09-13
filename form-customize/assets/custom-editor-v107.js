@@ -3940,9 +3940,10 @@
   function updateHeaderShareButtons(tabName) {
     try {
       const shareGroup = document.getElementById('share-export-group');
+      const headerMergeBtn = document.getElementById('btn-header-merge-prod');
+      const isEditingActiveForm = tabName && tabName !== 'dashboard' && tabName !== 'templates';
       if (shareGroup) {
         // ホーム（ダッシュボード）やテンプレート一覧画面では非表示、個別フォーム作業中（editor, flow, preview等）のみ表示
-        const isEditingActiveForm = tabName && tabName !== 'dashboard' && tabName !== 'templates';
         if (isEditingActiveForm) {
           shareGroup.style.setProperty('display', 'inline-flex', 'important');
           shareGroup.classList.remove('hidden');
@@ -3950,6 +3951,11 @@
           shareGroup.style.setProperty('display', 'none', 'important');
           shareGroup.classList.add('hidden');
         }
+      }
+      if (!isEditingActiveForm && headerMergeBtn) {
+        headerMergeBtn.style.setProperty('display', 'none', 'important');
+      } else if (typeof updatePublishSyncUI === 'function') {
+        updatePublishSyncUI();
       }
     } catch(e) {
       console.error('[ShareButtons] Failed to update state:', e);
@@ -15016,6 +15022,175 @@
     textarea.remove();
   }
 
+  // =========================================================================
+  // 🌿 Gitブランチ型 本番統合（公開更新 / Merge to main）管理モジュール
+  // =========================================================================
+
+  function checkFormPublishStatus(formObj) {
+    if (!formObj) return { isSynced: true, version: 1 };
+    const version = formObj.publishedVersion || 1;
+    if (!formObj.publishedSnapshot || !formObj.publishedSnapshot.sections) {
+      // まだ一度も明示的に本番統合されていない初期フォーム
+      const hasSections = formObj.sections && formObj.sections.length > 0;
+      return { isSynced: !hasSections, version: 1, isInitial: true, publishedAt: null };
+    }
+
+    const extractCore = (f) => ({
+      title: (f.title || '').trim(),
+      subtitle: (f.subtitle || '').trim(),
+      description: (f.description || '').trim(),
+      sections: (f.sections || []).map(sec => ({
+        id: sec.id,
+        title: (sec.title || '').trim(),
+        description: (sec.description || '').trim(),
+        questions: (sec.questions || []).map(q => ({
+          id: q.id,
+          title: (q.title || '').trim(),
+          type: q.type,
+          required: !!q.required,
+          options: q.options || [],
+          dataKey: q.dataKey || null,
+          validation: q.validation || null,
+          apiConfig: q.apiConfig || null
+        }))
+      }))
+    });
+
+    const currentCore = JSON.stringify(extractCore(formObj));
+    const publishedCore = JSON.stringify(extractCore(formObj.publishedSnapshot));
+    const isSynced = (currentCore === publishedCore);
+
+    return {
+      isSynced,
+      version,
+      publishedAt: formObj.publishedAt || null
+    };
+  }
+
+  function mergeFormToProduction(formIndex) {
+    const { formObj, idx } = getCurrentFormObject(formIndex);
+    if (!formObj) return;
+
+    const currentTitle = formObj.title || '無題のフォーム';
+    const currentVersion = formObj.publishedVersion || 1;
+    const nextVersion = currentVersion + 1;
+
+    // クリーンな公開スナップショットを作成（循環参照や不要メタデータを除去）
+    const snapshot = {
+      id: formObj.id || `form_${idx}`,
+      title: formObj.title || '無題のフォーム',
+      subtitle: formObj.subtitle || '',
+      description: formObj.description || '',
+      sections: JSON.parse(JSON.stringify(formObj.sections || [])),
+      theme: formObj.theme ? JSON.parse(JSON.stringify(formObj.theme)) : null,
+      settings: formObj.settings ? JSON.parse(JSON.stringify(formObj.settings)) : null,
+      estimatedTime: formObj.estimatedTime || null,
+      publishedVersion: nextVersion,
+      publishedAt: new Date().toISOString()
+    };
+
+    formObj.publishedSnapshot = snapshot;
+    formObj.publishedVersion = nextVersion;
+    formObj.publishedAt = snapshot.publishedAt;
+
+    // window.U の該当インデックスも確実に更新
+    if (window.U && window.U[idx]) {
+      window.U[idx] = formObj;
+    }
+
+    // localStorage の form_customize_all_forms へ保存（フックにより Supabase へ自動同期される）
+    try {
+      const allFormsRaw = localStorage.getItem('form_customize_all_forms');
+      let allForms = allFormsRaw ? JSON.parse(allFormsRaw) : [];
+      if (allForms[idx]) {
+        allForms[idx] = formObj;
+      } else {
+        const fIdx = allForms.findIndex(f => f && (f.id === formObj.id || f.title === formObj.title));
+        if (fIdx !== -1) allForms[fIdx] = formObj;
+        else allForms.push(formObj);
+      }
+      localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+    } catch(e) {
+      console.warn('[Merge] Failed to update localStorage allForms:', e);
+    }
+
+    // UIを更新
+    updatePublishSyncUI(idx);
+
+    // トースト通知
+    showGlobalShareToast(`「${currentTitle}」を本番公開リンクへ統合しました！（v${nextVersion}）`);
+    if (typeof showToast === 'function') {
+      showToast(`「${currentTitle}」を本番環境へ統合しました。配布済み本番リンクが最新版（v${nextVersion}）に切り替わりました。`, 'success');
+    }
+  }
+
+  function updatePublishSyncUI(targetIndex) {
+    const { formObj, idx } = getCurrentFormObject(targetIndex);
+    if (!formObj) return;
+
+    const status = checkFormPublishStatus(formObj);
+
+    // モーダル内要素
+    const syncArea = document.getElementById('share-publish-sync-area');
+    const syncDot = document.getElementById('share-publish-sync-dot');
+    const syncTitle = document.getElementById('share-publish-sync-title');
+    const versionBadge = document.getElementById('share-publish-version-badge');
+    const syncDesc = document.getElementById('share-publish-sync-desc');
+    const mergeBtn = document.getElementById('btn-merge-to-production');
+
+    // ヘッダーボタン
+    const headerMergeBtn = document.getElementById('btn-header-merge-prod');
+
+    if (versionBadge) {
+      versionBadge.textContent = `v${status.version}`;
+    }
+
+    if (status.isSynced) {
+      if (syncArea) {
+        syncArea.style.borderColor = '#cbd5e1';
+        syncArea.style.background = '#f8fafc';
+      }
+      if (syncDot) syncDot.style.background = '#10b981';
+      if (syncTitle) {
+        syncTitle.textContent = '本番公開リンクと同期中';
+        syncTitle.style.color = '#1e293b';
+      }
+      if (syncDesc) {
+        const pubTime = status.publishedAt ? new Date(status.publishedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
+        syncDesc.textContent = pubTime 
+          ? `現在の編集内容は本番公開リンクに反映されています（最終統合: ${pubTime}）。`
+          : '現在の編集内容は本番公開リンクに反映されています。';
+      }
+      if (mergeBtn) mergeBtn.style.display = 'none';
+      if (headerMergeBtn) headerMergeBtn.style.setProperty('display', 'none', 'important');
+    } else {
+      if (syncArea) {
+        syncArea.style.borderColor = '#f59e0b';
+        syncArea.style.background = '#fffbeb';
+      }
+      if (syncDot) syncDot.style.background = '#f59e0b';
+      if (syncTitle) {
+        syncTitle.textContent = '未統合の変更があります（test branch）';
+        syncTitle.style.color = '#b45309';
+      }
+      if (syncDesc) {
+        syncDesc.textContent = '編集中の最新内容はテスト用リンクでのみ確認できます。本番公開リンク（main）は旧バージョンのまま保護されています。';
+      }
+      if (mergeBtn) {
+        mergeBtn.style.display = 'inline-flex';
+        mergeBtn.innerHTML = '🚀 本番環境へ統合';
+      }
+      const activeTab = localStorage.getItem('form_customize_active_tab') || 'editor';
+      if (headerMergeBtn && activeTab && activeTab !== 'dashboard' && activeTab !== 'templates') {
+        headerMergeBtn.style.setProperty('display', 'inline-flex', 'important');
+      }
+    }
+  }
+
+  window.checkFormPublishStatus = checkFormPublishStatus;
+  window.mergeFormToProduction = mergeFormToProduction;
+  window.updatePublishSyncUI = updatePublishSyncUI;
+
   async function openShareUrlModal(formIndex) {
     const modal = document.getElementById('modal-share-url');
     if (!modal) return;
@@ -15153,6 +15328,24 @@
       });
     }
 
+    // 🚀 本番環境へ統合（公開更新 / Merge to main）ボタンのイベント紐付け
+    const mergeBtn = document.getElementById('btn-merge-to-production');
+    if (mergeBtn && !mergeBtn._hooked) {
+      mergeBtn._hooked = true;
+      mergeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const { formObj } = getCurrentFormObject(_currentShareModalFormIndex);
+        const title = formObj && formObj.title ? formObj.title : 'フォーム';
+        const nextVer = ((formObj && formObj.publishedVersion) || 1) + 1;
+        if (confirm(`「${title}」の最新編集内容を本番公開リンクへ統合（公開更新）しますか？\n\n・新バージョン: v${nextVer}\n・配布済みの本番URLは変更されず、回答画面が最新版へ切り替わります。\n・過去のテスト送信データが本番に混ざることはありません。`)) {
+          mergeFormToProduction(_currentShareModalFormIndex);
+        }
+      });
+    }
+
+    // 本番統合ステータスの更新
+    updatePublishSyncUI(_currentShareModalFormIndex);
+
     // 初期タブ適用
     applyEnvTab('production');
 
@@ -15173,6 +15366,21 @@
     const initialTab = localStorage.getItem('form_customize_active_tab') || 'dashboard';
     if (typeof updateHeaderShareButtons === 'function') {
       updateHeaderShareButtons(initialTab);
+    }
+
+    // 🚀 ヘッダーのクイック「本番へ統合」ボタン
+    const headerMergeBtn = document.getElementById('btn-header-merge-prod');
+    if (headerMergeBtn && !headerMergeBtn._hooked) {
+      headerMergeBtn._hooked = true;
+      headerMergeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const { formObj, idx } = getCurrentFormObject();
+        const title = formObj && formObj.title ? formObj.title : 'フォーム';
+        const nextVer = ((formObj && formObj.publishedVersion) || 1) + 1;
+        if (confirm(`「${title}」の最新編集内容を本番公開リンクへ統合（公開更新）しますか？\n\n・新バージョン: v${nextVer}\n・配布済みの本番URLは変更されず、回答画面が最新版へ切り替わります。\n・過去のテスト送信データが本番に混ざることはありません。`)) {
+          mergeFormToProduction(idx);
+        }
+      });
     }
 
     // 1. ヘッダーの「🔗 リンクを発行」ボタン

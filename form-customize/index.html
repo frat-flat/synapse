@@ -112,6 +112,10 @@
           <span class="btn-icon">📱</span>
           <span class="btn-text">プレビュー</span>
         </button>
+        <!-- 🚀 本番環境へ統合（公開更新）ヘッダーボタン -->
+        <button id="btn-header-merge-prod" class="btn btn-success" data-tooltip="最新の編集内容を本番公開リンクへ統合・更新" style="display: none; align-items: center; gap: 6px; margin-right: 8px; background: #16a34a !important; border-color: #15803d !important; color: #fff !important; font-weight: 700; font-size: 0.8rem; padding: 6px 12px; border-radius: 6px; cursor: pointer; box-shadow: 0 1px 3px rgba(22,163,74,0.3);">
+          <span>🚀</span> <span class="btn-text">本番へ統合</span>
+        </button>
         <!-- 🔗 回答用リンク発行＆出力ボタングループ (リンク発行枠内にJSON出力を集約) -->
         <div class="share-export-btn-group" id="share-export-group" style="display: none;">
           <button id="btn-share-form-url" class="btn btn-share-link" data-tooltip="回答用URLを発行・コピー">
@@ -1030,6 +1034,25 @@
           <div id="share-env-notice" style="margin-bottom: 14px; padding: 10px 14px; border-radius: 6px; font-size: 0.76rem; line-height: 1.4; background: #f8fafc; border: 1px solid #cbd5e1; color: #475569;">
             <strong id="share-env-notice-title" style="color: #1e293b; display: block; margin-bottom: 2px;">🚀 本番公開用URL (main branch)</strong>
             <span id="share-env-notice-desc">一般回答者・顧客向けの公式リンクです。回答データは本番マスターテーブルへ正規保存されます。</span>
+          </div>
+
+          <!-- 🌿 本番統合（公開更新 / Merge to main）ステータスエリア -->
+          <div id="share-publish-sync-area" style="margin-bottom: 14px; padding: 12px 14px; border-radius: 6px; font-size: 0.76rem; line-height: 1.4; border: 1.5px solid #cbd5e1; background: #f8fafc; transition: all 0.25s;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <div style="flex: 1;">
+                <div style="display: flex; align-items: center; gap: 6px; font-weight: 700;">
+                  <span id="share-publish-sync-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
+                  <span id="share-publish-sync-title" style="color: #1e293b;">本番公開リンクと同期中</span>
+                  <span id="share-publish-version-badge" style="font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; background: #e2e8f0; color: #475569; font-weight: 700;">v1</span>
+                </div>
+                <div id="share-publish-sync-desc" style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">
+                  現在の編集内容は本番公開リンクに反映されています。
+                </div>
+              </div>
+              <button type="button" id="btn-merge-to-production" class="btn btn-primary" style="display: none; white-space: nowrap; font-size: 0.78rem; font-weight: 700; padding: 6px 12px; background: #16a34a !important; border-color: #15803d !important; color: #fff !important; cursor: pointer; border-radius: 6px; box-shadow: 0 1px 3px rgba(22,163,74,0.3);">
+                🚀 本番環境へ統合
+              </button>
+            </div>
           </div>
 
           <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px 14px; margin-bottom: 14px;">
