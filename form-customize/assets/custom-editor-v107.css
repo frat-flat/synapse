@@ -5739,3 +5739,110 @@ button.btn-sec-reorder {
 .title-badge.badge-style-outline.badge-shape-capsule {
   border: 2px solid var(--badge-bg, var(--color-primary, #1a73e8)) !important;
 }
+
+/* ==========================================
+   🔤 タイトル文字自体の変形（ワープテキスト＆立体ロゴ）
+   ========================================== */
+.title-text-warp {
+  display: inline-block !important;
+  transform-style: preserve-3d !important;
+  transition: transform 0.25s ease, filter 0.25s ease !important;
+  line-height: 1.25 !important;
+}
+
+/* 変形強度設定 */
+.warp-strength-light {
+  --warp-perspective: 260px;
+  --warp-angle-x: 15deg;
+  --warp-angle-y: 18deg;
+  --warp-skew: 10deg;
+  --warp-scale-y: 1.15;
+}
+.warp-strength-medium {
+  --warp-perspective: 160px;
+  --warp-angle-x: 25deg;
+  --warp-angle-y: 28deg;
+  --warp-skew: 16deg;
+  --warp-scale-y: 1.3;
+}
+.warp-strength-strong {
+  --warp-perspective: 110px;
+  --warp-angle-x: 35deg;
+  --warp-angle-y: 38deg;
+  --warp-skew: 24deg;
+  --warp-scale-y: 1.45;
+}
+
+/* ① 逆台形（上広・下狭 / 俯瞰パース） */
+.text-warp-trapezoid-down {
+  transform: perspective(var(--warp-perspective, 160px)) rotateX(var(--warp-angle-x, 25deg)) scaleY(var(--warp-scale-y, 1.3)) !important;
+  transform-origin: center bottom !important;
+}
+
+/* ② 正台形（上狭・下広 / 仰角モニュメント） */
+.text-warp-trapezoid-up {
+  transform: perspective(var(--warp-perspective, 160px)) rotateX(calc(-1 * var(--warp-angle-x, 25deg))) scaleY(var(--warp-scale-y, 1.3)) !important;
+  transform-origin: center top !important;
+}
+
+/* ③ スピードスラッシュ（平行斜体） */
+.text-warp-skew {
+  transform: skewX(calc(-1 * var(--warp-skew, 16deg))) !important;
+  transform-origin: center center !important;
+}
+
+/* ④ 左右パース（左大・右小） */
+.text-warp-perspective-left {
+  transform: perspective(280px) rotateY(var(--warp-angle-y, 28deg)) scaleX(1.1) !important;
+  transform-origin: center center !important;
+}
+
+/* ⑤ 左右パース（左小・右大） */
+.text-warp-perspective-right {
+  transform: perspective(280px) rotateY(calc(-1 * var(--warp-angle-y, 28deg))) scaleX(1.1) !important;
+  transform-origin: center center !important;
+}
+
+/* ⑥ スロープ・アーチ文字（インラインフレックス） */
+.text-warp-slope-container {
+  display: inline-flex !important;
+  align-items: flex-end !important;
+  gap: 2px !important;
+}
+.text-warp-slope-container > span {
+  display: inline-block !important;
+  line-height: 1 !important;
+  transition: transform 0.2s ease !important;
+}
+
+/* ✨ ロゴ立体エフェクト */
+/* 3D押し出しシャドウ */
+.text-effect-3d {
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.25))
+          drop-shadow(0 4px 0 rgba(0, 0, 0, 0.2))
+          drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)) !important;
+}
+
+/* ゴールド金属グラデーション */
+.text-effect-gold {
+  background: linear-gradient(180deg, #ffd700 0%, #ff9800 65%, #b25000 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 2px 0 #7a3a00)
+          drop-shadow(0 4px 0 #4a2300)
+          drop-shadow(0 6px 12px rgba(0, 0, 0, 0.45)) !important;
+}
+
+/* ネオンサイバー発光 */
+.text-effect-neon {
+  color: #00e5ff !important;
+  text-shadow: 0 0 8px rgba(0, 229, 255, 0.8),
+               0 0 16px rgba(0, 229, 255, 0.5),
+               0 0 24px rgba(0, 229, 255, 0.3) !important;
+}
+
+/* 白フチ・袋文字 */
+.text-effect-outline {
+  -webkit-text-stroke: 1.5px currentColor !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2)) !important;
+}

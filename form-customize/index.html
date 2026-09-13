@@ -402,6 +402,45 @@
                     <input type="text" id="editor-form-title" class="form-control title-input" placeholder="フォームのタイトルを入力..." />
                   </div>
 
+                  <!-- 🔤 タイトル文字の変形（ワープロゴ・台形ロゴ化） -->
+                  <div class="form-group-row" style="display: flex; gap: 8px; margin: 6px 0 2px 0;">
+                    <div class="form-group flex-1" style="margin: 0;">
+                      <label for="editor-title-warp-shape" style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 3px; display: block;">🔤 文字変形（ワープロゴ）</label>
+                      <select id="editor-title-warp-shape" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
+                        <option value="none" selected>なし（通常文字）[標準]</option>
+                        <option value="trapezoid-down">逆台形（上広・下狭 / 迫力パース）</option>
+                        <option value="trapezoid-up">正台形（上狭・下広 / モニュメント）</option>
+                        <option value="slope-up">スロープ台形（右肩上がり / 成長）</option>
+                        <option value="roof">山型ルーフ（中央高 / エンブレム）</option>
+                        <option value="skew">スピードスラッシュ（平行斜体）</option>
+                        <option value="perspective-left">左右パース（左大・右小）</option>
+                        <option value="perspective-right">左右パース（左小・右大）</option>
+                      </select>
+                    </div>
+                    <div class="form-group flex-1" style="margin: 0;">
+                      <label for="editor-title-warp-effect" style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 3px; display: block;">✨ ロゴ立体エフェクト</label>
+                      <select id="editor-title-warp-effect" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
+                        <option value="none" selected>なし（フラット）[標準]</option>
+                        <option value="3d">3D立体シャドウ</option>
+                        <option value="gold">ゴールド金属光沢</option>
+                        <option value="neon">ネオン発光</option>
+                        <option value="outline">白フチ袋文字</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- 変形強度設定（変形が選択された場合に表示） -->
+                  <div id="editor-title-warp-strength-container" style="display: none; margin: 4px 0 6px 0;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.03); border: 1px dashed var(--color-border); border-radius: 6px; padding: 4px 10px;">
+                      <label for="editor-title-warp-strength" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">🎚️ 変形の強さ</label>
+                      <select id="editor-title-warp-strength" class="form-control form-control-sm" style="width: auto; height: 24px; font-size: 0.7rem; padding: 1px 6px; cursor: pointer;">
+                        <option value="light">弱 (Light)</option>
+                        <option value="medium" selected>中 (Medium) [標準]</option>
+                        <option value="strong">強 (Strong)</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <!-- 🏷️ タイトル外枠（簡易ロゴ化）バッジ設定 -->
                   <div class="form-group" style="margin: 6px 0 2px 0;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">

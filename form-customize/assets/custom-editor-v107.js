@@ -3663,7 +3663,8 @@
         'showLogo', 'headerImage', 'headerImageScale', 'headerImagePosition', 'headerImagePositionX',
         'logoType', 'logoPosition', 'logoImageUrl', 'useHeaderImage', 'useBgImage', 'bgTheme', 'bgCustomUrl',
         'headerStyle', 'headerAlign', 'subtitlePosition',
-        'titleBadgeShape', 'titleBadgeStyle', 'titleBadgeBgType', 'titleBadgeBgCustom', 'titleBadgeColorType', 'titleBadgeColorCustom'
+        'titleBadgeShape', 'titleBadgeStyle', 'titleBadgeBgType', 'titleBadgeBgCustom', 'titleBadgeColorType', 'titleBadgeColorCustom',
+        'titleWarpShape', 'titleWarpStrength', 'titleWarpEffect'
       ];
       if (!preserveCurrentMode && savedForm.editorMode !== undefined) {
         window.G.editorMode = savedForm.editorMode;
@@ -3715,6 +3716,9 @@
     if (window.G.titleBadgeBgCustom === undefined) window.G.titleBadgeBgCustom = "#1a73e8";
     if (window.G.titleBadgeColorType === undefined) window.G.titleBadgeColorType = "white";
     if (window.G.titleBadgeColorCustom === undefined) window.G.titleBadgeColorCustom = "#ffffff";
+    if (window.G.titleWarpShape === undefined) window.G.titleWarpShape = "none";
+    if (window.G.titleWarpStrength === undefined) window.G.titleWarpStrength = "medium";
+    if (window.G.titleWarpEffect === undefined) window.G.titleWarpEffect = "none";
 
     const g = window.G;
 
@@ -3753,6 +3757,18 @@
 
     const subtitlePosEl = document.getElementById('editor-subtitle-position');
     if (subtitlePosEl) subtitlePosEl.value = g.subtitlePosition || 'below';
+
+    // 🔤 タイトル文字変形＆立体エフェクトのプレフィル
+    const titleWarpShapeEl = document.getElementById('editor-title-warp-shape');
+    const titleWarpStrengthContainer = document.getElementById('editor-title-warp-strength-container');
+    const titleWarpStrengthEl = document.getElementById('editor-title-warp-strength');
+    const titleWarpEffectEl = document.getElementById('editor-title-warp-effect');
+
+    const warpShapeVal = g.titleWarpShape || 'none';
+    if (titleWarpShapeEl) titleWarpShapeEl.value = warpShapeVal;
+    if (titleWarpStrengthContainer) titleWarpStrengthContainer.style.display = warpShapeVal !== 'none' ? 'block' : 'none';
+    if (titleWarpStrengthEl) titleWarpStrengthEl.value = g.titleWarpStrength || 'medium';
+    if (titleWarpEffectEl) titleWarpEffectEl.value = g.titleWarpEffect || 'none';
 
     // 🏷️ タイトル外枠（簡易ロゴ化）バッジ設定のプレフィル
     const titleBadgeShapeEl = document.getElementById('editor-title-badge-shape');
@@ -4614,6 +4630,41 @@
       if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
     });
 
+    // 🔤 タイトル文字変形＆立体ロゴエフェクトのイベントリスナー
+    const titleWarpStrengthContainer = document.getElementById('editor-title-warp-strength-container');
+    bindChange('editor-title-warp-shape', v => {
+      window.G.titleWarpShape = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleWarpShape = v;
+      if (window.n) window.n.titleWarpShape = v;
+      if (titleWarpStrengthContainer) {
+        titleWarpStrengthContainer.style.display = v !== 'none' ? 'block' : 'none';
+      }
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-warp-strength', v => {
+      window.G.titleWarpStrength = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleWarpStrength = v;
+      if (window.n) window.n.titleWarpStrength = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-warp-effect', v => {
+      window.G.titleWarpEffect = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleWarpEffect = v;
+      if (window.n) window.n.titleWarpEffect = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
     // 🏷️ タイトル外枠（簡易ロゴ化）バッジ設定のイベントリスナー
     const titleBadgeOptionsEl = document.getElementById('editor-title-badge-options');
     bindChange('editor-title-badge-shape', v => {
@@ -4917,6 +4968,58 @@
     });
   }
 
+  function applyTitleTextWarp(titleEl, text, warpShape, warpStrength, warpEffect) {
+    if (!titleEl) return;
+    warpShape = warpShape || 'none';
+    warpStrength = warpStrength || 'medium';
+    warpEffect = warpEffect || 'none';
+
+    if (warpShape === 'none' && warpEffect === 'none') {
+      titleEl.textContent = text;
+      return;
+    }
+
+    const span = document.createElement('span');
+    span.className = 'title-text-warp';
+    if (warpStrength) {
+      span.classList.add('warp-strength-' + warpStrength);
+    }
+    if (warpEffect && warpEffect !== 'none') {
+      span.classList.add('text-effect-' + warpEffect);
+    }
+
+    if (warpShape === 'slope-up' || warpShape === 'roof') {
+      span.classList.add('text-warp-slope-container');
+      const chars = Array.from(text || '');
+      const len = chars.length;
+      chars.forEach((ch, i) => {
+        const cSpan = document.createElement('span');
+        cSpan.textContent = ch;
+        let pct = 100;
+        if (warpShape === 'slope-up') {
+          pct = len <= 1 ? 100 : Math.round(70 + (60 * i) / (len - 1));
+        } else if (warpShape === 'roof') {
+          const dist = Math.abs(i - (len - 1) / 2) / ((len - 1) / 2 || 1);
+          pct = Math.round(130 - 55 * dist);
+        }
+        cSpan.style.fontSize = pct + '%';
+        if (warpEffect && warpEffect !== 'none') {
+          cSpan.classList.add('text-effect-' + warpEffect);
+        }
+        span.appendChild(cSpan);
+      });
+    } else if (warpShape !== 'none') {
+      span.classList.add('text-warp-' + warpShape);
+      span.textContent = text;
+    } else {
+      span.textContent = text;
+    }
+
+    titleEl.innerHTML = '';
+    titleEl.appendChild(span);
+  }
+  window.applyTitleTextWarp = applyTitleTextWarp;
+
   function applyPreviewTheme() {
     const previewContainer = document.querySelector('.preview-container');
     const previewCard = document.querySelector('.preview-card');
@@ -4975,7 +5078,7 @@
     const previewTitle = document.getElementById('preview-form-title');
     const previewDesc = document.getElementById('preview-form-desc');
     if (previewTitle) {
-      previewTitle.textContent = isPro ? ((g.header ? g.header.title : null) || g.title || "セクション") : (g.title || "セクション");
+      const rawTitle = isPro ? ((g.header ? g.header.title : null) || g.title || "セクション") : (g.title || "セクション");
 
       // 🏷️ タイトル外枠（簡易ロゴ化）バッジの適用
       const badgeShape = g.titleBadgeShape || 'none';
@@ -5014,6 +5117,9 @@
         else if (badgeColorType === 'custom') actualColor = badgeColorCustom;
         previewTitle.style.setProperty('--badge-color', actualColor);
       }
+
+      // 🔤 タイトル文字自体の変形（ワープテキスト＆立体ロゴ）の適用
+      applyTitleTextWarp(previewTitle, rawTitle, g.titleWarpShape, g.titleWarpStrength, g.titleWarpEffect);
     }
 
     // サブタイトルの取得と反映（リアルタイム入力値＆データオブジェクト双方対応）
@@ -12729,7 +12835,7 @@
     const proDescVal = (g.header && g.header.disclaimer) ? g.header.disclaimer : currentFormDesc;
 
     if (liveTitleH) {
-      liveTitleH.textContent = isPro ? (proTitleVal || "フォーム") : (currentFormTitle || "フォーム");
+      const liveRawTitle = isPro ? (proTitleVal || "フォーム") : (currentFormTitle || "フォーム");
 
       // 🏷️ タイトル外枠（簡易ロゴ化）バッジの適用
       const badgeShape = g.titleBadgeShape || 'none';
@@ -12768,6 +12874,9 @@
         else if (badgeColorType === 'custom') actualColor = badgeColorCustom;
         liveTitleH.style.setProperty('--badge-color', actualColor);
       }
+
+      // 🔤 タイトル文字自体の変形（ワープテキスト＆立体ロゴ）の適用
+      applyTitleTextWarp(liveTitleH, liveRawTitle, g.titleWarpShape, g.titleWarpStrength, g.titleWarpEffect);
     }
 
     // サブタイトルの取得と反映（リアルタイム入力値＆データオブジェクト双方対応）
@@ -13249,10 +13358,13 @@
   // 高速インプレース・プレビュー更新（文字入力時の全DOM破棄・チラつき・遅延を解消）
   function fastUpdateLivePreview(type, value, extra) {
     if (type === 'form_title') {
+      const warpShape = window.G ? window.G.titleWarpShape : 'none';
+      const warpStrength = window.G ? window.G.titleWarpStrength : 'medium';
+      const warpEffect = window.G ? window.G.titleWarpEffect : 'none';
       const el = document.getElementById('live-preview-form-title');
-      if (el) el.textContent = value || "フォーム";
+      if (el) applyTitleTextWarp(el, value || "フォーム", warpShape, warpStrength, warpEffect);
       const mob = document.querySelector('.mobile-preview-title');
-      if (mob) mob.textContent = value || "フォーム";
+      if (mob) applyTitleTextWarp(mob, value || "フォーム", warpShape, warpStrength, warpEffect);
     } else if (type === 'subtitle' || type === 'form_subtitle') {
       const liveSub = document.getElementById('live-preview-form-subtitle');
       if (liveSub) {
@@ -13532,6 +13644,32 @@
         if (window.G) window.G.subtitlePosition = t.value;
         if (window.n) window.n.subtitlePosition = t.value;
         if (window.U && window.U[window.W]) window.U[window.W].subtitlePosition = t.value;
+        applyPreviewTheme();
+        renderLivePreview();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      } else if (t.id === 'editor-title-warp-shape' || t.id === 'editor-title-warp-strength' || t.id === 'editor-title-warp-effect') {
+        const warpShapeEl = document.getElementById('editor-title-warp-shape');
+        const warpStrengthEl = document.getElementById('editor-title-warp-strength');
+        const warpEffectEl = document.getElementById('editor-title-warp-effect');
+        const strengthContainer = document.getElementById('editor-title-warp-strength-container');
+
+        const wsVal = warpShapeEl ? warpShapeEl.value : 'none';
+        const wstVal = warpStrengthEl ? warpStrengthEl.value : 'medium';
+        const weVal = warpEffectEl ? warpEffectEl.value : 'none';
+
+        if (strengthContainer) strengthContainer.style.display = wsVal !== 'none' ? 'block' : 'none';
+
+        const updateWarp = (obj) => {
+          if (!obj) return;
+          obj.titleWarpShape = wsVal;
+          obj.titleWarpStrength = wstVal;
+          obj.titleWarpEffect = weVal;
+        };
+        updateWarp(window.G);
+        updateWarp(window.n);
+        if (window.U && window.U[window.W]) updateWarp(window.U[window.W]);
+
         applyPreviewTheme();
         renderLivePreview();
         if (typeof window.S === 'function') window.S();
@@ -13988,6 +14126,9 @@
         if (window.G.titleBadgeBgCustom !== undefined) allForms[idx].titleBadgeBgCustom = window.G.titleBadgeBgCustom;
         if (window.G.titleBadgeColorType !== undefined) allForms[idx].titleBadgeColorType = window.G.titleBadgeColorType;
         if (window.G.titleBadgeColorCustom !== undefined) allForms[idx].titleBadgeColorCustom = window.G.titleBadgeColorCustom;
+        if (window.G.titleWarpShape !== undefined) allForms[idx].titleWarpShape = window.G.titleWarpShape;
+        if (window.G.titleWarpStrength !== undefined) allForms[idx].titleWarpStrength = window.G.titleWarpStrength;
+        if (window.G.titleWarpEffect !== undefined) allForms[idx].titleWarpEffect = window.G.titleWarpEffect;
         
         if (window.G.editorMode !== undefined) allForms[idx].editorMode = window.G.editorMode;
         if (window.G.header !== undefined) allForms[idx].header = window.G.header;
@@ -15444,6 +15585,9 @@
       titleBadgeBgCustom: f.titleBadgeBgCustom || '#1a73e8',
       titleBadgeColorType: f.titleBadgeColorType || 'white',
       titleBadgeColorCustom: f.titleBadgeColorCustom || '#ffffff',
+      titleWarpShape: f.titleWarpShape || 'none',
+      titleWarpStrength: f.titleWarpStrength || 'medium',
+      titleWarpEffect: f.titleWarpEffect || 'none',
       sections: (f.sections || []).map(sec => ({
         id: sec.id,
         title: (sec.title || '').trim(),
@@ -15495,6 +15639,9 @@
       titleBadgeBgCustom: formObj.titleBadgeBgCustom || '#1a73e8',
       titleBadgeColorType: formObj.titleBadgeColorType || 'white',
       titleBadgeColorCustom: formObj.titleBadgeColorCustom || '#ffffff',
+      titleWarpShape: formObj.titleWarpShape || 'none',
+      titleWarpStrength: formObj.titleWarpStrength || 'medium',
+      titleWarpEffect: formObj.titleWarpEffect || 'none',
       sections: JSON.parse(JSON.stringify(formObj.sections || [])),
       theme: formObj.theme ? JSON.parse(JSON.stringify(formObj.theme)) : null,
       settings: formObj.settings ? JSON.parse(JSON.stringify(formObj.settings)) : null,
