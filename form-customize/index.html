@@ -383,19 +383,34 @@
                   
                   <!-- 2. フォームのタイトル -->
                   <div class="form-group" style="margin: 0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 6px;">
                       <label for="editor-form-title" style="font-size: 0.75rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">フォームのタイトル</label>
-                      <div class="title-size-control-group" style="display: flex; align-items: center; gap: 4px;">
-                        <span style="font-size: 0.7rem; color: var(--color-text-muted); white-space: nowrap;">文字サイズ:</span>
-                        <select id="editor-title-font-size" class="form-control form-control-sm" style="width: auto; height: 26px; font-size: 0.72rem; padding: 1px 6px; cursor: pointer; border-radius: 4px;">
-                          <option value="small">S (小)</option>
-                          <option value="medium">M (中)</option>
-                          <option value="large" selected>L (大)</option>
-                          <option value="custom">カスタム</option>
-                        </select>
-                        <div id="editor-title-size-custom-container" style="display: none; align-items: center; gap: 2px;">
-                          <input type="number" id="editor-title-size-custom-val" class="form-control form-control-sm" style="width: 55px; height: 26px; font-size: 0.72rem; padding: 1px 4px;" min="10" max="100" value="28" />
-                          <span style="font-size: 0.7rem; color: var(--color-text-muted);">px</span>
+                      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <!-- 文字サイズ -->
+                        <div class="title-size-control-group" style="display: flex; align-items: center; gap: 3px;">
+                          <span style="font-size: 0.7rem; color: var(--color-text-muted); white-space: nowrap;">サイズ:</span>
+                          <select id="editor-title-font-size" class="form-control form-control-sm" style="width: auto; height: 26px; font-size: 0.72rem; padding: 1px 4px; cursor: pointer; border-radius: 4px;">
+                            <option value="small">S (小)</option>
+                            <option value="medium">M (中)</option>
+                            <option value="large" selected>L (大)</option>
+                            <option value="custom">カスタム</option>
+                          </select>
+                          <div id="editor-title-size-custom-container" style="display: none; align-items: center; gap: 2px;">
+                            <input type="number" id="editor-title-size-custom-val" class="form-control form-control-sm" style="width: 50px; height: 26px; font-size: 0.72rem; padding: 1px 4px;" min="10" max="100" value="28" />
+                            <span style="font-size: 0.7rem; color: var(--color-text-muted);">px</span>
+                          </div>
+                        </div>
+                        <!-- 文字色 -->
+                        <div class="title-color-control-group" style="display: flex; align-items: center; gap: 3px;">
+                          <span style="font-size: 0.7rem; color: var(--color-text-muted); white-space: nowrap;">文字色:</span>
+                          <select id="editor-title-color-type" class="form-control form-control-sm" style="width: auto; height: 26px; font-size: 0.72rem; padding: 1px 4px; cursor: pointer; border-radius: 4px;">
+                            <option value="default" selected>標準 (濃灰)</option>
+                            <option value="primary">テーマ色</option>
+                            <option value="dark">黒 (#202124)</option>
+                            <option value="white">白 (#ffffff)</option>
+                            <option value="custom">カスタム色</option>
+                          </select>
+                          <input type="color" id="editor-title-color-custom" value="#1a73e8" style="display: none; width: 26px; height: 26px; padding: 0; border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer;" title="カスタム文字色を選択" />
                         </div>
                       </div>
                     </div>
@@ -1377,7 +1392,7 @@
       }
 
       .preview-form-header h1 {
-        color: var(--color-text) !important;
+        color: var(--color-text);
       }
 
       .preview-form-header p {

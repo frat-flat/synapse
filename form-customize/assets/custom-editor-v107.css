@@ -5835,10 +5835,10 @@ button.btn-sec-reorder {
 
 /* ネオンサイバー発光 */
 .text-effect-neon {
-  color: #00e5ff !important;
-  text-shadow: 0 0 8px rgba(0, 229, 255, 0.8),
-               0 0 16px rgba(0, 229, 255, 0.5),
-               0 0 24px rgba(0, 229, 255, 0.3) !important;
+  color: var(--neon-color, #00e5ff) !important;
+  text-shadow: 0 0 8px var(--neon-color, rgba(0, 229, 255, 0.8)),
+               0 0 16px var(--neon-color, rgba(0, 229, 255, 0.5)),
+               0 0 24px var(--neon-color, rgba(0, 229, 255, 0.3)) !important;
 }
 
 /* 白フチ・袋文字 */

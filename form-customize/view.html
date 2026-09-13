@@ -285,10 +285,10 @@
                 drop-shadow(0 6px 12px rgba(0, 0, 0, 0.45)) !important;
       }
       .text-effect-neon {
-        color: #00e5ff !important;
-        text-shadow: 0 0 8px rgba(0, 229, 255, 0.8),
-                     0 0 16px rgba(0, 229, 255, 0.5),
-                     0 0 24px rgba(0, 229, 255, 0.3) !important;
+        color: var(--neon-color, #00e5ff) !important;
+        text-shadow: 0 0 8px var(--neon-color, rgba(0, 229, 255, 0.8)),
+                     0 0 16px var(--neon-color, rgba(0, 229, 255, 0.5)),
+                     0 0 24px var(--neon-color, rgba(0, 229, 255, 0.3)) !important;
       }
       .text-effect-outline {
         -webkit-text-stroke: 1.5px currentColor !important;
@@ -2650,11 +2650,19 @@
           });
         }
 
-        function applyTitleTextWarp(titleEl, text, warpShape, warpStrength, warpEffect) {
+        function applyTitleTextWarp(titleEl, text, warpShape, warpStrength, warpEffect, textColor) {
           if (!titleEl) return;
           warpShape = warpShape || 'none';
           warpStrength = warpStrength || 'medium';
           warpEffect = warpEffect || 'none';
+
+          if (textColor) {
+            titleEl.style.setProperty('color', textColor, 'important');
+            titleEl.style.setProperty('--neon-color', textColor);
+          } else {
+            titleEl.style.removeProperty('color');
+            titleEl.style.removeProperty('--neon-color');
+          }
 
           if (warpShape === 'none' && warpEffect === 'none') {
             titleEl.textContent = text;
@@ -2663,6 +2671,10 @@
 
           const span = document.createElement('span');
           span.className = 'title-text-warp';
+          if (textColor) {
+            span.style.setProperty('color', textColor, 'important');
+            span.style.setProperty('--neon-color', textColor);
+          }
           if (warpStrength) {
             span.classList.add('warp-strength-' + warpStrength);
           }
@@ -2685,6 +2697,9 @@
                 pct = Math.round(130 - 55 * dist);
               }
               cSpan.style.fontSize = pct + '%';
+              if (textColor) {
+                cSpan.style.color = textColor;
+              }
               if (warpEffect && warpEffect !== 'none') {
                 cSpan.classList.add('text-effect-' + warpEffect);
               }
@@ -2834,11 +2849,23 @@
             formTitleEl.style.setProperty('--badge-color', actualColor);
           }
 
-          // 🔤 タイトル文字自体の変形（ワープテキスト＆立体ロゴ）の適用
+          // 🔤 タイトル文字自体の変形（ワープテキスト＆立体ロゴ）および文字色の適用
           const warpShape = formDefinition.titleWarpShape || 'none';
           const warpStrength = formDefinition.titleWarpStrength || 'medium';
           const warpEffect = formDefinition.titleWarpEffect || 'none';
-          applyTitleTextWarp(formTitleEl, formDefinition.title || '無題のフォーム', warpShape, warpStrength, warpEffect);
+
+          const colorType = formDefinition.titleColorType || (formDefinition.titleBadgeShape && formDefinition.titleBadgeShape !== 'none' ? formDefinition.titleBadgeColorType : 'default');
+          const customColor = formDefinition.titleColorCustom || formDefinition.titleBadgeColorCustom || '#1a73e8';
+          let titleTextColor = '';
+          if (colorType === 'primary') titleTextColor = 'var(--color-primary, #1a73e8)';
+          else if (colorType === 'dark') titleTextColor = '#202124';
+          else if (colorType === 'white') titleTextColor = '#ffffff';
+          else if (colorType === 'custom') titleTextColor = customColor;
+          else if (badgeShape !== 'none' && badgeStyle === 'fill') {
+            titleTextColor = formDefinition.titleBadgeColorType === 'dark' ? '#202124' : '#ffffff';
+          }
+
+          applyTitleTextWarp(formTitleEl, formDefinition.title || '無題のフォーム', warpShape, warpStrength, warpEffect, titleTextColor);
 
           // テーマカラー（primaryColor / backgroundColor）の反映
           if (formDefinition.appearance) {
