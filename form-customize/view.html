@@ -702,6 +702,23 @@
         </p>
       </div>
 
+      <!-- 🧪 テストモード告知バナー (env=test / branch=test 時のみ表示) -->
+      <div id="test-mode-banner" style="display: none; width: 100%; box-sizing: border-box; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border: 1.5px solid #f59e0b; border-radius: 8px; padding: 12px 16px; margin-bottom: 4px; box-shadow: 0 2px 6px rgba(245,158,11,0.12);">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.4rem;">🧪</span>
+            <div>
+              <div style="font-size: 0.88rem; font-weight: 700; color: #b45309; display: flex; align-items: center; gap: 6px;">
+                <span>テスト送信モード稼働中</span>
+                <span style="background: #f59e0b; color: #fff; font-size: 0.65rem; font-weight: 800; padding: 1px 6px; border-radius: 10px; letter-spacing: 0.5px;">test branch</span>
+              </div>
+              <div style="font-size: 0.74rem; color: #92400e; margin-top: 2px;">この送信はテスト用隔離テーブルへ保存され、本番データには一切混ざりません。</div>
+            </div>
+          </div>
+          <span style="font-size: 0.72rem; color: #b45309; font-weight: 600; background: rgba(245,158,11,0.15); padding: 4px 8px; border-radius: 4px; white-space: nowrap;">隔離モード</span>
+        </div>
+      </div>
+
       <!-- フォーム本体コンテナ -->
       <div id="form-container" style="display: none; flex-direction: column; gap: 16px;">
         <!-- ヘッダーカード -->
@@ -930,8 +947,16 @@
         // 3. フォーム初期ロード
         // ==========================================
         async function loadForm() {
-          const hash = window.location.hash || '';
+          // 🧪 テスト環境（env=test または branch=test）のチェックとバナー表示
           const search = new URLSearchParams(window.location.search);
+          const isTestEnv = search.get('env') === 'test' || search.get('branch') === 'test' || search.get('mode') === 'test';
+          window.IS_TEST_ENV = isTestEnv;
+          const testBanner = document.getElementById('test-mode-banner');
+          if (testBanner) {
+            testBanner.style.display = isTestEnv ? 'block' : 'none';
+          }
+
+          const hash = window.location.hash || '';
 
           let dataParam = null;
           if (hash.startsWith('#data=')) {
@@ -1093,6 +1118,11 @@
 
           loadingBox.style.display = 'none';
           formContainer.style.display = 'flex';
+
+          // 🧪 テスト環境バナーの表示維持
+          if (testBanner) {
+            testBanner.style.display = window.IS_TEST_ENV ? 'block' : 'none';
+          }
 
           // 初期化
           initFormView();
@@ -2595,7 +2625,15 @@
           if (nextAction === 'submit') {
             btnNext.style.display = 'none';
             btnSubmit.style.display = 'inline-flex';
-            btnSubmit.textContent = '送信';
+            if (window.IS_TEST_ENV) {
+              btnSubmit.innerHTML = '🧪 テスト送信する';
+              btnSubmit.style.setProperty('background', '#d97706', 'important');
+              btnSubmit.style.setProperty('border-color', '#b45309', 'important');
+            } else {
+              btnSubmit.textContent = '送信';
+              btnSubmit.style.removeProperty('background');
+              btnSubmit.style.removeProperty('border-color');
+            }
           } else {
             btnNext.style.display = 'inline-flex';
             btnSubmit.style.display = 'none';
@@ -5153,19 +5191,24 @@
               rowId: rowId,
               registrationCode: confirmedCode,
               currentSectionId: currentSectionId,
-              nextSectionId: nextSecId
+              nextSectionId: nextSecId,
+              env: window.IS_TEST_ENV ? 'test' : 'production',
+              branch: window.IS_TEST_ENV ? 'test' : 'main'
             }, '*');
           }
 
           // 2. ローカルストレージへの回答データ蓄積（スタンドアローン回答ログ）
           try {
-            const formKey = `form_responses_${formDefinition.id || 'default'}`;
+            const storagePrefix = window.IS_TEST_ENV ? 'form_responses_test_' : 'form_responses_';
+            const formKey = `${storagePrefix}${formDefinition.id || 'default'}`;
             const existing = JSON.parse(localStorage.getItem(formKey) || '[]');
             existing.push({
               submittedAt: new Date().toISOString(),
               data: submitData,
               isPartial: isPartial,
-              registrationCode: confirmedCode
+              registrationCode: confirmedCode,
+              env: window.IS_TEST_ENV ? 'test' : 'production',
+              branch: window.IS_TEST_ENV ? 'test' : 'main'
             });
             localStorage.setItem(formKey, JSON.stringify(existing));
           } catch(e) {}
@@ -5174,7 +5217,7 @@
           const successTitle = document.getElementById('success-title');
           const successDesc = document.getElementById('success-desc');
           if (isPartial) {
-            if (successTitle) successTitle.textContent = '途中送信が完了し、登録コードが確定しました！';
+            if (successTitle) successTitle.textContent = window.IS_TEST_ENV ? '【テスト】途中送信が完了し、登録コードが確定しました！' : '途中送信が完了し、登録コードが確定しました！';
             if (successDesc) successDesc.innerHTML = `
               <div style="margin: 16px 0; background: rgba(49, 130, 206, 0.08); border: 1.5px solid #3182ce; border-radius: 8px; padding: 16px; text-align: center;">
                 <div style="font-size: 0.85rem; font-weight: 700; color: #2b6cb0; margin-bottom: 6px;">【 確定登録コード 】</div>
@@ -5222,8 +5265,23 @@
               };
             }
           } else {
-            if (successTitle) successTitle.textContent = '回答を受け付けました';
-            if (successDesc) successDesc.textContent = 'ご回答ありがとうございました。内容は正常に記録されました。';
+            if (successTitle) successTitle.textContent = window.IS_TEST_ENV ? '🧪 テスト回答を受け付けました' : '回答を受け付けました';
+            if (successDesc) {
+              if (window.IS_TEST_ENV) {
+                successDesc.innerHTML = `
+                  <p>テスト送信が正常に完了しました。</p>
+                  <div style="margin-top: 14px; padding: 12px 16px; background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 8px; font-size: 0.82rem; color: #92400e; font-weight: 600; text-align: left; display: flex; align-items: flex-start; gap: 10px;">
+                    <span style="font-size: 1.2rem;">🛡️</span>
+                    <div>
+                      <div style="font-weight: 700; color: #b45309; margin-bottom: 2px;">本番データ隔離保証 (test branch)</div>
+                      <div>このテスト送信データは隔離テーブル「${escapeHtml(formDefinition.title || 'フォーム')} (テスト)」へ保存されました。本番顧客・取引先データには一切影響を与えていません。</div>
+                    </div>
+                  </div>
+                `;
+              } else {
+                successDesc.textContent = 'ご回答ありがとうございました。内容は正常に記録されました。';
+              }
+            }
           }
 
           // 4. 回答控えメールの自動送信（autoReply: true のメールアドレス項目宛て）

@@ -18291,32 +18291,57 @@ function handleFormSubmitMessage(event) {
     return;
   }
 
+  // テストデータ消去イベント
+  if (event.data.type === 'CLEAR_FORM_TEST_DATA') {
+    const { formTitle } = event.data;
+    if (formTitle) {
+      const testTableName = `${formTitle} (テスト)`;
+      const testTable = state.customTables.find(t => t.name === testTableName);
+      if (testTable) {
+        testTable.rows = [];
+        if (typeof saveState === 'function') saveState();
+        if (typeof renderCustomTablesMenu === 'function') renderCustomTablesMenu();
+        if (typeof showToast === 'function') showToast(`「${formTitle}」のテストデータをすべて消去しました。`, 'info');
+        console.log(`[Synapse] Cleared all test data for form "${formTitle}"`);
+      }
+    }
+    return;
+  }
+
   // 送信イベント以外はスルー
   if (event.data.type !== 'FORM_SUBMIT') return;
 
-  const { formTitle, data, isTemporary, isPartialSubmit, rowId: clientRowId, nextSectionId, currentSectionId } = event.data;
+  const { formTitle, data, isTemporary, isPartialSubmit, rowId: clientRowId, nextSectionId, currentSectionId, env, branch } = event.data;
   if (!data) return;
+
+  // 🧪 テスト送信フラグの判定（Gitブランチ型環境分離: test vs production）
+  const isTestSubmission = env === 'test' || branch === 'test';
+  const effectiveTableName = isTestSubmission ? `${formTitle} (テスト)` : formTitle;
 
   // 事前に行IDを決定（新規なら採番、既存なら引き継ぐ）
   const targetRowId = clientRowId || 'row_' + Date.now();
 
   // 一時保存・途中送信・回答完了ステータスおよび再開用URLをデータに自動マージ
   data["ステータス"] = isTemporary ? "一時保存" : (isPartialSubmit ? "途中送信（コード確定済）" : "回答完了");
+  if (isTestSubmission) {
+    data["送信種別"] = "🧪 テスト送信 (test branch)";
+  }
   
   // プレビュー画面で再開させるためのURLを生成
   const resumeSecParam = nextSectionId ? `&resumeSec=${encodeURIComponent(nextSectionId)}` : '';
+  const resumeEnvParam = isTestSubmission ? '&env=test' : '';
   const resumeUrl = (isTemporary || isPartialSubmit || nextSectionId)
-    ? window.location.origin + "/form-customize/view.html?res_id=" + targetRowId + resumeSecParam
+    ? window.location.origin + "/form-customize/view.html?res_id=" + targetRowId + resumeSecParam + resumeEnvParam
     : "";
   
   data["再開用URL"] = resumeUrl;
 
-  console.log(`%c[Form Submit]%c Received submission for form "${formTitle}" (isTemporary: ${!!isTemporary}, isPartial: ${!!isPartialSubmit}, rowId: ${targetRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
+  console.log(`%c[Form Submit]%c Received submission for form "${effectiveTableName}" (isTest: ${isTestSubmission}, isTemporary: ${!!isTemporary}, isPartial: ${!!isPartialSubmit}, rowId: ${targetRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
 
   // ----------------------------------------------------
   // 1. COS内カスタムマスターテーブルへのデータ蓄積・更新
   // ----------------------------------------------------
-  let targetTable = state.customTables.find(t => t.name === formTitle);
+  let targetTable = state.customTables.find(t => t.name === effectiveTableName);
   let isNewTable = false;
 
   if (!targetTable) {
@@ -18338,7 +18363,7 @@ function handleFormSubmitMessage(event) {
 
     targetTable = {
       id: tableId,
-      name: formTitle,
+      name: effectiveTableName,
       parentMenuId: 'root', // メニューのルート直下に配置
       columns: columns,
       visibleColumns: columns.map(c => c.id),
@@ -18419,7 +18444,7 @@ function handleFormSubmitMessage(event) {
   
   // 編集監査ログへ記録
   logCellEdit(targetTable.id, targetRowId, 'all_columns', 'none', JSON.stringify(data));
-  console.log(`%c[Synapse Database]%c Saved row (ID: ${targetRowId}) to Custom Master Table "${formTitle}":`, "color: #3b82f6; font-weight: bold;", "color: inherit;", targetRow);
+  console.log(`%c[Synapse Database]%c Saved row (ID: ${targetRowId}) to Custom Master Table "${effectiveTableName}":`, "color: #3b82f6; font-weight: bold;", "color: inherit;", targetRow);
 
   // もしカスタムテーブルが新設された場合は、サイドメニューを再描画する
   if (isNewTable) {
@@ -18477,7 +18502,8 @@ function handleFormSubmitMessage(event) {
   };
 
   // 送信された項目の中に、会社名/企業名があるか確認（最低限これがないとパートナーレコードとして不適切）
-  const partnerName = getValueByMapping('registeredName');
+  // ※ 🧪 テスト送信時は本番パートナーDBの汚染を防ぐため転送処理を完全にスキップ
+  const partnerName = (!isTestSubmission) ? getValueByMapping('registeredName') : '';
   if (partnerName) {
     let existingPartner = null;
     
@@ -18594,7 +18620,11 @@ function handleFormSubmitMessage(event) {
         formTitle: formTitle
       }, '*');
     }
-    showToast(`フォーム「${formTitle}」の途中回答を一時保存しました。`, 'success');
+    if (isTestSubmission) {
+      showToast(`【テスト】フォーム「${formTitle}」の途中回答を隔離保存しました。`, 'info');
+    } else {
+      showToast(`フォーム「${formTitle}」の途中回答を一時保存しました。`, 'success');
+    }
   } else {
     if (event.source && typeof event.source.postMessage === 'function') {
       event.source.postMessage({
@@ -18611,9 +18641,13 @@ function handleFormSubmitMessage(event) {
       }, '*');
     }
     if (isPartialSubmit) {
-      showToast(`フォーム「${formTitle}」の途中回答を受信し、登録コード [${confirmedCode}] を確定しました。`, 'success');
+      showToast(`${isTestSubmission ? '【テスト】' : ''}フォーム「${formTitle}」の途中回答を受信し、登録コード [${confirmedCode}] を確定しました。`, isTestSubmission ? 'info' : 'success');
     } else {
-      showToast(`フォーム「${formTitle}」の回答を受信し、パートナーDBおよびCOSマスタへ保存しました。`, 'success');
+      if (isTestSubmission) {
+        showToast(`【テスト】フォーム「${formTitle}」のテスト送信を受信し、隔離テーブル「${effectiveTableName}」へ保存しました。`, 'info');
+      } else {
+        showToast(`フォーム「${formTitle}」の回答を受信し、パートナーDBおよびCOSマスタへ保存しました。`, 'success');
+      }
     }
   }
 }

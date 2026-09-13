@@ -5553,7 +5553,9 @@
         isPartialSubmit: true,
         rowId: rowId,
         currentSectionId: currentSecId,
-        nextSectionId: nextSecId
+        nextSectionId: nextSecId,
+        env: 'test',
+        branch: 'test'
       }, '*');
     }
 
@@ -5896,7 +5898,7 @@
         saveBtn.disabled = true;
         saveBtn.textContent = '保存中...';
         const data = window.V || {};
-        window.parent.postMessage({ type: 'FORM_SUBMIT', formTitle: window.L.title || '無題のフォーム', data: data, isTemporary: true, rowId: window.currentResumeRowId || null }, '*');
+        window.parent.postMessage({ type: 'FORM_SUBMIT', formTitle: window.L.title || '無題のフォーム', data: data, isTemporary: true, rowId: window.currentResumeRowId || null, env: 'test', branch: 'test' }, '*');
       });
     }
     const copyBtn = draftPanel.querySelector('#btn-preview-draft-url-copy');
@@ -14915,6 +14917,7 @@
   }
 
   let _currentShareModalFormIndex = null;
+  let _currentShareModalEnv = 'production'; // 'production' (main) | 'test' (test branch)
 
   function updateShareModalOpenTabBtn(targetUrl) {
     const openTabBtn = document.getElementById('btn-open-share-url-tab');
@@ -14925,7 +14928,7 @@
     }
   }
 
-  function getPublicFormShareUrl(formIndex, shorten = true) {
+  function getPublicFormShareUrl(formIndex, shorten = true, env = 'production') {
     const origin = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : '';
     let pathname = window.location.pathname || '';
     
@@ -14950,13 +14953,16 @@
     // バックグラウンドでクラウド（Supabase）への保存・同期を実行
     try { syncFormsToCloud(); } catch(e) {}
 
+    const isTest = (env === 'test');
+    const envParam = isTest ? (shorten ? '?env=test' : '&env=test') : '';
+
     // 短縮URL (Google Forms短縮URL風: 例 https://synapse-wayway.vercel.app/f/0)
     if (shorten) {
-      return `${origin}/f/${idx}`;
+      return `${origin}/f/${idx}${envParam}`;
     }
 
     // 完全URL (例: https://synapse-wayway.vercel.app/form-customize/view.html?id=form_0)
-    return `${origin}${viewPath}?id=${encodeURIComponent(formId)}&form_idx=${idx}`;
+    return `${origin}${viewPath}?id=${encodeURIComponent(formId)}&form_idx=${idx}${envParam}`;
   }
 
   function showGlobalShareToast(msg) {
@@ -14978,11 +14984,12 @@
   }
 
   async function copyFormShareUrl(formIndex, silent = false, forceShorten = true) {
-    const url = getPublicFormShareUrl(formIndex, forceShorten);
+    const url = getPublicFormShareUrl(formIndex, forceShorten, _currentShareModalEnv || 'production');
     if (navigator.clipboard && navigator.clipboard.writeText) {
       try {
         await navigator.clipboard.writeText(url);
-        if (!silent) showGlobalShareToast('回答者用短縮リンクをクリップボードにコピーしました！');
+        const envLabel = _currentShareModalEnv === 'test' ? 'テスト送信リンク' : '本番用共有リンク';
+        if (!silent) showGlobalShareToast(`${envLabel}をクリップボードにコピーしました！`);
       } catch (e) {
         fallbackCopy(url, silent);
       }
@@ -15001,7 +15008,8 @@
     textarea.select();
     try {
       document.execCommand('copy');
-      if (!silent) showGlobalShareToast('回答者用短縮リンクをクリップボードにコピーしました！');
+      const envLabel = _currentShareModalEnv === 'test' ? 'テスト送信リンク' : '本番用共有リンク';
+      if (!silent) showGlobalShareToast(`${envLabel}をクリップボードにコピーしました！`);
     } catch (e) {
       console.warn('Copy failed:', e);
     }
@@ -15013,6 +15021,7 @@
     if (!modal) return;
     const { formObj, idx } = getCurrentFormObject(formIndex);
     _currentShareModalFormIndex = idx;
+    _currentShareModalEnv = 'production'; // デフォルトは本番リンク
     const formTitle = formObj && formObj.title ? formObj.title : '無題のフォーム';
 
     const titleEl = document.getElementById('share-modal-form-title');
@@ -15023,19 +15032,129 @@
     const toastEl = document.getElementById('share-modal-copy-toast');
     if (toastEl) toastEl.style.display = 'none';
 
-    const isShorten = shortenCheckbox ? shortenCheckbox.checked : true;
-    const url = getPublicFormShareUrl(idx, isShorten);
-    if (inputEl) inputEl.value = url;
-    updateShareModalOpenTabBtn(url);
+    const prodTabBtn = document.getElementById('share-tab-prod');
+    const testTabBtn = document.getElementById('share-tab-test');
+    const envNotice = document.getElementById('share-env-notice');
+    const envNoticeTitle = document.getElementById('share-env-notice-title');
+    const envNoticeDesc = document.getElementById('share-env-notice-desc');
+    const urlLabel = document.getElementById('share-modal-url-label');
+    const testStatusBadge = document.getElementById('share-test-status-badge');
+    const testToolsArea = document.getElementById('share-test-tools-area');
+    const clearTestBtn = document.getElementById('btn-clear-test-data');
+
+    // URL更新ヘルパー
+    const refreshModalUrl = () => {
+      const isShorten = shortenCheckbox ? shortenCheckbox.checked : true;
+      const url = getPublicFormShareUrl(_currentShareModalFormIndex, isShorten, _currentShareModalEnv);
+      if (inputEl) inputEl.value = url;
+      updateShareModalOpenTabBtn(url);
+    };
+
+    // タブ表示切り替えヘルパー
+    const applyEnvTab = (env) => {
+      _currentShareModalEnv = env;
+      if (env === 'production') {
+        if (prodTabBtn) {
+          prodTabBtn.style.background = '#673ab7';
+          prodTabBtn.style.color = '#ffffff';
+          prodTabBtn.classList.add('active');
+        }
+        if (testTabBtn) {
+          testTabBtn.style.background = 'transparent';
+          testTabBtn.style.color = '#64748b';
+          testTabBtn.classList.remove('active');
+        }
+        if (envNotice) {
+          envNotice.style.background = '#f8fafc';
+          envNotice.style.borderColor = '#cbd5e1';
+          envNotice.style.color = '#475569';
+        }
+        if (envNoticeTitle) {
+          envNoticeTitle.textContent = '🚀 本番公開用URL (main branch)';
+          envNoticeTitle.style.color = '#1e293b';
+        }
+        if (envNoticeDesc) {
+          envNoticeDesc.textContent = '一般回答者・顧客向けの公式リンクです。回答データは本番マスターテーブルへ正規保存されます。';
+        }
+        if (urlLabel) urlLabel.textContent = '本番用URL（一般回答者向け）';
+        if (testStatusBadge) testStatusBadge.style.display = 'none';
+        if (testToolsArea) testToolsArea.style.display = 'none';
+      } else {
+        if (prodTabBtn) {
+          prodTabBtn.style.background = 'transparent';
+          prodTabBtn.style.color = '#64748b';
+          prodTabBtn.classList.remove('active');
+        }
+        if (testTabBtn) {
+          testTabBtn.style.background = '#d97706';
+          testTabBtn.style.color = '#ffffff';
+          testTabBtn.classList.add('active');
+        }
+        if (envNotice) {
+          envNotice.style.background = '#fffbeb';
+          envNotice.style.borderColor = '#fde68a';
+          envNotice.style.color = '#92400e';
+        }
+        if (envNoticeTitle) {
+          envNoticeTitle.textContent = '🧪 テスト送信専用URL (test branch)';
+          envNoticeTitle.style.color = '#b45309';
+        }
+        if (envNoticeDesc) {
+          envNoticeDesc.textContent = '公開前・公開後の動作検証用リンクです。送信データは「(テスト)」テーブルへ完全隔離保存され、本番データには一切混ざりません。';
+        }
+        if (urlLabel) urlLabel.textContent = 'テスト送信専用URL（動作検証用・本番隔離）';
+        if (testStatusBadge) testStatusBadge.style.display = 'inline-block';
+        if (testToolsArea) testToolsArea.style.display = 'flex';
+      }
+      refreshModalUrl();
+    };
+
+    if (prodTabBtn && !prodTabBtn._hooked) {
+      prodTabBtn._hooked = true;
+      prodTabBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        applyEnvTab('production');
+      });
+    }
+
+    if (testTabBtn && !testTabBtn._hooked) {
+      testTabBtn._hooked = true;
+      testTabBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        applyEnvTab('test');
+      });
+    }
+
+    if (clearTestBtn && !clearTestBtn._hooked) {
+      clearTestBtn._hooked = true;
+      clearTestBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (confirm(`「${formTitle}」のテスト送信データをすべて消去（初期化）しますか？\n※ 本番データは一切削除されません。`)) {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+              type: 'CLEAR_FORM_TEST_DATA',
+              formTitle: formTitle
+            }, '*');
+          }
+          // ローカルストレージのテストデータも消去
+          try {
+            const testKey = `form_responses_test_${formObj.id || 'default'}`;
+            localStorage.removeItem(testKey);
+          } catch(err) {}
+          showGlobalShareToast('テスト送信データをリセットしました！');
+        }
+      });
+    }
 
     if (shortenCheckbox && !shortenCheckbox._hooked) {
       shortenCheckbox._hooked = true;
       shortenCheckbox.addEventListener('change', () => {
-        const currentUrl = getPublicFormShareUrl(_currentShareModalFormIndex, shortenCheckbox.checked);
-        if (inputEl) inputEl.value = currentUrl;
-        updateShareModalOpenTabBtn(currentUrl);
+        refreshModalUrl();
       });
     }
+
+    // 初期タブ適用
+    applyEnvTab('production');
 
     modal.classList.add('active');
     modal.style.display = 'flex';
