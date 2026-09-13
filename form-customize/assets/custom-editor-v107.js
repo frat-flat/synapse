@@ -4730,7 +4730,7 @@
     });
 
     const onWarpStrengthChange = (val) => {
-      const num = Math.max(1, Math.min(100, parseInt(val, 10) || 50));
+      const num = Math.max(1, Math.min(200, parseInt(val, 10) || 50));
       window.G.titleWarpStrength = num;
       if (window.U && window.U[window.W]) window.U[window.W].titleWarpStrength = num;
       if (window.n) window.n.titleWarpStrength = num;
@@ -5155,8 +5155,8 @@
     else if (warpStrength === 'strong') strNum = 75;
     else if (typeof warpStrength === 'number') strNum = warpStrength;
     else if (typeof warpStrength === 'string' && !isNaN(parseInt(warpStrength, 10))) strNum = parseInt(warpStrength, 10);
-    strNum = Math.max(1, Math.min(100, strNum));
-    const strRatio = strNum / 100; // 0.01 〜 1.0
+    strNum = Math.max(1, Math.min(200, strNum));
+    const strRatio = strNum / 100; // 0.01 〜 2.0
 
     // 光の向き（0〜360、デフォルト315）と強さ（1〜100、デフォルト60）
     let angle = (typeof lightAngle === 'number') ? lightAngle : 315;
@@ -5251,63 +5251,108 @@
       span.style.setProperty('--title-shadow-filter', `drop-shadow(${ox}px ${oy}px 1px rgba(0, 0, 0, ${(0.45 * intensityRatio).toFixed(2)}))`);
     }
 
-    // 🔤 変形のダイナミック適用
-    if (warpShape === 'trapezoid-down') {
-      span.classList.add('text-warp-trapezoid-down');
-      const p = Math.round(220 - strRatio * 80); // 140px 〜 220px
-      const degX = Math.round(14 + strRatio * 26); // 14° 〜 40°
-      const scaleY = (1.05 + strRatio * 0.3).toFixed(2); // 1.05 〜 1.35
-      span.style.setProperty('--warp-perspective', p + 'px');
-      span.style.setProperty('--warp-angle-x', degX + 'deg');
-      span.style.setProperty('--warp-scale-y', scaleY);
-      span.textContent = text;
-    } else if (warpShape === 'trapezoid-up') {
-      span.classList.add('text-warp-trapezoid-up');
-      const p = Math.round(220 - strRatio * 80);
-      const degX = Math.round(14 + strRatio * 26);
-      const scaleY = (1.05 + strRatio * 0.3).toFixed(2);
-      span.style.setProperty('--warp-perspective', p + 'px');
-      span.style.setProperty('--warp-angle-x', degX + 'deg');
-      span.style.setProperty('--warp-scale-y', scaleY);
-      span.textContent = text;
-    } else if (warpShape === 'skew') {
+    // 🔤 各変形形状のダイナミック描画
+    if (warpShape === 'skew') {
       span.classList.add('text-warp-skew');
-      const skewX = Math.round(10 + strRatio * 24); // 10° 〜 34°
+      const skewX = Math.min(50, Math.round(8 + strRatio * 20));
       span.style.setProperty('--warp-skew', skewX + 'deg');
       span.textContent = text;
-    } else if (warpShape === 'perspective-left' || warpShape === 'perspective-right') {
-      span.classList.add('text-warp-' + warpShape);
-      const p = Math.round(300 - strRatio * 100); // 200px 〜 300px
-      const degY = Math.round(14 + strRatio * 24); // 14° 〜 38°
-      span.style.setProperty('--warp-angle-y', degY + 'deg');
-      span.textContent = text;
-    } else if (warpShape === 'slope-up' || warpShape === 'roof') {
+    } else if (warpShape === 'trapezoid-down' || warpShape === 'trapezoid-up' || warpShape === 'perspective-left' || warpShape === 'perspective-right' || warpShape === 'slope-up' || warpShape === 'roof') {
       span.classList.add('text-warp-slope-container');
       const chars = Array.from(text || '');
       const len = chars.length;
-      chars.forEach((ch, i) => {
-        const cSpan = document.createElement('span');
-        cSpan.textContent = ch;
-        let pct = 100;
-        if (warpShape === 'slope-up') {
-          const minPct = Math.round(100 - 55 * strRatio);
-          const maxPct = Math.round(100 + 110 * strRatio);
-          pct = len <= 1 ? 100 : Math.round(minPct + ((maxPct - minPct) * i) / (len - 1));
-        } else if (warpShape === 'roof') {
-          const dist = Math.abs(i - (len - 1) / 2) / ((len - 1) / 2 || 1);
-          const maxPct = Math.round(100 + 80 * strRatio);
-          const minPct = Math.round(100 - 40 * strRatio);
-          pct = Math.round(maxPct - (maxPct - minPct) * dist);
-        }
-        cSpan.style.fontSize = pct + '%';
-        if (textColor) {
-          cSpan.style.color = textColor;
-        }
-        if (warpEffect && warpEffect !== 'none') {
-          cSpan.classList.add('text-effect-' + warpEffect);
-        }
-        span.appendChild(cSpan);
-      });
+
+      if (warpShape === 'trapezoid-down') {
+        span.style.alignItems = 'flex-end';
+        chars.forEach((ch, i) => {
+          const cSpan = document.createElement('span');
+          cSpan.textContent = ch;
+          cSpan.style.display = 'inline-block';
+          cSpan.style.transformOrigin = 'center bottom';
+          const norm = len <= 1 ? 0 : (i - (len - 1) / 2) / ((len - 1) / 2);
+          const rotZ = norm * (16 * strRatio);
+          const transY = Math.abs(norm) * (-9 * strRatio);
+          const scale = 1.0 + Math.abs(norm) * (0.28 * strRatio);
+          cSpan.style.transform = `translateY(${transY.toFixed(1)}px) rotate(${rotZ.toFixed(1)}deg) scale(${scale.toFixed(2)})`;
+          if (textColor) cSpan.style.color = textColor;
+          span.appendChild(cSpan);
+        });
+      } else if (warpShape === 'trapezoid-up') {
+        span.style.alignItems = 'flex-start';
+        chars.forEach((ch, i) => {
+          const cSpan = document.createElement('span');
+          cSpan.textContent = ch;
+          cSpan.style.display = 'inline-block';
+          cSpan.style.transformOrigin = 'center top';
+          const norm = len <= 1 ? 0 : (i - (len - 1) / 2) / ((len - 1) / 2);
+          const rotZ = norm * (-16 * strRatio);
+          const transY = Math.abs(norm) * (9 * strRatio);
+          const scale = 1.0 + Math.abs(norm) * (0.28 * strRatio);
+          cSpan.style.transform = `translateY(${transY.toFixed(1)}px) rotate(${rotZ.toFixed(1)}deg) scale(${scale.toFixed(2)})`;
+          if (textColor) cSpan.style.color = textColor;
+          span.appendChild(cSpan);
+        });
+      } else if (warpShape === 'perspective-left') {
+        span.style.alignItems = 'center';
+        chars.forEach((ch, i) => {
+          const cSpan = document.createElement('span');
+          cSpan.textContent = ch;
+          cSpan.style.display = 'inline-block';
+          const ratio = len <= 1 ? 0 : i / (len - 1);
+          const minScale = Math.max(0.3, 1.0 - 0.45 * strRatio);
+          const maxScale = Math.min(2.4, 1.0 + 0.65 * strRatio);
+          const curScale = maxScale - ratio * (maxScale - minScale);
+          cSpan.style.fontSize = `${Math.round(curScale * 100)}%`;
+          if (textColor) cSpan.style.color = textColor;
+          span.appendChild(cSpan);
+        });
+      } else if (warpShape === 'perspective-right') {
+        span.style.alignItems = 'center';
+        chars.forEach((ch, i) => {
+          const cSpan = document.createElement('span');
+          cSpan.textContent = ch;
+          cSpan.style.display = 'inline-block';
+          const ratio = len <= 1 ? 0 : i / (len - 1);
+          const minScale = Math.max(0.3, 1.0 - 0.45 * strRatio);
+          const maxScale = Math.min(2.4, 1.0 + 0.65 * strRatio);
+          const curScale = minScale + ratio * (maxScale - minScale);
+          cSpan.style.fontSize = `${Math.round(curScale * 100)}%`;
+          if (textColor) cSpan.style.color = textColor;
+          span.appendChild(cSpan);
+        });
+      } else if (warpShape === 'slope-up') {
+        span.style.alignItems = 'flex-end';
+        chars.forEach((ch, i) => {
+          const cSpan = document.createElement('span');
+          cSpan.textContent = ch;
+          cSpan.style.display = 'inline-block';
+          const ratio = len <= 1 ? 0 : i / (len - 1);
+          const minScale = Math.max(0.3, 1.0 - 0.5 * strRatio);
+          const maxScale = Math.min(2.5, 1.0 + 1.0 * strRatio);
+          const curScale = minScale + ratio * (maxScale - minScale);
+          const lift = -1 * (18 * strRatio * ratio);
+          cSpan.style.fontSize = `${Math.round(curScale * 100)}%`;
+          cSpan.style.transform = `translateY(${lift.toFixed(1)}px)`;
+          if (textColor) cSpan.style.color = textColor;
+          span.appendChild(cSpan);
+        });
+      } else if (warpShape === 'roof') {
+        span.style.alignItems = 'flex-end';
+        chars.forEach((ch, i) => {
+          const cSpan = document.createElement('span');
+          cSpan.textContent = ch;
+          cSpan.style.display = 'inline-block';
+          const dist = len <= 1 ? 0 : Math.abs(i - (len - 1) / 2) / ((len - 1) / 2);
+          const maxScale = Math.min(2.5, 1.0 + 0.9 * strRatio);
+          const minScale = Math.max(0.3, 1.0 - 0.45 * strRatio);
+          const curScale = maxScale - dist * (maxScale - minScale);
+          const archLift = -1 * (20 * strRatio * (1 - Math.pow(dist, 1.4)));
+          cSpan.style.fontSize = `${Math.round(curScale * 100)}%`;
+          cSpan.style.transform = `translateY(${archLift.toFixed(1)}px)`;
+          if (textColor) cSpan.style.color = textColor;
+          span.appendChild(cSpan);
+        });
+      }
     } else {
       span.textContent = text;
     }
@@ -13990,7 +14035,7 @@
         if (t.id === 'editor-title-warp-strength') wstVal = parseInt(t.value, 10) || 50;
         else if (t.id === 'editor-title-warp-strength-num') wstVal = parseInt(t.value, 10) || 50;
         else if (warpStrengthEl) wstVal = parseInt(warpStrengthEl.value, 10) || 50;
-        wstVal = Math.max(1, Math.min(100, wstVal));
+        wstVal = Math.max(1, Math.min(200, wstVal));
 
         if (warpStrengthEl && parseInt(warpStrengthEl.value, 10) !== wstVal) warpStrengthEl.value = wstVal;
         if (warpStrengthNumEl && parseInt(warpStrengthNumEl.value, 10) !== wstVal) warpStrengthNumEl.value = wstVal;

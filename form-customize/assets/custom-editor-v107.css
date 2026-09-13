@@ -5775,13 +5775,13 @@ button.btn-sec-reorder {
 
 /* ① 逆台形（上広・下狭 / 俯瞰パース） */
 .text-warp-trapezoid-down {
-  transform: perspective(var(--warp-perspective, 160px)) rotateX(var(--warp-angle-x, 25deg)) scaleY(var(--warp-scale-y, 1.3)) !important;
+  transform: perspective(var(--warp-perspective, 140px)) rotateX(var(--warp-angle-x, 25deg)) scaleY(var(--warp-scale-y, 1.3)) scaleX(var(--warp-scale-x, 1.0)) !important;
   transform-origin: center bottom !important;
 }
 
 /* ② 正台形（上狭・下広 / 仰角モニュメント） */
 .text-warp-trapezoid-up {
-  transform: perspective(var(--warp-perspective, 160px)) rotateX(calc(-1 * var(--warp-angle-x, 25deg))) scaleY(var(--warp-scale-y, 1.3)) !important;
+  transform: perspective(var(--warp-perspective, 140px)) rotateX(calc(-1 * var(--warp-angle-x, 25deg))) scaleY(var(--warp-scale-y, 1.3)) scaleX(var(--warp-scale-x, 1.0)) !important;
   transform-origin: center top !important;
 }
 
@@ -5793,14 +5793,14 @@ button.btn-sec-reorder {
 
 /* ④ 左右パース（左大・右小） */
 .text-warp-perspective-left {
-  transform: perspective(280px) rotateY(var(--warp-angle-y, 28deg)) scaleX(1.1) !important;
-  transform-origin: center center !important;
+  transform: perspective(var(--warp-perspective, 180px)) rotateY(var(--warp-angle-y, 28deg)) scaleX(var(--warp-scale-x, 1.2)) scaleY(var(--warp-scale-y, 1.0)) !important;
+  transform-origin: left center !important;
 }
 
 /* ⑤ 左右パース（左小・右大） */
 .text-warp-perspective-right {
-  transform: perspective(280px) rotateY(calc(-1 * var(--warp-angle-y, 28deg))) scaleX(1.1) !important;
-  transform-origin: center center !important;
+  transform: perspective(var(--warp-perspective, 180px)) rotateY(calc(-1 * var(--warp-angle-y, 28deg))) scaleX(var(--warp-scale-x, 1.2)) scaleY(var(--warp-scale-y, 1.0)) !important;
+  transform-origin: right center !important;
 }
 
 /* ⑥ スロープ・アーチ文字（インラインフレックス） */
