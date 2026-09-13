@@ -362,7 +362,7 @@
   const DEFAULT_TEMPLATES = [
     {
       title: "法人・個人自動分岐ハイブリッド申請書",
-      description: "申請区分（法人 / 個人・個人事業主）に応じて自動でセクションを切り替え、同一カラムに統合集約するプロ用テンプレートです。",
+      description: "申請区分（法人 / 個人事業主）に応じて自動でセクションを切り替え、同一カラムに統合集約するプロ用テンプレートです。",
       category: "business",
       stripeColor: "#0284c7",
       sections: [
@@ -381,7 +381,7 @@
               dataKey: "applicant_type",
               options: [
                 { label: "🏢 法人として申請", nextSectionId: "sec_hybrid_corp_2" },
-                { label: "👤 個人・個人事業主として申請", nextSectionId: "sec_hybrid_indiv_3" }
+                { label: "👤 個人事業主として申請", nextSectionId: "sec_hybrid_indiv_3" }
               ]
             }
           ]
@@ -409,7 +409,7 @@
         },
         {
           id: "sec_hybrid_indiv_3",
-          title: "個人・個人事業主情報の入力",
+          title: "個人事業主情報の入力",
           description: "個人事業主または個人の基本情報をご入力ください。",
           nextAction: "submit",
           questions: [
@@ -8933,7 +8933,7 @@
       ];
     }
 
-    function buildIndivInfoQuestions(baseTime = Date.now(), indivGrpId = `grp_indiv_info_${baseTime}`, indivGrpTitle = '個人・個人事業主情報') {
+    function buildIndivInfoQuestions(baseTime = Date.now(), indivGrpId = `grp_indiv_info_${baseTime}`, indivGrpTitle = '個人事業主情報') {
       const taxStatusQId = `q_tax_status_${baseTime + 11}`;
       return [
         {
@@ -9163,7 +9163,7 @@
               dataKey: "applicant_type",
               options: [
                 { label: "🏢 法人として申請", nextSectionId: secCorpId },
-                { label: "👤 個人・個人事業主として申請", nextSectionId: secIndivId }
+                { label: "👤 個人事業主として申請", nextSectionId: secIndivId }
               ]
             }
           ]
@@ -9179,10 +9179,10 @@
 
         const indivSec = {
           id: secIndivId,
-          title: "個人・個人事業主情報の入力",
+          title: "個人事業主情報の入力",
           description: "個人事業主または個人の基本情報をご入力ください。",
           nextAction: "submit",
-          questions: buildIndivInfoQuestions(baseTime + 20, `grp_indiv_${baseTime + 20}`, '個人・個人事業主情報')
+          questions: buildIndivInfoQuestions(baseTime + 20, `grp_indiv_${baseTime + 20}`, '個人事業主情報')
         };
 
         if (!window.n.sections) window.n.sections = [];
@@ -9216,7 +9216,7 @@
         activeSec.questions.push(...buildCorpInfoQuestions(baseTime, corpGrpId, corpGrpTitle));
       } else if (val === 'pro_individual_info') {
         const indivGrpId = `grp_indiv_info_${baseTime}`;
-        const indivGrpTitle = '個人・個人事業主情報';
+        const indivGrpTitle = '個人事業主情報';
         activeSec.questions.push(...buildIndivInfoQuestions(baseTime, indivGrpId, indivGrpTitle));
       } else if (val === 'email_autoreply') {
         activeSec.questions.push({
@@ -9488,7 +9488,7 @@
 
       const optIndivInfo = document.createElement('option');
       optIndivInfo.value = "pro_individual_info";
-      optIndivInfo.textContent = "👤 個人・個人事業主情報一括セット（氏名・カナ・屋号・住所・税務区分3択・インボイス）";
+      optIndivInfo.textContent = "👤 個人事業主情報一括セット（氏名・カナ・屋号・住所・税務区分3択・インボイス）";
       optGroup.appendChild(optIndivInfo);
 
       const optHybrid = document.createElement('option');
