@@ -446,13 +446,65 @@
 
                   <!-- 変形強度設定（変形が選択された場合に表示） -->
                   <div id="editor-title-warp-strength-container" style="display: none; margin: 4px 0 6px 0;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.03); border: 1px dashed var(--color-border); border-radius: 6px; padding: 4px 10px;">
-                      <label for="editor-title-warp-strength" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">🎚️ 変形の強さ</label>
-                      <select id="editor-title-warp-strength" class="form-control form-control-sm" style="width: auto; height: 24px; font-size: 0.7rem; padding: 1px 6px; cursor: pointer;">
-                        <option value="light">弱 (Light)</option>
-                        <option value="medium" selected>中 (Medium) [標準]</option>
-                        <option value="strong">強 (Strong)</option>
-                      </select>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(0,0,0,0.03); border: 1px dashed var(--color-border); border-radius: 6px; padding: 6px 10px;">
+                      <label for="editor-title-warp-strength" style="font-size: 0.7rem; color: var(--color-text-muted); margin: 0; font-weight: 600; white-space: nowrap;">🎚️ 変形の強さ</label>
+                      <div style="display: flex; align-items: center; gap: 6px; flex: 1; max-width: 220px;">
+                        <input type="range" id="editor-title-warp-strength" min="1" max="100" value="50" style="flex: 1; height: 16px; cursor: pointer; accent-color: var(--color-primary, #1a73e8);" />
+                        <div style="display: flex; align-items: center; gap: 2px;">
+                          <input type="number" id="editor-title-warp-strength-num" min="1" max="100" value="50" class="form-control form-control-sm" style="width: 44px; height: 24px; font-size: 0.72rem; padding: 1px 3px; text-align: right;" />
+                          <span style="font-size: 0.7rem; color: var(--color-text-muted);">%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 💡 光と影の設定（ライティングパネル: 立体エフェクト選択時に表示） -->
+                  <div id="editor-title-lighting-container" style="display: none; margin: 4px 0 6px 0;">
+                    <div style="display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.03); border: 1px dashed var(--color-border); border-radius: 6px; padding: 8px 10px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 0.72rem; color: var(--color-text); font-weight: 600;">💡 光と影の設定（ライティング）</span>
+                        <span style="font-size: 0.65rem; color: var(--color-text-muted);">向きと陰影の強弱</span>
+                      </div>
+                      
+                      <!-- 光の向き (8方向ボタングリッド ＆ 角度スライダー) -->
+                      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <!-- 8方向クイック選択ボタン (3x3 グリッド) -->
+                        <div class="light-direction-grid" style="display: grid; grid-template-columns: repeat(3, 22px); grid-template-rows: repeat(3, 22px); gap: 2px; background: rgba(0,0,0,0.05); padding: 3px; border-radius: 6px; border: 1px solid var(--color-border);">
+                          <button type="button" class="btn-light-dir active" data-angle="315" title="左上から照射 (315°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">↖</button>
+                          <button type="button" class="btn-light-dir" data-angle="270" title="真上から照射 (270°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">⬆</button>
+                          <button type="button" class="btn-light-dir" data-angle="225" title="右上から照射 (225°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">↗</button>
+                          <button type="button" class="btn-light-dir" data-angle="180" title="左から照射 (180°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">⬅</button>
+                          <div style="display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--color-primary, #1a73e8);">💡</div>
+                          <button type="button" class="btn-light-dir" data-angle="0" title="右から照射 (0°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">➡</button>
+                          <button type="button" class="btn-light-dir" data-angle="135" title="左下から照射 (135°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">↙</button>
+                          <button type="button" class="btn-light-dir" data-angle="90" title="真下から照射 (90°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">⬇</button>
+                          <button type="button" class="btn-light-dir" data-angle="45" title="右下から照射 (45°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">↘</button>
+                        </div>
+                        
+                        <!-- 角度スライダーと数値 -->
+                        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px;">
+                          <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label for="editor-title-light-angle" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">光の向き (角度)</label>
+                            <div style="display: flex; align-items: center; gap: 2px;">
+                              <input type="number" id="editor-title-light-angle-num" min="0" max="360" value="315" class="form-control form-control-sm" style="width: 44px; height: 22px; font-size: 0.7rem; padding: 1px 3px; text-align: right;" />
+                              <span style="font-size: 0.68rem; color: var(--color-text-muted);">°</span>
+                            </div>
+                          </div>
+                          <input type="range" id="editor-title-light-angle" min="0" max="360" value="315" style="width: 100%; height: 16px; cursor: pointer; accent-color: var(--color-primary, #1a73e8);" />
+                        </div>
+                      </div>
+
+                      <!-- 光の強さ (スライダー ＆ 数値) -->
+                      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px dotted var(--color-border); padding-top: 6px;">
+                        <label for="editor-title-light-intensity" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600; white-space: nowrap;">光の強さ (メリハリ)</label>
+                        <div style="display: flex; align-items: center; gap: 6px; flex: 1; max-width: 180px;">
+                          <input type="range" id="editor-title-light-intensity" min="1" max="100" value="60" style="flex: 1; height: 16px; cursor: pointer; accent-color: var(--color-primary, #1a73e8);" />
+                          <div style="display: flex; align-items: center; gap: 2px;">
+                            <input type="number" id="editor-title-light-intensity-num" min="1" max="100" value="60" class="form-control form-control-sm" style="width: 44px; height: 22px; font-size: 0.7rem; padding: 1px 3px; text-align: right;" />
+                            <span style="font-size: 0.68rem; color: var(--color-text-muted);">%</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 

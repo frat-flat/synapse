@@ -5816,33 +5816,45 @@ button.btn-sec-reorder {
 }
 
 /* ✨ ロゴ立体エフェクト */
-/* 3D押し出しシャドウ */
+/* 3D押し出しシャドウ（動的CSS変数またはデフォルトのシャープ多重影） */
 .text-effect-3d {
-  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.25))
-          drop-shadow(0 4px 0 rgba(0, 0, 0, 0.2))
-          drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)) !important;
+  filter: var(--title-shadow-filter, drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.45)) drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.35)) drop-shadow(3px 3px 1px rgba(0, 0, 0, 0.25))) !important;
 }
 
 /* ゴールド金属グラデーション */
 .text-effect-gold {
-  background: linear-gradient(180deg, #ffd700 0%, #ff9800 65%, #b25000 100%) !important;
+  background: var(--gold-gradient, linear-gradient(135deg, #fff2a3 0%, #ffd700 35%, #e67e22 70%, #964000 100%)) !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
-  filter: drop-shadow(0 2px 0 #7a3a00)
-          drop-shadow(0 4px 0 #4a2300)
-          drop-shadow(0 6px 12px rgba(0, 0, 0, 0.45)) !important;
+  filter: var(--title-shadow-filter, drop-shadow(1px 1px 0 #b35900) drop-shadow(2px 2px 0 #7a3a00) drop-shadow(3px 3px 2px rgba(0, 0, 0, 0.4))) !important;
 }
 
 /* ネオンサイバー発光 */
 .text-effect-neon {
   color: var(--neon-color, #00e5ff) !important;
-  text-shadow: 0 0 8px var(--neon-color, rgba(0, 229, 255, 0.8)),
-               0 0 16px var(--neon-color, rgba(0, 229, 255, 0.5)),
-               0 0 24px var(--neon-color, rgba(0, 229, 255, 0.3)) !important;
+  text-shadow: 0 0 4px var(--neon-color, rgba(0, 229, 255, 0.9)),
+               0 0 10px var(--neon-color, rgba(0, 229, 255, 0.6)),
+               0 0 18px var(--neon-color, rgba(0, 229, 255, 0.4)) !important;
 }
 
 /* 白フチ・袋文字 */
 .text-effect-outline {
   -webkit-text-stroke: 1.5px currentColor !important;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2)) !important;
+  filter: var(--title-shadow-filter, drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.3))) !important;
+}
+
+/* 💡 ライティング方向ボタンスタイル */
+.btn-light-dir {
+  transition: all 0.15s ease;
+  user-select: none;
+  color: var(--color-text, #333);
+}
+.btn-light-dir:hover {
+  background: rgba(0, 0, 0, 0.1) !important;
+  transform: scale(1.1);
+}
+.btn-light-dir.active {
+  background: var(--color-primary, #1a73e8) !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }

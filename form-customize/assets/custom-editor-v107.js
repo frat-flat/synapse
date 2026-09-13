@@ -3665,6 +3665,7 @@
         'headerStyle', 'headerAlign', 'subtitlePosition',
         'titleBadgeShape', 'titleBadgeStyle', 'titleBadgeBgType', 'titleBadgeBgCustom', 'titleBadgeColorType', 'titleBadgeColorCustom',
         'titleWarpShape', 'titleWarpStrength', 'titleWarpEffect',
+        'titleLightAngle', 'titleLightIntensity',
         'titleColorType', 'titleColorCustom'
       ];
       if (!preserveCurrentMode && savedForm.editorMode !== undefined) {
@@ -3718,8 +3719,10 @@
     if (window.G.titleBadgeColorType === undefined) window.G.titleBadgeColorType = "white";
     if (window.G.titleBadgeColorCustom === undefined) window.G.titleBadgeColorCustom = "#ffffff";
     if (window.G.titleWarpShape === undefined) window.G.titleWarpShape = "none";
-    if (window.G.titleWarpStrength === undefined) window.G.titleWarpStrength = "medium";
+    if (window.G.titleWarpStrength === undefined) window.G.titleWarpStrength = 50;
     if (window.G.titleWarpEffect === undefined) window.G.titleWarpEffect = "none";
+    if (window.G.titleLightAngle === undefined) window.G.titleLightAngle = 315;
+    if (window.G.titleLightIntensity === undefined) window.G.titleLightIntensity = 60;
     if (window.G.titleColorType === undefined) window.G.titleColorType = "default";
     if (window.G.titleColorCustom === undefined) window.G.titleColorCustom = "#1a73e8";
 
@@ -3775,13 +3778,51 @@
     const titleWarpShapeEl = document.getElementById('editor-title-warp-shape');
     const titleWarpStrengthContainer = document.getElementById('editor-title-warp-strength-container');
     const titleWarpStrengthEl = document.getElementById('editor-title-warp-strength');
+    const titleWarpStrengthNumEl = document.getElementById('editor-title-warp-strength-num');
     const titleWarpEffectEl = document.getElementById('editor-title-warp-effect');
+    const titleLightingContainer = document.getElementById('editor-title-lighting-container');
+    const titleLightAngleEl = document.getElementById('editor-title-light-angle');
+    const titleLightAngleNumEl = document.getElementById('editor-title-light-angle-num');
+    const titleLightIntensityEl = document.getElementById('editor-title-light-intensity');
+    const titleLightIntensityNumEl = document.getElementById('editor-title-light-intensity-num');
 
     const warpShapeVal = g.titleWarpShape || 'none';
     if (titleWarpShapeEl) titleWarpShapeEl.value = warpShapeVal;
     if (titleWarpStrengthContainer) titleWarpStrengthContainer.style.display = warpShapeVal !== 'none' ? 'block' : 'none';
-    if (titleWarpStrengthEl) titleWarpStrengthEl.value = g.titleWarpStrength || 'medium';
-    if (titleWarpEffectEl) titleWarpEffectEl.value = g.titleWarpEffect || 'none';
+
+    // 変形強度の数値化（旧light/medium/strongからの後方互換変換）
+    let warpStrengthVal = 50;
+    if (g.titleWarpStrength === 'light') warpStrengthVal = 25;
+    else if (g.titleWarpStrength === 'medium') warpStrengthVal = 50;
+    else if (g.titleWarpStrength === 'strong') warpStrengthVal = 75;
+    else if (typeof g.titleWarpStrength === 'number') warpStrengthVal = g.titleWarpStrength;
+    else if (typeof g.titleWarpStrength === 'string' && !isNaN(parseInt(g.titleWarpStrength, 10))) warpStrengthVal = parseInt(g.titleWarpStrength, 10);
+    g.titleWarpStrength = warpStrengthVal;
+
+    if (titleWarpStrengthEl) titleWarpStrengthEl.value = warpStrengthVal;
+    if (titleWarpStrengthNumEl) titleWarpStrengthNumEl.value = warpStrengthVal;
+
+    const warpEffectVal = g.titleWarpEffect || 'none';
+    if (titleWarpEffectEl) titleWarpEffectEl.value = warpEffectVal;
+    if (titleLightingContainer) titleLightingContainer.style.display = warpEffectVal !== 'none' ? 'block' : 'none';
+
+    const lightAngleVal = g.titleLightAngle !== undefined ? g.titleLightAngle : 315;
+    if (titleLightAngleEl) titleLightAngleEl.value = lightAngleVal;
+    if (titleLightAngleNumEl) titleLightAngleNumEl.value = lightAngleVal;
+
+    // 8方向ボタンのアクティブ状態更新
+    document.querySelectorAll('.btn-light-dir').forEach(btn => {
+      const bAngle = parseInt(btn.dataset.angle, 10);
+      if (Math.abs(bAngle - lightAngleVal) < 23 || (bAngle === 0 && lightAngleVal >= 338)) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    const lightIntensityVal = g.titleLightIntensity !== undefined ? g.titleLightIntensity : 60;
+    if (titleLightIntensityEl) titleLightIntensityEl.value = lightIntensityVal;
+    if (titleLightIntensityNumEl) titleLightIntensityNumEl.value = lightIntensityVal;
 
     // 🏷️ タイトル外枠（簡易ロゴ化）バッジ設定のプレフィル
     const titleBadgeShapeEl = document.getElementById('editor-title-badge-shape');
@@ -4673,6 +4714,8 @@
 
     // 🔤 タイトル文字変形＆立体ロゴエフェクトのイベントリスナー
     const titleWarpStrengthContainer = document.getElementById('editor-title-warp-strength-container');
+    const titleLightingContainer = document.getElementById('editor-title-lighting-container');
+
     bindChange('editor-title-warp-shape', v => {
       window.G.titleWarpShape = v;
       if (window.U && window.U[window.W]) window.U[window.W].titleWarpShape = v;
@@ -4686,25 +4729,100 @@
       if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
     });
 
-    bindChange('editor-title-warp-strength', v => {
-      window.G.titleWarpStrength = v;
-      if (window.U && window.U[window.W]) window.U[window.W].titleWarpStrength = v;
-      if (window.n) window.n.titleWarpStrength = v;
+    const onWarpStrengthChange = (val) => {
+      const num = Math.max(1, Math.min(100, parseInt(val, 10) || 50));
+      window.G.titleWarpStrength = num;
+      if (window.U && window.U[window.W]) window.U[window.W].titleWarpStrength = num;
+      if (window.n) window.n.titleWarpStrength = num;
+      const slider = document.getElementById('editor-title-warp-strength');
+      const numInput = document.getElementById('editor-title-warp-strength-num');
+      if (slider && parseInt(slider.value, 10) !== num) slider.value = num;
+      if (numInput && parseInt(numInput.value, 10) !== num) numInput.value = num;
+      fastUpdateLivePreview('title_warp');
+      applyPreviewTheme();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    };
+    bindInput('editor-title-warp-strength', onWarpStrengthChange);
+    bindChange('editor-title-warp-strength', onWarpStrengthChange);
+    bindInput('editor-title-warp-strength-num', onWarpStrengthChange);
+    bindChange('editor-title-warp-strength-num', onWarpStrengthChange);
+
+    bindChange('editor-title-warp-effect', v => {
+      window.G.titleWarpEffect = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleWarpEffect = v;
+      if (window.n) window.n.titleWarpEffect = v;
+      if (titleLightingContainer) {
+        titleLightingContainer.style.display = v !== 'none' ? 'block' : 'none';
+      }
       applyPreviewTheme();
       renderLivePreview();
       if (typeof window.S === 'function') window.S();
       if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
     });
 
-    bindChange('editor-title-warp-effect', v => {
-      window.G.titleWarpEffect = v;
-      if (window.U && window.U[window.W]) window.U[window.W].titleWarpEffect = v;
-      if (window.n) window.n.titleWarpEffect = v;
+    // 💡 ライティング（光の向き・角度）のイベントリスナー
+    const onLightAngleChange = (val) => {
+      let deg = parseInt(val, 10);
+      if (isNaN(deg)) deg = 315;
+      deg = ((deg % 360) + 360) % 360;
+      window.G.titleLightAngle = deg;
+      if (window.U && window.U[window.W]) window.U[window.W].titleLightAngle = deg;
+      if (window.n) window.n.titleLightAngle = deg;
+      const slider = document.getElementById('editor-title-light-angle');
+      const numInput = document.getElementById('editor-title-light-angle-num');
+      if (slider && parseInt(slider.value, 10) !== deg) slider.value = deg;
+      if (numInput && parseInt(numInput.value, 10) !== deg) numInput.value = deg;
+
+      // 8方向ボタンのactive更新
+      document.querySelectorAll('.btn-light-dir').forEach(btn => {
+        const bAngle = parseInt(btn.dataset.angle, 10);
+        if (Math.abs(bAngle - deg) < 23 || (bAngle === 0 && deg >= 338)) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      fastUpdateLivePreview('title_warp');
       applyPreviewTheme();
-      renderLivePreview();
       if (typeof window.S === 'function') window.S();
       if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    };
+    bindInput('editor-title-light-angle', onLightAngleChange);
+    bindChange('editor-title-light-angle', onLightAngleChange);
+    bindInput('editor-title-light-angle-num', onLightAngleChange);
+    bindChange('editor-title-light-angle-num', onLightAngleChange);
+
+    // 8方向クイックボタンのクリック
+    document.querySelectorAll('.btn-light-dir').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const angle = parseInt(btn.dataset.angle, 10);
+        onLightAngleChange(angle);
+      });
     });
+
+    // 💡 ライティング（光の強弱・メリハリ）のイベントリスナー
+    const onLightIntensityChange = (val) => {
+      const num = Math.max(1, Math.min(100, parseInt(val, 10) || 60));
+      window.G.titleLightIntensity = num;
+      if (window.U && window.U[window.W]) window.U[window.W].titleLightIntensity = num;
+      if (window.n) window.n.titleLightIntensity = num;
+      const slider = document.getElementById('editor-title-light-intensity');
+      const numInput = document.getElementById('editor-title-light-intensity-num');
+      if (slider && parseInt(slider.value, 10) !== num) slider.value = num;
+      if (numInput && parseInt(numInput.value, 10) !== num) numInput.value = num;
+
+      fastUpdateLivePreview('title_warp');
+      applyPreviewTheme();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    };
+    bindInput('editor-title-light-intensity', onLightIntensityChange);
+    bindChange('editor-title-light-intensity', onLightIntensityChange);
+    bindInput('editor-title-light-intensity-num', onLightIntensityChange);
+    bindChange('editor-title-light-intensity-num', onLightIntensityChange);
 
     // 🏷️ タイトル外枠（簡易ロゴ化）バッジ設定のイベントリスナー
     const titleBadgeOptionsEl = document.getElementById('editor-title-badge-options');
@@ -5025,12 +5143,29 @@
   }
   window.resolveTitleTextColor = resolveTitleTextColor;
 
-  function applyTitleTextWarp(titleEl, text, warpShape, warpStrength, warpEffect, textColor) {
+  function applyTitleTextWarp(titleEl, text, warpShape, warpStrength, warpEffect, textColor, lightAngle, lightIntensity) {
     if (!titleEl) return;
     warpShape = warpShape || 'none';
-    warpStrength = warpStrength || 'medium';
     warpEffect = warpEffect || 'none';
 
+    // 強度の数値パース（1〜100、旧light=25, medium=50, strong=75）
+    let strNum = 50;
+    if (warpStrength === 'light') strNum = 25;
+    else if (warpStrength === 'medium') strNum = 50;
+    else if (warpStrength === 'strong') strNum = 75;
+    else if (typeof warpStrength === 'number') strNum = warpStrength;
+    else if (typeof warpStrength === 'string' && !isNaN(parseInt(warpStrength, 10))) strNum = parseInt(warpStrength, 10);
+    strNum = Math.max(1, Math.min(100, strNum));
+    const strRatio = strNum / 100; // 0.01 〜 1.0
+
+    // 光の向き（0〜360、デフォルト315）と強さ（1〜100、デフォルト60）
+    let angle = (typeof lightAngle === 'number') ? lightAngle : 315;
+    angle = ((angle % 360) + 360) % 360;
+    let intensity = (typeof lightIntensity === 'number') ? lightIntensity : 60;
+    intensity = Math.max(1, Math.min(100, intensity));
+    const intensityRatio = intensity / 100;
+
+    // 基本文字色
     if (textColor) {
       titleEl.style.setProperty('color', textColor, 'important');
       titleEl.style.setProperty('--neon-color', textColor);
@@ -5050,14 +5185,103 @@
       span.style.setProperty('color', textColor, 'important');
       span.style.setProperty('--neon-color', textColor);
     }
-    if (warpStrength) {
-      span.classList.add('warp-strength-' + warpStrength);
-    }
-    if (warpEffect && warpEffect !== 'none') {
-      span.classList.add('text-effect-' + warpEffect);
+
+    // 💡 光と影（ライティング＆シャドウ計算: ぼやけを排除したソリッド多層押し出し）
+    const rad = (angle * Math.PI) / 180;
+    const lx = Math.cos(rad);
+    const ly = Math.sin(rad);
+    const sx = -lx;
+    const sy = -ly;
+
+    if (warpEffect === '3d') {
+      span.classList.add('text-effect-3d');
+      const maxDist = 1.8 + intensityRatio * 3.2; // 1.8px 〜 5.0px
+      const steps = Math.max(3, Math.round(2 + intensityRatio * 3)); // 3〜5段
+      const drops = [];
+
+      // 光の当たる側のベベル・ハイライト
+      const hlX = (lx * 1.0).toFixed(1);
+      const hlY = (ly * 1.0).toFixed(1);
+      const hlAlpha = (0.3 + 0.35 * intensityRatio).toFixed(2);
+      drops.push(`drop-shadow(${hlX}px ${hlY}px 0 rgba(255, 255, 255, ${hlAlpha}))`);
+
+      // ソリッド多層押し出しレイヤー (blur: 0 のハードエッジ)
+      for (let s = 1; s <= steps; s++) {
+        const d = (maxDist * (s / steps)).toFixed(1);
+        const stepX = (sx * d).toFixed(1);
+        const stepY = (sy * d).toFixed(1);
+        const alpha = (Math.min(0.7, (0.18 + (s / steps) * 0.38) * (0.8 + 0.4 * intensityRatio))).toFixed(2);
+        drops.push(`drop-shadow(${stepX}px ${stepY}px 0 rgba(0, 0, 0, ${alpha}))`);
+      }
+
+      // 接地アンビエントシャドウ (わずか1pxの極細ぼかしで輪郭を汚さず自然に接地)
+      const fDist = (maxDist + 0.8).toFixed(1);
+      const fX = (sx * fDist).toFixed(1);
+      const fY = (sy * fDist).toFixed(1);
+      const fAlpha = (0.25 * intensityRatio).toFixed(2);
+      drops.push(`drop-shadow(${fX}px ${fY}px 1px rgba(0, 0, 0, ${fAlpha}))`);
+
+      span.style.setProperty('--title-shadow-filter', drops.join(' '));
+    } else if (warpEffect === 'gold') {
+      span.classList.add('text-effect-gold');
+      const gradAngle = Math.round((angle + 180) % 360);
+      span.style.setProperty('--gold-gradient', `linear-gradient(${gradAngle}deg, #fff4b8 0%, #ffd700 35%, #e67e22 70%, #8c3b00 100%)`);
+      const steps = Math.max(3, Math.round(2 + intensityRatio * 3));
+      const drops = [];
+      for (let s = 1; s <= steps; s++) {
+        const d = (2.2 * (s / steps)).toFixed(1);
+        const stepX = (sx * d).toFixed(1);
+        const stepY = (sy * d).toFixed(1);
+        drops.push(`drop-shadow(${stepX}px ${stepY}px 0 #7a3a00)`);
+      }
+      const fX = (sx * 2.8).toFixed(1);
+      const fY = (sy * 2.8).toFixed(1);
+      drops.push(`drop-shadow(${fX}px ${fY}px 1.5px rgba(0, 0, 0, ${(0.4 * intensityRatio).toFixed(2)}))`);
+      span.style.setProperty('--title-shadow-filter', drops.join(' '));
+    } else if (warpEffect === 'neon') {
+      span.classList.add('text-effect-neon');
+      const b1 = Math.max(2, Math.round(4 * intensityRatio));
+      const b2 = Math.max(6, Math.round(12 * intensityRatio));
+      const b3 = Math.max(12, Math.round(22 * intensityRatio));
+      span.style.textShadow = `0 0 ${b1}px var(--neon-color, #00e5ff), 0 0 ${b2}px var(--neon-color, #00e5ff), 0 0 ${b3}px var(--neon-color, #00e5ff)`;
+    } else if (warpEffect === 'outline') {
+      span.classList.add('text-effect-outline');
+      const ox = (sx * 2 * intensityRatio).toFixed(1);
+      const oy = (sy * 2 * intensityRatio).toFixed(1);
+      span.style.setProperty('--title-shadow-filter', `drop-shadow(${ox}px ${oy}px 1px rgba(0, 0, 0, ${(0.45 * intensityRatio).toFixed(2)}))`);
     }
 
-    if (warpShape === 'slope-up' || warpShape === 'roof') {
+    // 🔤 変形のダイナミック適用
+    if (warpShape === 'trapezoid-down') {
+      span.classList.add('text-warp-trapezoid-down');
+      const p = Math.round(220 - strRatio * 80); // 140px 〜 220px
+      const degX = Math.round(14 + strRatio * 26); // 14° 〜 40°
+      const scaleY = (1.05 + strRatio * 0.3).toFixed(2); // 1.05 〜 1.35
+      span.style.setProperty('--warp-perspective', p + 'px');
+      span.style.setProperty('--warp-angle-x', degX + 'deg');
+      span.style.setProperty('--warp-scale-y', scaleY);
+      span.textContent = text;
+    } else if (warpShape === 'trapezoid-up') {
+      span.classList.add('text-warp-trapezoid-up');
+      const p = Math.round(220 - strRatio * 80);
+      const degX = Math.round(14 + strRatio * 26);
+      const scaleY = (1.05 + strRatio * 0.3).toFixed(2);
+      span.style.setProperty('--warp-perspective', p + 'px');
+      span.style.setProperty('--warp-angle-x', degX + 'deg');
+      span.style.setProperty('--warp-scale-y', scaleY);
+      span.textContent = text;
+    } else if (warpShape === 'skew') {
+      span.classList.add('text-warp-skew');
+      const skewX = Math.round(10 + strRatio * 24); // 10° 〜 34°
+      span.style.setProperty('--warp-skew', skewX + 'deg');
+      span.textContent = text;
+    } else if (warpShape === 'perspective-left' || warpShape === 'perspective-right') {
+      span.classList.add('text-warp-' + warpShape);
+      const p = Math.round(300 - strRatio * 100); // 200px 〜 300px
+      const degY = Math.round(14 + strRatio * 24); // 14° 〜 38°
+      span.style.setProperty('--warp-angle-y', degY + 'deg');
+      span.textContent = text;
+    } else if (warpShape === 'slope-up' || warpShape === 'roof') {
       span.classList.add('text-warp-slope-container');
       const chars = Array.from(text || '');
       const len = chars.length;
@@ -5066,10 +5290,14 @@
         cSpan.textContent = ch;
         let pct = 100;
         if (warpShape === 'slope-up') {
-          pct = len <= 1 ? 100 : Math.round(70 + (60 * i) / (len - 1));
+          const minPct = Math.round(100 - 55 * strRatio);
+          const maxPct = Math.round(100 + 110 * strRatio);
+          pct = len <= 1 ? 100 : Math.round(minPct + ((maxPct - minPct) * i) / (len - 1));
         } else if (warpShape === 'roof') {
           const dist = Math.abs(i - (len - 1) / 2) / ((len - 1) / 2 || 1);
-          pct = Math.round(130 - 55 * dist);
+          const maxPct = Math.round(100 + 80 * strRatio);
+          const minPct = Math.round(100 - 40 * strRatio);
+          pct = Math.round(maxPct - (maxPct - minPct) * dist);
         }
         cSpan.style.fontSize = pct + '%';
         if (textColor) {
@@ -5080,9 +5308,6 @@
         }
         span.appendChild(cSpan);
       });
-    } else if (warpShape !== 'none') {
-      span.classList.add('text-warp-' + warpShape);
-      span.textContent = text;
     } else {
       span.textContent = text;
     }
@@ -5192,7 +5417,7 @@
 
       // 🔤 タイトル文字自体の変形（ワープテキスト＆立体ロゴ）および文字色の適用
       const titleTextColor = resolveTitleTextColor(g, badgeShape, badgeStyle);
-      applyTitleTextWarp(previewTitle, rawTitle, g.titleWarpShape, g.titleWarpStrength, g.titleWarpEffect, titleTextColor);
+      applyTitleTextWarp(previewTitle, rawTitle, g.titleWarpShape, g.titleWarpStrength, g.titleWarpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
     }
 
     // サブタイトルの取得と反映（リアルタイム入力値＆データオブジェクト双方対応）
@@ -12950,7 +13175,7 @@
 
       // 🔤 タイトル文字自体の変形（ワープテキスト＆立体ロゴ）および文字色の適用
       const titleTextColor = resolveTitleTextColor(g, badgeShape, badgeStyle);
-      applyTitleTextWarp(liveTitleH, liveRawTitle, g.titleWarpShape, g.titleWarpStrength, g.titleWarpEffect, titleTextColor);
+      applyTitleTextWarp(liveTitleH, liveRawTitle, g.titleWarpShape, g.titleWarpStrength, g.titleWarpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
     }
 
     // サブタイトルの取得と反映（リアルタイム入力値＆データオブジェクト双方対応）
@@ -13431,16 +13656,19 @@
 
   // 高速インプレース・プレビュー更新（文字入力時の全DOM破棄・チラつき・遅延を解消）
   function fastUpdateLivePreview(type, value, extra) {
-    if (type === 'form_title') {
+    if (type === 'form_title' || type === 'title_warp') {
       const g = window.G || {};
       const warpShape = g.titleWarpShape || 'none';
-      const warpStrength = g.titleWarpStrength || 'medium';
+      const warpStrength = g.titleWarpStrength || 50;
       const warpEffect = g.titleWarpEffect || 'none';
       const titleTextColor = resolveTitleTextColor(g, g.titleBadgeShape || 'none', g.titleBadgeStyle || 'fill');
+      const curTitle = value || (document.getElementById('editor-pro-title') ? document.getElementById('editor-pro-title').value : '') || (g.header ? g.header.title : '') || g.title || "フォーム";
       const el = document.getElementById('live-preview-form-title');
-      if (el) applyTitleTextWarp(el, value || "フォーム", warpShape, warpStrength, warpEffect, titleTextColor);
+      if (el) applyTitleTextWarp(el, curTitle, warpShape, warpStrength, warpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
       const mob = document.querySelector('.mobile-preview-title');
-      if (mob) applyTitleTextWarp(mob, value || "フォーム", warpShape, warpStrength, warpEffect, titleTextColor);
+      if (mob) applyTitleTextWarp(mob, curTitle, warpShape, warpStrength, warpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+      const panelTitle = document.getElementById('preview-form-title');
+      if (panelTitle) applyTitleTextWarp(panelTitle, curTitle, warpShape, warpStrength, warpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
     } else if (type === 'subtitle' || type === 'form_subtitle') {
       const liveSub = document.getElementById('live-preview-form-subtitle');
       if (liveSub) {
@@ -13745,30 +13973,66 @@
         renderLivePreview();
         if (typeof window.S === 'function') window.S();
         if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
-      } else if (t.id === 'editor-title-warp-shape' || t.id === 'editor-title-warp-strength' || t.id === 'editor-title-warp-effect') {
+      } else if (t.id === 'editor-title-warp-shape' || t.id === 'editor-title-warp-strength' || t.id === 'editor-title-warp-strength-num' || t.id === 'editor-title-warp-effect' || t.id === 'editor-title-light-angle' || t.id === 'editor-title-light-angle-num' || t.id === 'editor-title-light-intensity' || t.id === 'editor-title-light-intensity-num') {
         const warpShapeEl = document.getElementById('editor-title-warp-shape');
         const warpStrengthEl = document.getElementById('editor-title-warp-strength');
+        const warpStrengthNumEl = document.getElementById('editor-title-warp-strength-num');
         const warpEffectEl = document.getElementById('editor-title-warp-effect');
+        const lightAngleEl = document.getElementById('editor-title-light-angle');
+        const lightAngleNumEl = document.getElementById('editor-title-light-angle-num');
+        const lightIntensityEl = document.getElementById('editor-title-light-intensity');
+        const lightIntensityNumEl = document.getElementById('editor-title-light-intensity-num');
         const strengthContainer = document.getElementById('editor-title-warp-strength-container');
+        const lightingContainer = document.getElementById('editor-title-lighting-container');
 
         const wsVal = warpShapeEl ? warpShapeEl.value : 'none';
-        const wstVal = warpStrengthEl ? warpStrengthEl.value : 'medium';
+        let wstVal = 50;
+        if (t.id === 'editor-title-warp-strength') wstVal = parseInt(t.value, 10) || 50;
+        else if (t.id === 'editor-title-warp-strength-num') wstVal = parseInt(t.value, 10) || 50;
+        else if (warpStrengthEl) wstVal = parseInt(warpStrengthEl.value, 10) || 50;
+        wstVal = Math.max(1, Math.min(100, wstVal));
+
+        if (warpStrengthEl && parseInt(warpStrengthEl.value, 10) !== wstVal) warpStrengthEl.value = wstVal;
+        if (warpStrengthNumEl && parseInt(warpStrengthNumEl.value, 10) !== wstVal) warpStrengthNumEl.value = wstVal;
+
         const weVal = warpEffectEl ? warpEffectEl.value : 'none';
 
+        let laVal = 315;
+        if (t.id === 'editor-title-light-angle') laVal = parseInt(t.value, 10);
+        else if (t.id === 'editor-title-light-angle-num') laVal = parseInt(t.value, 10);
+        else if (lightAngleEl) laVal = parseInt(lightAngleEl.value, 10);
+        if (isNaN(laVal)) laVal = 315;
+        laVal = ((laVal % 360) + 360) % 360;
+
+        if (lightAngleEl && parseInt(lightAngleEl.value, 10) !== laVal) lightAngleEl.value = laVal;
+        if (lightAngleNumEl && parseInt(lightAngleNumEl.value, 10) !== laVal) lightAngleNumEl.value = laVal;
+
+        let liVal = 60;
+        if (t.id === 'editor-title-light-intensity') liVal = parseInt(t.value, 10) || 60;
+        else if (t.id === 'editor-title-light-intensity-num') liVal = parseInt(t.value, 10) || 60;
+        else if (lightIntensityEl) liVal = parseInt(lightIntensityEl.value, 10) || 60;
+        liVal = Math.max(1, Math.min(100, liVal));
+
+        if (lightIntensityEl && parseInt(lightIntensityEl.value, 10) !== liVal) lightIntensityEl.value = liVal;
+        if (lightIntensityNumEl && parseInt(lightIntensityNumEl.value, 10) !== liVal) lightIntensityNumEl.value = liVal;
+
         if (strengthContainer) strengthContainer.style.display = wsVal !== 'none' ? 'block' : 'none';
+        if (lightingContainer) lightingContainer.style.display = weVal !== 'none' ? 'block' : 'none';
 
         const updateWarp = (obj) => {
           if (!obj) return;
           obj.titleWarpShape = wsVal;
           obj.titleWarpStrength = wstVal;
           obj.titleWarpEffect = weVal;
+          obj.titleLightAngle = laVal;
+          obj.titleLightIntensity = liVal;
         };
         updateWarp(window.G);
         updateWarp(window.n);
         if (window.U && window.U[window.W]) updateWarp(window.U[window.W]);
 
+        fastUpdateLivePreview('title_warp');
         applyPreviewTheme();
-        renderLivePreview();
         if (typeof window.S === 'function') window.S();
         if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
       } else if (t.id === 'editor-title-badge-shape' || t.id === 'editor-title-badge-style' || t.id === 'editor-title-badge-bg-type' || t.id === 'editor-title-badge-bg-custom' || t.id === 'editor-title-badge-color-type' || t.id === 'editor-title-badge-color-custom') {
@@ -14226,6 +14490,8 @@
         if (window.G.titleWarpShape !== undefined) allForms[idx].titleWarpShape = window.G.titleWarpShape;
         if (window.G.titleWarpStrength !== undefined) allForms[idx].titleWarpStrength = window.G.titleWarpStrength;
         if (window.G.titleWarpEffect !== undefined) allForms[idx].titleWarpEffect = window.G.titleWarpEffect;
+        if (window.G.titleLightAngle !== undefined) allForms[idx].titleLightAngle = window.G.titleLightAngle;
+        if (window.G.titleLightIntensity !== undefined) allForms[idx].titleLightIntensity = window.G.titleLightIntensity;
         if (window.G.titleColorType !== undefined) allForms[idx].titleColorType = window.G.titleColorType;
         if (window.G.titleColorCustom !== undefined) allForms[idx].titleColorCustom = window.G.titleColorCustom;
         
@@ -15685,8 +15951,10 @@
       titleBadgeColorType: f.titleBadgeColorType || 'white',
       titleBadgeColorCustom: f.titleBadgeColorCustom || '#ffffff',
       titleWarpShape: f.titleWarpShape || 'none',
-      titleWarpStrength: f.titleWarpStrength || 'medium',
+      titleWarpStrength: f.titleWarpStrength !== undefined ? f.titleWarpStrength : 50,
       titleWarpEffect: f.titleWarpEffect || 'none',
+      titleLightAngle: f.titleLightAngle !== undefined ? f.titleLightAngle : 315,
+      titleLightIntensity: f.titleLightIntensity !== undefined ? f.titleLightIntensity : 60,
       titleColorType: f.titleColorType || 'default',
       titleColorCustom: f.titleColorCustom || '#1a73e8',
       sections: (f.sections || []).map(sec => ({
@@ -15741,8 +16009,10 @@
       titleBadgeColorType: formObj.titleBadgeColorType || 'white',
       titleBadgeColorCustom: formObj.titleBadgeColorCustom || '#ffffff',
       titleWarpShape: formObj.titleWarpShape || 'none',
-      titleWarpStrength: formObj.titleWarpStrength || 'medium',
+      titleWarpStrength: formObj.titleWarpStrength !== undefined ? formObj.titleWarpStrength : 50,
       titleWarpEffect: formObj.titleWarpEffect || 'none',
+      titleLightAngle: formObj.titleLightAngle !== undefined ? formObj.titleLightAngle : 315,
+      titleLightIntensity: formObj.titleLightIntensity !== undefined ? formObj.titleLightIntensity : 60,
       titleColorType: formObj.titleColorType || 'default',
       titleColorCustom: formObj.titleColorCustom || '#1a73e8',
       sections: JSON.parse(JSON.stringify(formObj.sections || [])),
