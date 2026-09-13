@@ -146,6 +146,73 @@
         margin: 14px 0 0 auto;
       }
 
+      /* 🏷️ タイトル外枠（簡易ロゴ化）バッジスタイル */
+      .title-badge {
+        display: inline-block !important;
+        box-sizing: border-box !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        position: relative !important;
+        text-decoration: none !important;
+        line-height: 1.3 !important;
+        max-width: 100% !important;
+        word-break: break-word !important;
+      }
+      .title-badge.badge-style-fill {
+        background-color: var(--badge-bg, var(--color-primary, #1a73e8));
+        color: var(--badge-color, #ffffff) !important;
+        filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.16));
+      }
+      .title-badge.badge-style-outline {
+        background-color: transparent !important;
+        color: var(--badge-color, var(--color-primary, #1a73e8)) !important;
+        filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.08));
+      }
+      .title-badge.badge-shape-trapezoid-down {
+        clip-path: polygon(0% 0%, 100% 0%, 93% 100%, 7% 100%) !important;
+        padding: 10px 42px !important;
+      }
+      .title-badge.badge-shape-trapezoid-up {
+        clip-path: polygon(7% 0%, 93% 0%, 100% 100%, 0% 100%) !important;
+        padding: 10px 42px !important;
+      }
+      .title-badge.badge-shape-parallelogram {
+        clip-path: polygon(6% 0%, 100% 0%, 94% 100%, 0% 100%) !important;
+        padding: 10px 38px !important;
+      }
+      .title-badge.badge-shape-ribbon {
+        clip-path: polygon(0% 0%, 100% 0%, 95% 50%, 100% 100%, 0% 100%, 5% 50%) !important;
+        padding: 10px 46px !important;
+      }
+      .title-badge.badge-shape-capsule {
+        border-radius: 9999px !important;
+        padding: 8px 36px !important;
+      }
+      .title-badge.badge-shape-chamfer {
+        clip-path: polygon(14px 0%, calc(100% - 14px) 0%, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 14px 100%, 0% calc(100% - 14px), 0% 14px) !important;
+        padding: 10px 36px !important;
+      }
+      .title-badge.badge-shape-retro {
+        border: 4px double var(--badge-bg, var(--color-primary, #1a73e8)) !important;
+        border-radius: 6px !important;
+        padding: 8px 32px !important;
+      }
+      .title-badge.badge-shape-retro.badge-style-fill {
+        background-color: var(--badge-bg, var(--color-primary, #1a73e8)) !important;
+        border-color: rgba(255, 255, 255, 0.6) !important;
+        outline: 2px solid var(--badge-bg, var(--color-primary, #1a73e8)) !important;
+      }
+      .title-badge.badge-shape-retro.badge-style-outline {
+        border-color: var(--badge-bg, var(--color-primary, #1a73e8)) !important;
+      }
+      .title-badge.badge-style-outline.badge-shape-trapezoid-down,
+      .title-badge.badge-style-outline.badge-shape-trapezoid-up,
+      .title-badge.badge-style-outline.badge-shape-parallelogram,
+      .title-badge.badge-style-outline.badge-shape-ribbon,
+      .title-badge.badge-style-outline.badge-shape-chamfer,
+      .title-badge.badge-style-outline.badge-shape-capsule {
+        border: 2px solid var(--badge-bg, var(--color-primary, #1a73e8)) !important;
+      }
+
       .form-header-card h1 {
         font-size: 1.85rem;
         font-weight: 700;
@@ -2591,6 +2658,58 @@
             formHeaderCardEl.insertBefore(formSubtitleEl, formTitleEl);
           } else {
             formHeaderCardEl.insertBefore(formSubtitleEl, formDescEl);
+          }
+
+          // 🏷️ タイトル外枠（簡易ロゴ化）バッジの適用
+          const badgeShape = formDefinition.titleBadgeShape || 'none';
+          const badgeStyle = formDefinition.titleBadgeStyle || 'fill';
+          const badgeBgType = formDefinition.titleBadgeBgType || 'primary';
+          const badgeBgCustom = formDefinition.titleBadgeBgCustom || '#1a73e8';
+          const badgeColorType = formDefinition.titleBadgeColorType || 'white';
+          const badgeColorCustom = formDefinition.titleBadgeColorCustom || '#ffffff';
+
+          // バッジクラス＆カスタムプロパティをリセット
+          formTitleEl.classList.remove(
+            'title-badge',
+            'badge-style-fill',
+            'badge-style-outline',
+            'badge-shape-trapezoid-down',
+            'badge-shape-trapezoid-up',
+            'badge-shape-parallelogram',
+            'badge-shape-ribbon',
+            'badge-shape-capsule',
+            'badge-shape-chamfer',
+            'badge-shape-retro'
+          );
+          formTitleEl.style.removeProperty('--badge-bg');
+          formTitleEl.style.removeProperty('--badge-color');
+
+          if (badgeShape && badgeShape !== 'none') {
+            formTitleEl.classList.add('title-badge', `badge-shape-${badgeShape}`, `badge-style-${badgeStyle}`);
+
+            // 背景色 / 枠線色
+            let actualBg = 'var(--color-primary, #1a73e8)';
+            if (badgeBgType === 'dark') actualBg = '#202124';
+            else if (badgeBgType === 'custom') actualBg = badgeBgCustom;
+            formTitleEl.style.setProperty('--badge-bg', actualBg);
+
+            // 文字色
+            let actualColor = '#ffffff';
+            if (badgeColorType === 'dark') actualColor = '#202124';
+            else if (badgeColorType === 'primary') actualColor = 'var(--color-primary, #1a73e8)';
+            else if (badgeColorType === 'custom') actualColor = badgeColorCustom;
+            formTitleEl.style.setProperty('--badge-color', actualColor);
+          }
+
+          // テーマカラー（primaryColor / backgroundColor）の反映
+          if (formDefinition.appearance) {
+            if (formDefinition.appearance.primaryColor) {
+              document.documentElement.style.setProperty('--color-primary', formDefinition.appearance.primaryColor);
+              document.documentElement.style.setProperty('--color-border-focus', formDefinition.appearance.primaryColor);
+            }
+            if (formDefinition.appearance.backgroundColor) {
+              document.documentElement.style.setProperty('--color-bg-page', formDefinition.appearance.backgroundColor);
+            }
           }
 
           // 最初のセクションを描画

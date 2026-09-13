@@ -3662,7 +3662,8 @@
         'appearance', 'header', 'announcement', 'displayMode', 'progressIndicator',
         'showLogo', 'headerImage', 'headerImageScale', 'headerImagePosition', 'headerImagePositionX',
         'logoType', 'logoPosition', 'logoImageUrl', 'useHeaderImage', 'useBgImage', 'bgTheme', 'bgCustomUrl',
-        'headerStyle', 'headerAlign', 'subtitlePosition'
+        'headerStyle', 'headerAlign', 'subtitlePosition',
+        'titleBadgeShape', 'titleBadgeStyle', 'titleBadgeBgType', 'titleBadgeBgCustom', 'titleBadgeColorType', 'titleBadgeColorCustom'
       ];
       if (!preserveCurrentMode && savedForm.editorMode !== undefined) {
         window.G.editorMode = savedForm.editorMode;
@@ -3708,6 +3709,12 @@
     if (window.G.headerStyle === undefined) window.G.headerStyle = "card-accent-top";
     if (window.G.headerAlign === undefined) window.G.headerAlign = "left";
     if (window.G.subtitlePosition === undefined) window.G.subtitlePosition = "below";
+    if (window.G.titleBadgeShape === undefined) window.G.titleBadgeShape = "none";
+    if (window.G.titleBadgeStyle === undefined) window.G.titleBadgeStyle = "fill";
+    if (window.G.titleBadgeBgType === undefined) window.G.titleBadgeBgType = "primary";
+    if (window.G.titleBadgeBgCustom === undefined) window.G.titleBadgeBgCustom = "#1a73e8";
+    if (window.G.titleBadgeColorType === undefined) window.G.titleBadgeColorType = "white";
+    if (window.G.titleBadgeColorCustom === undefined) window.G.titleBadgeColorCustom = "#ffffff";
 
     const g = window.G;
 
@@ -3747,6 +3754,34 @@
     const subtitlePosEl = document.getElementById('editor-subtitle-position');
     if (subtitlePosEl) subtitlePosEl.value = g.subtitlePosition || 'below';
 
+    // 🏷️ タイトル外枠（簡易ロゴ化）バッジ設定のプレフィル
+    const titleBadgeShapeEl = document.getElementById('editor-title-badge-shape');
+    const titleBadgeOptionsEl = document.getElementById('editor-title-badge-options');
+    const titleBadgeStyleEl = document.getElementById('editor-title-badge-style');
+    const titleBadgeBgTypeEl = document.getElementById('editor-title-badge-bg-type');
+    const titleBadgeBgCustomEl = document.getElementById('editor-title-badge-bg-custom');
+    const titleBadgeColorTypeEl = document.getElementById('editor-title-badge-color-type');
+    const titleBadgeColorCustomEl = document.getElementById('editor-title-badge-color-custom');
+
+    const shapeVal = g.titleBadgeShape || 'none';
+    if (titleBadgeShapeEl) titleBadgeShapeEl.value = shapeVal;
+    if (titleBadgeOptionsEl) titleBadgeOptionsEl.style.display = shapeVal !== 'none' ? 'block' : 'none';
+    if (titleBadgeStyleEl) titleBadgeStyleEl.value = g.titleBadgeStyle || 'fill';
+
+    const bgTypeVal = g.titleBadgeBgType || 'primary';
+    if (titleBadgeBgTypeEl) titleBadgeBgTypeEl.value = bgTypeVal;
+    if (titleBadgeBgCustomEl) {
+      titleBadgeBgCustomEl.value = g.titleBadgeBgCustom || '#1a73e8';
+      titleBadgeBgCustomEl.style.display = bgTypeVal === 'custom' ? 'block' : 'none';
+    }
+
+    const colorTypeVal = g.titleBadgeColorType || 'white';
+    if (titleBadgeColorTypeEl) titleBadgeColorTypeEl.value = colorTypeVal;
+    if (titleBadgeColorCustomEl) {
+      titleBadgeColorCustomEl.value = g.titleBadgeColorCustom || '#ffffff';
+      titleBadgeColorCustomEl.style.display = colorTypeVal === 'custom' ? 'block' : 'none';
+    }
+
     document.getElementById('editor-pro-display-mode').value = g.displayMode;
     document.getElementById('editor-pro-progress-indicator').value = g.progressIndicator;
 
@@ -3770,10 +3805,14 @@
         container.style.display = "none";
       }
     };
-    prefillFontSize('editor-title-font-size', 'editor-title-size-custom-container', 'editor-title-size-custom-val', g.appearance.fontSizes.title);
-    prefillFontSize('editor-pro-size-title', 'editor-pro-size-title-custom-container', 'editor-pro-size-title-custom-val', g.appearance.fontSizes.title);
-    prefillFontSize('editor-pro-size-section', 'editor-pro-size-section-custom-container', 'editor-pro-size-section-custom-val', g.appearance.fontSizes.section);
-    prefillFontSize('editor-pro-size-label', 'editor-pro-size-label-custom-container', 'editor-pro-size-label-custom-val', g.appearance.fontSizes.label);
+    const titleFontSize = (g.appearance && g.appearance.fontSizes && g.appearance.fontSizes.title) || 'large';
+    const sectionFontSize = (g.appearance && g.appearance.fontSizes && g.appearance.fontSizes.section) || 'medium';
+    const labelFontSize = (g.appearance && g.appearance.fontSizes && g.appearance.fontSizes.label) || 'medium';
+
+    prefillFontSize('editor-title-font-size', 'editor-title-size-custom-container', 'editor-title-size-custom-val', titleFontSize);
+    prefillFontSize('editor-pro-size-title', 'editor-pro-size-title-custom-container', 'editor-pro-size-title-custom-val', titleFontSize);
+    prefillFontSize('editor-pro-size-section', 'editor-pro-size-section-custom-container', 'editor-pro-size-section-custom-val', sectionFontSize);
+    prefillFontSize('editor-pro-size-label', 'editor-pro-size-label-custom-container', 'editor-pro-size-label-custom-val', labelFontSize);
 
     document.getElementById('editor-pro-show-duration').checked = !!g.announcement.showDuration;
     document.getElementById('editor-pro-show-alert').checked = !!g.announcement.showAlertBox;
@@ -4575,6 +4614,75 @@
       if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
     });
 
+    // 🏷️ タイトル外枠（簡易ロゴ化）バッジ設定のイベントリスナー
+    const titleBadgeOptionsEl = document.getElementById('editor-title-badge-options');
+    bindChange('editor-title-badge-shape', v => {
+      window.G.titleBadgeShape = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleBadgeShape = v;
+      if (window.n) window.n.titleBadgeShape = v;
+      if (titleBadgeOptionsEl) {
+        titleBadgeOptionsEl.style.display = v !== 'none' ? 'block' : 'none';
+      }
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-badge-style', v => {
+      window.G.titleBadgeStyle = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleBadgeStyle = v;
+      if (window.n) window.n.titleBadgeStyle = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-badge-bg-type', v => {
+      window.G.titleBadgeBgType = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleBadgeBgType = v;
+      if (window.n) window.n.titleBadgeBgType = v;
+      const customBgEl = document.getElementById('editor-title-badge-bg-custom');
+      if (customBgEl) customBgEl.style.display = v === 'custom' ? 'block' : 'none';
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-badge-bg-custom', v => {
+      window.G.titleBadgeBgCustom = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleBadgeBgCustom = v;
+      if (window.n) window.n.titleBadgeBgCustom = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-badge-color-type', v => {
+      window.G.titleBadgeColorType = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleBadgeColorType = v;
+      if (window.n) window.n.titleBadgeColorType = v;
+      const customColorEl = document.getElementById('editor-title-badge-color-custom');
+      if (customColorEl) customColorEl.style.display = v === 'custom' ? 'block' : 'none';
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-badge-color-custom', v => {
+      window.G.titleBadgeColorCustom = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleBadgeColorCustom = v;
+      if (window.n) window.n.titleBadgeColorCustom = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
     bindInput('editor-pro-contrast', v => {
       window.G.appearance.contrast = parseInt(v, 10);
       const basePreset = COLOR_PRESETS[window.G.appearance.colorPreset];
@@ -4868,6 +4976,44 @@
     const previewDesc = document.getElementById('preview-form-desc');
     if (previewTitle) {
       previewTitle.textContent = isPro ? ((g.header ? g.header.title : null) || g.title || "セクション") : (g.title || "セクション");
+
+      // 🏷️ タイトル外枠（簡易ロゴ化）バッジの適用
+      const badgeShape = g.titleBadgeShape || 'none';
+      const badgeStyle = g.titleBadgeStyle || 'fill';
+      const badgeBgType = g.titleBadgeBgType || 'primary';
+      const badgeBgCustom = g.titleBadgeBgCustom || '#1a73e8';
+      const badgeColorType = g.titleBadgeColorType || 'white';
+      const badgeColorCustom = g.titleBadgeColorCustom || '#ffffff';
+
+      previewTitle.classList.remove(
+        'title-badge',
+        'badge-style-fill',
+        'badge-style-outline',
+        'badge-shape-trapezoid-down',
+        'badge-shape-trapezoid-up',
+        'badge-shape-parallelogram',
+        'badge-shape-ribbon',
+        'badge-shape-capsule',
+        'badge-shape-chamfer',
+        'badge-shape-retro'
+      );
+      previewTitle.style.removeProperty('--badge-bg');
+      previewTitle.style.removeProperty('--badge-color');
+
+      if (badgeShape && badgeShape !== 'none') {
+        previewTitle.classList.add('title-badge', `badge-shape-${badgeShape}`, `badge-style-${badgeStyle}`);
+
+        let actualBg = 'var(--color-primary, #1a73e8)';
+        if (badgeBgType === 'dark') actualBg = '#202124';
+        else if (badgeBgType === 'custom') actualBg = badgeBgCustom;
+        previewTitle.style.setProperty('--badge-bg', actualBg);
+
+        let actualColor = '#ffffff';
+        if (badgeColorType === 'dark') actualColor = '#202124';
+        else if (badgeColorType === 'primary') actualColor = 'var(--color-primary, #1a73e8)';
+        else if (badgeColorType === 'custom') actualColor = badgeColorCustom;
+        previewTitle.style.setProperty('--badge-color', actualColor);
+      }
     }
 
     // サブタイトルの取得と反映（リアルタイム入力値＆データオブジェクト双方対応）
@@ -12582,7 +12728,47 @@
     const proTitleVal = (g.header && g.header.title) ? g.header.title : currentFormTitle;
     const proDescVal = (g.header && g.header.disclaimer) ? g.header.disclaimer : currentFormDesc;
 
-    if (liveTitleH) liveTitleH.textContent = isPro ? (proTitleVal || "フォーム") : (currentFormTitle || "フォーム");
+    if (liveTitleH) {
+      liveTitleH.textContent = isPro ? (proTitleVal || "フォーム") : (currentFormTitle || "フォーム");
+
+      // 🏷️ タイトル外枠（簡易ロゴ化）バッジの適用
+      const badgeShape = g.titleBadgeShape || 'none';
+      const badgeStyle = g.titleBadgeStyle || 'fill';
+      const badgeBgType = g.titleBadgeBgType || 'primary';
+      const badgeBgCustom = g.titleBadgeBgCustom || '#1a73e8';
+      const badgeColorType = g.titleBadgeColorType || 'white';
+      const badgeColorCustom = g.titleBadgeColorCustom || '#ffffff';
+
+      liveTitleH.classList.remove(
+        'title-badge',
+        'badge-style-fill',
+        'badge-style-outline',
+        'badge-shape-trapezoid-down',
+        'badge-shape-trapezoid-up',
+        'badge-shape-parallelogram',
+        'badge-shape-ribbon',
+        'badge-shape-capsule',
+        'badge-shape-chamfer',
+        'badge-shape-retro'
+      );
+      liveTitleH.style.removeProperty('--badge-bg');
+      liveTitleH.style.removeProperty('--badge-color');
+
+      if (badgeShape && badgeShape !== 'none') {
+        liveTitleH.classList.add('title-badge', `badge-shape-${badgeShape}`, `badge-style-${badgeStyle}`);
+
+        let actualBg = 'var(--color-primary, #1a73e8)';
+        if (badgeBgType === 'dark') actualBg = '#202124';
+        else if (badgeBgType === 'custom') actualBg = badgeBgCustom;
+        liveTitleH.style.setProperty('--badge-bg', actualBg);
+
+        let actualColor = '#ffffff';
+        if (badgeColorType === 'dark') actualColor = '#202124';
+        else if (badgeColorType === 'primary') actualColor = 'var(--color-primary, #1a73e8)';
+        else if (badgeColorType === 'custom') actualColor = badgeColorCustom;
+        liveTitleH.style.setProperty('--badge-color', actualColor);
+      }
+    }
 
     // サブタイトルの取得と反映（リアルタイム入力値＆データオブジェクト双方対応）
     const currentSubtitle = document.getElementById('editor-pro-subtitle') 
@@ -13305,6 +13491,16 @@
           if (q) q.scrollText = t.value;
         }
         fastUpdateLivePreview('question_scroll', t.value, { questionId: qId });
+      } else if (t.id === 'editor-title-badge-bg-custom' || t.id === 'editor-title-badge-color-custom') {
+        if (t.id === 'editor-title-badge-bg-custom') {
+          if (window.G) window.G.titleBadgeBgCustom = t.value;
+          if (window.n) window.n.titleBadgeBgCustom = t.value;
+        } else {
+          if (window.G) window.G.titleBadgeColorCustom = t.value;
+          if (window.n) window.n.titleBadgeColorCustom = t.value;
+        }
+        applyPreviewTheme();
+        renderLivePreview();
       } else {
         const card = t.closest('.question-card');
         if (card && t.placeholder && t.placeholder.includes('タイトル')) {
@@ -13336,6 +13532,43 @@
         if (window.G) window.G.subtitlePosition = t.value;
         if (window.n) window.n.subtitlePosition = t.value;
         if (window.U && window.U[window.W]) window.U[window.W].subtitlePosition = t.value;
+        applyPreviewTheme();
+        renderLivePreview();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      } else if (t.id === 'editor-title-badge-shape' || t.id === 'editor-title-badge-style' || t.id === 'editor-title-badge-bg-type' || t.id === 'editor-title-badge-bg-custom' || t.id === 'editor-title-badge-color-type' || t.id === 'editor-title-badge-color-custom') {
+        const shapeEl = document.getElementById('editor-title-badge-shape');
+        const styleEl = document.getElementById('editor-title-badge-style');
+        const bgTypeEl = document.getElementById('editor-title-badge-bg-type');
+        const bgCustomEl = document.getElementById('editor-title-badge-bg-custom');
+        const colorTypeEl = document.getElementById('editor-title-badge-color-type');
+        const colorCustomEl = document.getElementById('editor-title-badge-color-custom');
+        const optionsContainer = document.getElementById('editor-title-badge-options');
+
+        const sVal = shapeEl ? shapeEl.value : 'none';
+        const stVal = styleEl ? styleEl.value : 'fill';
+        const bgtVal = bgTypeEl ? bgTypeEl.value : 'primary';
+        const bgcVal = bgCustomEl ? bgCustomEl.value : '#1a73e8';
+        const ctVal = colorTypeEl ? colorTypeEl.value : 'white';
+        const ccVal = colorCustomEl ? colorCustomEl.value : '#ffffff';
+
+        if (optionsContainer) optionsContainer.style.display = sVal !== 'none' ? 'block' : 'none';
+        if (bgCustomEl) bgCustomEl.style.display = bgtVal === 'custom' ? 'block' : 'none';
+        if (colorCustomEl) colorCustomEl.style.display = ctVal === 'custom' ? 'block' : 'none';
+
+        const updateTarget = (obj) => {
+          if (!obj) return;
+          obj.titleBadgeShape = sVal;
+          obj.titleBadgeStyle = stVal;
+          obj.titleBadgeBgType = bgtVal;
+          obj.titleBadgeBgCustom = bgcVal;
+          obj.titleBadgeColorType = ctVal;
+          obj.titleBadgeColorCustom = ccVal;
+        };
+        updateTarget(window.G);
+        updateTarget(window.n);
+        if (window.U && window.U[window.W]) updateTarget(window.U[window.W]);
+
         applyPreviewTheme();
         renderLivePreview();
         if (typeof window.S === 'function') window.S();
@@ -13749,6 +13982,12 @@
         if (window.G.headerStyle !== undefined) allForms[idx].headerStyle = window.G.headerStyle;
         if (window.G.headerAlign !== undefined) allForms[idx].headerAlign = window.G.headerAlign;
         if (window.G.subtitlePosition !== undefined) allForms[idx].subtitlePosition = window.G.subtitlePosition;
+        if (window.G.titleBadgeShape !== undefined) allForms[idx].titleBadgeShape = window.G.titleBadgeShape;
+        if (window.G.titleBadgeStyle !== undefined) allForms[idx].titleBadgeStyle = window.G.titleBadgeStyle;
+        if (window.G.titleBadgeBgType !== undefined) allForms[idx].titleBadgeBgType = window.G.titleBadgeBgType;
+        if (window.G.titleBadgeBgCustom !== undefined) allForms[idx].titleBadgeBgCustom = window.G.titleBadgeBgCustom;
+        if (window.G.titleBadgeColorType !== undefined) allForms[idx].titleBadgeColorType = window.G.titleBadgeColorType;
+        if (window.G.titleBadgeColorCustom !== undefined) allForms[idx].titleBadgeColorCustom = window.G.titleBadgeColorCustom;
         
         if (window.G.editorMode !== undefined) allForms[idx].editorMode = window.G.editorMode;
         if (window.G.header !== undefined) allForms[idx].header = window.G.header;
@@ -15199,6 +15438,12 @@
       headerStyle: f.headerStyle || 'card-accent-top',
       headerAlign: f.headerAlign || 'left',
       subtitlePosition: f.subtitlePosition || 'below',
+      titleBadgeShape: f.titleBadgeShape || 'none',
+      titleBadgeStyle: f.titleBadgeStyle || 'fill',
+      titleBadgeBgType: f.titleBadgeBgType || 'primary',
+      titleBadgeBgCustom: f.titleBadgeBgCustom || '#1a73e8',
+      titleBadgeColorType: f.titleBadgeColorType || 'white',
+      titleBadgeColorCustom: f.titleBadgeColorCustom || '#ffffff',
       sections: (f.sections || []).map(sec => ({
         id: sec.id,
         title: (sec.title || '').trim(),
@@ -15244,6 +15489,12 @@
       headerStyle: formObj.headerStyle || 'card-accent-top',
       headerAlign: formObj.headerAlign || 'left',
       subtitlePosition: formObj.subtitlePosition || 'below',
+      titleBadgeShape: formObj.titleBadgeShape || 'none',
+      titleBadgeStyle: formObj.titleBadgeStyle || 'fill',
+      titleBadgeBgType: formObj.titleBadgeBgType || 'primary',
+      titleBadgeBgCustom: formObj.titleBadgeBgCustom || '#1a73e8',
+      titleBadgeColorType: formObj.titleBadgeColorType || 'white',
+      titleBadgeColorCustom: formObj.titleBadgeColorCustom || '#ffffff',
       sections: JSON.parse(JSON.stringify(formObj.sections || [])),
       theme: formObj.theme ? JSON.parse(JSON.stringify(formObj.theme)) : null,
       settings: formObj.settings ? JSON.parse(JSON.stringify(formObj.settings)) : null,

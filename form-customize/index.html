@@ -402,6 +402,63 @@
                     <input type="text" id="editor-form-title" class="form-control title-input" placeholder="フォームのタイトルを入力..." />
                   </div>
 
+                  <!-- 🏷️ タイトル外枠（簡易ロゴ化）バッジ設定 -->
+                  <div class="form-group" style="margin: 6px 0 2px 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                      <label for="editor-title-badge-shape" style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600; margin: 0;">🏷️ タイトル外枠（簡易ロゴ化）</label>
+                      <span style="font-size: 0.65rem; color: var(--color-text-muted);">台形やバッジ形状でロゴ風に演出</span>
+                    </div>
+                    <select id="editor-title-badge-shape" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
+                      <option value="none" selected>なし（通常テキスト）[標準]</option>
+                      <option value="trapezoid-down">台形（上広・下狭 / バナー型ロゴ）</option>
+                      <option value="trapezoid-up">台形（上狭・下広 / エンブレム型ロゴ）</option>
+                      <option value="parallelogram">平行四辺形（スラッシュ・斜めカット）</option>
+                      <option value="ribbon">リボン・ペナント（両端V字カット）</option>
+                      <option value="capsule">カプセル・ピル（完全角丸オーバル）</option>
+                      <option value="chamfer">八角形（角落ちエッジ / オクタゴン）</option>
+                      <option value="retro">レトロ看板（二重枠クラシック）</option>
+                    </select>
+                  </div>
+
+                  <!-- バッジ詳細設定（形状が none 以外のときに展開） -->
+                  <div id="editor-title-badge-options" style="display: none; background: rgba(0,0,0,0.03); border: 1px dashed var(--color-border); border-radius: 6px; padding: 8px 10px; margin: 4px 0 8px 0;">
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                      <!-- スタイル種別 (塗りつぶし / 枠線) -->
+                      <div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 100px;">
+                        <label for="editor-title-badge-style" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">ロゴ塗り方</label>
+                        <select id="editor-title-badge-style" class="form-control form-control-sm" style="height: 26px; font-size: 0.7rem; padding: 1px 4px; cursor: pointer;">
+                          <option value="fill" selected>塗りつぶし（推奨）</option>
+                          <option value="outline">枠線のみ（透明背景）</option>
+                        </select>
+                      </div>
+                      <!-- バッジ背景色 / 枠線色 -->
+                      <div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 110px;">
+                        <label for="editor-title-badge-bg-type" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">外枠・背景色</label>
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                          <select id="editor-title-badge-bg-type" class="form-control form-control-sm" style="height: 26px; font-size: 0.7rem; padding: 1px 4px; cursor: pointer; flex: 1;">
+                            <option value="primary" selected>テーマ色</option>
+                            <option value="dark">ブラック / 濃灰</option>
+                            <option value="custom">カスタム色</option>
+                          </select>
+                          <input type="color" id="editor-title-badge-bg-custom" value="#1a73e8" style="display: none; width: 26px; height: 26px; padding: 0; border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer;" />
+                        </div>
+                      </div>
+                      <!-- バッジ内文字色 -->
+                      <div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 100px;">
+                        <label for="editor-title-badge-color-type" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">文字色</label>
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                          <select id="editor-title-badge-color-type" class="form-control form-control-sm" style="height: 26px; font-size: 0.7rem; padding: 1px 4px; cursor: pointer; flex: 1;">
+                            <option value="white" selected>白 (#fff)</option>
+                            <option value="dark">黒 / 濃灰</option>
+                            <option value="primary">テーマ色</option>
+                            <option value="custom">カスタム色</option>
+                          </select>
+                          <input type="color" id="editor-title-badge-color-custom" value="#ffffff" style="display: none; width: 26px; height: 26px; padding: 0; border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer;" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <!-- タイトル枠デザイン ＆ 文字配置 -->
                   <div class="form-group-row" style="display: flex; gap: 10px; margin: 4px 0;">
                     <!-- タイトル枠デザイン -->
