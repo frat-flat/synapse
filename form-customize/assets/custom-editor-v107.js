@@ -2300,8 +2300,8 @@
       if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
         return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isZip: false, isBank: false, isBranch: false, isBranchCode: false, label: '適格請求書発行事業者API連携', source: 'title_fallback' };
       }
-      if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('屋号')) &&
-          !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな')) {
+      if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名')) &&
+          !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな') && !t.includes('屋号')) {
         return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: false, label: '国税庁法人番号API連携', source: 'title_fallback' };
       }
       if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座')) ||

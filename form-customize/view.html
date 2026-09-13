@@ -2108,8 +2108,8 @@
             if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
               return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isZip: false, isBank: false, isBranch: false, isBranchCode: false };
             }
-            if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('屋号')) &&
-                !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな')) {
+            if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名')) &&
+                !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな') && !t.includes('屋号')) {
               return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: false };
             }
             if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座') && !t.includes('支店')) ||
@@ -2142,7 +2142,7 @@
               const qTitle = q.title || '';
 
               // 0. 法人名欄
-              const isCorpNameField = (q.dataKey === 'company_name') || ((qTitle.includes('法人名') || qTitle.includes('会社名')) && !qTitle.includes('カナ') && !qTitle.includes('フリガナ') && !qTitle.includes('ふりがな'));
+              const isCorpNameField = !qTitle.includes('屋号') && ((q.dataKey === 'company_name') || ((qTitle.includes('法人名') || qTitle.includes('会社名')) && !qTitle.includes('カナ') && !qTitle.includes('フリガナ') && !qTitle.includes('ふりがな')));
               if (isCorpNameField && item.name) {
                 formValues[q.id] = item.name.trim();
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
