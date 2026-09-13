@@ -5270,10 +5270,10 @@
           cSpan.style.display = 'inline-block';
           cSpan.style.transformOrigin = 'center bottom';
           const norm = len <= 1 ? 0 : (i - (len - 1) / 2) / ((len - 1) / 2);
-          const skew = norm * (14 * strRatio);
-          const scaleY = 1.0 + Math.abs(norm) * (0.35 * strRatio);
-          const scaleX = 1.0 + Math.abs(norm) * (0.15 * strRatio);
-          cSpan.style.transform = `skewX(${(-1 * skew).toFixed(1)}deg) scale(${scaleX.toFixed(2)}, ${scaleY.toFixed(2)})`;
+          const skew = norm * (16 * strRatio);
+          cSpan.style.transform = `skewX(${(-1 * skew).toFixed(1)}deg)`;
+          const margin = Math.abs(norm) * (1.5 * strRatio);
+          cSpan.style.margin = `0 ${margin.toFixed(1)}px`;
           if (textColor) cSpan.style.color = textColor;
           span.appendChild(cSpan);
         });
@@ -5285,10 +5285,8 @@
           cSpan.style.display = 'inline-block';
           cSpan.style.transformOrigin = 'center bottom';
           const norm = len <= 1 ? 0 : (i - (len - 1) / 2) / ((len - 1) / 2);
-          const skew = norm * (-12 * strRatio);
-          const scaleY = Math.max(0.4, 1.0 - Math.abs(norm) * (0.32 * strRatio));
-          const scaleX = Math.max(0.6, 1.0 - Math.abs(norm) * (0.12 * strRatio));
-          cSpan.style.transform = `skewX(${(-1 * skew).toFixed(1)}deg) scale(${scaleX.toFixed(2)}, ${scaleY.toFixed(2)})`;
+          const skew = norm * (-14 * strRatio);
+          cSpan.style.transform = `skewX(${(-1 * skew).toFixed(1)}deg)`;
           if (textColor) cSpan.style.color = textColor;
           span.appendChild(cSpan);
         });
