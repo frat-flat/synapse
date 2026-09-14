@@ -17299,6 +17299,13 @@
             if (form && form.sections) {
               form.sections.forEach(sec => {
                 (sec.questions || []).forEach(q => {
+                  const isCorp = q.title && (q.title.includes('法人名') || q.title.includes('会社名') || q.title.includes('企業名')) && !q.title.includes('屋号');
+                  if (isCorp) {
+                    if (q.validation && (q.validation.condition === 'auto_hyphen' || q.validation.autoHyphen)) {
+                      delete q.validation;
+                      updated = true;
+                    }
+                  }
                   if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
                     if (q.description) {
                       const cleaned = cleanHyphenNotice(q.description);
@@ -17307,7 +17314,7 @@
                         updated = true;
                       }
                     }
-                    if (!q.validation && q.title.includes('屋号')) {
+                    if (!q.validation && q.title.includes('屋号') && !q.title.includes('法人名')) {
                       q.validation = { category: 'text', condition: 'auto_hyphen', value: '', value2: '', errorMessage: '' };
                       updated = true;
                     }
@@ -17326,6 +17333,12 @@
     formsToCheck.forEach(form => {
       form.sections.forEach(sec => {
         (sec.questions || []).forEach(q => {
+          const isCorp = q.title && (q.title.includes('法人名') || q.title.includes('会社名') || q.title.includes('企業名')) && !q.title.includes('屋号');
+          if (isCorp) {
+            if (q.validation && (q.validation.condition === 'auto_hyphen' || q.validation.autoHyphen)) {
+              delete q.validation;
+            }
+          }
           if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
             if (q.description) {
               q.description = cleanHyphenNotice(q.description);
@@ -17334,7 +17347,7 @@
             if (descInput) {
               descInput.value = cleanHyphenNotice(descInput.value);
             }
-            if (!q.validation && q.title.includes('屋号')) {
+            if (!q.validation && q.title.includes('屋号') && !q.title.includes('法人名')) {
               q.validation = { category: 'text', condition: 'auto_hyphen', value: '', value2: '', errorMessage: '' };
             }
           }
@@ -17358,10 +17371,11 @@
         if (!card) return;
         const titleEl = card.querySelector('.question-title, .preview-q-title');
         const titleText = titleEl ? titleEl.textContent : '';
-        const isCorp = (titleText.includes('法人名') || titleText.includes('屋号')) &&
+        // 法人名には絶対にハイフン補填を適用しない（個人事業主の屋号のみ対象）
+        const isTrade = titleText.includes('屋号') && !titleText.includes('法人名') && !titleText.includes('会社名') && !titleText.includes('企業名') &&
                        !titleText.includes('カナ') && !titleText.includes('フリガナ') && !titleText.includes('ふりがな');
         
-        if (isCorp) {
+        if (isTrade) {
           if (!input.value || input.value.trim() === '' || input.value.trim() === '-') {
             isSoleProprietorNoTrade = true;
             input.value = '-';
@@ -17371,15 +17385,15 @@
         }
       });
 
-      // 個人事業で屋号がない場合はカナ欄も自動で半角ハイフン「-」を補填
+      // 個人事業で屋号がない場合は屋号カナ欄も自動で半角ハイフン「-」を補填
       if (isSoleProprietorNoTrade) {
         inputs.forEach(input => {
           const card = input.closest('.question-card, .preview-question-card');
           if (!card) return;
           const titleEl = card.querySelector('.question-title, .preview-q-title');
           const titleText = titleEl ? titleEl.textContent : '';
-          const isKana = titleText.includes('カナ') || titleText.includes('フリガナ') || titleText.includes('ふりがな');
-          if (isKana && (!input.value || input.value.trim() === '')) {
+          const isTradeKana = titleText.includes('屋号') && (titleText.includes('カナ') || titleText.includes('フリガナ') || titleText.includes('ふりがな'));
+          if (isTradeKana && (!input.value || input.value.trim() === '')) {
             input.value = '-';
             input.dispatchEvent(new Event('input', { bubbles: true }));
             input.dispatchEvent(new Event('change', { bubbles: true }));

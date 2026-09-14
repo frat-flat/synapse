@@ -3135,6 +3135,17 @@
           // 法人名・屋号の質問に対する案内文＆自動ハイフン補填ルールの自動適用
           formDefinition.sections.forEach(s => {
             (s.questions || []).forEach(q => {
+              const isCorp = q.title && (q.title.includes('法人名') || q.title.includes('会社名') || q.title.includes('企業名')) && !q.title.includes('屋号');
+              if (isCorp) {
+                // 法人名・カナは自動ハイフン補填を絶対に適用しない（手入力またはAPI照会必須）
+                if (q.validation && (q.validation.condition === 'auto_hyphen' || q.validation.autoHyphen)) {
+                  q.validation = null;
+                }
+                if (formValues[q.id] === '-') {
+                  delete formValues[q.id];
+                }
+              }
+
               if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
                 // 既存の記述から不要な個人事業主向け注意書きや自動ハイフン補填への言及をクリーンアップ
                 if (q.description) {
@@ -3143,9 +3154,11 @@
                     .replace(/（自動で半角ハイフン「-」が補填されます）/g, '')
                     .replace(/\(自動で半角ハイフン「-」が補填されます\)/g, '')
                     .replace(/。自動で半角ハイフン「-」が補填されます/g, '')
+                    .replace(/全角カタ[\uFFFD\?]+ナ/g, '全角カタカナ')
+                    .replace(/\uFFFD+/g, '')
                     .trim();
                 }
-                if (!q.validation && q.title.includes('屋号')) {
+                if (!q.validation && q.title.includes('屋号') && !q.title.includes('法人名')) {
                   q.validation = { category: 'text', condition: 'auto_hyphen', errorMessage: '' };
                 }
               }
@@ -4259,7 +4272,10 @@
           input.type = 'text';
           input.className = 'form-control';
           input.placeholder = (q.title && q.title.includes('法人名')) ? '法人名を入力...' : ((q.title && q.title.includes('屋号')) ? '屋号を入力...' : '法人名を入力...');
-          input.value = initialVal || '';
+          const isCorp = q.title && (q.title.includes('法人名') || q.title.includes('会社名') || q.title.includes('企業名')) && !q.title.includes('屋号');
+          const safeVal = (isCorp && initialVal === '-') ? '' : (initialVal || '');
+          input.value = safeVal;
+          if (isCorp && formValues[q.id] === '-') formValues[q.id] = safeVal;
           inputGroup.appendChild(input);
 
           // 候補パネル
@@ -5160,7 +5176,12 @@
         }
 
         function renderInputField(q, container) {
-          const val = formValues[q.id];
+          const isCorpField = q.title && (q.title.includes('法人名') || q.title.includes('会社名') || q.title.includes('企業名')) && !q.title.includes('屋号');
+          let val = formValues[q.id];
+          if (isCorpField && val === '-') {
+            val = '';
+            formValues[q.id] = '';
+          }
 
           if (q.type === 'text') {
             const apiConfig = getQuestionApiConfig(q);
@@ -5498,37 +5519,41 @@
         function autoFillHyphenForEmptyFields(section) {
           if (!section || !section.questions) return;
 
-          // 1. 法人名・屋号の質問状況をチェック（当セクションまたは全セクション）
+          // 1. 個人事業主の屋号なしチェック（現在のセクション内に屋号欄がある場合のみ）
+          // ※ 法人名には絶対にハイフン補填を適用しない
           let isSoleProprietorNoTrade = false;
-          if (formDefinition && formDefinition.sections) {
-            formDefinition.sections.forEach(s => {
-              (s.questions || []).forEach(q => {
-                const isCorp = q.title && (q.title.includes('法人名') || q.title.includes('屋号')) &&
-                               !q.title.includes('カナ') && !q.title.includes('フリガナ') && !q.title.includes('ふりがな');
-                if (isCorp) {
-                  const val = formValues[q.id];
-                  if (val === undefined || val === null || (typeof val === 'string' && val.trim() === '') || val === '-') {
-                    isSoleProprietorNoTrade = true;
-                    formValues[q.id] = '-';
-                    const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
-                    if (card) {
-                      const input = card.querySelector('input.form-control, textarea.form-control');
-                      if (input) input.value = '-';
-                      card.classList.remove('has-error');
-                    }
-                  }
-                }
-              });
-            });
+          const tradeQ = (section.questions || []).find(q => {
+            const t = q.title || '';
+            return t.includes('屋号') && !t.includes('法人名') && !t.includes('会社名') && !t.includes('企業名') &&
+                   !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな');
+          });
+
+          if (tradeQ) {
+            const val = formValues[tradeQ.id];
+            const isTradeEmpty = val === undefined || val === null || (typeof val === 'string' && val.trim() === '') || val === '-';
+            if (isTradeEmpty) {
+              isSoleProprietorNoTrade = true;
+              formValues[tradeQ.id] = '-';
+              const card = document.querySelector(`.question-card[data-question-id="${tradeQ.id}"]`);
+              if (card) {
+                const input = card.querySelector('input.form-control, textarea.form-control');
+                if (input) input.value = '-';
+                card.classList.remove('has-error');
+              }
+            }
           }
 
           // 2. セクション内の質問に対する補填処理
           section.questions.forEach(q => {
-            const isAutoHyphenRule = q.validation && (q.validation.condition === 'auto_hyphen' || q.validation.autoHyphen);
-            const isKanaField = q.title && (q.title.includes('カナ') || q.title.includes('フリガナ') || q.title.includes('ふりがな'));
+            const isCorpField = q.title && (q.title.includes('法人名') || q.title.includes('会社名') || q.title.includes('企業名')) && !q.title.includes('屋号');
+            // 法人名・法人名カナには絶対に自動ハイフンを適用しない
+            if (isCorpField) return;
 
-            // 個人事業で屋号がない場合はカナ欄も自動で半角ハイフン「-」を補填してエラーにならないようにする
-            if (isAutoHyphenRule || (isKanaField && isSoleProprietorNoTrade)) {
+            const isAutoHyphenRule = q.validation && (q.validation.condition === 'auto_hyphen' || q.validation.autoHyphen);
+            const isTradeKanaField = q.title && q.title.includes('屋号') && (q.title.includes('カナ') || q.title.includes('フリガナ') || q.title.includes('ふりがな'));
+
+            // 個人事業で屋号がない場合は屋号カナ欄も自動で半角ハイフン「-」を補填してエラーにならないようにする
+            if (isAutoHyphenRule || (isTradeKanaField && isSoleProprietorNoTrade)) {
               const curVal = formValues[q.id];
               const isEmpty = curVal === undefined || curVal === null || (typeof curVal === 'string' && curVal.trim() === '');
               if (isEmpty) {
