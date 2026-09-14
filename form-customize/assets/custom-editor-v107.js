@@ -17227,11 +17227,12 @@
   // =========================================================================
   // 🏢 法人名・屋号の案内文 & 未入力時半角ハイフン自動補填入力規則機能
   // =========================================================================
-  const AUTO_HYPHEN_NOTICE_TEXT = '※ 個人事業主の方で屋号がない場合は、未入力のまま「次へ」へお進みください。';
+  const AUTO_HYPHEN_NOTICE_TEXT = '';
 
   function cleanHyphenNotice(text) {
     if (!text) return text;
     return text
+      .replace(/[\r\n]*※?\s*個人事業主の方で屋号がない場合は[、\s]*未入力のまま[「『]?次へ[」』]?へお進みください。?/g, '')
       .replace(/（自動で半角ハイフン「-」が補填されます）/g, '')
       .replace(/\(自動で半角ハイフン「-」が補填されます\)/g, '')
       .replace(/。自動で半角ハイフン「-」が補填されます/g, '')
@@ -17306,11 +17307,7 @@
                         updated = true;
                       }
                     }
-                    if (!q.description || !q.description.includes('屋号がない場合')) {
-                      q.description = (q.description ? q.description + '\n' : '') + AUTO_HYPHEN_NOTICE_TEXT;
-                      updated = true;
-                    }
-                    if (!q.validation || q.validation.condition !== 'auto_hyphen') {
+                    if (!q.validation && q.title.includes('屋号')) {
                       q.validation = { category: 'text', condition: 'auto_hyphen', value: '', value2: '', errorMessage: '' };
                       updated = true;
                     }
@@ -17333,17 +17330,11 @@
             if (q.description) {
               q.description = cleanHyphenNotice(q.description);
             }
-            if (!q.description || !q.description.includes('屋号がない場合')) {
-              q.description = (q.description ? q.description + '\n' : '') + AUTO_HYPHEN_NOTICE_TEXT;
-            }
             const descInput = document.querySelector(`.q-desc-input[data-question-id="${q.id}"]`);
             if (descInput) {
               descInput.value = cleanHyphenNotice(descInput.value);
-              if (!descInput.value.includes('屋号がない場合')) {
-                descInput.value = q.description;
-              }
             }
-            if (!q.validation || q.validation.condition !== 'auto_hyphen') {
+            if (!q.validation && q.title.includes('屋号')) {
               q.validation = { category: 'text', condition: 'auto_hyphen', value: '', value2: '', errorMessage: '' };
             }
           }
