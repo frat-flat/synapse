@@ -16674,6 +16674,10 @@
       }
       if (mergeBtn) mergeBtn.style.display = 'none';
       if (headerMergeBtn) headerMergeBtn.style.setProperty('display', 'none', 'important');
+      const menuItemMerge = document.getElementById('menu-item-merge-prod');
+      if (menuItemMerge) menuItemMerge.style.display = 'none';
+      const mainBtnLabel = document.getElementById('share-btn-main-label');
+      if (mainBtnLabel) mainBtnLabel.innerHTML = '本番・連携';
     } else {
       if (syncArea) {
         syncArea.style.borderColor = '#f59e0b';
@@ -16691,10 +16695,11 @@
         mergeBtn.style.display = 'inline-flex';
         mergeBtn.innerHTML = '🚀 本番環境へ統合';
       }
-      const activeTab = localStorage.getItem('form_customize_active_tab') || 'editor';
-      if (headerMergeBtn && activeTab && activeTab !== 'dashboard' && activeTab !== 'templates') {
-        headerMergeBtn.style.setProperty('display', 'inline-flex', 'important');
-      }
+      const menuItemMerge = document.getElementById('menu-item-merge-prod');
+      if (menuItemMerge) menuItemMerge.style.display = 'flex';
+      const mainBtnLabel = document.getElementById('share-btn-main-label');
+      if (mainBtnLabel) mainBtnLabel.innerHTML = '本番・連携 <span style="background:#ef4444; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">要統合</span>';
+      if (headerMergeBtn) headerMergeBtn.style.setProperty('display', 'none', 'important');
     }
   }
 
@@ -16924,6 +16929,34 @@
           if (exportGroup) exportGroup.classList.remove('open');
         }
       });
+
+      const menuMerge = document.getElementById('menu-item-merge-prod');
+      if (menuMerge && !menuMerge._hooked) {
+        menuMerge._hooked = true;
+        menuMerge.addEventListener('click', (e) => {
+          e.preventDefault();
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          const { formObj, idx } = getCurrentFormObject();
+          const title = formObj && formObj.title ? formObj.title : 'このフォーム';
+          const nextVer = ((formObj && formObj.publishedVersion) || 1) + 1;
+          if (confirm(`「${title}」の最新編集内容を本番公開リンクへ統合（公開更新）しますか？\n\n・新バージョン: v${nextVer}\n・配布済みの本番URLは変更されず、回答画面が最新版へ切り替わります。\n・過去のテスト送信データが本番に混ざることはありません。`)) {
+            mergeFormToProduction(idx);
+          }
+        });
+      }
+
+      const menuColPreview = document.getElementById('menu-item-column-preview');
+      if (menuColPreview && !menuColPreview._hooked) {
+        menuColPreview._hooked = true;
+        menuColPreview.addEventListener('click', (e) => {
+          e.preventDefault();
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          const { formObj } = getCurrentFormObject();
+          openFormColumnMappingModal(formObj || window.G || window.L);
+        });
+      }
 
       const menuShareLink = document.getElementById('menu-item-share-link');
       if (menuShareLink && !menuShareLink._hooked) {
@@ -19592,6 +19625,34 @@
       });
     });
 
+    // Supabase / LocalStorage 上に既に該当テーブルが作成済みかチェック
+    let customTables = [];
+    try {
+      customTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || [];
+    } catch(e) {}
+    const existingTable = customTables.find(t => t.name === formTitle);
+
+    let actionBtnHtml = '';
+    if (existingTable) {
+      actionBtnHtml = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="background: #dcfce7; color: #15803d; font-size: 0.78rem; font-weight: 700; padding: 5px 12px; border-radius: 6px; border: 1px solid #bbf7d0; display: inline-flex; align-items: center; gap: 5px;">
+            <span>✅</span> <span>Supabase連携テーブル作成済み（ID: ${escapeHtml(existingTable.id)} / ${existingTable.rows ? existingTable.rows.length : 0}件蓄積中）</span>
+          </span>
+          <button type="button" id="btn-col-modal-ok" style="background: #0284c7; color: #fff; border: none; font-weight: 700; font-size: 0.85rem; padding: 7px 20px; border-radius: 6px; cursor: pointer;">閉じる</button>
+        </div>
+      `;
+    } else {
+      actionBtnHtml = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button type="button" id="btn-create-supabase-table" style="background: #0284c7; color: #fff; border: 1px solid #0369a1; font-weight: 700; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(2,132,199,0.3); transition: all 0.2s;">
+            <span>⚡</span> <span>Supabase上にこのテーブルを事前作成</span>
+          </button>
+          <button type="button" id="btn-col-modal-ok" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 600; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer;">閉じる</button>
+        </div>
+      `;
+    }
+
     modal.innerHTML = `
       <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 960px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); overflow: hidden;">
         <!-- ヘッダー -->
@@ -19643,11 +19704,11 @@
         </div>
 
         <!-- フッター -->
-        <div style="padding: 14px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; align-items: center; justify-content: space-between;">
+        <div style="padding: 14px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
           <div style="font-size: 0.78rem; color: #64748b;">
-            💡 カラム名を変更したい場合は、設問の「タイトル」または右パネルの「詳細設定 > 連携キー (dataKey)」を編集してください。
+            💡 初回本番送信時に自動生成されますが、事前にSupabase上へテーブル枠を作成しておくことも可能です。
           </div>
-          <button type="button" id="btn-col-modal-ok" style="background: #0284c7; color: #fff; border: none; font-weight: 700; font-size: 0.85rem; padding: 8px 20px; border-radius: 6px; cursor: pointer;">閉じる</button>
+          ${actionBtnHtml}
         </div>
       </div>
     `;
@@ -19656,7 +19717,118 @@
 
     const closeHandler = () => { modal.style.display = 'none'; };
     modal.querySelector('#btn-close-col-modal').onclick = closeHandler;
-    modal.querySelector('#btn-col-modal-ok').onclick = closeHandler;
+    const okBtn = modal.querySelector('#btn-col-modal-ok');
+    if (okBtn) okBtn.onclick = closeHandler;
+    modal.onclick = (e) => { if (e.target === modal) closeHandler(); };
+
+    // ⚡ Supabase上にこのテーブルを事前作成するイベント
+    const createBtn = modal.querySelector('#btn-create-supabase-table');
+    if (createBtn) {
+      createBtn.onclick = async () => {
+        createBtn.disabled = true;
+        createBtn.innerHTML = '<span>⏳</span> <span>Supabaseテーブル作成中...</span>';
+
+        try {
+          const newTableId = `ctbl_${Date.now()}`;
+          const columns = [];
+
+          sections.forEach((sec) => {
+            (sec.questions || []).forEach(q => {
+              const colName = q.title || q.dataKey || q.id;
+              let colType = 'text';
+              if (q.type === 'date') colType = 'date';
+              else if (q.type === 'select' || q.type === 'radio') colType = 'select';
+              else if (q.type === 'number') colType = 'number';
+
+              columns.push({
+                id: q.dataKey || `col_${q.id}`,
+                label: colName,
+                type: colType,
+                required: q.required || false,
+                choices: q.options ? q.options.map(opt => ({ value: opt })) : undefined
+              });
+            });
+          });
+
+          // システムカラム追加
+          columns.push(
+            { id: 'status', label: 'ステータス', type: 'select', choices: [{ value: '回答完了', color: '#10b981' }, { value: '途中送信', color: '#f59e0b' }], required: false },
+            { id: 'registration_code', label: '確定登録コード', type: 'text', required: false },
+            { id: 'resume_url', label: '再開用URL', type: 'text', required: false },
+            { id: 'created_at', label: '送信日時', type: 'date', required: false }
+          );
+
+          const newTable = {
+            id: newTableId,
+            name: formTitle,
+            parentMenuId: 'custom-tables',
+            columns: columns,
+            visibleColumns: columns.map(c => c.id),
+            columnWidths: {},
+            rowHeights: {},
+            fixedCol: 'none',
+            fixedRow: 'none',
+            cellStyles: {},
+            rows: []
+          };
+
+          // 1. localStorage更新
+          let curTables = [];
+          try { curTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
+          curTables.push(newTable);
+          localStorage.setItem('synapse_custom_tables', JSON.stringify(curTables));
+          localStorage.setItem(`synapse_table_${newTableId}`, JSON.stringify(newTable));
+
+          // 2. Supabase REST API へ即時保存
+          const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+          const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+
+          await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+            method: 'POST',
+            headers: {
+              apikey: sbKey,
+              Authorization: `Bearer ${sbKey}`,
+              'Content-Type': 'application/json',
+              Prefer: 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify({
+              key: `synapse_table_${newTableId}`,
+              value: newTable,
+              updated_at: new Date().toISOString()
+            })
+          });
+
+          await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+            method: 'POST',
+            headers: {
+              apikey: sbKey,
+              Authorization: `Bearer ${sbKey}`,
+              'Content-Type': 'application/json',
+              Prefer: 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify({
+              key: 'synapse_custom_tables',
+              value: curTables,
+              updated_at: new Date().toISOString()
+            })
+          });
+
+          // 3. 親ウィンドウへの通知（iframe動作時）
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'SYNAPSE_TABLE_CREATED', table: newTable }, '*');
+          }
+
+          // モーダル表示を完了状態に再描画
+          openFormColumnMappingModal(formDef);
+          alert(`✅ Supabase上にテーブル「${formTitle}」を事前作成しました！\n\n・全${columns.length}カラムを定義済み\n・Synapseの「カスタムテーブル」一覧から即座に確認・操作できます。`);
+        } catch(err) {
+          console.error('Failed to create table on Supabase:', err);
+          alert(`テーブル作成に失敗しました: ${err.message}`);
+          createBtn.disabled = false;
+          createBtn.innerHTML = '<span>⚡</span> <span>Supabase上にこのテーブルを事前作成</span>';
+        }
+      };
+    }
     modal.onclick = (e) => { if (e.target === modal) closeHandler(); };
   }
   window.openFormColumnMappingModal = openFormColumnMappingModal;

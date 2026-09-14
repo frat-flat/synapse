@@ -107,34 +107,45 @@
         </button>
       </nav>
       <div class="header-actions">
-        <!-- 📊 テーブルカラム対応プレビューボタン -->
-        <button id="btn-header-column-preview" class="btn btn-secondary" data-tooltip="本番送信時にどの質問が何のカラムに収まるかを確認" style="display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; font-weight: 600; font-size: 0.8rem; padding: 6px 12px; border-radius: 6px; cursor: pointer; border: 1px solid #cbd5e1; background: #f8fafc; color: #334155;">
-          <span>📊</span> <span class="btn-text">テーブル連携確認</span>
-        </button>
         <!-- 📱 プレビュー表示トグルボタン (最小化/展開) -->
         <button id="btn-header-preview-toggle" class="btn btn-secondary active" data-tooltip="プレビューを非表示にする" style="display: none; align-items: center; gap: 6px; margin-right: 8px;">
           <span class="btn-icon">📱</span>
           <span class="btn-text">プレビュー</span>
         </button>
-        <!-- 🚀 本番環境へ統合（公開更新）ヘッダーボタン -->
-        <button id="btn-header-merge-prod" class="btn btn-success" data-tooltip="最新の編集内容を本番公開リンクへ統合・更新" style="display: none; align-items: center; gap: 6px; margin-right: 8px; background: #16a34a !important; border-color: #15803d !important; color: #fff !important; font-weight: 700; font-size: 0.8rem; padding: 6px 12px; border-radius: 6px; cursor: pointer; box-shadow: 0 1px 3px rgba(22,163,74,0.3);">
+        <!-- 🚀 本番環境へ統合（公開更新）ヘッダーボタン（非表示化しドロップダウン内へ集約） -->
+        <button id="btn-header-merge-prod" class="btn btn-success" data-tooltip="最新の編集内容を本番公開リンクへ統合・更新" style="display: none !important;">
           <span>🚀</span> <span class="btn-text">本番へ統合</span>
         </button>
-        <!-- 🔗 回答用リンク発行＆出力ボタングループ (リンク発行枠内にJSON出力を集約) -->
+        <!-- 🚀 本番連携・公開ボタングループ（プレビュー以外を1箇所に集約） -->
         <div class="share-export-btn-group" id="share-export-group" style="display: none;">
-          <button id="btn-share-form-url" class="btn btn-share-link" data-tooltip="回答用URLを発行・コピー">
-            <span class="btn-icon">🔗</span>
-            <span class="btn-text">リンクを発行</span>
+          <button id="btn-share-form-url" class="btn btn-share-link" data-tooltip="本番公開・連携メニュー" style="display: inline-flex; align-items: center; gap: 6px;">
+            <span class="btn-icon">🚀</span>
+            <span class="btn-text" id="share-btn-main-label">本番・連携</span>
           </button>
-          <button type="button" id="btn-share-dropdown-toggle" class="btn btn-share-dropdown-toggle" data-tooltip="その他の出力オプション" aria-label="その他の出力オプション">
+          <button type="button" id="btn-share-dropdown-toggle" class="btn btn-share-dropdown-toggle" data-tooltip="連携・出力メニューを開く" aria-label="連携・出力メニューを開く">
             <span class="dropdown-arrow">▼</span>
           </button>
-          <div class="share-dropdown-menu" id="share-dropdown-menu">
+          <div class="share-dropdown-menu" id="share-dropdown-menu" style="min-width: 270px;">
+            <div class="share-dropdown-item" id="menu-item-merge-prod" style="display: none;">
+              <span class="menu-icon">🚀</span>
+              <div class="menu-text-group">
+                <span class="menu-title" style="color: #16a34a; font-weight: 700;">本番へ統合</span>
+                <span class="menu-desc">最新の編集内容を本番公開リンクへ反映</span>
+              </div>
+            </div>
+            <div class="share-dropdown-item" id="menu-item-column-preview">
+              <span class="menu-icon">📊</span>
+              <div class="menu-text-group">
+                <span class="menu-title" style="color: #0284c7; font-weight: 700;">テーブル連携確認</span>
+                <span class="menu-desc">Supabase連携カラムの確認・事前作成</span>
+              </div>
+            </div>
+            <div class="share-dropdown-divider"></div>
             <div class="share-dropdown-item" id="menu-item-share-link">
               <span class="menu-icon">🔗</span>
               <div class="menu-text-group">
                 <span class="menu-title">回答用リンクを発行</span>
-                <span class="menu-desc">回答者向け共有URLをコピー・モーダル表示</span>
+                <span class="menu-desc">回答者向け共有URL・QRコードを表示</span>
               </div>
             </div>
             <div class="share-dropdown-divider"></div>
@@ -143,6 +154,13 @@
               <div class="menu-text-group">
                 <span class="menu-title">フォーム定義JSONを出力</span>
                 <span class="menu-desc">フォーム設定をJSON形式で確認・コピー</span>
+              </div>
+            </div>
+            <div class="share-dropdown-item" id="btn-import-json">
+              <span class="menu-icon">📥</span>
+              <div class="menu-text-group">
+                <span class="menu-title">フォーム定義JSONをインポート</span>
+                <span class="menu-desc">外部のJSONファイルを読み込んで適用</span>
               </div>
             </div>
           </div>
