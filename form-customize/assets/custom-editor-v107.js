@@ -6414,6 +6414,13 @@
                       window.V[q.id] = window.V[q.id].replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[^\d]/g, '');
                     }
                   }
+                  const isHolder = (q.dataKey === 'account_holder_kana') || (q.title && (q.title.includes('口座名義') || q.title.includes('名義人') || (q.title.includes('口座') && q.title.includes('名義'))));
+                  if (isHolder) {
+                    if (q.validation && q.validation.category === 'regex') {
+                      q.validation.value = '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$';
+                      q.validation.errorMessage = '口座名義はカナと（）.のみで入力してください。';
+                    }
+                  }
                 });
               });
             }
@@ -9734,7 +9741,7 @@
 
     if (!input.dataset.accountHolderBound) {
       input.dataset.accountHolderBound = "1";
-      const kanaRegex = /^[ァ-ヶｦ-ﾟー\-()（）.\．\・\s　]+$/;
+      const kanaRegex = /^[ァ-ヶｦ-ﾟー\-‐―()（）.\．\・\s　]+$/;
       const convertHiragana = (str) => {
         if (!str) return '';
         return str.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
@@ -10516,7 +10523,7 @@
             validation: {
               category: "regex",
               condition: "matches",
-              value: "^[ァ-ヶｦ-ﾟー\\-()（）.\\．\\・\\s　]+$",
+              value: "^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$",
               presetKey: "account_holder_kana",
               value2: "",
               errorMessage: "口座名義はカナと（）.のみで入力してください。"
@@ -15717,7 +15724,8 @@
     phone: { label: "携帯電話のみ (例: 090-1234-5678)", pattern: "^(070|080|090)-\\d{4}-\\d{4}$" },
     phone_nohyphen: { label: "携帯電話のみ（-無） (例: 09012345678)", pattern: "^(070|080|090)\\d{8}$" },
     email: { label: "メールアドレス (例: name@example.com)", pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" },
-    birthdate: { label: "生年月日 (例: 1990/01/01)", pattern: "^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$" }
+    birthdate: { label: "生年月日 (例: 1990/01/01)", pattern: "^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$" },
+    account_holder_kana: { label: "口座名義（カナ・（）.許可） (例: カ）ヤマダ タロウ)", pattern: "^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$" }
   };
   window.REGEX_PRESET_DEFINITIONS = REGEX_PRESET_DEFINITIONS;
 
@@ -16018,7 +16026,26 @@
     formObj.sections.forEach(sec => {
       if (!sec || !sec.questions) return;
       sec.questions.forEach(q => {
-        if (!q || !q.validation) return;
+        if (!q) return;
+        const t = (q.title || '').trim();
+        const isAcctHolder = (q.dataKey === 'account_holder_kana') || ((t.includes('口座名義') || t.includes('名義人') || (t.includes('口座') && t.includes('名義'))) && (t.includes('カナ') || t.includes('フリガナ') || t.includes('ふりがな') || (q.validation && q.validation.category === 'regex' && /^[ァ-ヶ]/.test(q.validation.value || ''))));
+        if (isAcctHolder) {
+          const desc = q.description || '';
+          if (!desc || desc.includes('全角カタカナで入力してください')) {
+            q.description = 'カナ、カッコ（）、ドット（.）で入力してください。（例: カ）ヤマダ タロウ）';
+            modified = true;
+          }
+          if (q.validation && q.validation.category === 'regex') {
+            if (q.validation.value !== '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$' || q.validation.presetKey !== 'account_holder_kana') {
+              q.validation.value = '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$';
+              q.validation.presetKey = 'account_holder_kana';
+              q.validation.errorMessage = '口座名義はカナと（）.のみで入力してください。';
+              modified = true;
+            }
+          }
+        }
+
+        if (!q.validation) return;
         const v = q.validation;
         const desc = q.description || '';
         if (v.category === 'regex') {
@@ -18891,6 +18918,15 @@
               value2: '',
               errorMessage: '正しい口座番号（6〜7桁の半角数字）を入力してください。'
             };
+          } else if ((q.dataKey === 'account_holder_kana') || /口座名義|名義/.test(q.title || '')) {
+            q.validation = {
+              category: 'regex',
+              condition: 'matches',
+              presetKey: 'account_holder_kana',
+              value: '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$',
+              value2: '',
+              errorMessage: '口座名義はカナと（）.のみで入力してください。'
+            };
           } else {
             q.validation = { category: 'text', condition: 'email', value: '', value2: '', errorMessage: '有効なメールアドレスを入力してください。' };
           }
@@ -18918,6 +18954,10 @@
           presetKey = 'bank_account';
           patVal = '^[0-9]{6,7}$';
           defErr = '正しい口座番号（6〜7桁の半角数字）を入力してください。';
+        } else if ((q.dataKey === 'account_holder_kana') || /口座名義|名義/.test(q.title || '')) {
+          presetKey = 'account_holder_kana';
+          patVal = '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$';
+          defErr = '口座名義はカナと（）.のみで入力してください。';
         } else if (window.getAutoErrorMessageForQuestion) {
           const autoErr = window.getAutoErrorMessageForQuestion(q.title, { category: 'regex' });
           if (autoErr && autoErr !== '入力値が正しくありません。') defErr = autoErr;

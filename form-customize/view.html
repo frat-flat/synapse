@@ -2535,7 +2535,7 @@
           return str.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
         }
 
-        const ACCOUNT_HOLDER_KANA_REGEX = /^[ァ-ヶｦ-ﾟー\-()（）.\．\・\s　]+$/;
+        const ACCOUNT_HOLDER_KANA_REGEX = /^[ァ-ヶｦ-ﾟー\-‐―()（）.\．\・\s　]+$/;
 
         function isAccountHolderKanaField(q) {
           if (!q) return false;
@@ -3118,6 +3118,31 @@
                 }
                 if (!q.validation) {
                   q.validation = { category: 'text', condition: 'auto_hyphen', errorMessage: '' };
+                }
+              }
+
+              // 口座名義（カナ）の案内文・バリデーションを（）、ドット許可仕様に自動同期
+              if (isAccountHolderKanaField(q)) {
+                if (!q.description || q.description.includes('全角カタカナで入力してください')) {
+                  q.description = 'カナ、カッコ（）、ドット（.）で入力してください。（例: カ）ヤマダ タロウ）';
+                }
+                if (q.validation && q.validation.category === 'regex') {
+                  q.validation.value = '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$';
+                  q.validation.errorMessage = '口座名義はカナと（）.のみで入力してください。';
+                  q.validation.presetKey = 'account_holder_kana';
+                }
+              }
+
+              // 口座番号の案内文・バリデーションを6〜7桁仕様に自動同期
+              const isAcctNum = (q.dataKey === 'account_number') || (q.title && (q.title.includes('口座番号') || (!q.title.includes('名義') && q.title.includes('口座'))));
+              if (isAcctNum) {
+                if (!q.description || (q.description.includes('7桁') && !q.description.includes('6〜7桁'))) {
+                  q.description = '6〜7桁の半角数字で入力してください（例: 1234567）';
+                }
+                if (q.validation && q.validation.category === 'regex') {
+                  q.validation.value = '^[0-9]{6,7}$';
+                  q.validation.errorMessage = '正しい口座番号（6〜7桁の半角数字）を入力してください。';
+                  q.validation.presetKey = 'bank_account';
                 }
               }
             });
@@ -5613,6 +5638,9 @@
                     // 口座番号における6〜7桁対応（エスケープ崩れや既存の7桁固定設定も含めて完全に堅牢化）
                     if (isAcctNum) {
                       regexPattern = '^[0-9]{6,7}$';
+                    } else if (isAccountHolderKana) {
+                      // 口座名義（カナ）は法人略称 カ）、ド）、ユ）等のカッコやドット（.）を確実に許可
+                      regexPattern = '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$';
                     } else if (regexPattern) {
                       regexPattern = regexPattern.replace(/\\\\/g, '\\');
                     }
@@ -5646,8 +5674,11 @@
                   card.classList.add('has-error');
                   let dispErr = v.errorMessage;
                   const isAcctNum = (q.dataKey === 'account_number') || (q.title && (q.title.includes('口座番号') || (!q.title.includes('名義') && q.title.includes('口座'))));
+                  const isAcctHolder = isAccountHolderKanaField(q);
                   if (isAcctNum && (!dispErr || dispErr === '入力値が正しくありません。')) {
                     dispErr = '正しい口座番号（6〜7桁の半角数字）を入力してください。';
+                  } else if (isAcctHolder && (!dispErr || dispErr === '入力値が正しくありません。' || dispErr === '全角カタカナで入力してください。')) {
+                    dispErr = '口座名義はカナと（）.のみで入力してください（例: カ）ヤマダ タロウ）。';
                   }
                   if (errorTextEl) errorTextEl.textContent = dispErr || '正しい形式で入力してください。';
                   isValid = false;
