@@ -5846,9 +5846,26 @@
         if (['radio', 'select'].includes(q.type) && q.options) {
           const val = window.V[q.id];
           if (val) {
-            const opt = q.options.find(o => o.label === val);
+            const cleanVal = String(val).trim();
+            // セマンティック最優先安全弁
+            if (cleanVal.includes('個人') && !cleanVal.includes('法人')) {
+              const pSec = sections.find(s => s && s.title && s.title.includes('個人') && !s.title.includes('法人'));
+              if (pSec) return pSec;
+            } else if (cleanVal.includes('法人')) {
+              const cSec = sections.find(s => s && s.title && s.title.includes('法人'));
+              if (cSec) return cSec;
+            }
+
+            const opt = q.options.find(o => o && String(o.label).trim() === cleanVal) ||
+                        q.options.find(o => o && cleanVal.includes(String(o.label).trim()));
             if (opt && opt.nextSectionId && opt.nextSectionId !== 'partial_submit' && opt.nextSectionId !== 'submit') {
-              const target = sections.find(s => s.id === opt.nextSectionId);
+              let target = sections.find(s => s.id === opt.nextSectionId);
+              if (!target && opt.nextSectionId.startsWith('q_')) {
+                target = sections.find(s => (s.questions || []).some(q => q.id === opt.nextSectionId));
+              }
+              if (!target) {
+                target = sections.find(s => s.title && (s.title.includes(opt.nextSectionId) || opt.nextSectionId.includes(s.title)));
+              }
               if (target) return target;
             }
           }
@@ -5858,7 +5875,13 @@
 
     const act = section.nextAction;
     if (act && !['next', 'submit', 'partial_submit'].includes(act)) {
-      const target = sections.find(s => s.id === act);
+      let target = sections.find(s => s.id === act);
+      if (!target && typeof act === 'string' && act.startsWith('q_')) {
+        target = sections.find(s => (s.questions || []).some(q => q.id === act));
+      }
+      if (!target && typeof act === 'string') {
+        target = sections.find(s => s.title && (s.title.includes(act) || act.includes(s.title)));
+      }
       if (target) return target;
     }
 

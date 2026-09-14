@@ -3518,22 +3518,94 @@
           }, 3500);
         }
 
+        // 遷移先セクションの解決エンジン（ID・質問ID・グループID・タイトル・意味論フォールバックに対応）
+        function resolveTargetSectionFromIdOrRef(targetRef, sections, currentSec = null, selectedVal = '') {
+          if (!targetRef || targetRef === 'next') return null;
+          if (targetRef === 'submit' || targetRef === 'partial_submit') return targetRef;
+
+          const targetStr = String(targetRef).trim();
+
+          // 1. セクションID完全一致
+          let sec = sections.find(s => s && s.id === targetStr);
+          if (sec) return sec.id;
+
+          // 2. 質問IDからの逆引き (q_... 指定時)
+          sec = sections.find(s => s && (s.questions || []).some(q => q && q.id === targetStr));
+          if (sec) return sec.id;
+
+          // 3. グループIDからの逆引き (grp_... 指定時)
+          sec = sections.find(s => s && (s.questions || []).some(q => q && q.groupId === targetStr));
+          if (sec) return sec.id;
+
+          // 4. セクションタイトル完全一致 (「お申込者情報の入力 - 個人」等)
+          sec = sections.find(s => s && s.title && s.title.trim().toLowerCase() === targetStr.toLowerCase());
+          if (sec) return sec.id;
+
+          // 5. セクションタイトル部分一致（前方・後方）
+          sec = sections.find(s => s && s.title && (s.title.includes(targetStr) || targetStr.includes(s.title)));
+          if (sec) return sec.id;
+
+          // 6. 意味論（セマンティック）安全弁：
+          // 選択値または参照に「個人」が含まれる場合、個人向けセクションへ最優先誘導
+          const checkText = (selectedVal + ' ' + targetStr).toLowerCase();
+          if (checkText.includes('個人') && !checkText.includes('法人')) {
+            const personalSec = sections.find(s => s && s.title && s.title.includes('個人') && !s.title.includes('法人'));
+            if (personalSec) return personalSec.id;
+          }
+          if (checkText.includes('法人') && !checkText.includes('個人')) {
+            const corpSec = sections.find(s => s && s.title && s.title.includes('法人'));
+            if (corpSec) return corpSec.id;
+          }
+
+          return null;
+        }
+
         // セクションの次のアクション（分岐またはデフォルト）判定
         function getSectionNextAction(section) {
+          if (!section) return 'submit';
           const sections = formDefinition.sections || [];
           const curIdx = sections.findIndex(s => s.id === section.id);
 
           // 1. 質問ごとの選択肢分岐ルール（radio / select）
           const questions = section.questions || [];
           for (const q of questions) {
-            if (['radio', 'select'].includes(q.type)) {
-              const val = formValues[q.id];
+            // 都道府県などの一般的な入力項目がセクション全体の遷移先を誤誘導しないよう除外
+            const isAddressSelect = q.type === 'select' && (q.title && (q.title.includes('都道府県') || q.title.includes('住所')));
+            if (['radio', 'select'].includes(q.type) && !isAddressSelect) {
+              // DOM上のチェック状態も含めて確実に現在値を取得
+              let val = formValues[q.id];
+              if (!val) {
+                const checkedRadio = document.querySelector(`input[name="opt_${q.id}"]:checked`) ||
+                                     document.querySelector(`input[name="${q.id}"]:checked`);
+                if (checkedRadio) val = checkedRadio.value;
+              }
+              if (!val && q.type === 'select') {
+                const selEl = document.querySelector(`select[data-question-id="${q.id}"]`) ||
+                              document.querySelector(`.question-card[data-question-id="${q.id}"] select`);
+                if (selEl) val = selEl.value;
+              }
+
               if (val) {
-                const opt = (q.options || []).find(o => o.label === val);
+                const cleanVal = String(val).trim();
+                const opt = (q.options || []).find(o => o && String(o.label).trim() === cleanVal) ||
+                            (q.options || []).find(o => o && cleanVal.includes(String(o.label).trim()));
+
+                // 🛡️ セマンティック最優先安全弁：
+                // 「事業者区分」「申請区分」等の質問で「個人」が選択されている場合、何があっても個人向けセクションへ誘導
+                const qTitle = String(q.title || '');
+                if (qTitle.includes('区分') || qTitle.includes('種別') || qTitle.includes('タイプ') || cleanVal === '個人' || cleanVal === '法人') {
+                  if (cleanVal.includes('個人') && !cleanVal.includes('法人')) {
+                    const personalSec = sections.find(s => s && s.title && s.title.includes('個人') && !s.title.includes('法人'));
+                    if (personalSec) return personalSec.id;
+                  } else if (cleanVal.includes('法人')) {
+                    const corpSec = sections.find(s => s && s.title && s.title.includes('法人'));
+                    if (corpSec) return corpSec.id;
+                  }
+                }
+
                 if (opt && opt.nextSectionId) {
-                  if (opt.nextSectionId === 'submit') return 'submit';
-                  const targetSec = sections.find(s => s.id === opt.nextSectionId);
-                  if (targetSec) return targetSec.id;
+                  const resolved = resolveTargetSectionFromIdOrRef(opt.nextSectionId, sections, section, cleanVal);
+                  if (resolved) return resolved;
                 }
               }
             }
@@ -3546,17 +3618,9 @@
             const nextSec = (curIdx !== -1 && curIdx < sections.length - 1) ? sections[curIdx + 1] : null;
             return nextSec ? nextSec.id : 'submit';
           }
-          if (typeof act === 'string' && act.startsWith('q_')) {
-            const foundSec = sections.find(s => (s.questions || []).some(q => q.id === act));
-            if (foundSec) {
-              return (foundSec.id === section.id)
-                ? ((curIdx < sections.length - 1) ? sections[curIdx + 1].id : 'submit')
-                : foundSec.id;
-            }
-          }
-          if (sections.some(s => s.id === act)) {
-            return act;
-          }
+
+          const resolvedAct = resolveTargetSectionFromIdOrRef(act, sections, section);
+          if (resolvedAct) return resolvedAct;
 
           // 3. デフォルト fallback：順番通りの次のセクション、無ければ submit
           if (curIdx !== -1 && curIdx < sections.length - 1) {
@@ -5765,34 +5829,11 @@
         }
 
         function getResolvedNextSection(section) {
+          if (!section) return null;
+          const nextAct = getSectionNextAction(section);
+          if (!nextAct || nextAct === 'submit') return null;
           const sections = formDefinition.sections || [];
-          const curIdx = sections.findIndex(s => s.id === section.id);
-
-          const questions = section.questions || [];
-          for (const q of questions) {
-            if (['radio', 'select'].includes(q.type)) {
-              const val = formValues[q.id];
-              if (val) {
-                const opt = (q.options || []).find(o => o.label === val);
-                if (opt && opt.nextSectionId && opt.nextSectionId !== 'partial_submit') {
-                  if (opt.nextSectionId === 'submit') return null;
-                  const targetSec = sections.find(s => s.id === opt.nextSectionId);
-                  if (targetSec) return targetSec;
-                }
-              }
-            }
-          }
-
-          const act = section.nextAction;
-          if (act && !['next', 'partial_submit', 'submit'].includes(act)) {
-            const targetSec = sections.find(s => s.id === act);
-            if (targetSec) return targetSec;
-          }
-
-          if (curIdx !== -1 && curIdx < sections.length - 1) {
-            return sections[curIdx + 1];
-          }
-          return null;
+          return sections.find(s => s && s.id === nextAct) || null;
         }
 
         function getQuestionTypeLabel(type) {
