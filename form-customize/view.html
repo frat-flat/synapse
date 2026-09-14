@@ -5610,9 +5610,11 @@
                     }
 
                     let regexPattern = v.value;
-                    // 口座番号における6〜7桁対応（既存の7桁固定設定も安全に6〜7桁へ許容拡張）
-                    if (isAcctNum && (regexPattern === '^[0-9]{7}$' || regexPattern === '^\\d{7}$' || regexPattern === '^[0-9]{6,7}$' || regexPattern === '^\\d{6,7}$')) {
+                    // 口座番号における6〜7桁対応（エスケープ崩れや既存の7桁固定設定も含めて完全に堅牢化）
+                    if (isAcctNum) {
                       regexPattern = '^[0-9]{6,7}$';
+                    } else if (regexPattern) {
+                      regexPattern = regexPattern.replace(/\\\\/g, '\\');
                     }
 
                     const reg = new RegExp(regexPattern);
