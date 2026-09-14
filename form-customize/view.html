@@ -2697,7 +2697,7 @@
 
               // 3. インボイス登録番号欄
               const apiConf = getQuestionApiConfig(q);
-              const isInvField = (q.dataKey === 'invoice_number') || (apiConf && apiConf.isInvoice) || (qTitle.includes('インボイス') && (qTitle.includes('番号') || qTitle.includes('登録')));
+              const isInvField = !isTaxInvoiceField && q.type !== 'radio' && ((q.dataKey === 'invoice_number') || (apiConf && apiConf.isInvoice) || (qTitle.includes('インボイス') && (qTitle.includes('番号') || qTitle.includes('登録番号'))));
               if (isInvField && item.num) {
                 const formattedInv = item.num.startsWith('T') ? item.num : ('T' + item.num);
                 formValues[q.id] = formattedInv;
@@ -3979,10 +3979,11 @@
             if (!card) return;
 
             // 🎯 税務区分3択とインボイス登録番号の表示連動制御
-            const isInvoiceField = (q.dataKey === 'invoice_number') ||
-              ((q.title || '').includes('インボイス') && ((q.title || '').includes('番号') || (q.title || '').includes('登録')));
+            const isTaxStatusField = (q.dataKey === 'tax_invoice_status') || q.type === 'radio' || (q.title || '').includes('税務区分') || (q.title || '').includes('登録状況') || (q.title || '').includes('課税事業者');
+            const isInvoiceField = !isTaxStatusField && q.type !== 'radio' && ((q.dataKey === 'invoice_number') ||
+              ((q.title || '').includes('インボイス') && ((q.title || '').includes('番号') || (q.title || '').includes('登録番号'))));
             if (isInvoiceField) {
-              const taxQ = (section.questions || []).find(cq => cq.dataKey === 'tax_invoice_status' || (cq.title || '').includes('税務区分') || (cq.title || '').includes('インボイス登録状況'));
+              const taxQ = (section.questions || []).find(cq => cq.id !== q.id && (cq.dataKey === 'tax_invoice_status' || (cq.title || '').includes('税務区分') || (cq.title || '').includes('インボイス登録状況') || (cq.title || '').includes('課税事業者')));
               if (taxQ) {
                 const currentTaxVal = formValues[taxQ.id] || getResolvedQuestionValue(taxQ.id);
                 if (currentTaxVal === 'インボイス登録事業者である。') {
@@ -5309,7 +5310,10 @@
                   label.classList.add('selected');
                   // ラジオ変更で次のアクションが変わる可能性があるので更新
                   const section = formDefinition.sections.find(s => s.id === currentSectionId);
-                  if (section) updateNavButtons(section);
+                  if (section) {
+                    updateNavButtons(section);
+                    applySectionSkipLogic(section);
+                  }
                 } else {
                   if (!Array.isArray(formValues[q.id])) formValues[q.id] = [];
                   if (input.checked) {
@@ -5594,10 +5598,11 @@
             // 2-4. 町名・番地の番地入力確認は「次へ」クリック時の確認ポップアップにて実施
 
             // 2-5. 税務区分「インボイス登録事業者である。」選択時の番号必須チェック
-            const isInvNumField = (q.dataKey === 'invoice_number') ||
-              ((q.title || '').includes('インボイス') && ((q.title || '').includes('番号') || (q.title || '').includes('登録')));
+            const isTaxStatusFieldVal = (q.dataKey === 'tax_invoice_status') || q.type === 'radio' || (q.title || '').includes('税務区分') || (q.title || '').includes('登録状況') || (q.title || '').includes('課税事業者');
+            const isInvNumField = !isTaxStatusFieldVal && q.type !== 'radio' && ((q.dataKey === 'invoice_number') ||
+              ((q.title || '').includes('インボイス') && ((q.title || '').includes('番号') || (q.title || '').includes('登録番号'))));
             if (isInvNumField) {
-              const taxQ = (section.questions || []).find(cq => cq.dataKey === 'tax_invoice_status' || (cq.title || '').includes('税務区分') || (cq.title || '').includes('インボイス登録状況'));
+              const taxQ = (section.questions || []).find(cq => cq.id !== q.id && (cq.dataKey === 'tax_invoice_status' || (cq.title || '').includes('税務区分') || (cq.title || '').includes('インボイス登録状況') || (cq.title || '').includes('課税事業者')));
               if (taxQ) {
                 const taxVal = formValues[taxQ.id];
                 if (taxVal !== 'インボイス登録事業者である。') {
