@@ -2291,29 +2291,37 @@
       };
     }
 
-    // ② 補助フォールバック（作成者が入力規則を設定していない場合のタイトル推測アシスト）
-    if (qDef.type === 'text' && qDef.title) {
-      const t = qDef.title;
-      if (t.includes('郵便番号') || t.toLowerCase().includes('zip')) {
-        return { isApi: true, category: 'api', condition: 'zip_code', isCorp: false, isInvoice: false, isZip: true, isBank: false, isBranch: false, isBranchCode: false, label: '郵便番号住所検索API連携', source: 'title_fallback' };
+    // ② 補助フォールバック（作成者が入力規則を設定していない場合のタイトル・dataKey推測アシスト）
+    if (qDef.type === 'text') {
+      const isKana = qDef.title && (qDef.title.includes('カナ') || qDef.title.includes('フリガナ') || qDef.title.includes('ふりがな'));
+      const isPureTrade = qDef.title && qDef.title.trim() === '屋号';
+
+      if (!isKana && qDef.dataKey === 'company_name' && !isPureTrade) {
+        return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: false, label: '国税庁法人番号API連携', source: 'dataKey' };
       }
-      if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
-        return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isZip: false, isBank: false, isBranch: false, isBranchCode: false, label: '適格請求書発行事業者API連携', source: 'title_fallback' };
-      }
-      if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名')) &&
-          !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな') && !t.includes('屋号')) {
-        return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: false, label: '国税庁法人番号API連携', source: 'title_fallback' };
-      }
-      if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座')) ||
-          t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード'))) {
-        return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isZip: false, isBank: true, isBranch: false, isBranchCode: false, label: '全銀協金融機関API連携', source: 'title_fallback' };
-      }
-      if (t.includes('支店名') || (t.includes('支店') && !t.includes('番号') && !t.includes('コード')) ||
-          t.includes('店舗名') || (t.includes('店舗') && !t.includes('番号') && !t.includes('コード'))) {
-        return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: true, isBranchCode: false, label: '全銀協支店情報API連携', source: 'title_fallback' };
-      }
-      if (t.includes('支店番号') || t.includes('支店コード') || t.includes('店舗番号') || t.includes('店舗コード') || ((t.includes('支店') || t.includes('店舗')) && t.includes('番号'))) {
-        return { isApi: true, category: 'api', condition: 'branch_code', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: true, label: '全銀協支店番号API連携', source: 'title_fallback' };
+
+      if (qDef.title) {
+        const t = qDef.title;
+        if (t.includes('郵便番号') || t.toLowerCase().includes('zip')) {
+          return { isApi: true, category: 'api', condition: 'zip_code', isCorp: false, isInvoice: false, isZip: true, isBank: false, isBranch: false, isBranchCode: false, label: '郵便番号住所検索API連携', source: 'title_fallback' };
+        }
+        if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
+          return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isZip: false, isBank: false, isBranch: false, isBranchCode: false, label: '適格請求書発行事業者API連携', source: 'title_fallback' };
+        }
+        if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('貴社名') || t.includes('御社名') || t.includes('商号')) && !isKana && !isPureTrade) {
+          return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: false, label: '国税庁法人番号API連携', source: 'title_fallback' };
+        }
+        if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座')) ||
+            t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード'))) {
+          return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isZip: false, isBank: true, isBranch: false, isBranchCode: false, label: '全銀協金融機関API連携', source: 'title_fallback' };
+        }
+        if (t.includes('支店名') || (t.includes('支店') && !t.includes('番号') && !t.includes('コード')) ||
+            t.includes('店舗名') || (t.includes('店舗') && !t.includes('番号') && !t.includes('コード'))) {
+          return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: true, isBranchCode: false, label: '全銀協支店情報API連携', source: 'title_fallback' };
+        }
+        if (t.includes('支店番号') || t.includes('支店コード') || t.includes('店舗番号') || t.includes('店舗コード') || ((t.includes('支店') || t.includes('店舗')) && t.includes('番号'))) {
+          return { isApi: true, category: 'api', condition: 'branch_code', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: true, label: '全銀協支店番号API連携', source: 'title_fallback' };
+        }
       }
     }
 
@@ -8497,19 +8505,27 @@
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.results) && data.results.length > 0) {
-            listToRender = data.results.map(item => ({
-              name: item.name,
-              nameKana: item.nameKana || "",
-              num: item.num,
-              pref: item.pref,
-              cityName: item.cityName || "",
-              street: item.street || "",
-              postCode: item.postCode || "",
-              address: item.address || "",
-              regDate: item.regDate || "",
-              invoiceNum: item.invoiceNum || (item.num ? `T${item.num}` : "")
-            }));
-            isLiveApi = true;
+            let filteredResults = data.results;
+            if (selPref && selPref.trim() !== '') {
+              filteredResults = filteredResults.filter(item => {
+                return (item.pref && item.pref.includes(selPref)) || (item.address && item.address.includes(selPref));
+              });
+            }
+            if (filteredResults.length > 0) {
+              listToRender = filteredResults.slice(0, 50).map(item => ({
+                name: item.name,
+                nameKana: item.nameKana || "",
+                num: item.num,
+                pref: item.pref,
+                cityName: item.cityName || "",
+                street: item.street || "",
+                postCode: item.postCode || "",
+                address: item.address || "",
+                regDate: item.regDate || "",
+                invoiceNum: item.invoiceNum || (item.num ? `T${item.num}` : "")
+              }));
+              isLiveApi = true;
+            }
           }
         }
       } catch (err) {
@@ -8584,8 +8600,9 @@
       } else {
         const prefLabel = selPref ? `【${escapeHtml(selPref)}】` : '';
         curPanel.innerHTML = `
-          <div style="padding:12px; font-size:0.75rem; color:#718096; text-align:center;">
+          <div style="padding:12px; font-size:0.75rem; color:#718096; text-align:center; line-height:1.4;">
             国税庁API照会: 一致する法人情報が見つかりませんでした ${prefLabel}
+            <div style="font-size:0.68rem; color:#a0aec0; margin-top:4px;">（屋号または個人事業主の方はそのまま手入力して進めていただけます）</div>
           </div>
         `;
         curPanel.style.display = 'block';

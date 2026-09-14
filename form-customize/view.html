@@ -2363,29 +2363,37 @@
               isBranchCode: cond === 'branch_code'
             };
           }
-          if (q.type === 'text' && q.title) {
-            const t = q.title;
-            if (t.includes('郵便番号') || t.toLowerCase().includes('zip')) {
-              return { isApi: true, category: 'api', condition: 'zip_code', isCorp: false, isInvoice: false, isZip: true, isBank: false, isBranch: false, isBranchCode: false };
-            }
-            if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
-              return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isZip: false, isBank: false, isBranch: false, isBranchCode: false };
-            }
-            if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名')) &&
-                !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな') && !t.includes('屋号')) {
+          if (q.type === 'text') {
+            const isKana = q.title && (q.title.includes('カナ') || q.title.includes('フリガナ') || q.title.includes('ふりがな'));
+            const isPureTrade = q.title && q.title.trim() === '屋号';
+
+            if (!isKana && q.dataKey === 'company_name' && !isPureTrade) {
               return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: false };
             }
-            if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座') && !t.includes('支店')) ||
-                t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード') && !t.includes('支店'))) {
-              return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isZip: false, isBank: true, isBranch: false, isBranchCode: false };
-            }
-            if (t.includes('支店名') || (t.includes('支店') && !t.includes('コード') && !t.includes('番号')) ||
-                t.includes('出張所名') || (t.includes('店舗名') && !t.includes('コード') && !t.includes('番号'))) {
-              return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: true, isBranchCode: false };
-            }
-            if (t.includes('支店番号') || t.includes('支店コード') || t.includes('店舗番号') || t.includes('店舗コード') ||
-                ((t.includes('支店') || t.includes('店舗')) && t.includes('番号'))) {
-              return { isApi: true, category: 'api', condition: 'branch_code', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: true };
+
+            if (q.title) {
+              const t = q.title;
+              if (t.includes('郵便番号') || t.toLowerCase().includes('zip')) {
+                return { isApi: true, category: 'api', condition: 'zip_code', isCorp: false, isInvoice: false, isZip: true, isBank: false, isBranch: false, isBranchCode: false };
+              }
+              if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
+                return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isZip: false, isBank: false, isBranch: false, isBranchCode: false };
+              }
+              if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('貴社名') || t.includes('御社名') || t.includes('商号')) && !isKana && !isPureTrade) {
+                return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: false };
+              }
+              if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座') && !t.includes('支店')) ||
+                  t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード') && !t.includes('支店'))) {
+                return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isZip: false, isBank: true, isBranch: false, isBranchCode: false };
+              }
+              if (t.includes('支店名') || (t.includes('支店') && !t.includes('コード') && !t.includes('番号')) ||
+                  t.includes('出張所名') || (t.includes('店舗名') && !t.includes('コード') && !t.includes('番号'))) {
+                return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: true, isBranchCode: false };
+              }
+              if (t.includes('支店番号') || t.includes('支店コード') || t.includes('店舗番号') || t.includes('店舗コード') ||
+                  ((t.includes('支店') || t.includes('店舗')) && t.includes('番号'))) {
+                return { isApi: true, category: 'api', condition: 'branch_code', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: true };
+              }
             }
           }
           return null;
@@ -2405,7 +2413,7 @@
               const qTitle = q.title || '';
 
               // 0. 法人名欄
-              const isCorpNameField = !qTitle.includes('屋号') && ((q.dataKey === 'company_name') || ((qTitle.includes('法人名') || qTitle.includes('会社名')) && !qTitle.includes('カナ') && !qTitle.includes('フリガナ') && !qTitle.includes('ふりがな')));
+              const isCorpNameField = (q.dataKey === 'company_name') || ((qTitle.includes('法人名') || qTitle.includes('会社名') || qTitle.includes('貴社名') || qTitle.includes('御社名') || qTitle.includes('企業名') || qTitle.includes('商号')) && !qTitle.includes('カナ') && !qTitle.includes('フリガナ') && !qTitle.includes('ふりがな') && qTitle.trim() !== '屋号');
               if (isCorpNameField && item.name) {
                 formValues[q.id] = item.name.trim();
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
@@ -4016,19 +4024,27 @@
                 const data = await res.json();
                 apiCalled = true;
                 if (data.success && Array.isArray(data.results) && data.results.length > 0) {
-                  listToRender = data.results.map(item => ({
-                    name: item.name,
-                    nameKana: item.nameKana || "",
-                    num: item.num,
-                    pref: item.pref,
-                    cityName: item.cityName || "",
-                    street: item.street || "",
-                    postCode: item.postCode || "",
-                    address: item.address || "",
-                    regDate: item.regDate || "",
-                    invoiceNum: item.invoiceNum || (item.num ? `T${item.num}` : "")
-                  }));
-                  isLiveApi = true;
+                  let filteredResults = data.results;
+                  if (selPref && selPref.trim() !== '') {
+                    filteredResults = filteredResults.filter(item => {
+                      return (item.pref && item.pref.includes(selPref)) || (item.address && item.address.includes(selPref));
+                    });
+                  }
+                  if (filteredResults.length > 0) {
+                    listToRender = filteredResults.slice(0, 50).map(item => ({
+                      name: item.name,
+                      nameKana: item.nameKana || "",
+                      num: item.num,
+                      pref: item.pref,
+                      cityName: item.cityName || "",
+                      street: item.street || "",
+                      postCode: item.postCode || "",
+                      address: item.address || "",
+                      regDate: item.regDate || "",
+                      invoiceNum: item.invoiceNum || (item.num ? `T${item.num}` : "")
+                    }));
+                    isLiveApi = true;
+                  }
                 }
               }
             } catch (err) {
@@ -4120,7 +4136,14 @@
 
               searchPanel.style.display = 'block';
             } else {
-              searchPanel.style.display = 'none';
+              const prefLabel = selPref ? `【${escapeHtml(selPref)}】` : '';
+              searchPanel.innerHTML = `
+                <div style="padding: 12px; font-size: 0.78rem; color: #64748b; text-align: center; line-height: 1.4;">
+                  国税庁API照会: 一致する法人情報が見つかりませんでした ${prefLabel}
+                  <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px;">（屋号や個人事業主の方はそのまま手入力してご回答いただけます）</div>
+                </div>
+              `;
+              searchPanel.style.display = 'block';
             }
           };
 

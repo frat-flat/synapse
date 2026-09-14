@@ -62,7 +62,7 @@ async function queryNtaApi(appId, searchName, prefCode) {
   });
 
   if (prefCode) {
-    params.append('pref', prefCode);
+    params.append('address', prefCode);
   }
 
   const apiUrl = `https://api.houjin-bangou.nta.go.jp/4/name?${params.toString()}`;
@@ -160,12 +160,25 @@ module.exports = async (req, res) => {
   try {
     const rawName = name.trim();
     let prefCode = '';
+    let prefNameTarget = '';
     if (pref) {
       const p = pref.trim();
       if (/^\d{2}$/.test(p)) {
         prefCode = p;
-      } else if (PREFECTURE_CODES[p]) {
-        prefCode = PREFECTURE_CODES[p];
+        for (const [name, code] of Object.entries(PREFECTURE_CODES)) {
+          if (code === p) {
+            prefNameTarget = name;
+            break;
+          }
+        }
+      } else {
+        for (const [name, code] of Object.entries(PREFECTURE_CODES)) {
+          if (name === p || name.startsWith(p) || p.startsWith(name.replace(/(都|府|県)$/, ''))) {
+            prefCode = code;
+            prefNameTarget = name;
+            break;
+          }
+        }
       }
     }
 
@@ -186,14 +199,14 @@ module.exports = async (req, res) => {
       searchQueries.add(toFullWidth(cleanCore));
     }
 
-    // 国税庁APIへ並行リクエスト
+    // 国税庁APIへ並行リクエスト（addressパラメータで都道府県コードを渡す）
     const queryPromises = Array.from(searchQueries).slice(0, 4).map(q =>
       queryNtaApi(appId, q, prefCode).catch(() => [])
     );
 
     const responses = await Promise.all(queryPromises);
 
-    // 結果のマージ＆重複排除（法人番号 num をキーとする）
+    // 結果のマージ＆重複排除（法人番号 num をキーとする）＆ 指定都道府県への厳格フィルタリング
     const seen = new Set();
     const results = [];
 
@@ -201,6 +214,16 @@ module.exports = async (req, res) => {
       for (const item of list) {
         if (!seen.has(item.num)) {
           seen.add(item.num);
+          // 都道府県指定がある場合は他都道府県の法人を完全に除外
+          if (prefCode || prefNameTarget) {
+            const itemPref = item.pref || '';
+            const itemPrefCode = PREFECTURE_CODES[itemPref] || '';
+            const matchCode = prefCode && itemPrefCode === prefCode;
+            const matchName = prefNameTarget && (itemPref === prefNameTarget || (item.address && item.address.includes(prefNameTarget)));
+            if (!matchCode && !matchName) {
+              continue;
+            }
+          }
           results.push(item);
         }
       }
