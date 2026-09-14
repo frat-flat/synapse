@@ -72,6 +72,32 @@
           options: []
         };
       }
+      if (!window.re.bank_account) {
+        window.re.bank_account = {
+          type: "text",
+          title: "口座番号",
+          description: "6〜7桁の半角数字で入力してください（例: 1234567）",
+          placeholder: "0477651",
+          required: true,
+          validation: {
+            category: "regex",
+            condition: "matches",
+            presetKey: "bank_account",
+            value: "^\\d{6,7}$",
+            value2: "",
+            errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+          },
+          options: []
+        };
+      } else {
+        window.re.bank_account.description = "6〜7桁の半角数字で入力してください（例: 1234567）";
+        window.re.bank_account.placeholder = "0477651";
+        if (window.re.bank_account.validation) {
+          window.re.bank_account.validation.presetKey = "bank_account";
+          window.re.bank_account.validation.value = "^\\d{6,7}$";
+          window.re.bank_account.validation.errorMessage = "正しい口座番号（6〜7桁の半角数字）を入力してください。";
+        }
+      }
       if (window.re.pro_bank && Array.isArray(window.re.pro_bank.questions)) {
         window.re.pro_bank.questions.forEach(q => {
           if (q.title === '金融機関名' || q.title === '銀行名') {
@@ -80,6 +106,16 @@
             q.validation = { category: "api", condition: "branch_name", errorMessage: "実在する支店名を入力または選択してください。" };
           } else if (q.title === '支店番号' || q.title === '支店コード') {
             q.validation = { category: "api", condition: "branch_code", errorMessage: "実在する3桁の支店番号を入力または選択してください。" };
+          } else if (q.title === '口座番号') {
+            q.description = "6〜7桁の半角数字で入力してください（例: 1234567）";
+            q.placeholder = "0477651";
+            q.validation = {
+              category: "regex",
+              condition: "matches",
+              presetKey: "bank_account",
+              value: "^\\d{6,7}$",
+              errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+            };
           }
         });
       }
@@ -9524,12 +9560,21 @@
         return str.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
       };
 
-      const validate = () => {
+      let isComposing = false;
+      input.addEventListener('compositionstart', () => { isComposing = true; });
+      input.addEventListener('compositionend', () => {
+        isComposing = false;
+        validate(true);
+      });
+
+      const validate = (doConvert) => {
         let val = input.value;
-        const converted = convertHiragana(val);
-        if (converted !== val) {
-          val = converted;
-          input.value = val;
+        if (doConvert) {
+          const converted = convertHiragana(val);
+          if (converted !== val) {
+            val = converted;
+            input.value = val;
+          }
         }
 
         const trimmed = val.trim();
@@ -9543,8 +9588,13 @@
           clearIntegrityError(card);
         }
       };
-      input.addEventListener('input', validate);
-      input.addEventListener('blur', validate);
+      input.addEventListener('input', (e) => {
+        if (isComposing || (e && e.isComposing)) return;
+        validate(false);
+      });
+      input.addEventListener('blur', () => {
+        validate(true);
+      });
     }
   }
 
@@ -10229,7 +10279,7 @@
             id: `q_account_number_${baseTime}`,
             type: "text",
             title: "口座番号",
-            description: "7桁の半角数字で入力してください（例: 1234567）",
+            description: "6〜7桁の半角数字で入力してください（例: 1234567）",
             required: true,
             groupId: bankGrpId,
             groupTitle: bankGrpTitle,
@@ -10237,10 +10287,10 @@
             validation: {
               category: "regex",
               condition: "matches",
-              value: "^[0-9]{7}$",
-              presetKey: "custom",
+              value: "^[0-9]{6,7}$",
+              presetKey: "bank_account",
               value2: "",
-              errorMessage: "正しい口座番号（7桁の半角数字）を入力してください。"
+              errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
             },
             options: []
           },
@@ -10315,12 +10365,40 @@
           options: []
         };
       }
+      if (!window.re.bank_account) {
+        window.re.bank_account = {
+          type: "text",
+          title: "口座番号",
+          description: "6〜7桁の半角数字で入力してください（例: 1234567）",
+          placeholder: "0477651",
+          required: true,
+          validation: {
+            category: "regex",
+            condition: "matches",
+            presetKey: "bank_account",
+            value: "^\\d{6,7}$",
+            value2: "",
+            errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+          },
+          options: []
+        };
+      }
       if (window.re.pro_bank && Array.isArray(window.re.pro_bank.questions)) {
         window.re.pro_bank.questions.forEach(q => {
           if (q.title === '金融機関名' || q.title === '銀行名') {
             q.validation = { category: "api", condition: "bank_name", errorMessage: "実在する金融機関名を入力または選択してください。" };
           } else if (q.title === '支店名') {
             q.validation = { category: "api", condition: "branch_name", errorMessage: "実在する支店名を入力または選択してください。" };
+          } else if (q.title === '口座番号') {
+            q.description = "6〜7桁の半角数字で入力してください（例: 1234567）";
+            q.placeholder = "0477651";
+            q.validation = {
+              category: "regex",
+              condition: "matches",
+              presetKey: "bank_account",
+              value: "^\\d{6,7}$",
+              errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+            };
           }
         });
       }
@@ -10391,6 +10469,12 @@
       optBranchCodeSingle.value = "branch_code";
       optBranchCodeSingle.textContent = "支店番号（全銀協API連携）";
       presetSelect.appendChild(optBranchCodeSingle);
+    }
+    if (!presetSelect.querySelector('option[value="bank_account"]')) {
+      const optBankAcctSingle = document.createElement('option');
+      optBankAcctSingle.value = "bank_account";
+      optBankAcctSingle.textContent = "口座番号（6〜7桁半角数字）";
+      presetSelect.appendChild(optBankAcctSingle);
     }
 
     // ✉️ メールアドレス（2種類: 通常 / 回答控え自動送信）
@@ -15415,6 +15499,7 @@
   // =========================================================================
   const REGEX_PRESET_DEFINITIONS = {
     custom: { label: "カスタム（式を直接入力）", pattern: "" },
+    bank_account: { label: "口座番号 (6〜7桁) (例: 1234567)", pattern: "^\\d{6,7}$" },
     zip: { label: "郵便番号 (例: 123-4567)", pattern: "^\\d{3}-\\d{4}$" },
     zip_nohyphen: { label: "郵便番号（-無） (例: 1234567)", pattern: "^\\d{7}$" },
     tel_both: { label: "電話番号（固定・携帯 共通） (例: 03-1234-5678 / 090-1234-5678)", pattern: "^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$" },
@@ -15435,7 +15520,7 @@
     });
   }
 
-  // プリセット質問定義 (window.re) の電話番号および生年月日
+  // プリセット質問定義 (window.re) の電話番号、生年月日および口座番号
   if (window.re) {
     if (window.re.tel) {
       window.re.tel.description = "ハイフンを含めて半角数字で入力してください。（例: 03-1234-5678 または 090-1234-5678）";
@@ -15460,6 +15545,32 @@
         },
         options: []
       };
+    }
+    if (!window.re.bank_account) {
+      window.re.bank_account = {
+        type: "text",
+        title: "口座番号",
+        description: "6〜7桁の半角数字で入力してください（例: 1234567）",
+        placeholder: "0477651",
+        required: true,
+        validation: {
+          category: "regex",
+          condition: "matches",
+          presetKey: "bank_account",
+          value: "^\\d{6,7}$",
+          value2: "",
+          errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+        },
+        options: []
+      };
+    } else {
+      window.re.bank_account.description = "6〜7桁の半角数字で入力してください（例: 1234567）";
+      window.re.bank_account.placeholder = "0477651";
+      if (window.re.bank_account.validation) {
+        window.re.bank_account.validation.presetKey = "bank_account";
+        window.re.bank_account.validation.value = "^\\d{6,7}$";
+        window.re.bank_account.validation.errorMessage = "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+      }
     }
   }
 
@@ -15577,8 +15688,8 @@
     }
 
     // 10. 口座番号
-    if (/口座番号/.test(t) || (!/名義/.test(t) && /口座/.test(t)) || pattern === '^\\d{7}$' || pattern === '^\\d{6,7}$') {
-      return '7桁の半角数字で入力してください。（例: 1234567）';
+    if (preset === 'bank_account' || /口座番号/.test(t) || (!/名義/.test(t) && /口座/.test(t)) || pattern === '^\\d{7}$' || pattern === '^\\d{6,7}$' || pattern === '^[0-9]{7}$' || pattern === '^[0-9]{6,7}$') {
+      return '6〜7桁の半角数字で入力してください。（例: 1234567）';
     }
 
     // 11. インボイス登録番号
@@ -15662,8 +15773,8 @@
     }
 
     // 口座番号
-    if (/口座番号/.test(t) || (!/名義/.test(t) && /口座/.test(t)) || pattern === '^\\d{7}$') {
-      return '正しい口座番号（7桁の半角数字）を入力してください。';
+    if (preset === 'bank_account' || /口座番号/.test(t) || (!/名義/.test(t) && /口座/.test(t)) || pattern === '^\\d{7}$' || pattern === '^\\d{6,7}$' || pattern === '^[0-9]{7}$' || pattern === '^[0-9]{6,7}$') {
+      return '正しい口座番号（6〜7桁の半角数字）を入力してください。';
     }
 
     // メールアドレス
@@ -15777,6 +15888,7 @@
       const needsUpdate = currentKeys.length !== targetKeys.length ||
         !currentKeys.includes('birthdate') ||
         !currentKeys.includes('email') ||
+        !currentKeys.includes('bank_account') ||
         !currentKeys.includes('tel_both_nohyphen');
 
       if (needsUpdate) {
@@ -15796,6 +15908,12 @@
       const opt = document.createElement('option');
       opt.value = 'birthdate';
       opt.textContent = '生年月日';
+      presetSelect.appendChild(opt);
+    }
+    if (presetSelect && !presetSelect.querySelector('option[value="bank_account"]')) {
+      const opt = document.createElement('option');
+      opt.value = 'bank_account';
+      opt.textContent = '口座番号 (6〜7桁)';
       presetSelect.appendChild(opt);
     }
 
@@ -17347,8 +17465,8 @@
           pattern = "^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$";
         }
       } else if (q.includes('口座') || q.includes('こうざ')) {
-        text = "💳 **口座番号**の正規表現です。\n\n一般的に使用される口座番号（7桁の半角数字）に一致させるには、以下の正規表現を使用します：\n`^\\d{7}$`\n\n※桁数が異なる（例: 6桁）金融機関を考慮する場合は、範囲指定（例: 6〜7桁 `^\\d{6,7}$`）に変更することもできます。";
-        pattern = "^\\d{7}$";
+        text = "💳 **口座番号**の正規表現です。\n\n一般的に使用される口座番号（6〜7桁の半角数字）に一致させるには、以下の正規表現を使用します：\n`^\\d{6,7}$`\n\n※信用金庫や一部金融機関の6桁口座にも完全対応した推奨設定です。";
+        pattern = "^\\d{6,7}$";
       } else if (q.includes('インボイス') || q.includes('いんぼいす') || q.includes('登録番号')) {
         text = "🧾 **インボイス登録番号**の正規表現です。\n\n適格請求書発行事業者の登録番号（Tで始まる13桁の半角数字）に一致させるには、以下の表現を使用します：\n`^T\\d{13}$`\n\n※先頭のアルファベット大文字「T」と、それに続く13桁の数字を厳密に制限する形式です。";
         pattern = "^T\\d{13}$";
@@ -18546,7 +18664,18 @@
       if (valToggle.checked) {
         valFields.style.display = 'block';
         if (!q.validation) {
-          q.validation = { category: 'text', condition: 'email', value: '', value2: '', errorMessage: '有効なメールアドレスを入力してください。' };
+          if (/口座番号/.test(q.title || '')) {
+            q.validation = {
+              category: 'regex',
+              condition: 'matches',
+              presetKey: 'bank_account',
+              value: '^\\d{6,7}$',
+              value2: '',
+              errorMessage: '正しい口座番号（6〜7桁の半角数字）を入力してください。'
+            };
+          } else {
+            q.validation = { category: 'text', condition: 'email', value: '', value2: '', errorMessage: '有効なメールアドレスを入力してください。' };
+          }
         }
         syncDrawerValidationInputs(q.validation);
       } else {
@@ -18560,12 +18689,25 @@
       const q = findQuestionDefById(_activeDrawerQuestionId);
       if (!q) return;
       const cat = valCatSelect.value;
-      const defErr = cat === 'number' ? '数値を入力してください。' : (cat === 'api' ? '実在する候補を選択してください。' : '入力値が正しくありません。');
+      let defErr = cat === 'number' ? '数値を入力してください。' : (cat === 'api' ? '実在する候補を選択してください。' : '入力値が正しくありません。');
       const bObj = window.b && window.b[cat] ? window.b[cat] : null;
       const firstCond = bObj ? Object.keys(bObj.conditions)[0] : 'email';
 
-      q.validation = { category: cat, condition: firstCond, value: '', value2: '', errorMessage: defErr };
-      if (cat === 'regex') q.validation.presetKey = 'custom';
+      let presetKey = 'custom';
+      let patVal = '';
+      if (cat === 'regex') {
+        if (/口座番号/.test(q.title || '')) {
+          presetKey = 'bank_account';
+          patVal = '^\\d{6,7}$';
+          defErr = '正しい口座番号（6〜7桁の半角数字）を入力してください。';
+        } else if (window.getAutoErrorMessageForQuestion) {
+          const autoErr = window.getAutoErrorMessageForQuestion(q.title, { category: 'regex' });
+          if (autoErr && autoErr !== '入力値が正しくありません。') defErr = autoErr;
+        }
+      }
+
+      q.validation = { category: cat, condition: firstCond, value: patVal, value2: '', errorMessage: defErr };
+      if (cat === 'regex') q.validation.presetKey = presetKey;
 
       syncDrawerValidationConditionOptions(cat, firstCond);
       syncDrawerValidationPatternAndNotice(q.validation);
