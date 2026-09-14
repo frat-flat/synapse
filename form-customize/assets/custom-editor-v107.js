@@ -19533,6 +19533,146 @@
     }, 2000);
   }
 
+  // ==========================================
+  // 📊 本番テーブル連携カラム確認モーダル
+  // ==========================================
+  function openFormColumnMappingModal(targetFormDef = null) {
+    const formDef = targetFormDef || window.L || {};
+    const formTitle = formDef.title || '無題のフォーム';
+    const sections = formDef.sections || [];
+
+    let modal = document.getElementById('form-column-mapping-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'form-column-mapping-modal';
+      modal.className = 'column-mapping-modal-overlay';
+      modal.style.cssText = 'position: fixed; inset: 0; z-index: 100000; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 20px;';
+      document.body.appendChild(modal);
+    }
+
+    let rowsHtml = '';
+    let colIndex = 1;
+
+    sections.forEach((sec, sIdx) => {
+      const secTitle = sec.title || `セクション ${sIdx + 1}`;
+      (sec.questions || []).forEach(q => {
+        const qTitle = q.title || '(無題の設問)';
+        const colName = q.title || q.dataKey || q.id;
+        const dataKey = q.dataKey || '-';
+        const typeLabel = q.type === 'text' ? 'テキスト' :
+                          q.type === 'radio' ? '単一選択 (ラジオ)' :
+                          q.type === 'checkbox' ? '複数選択 (チェック)' :
+                          q.type === 'select' ? 'プルダウン' :
+                          q.type === 'textarea' ? '複数行テキスト' : q.type;
+
+        // API連携情報の抽出
+        let apiBadge = '<span style="color: #94a3b8;">-</span>';
+        if (q.validation && q.validation.category === 'api') {
+          if (q.validation.condition === 'corp_name') apiBadge = '<span style="background: #e0f2fe; color: #0284c7; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">国税庁法人番号API</span>';
+          else if (q.validation.condition === 'invoice_number') apiBadge = '<span style="background: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">国税庁インボイス公表API</span>';
+        } else if (q.dataKey === 'zip_code' || qTitle.includes('郵便番号')) {
+          apiBadge = '<span style="background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">郵便番号住所自動補完</span>';
+        } else if (qTitle.includes('銀行') || q.dataKey === 'bank_name') {
+          apiBadge = '<span style="background: #f3e8ff; color: #7e22ce; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">全銀協 金融機関API</span>';
+        }
+
+        const requiredBadge = q.required ? '<span style="color: #dc2626; font-weight: bold; margin-left: 2px;">*</span>' : '';
+
+        rowsHtml += `
+          <tr style="border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; transition: background 0.15s;">
+            <td style="padding: 10px 12px; color: #64748b; font-family: monospace; text-align: center;">${colIndex++}</td>
+            <td style="padding: 10px 12px; color: #475569; font-weight: 500;">${escapeHtml(secTitle)}</td>
+            <td style="padding: 10px 12px; color: #1e293b; font-weight: 600;">${escapeHtml(qTitle)}${requiredBadge}</td>
+            <td style="padding: 10px 12px; color: #0284c7; font-weight: 700; font-family: monospace;">${escapeHtml(colName)}</td>
+            <td style="padding: 10px 12px; color: #64748b; font-family: monospace;">${escapeHtml(dataKey)}</td>
+            <td style="padding: 10px 12px; color: #334155;">${escapeHtml(typeLabel)}</td>
+            <td style="padding: 10px 12px;">${apiBadge}</td>
+          </tr>
+        `;
+      });
+    });
+
+    modal.innerHTML = `
+      <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 960px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); overflow: hidden;">
+        <!-- ヘッダー -->
+        <div style="padding: 18px 24px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; background: #f8fafc;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">📊</span>
+              <h2 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0;">本番テーブル連携カラム確認ビュー</h2>
+              <span style="background: #0284c7; color: #fff; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">カラムマッピング</span>
+            </div>
+            <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">
+              本番送信時にデータベース上の個別テーブル「<strong style="color: #0f172a;">${escapeHtml(formTitle)}</strong>」に格納されるカラム構成の一覧です。
+            </div>
+          </div>
+          <button type="button" id="btn-close-col-modal" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1;">&times;</button>
+        </div>
+
+        <!-- テーブル本体スクロールエリア -->
+        <div style="flex: 1; overflow-y: auto; padding: 0 24px 20px 24px;">
+          <table style="width: 100%; border-collapse: collapse; margin-top: 16px; text-align: left;">
+            <thead>
+              <tr style="background: #f1f5f9; color: #475569; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #cbd5e1; position: sticky; top: 0; z-index: 10;">
+                <th style="padding: 10px 12px; width: 45px; text-align: center;">#</th>
+                <th style="padding: 10px 12px;">セクション</th>
+                <th style="padding: 10px 12px;">設問タイトル</th>
+                <th style="padding: 10px 12px; color: #0284c7;">本番テーブルカラム名</th>
+                <th style="padding: 10px 12px;">物理キー (dataKey)</th>
+                <th style="padding: 10px 12px;">型 / 入力形式</th>
+                <th style="padding: 10px 12px;">API連携 / 自動補完</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <!-- 自動付与システム共通カラムの明示 -->
+          <div style="margin-top: 20px; padding: 14px 18px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px;">
+            <div style="font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span>⚙️</span> システム自動付与カラム（全送信共通）
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.76rem; color: #64748b;">
+              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px;"><strong>ステータス</strong> (回答完了 / 途中送信)</span>
+              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px;"><strong>登録コード</strong> (8桁確定ID)</span>
+              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px;"><strong>再開用URL</strong> (途中再開リンク)</span>
+              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px;"><strong>送信日時</strong> (タイムスタンプ)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- フッター -->
+        <div style="padding: 14px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-size: 0.78rem; color: #64748b;">
+            💡 カラム名を変更したい場合は、設問の「タイトル」または右パネルの「詳細設定 > 連携キー (dataKey)」を編集してください。
+          </div>
+          <button type="button" id="btn-col-modal-ok" style="background: #0284c7; color: #fff; border: none; font-weight: 700; font-size: 0.85rem; padding: 8px 20px; border-radius: 6px; cursor: pointer;">閉じる</button>
+        </div>
+      </div>
+    `;
+
+    modal.style.display = 'flex';
+
+    const closeHandler = () => { modal.style.display = 'none'; };
+    modal.querySelector('#btn-close-col-modal').onclick = closeHandler;
+    modal.querySelector('#btn-col-modal-ok').onclick = closeHandler;
+    modal.onclick = (e) => { if (e.target === modal) closeHandler(); };
+  }
+  window.openFormColumnMappingModal = openFormColumnMappingModal;
+
+  // ヘッダーボタンの初期化
+  function setupHeaderColumnPreviewButton() {
+    const btn = document.getElementById('btn-header-column-preview');
+    if (btn && !btn.dataset.bound) {
+      btn.dataset.bound = 'true';
+      btn.addEventListener('click', () => {
+        openFormColumnMappingModal(window.L);
+      });
+    }
+  }
+  setInterval(setupHeaderColumnPreviewButton, 500);
+
   // 変更の永続化とライブ同期
   function persistDrawerChanges() {
     if (window.S) window.S();
@@ -19543,9 +19683,13 @@
   // 監視と初期化ループへの登録
   setInterval(injectQuestionCardCompactStylesAndBadges, 250);
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', injectQuestionCardCompactStylesAndBadges);
+    document.addEventListener('DOMContentLoaded', () => {
+      injectQuestionCardCompactStylesAndBadges();
+      setupHeaderColumnPreviewButton();
+    });
   } else {
     injectQuestionCardCompactStylesAndBadges();
+    setupHeaderColumnPreviewButton();
   }
 })();
 

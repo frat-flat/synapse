@@ -2378,6 +2378,7 @@ function getTableIdFromStorageKey(key) {
   if (key === STORAGE_KEYS.AG_CONTRACTS || key === STORAGE_KEYS.AG_COLUMNS) return 'agency-info-screen';
   if (key === 'synapse_dbmake_partners' || key === STORAGE_KEYS.DBMAKE_COLUMNS) return 'dbmake-screen';
   if (typeof key === 'string' && key.startsWith('custom-table-')) return key;
+  if (typeof key === 'string' && key.startsWith('synapse_table_')) return 'custom-table-' + key.replace('synapse_table_', '');
   return null;
 }
 
@@ -2822,6 +2823,19 @@ function loadStateFromLocalStorage(keys) {
       dbmakePartners = JSON.parse(localStorage.getItem('synapse_dbmake_partners')) || [];
     } else if (key === STORAGE_KEYS.CUSTOM_TABLES) {
       state.customTables = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_TABLES)) || [];
+    } else if (typeof key === 'string' && key.startsWith('synapse_table_')) {
+      try {
+        const singleTbl = JSON.parse(localStorage.getItem(key));
+        if (singleTbl && singleTbl.id) {
+          state.customTables = state.customTables || [];
+          const exIdx = state.customTables.findIndex(t => t.id === singleTbl.id);
+          if (exIdx >= 0) {
+            state.customTables[exIdx] = singleTbl;
+          } else {
+            state.customTables.push(singleTbl);
+          }
+        }
+      } catch(e) {}
     } else if (key === STORAGE_KEYS.CUSTOM_ACCORDIONS) {
       state.customAccordions = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_ACCORDIONS)) || [];
     } else if (key === STORAGE_KEYS.JO_COLUMNS) {
@@ -6019,6 +6033,377 @@ function setupTableCreator() {
   });
 }
 
+// =================================================================
+// 📊 レコードから独立テーブル作成（管理者専用機能）
+// =================================================================
+function getRecordDisplayTitle(targetRow, meta) {
+  if (!targetRow) return 'レコード';
+  const priorityKeys = ['company_name', 'companyName', 'corporate_name', 'company', 'agency_name', 'name', 'applicant_name', 'rep_name', 'representative_name', 'title', 'code', 'registration_code'];
+  for (const k of priorityKeys) {
+    if (targetRow[k]) return String(targetRow[k]).trim();
+  }
+  if (meta && meta.columns) {
+    for (const col of meta.columns) {
+      if (/会社|企業|法人|屋号|氏名|名前|契約者|顧客/.test(col.label)) {
+        if (targetRow[col.id]) return String(targetRow[col.id]).trim();
+      }
+    }
+    for (const col of meta.columns) {
+      if (targetRow[col.id]) return String(targetRow[col.id]).trim();
+    }
+  }
+  return targetRow[meta?.idKey] || targetRow.id || targetRow.customerId || 'レコード';
+}
+
+function openRecordToTableModal(tableId, targetRowId) {
+  const isMasterAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
+  if (!isMasterAdmin) {
+    showToast('レコードからの独立テーブル作成は管理者アカウント限定機能です。', 'warning');
+    return;
+  }
+
+  let cleanId = tableId;
+  if (typeof cleanId === 'string' && cleanId.startsWith('custom-table-')) {
+    cleanId = cleanId.replace('custom-table-', '');
+  }
+  const meta = getTableMeta(cleanId) || getTableMeta(tableId);
+  if (!meta || !meta.rows) {
+    showToast('対象テーブルの情報を取得できませんでした。', 'error');
+    return;
+  }
+
+  let targetRow = null;
+  if (targetRowId !== undefined && targetRowId !== null) {
+    targetRow = meta.rows.find(r => (r[meta.idKey] || r.id || r.customerId) == targetRowId);
+    if (!targetRow && typeof targetRowId === 'number' && meta.rows[targetRowId]) {
+      targetRow = meta.rows[targetRowId];
+    }
+  }
+  if (!targetRow) {
+    if (meta.rows.length > 0) {
+      targetRow = meta.rows[0];
+    } else {
+      showToast('テーブルにレコードが存在しません。', 'warning');
+      return;
+    }
+  }
+
+  const modal = document.getElementById('record-to-table-modal');
+  if (!modal) {
+    console.error('record-to-table-modal element not found');
+    return;
+  }
+
+  const displayTitle = getRecordDisplayTitle(targetRow, meta);
+  const sourceTableTitle = meta.name || cleanId;
+
+  // UI要素の更新
+  const srcTableEl = document.getElementById('r2t-source-table-name');
+  const srcRowIdEl = document.getElementById('r2t-source-row-id');
+  const srcRecordNameEl = document.getElementById('r2t-source-record-name');
+  const tableNameInput = document.getElementById('r2t-table-name-input');
+  const templateSelect = document.getElementById('r2t-template-select');
+  const parentMenuSelect = document.getElementById('r2t-parent-menu-select');
+  const previewBox = document.getElementById('r2t-preview-box');
+
+  if (srcTableEl) srcTableEl.textContent = sourceTableTitle;
+  if (srcRowIdEl) srcRowIdEl.textContent = `ID: ${targetRow[meta.idKey] || targetRow.id || '-'}`;
+  if (srcRecordNameEl) srcRecordNameEl.textContent = displayTitle;
+
+  // 提案される新テーブル名
+  if (tableNameInput) {
+    tableNameInput.value = `${displayTitle}_案件管理`;
+  }
+
+  // フォルダ／配置先メニューの選択肢を現在の状態から同期
+  if (parentMenuSelect) {
+    parentMenuSelect.innerHTML = `
+      <option value="custom-tables">📋 カスタムテーブル</option>
+      <option value="root">📁 ルート直下</option>
+    `;
+    if (state.customAccordions && state.customAccordions.length > 0) {
+      state.customAccordions.forEach(acc => {
+        const opt = document.createElement('option');
+        opt.value = acc.id;
+        opt.textContent = `📁 ${acc.name || acc.id}`;
+        parentMenuSelect.appendChild(opt);
+      });
+    }
+  }
+
+  // プレビュー更新関数
+  const updatePreview = () => {
+    if (!previewBox) return;
+    const tpl = templateSelect ? templateSelect.value : 'case-progress';
+
+    if (tpl === 'case-progress') {
+      previewBox.innerHTML = `
+        <div style="font-weight: 700; color: #0284c7; margin-bottom: 6px;">📈 案件・進捗管理型 (方式C) カラム構成 (7列)</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
+          <span style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px; font-weight:600;">📅 日付</span>
+          <span style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px; font-weight:600;">🏷️ ステータス</span>
+          <span style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px; font-weight:600;">📌 工程・タスク</span>
+          <span style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px; font-weight:600;">👤 担当者</span>
+          <span style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px; font-weight:600;">📝 内容・進捗詳細</span>
+          <span style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px; font-weight:600;">⏰ 次回予定日</span>
+          <span style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px; font-weight:600;">💬 備考</span>
+        </div>
+        <div style="font-size: 0.73rem; color: #64748b;">
+          💡 初期データとして「${escapeHtml(displayTitle)}」の受付・開始レコードが自動投入され、以降の進捗履歴を蓄積できます。
+        </div>
+      `;
+    } else if (tpl === 'item-ledger') {
+      const colLabels = (meta.columns || []).map(c => c.label || c.id);
+      previewBox.innerHTML = `
+        <div style="font-weight: 700; color: #059669; margin-bottom: 6px;">📋 項目台帳型 カラム構成 (${colLabels.length}列)</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; max-height: 80px; overflow-y: auto;">
+          ${colLabels.map(l => `<span style="background:#d1fae5; color:#065f46; padding:2px 6px; border-radius:4px; font-size:0.72rem;">${escapeHtml(l)}</span>`).join('')}
+        </div>
+        <div style="font-size: 0.73rem; color: #64748b;">
+          💡 元レコードの全属性（値含む）を1行目として引き継いだ独立台帳テーブルを実体化します。
+        </div>
+      `;
+    } else if (tpl === 'attribute-carte') {
+      previewBox.innerHTML = `
+        <div style="font-weight: 700; color: #7c3aed; margin-bottom: 6px;">📑 詳細カルテ型 カラム構成 (4列)</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
+          <span style="background:#ede9fe; color:#5b21b6; padding:3px 8px; border-radius:4px; font-weight:600;">項目名</span>
+          <span style="background:#ede9fe; color:#5b21b6; padding:3px 8px; border-radius:4px; font-weight:600;">登録値</span>
+          <span style="background:#ede9fe; color:#5b21b6; padding:3px 8px; border-radius:4px; font-weight:600;">ステータス</span>
+          <span style="background:#ede9fe; color:#5b21b6; padding:3px 8px; border-radius:4px; font-weight:600;">備考</span>
+        </div>
+        <div style="font-size: 0.73rem; color: #64748b;">
+          💡 元レコードの各項目を縦並び（全${meta.columns?.length || 0}項目を行として）展開し、個別カルテとして精査・更新できます。
+        </div>
+      `;
+    }
+  };
+
+  if (templateSelect) {
+    templateSelect.onchange = () => {
+      const tpl = templateSelect.value;
+      if (tableNameInput) {
+        if (tpl === 'case-progress') tableNameInput.value = `${displayTitle}_案件管理`;
+        else if (tpl === 'item-ledger') tableNameInput.value = `${displayTitle}_台帳`;
+        else if (tpl === 'attribute-carte') tableNameInput.value = `${displayTitle}_カルテ`;
+      }
+      updatePreview();
+    };
+  }
+
+  updatePreview();
+  modal.style.display = 'flex';
+
+  // 閉じる・キャンセルイベント
+  const closeModal = () => { modal.style.display = 'none'; };
+  const closeBtn = document.getElementById('record-to-table-modal-close');
+  const cancelBtn = document.getElementById('record-to-table-modal-cancel');
+  if (closeBtn) closeBtn.onclick = closeModal;
+  if (cancelBtn) cancelBtn.onclick = closeModal;
+  modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+
+  // 作成実行
+  const submitBtn = document.getElementById('record-to-table-modal-submit');
+  if (submitBtn) {
+    submitBtn.onclick = () => {
+      const newTableName = tableNameInput ? tableNameInput.value.trim() : '';
+      if (!newTableName) {
+        showToast('テーブル名を入力してください。', 'warning');
+        return;
+      }
+      const tpl = templateSelect ? templateSelect.value : 'case-progress';
+      const parentMenu = parentMenuSelect ? parentMenuSelect.value : 'custom-tables';
+
+      createIndependentTableFromRow({
+        sourceTableId: cleanId,
+        sourceRowId: targetRow[meta.idKey] || targetRow.id,
+        sourceTitle: displayTitle,
+        tableName: newTableName,
+        template: tpl,
+        parentMenuId: parentMenu,
+        targetRow: targetRow,
+        meta: meta
+      });
+
+      closeModal();
+    };
+  }
+}
+
+function createIndependentTableFromRow({ sourceTableId, sourceRowId, sourceTitle, tableName, template, parentMenuId, targetRow, meta }) {
+  const newTableId = `ctbl_${Date.now()}`;
+  let columns = [];
+  let rows = [];
+  let columnWidths = {};
+
+  if (template === 'case-progress') {
+    // 方式C: 案件・進捗管理テーブル型
+    columns = [
+      { id: 'col_date', label: '日付', type: 'date', required: true },
+      { 
+        id: 'col_status', 
+        label: 'ステータス', 
+        type: 'select', 
+        choices: [
+          { value: '未着手', color: '#94a3b8' },
+          { value: '進行中', color: '#0284c7' },
+          { value: '確認待ち', color: '#f59e0b' },
+          { value: '完了', color: '#10b981' },
+          { value: '保留', color: '#ef4444' }
+        ],
+        required: true 
+      },
+      { id: 'col_task', label: '工程・タスク', type: 'text', required: true },
+      { id: 'col_assignee', label: '担当者', type: 'text', required: false },
+      { id: 'col_detail', label: '内容・進捗詳細', type: 'text', required: false },
+      { id: 'col_next_date', label: '次回予定日', type: 'date', required: false },
+      { id: 'col_notes', label: '備考', type: 'text', required: false }
+    ];
+
+    columnWidths = {
+      col_date: 120,
+      col_status: 110,
+      col_task: 180,
+      col_assignee: 120,
+      col_detail: 260,
+      col_next_date: 120,
+      col_notes: 160
+    };
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const adminUser = (state.currentUser && (state.currentUser.name || state.currentUser.id)) || '管理者';
+
+    rows = [
+      {
+        id: `row_${Date.now()}_1`,
+        col_date: todayStr,
+        col_status: '進行中',
+        col_task: '個別テーブル実体化・管理開始',
+        col_assignee: adminUser,
+        col_detail: `${sourceTitle} のデータを元にデータベース上に独立テーブルを新設`,
+        col_next_date: '',
+        col_notes: `元テーブル: ${meta?.name || sourceTableId} (ID: ${sourceRowId})`
+      },
+      {
+        id: `row_${Date.now()}_2`,
+        col_date: todayStr,
+        col_status: '未着手',
+        col_task: '初期ヒアリング・書類確認',
+        col_assignee: '',
+        col_detail: '',
+        col_next_date: '',
+        col_notes: ''
+      }
+    ];
+  } else if (template === 'attribute-carte') {
+    // 方式A: 詳細カルテ型（キー/バリュー縦展開）
+    columns = [
+      { id: 'col_item_name', label: '項目名', type: 'text', required: true },
+      { id: 'col_item_value', label: '登録値', type: 'text', required: false },
+      { 
+        id: 'col_status', 
+        label: 'ステータス', 
+        type: 'select', 
+        choices: [
+          { value: '確認済', color: '#10b981' },
+          { value: '未確認', color: '#94a3b8' },
+          { value: '要修正', color: '#f59e0b' }
+        ],
+        required: false 
+      },
+      { id: 'col_memo', label: '備考・確認メモ', type: 'text', required: false }
+    ];
+
+    columnWidths = {
+      col_item_name: 180,
+      col_item_value: 300,
+      col_status: 120,
+      col_memo: 200
+    };
+
+    rows = (meta.columns || []).map((col, idx) => {
+      const val = targetRow[col.id] !== undefined ? String(targetRow[col.id]) : '';
+      return {
+        id: `row_${Date.now()}_${idx + 1}`,
+        col_item_name: col.label || col.id,
+        col_item_value: val,
+        col_status: val ? '確認済' : '未確認',
+        col_memo: ''
+      };
+    });
+    if (rows.length === 0) {
+      rows = [{ id: `row_${Date.now()}_1`, col_item_name: '会社名', col_item_value: sourceTitle, col_status: '確認済', col_memo: '' }];
+    }
+  } else {
+    // 項目台帳型（元カラム構造・値をそのまま引き継ぐ）
+    columns = (meta.columns || []).map(col => ({
+      id: col.id,
+      label: col.label,
+      type: col.type || 'text',
+      required: col.required || false,
+      choices: col.choices ? JSON.parse(JSON.stringify(col.choices)) : undefined
+    }));
+    if (columns.length === 0) {
+      columns = [
+        { id: 'col_title', label: '名称', type: 'text', required: true },
+        { id: 'col_notes', label: '備考', type: 'text', required: false }
+      ];
+    }
+
+    columnWidths = Object.assign({}, meta.columnWidths || {});
+    const initialRow = { id: `row_${Date.now()}_1` };
+    columns.forEach(col => {
+      initialRow[col.id] = targetRow[col.id] !== undefined ? targetRow[col.id] : '';
+    });
+    rows = [initialRow];
+  }
+
+  const newTable = {
+    id: newTableId,
+    name: tableName,
+    parentMenuId: parentMenuId || 'custom-tables',
+    sourceRecord: {
+      sourceTableId: sourceTableId,
+      sourceRowId: sourceRowId,
+      sourceTitle: sourceTitle,
+      template: template,
+      createdAt: new Date().toISOString()
+    },
+    columns: columns,
+    visibleColumns: columns.map(c => c.id),
+    columnWidths: columnWidths,
+    rowHeights: {},
+    fixedCol: 'none',
+    fixedRow: 'none',
+    cellStyles: {},
+    rows: rows
+  };
+
+  // 1. state.customTables へ追加 & localStorage保存
+  state.customTables = state.customTables || [];
+  state.customTables.push(newTable);
+  saveCustomTables();
+
+  // 2. データベース（Supabase synapse_storage）上に個別の独立テーブルとして即座に保存
+  if (typeof syncToSupabase === 'function') {
+    syncToSupabase(`synapse_table_${newTableId}`, newTable);
+    syncToSupabase(STORAGE_KEYS.CUSTOM_TABLES, state.customTables);
+  }
+
+  // 3. UI再描画と新規テーブルのタブ自動オープン
+  if (typeof renderCustomTableList === 'function') {
+    renderCustomTableList();
+  }
+  if (typeof openTab === 'function') {
+    openTab(`custom-table-${newTableId}`, 'custom-table-screen', `📋 ${tableName}`);
+  }
+
+  showToast(`データベース上に独立テーブル「${tableName}」を作成しました。`, 'success');
+  return newTable;
+}
+window.openRecordToTableModal = openRecordToTableModal;
+window.createIndependentTableFromRow = createIndependentTableFromRow;
+
 // 表示列選択チェックボックスの描画
 function renderCtColumnSelector(tbl) {
   const container = document.getElementById('ct-column-selector-dropdown');
@@ -6312,11 +6697,14 @@ function showCtContextMenu(x, y, tbl, type, targetId) {
   const mergeItem = document.getElementById('ct-menu-merge-columns');
   const switchPrimaryItem = document.getElementById('ct-menu-switch-primary-merge');
   const unmergeItem = document.getElementById('ct-menu-unmerge-columns');
+  const createTableItem = document.getElementById('ct-menu-create-table-from-row');
+  const isMasterAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
 
   if (type === 'col') {
     if (widthItem) widthItem.style.display = 'block';
     if (heightItem) heightItem.style.display = 'none';
     if (dropdownSettingsItem) dropdownSettingsItem.style.display = 'block';
+    if (createTableItem) createTableItem.style.display = 'none';
 
     const normId = normalizeTableId(tbl.id);
     const existingGroup = getMergedGroupForCol(normId, targetId);
@@ -6348,6 +6736,7 @@ function showCtContextMenu(x, y, tbl, type, targetId) {
     if (mergeItem) mergeItem.style.display = 'none';
     if (switchPrimaryItem) switchPrimaryItem.style.display = 'none';
     if (unmergeItem) unmergeItem.style.display = 'none';
+    if (createTableItem) createTableItem.style.display = isMasterAdmin ? 'block' : 'none';
   }
 
   menu.style.left = `${x}px`;
@@ -7123,7 +7512,7 @@ function renderCustomTable(tableId) {
       const style = tbl.cellStyles[cellKey] || {};
       applyInlineStylesToCell(td, style);
 
-      const previewBg = getPreviewCellBgColor(`custom-table-${tbl.id}`, col.id, rowIdx);
+      const previewBg = getPreviewCellBgColor(`custom-table-${tbl.id}`, col.id, rowIndex);
       if (previewBg) {
         td.style.backgroundColor = previewBg;
       }
@@ -7240,7 +7629,7 @@ function renderCustomTable(tableId) {
         if (col.type === 'select') {
           e.stopPropagation();
           if (isTableLocked(tableId)) return;
-          if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess(`custom-table-${tbl.id}`, rowIdx, col.id)) {
+          if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess(`custom-table-${tbl.id}`, rowIndex, col.id)) {
             showToast('このセルの編集権限がありません（読取専用）。', 'warning');
             return;
           }
@@ -7251,7 +7640,7 @@ function renderCustomTable(tableId) {
 
       td.addEventListener('dblclick', () => {
         if (isTableLocked(tableId)) return;
-        if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess(`custom-table-${tbl.id}`, rowIdx, col.id)) {
+        if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess(`custom-table-${tbl.id}`, rowIndex, col.id)) {
           showToast('このセルの編集権限がありません（読取専用）。', 'warning');
           return;
         }
@@ -9263,6 +9652,15 @@ function setupCtButtonsEvents() {
     unmergeColumnQuick(normId, ctResizeState.targetId);
   });
 
+  // 📊 このレコードから独立テーブルを作成
+  document.getElementById('ct-menu-create-table-from-row')?.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('ct-context-menu');
+    if (menu) menu.style.display = 'none';
+    if (!ctResizeState.tblId) return;
+    openRecordToTableModal(ctResizeState.tblId, ctResizeState.targetId);
+  });
+
   // リサイズダイアログ：キャンセル
   const closeCtResizeDialog = () => {
     const modal = document.getElementById('ct-resize-dialog-modal');
@@ -11259,10 +11657,10 @@ if (document.readyState === 'loading') {
 }
 
 function renderTableControlBar(tableId, parentContainerEl) {
-  const existing = parentContainerEl.querySelector(`.table-control-bar-${tableId}`);
-  if (existing && existing.parentNode) {
-    existing.parentNode.removeChild(existing);
-  }
+  const existingList = parentContainerEl.querySelectorAll('.table-control-bar');
+  existingList.forEach(el => {
+    if (el.parentNode) el.parentNode.removeChild(el);
+  });
 
   const controlBar = document.createElement('div');
   controlBar.className = `table-control-bar table-control-bar-${tableId}`;
@@ -11292,6 +11690,36 @@ function renderTableControlBar(tableId, parentContainerEl) {
     }
   });
   leftDiv.appendChild(addSingleBtn);
+
+  // 📊 管理者専用: レコードから独立テーブル作成ボタン
+  const isMasterAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
+  if (isMasterAdmin) {
+    const createTableBtn = document.createElement('button');
+    createTableBtn.className = 'btn btn-secondary ct-create-table-from-row-btn';
+    createTableBtn.style.padding = '0.22rem 0.6rem';
+    createTableBtn.style.fontSize = '0.78rem';
+    createTableBtn.style.display = 'flex';
+    createTableBtn.style.alignItems = 'center';
+    createTableBtn.style.gap = '0.25rem';
+    createTableBtn.style.color = '#0369a1';
+    createTableBtn.style.borderColor = '#bae6fd';
+    createTableBtn.style.background = '#f0f9ff';
+    createTableBtn.innerHTML = `<span>📊</span> <span>独立テーブル作成</span>`;
+    createTableBtn.title = '選択中のレコードを元に、データベース上に個別の独立テーブルを作成します（管理者専用）';
+    createTableBtn.addEventListener('click', () => {
+      const selectedRowIds = Array.from(state.ctSelectedRows || []);
+      let targetRowId = selectedRowIds.length > 0 ? selectedRowIds[0] : null;
+      if (!targetRowId && state.ctSelectedCell && state.ctSelectedCell.rowId) {
+        targetRowId = state.ctSelectedCell.rowId;
+      }
+      if (!targetRowId && (state.agSelectedCell || state.joSelectedCell || state.apSelectedCell || state.dbmakeSelectedCell)) {
+        const cell = state.agSelectedCell || state.joSelectedCell || state.apSelectedCell || state.dbmakeSelectedCell;
+        targetRowId = cell.customerId || cell.id || cell.partnerId;
+      }
+      openRecordToTableModal(tableId, targetRowId);
+    });
+    leftDiv.appendChild(createTableBtn);
+  }
 
   // 📥 CSVインポートボタン
   const meta = getTableMeta(tableId);
@@ -18316,7 +18744,7 @@ function handleFormSubmitMessage(event) {
 
   // 🧪 テスト送信フラグの判定（Gitブランチ型環境分離: test vs production）
   const isTestSubmission = env === 'test' || branch === 'test';
-  const effectiveTableName = isTestSubmission ? `${formTitle} (テスト)` : formTitle;
+  const effectiveTableName = formTitle || '無題のフォーム';
 
   // 事前に行IDを決定（新規なら採番、既存なら引き継ぐ）
   const targetRowId = clientRowId || 'row_' + Date.now();
@@ -18338,8 +18766,29 @@ function handleFormSubmitMessage(event) {
 
   console.log(`%c[Form Submit]%c Received submission for form "${effectiveTableName}" (isTest: ${isTestSubmission}, isTemporary: ${!!isTemporary}, isPartial: ${!!isPartialSubmit}, rowId: ${targetRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
 
+  // ⚠️ テスト送信時はDBテーブルを作成・汚染しない（ユーザー指定仕様: テストデータ用テーブルは不要）
+  if (isTestSubmission) {
+    const testCode = 'TEST_' + Math.floor(10000000 + Math.random() * 90000000).toString().substring(0, 8);
+    if (event.source && typeof event.source.postMessage === 'function') {
+      event.source.postMessage({
+        type: isTemporary ? 'FORM_SUBMIT_TEMPORARY_RESPONSE' : 'FORM_SUBMIT_RESPONSE',
+        success: true,
+        rowId: targetRowId,
+        partnerId: null,
+        registrationCode: testCode,
+        isTemporary: !!isTemporary,
+        isPartialSubmit: !!isPartialSubmit,
+        resumeUrl: resumeUrl,
+        nextSectionId: nextSectionId || null,
+        formTitle: formTitle
+      }, '*');
+    }
+    showToast(`【テスト送信】「${formTitle}」のテスト送信を受け付けました（DBテーブルには書き込まれません）。`, 'info');
+    return;
+  }
+
   // ----------------------------------------------------
-  // 1. COS内カスタムマスターテーブルへのデータ蓄積・更新
+  // 1. COS内カスタムマスターテーブルへのデータ蓄積・更新（本番送信のみ）
   // ----------------------------------------------------
   let targetTable = state.customTables.find(t => t.name === effectiveTableName);
   let isNewTable = false;
@@ -43563,6 +44012,25 @@ function handleSpreadsheetMenuAction(action, label) {
       moveSelectedSpreadsheetRow(1);
       break;
 
+    case 'create-table-from-row': {
+      const isMasterAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
+      if (!isMasterAdmin) {
+        showToast('レコードからの独立テーブル作成は管理者アカウント限定機能です。', 'warning');
+        return;
+      }
+      const selectedRowIds = Array.from(state.ctSelectedRows || []);
+      let targetRowId = selectedRowIds.length > 0 ? selectedRowIds[0] : null;
+      if (!targetRowId && state.ctSelectedCell && state.ctSelectedCell.rowId) {
+        targetRowId = state.ctSelectedCell.rowId;
+      }
+      if (!targetRowId && (state.agSelectedCell || state.joSelectedCell || state.apSelectedCell || state.dbmakeSelectedCell)) {
+        const cell = state.agSelectedCell || state.joSelectedCell || state.apSelectedCell || state.dbmakeSelectedCell;
+        targetRowId = cell.customerId || cell.id || cell.partnerId;
+      }
+      openRecordToTableModal(normId, targetRowId);
+      break;
+    }
+
     case 'delete-selected-rows':
       deleteSelectedSpreadsheetRows();
       break;
@@ -44939,6 +45407,12 @@ function initSpreadsheetCellContextMenu() {
           td.classList.add('selected-cell', 'active-cell');
         }
       }
+    }
+
+    const isMasterAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.id === 'admin' || state.currentUser.id === 'owner' || state.currentUser.id === 'owner@synapse.management' || state.currentUser.role === 'owner' || state.currentUser.role === 'admin'));
+    const createTableItem = document.getElementById('cell-menu-create-table-from-row');
+    if (createTableItem) {
+      createTableItem.style.display = isMasterAdmin ? 'flex' : 'none';
     }
 
     const menuWidth = 240;
