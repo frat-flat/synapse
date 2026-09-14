@@ -1238,6 +1238,36 @@
       </section>
     </main>
 
+    <!-- 町名・番地（住所）確認モーダル -->
+    <div id="street-confirm-modal" class="street-confirm-modal-backdrop" style="display: none;">
+      <div class="street-confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="street-confirm-title">
+        <div class="street-confirm-modal-header">
+          <div class="street-confirm-icon-badge">📍</div>
+          <div>
+            <h3 id="street-confirm-title" class="street-confirm-modal-title">町名・番地の入力確認</h3>
+          </div>
+        </div>
+        <div class="street-confirm-modal-body">
+          <div class="street-confirm-alert-box">
+            <span style="font-size: 1.15rem; line-height: 1; flex-shrink: 0;">⚠️</span>
+            <div id="street-confirm-alert-text">
+              自動補完された住所の末尾に、必ず<strong>【番地・号（数字）】</strong>を追記してください。
+            </div>
+          </div>
+          <div class="street-confirm-current-display">
+            <div id="street-confirm-address-context" style="display: none; font-size: 0.8rem; color: #64748b; margin-bottom: 6px;"></div>
+            <div class="street-confirm-current-label">現在の入力内容</div>
+            <div id="street-confirm-current-val" class="street-confirm-current-value"></div>
+          </div>
+          <div id="street-confirm-status" class="street-confirm-status-notice"></div>
+        </div>
+        <div class="street-confirm-modal-footer">
+          <button type="button" id="btn-street-modal-cancel" class="btn-street-cancel">✏️ 戻って追記・修正</button>
+          <button type="button" id="btn-street-modal-proceed" class="btn-street-proceed">このまま次へ進む →</button>
+        </div>
+      </div>
+    </div>
+
     <!-- JSONエクスポート・モーダル -->
     <div id="modal-export" class="modal-overlay">
       <div class="modal-content">
@@ -1795,6 +1825,175 @@
         cursor: not-allowed !important;
         pointer-events: none !important;
         box-shadow: none !important;
+      }
+
+      /* 町名・番地（住所）確認モーダル */
+      .street-confirm-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .street-confirm-modal-backdrop.show {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .street-confirm-modal-card {
+        background: #ffffff;
+        border-radius: 16px;
+        width: 100%;
+        max-width: 500px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(226, 232, 240, 0.8);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transform: scale(0.95) translateY(8px);
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .street-confirm-modal-backdrop.show .street-confirm-modal-card {
+        transform: scale(1) translateY(0);
+      }
+      .street-confirm-modal-header {
+        padding: 20px 24px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid #f1f5f9;
+      }
+      .street-confirm-icon-badge {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: #eff6ff;
+        border: 1px solid #dbeafe;
+        color: #2563eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+      }
+      .street-confirm-modal-title {
+        font-size: 1.12rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+        line-height: 1.3;
+      }
+      .street-confirm-modal-body {
+        padding: 20px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .street-confirm-alert-box {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 10px;
+        padding: 12px 14px;
+        color: #92400e;
+        font-size: 0.88rem;
+        font-weight: 600;
+        line-height: 1.5;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .street-confirm-current-display {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+      .street-confirm-current-label {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+      }
+      .street-confirm-current-value {
+        font-size: 1.08rem;
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.4;
+        word-break: break-all;
+      }
+      .street-confirm-status-notice {
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .street-confirm-status-warning {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+      }
+      .street-confirm-status-ok {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #15803d;
+      }
+      .street-confirm-modal-footer {
+        padding: 16px 24px 20px;
+        display: flex;
+        gap: 12px;
+        background: #f8fafc;
+        border-top: 1px solid #f1f5f9;
+      }
+      .btn-street-cancel {
+        flex: 1;
+        padding: 11px 16px;
+        background: #ffffff;
+        color: #334155;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.92rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .btn-street-cancel:hover {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+      }
+      .btn-street-proceed {
+        flex: 1;
+        padding: 11px 16px;
+        background: #2563eb;
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.92rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .btn-street-proceed:hover {
+        background: #1d4ed8;
+      }
+      @keyframes streetHighlightPulse {
+        0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); border-color: #2563eb; }
+        50% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.25); border-color: #2563eb; }
+        100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+      }
+      .street-focus-highlight {
+        animation: streetHighlightPulse 1.8s ease-out;
+        border-color: #2563eb !important;
       }
     </style>
 

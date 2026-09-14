@@ -433,7 +433,7 @@
             { id: "q_hc_zip", type: "text", title: "郵便番号", description: "法人選択で自動入力されます（7桁半角数字）", required: true, dataKey: "zip_code", validation: { category: "regex", condition: "matches", value: "^[0-9]{3}-?[0-9]{4}$", presetKey: "zip", errorMessage: "郵便番号を7桁で入力してください。" }, options: [] },
             { id: "q_hc_pref", type: "select", title: "都道府県", description: "本店所在地の都道府県を選択してください", required: true, dataKey: "pref", options: JAPAN_PREFECTURES.map(p => ({ label: p })) },
             { id: "q_hc_city", type: "text", title: "市区町村", required: true, dataKey: "city", options: [] },
-            { id: "q_hc_street", type: "text", title: "町名・番地", required: true, dataKey: "street", options: [] },
+            { id: "q_hc_street", type: "text", title: "町名・番地", description: "自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。", required: true, dataKey: "street", options: [] },
             { id: "q_hc_building", type: "text", title: "建物名・部屋番号", description: "ビル名・階数・部屋番号等がある場合はご入力ください", required: false, dataKey: "building", options: [] },
             { id: "q_hc_rep_name", type: "text", title: "代表者名", description: "代表取締役の氏名を入力してください（例: 山田 太郎）", required: true, dataKey: "representative_name", options: [] },
             { id: "q_hc_rep_kana", type: "text", title: "代表者名（カナ）", description: "代表取締役のフリガナを全角カタカナで入力してください", required: true, dataKey: "representative_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "representative_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
@@ -6495,14 +6495,155 @@
     };
     wrapStIfNeeded();
 
-    // キャプチャフェーズで #btn-preview-next のクリックを最優先フック
+    function findStreetQuestionInPreviewSection(section) {
+      if (!section || !section.questions) return null;
+      return section.questions.find(q => {
+        const d = (q.description || '');
+        const t = (q.title || '');
+        if (q.dataKey === 'street') return true;
+        if (q.id && q.id.includes('street') && !q.id.includes('building')) return true;
+        if (d.includes('番地・号') || (d.includes('番地') && d.includes('追記'))) return true;
+        if ((t.includes('町名') || t.includes('番地')) && !t.includes('建物') && !t.includes('部屋')) return true;
+        return false;
+      });
+    }
+
+    function showStreetConfirmModalPreview(section, streetQ, isSubmit, onProceed) {
+      let modalEl = document.getElementById('street-confirm-modal');
+      if (!modalEl) {
+        onProceed();
+        return;
+      }
+
+      const container = document.getElementById('preview-section-container') || document;
+      const card = container.querySelector(`.preview-q-card[data-question-id="${streetQ.id}"]`);
+      const inputEl = card ? card.querySelector('input[type="text"], textarea') : null;
+
+      let streetVal = (window.V && window.V[streetQ.id] != null) ? String(window.V[streetQ.id]).trim() : '';
+      if (!streetVal && inputEl) {
+        streetVal = (inputEl.value || '').trim();
+      }
+
+      const alertTextEl = modalEl.querySelector('#street-confirm-alert-text');
+      const addrContextEl = modalEl.querySelector('#street-confirm-address-context');
+      const currentValEl = modalEl.querySelector('#street-confirm-current-val');
+      const statusEl = modalEl.querySelector('#street-confirm-status');
+      const btnProceed = modalEl.querySelector('#btn-street-modal-proceed');
+      const btnCancel = modalEl.querySelector('#btn-street-modal-cancel');
+
+      if (alertTextEl) {
+        const desc = (streetQ.description || '').trim();
+        const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        if (desc) {
+          alertTextEl.innerHTML = esc(desc).replace(/【(.*?)】/g, '<strong>【$1】</strong>');
+        } else {
+          alertTextEl.innerHTML = '自動補完された住所の末尾に、必ず<strong>【番地・号（数字）】</strong>を追記してください。';
+        }
+      }
+
+      const prefQ = (section.questions || []).find(q => q.dataKey === 'pref' || (q.title && q.title.includes('都道府県')));
+      const cityQ = (section.questions || []).find(q => q.dataKey === 'city' || (q.title && (q.title.includes('市区町村') || q.title.includes('市町村'))));
+      let prefVal = prefQ ? ((window.V && window.V[prefQ.id]) || '') : '';
+      let cityVal = cityQ ? ((window.V && window.V[cityQ.id]) || '') : '';
+      if (!prefVal && prefQ) {
+        const pCard = container.querySelector(`.preview-q-card[data-question-id="${prefQ.id}"]`);
+        const pInput = pCard ? pCard.querySelector('select, input') : null;
+        if (pInput) prefVal = pInput.value || '';
+      }
+      if (!cityVal && cityQ) {
+        const cCard = container.querySelector(`.preview-q-card[data-question-id="${cityQ.id}"]`);
+        const cInput = cCard ? cCard.querySelector('input') : null;
+        if (cInput) cityVal = cInput.value || '';
+      }
+
+      if (addrContextEl) {
+        if (prefVal || cityVal) {
+          addrContextEl.style.display = 'block';
+          addrContextEl.textContent = `📍 ${prefVal} ${cityVal}`.trim();
+        } else {
+          addrContextEl.style.display = 'none';
+        }
+      }
+
+      if (currentValEl) {
+        currentValEl.textContent = streetVal || '（未入力）';
+      }
+
+      const hasDigits = /[\d０-９]/.test(streetVal);
+      const hasKanjiNum = /[一二三四五六七八九十]/.test(streetVal);
+      const endsWithTown = /(?:丁目|町|大字|字|通|区|市)$/.test(streetVal.replace(/[\s　]+$/, ''));
+      const isMissingBanchi = (!hasDigits && !hasKanjiNum) || endsWithTown || !streetVal;
+
+      if (statusEl) {
+        if (isMissingBanchi) {
+          statusEl.className = 'street-confirm-status-notice street-confirm-status-warning';
+          statusEl.innerHTML = '<span>⚠️</span> <span>番地・号（数字）がまだ入力されていない可能性があります。</span>';
+        } else {
+          statusEl.className = 'street-confirm-status-notice street-confirm-status-ok';
+          statusEl.innerHTML = '<span>✓</span> <span>番地・号（数字）が正しく入力されているかご確認ください。</span>';
+        }
+      }
+
+      if (btnProceed) {
+        btnProceed.textContent = isSubmit ? 'このまま送信する ✓' : 'このまま次へ進む →';
+      }
+
+      modalEl.style.display = 'flex';
+      requestAnimationFrame(() => {
+        modalEl.classList.add('show');
+      });
+
+      const hideModal = () => {
+        modalEl.classList.remove('show');
+        setTimeout(() => {
+          modalEl.style.display = 'none';
+        }, 200);
+      };
+
+      btnCancel.onclick = () => {
+        hideModal();
+        if (inputEl) {
+          inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => {
+            inputEl.focus();
+            try {
+              const len = inputEl.value.length;
+              inputEl.setSelectionRange(len, len);
+            } catch(e) {}
+            if (card) {
+              card.classList.remove('street-focus-highlight');
+              void card.offsetWidth;
+              card.classList.add('street-focus-highlight');
+            }
+          }, 250);
+        }
+      };
+
+      btnProceed.onclick = () => {
+        hideModal();
+        onProceed();
+      };
+
+      modalEl.onclick = (e) => {
+        if (e.target === modalEl) {
+          btnCancel.click();
+        }
+      };
+    }
+
+    // キャプチャフェーズで #btn-preview-next / #btn-preview-submit のクリックを最優先フック
     if (!window._hasPreviewNextCaptureHooked) {
       window._hasPreviewNextCaptureHooked = true;
       document.addEventListener('click', (e) => {
-        const btn = e.target.closest('#btn-preview-next');
+        const btn = e.target.closest('#btn-preview-next, #btn-preview-submit, #preview-next-btn, #preview-submit-btn');
         if (!btn) return;
         const panelPreview = document.getElementById('panel-preview');
         if (!panelPreview || (!panelPreview.classList.contains('active') && panelPreview.style.display === 'none')) return;
+
+        if (window._bypassStreetConfirmOnce) {
+          window._bypassStreetConfirmOnce = false;
+          return;
+        }
 
         const formData = window.L || window.G || window.n;
         if (!formData || !formData.sections) return;
@@ -6517,6 +6658,19 @@
             e.stopImmediatePropagation();
             return;
           }
+        }
+
+        // 町名・番地の入力確認ポップアップ判定
+        const streetQ = findStreetQuestionInPreviewSection(curSec);
+        if (streetQ) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          const isSubmit = btn.id.includes('submit');
+          showStreetConfirmModalPreview(curSec, streetQ, isSubmit, () => {
+            window._bypassStreetConfirmOnce = true;
+            btn.click();
+          });
+          return;
         }
 
         // 途中送信が設定されているセクション完了時の割り込み
@@ -9711,7 +9865,7 @@
           id: `q_street_${baseTime + 5}`,
           type: "text",
           title: "町名・番地",
-          description: "",
+          description: "自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。",
           required: true,
           groupId: corpGrpId,
           groupTitle: corpGrpTitle,
@@ -10167,7 +10321,7 @@
           { id: `q_zip_${baseTime + 1}`, type: "text", title: "郵便番号", description: "法人選択または7桁入力で住所を自動補完します", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "zip_code" },
           { id: `q_pref_${baseTime + 2}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "pref" },
           { id: `q_city_${baseTime + 3}`, type: "text", title: "市区町村", description: "", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "city" },
-          { id: `q_street_${baseTime + 4}`, type: "text", title: "町名・番地", description: "", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "street" },
+          { id: `q_street_${baseTime + 4}`, type: "text", title: "町名・番地", description: "自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "street" },
           { id: `q_building_${baseTime + 5}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "building" }
         );
       } else if (val === 'pro_address') {
@@ -10178,7 +10332,7 @@
           { id: `q_zip_${baseTime}`, type: "text", title: "郵便番号", description: "7桁半角数字を入力すると住所を自動補完します", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "zip_code" },
           { id: `q_pref_${baseTime + 1}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "pref" },
           { id: `q_city_${baseTime + 2}`, type: "text", title: "市区町村", description: "", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "city" },
-          { id: `q_street_${baseTime + 3}`, type: "text", title: "町名・番地", description: "", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "street" },
+          { id: `q_street_${baseTime + 3}`, type: "text", title: "町名・番地", description: "自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "street" },
           { id: `q_building_${baseTime + 4}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "building" }
         );
       } else if (val === 'pro_bank') {
@@ -15635,6 +15789,12 @@
         return '半角数字で入力してください。ハイフンの有無はどちらでも構いません。（例: 123-4567 または 1234567）';
       }
       return 'ハイフンを含めて半角数字で入力してください。（例: 123-4567）';
+    }
+
+    // 7.5 町名・番地判定
+    const isStreet = preset === 'street' || cond === 'street' || ((/町名|番地/.test(t) || /street/i.test(t)) && !/建物|部屋|ビル|マンション|郵便/.test(t));
+    if (isStreet) {
+      return '自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。';
     }
 
     // 8. 電話番号判定 (プリセット、タイトル、または正規表現パターン)
