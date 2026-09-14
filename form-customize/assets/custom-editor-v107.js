@@ -16377,6 +16377,7 @@
     const openTabBtn = document.getElementById('btn-open-share-url-tab');
     if (openTabBtn) {
       openTabBtn.onclick = () => {
+        try { syncFormsToCloud(null, true); } catch(e) {}
         window.open(targetUrl, '_blank');
       };
     }
@@ -16404,8 +16405,8 @@
     const { formObj, idx } = getCurrentFormObject(formIndex);
     const formId = formObj && formObj.id ? formObj.id : `form_${idx}`;
     
-    // バックグラウンドでクラウド（Supabase）への保存・同期を実行
-    try { syncFormsToCloud(); } catch(e) {}
+    // バックグラウンドでクラウド（Supabase）への保存・即時同期を実行
+    try { syncFormsToCloud(null, true); } catch(e) {}
 
     const isTest = (env === 'test');
     const envParam = isTest ? (shorten ? '?env=test' : '&env=test') : '';
@@ -16760,7 +16761,7 @@
           envNoticeTitle.style.color = '#b45309';
         }
         if (envNoticeDesc) {
-          envNoticeDesc.textContent = '公開前・公開後の動作検証用リンクです。送信データは「(テスト)」テーブルへ完全隔離保存され、本番データには一切混ざりません。';
+          envNoticeDesc.textContent = '公開前・公開後の動作検証用リンクです。編集内容は常に自動で即時反映されます（テスト環境への手動更新は一切不要です）。送信データは「(テスト)」テーブルへ完全隔離保存され、本番データには一切混ざりません。';
         }
         if (urlLabel) urlLabel.textContent = 'テスト送信専用URL（動作検証用・本番隔離）';
         if (testStatusBadge) testStatusBadge.style.display = 'inline-block';
@@ -17395,7 +17396,7 @@
   let _cloudSyncDebounceTimer = null;
   let _isCloudSyncing = false;
 
-  async function syncFormsToCloud(forms) {
+  async function syncFormsToCloud(forms, immediate = false) {
     if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
       console.log('[Cloud Sync] Skipped on local development environment (localhost).');
       return;
@@ -17409,7 +17410,8 @@
     if (!forms || !Array.isArray(forms) || forms.length === 0) return;
 
     clearTimeout(_cloudSyncDebounceTimer);
-    _cloudSyncDebounceTimer = setTimeout(async () => {
+
+    const doSync = async () => {
       try {
         console.log('[Cloud Sync] Pushing forms to Supabase...', forms.length, 'forms');
         // 1. サーバーレス API (/api/forms) への POST
@@ -17448,7 +17450,13 @@
       } catch(e) {
         console.error('[Cloud Sync] Direct Supabase fallback failed:', e);
       }
-    }, 300);
+    };
+
+    if (immediate) {
+      return doSync();
+    } else {
+      _cloudSyncDebounceTimer = setTimeout(doSync, 300);
+    }
   }
 
   async function loadFormsFromCloud() {
