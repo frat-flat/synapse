@@ -12,7 +12,7 @@
     <!-- Google Fonts: Inter & Noto Sans JP -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Inter:wght@300;400;500;600;700&family=Kaisei+Decol:wght@500;700&family=M+PLUS+Rounded+1c:wght@400;700;800&family=Noto+Sans+JP:wght@300;400;500;700;900&family=Noto+Serif+JP:wght@500;700;900&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap" rel="stylesheet">
 
     <style>
       :root {
@@ -2646,6 +2646,30 @@
           });
         }
 
+        // 🔤 タイトル・サブタイトル用フォントファミリーマップ
+        const TITLE_FONT_MAP = {
+          'default': "'Noto Sans JP', sans-serif",
+          'noto-serif': "'Noto Serif JP', serif",
+          'rounded': "'M PLUS Rounded 1c', sans-serif",
+          'dela-gothic': "'Dela Gothic One', sans-serif",
+          'zen-kaku': "'Zen Kaku Gothic New', sans-serif",
+          'kaisei': "'Kaisei Decol', serif"
+        };
+
+        function applyTitleFontToElement(titleEl, subtitleEl, fontKey, targetScope) {
+          const fontValue = TITLE_FONT_MAP[fontKey] || TITLE_FONT_MAP['default'];
+          if (titleEl) {
+            titleEl.style.setProperty('font-family', fontValue, 'important');
+          }
+          if (subtitleEl) {
+            if (targetScope === 'both') {
+              subtitleEl.style.setProperty('font-family', fontValue, 'important');
+            } else {
+              subtitleEl.style.removeProperty('font-family');
+            }
+          }
+        }
+
         function applyTitleTextWarp(titleEl, text, warpShape, warpStrength, warpEffect, textColor, lightAngle, lightIntensity) {
           if (!titleEl) return;
           warpShape = warpShape || 'none';
@@ -3016,6 +3040,7 @@
           }
 
           applyTitleTextWarp(formTitleEl, formDefinition.title || '無題のフォーム', warpShape, warpStrength, warpEffect, titleTextColor, lightAngle, lightIntensity);
+          applyTitleFontToElement(formTitleEl, formSubtitleEl, formDefinition.titleFontFamily, formDefinition.titleFontTarget);
 
           // テーマカラー（primaryColor / backgroundColor）の反映
           if (formDefinition.appearance) {

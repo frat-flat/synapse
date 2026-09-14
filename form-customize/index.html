@@ -12,7 +12,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Inter:wght@300;400;500;600;700&family=Kaisei+Decol:wght@500;700&family=M+PLUS+Rounded+1c:wght@400;700;800&family=Noto+Sans+JP:wght@300;400;500;700;900&family=Noto+Serif+JP:wght@500;700;900&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap" rel="stylesheet">
     <script type="module" src="./assets/index-W0nnFdhS-v6.js?v=6.0.2"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
     <script>
@@ -381,219 +381,17 @@
                 <div class="settings-card-basic" style="display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 6px; border: 1px solid var(--color-border); background: rgba(0,0,0,0.05); margin-bottom: 12px;">
                   <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">📝 フォーム基本情報</span>
                   
-                  <!-- 2. フォームのタイトル -->
+                  <!-- 1. フォームのタイトル -->
                   <div class="form-group" style="margin: 0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 6px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                       <label for="editor-form-title" style="font-size: 0.75rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">フォームのタイトル</label>
-                      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <!-- 文字サイズ -->
-                        <div class="title-size-control-group" style="display: flex; align-items: center; gap: 3px;">
-                          <span style="font-size: 0.7rem; color: var(--color-text-muted); white-space: nowrap;">サイズ:</span>
-                          <select id="editor-title-font-size" class="form-control form-control-sm" style="width: auto; height: 26px; font-size: 0.72rem; padding: 1px 4px; cursor: pointer; border-radius: 4px;">
-                            <option value="small">S (小)</option>
-                            <option value="medium">M (中)</option>
-                            <option value="large" selected>L (大)</option>
-                            <option value="custom">カスタム</option>
-                          </select>
-                          <div id="editor-title-size-custom-container" style="display: none; align-items: center; gap: 2px;">
-                            <input type="number" id="editor-title-size-custom-val" class="form-control form-control-sm" style="width: 50px; height: 26px; font-size: 0.72rem; padding: 1px 4px;" min="10" max="100" value="28" />
-                            <span style="font-size: 0.7rem; color: var(--color-text-muted);">px</span>
-                          </div>
-                        </div>
-                        <!-- 文字色 -->
-                        <div class="title-color-control-group" style="display: flex; align-items: center; gap: 3px;">
-                          <span style="font-size: 0.7rem; color: var(--color-text-muted); white-space: nowrap;">文字色:</span>
-                          <select id="editor-title-color-type" class="form-control form-control-sm" style="width: auto; height: 26px; font-size: 0.72rem; padding: 1px 4px; cursor: pointer; border-radius: 4px;">
-                            <option value="default" selected>標準 (濃灰)</option>
-                            <option value="primary">テーマ色</option>
-                            <option value="dark">黒 (#202124)</option>
-                            <option value="white">白 (#ffffff)</option>
-                            <option value="custom">カスタム色</option>
-                          </select>
-                          <input type="color" id="editor-title-color-custom" value="#1a73e8" style="display: none; width: 26px; height: 26px; padding: 0; border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer;" title="カスタム文字色を選択" />
-                        </div>
-                      </div>
                     </div>
                     <input type="text" id="editor-form-title" class="form-control title-input" placeholder="フォームのタイトルを入力..." />
                   </div>
 
-                  <!-- 🔤 タイトル文字の変形（ワープロゴ・台形ロゴ化） -->
-                  <div class="form-group-row" style="display: flex; gap: 8px; margin: 6px 0 2px 0;">
-                    <div class="form-group flex-1" style="margin: 0;">
-                      <label for="editor-title-warp-shape" style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 3px; display: block;">🔤 文字変形（ワープロゴ）</label>
-                      <select id="editor-title-warp-shape" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
-                        <option value="none" selected>なし（通常文字）[標準]</option>
-                        <option value="trapezoid-down">逆台形（上広・下狭 / 迫力パース）</option>
-                        <option value="trapezoid-up">正台形（上狭・下広 / モニュメント）</option>
-                        <option value="slope-up">スロープ台形（右肩上がり / 成長）</option>
-                        <option value="roof">山型ルーフ（中央高 / エンブレム）</option>
-                        <option value="skew">スピードスラッシュ（平行斜体）</option>
-                        <option value="perspective-left">左右パース（左大・右小）</option>
-                        <option value="perspective-right">左右パース（左小・右大）</option>
-                      </select>
-                    </div>
-                    <div class="form-group flex-1" style="margin: 0;">
-                      <label for="editor-title-warp-effect" style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 3px; display: block;">✨ ロゴ立体エフェクト</label>
-                      <select id="editor-title-warp-effect" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
-                        <option value="none" selected>なし（フラット）[標準]</option>
-                        <option value="3d">3D立体シャドウ</option>
-                        <option value="gold">ゴールド金属光沢</option>
-                        <option value="neon">ネオン発光</option>
-                        <option value="outline">白フチ袋文字</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <!-- 変形強度設定（変形が選択された場合に表示） -->
-                  <div id="editor-title-warp-strength-container" style="display: none; margin: 4px 0 6px 0;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(0,0,0,0.03); border: 1px dashed var(--color-border); border-radius: 6px; padding: 6px 10px;">
-                      <label for="editor-title-warp-strength" style="font-size: 0.7rem; color: var(--color-text-muted); margin: 0; font-weight: 600; white-space: nowrap;">🎚️ 変形の強さ</label>
-                      <div style="display: flex; align-items: center; gap: 6px; flex: 1; max-width: 230px;">
-                        <input type="range" id="editor-title-warp-strength" min="1" max="200" value="50" style="flex: 1; height: 16px; cursor: pointer; accent-color: var(--color-primary, #1a73e8);" />
-                        <div style="display: flex; align-items: center; gap: 2px;">
-                          <input type="number" id="editor-title-warp-strength-num" min="1" max="200" value="50" class="form-control form-control-sm" style="width: 48px; height: 24px; font-size: 0.72rem; padding: 1px 3px; text-align: right;" />
-                          <span style="font-size: 0.7rem; color: var(--color-text-muted);">%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- 💡 光と影の設定（ライティングパネル: 立体エフェクト選択時に表示） -->
-                  <div id="editor-title-lighting-container" style="display: none; margin: 4px 0 6px 0;">
-                    <div style="display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.03); border: 1px dashed var(--color-border); border-radius: 6px; padding: 8px 10px;">
-                      <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 0.72rem; color: var(--color-text); font-weight: 600;">💡 光と影の設定（ライティング）</span>
-                        <span style="font-size: 0.65rem; color: var(--color-text-muted);">向きと陰影の強弱</span>
-                      </div>
-                      
-                      <!-- 光の向き (8方向ボタングリッド ＆ 角度スライダー) -->
-                      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                        <!-- 8方向クイック選択ボタン (3x3 グリッド) -->
-                        <div class="light-direction-grid" style="display: grid; grid-template-columns: repeat(3, 22px); grid-template-rows: repeat(3, 22px); gap: 2px; background: rgba(0,0,0,0.05); padding: 3px; border-radius: 6px; border: 1px solid var(--color-border);">
-                          <button type="button" class="btn-light-dir active" data-angle="315" title="左上から照射 (315°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">↖</button>
-                          <button type="button" class="btn-light-dir" data-angle="270" title="真上から照射 (270°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">⬆</button>
-                          <button type="button" class="btn-light-dir" data-angle="225" title="右上から照射 (225°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">↗</button>
-                          <button type="button" class="btn-light-dir" data-angle="180" title="左から照射 (180°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">⬅</button>
-                          <div style="display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--color-primary, #1a73e8);">💡</div>
-                          <button type="button" class="btn-light-dir" data-angle="0" title="右から照射 (0°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">➡</button>
-                          <button type="button" class="btn-light-dir" data-angle="135" title="左下から照射 (135°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">↙</button>
-                          <button type="button" class="btn-light-dir" data-angle="90" title="真下から照射 (90°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">⬇</button>
-                          <button type="button" class="btn-light-dir" data-angle="45" title="右下から照射 (45°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">↘</button>
-                        </div>
-                        
-                        <!-- 角度スライダーと数値 -->
-                        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px;">
-                          <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <label for="editor-title-light-angle" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">光の向き (角度)</label>
-                            <div style="display: flex; align-items: center; gap: 2px;">
-                              <input type="number" id="editor-title-light-angle-num" min="0" max="360" value="315" class="form-control form-control-sm" style="width: 44px; height: 22px; font-size: 0.7rem; padding: 1px 3px; text-align: right;" />
-                              <span style="font-size: 0.68rem; color: var(--color-text-muted);">°</span>
-                            </div>
-                          </div>
-                          <input type="range" id="editor-title-light-angle" min="0" max="360" value="315" style="width: 100%; height: 16px; cursor: pointer; accent-color: var(--color-primary, #1a73e8);" />
-                        </div>
-                      </div>
-
-                      <!-- 光の強さ (スライダー ＆ 数値) -->
-                      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px dotted var(--color-border); padding-top: 6px;">
-                        <label for="editor-title-light-intensity" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600; white-space: nowrap;">光の強さ (メリハリ)</label>
-                        <div style="display: flex; align-items: center; gap: 6px; flex: 1; max-width: 180px;">
-                          <input type="range" id="editor-title-light-intensity" min="1" max="100" value="60" style="flex: 1; height: 16px; cursor: pointer; accent-color: var(--color-primary, #1a73e8);" />
-                          <div style="display: flex; align-items: center; gap: 2px;">
-                            <input type="number" id="editor-title-light-intensity-num" min="1" max="100" value="60" class="form-control form-control-sm" style="width: 44px; height: 22px; font-size: 0.7rem; padding: 1px 3px; text-align: right;" />
-                            <span style="font-size: 0.68rem; color: var(--color-text-muted);">%</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- 🏷️ タイトル外枠（簡易ロゴ化）バッジ設定 -->
-                  <div class="form-group" style="margin: 6px 0 2px 0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
-                      <label for="editor-title-badge-shape" style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600; margin: 0;">🏷️ タイトル外枠（簡易ロゴ化）</label>
-                      <span style="font-size: 0.65rem; color: var(--color-text-muted);">台形やバッジ形状でロゴ風に演出</span>
-                    </div>
-                    <select id="editor-title-badge-shape" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
-                      <option value="none" selected>なし（通常テキスト）[標準]</option>
-                      <option value="trapezoid-down">台形（上広・下狭 / バナー型ロゴ）</option>
-                      <option value="trapezoid-up">台形（上狭・下広 / エンブレム型ロゴ）</option>
-                      <option value="parallelogram">平行四辺形（スラッシュ・斜めカット）</option>
-                      <option value="ribbon">リボン・ペナント（両端V字カット）</option>
-                      <option value="capsule">カプセル・ピル（完全角丸オーバル）</option>
-                      <option value="chamfer">八角形（角落ちエッジ / オクタゴン）</option>
-                      <option value="retro">レトロ看板（二重枠クラシック）</option>
-                    </select>
-                  </div>
-
-                  <!-- バッジ詳細設定（形状が none 以外のときに展開） -->
-                  <div id="editor-title-badge-options" style="display: none; background: rgba(0,0,0,0.03); border: 1px dashed var(--color-border); border-radius: 6px; padding: 8px 10px; margin: 4px 0 8px 0;">
-                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                      <!-- スタイル種別 (塗りつぶし / 枠線) -->
-                      <div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 100px;">
-                        <label for="editor-title-badge-style" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">ロゴ塗り方</label>
-                        <select id="editor-title-badge-style" class="form-control form-control-sm" style="height: 26px; font-size: 0.7rem; padding: 1px 4px; cursor: pointer;">
-                          <option value="fill" selected>塗りつぶし（推奨）</option>
-                          <option value="outline">枠線のみ（透明背景）</option>
-                        </select>
-                      </div>
-                      <!-- バッジ背景色 / 枠線色 -->
-                      <div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 110px;">
-                        <label for="editor-title-badge-bg-type" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">外枠・背景色</label>
-                        <div style="display: flex; gap: 4px; align-items: center;">
-                          <select id="editor-title-badge-bg-type" class="form-control form-control-sm" style="height: 26px; font-size: 0.7rem; padding: 1px 4px; cursor: pointer; flex: 1;">
-                            <option value="primary" selected>テーマ色</option>
-                            <option value="dark">ブラック / 濃灰</option>
-                            <option value="custom">カスタム色</option>
-                          </select>
-                          <input type="color" id="editor-title-badge-bg-custom" value="#1a73e8" style="display: none; width: 26px; height: 26px; padding: 0; border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer;" />
-                        </div>
-                      </div>
-                      <!-- バッジ内文字色 -->
-                      <div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 100px;">
-                        <label for="editor-title-badge-color-type" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">文字色</label>
-                        <div style="display: flex; gap: 4px; align-items: center;">
-                          <select id="editor-title-badge-color-type" class="form-control form-control-sm" style="height: 26px; font-size: 0.7rem; padding: 1px 4px; cursor: pointer; flex: 1;">
-                            <option value="white" selected>白 (#fff)</option>
-                            <option value="dark">黒 / 濃灰</option>
-                            <option value="primary">テーマ色</option>
-                            <option value="custom">カスタム色</option>
-                          </select>
-                          <input type="color" id="editor-title-badge-color-custom" value="#ffffff" style="display: none; width: 26px; height: 26px; padding: 0; border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer;" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- タイトル枠デザイン ＆ 文字配置 -->
-                  <div class="form-group-row" style="display: flex; gap: 10px; margin: 4px 0;">
-                    <!-- タイトル枠デザイン -->
-                    <div class="form-group flex-1" style="margin: 0;">
-                      <label for="editor-header-style" style="font-size: 0.72rem; color: var(--color-text-muted); margin-bottom: 3px; font-weight: 600; display: block;">🎨 タイトル枠デザイン</label>
-                      <select id="editor-header-style" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
-                        <option value="card-accent-top">枠あり（上部アクセント）[標準]</option>
-                        <option value="card-simple">枠あり（シンプル枠）</option>
-                        <option value="card-accent-left">枠あり（左ラインアクセント）</option>
-                        <option value="card-shadow">枠あり（浮き出しシャドウ）</option>
-                        <option value="frameless">枠なし（シンプル透過）</option>
-                        <option value="frameless-underline">枠なし（タイトル下線アクセント）</option>
-                      </select>
-                    </div>
-                    <!-- 文字配置 -->
-                    <div class="form-group flex-1" style="margin: 0;">
-                      <label style="font-size: 0.72rem; color: var(--color-text-muted); margin-bottom: 3px; font-weight: 600; display: block;">📐 ヘッダー文字の配置</label>
-                      <div class="header-align-btn-group" style="display: flex; gap: 3px; height: 28px;">
-                        <button type="button" class="btn btn-sm btn-header-align active" data-align="left" style="flex: 1; padding: 2px 4px; font-size: 0.7rem; border-radius: 4px; border: 1px solid var(--color-border);" title="左揃え">⬅️ 左</button>
-                        <button type="button" class="btn btn-sm btn-header-align" data-align="center" style="flex: 1; padding: 2px 4px; font-size: 0.7rem; border-radius: 4px; border: 1px solid var(--color-border);" title="中央揃え">⏺️ 中央</button>
-                        <button type="button" class="btn btn-sm btn-header-align" data-align="right" style="flex: 1; padding: 2px 4px; font-size: 0.7rem; border-radius: 4px; border: 1px solid var(--color-border);" title="右揃え">➡️ 右</button>
-                      </div>
-                      <input type="hidden" id="editor-header-align" value="left" />
-                    </div>
-                  </div>
-
-                  <!-- 3. サブタイトル (プロ版限定) -->
+                  <!-- 2. サブタイトル (プロ版限定) -->
                   <div class="form-group pro-only-field" id="pro-subtitle-container" style="display: none; margin: 0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; margin-top: 6px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; margin-top: 2px;">
                       <label for="editor-pro-subtitle" style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--color-text-muted); margin: 0;">
                         <span>✏️ サブタイトル</span>
                         <span style="font-size: 0.65rem; background: rgba(0, 86, 179, 0.1); color: #0056b3; padding: 1px 4px; border-radius: 3px; font-weight: 700;">プロ版 💎</span>
@@ -609,21 +407,274 @@
                     <input type="text" id="editor-pro-subtitle" class="form-control form-control-sm" placeholder="例: 運営代行 お申し込みフォーム" />
                   </div>
 
-                  <!-- 4. フォームの説明 -->
+                  <!-- 3. フォームの説明 -->
                   <div class="form-group" style="margin: 0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; margin-top: 6px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; margin-top: 2px;">
                       <label for="editor-form-desc" style="font-size: 0.75rem; color: var(--color-text-muted); margin: 0;">フォームの説明</label>
                       <button type="button" class="btn-insert-link-modal" data-target="editor-form-desc" style="background: var(--color-bg-subtle, #f1f3f4); border: 1px solid var(--color-border); border-radius: 4px; padding: 2px 8px; font-size: 0.72rem; font-weight: 500; color: var(--color-primary, #1a73e8); cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.15s ease;">🔗 リンクを挿入</button>
                     </div>
                     <textarea id="editor-form-desc" class="form-control desc-input" placeholder="フォームの説明を入力..." rows="2" style="resize: vertical; min-height: 48px; line-height: 1.5; font-family: inherit; font-size: 0.85rem; padding: 6px 8px; border-radius: 4px;"></textarea>
                     <span class="link-hint-text" style="font-size: 0.72rem; color: var(--color-text-muted); display: block; margin-top: 3px;">💡 文字をリンクにするには <code>[表示したい文字](URL)</code> と書くか、右上の「🔗 リンクを挿入」ボタンをご利用ください</span>
                   </div>
-                </div>
-                <div class="form-group" id="editor-lock-container" style="margin-top: 12px; display: none; align-items: center; gap: 8px;">
-                  <input type="checkbox" id="editor-form-lock" style="width: 16px; height: 16px; cursor: pointer;" />
-                  <label for="editor-form-lock" style="margin: 0; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; color: var(--color-danger);">
-                    <span>🔒 管理者専用ロック (管理者のみ閲覧・編集可能)</span>
-                  </label>
+
+                  <!-- 🎨 タイトルの詳細設定（折りたたみアコーディオン） -->
+                  <details class="title-details-accordion" id="title-details-accordion">
+                    <summary class="title-details-summary">
+                      <div class="title-details-summary-left">
+                        <span class="title-details-summary-icon">🎨</span>
+                        <span class="title-details-summary-text">タイトルの詳細設定（書体・装飾・ロゴ化・配置）</span>
+                        <span id="title-details-active-badge" class="title-details-badge" style="display: none;">設定中 ✨</span>
+                      </div>
+                      <span class="title-details-arrow">▼</span>
+                    </summary>
+                    <div class="title-details-content">
+                      <!-- 1. 書体（フォント）＆ サイズ・カラー -->
+                      <div class="title-details-section">
+                        <div class="title-details-section-title">🔤 フォント（書体）＆ 文字スタイル</div>
+                        <div class="form-group-row" style="display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+                          <!-- フォント選択 -->
+                          <div class="form-group flex-1" style="margin: 0; min-width: 140px;">
+                            <label for="editor-title-font-family" style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 2px; display: block;">フォント（書体）</label>
+                            <select id="editor-title-font-family" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
+                              <option value="default" selected>標準ゴシック (Noto Sans JP)</option>
+                              <option value="noto-serif">高級明朝体 (Noto Serif JP)</option>
+                              <option value="rounded">やわらか丸ゴシック (M PLUS Rounded 1c)</option>
+                              <option value="dela-gothic">極太インパクト (Dela Gothic One)</option>
+                              <option value="zen-kaku">モダンゴシック (Zen Kaku Gothic)</option>
+                              <option value="kaisei">上品レトロ (Kaisei Decol)</option>
+                            </select>
+                          </div>
+                          <!-- 適用対象 -->
+                          <div class="form-group flex-1" style="margin: 0; min-width: 120px;">
+                            <label for="editor-title-font-target" style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 2px; display: block;">フォントの適用範囲</label>
+                            <select id="editor-title-font-target" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
+                              <option value="both" selected>タイトル ＋ サブタイトル</option>
+                              <option value="title">タイトルのみ</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <!-- 文字サイズ ＆ 文字色 -->
+                        <div class="form-group-row" style="display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap;">
+                          <!-- 文字サイズ -->
+                          <div class="form-group flex-1" style="margin: 0; min-width: 130px;">
+                            <label for="editor-title-font-size" style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 2px; display: block;">文字サイズ</label>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                              <select id="editor-title-font-size" class="form-control form-control-sm" style="flex: 1; height: 28px; font-size: 0.72rem; padding: 2px 4px; cursor: pointer;">
+                                <option value="small">S (小)</option>
+                                <option value="medium">M (中)</option>
+                                <option value="large" selected>L (大)</option>
+                                <option value="custom">カスタム</option>
+                              </select>
+                              <div id="editor-title-size-custom-container" style="display: none; align-items: center; gap: 2px;">
+                                <input type="number" id="editor-title-size-custom-val" class="form-control form-control-sm" style="width: 48px; height: 28px; font-size: 0.72rem; padding: 1px 4px;" min="10" max="100" value="28" />
+                                <span style="font-size: 0.68rem; color: var(--color-text-muted);">px</span>
+                              </div>
+                            </div>
+                          </div>
+                          <!-- 文字色 -->
+                          <div class="form-group flex-1" style="margin: 0; min-width: 130px;">
+                            <label for="editor-title-color-type" style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 2px; display: block;">文字色</label>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                              <select id="editor-title-color-type" class="form-control form-control-sm" style="flex: 1; height: 28px; font-size: 0.72rem; padding: 2px 4px; cursor: pointer;">
+                                <option value="default" selected>標準 (濃灰)</option>
+                                <option value="primary">テーマ色</option>
+                                <option value="dark">黒 (#202124)</option>
+                                <option value="white">白 (#ffffff)</option>
+                                <option value="custom">カスタム色</option>
+                              </select>
+                              <input type="color" id="editor-title-color-custom" value="#1a73e8" style="display: none; width: 28px; height: 28px; padding: 0; border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer;" title="カスタム文字色を選択" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- 2. タイトル枠デザイン ＆ 文字配置 -->
+                      <div class="title-details-section">
+                        <div class="title-details-section-title">📐 配置 ＆ タイトル枠デザイン</div>
+                        <div class="form-group-row" style="display: flex; gap: 8px;">
+                          <!-- タイトル枠デザイン -->
+                          <div class="form-group flex-1" style="margin: 0;">
+                            <label for="editor-header-style" style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; font-weight: 600; display: block;">枠デザイン</label>
+                            <select id="editor-header-style" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
+                              <option value="card-accent-top">枠あり（上部アクセント）[標準]</option>
+                              <option value="card-simple">枠あり（シンプル枠）</option>
+                              <option value="card-accent-left">枠あり（左ラインアクセント）</option>
+                              <option value="card-shadow">枠あり（浮き出しシャドウ）</option>
+                              <option value="frameless">枠なし（シンプル透過）</option>
+                              <option value="frameless-underline">枠なし（タイトル下線アクセント）</option>
+                            </select>
+                          </div>
+                          <!-- 文字配置 -->
+                          <div class="form-group flex-1" style="margin: 0;">
+                            <label style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; font-weight: 600; display: block;">文字の配置</label>
+                            <div class="header-align-btn-group" style="display: flex; gap: 3px; height: 28px;">
+                              <button type="button" class="btn btn-sm btn-header-align active" data-align="left" style="flex: 1; padding: 2px 4px; font-size: 0.7rem; border-radius: 4px; border: 1px solid var(--color-border);" title="左揃え">⬅️ 左</button>
+                              <button type="button" class="btn btn-sm btn-header-align" data-align="center" style="flex: 1; padding: 2px 4px; font-size: 0.7rem; border-radius: 4px; border: 1px solid var(--color-border);" title="中央揃え">⏺️ 中央</button>
+                              <button type="button" class="btn btn-sm btn-header-align" data-align="right" style="flex: 1; padding: 2px 4px; font-size: 0.7rem; border-radius: 4px; border: 1px solid var(--color-border);" title="右揃え">➡️ 右</button>
+                            </div>
+                            <input type="hidden" id="editor-header-align" value="left" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- 3. 文字変形（ワープロゴ）＆ 立体エフェクト -->
+                      <div class="title-details-section">
+                        <div class="title-details-section-title">✨ 文字変形 ＆ 立体ロゴエフェクト</div>
+                        <div class="form-group-row" style="display: flex; gap: 8px; margin-bottom: 4px;">
+                          <div class="form-group flex-1" style="margin: 0;">
+                            <label for="editor-title-warp-shape" style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 2px; display: block;">🔤 文字変形（ワープロゴ）</label>
+                            <select id="editor-title-warp-shape" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
+                              <option value="none" selected>なし（通常文字）[標準]</option>
+                              <option value="trapezoid-down">逆台形（上広・下狭 / 迫力パース）</option>
+                              <option value="trapezoid-up">正台形（上狭・下広 / モニュメント）</option>
+                              <option value="slope-up">スロープ台形（右肩上がり / 成長）</option>
+                              <option value="roof">山型ルーフ（中央高 / エンブレム）</option>
+                              <option value="skew">スピードスラッシュ（平行斜体）</option>
+                              <option value="perspective-left">左右パース（左大・右小）</option>
+                              <option value="perspective-right">左右パース（左小・右大）</option>
+                            </select>
+                          </div>
+                          <div class="form-group flex-1" style="margin: 0;">
+                            <label for="editor-title-warp-effect" style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 2px; display: block;">✨ 立体エフェクト</label>
+                            <select id="editor-title-warp-effect" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
+                              <option value="none" selected>なし（フラット）[標準]</option>
+                              <option value="3d">3D立体シャドウ</option>
+                              <option value="gold">ゴールド金属光沢</option>
+                              <option value="neon">ネオン発光</option>
+                              <option value="outline">白フチ袋文字</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <!-- 変形強度設定（変形が選択された場合に表示） -->
+                        <div id="editor-title-warp-strength-container" style="display: none; margin: 6px 0;">
+                          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(0,0,0,0.03); border: 1px dashed var(--color-border); border-radius: 6px; padding: 6px 10px;">
+                            <label for="editor-title-warp-strength" style="font-size: 0.7rem; color: var(--color-text-muted); margin: 0; font-weight: 600; white-space: nowrap;">🎚️ 変形の強さ</label>
+                            <div style="display: flex; align-items: center; gap: 6px; flex: 1; max-width: 230px;">
+                              <input type="range" id="editor-title-warp-strength" min="1" max="200" value="50" style="flex: 1; height: 16px; cursor: pointer; accent-color: var(--color-primary, #1a73e8);" />
+                              <div style="display: flex; align-items: center; gap: 2px;">
+                                <input type="number" id="editor-title-warp-strength-num" min="1" max="200" value="50" class="form-control form-control-sm" style="width: 48px; height: 24px; font-size: 0.72rem; padding: 1px 3px; text-align: right;" />
+                                <span style="font-size: 0.7rem; color: var(--color-text-muted);">%</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- 💡 光と影の設定（ライティングパネル: 立体エフェクト選択時に表示） -->
+                        <div id="editor-title-lighting-container" style="display: none; margin: 6px 0;">
+                          <div style="display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.03); border: 1px dashed var(--color-border); border-radius: 6px; padding: 8px 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                              <span style="font-size: 0.72rem; color: var(--color-text); font-weight: 600;">💡 光と影の設定（ライティング）</span>
+                              <span style="font-size: 0.65rem; color: var(--color-text-muted);">向きと陰影の強弱</span>
+                            </div>
+                            
+                            <!-- 光の向き (8方向ボタングリッド ＆ 角度スライダー) -->
+                            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                              <div class="light-direction-grid" style="display: grid; grid-template-columns: repeat(3, 22px); grid-template-rows: repeat(3, 22px); gap: 2px; background: rgba(0,0,0,0.05); padding: 3px; border-radius: 6px; border: 1px solid var(--color-border);">
+                                <button type="button" class="btn-light-dir active" data-angle="315" title="左上から照射 (315°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">↖</button>
+                                <button type="button" class="btn-light-dir" data-angle="270" title="真上から照射 (270°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">⬆</button>
+                                <button type="button" class="btn-light-dir" data-angle="225" title="右上から照射 (225°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">↗</button>
+                                <button type="button" class="btn-light-dir" data-angle="180" title="左から照射 (180°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">⬅</button>
+                                <div style="display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--color-primary, #1a73e8);">💡</div>
+                                <button type="button" class="btn-light-dir" data-angle="0" title="右から照射 (0°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">➡</button>
+                                <button type="button" class="btn-light-dir" data-angle="135" title="左下から照射 (135°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">↙</button>
+                                <button type="button" class="btn-light-dir" data-angle="90" title="真下から照射 (90°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">⬇</button>
+                                <button type="button" class="btn-light-dir" data-angle="45" title="右下から照射 (45°)" style="border:none; border-radius:3px; background:transparent; font-size:10px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">↘</button>
+                              </div>
+                              
+                              <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                  <label for="editor-title-light-angle" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">光の向き (角度)</label>
+                                  <div style="display: flex; align-items: center; gap: 2px;">
+                                    <input type="number" id="editor-title-light-angle-num" min="0" max="360" value="315" class="form-control form-control-sm" style="width: 44px; height: 22px; font-size: 0.7rem; padding: 1px 3px; text-align: right;" />
+                                    <span style="font-size: 0.68rem; color: var(--color-text-muted);">°</span>
+                                  </div>
+                                </div>
+                                <input type="range" id="editor-title-light-angle" min="0" max="360" value="315" style="width: 100%; height: 16px; cursor: pointer; accent-color: var(--color-primary, #1a73e8);" />
+                              </div>
+                            </div>
+
+                            <!-- 光の強さ (スライダー ＆ 数値) -->
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px dotted var(--color-border); padding-top: 6px;">
+                              <label for="editor-title-light-intensity" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600; white-space: nowrap;">光の強さ (メリハリ)</label>
+                              <div style="display: flex; align-items: center; gap: 6px; flex: 1; max-width: 180px;">
+                                <input type="range" id="editor-title-light-intensity" min="1" max="100" value="60" style="flex: 1; height: 16px; cursor: pointer; accent-color: var(--color-primary, #1a73e8);" />
+                                <div style="display: flex; align-items: center; gap: 2px;">
+                                  <input type="number" id="editor-title-light-intensity-num" min="1" max="100" value="60" class="form-control form-control-sm" style="width: 44px; height: 22px; font-size: 0.7rem; padding: 1px 3px; text-align: right;" />
+                                  <span style="font-size: 0.68rem; color: var(--color-text-muted);">%</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- 4. タイトル外枠（簡易ロゴ化）バッジ設定 -->
+                      <div class="title-details-section">
+                        <div class="title-details-section-title">🏷️ タイトル外枠（簡易ロゴ化バッジ）</div>
+                        <div class="form-group" style="margin: 0 0 6px 0;">
+                          <select id="editor-title-badge-shape" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; padding: 2px 6px; cursor: pointer;">
+                            <option value="none" selected>なし（通常テキスト）[標準]</option>
+                            <option value="trapezoid-down">台形（上広・下狭 / バナー型ロゴ）</option>
+                            <option value="trapezoid-up">台形（上狭・下広 / エンブレム型ロゴ）</option>
+                            <option value="parallelogram">平行四辺形（スラッシュ・斜めカット）</option>
+                            <option value="ribbon">リボン・ペナント（両端V字カット）</option>
+                            <option value="capsule">カプセル・ピル（完全角丸オーバル）</option>
+                            <option value="chamfer">八角形（角落ちエッジ / オクタゴン）</option>
+                            <option value="retro">レトロ看板（二重枠クラシック）</option>
+                          </select>
+                        </div>
+
+                        <!-- バッジ詳細設定（形状が none 以外のときに展開） -->
+                        <div id="editor-title-badge-options" style="display: none; background: rgba(0,0,0,0.03); border: 1px dashed var(--color-border); border-radius: 6px; padding: 8px 10px; margin: 4px 0 2px 0;">
+                          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <!-- スタイル種別 (塗りつぶし / 枠線) -->
+                            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 90px;">
+                              <label for="editor-title-badge-style" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">ロゴ塗り方</label>
+                              <select id="editor-title-badge-style" class="form-control form-control-sm" style="height: 26px; font-size: 0.7rem; padding: 1px 4px; cursor: pointer;">
+                                <option value="fill" selected>塗りつぶし（推奨）</option>
+                                <option value="outline">枠線のみ（透明背景）</option>
+                              </select>
+                            </div>
+                            <!-- バッジ背景色 / 枠線色 -->
+                            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 100px;">
+                              <label for="editor-title-badge-bg-type" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">外枠・背景色</label>
+                              <div style="display: flex; gap: 4px; align-items: center;">
+                                <select id="editor-title-badge-bg-type" class="form-control form-control-sm" style="height: 26px; font-size: 0.7rem; padding: 1px 4px; cursor: pointer; flex: 1;">
+                                  <option value="primary" selected>テーマ色</option>
+                                  <option value="dark">ブラック / 濃灰</option>
+                                  <option value="custom">カスタム色</option>
+                                </select>
+                                <input type="color" id="editor-title-badge-bg-custom" value="#1a73e8" style="display: none; width: 26px; height: 26px; padding: 0; border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer;" />
+                              </div>
+                            </div>
+                            <!-- バッジ内文字色 -->
+                            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 90px;">
+                              <label for="editor-title-badge-color-type" style="font-size: 0.68rem; color: var(--color-text-muted); margin: 0; font-weight: 600;">文字色</label>
+                              <div style="display: flex; gap: 4px; align-items: center;">
+                                <select id="editor-title-badge-color-type" class="form-control form-control-sm" style="height: 26px; font-size: 0.7rem; padding: 1px 4px; cursor: pointer; flex: 1;">
+                                  <option value="white" selected>白 (#fff)</option>
+                                  <option value="dark">黒 / 濃灰</option>
+                                  <option value="primary">テーマ色</option>
+                                  <option value="custom">カスタム色</option>
+                                </select>
+                                <input type="color" id="editor-title-badge-color-custom" value="#ffffff" style="display: none; width: 26px; height: 26px; padding: 0; border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer;" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </details>
+
+                  <!-- 4. 管理者専用ロック -->
+                  <div class="form-group" id="editor-lock-container" style="margin-top: 4px; display: none; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="editor-form-lock" style="width: 16px; height: 16px; cursor: pointer;" />
+                    <label for="editor-form-lock" style="margin: 0; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; color: var(--color-danger);">
+                      <span>🔒 管理者専用ロック (管理者のみ閲覧・編集可能)</span>
+                    </label>
+                  </div>
                 </div>
 
                 <!-- 重複するロゴチェックボックスを非表示化 (JSエラー防止用の非表示インプット) -->

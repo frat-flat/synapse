@@ -3666,7 +3666,8 @@
         'titleBadgeShape', 'titleBadgeStyle', 'titleBadgeBgType', 'titleBadgeBgCustom', 'titleBadgeColorType', 'titleBadgeColorCustom',
         'titleWarpShape', 'titleWarpStrength', 'titleWarpEffect',
         'titleLightAngle', 'titleLightIntensity',
-        'titleColorType', 'titleColorCustom'
+        'titleColorType', 'titleColorCustom',
+        'titleFontFamily', 'titleFontTarget'
       ];
       if (!preserveCurrentMode && savedForm.editorMode !== undefined) {
         window.G.editorMode = savedForm.editorMode;
@@ -3725,6 +3726,8 @@
     if (window.G.titleLightIntensity === undefined) window.G.titleLightIntensity = 60;
     if (window.G.titleColorType === undefined) window.G.titleColorType = "default";
     if (window.G.titleColorCustom === undefined) window.G.titleColorCustom = "#1a73e8";
+    if (window.G.titleFontFamily === undefined) window.G.titleFontFamily = "default";
+    if (window.G.titleFontTarget === undefined) window.G.titleFontTarget = "both";
 
     const g = window.G;
 
@@ -3763,6 +3766,12 @@
 
     const subtitlePosEl = document.getElementById('editor-subtitle-position');
     if (subtitlePosEl) subtitlePosEl.value = g.subtitlePosition || 'below';
+
+    // 🔤 タイトルフォント（書体）のプレフィル
+    const titleFontFamilyEl = document.getElementById('editor-title-font-family');
+    const titleFontTargetEl = document.getElementById('editor-title-font-target');
+    if (titleFontFamilyEl) titleFontFamilyEl.value = g.titleFontFamily || 'default';
+    if (titleFontTargetEl) titleFontTargetEl.value = g.titleFontTarget || 'both';
 
     // 🎨 タイトル文字色のプレフィル
     const titleColorTypeEl = document.getElementById('editor-title-color-type');
@@ -3851,6 +3860,8 @@
       titleBadgeColorCustomEl.value = g.titleBadgeColorCustom || '#ffffff';
       titleBadgeColorCustomEl.style.display = colorTypeVal === 'custom' ? 'block' : 'none';
     }
+
+    updateTitleDetailsActiveBadge();
 
     document.getElementById('editor-pro-display-mode').value = g.displayMode;
     document.getElementById('editor-pro-progress-indicator').value = g.progressIndicator;
@@ -4712,6 +4723,29 @@
       if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
     });
 
+    // 🔤 タイトルフォント（書体）のイベントリスナー
+    bindChange('editor-title-font-family', v => {
+      window.G.titleFontFamily = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleFontFamily = v;
+      if (window.n) window.n.titleFontFamily = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      updateTitleDetailsActiveBadge();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-font-target', v => {
+      window.G.titleFontTarget = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleFontTarget = v;
+      if (window.n) window.n.titleFontTarget = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      updateTitleDetailsActiveBadge();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
     // 🔤 タイトル文字変形＆立体ロゴエフェクトのイベントリスナー
     const titleWarpStrengthContainer = document.getElementById('editor-title-warp-strength-container');
     const titleLightingContainer = document.getElementById('editor-title-lighting-container');
@@ -4725,6 +4759,7 @@
       }
       applyPreviewTheme();
       renderLivePreview();
+      updateTitleDetailsActiveBadge();
       if (typeof window.S === 'function') window.S();
       if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
     });
@@ -5143,6 +5178,51 @@
   }
   window.resolveTitleTextColor = resolveTitleTextColor;
 
+  // 🔤 タイトル・サブタイトル用フォントファミリーマップ
+  const TITLE_FONT_MAP = {
+    'default': "'Noto Sans JP', sans-serif",
+    'noto-serif': "'Noto Serif JP', serif",
+    'rounded': "'M PLUS Rounded 1c', sans-serif",
+    'dela-gothic': "'Dela Gothic One', sans-serif",
+    'zen-kaku': "'Zen Kaku Gothic New', sans-serif",
+    'kaisei': "'Kaisei Decol', serif"
+  };
+  window.TITLE_FONT_MAP = TITLE_FONT_MAP;
+
+  function applyTitleFontToElement(titleEl, subtitleEl, fontKey, targetScope) {
+    const fontValue = TITLE_FONT_MAP[fontKey] || TITLE_FONT_MAP['default'];
+    if (titleEl) {
+      titleEl.style.setProperty('font-family', fontValue, 'important');
+    }
+    if (subtitleEl) {
+      if (targetScope === 'both') {
+        subtitleEl.style.setProperty('font-family', fontValue, 'important');
+      } else {
+        subtitleEl.style.removeProperty('font-family');
+      }
+    }
+  }
+  window.applyTitleFontToElement = applyTitleFontToElement;
+
+  function updateTitleDetailsActiveBadge() {
+    const g = window.G || {};
+    const badgeEl = document.getElementById('title-details-active-badge');
+    if (!badgeEl) return;
+
+    const hasFont = g.titleFontFamily && g.titleFontFamily !== 'default';
+    const hasWarp = g.titleWarpShape && g.titleWarpShape !== 'none';
+    const hasEffect = g.titleWarpEffect && g.titleWarpEffect !== 'none';
+    const hasBadge = g.titleBadgeShape && g.titleBadgeShape !== 'none';
+    const hasCustomSize = g.appearance && g.appearance.fontSizes && g.appearance.fontSizes.title && g.appearance.fontSizes.title !== 'large';
+    const hasCustomColor = g.titleColorType && g.titleColorType !== 'default';
+    const hasCustomStyle = g.headerStyle && g.headerStyle !== 'card-accent-top';
+    const hasCustomAlign = g.headerAlign && g.headerAlign !== 'left';
+
+    const isConfigured = !!(hasFont || hasWarp || hasEffect || hasBadge || hasCustomSize || hasCustomColor || hasCustomStyle || hasCustomAlign);
+    badgeEl.style.display = isConfigured ? 'inline-block' : 'none';
+  }
+  window.updateTitleDetailsActiveBadge = updateTitleDetailsActiveBadge;
+
   function applyTitleTextWarp(titleEl, text, warpShape, warpStrength, warpEffect, textColor, lightAngle, lightIntensity) {
     if (!titleEl) return;
     warpShape = warpShape || 'none';
@@ -5463,6 +5543,7 @@
       // 🔤 タイトル文字自体の変形（ワープテキスト＆立体ロゴ）および文字色の適用
       const titleTextColor = resolveTitleTextColor(g, badgeShape, badgeStyle);
       applyTitleTextWarp(previewTitle, rawTitle, g.titleWarpShape, g.titleWarpStrength, g.titleWarpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+      applyTitleFontToElement(previewTitle, subtitleP, g.titleFontFamily, g.titleFontTarget);
     }
 
     // サブタイトルの取得と反映（リアルタイム入力値＆データオブジェクト双方対応）
@@ -5478,6 +5559,7 @@
         subtitleP.textContent = "";
         subtitleP.style.display = 'none';
       }
+      applyTitleFontToElement(previewTitle, subtitleP, g.titleFontFamily, g.titleFontTarget);
     }
 
     // 枠スタイル・配置・サブタイトル位置の適用
@@ -13221,6 +13303,7 @@
       // 🔤 タイトル文字自体の変形（ワープテキスト＆立体ロゴ）および文字色の適用
       const titleTextColor = resolveTitleTextColor(g, badgeShape, badgeStyle);
       applyTitleTextWarp(liveTitleH, liveRawTitle, g.titleWarpShape, g.titleWarpStrength, g.titleWarpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+      applyTitleFontToElement(liveTitleH, liveSubtitleP, g.titleFontFamily, g.titleFontTarget);
     }
 
     // サブタイトルの取得と反映（リアルタイム入力値＆データオブジェクト双方対応）
@@ -13236,6 +13319,7 @@
         liveSubtitleP.textContent = "";
         liveSubtitleP.style.display = 'none';
       }
+      applyTitleFontToElement(liveTitleH, liveSubtitleP, g.titleFontFamily, g.titleFontTarget);
     }
 
     if (liveDescP) liveDescP.innerHTML = renderRichTextWithLinks(isPro ? proDescVal : currentFormDesc);
@@ -13709,21 +13793,33 @@
       const titleTextColor = resolveTitleTextColor(g, g.titleBadgeShape || 'none', g.titleBadgeStyle || 'fill');
       const curTitle = value || (document.getElementById('editor-pro-title') ? document.getElementById('editor-pro-title').value : '') || (g.header ? g.header.title : '') || g.title || "フォーム";
       const el = document.getElementById('live-preview-form-title');
-      if (el) applyTitleTextWarp(el, curTitle, warpShape, warpStrength, warpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+      if (el) {
+        applyTitleTextWarp(el, curTitle, warpShape, warpStrength, warpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+        applyTitleFontToElement(el, null, g.titleFontFamily, g.titleFontTarget);
+      }
       const mob = document.querySelector('.mobile-preview-title');
-      if (mob) applyTitleTextWarp(mob, curTitle, warpShape, warpStrength, warpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+      if (mob) {
+        applyTitleTextWarp(mob, curTitle, warpShape, warpStrength, warpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+        applyTitleFontToElement(mob, null, g.titleFontFamily, g.titleFontTarget);
+      }
       const panelTitle = document.getElementById('preview-form-title');
-      if (panelTitle) applyTitleTextWarp(panelTitle, curTitle, warpShape, warpStrength, warpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+      if (panelTitle) {
+        applyTitleTextWarp(panelTitle, curTitle, warpShape, warpStrength, warpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+        applyTitleFontToElement(panelTitle, null, g.titleFontFamily, g.titleFontTarget);
+      }
     } else if (type === 'subtitle' || type === 'form_subtitle') {
+      const g = window.G || {};
       const liveSub = document.getElementById('live-preview-form-subtitle');
       if (liveSub) {
         liveSub.textContent = value || "";
         liveSub.style.display = (value && value.trim() !== "") ? 'block' : 'none';
+        applyTitleFontToElement(null, liveSub, g.titleFontFamily, g.titleFontTarget);
       }
       const panelSub = document.getElementById('preview-form-subtitle');
       if (panelSub) {
         panelSub.textContent = value || "";
         panelSub.style.display = (value && value.trim() !== "") ? 'block' : 'none';
+        applyTitleFontToElement(null, panelSub, g.titleFontFamily, g.titleFontTarget);
       }
     } else if (type === 'form_desc') {
       const el = document.getElementById('live-preview-form-desc');
@@ -13993,6 +14089,29 @@
         if (window.G) window.G.subtitlePosition = t.value;
         if (window.n) window.n.subtitlePosition = t.value;
         if (window.U && window.U[window.W]) window.U[window.W].subtitlePosition = t.value;
+        applyPreviewTheme();
+        renderLivePreview();
+        updateTitleDetailsActiveBadge();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      } else if (t.id === 'editor-title-font-family' || t.id === 'editor-title-font-target') {
+        const fontFamEl = document.getElementById('editor-title-font-family');
+        const fontTarEl = document.getElementById('editor-title-font-target');
+        const ffVal = fontFamEl ? fontFamEl.value : 'default';
+        const ftVal = fontTarEl ? fontTarEl.value : 'both';
+        if (window.G) {
+          window.G.titleFontFamily = ffVal;
+          window.G.titleFontTarget = ftVal;
+        }
+        if (window.n) {
+          window.n.titleFontFamily = ffVal;
+          window.n.titleFontTarget = ftVal;
+        }
+        if (window.U && window.U[window.W]) {
+          window.U[window.W].titleFontFamily = ffVal;
+          window.U[window.W].titleFontTarget = ftVal;
+        }
+        updateTitleDetailsActiveBadge();
         applyPreviewTheme();
         renderLivePreview();
         if (typeof window.S === 'function') window.S();
@@ -14539,6 +14658,8 @@
         if (window.G.titleLightIntensity !== undefined) allForms[idx].titleLightIntensity = window.G.titleLightIntensity;
         if (window.G.titleColorType !== undefined) allForms[idx].titleColorType = window.G.titleColorType;
         if (window.G.titleColorCustom !== undefined) allForms[idx].titleColorCustom = window.G.titleColorCustom;
+        if (window.G.titleFontFamily !== undefined) allForms[idx].titleFontFamily = window.G.titleFontFamily;
+        if (window.G.titleFontTarget !== undefined) allForms[idx].titleFontTarget = window.G.titleFontTarget;
         
         if (window.G.editorMode !== undefined) allForms[idx].editorMode = window.G.editorMode;
         if (window.G.header !== undefined) allForms[idx].header = window.G.header;
@@ -16002,6 +16123,8 @@
       titleLightIntensity: f.titleLightIntensity !== undefined ? f.titleLightIntensity : 60,
       titleColorType: f.titleColorType || 'default',
       titleColorCustom: f.titleColorCustom || '#1a73e8',
+      titleFontFamily: f.titleFontFamily || 'default',
+      titleFontTarget: f.titleFontTarget || 'both',
       sections: (f.sections || []).map(sec => ({
         id: sec.id,
         title: (sec.title || '').trim(),
@@ -16060,6 +16183,8 @@
       titleLightIntensity: formObj.titleLightIntensity !== undefined ? formObj.titleLightIntensity : 60,
       titleColorType: formObj.titleColorType || 'default',
       titleColorCustom: formObj.titleColorCustom || '#1a73e8',
+      titleFontFamily: formObj.titleFontFamily || 'default',
+      titleFontTarget: formObj.titleFontTarget || 'both',
       sections: JSON.parse(JSON.stringify(formObj.sections || [])),
       theme: formObj.theme ? JSON.parse(JSON.stringify(formObj.theme)) : null,
       settings: formObj.settings ? JSON.parse(JSON.stringify(formObj.settings)) : null,

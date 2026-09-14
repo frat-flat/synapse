@@ -5858,3 +5858,132 @@ button.btn-sec-reorder {
   color: #ffffff !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
+
+/* ==========================================================================
+   🎨 タイトルの詳細設定（折りたたみアコーディオン）スタイル
+   ========================================================================== */
+.title-details-accordion {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--color-bg-card, #ffffff);
+  overflow: hidden;
+  margin-top: 4px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.title-details-accordion:hover {
+  border-color: #cbd5e1;
+}
+
+.title-details-accordion[open] {
+  border-color: var(--color-primary, #1a73e8);
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.08);
+}
+
+.title-details-summary {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 8px 12px !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  list-style: none !important;
+  background: rgba(0, 0, 0, 0.02);
+  transition: background 0.15s ease;
+}
+
+.title-details-summary::-webkit-details-marker {
+  display: none !important;
+}
+
+.title-details-summary:hover {
+  background: rgba(26, 115, 232, 0.05);
+}
+
+.title-details-summary-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.title-details-summary-icon {
+  font-size: 0.85rem;
+}
+
+.title-details-summary-text {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text, #333);
+}
+
+.title-details-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: #e0f2fe;
+  color: #0284c7;
+  padding: 1px 6px;
+  border-radius: 10px;
+  letter-spacing: 0.3px;
+  margin-left: 4px;
+}
+
+.title-details-arrow {
+  font-size: 0.65rem;
+  color: var(--color-text-muted, #64748b);
+  transition: transform 0.2s ease;
+}
+
+.title-details-accordion[open] .title-details-arrow {
+  transform: rotate(180deg);
+}
+
+.title-details-content {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  background: #fafbfc;
+}
+
+.title-details-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.08);
+}
+
+.title-details-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.title-details-section-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-text-dark, #475569);
+  margin-bottom: 1px;
+}
+
+/* 各種フォント適用ユーティリティ */
+.font-noto-sans {
+  font-family: 'Noto Sans JP', sans-serif !important;
+}
+.font-noto-serif {
+  font-family: 'Noto Serif JP', serif !important;
+}
+.font-rounded {
+  font-family: 'M PLUS Rounded 1c', sans-serif !important;
+}
+.font-dela-gothic {
+  font-family: 'Dela Gothic One', sans-serif !important;
+}
+.font-zen-kaku {
+  font-family: 'Zen Kaku Gothic New', sans-serif !important;
+}
+.font-kaisei {
+  font-family: 'Kaisei Decol', serif !important;
+}
+
