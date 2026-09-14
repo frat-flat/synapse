@@ -2639,8 +2639,14 @@
           const formattedZip = rawZip.length === 7 ? `${rawZip.substring(0, 3)}-${rawZip.substring(3)}` : rawZip;
 
           formDefinition.sections.forEach(sec => {
+            const secTitle = sec.title || '';
+            // 個人事業主用セクションには法人情報を一切自動反映しない
+            if (secTitle.includes('個人')) return;
+
             (sec.questions || []).forEach(q => {
               const qTitle = q.title || '';
+              // 屋号項目は自動反映の対象外
+              if (qTitle.includes('屋号')) return;
 
               // 0. 法人名欄
               const isCorpNameField = (q.dataKey === 'company_name') || ((qTitle.includes('法人名') || qTitle.includes('会社名') || qTitle.includes('貴社名') || qTitle.includes('御社名') || qTitle.includes('企業名') || qTitle.includes('商号')) && !qTitle.includes('カナ') && !qTitle.includes('フリガナ') && !qTitle.includes('ふりがな') && qTitle.trim() !== '屋号');
@@ -3343,6 +3349,13 @@
           const section = sections[sectionIndex];
           visitedSections.add(section.id);
 
+          // 🎯 個人/法人セクション描画時、反対ブランチのデータを確実に完全消去
+          if (section.title && section.title.includes('個人')) {
+            clearOppositeBranchValues('個人');
+          } else if (section.title && section.title.includes('法人')) {
+            clearOppositeBranchValues('法人');
+          }
+
           // 進捗バー更新（複数セクションある場合のみ表示）
           if (sections.length > 1) {
             progressContainerEl.style.display = 'flex';
@@ -3528,6 +3541,52 @@
             toast.classList.remove('show');
           }, 3500);
         }
+
+        // 🎯 事業者区分（法人 ↔ 個人）変更時、反対側ブランチの入力値を完全消去・初期化する
+        function clearOppositeBranchValues(selectedType) {
+          if (!formDefinition || !formDefinition.sections || !selectedType) return;
+          const isIndiv = selectedType.includes('個人');
+          const isCorp = selectedType.includes('法人');
+          if (!isIndiv && !isCorp) return;
+
+          formDefinition.sections.forEach(sec => {
+            const sTitle = sec.title || '';
+            // 個人選択時: 法人向けセクションの入力データを全破棄
+            if (isIndiv && sTitle.includes('法人')) {
+              (sec.questions || []).forEach(q => {
+                delete formValues[q.id];
+                delete formValues[q.id + '_is_same_as_above'];
+                delete formValues[q.id + '_confirm'];
+                delete formValues[q.id + '_scrolled'];
+              });
+            }
+            // 法人選択時: 個人向けセクションの入力データを全破棄
+            else if (isCorp && sTitle.includes('個人')) {
+              (sec.questions || []).forEach(q => {
+                delete formValues[q.id];
+                delete formValues[q.id + '_is_same_as_above'];
+                delete formValues[q.id + '_confirm'];
+                delete formValues[q.id + '_scrolled'];
+              });
+            }
+          });
+
+          // 個人選択時: 屋号・屋号カナ欄に不正に残存しているデータがあれば確実に破棄
+          if (isIndiv) {
+            formDefinition.sections.forEach(sec => {
+              const sTitle = sec.title || '';
+              if (sTitle.includes('個人')) {
+                (sec.questions || []).forEach(q => {
+                  const qTitle = q.title || '';
+                  if (qTitle.includes('屋号')) {
+                    delete formValues[q.id];
+                  }
+                });
+              }
+            });
+          }
+        }
+        window.clearOppositeBranchValues = clearOppositeBranchValues;
 
         // 遷移先セクションの解決エンジン（ID・質問ID・グループID・タイトル・意味論フォールバックに対応）
         function resolveTargetSectionFromIdOrRef(targetRef, sections, currentSec = null, selectedVal = '') {
@@ -4069,6 +4128,13 @@
                 } else {
                   card.style.display = 'none';
                   clearError(q.id);
+                  delete formValues[q.id];
+                  const inputs = card.querySelectorAll('input:not(.same-as-above-checkbox), textarea');
+                  inputs.forEach(inp => { inp.value = ''; });
+                  const badges = card.querySelectorAll('.api-verified-badge');
+                  badges.forEach(b => { b.style.display = 'none'; b.innerHTML = ''; });
+                  const panels = card.querySelectorAll('.invoice-search-panel, .corp-search-panel');
+                  panels.forEach(p => { p.style.display = 'none'; });
                 }
                 return;
               }
@@ -5373,6 +5439,12 @@
                   formValues[q.id] = opt.label;
                   list.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
                   label.classList.add('selected');
+
+                  // 事業者区分（法人 ↔ 個人）変更時は反対側ブランチの入力値を全消去
+                  if (q.title && (q.title.includes('事業者区分') || (q.dataKey && q.dataKey.includes('account_type')))) {
+                    clearOppositeBranchValues(opt.label);
+                  }
+
                   // ラジオ変更で次のアクションが変わる可能性があるので更新
                   const section = formDefinition.sections.find(s => s.id === currentSectionId);
                   if (section) {
@@ -6193,6 +6265,12 @@
 
           const section = formDefinition.sections.find(s => s.id === currentSectionId);
           if (!section) return;
+
+          // 現在のセクションに事業者区分質問があれば、選択されている区分に合わせて反対側ブランチのデータをクリア
+          const accountTypeQ = (section.questions || []).find(q => q.title && (q.title.includes('事業者区分') || (q.dataKey && q.dataKey.includes('account_type'))));
+          if (accountTypeQ && formValues[accountTypeQ.id]) {
+            clearOppositeBranchValues(formValues[accountTypeQ.id]);
+          }
 
           const proceedToNext = () => {
             // 途中送信が設定されているセクション完了時の割り込み判定

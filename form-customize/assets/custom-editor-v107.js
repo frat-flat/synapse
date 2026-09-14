@@ -13453,6 +13453,8 @@
             if (input) input.disabled = true;
           } else {
             card.style.display = 'none';
+            const inputs = card.querySelectorAll('input, textarea, select');
+            inputs.forEach(inp => { inp.value = ''; });
           }
           delete values[q.id];
           delete values[q.id + "_confirm"];
