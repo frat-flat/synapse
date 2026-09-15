@@ -1904,6 +1904,11 @@
               const linkKey = `${masterId}_${formDefinition.id}`;
               const linkInfo = allStoredLinks[linkKey];
 
+              if (linkInfo && linkInfo.issuerId && !window.FORM_ISSUER_ID) {
+                window.FORM_ISSUER_ID = linkInfo.issuerId;
+                window.FORM_ISSUER_NAME = linkInfo.issuerName || '';
+              }
+
               // 🔒 1回回答済み（かつ管理者から再有効化されていない）場合 -> ロック画面を表示して回答を遮断
               if (linkInfo && linkInfo.status === 'submitted') {
                 loadingBox.style.display = 'none';

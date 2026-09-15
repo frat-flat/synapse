@@ -45883,10 +45883,7 @@ function issueAppointForm(formId) {
 
   const origin = window.location.origin || '';
   const pathname = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
-  let formUrl = `${origin}${pathname}form-customize/view.html?id=${formId}&mid=${masterId}`;
-  if (issuerId) {
-    formUrl += `&uid=${encodeURIComponent(issuerId)}`;
-  }
+  const formUrl = `${origin}${pathname}form-customize/view.html?id=${formId}&mid=${masterId}`;
 
   const newLink = {
     formId: formId,
