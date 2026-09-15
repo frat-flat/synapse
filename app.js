@@ -45693,6 +45693,7 @@ function renderAppointLinkedForms(appointData) {
           <span>${escapeHtml(formItem.formName)}</span>
         </span>
         ${statusBadgeHtml}
+        ${formItem.issuerId ? `<span style="font-size: 0.72rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 3px; background: rgba(0,0,0,0.03); padding: 1px 6px; border-radius: 4px;" title="発行者: ${escapeHtml(formItem.issuerName || formItem.issuerId)}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>${escapeHtml(formItem.issuerName || formItem.issuerId)}</span>` : ''}
       </div>
       <div class="form-row-actions" style="display: flex; align-items: center; gap: 0.35rem;">
         ${actionButtonsHtml}
@@ -45876,15 +45877,24 @@ function issueAppointForm(formId) {
   const formName = targetDef ? targetDef.name : formId;
   const masterId = data.id;
 
+  // フォーム発行ユーザー（アポインター / 担当者）のID・名前
+  const issuerId = state.currentUser ? (state.currentUser.loginId || state.currentUser.id) : (localStorage.getItem('cos_logged_user') || localStorage.getItem('gf_current_user') || '');
+  const issuerName = state.currentUser ? (state.currentUser.name || issuerId) : (issuerId || '');
+
   const origin = window.location.origin || '';
   const pathname = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
-  const formUrl = `${origin}${pathname}form-customize/view.html?id=${formId}&mid=${masterId}`;
+  let formUrl = `${origin}${pathname}form-customize/view.html?id=${formId}&mid=${masterId}`;
+  if (issuerId) {
+    formUrl += `&uid=${encodeURIComponent(issuerId)}`;
+  }
 
   const newLink = {
     formId: formId,
     formName: formName,
     url: formUrl,
     masterId: masterId,
+    issuerId: issuerId,
+    issuerName: issuerName,
     status: 'pending',
     issuedAt: new Date().toISOString(),
     submittedAt: null,

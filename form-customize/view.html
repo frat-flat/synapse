@@ -1872,6 +1872,9 @@
           const masterId = search.get('mid') || search.get('master_id');
           window.FORM_MASTER_ID = masterId;
 
+          const issuerId = search.get('uid') || search.get('issuer_id') || search.get('issuer');
+          window.FORM_ISSUER_ID = issuerId;
+
           if (masterId) {
             // クラウド（Supabase synapse_storage）から最新のリンク状態およびマスタプロファイルを非同期取得（別端末・別ブラウザ対応）
             try {
@@ -6711,6 +6714,24 @@
             submitData['master_id'] = window.FORM_MASTER_ID;
           }
 
+          // フォーム発行ユーザーID（アポインター / 担当者ID）の紐づけ
+          let currentIssuerId = window.FORM_ISSUER_ID;
+          let currentIssuerName = '';
+          if (window.FORM_MASTER_ID) {
+            try {
+              const allLinks = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
+              const lk = allLinks[`${window.FORM_MASTER_ID}_${formDefinition.id}`];
+              if (lk) {
+                if (!currentIssuerId && lk.issuerId) currentIssuerId = lk.issuerId;
+                if (lk.issuerName) currentIssuerName = lk.issuerName;
+              }
+            } catch(e) {}
+          }
+          if (currentIssuerId) {
+            submitData['issuer_id'] = currentIssuerId;
+            if (currentIssuerName) submitData['issuer_name'] = currentIssuerName;
+          }
+
           console.log('[Form Submit] Submitted data:', submitData);
 
           const rowId = window.currentResumeRowId || ('row_' + Date.now());
@@ -6953,6 +6974,8 @@
               links[linkKey] = {
                 ...(links[linkKey] || {}),
                 masterId: window.FORM_MASTER_ID,
+                issuerId: currentIssuerId || links[linkKey]?.issuerId || null,
+                issuerName: currentIssuerName || links[linkKey]?.issuerName || null,
                 formId: formDefinition.id,
                 formName: formDefinition.title || formDefinition.id,
                 status: 'submitted',
