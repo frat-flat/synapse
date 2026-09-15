@@ -1682,8 +1682,52 @@
             } catch(e) {}
           }
 
+          // 🔑 セキュアトークン（推測不可能な英数字ハッシュ）の解決
+          const token = search.get('k') || search.get('token');
+          window.FORM_TOKEN = token;
+          let tokenInfo = null;
+
+          if (token) {
+            // 1. ローカルストレージからの高速取得
+            try {
+              const allTokens = JSON.parse(localStorage.getItem('synapse_form_tokens') || '{}');
+              if (allTokens[token]) tokenInfo = allTokens[token];
+            } catch(e) {}
+
+            // 2. クラウド（Supabase synapse_storage）からの取得（初見端末・別ブラウザ対応）
+            try {
+              const tokenRes = await fetch(`${SB_STORAGE_URL}/rest/v1/synapse_storage?key=eq.synapse_form_token_${encodeURIComponent(token)}&select=value`, {
+                headers: { 'apikey': SB_STORAGE_KEY, 'Authorization': `Bearer ${SB_STORAGE_KEY}` }
+              });
+              if (tokenRes.ok) {
+                const tokenRows = await tokenRes.json();
+                if (Array.isArray(tokenRows) && tokenRows.length > 0 && tokenRows[0].value) {
+                  tokenInfo = tokenRows[0].value;
+                  // ローカルキャッシュ保存
+                  try {
+                    const allTokens = JSON.parse(localStorage.getItem('synapse_form_tokens') || '{}');
+                    allTokens[token] = tokenInfo;
+                    localStorage.setItem('synapse_form_tokens', JSON.stringify(allTokens));
+                  } catch(e) {}
+                }
+              }
+            } catch(e) {
+              console.warn('[View Token] Cloud token fetch error:', e);
+            }
+
+            if (tokenInfo) {
+              window.FORM_TOKEN_INFO = tokenInfo;
+              if (tokenInfo.masterId) window.FORM_MASTER_ID = tokenInfo.masterId;
+              if (tokenInfo.issuerId) window.FORM_ISSUER_ID = tokenInfo.issuerId;
+              if (tokenInfo.issuerName) window.FORM_ISSUER_NAME = tokenInfo.issuerName;
+            }
+          }
+
           // フォーム識別子の解決
           let formId = search.get('id');
+          if (!formId && tokenInfo && tokenInfo.formId) {
+            formId = tokenInfo.formId;
+          }
           const formIdx = search.get('form_idx');
           // 短縮URLパス (/f/:id または /form/:id) からの自動抽出
           if (!formId) {
@@ -1869,10 +1913,10 @@
           // ==========================================
           // 🔗 マスタID（アポイント連動）判定 & 1回回答制限ロック
           // ==========================================
-          const masterId = search.get('mid') || search.get('master_id');
+          const masterId = search.get('mid') || search.get('master_id') || window.FORM_MASTER_ID;
           window.FORM_MASTER_ID = masterId;
 
-          const issuerId = search.get('uid') || search.get('issuer_id') || search.get('issuer');
+          const issuerId = search.get('uid') || search.get('issuer_id') || search.get('issuer') || window.FORM_ISSUER_ID;
           window.FORM_ISSUER_ID = issuerId;
 
           if (masterId) {
@@ -1902,7 +1946,7 @@
             try {
               const allStoredLinks = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
               const linkKey = `${masterId}_${formDefinition.id}`;
-              const linkInfo = allStoredLinks[linkKey];
+              const linkInfo = allStoredLinks[linkKey] || window.FORM_TOKEN_INFO;
 
               if (linkInfo && linkInfo.issuerId && !window.FORM_ISSUER_ID) {
                 window.FORM_ISSUER_ID = linkInfo.issuerId;
@@ -1918,7 +1962,7 @@
                 if (lockCard) {
                   lockCard.style.display = 'block';
                   const midEl = document.getElementById('submitted-master-id-val');
-                  if (midEl) midEl.textContent = masterId;
+                  if (midEl) midEl.textContent = window.FORM_TOKEN ? '受付済み (認証完了)' : masterId;
                   const atEl = document.getElementById('submitted-at-val');
                   if (atEl && linkInfo.submittedAt) {
                     atEl.textContent = new Date(linkInfo.submittedAt).toLocaleString('ja-JP');
@@ -6718,6 +6762,9 @@
           if (window.FORM_MASTER_ID) {
             submitData['master_id'] = window.FORM_MASTER_ID;
           }
+          if (window.FORM_TOKEN) {
+            submitData['token'] = window.FORM_TOKEN;
+          }
 
           // フォーム発行ユーザーID（アポインター / 担当者ID）の紐づけ
           let currentIssuerId = window.FORM_ISSUER_ID;
@@ -6725,7 +6772,7 @@
           if (window.FORM_MASTER_ID) {
             try {
               const allLinks = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
-              const lk = allLinks[`${window.FORM_MASTER_ID}_${formDefinition.id}`];
+              const lk = allLinks[`${window.FORM_MASTER_ID}_${formDefinition.id}`] || window.FORM_TOKEN_INFO;
               if (lk) {
                 if (!currentIssuerId && lk.issuerId) currentIssuerId = lk.issuerId;
                 if (lk.issuerName) currentIssuerName = lk.issuerName;
@@ -6793,9 +6840,28 @@
             const storagePrefix = window.IS_TEST_ENV ? 'form_responses_test_' : 'form_responses_';
             const formKey = `${storagePrefix}${formDefinition.id || 'default'}`;
             const existing = JSON.parse(localStorage.getItem(formKey) || '[]');
+
+            // 🗄️ 重複回答アーカイブ無効化処理: 同一マスタID（パーティーID）の過去回答が存在する場合、削除せずアーカイブ（無効化）
+            if (window.FORM_MASTER_ID) {
+              existing.forEach(entry => {
+                const d = entry.data || {};
+                if (d.master_id === window.FORM_MASTER_ID || d.party_id === window.FORM_MASTER_ID) {
+                  entry.isArchived = true;
+                  entry.archivedAt = new Date().toISOString();
+                  entry.archiveReason = 'superseded_by_newer_submission';
+                  d.is_archived = true;
+                  d.status = 'archived';
+                }
+              });
+            }
+
+            submitData['is_archived'] = false;
+            submitData['status'] = 'active';
+
             existing.push({
               submittedAt: new Date().toISOString(),
               data: submitData,
+              isArchived: false,
               isPartial: isPartial,
               registrationCode: confirmedCode,
               env: window.IS_TEST_ENV ? 'test' : 'production',
@@ -6976,9 +7042,12 @@
               const links = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
               const linkKey = `${window.FORM_MASTER_ID}_${formDefinition.id}`;
               const submittedTime = new Date().toISOString();
+              const activeToken = window.FORM_TOKEN || links[linkKey]?.token || null;
+
               links[linkKey] = {
                 ...(links[linkKey] || {}),
                 masterId: window.FORM_MASTER_ID,
+                token: activeToken,
                 issuerId: currentIssuerId || links[linkKey]?.issuerId || null,
                 issuerName: currentIssuerName || links[linkKey]?.issuerName || null,
                 formId: formDefinition.id,
@@ -6987,6 +7056,37 @@
                 submittedAt: submittedTime
               };
               localStorage.setItem('synapse_form_links', JSON.stringify(links));
+
+              // 🔑 トークン（synapse_form_tokens）の更新（ローカル & クラウド）
+              if (activeToken) {
+                try {
+                  const tokens = JSON.parse(localStorage.getItem('synapse_form_tokens') || '{}');
+                  tokens[activeToken] = {
+                    ...(tokens[activeToken] || {}),
+                    ...links[linkKey],
+                    token: activeToken,
+                    status: 'submitted',
+                    submittedAt: submittedTime
+                  };
+                  localStorage.setItem('synapse_form_tokens', JSON.stringify(tokens));
+
+                  // クラウド（Supabase）へトークン更新保存
+                  fetch(`${SB_STORAGE_URL}/rest/v1/synapse_storage`, {
+                    method: 'POST',
+                    headers: {
+                      'apikey': SB_STORAGE_KEY,
+                      'Authorization': `Bearer ${SB_STORAGE_KEY}`,
+                      'Content-Type': 'application/json',
+                      'Prefer': 'resolution=merge-duplicates'
+                    },
+                    body: JSON.stringify({
+                      key: `synapse_form_token_${activeToken}`,
+                      value: tokens[activeToken],
+                      updated_at: submittedTime
+                    })
+                  }).catch(err => console.warn('[CloudFormToken] Submit error:', err));
+                } catch(e) {}
+              }
 
               // クラウド（Supabase synapse_storage）へ保存（別端末・別ブラウザ連携）
               fetch(`${SB_STORAGE_URL}/rest/v1/synapse_storage`, {

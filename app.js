@@ -45772,6 +45772,19 @@ function getSynapseFormLinks() {
   }
 }
 
+function generateFormSecureToken(length = 20) {
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const bytes = new Uint8Array(Math.ceil(length / 2));
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').substring(0, length);
+  }
+  let str = '';
+  while (str.length < length) {
+    str += Math.random().toString(36).substring(2);
+  }
+  return str.substring(0, length);
+}
+
 function saveSynapseFormLink(masterId, formId, linkData) {
   try {
     const links = getSynapseFormLinks();
@@ -45784,6 +45797,15 @@ function saveSynapseFormLink(masterId, formId, linkData) {
       updatedAt: new Date().toISOString()
     };
     localStorage.setItem('synapse_form_links', JSON.stringify(links));
+
+    // トークン情報もトークンインデックス（synapse_form_tokens）へ保存
+    if (links[key].token) {
+      try {
+        const tokens = JSON.parse(localStorage.getItem('synapse_form_tokens') || '{}');
+        tokens[links[key].token] = links[key];
+        localStorage.setItem('synapse_form_tokens', JSON.stringify(tokens));
+      } catch(e) {}
+    }
 
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel('synapse_form_channel');
@@ -45802,6 +45824,8 @@ async function syncFormLinkToCloud(masterId, formId, linkData) {
   try {
     const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
     const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+    
+    // 1. マスタIDキーでの保存（社内管理画面での検索用）
     const key = `synapse_form_link_${masterId}_${formId}`;
     await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
       method: 'POST',
@@ -45817,6 +45841,25 @@ async function syncFormLinkToCloud(masterId, formId, linkData) {
         updated_at: new Date().toISOString()
       })
     });
+
+    // 2. セキュアトークンキーでの保存（顧客端末からトークンのみで情報照合用）
+    if (linkData && linkData.token) {
+      const tokenKey = `synapse_form_token_${linkData.token}`;
+      await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: {
+          'apikey': sbKey,
+          'Authorization': `Bearer ${sbKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          key: tokenKey,
+          value: linkData,
+          updated_at: new Date().toISOString()
+        })
+      });
+    }
   } catch(e) {
     console.warn('[CloudFormLink] Save error:', e);
   }
@@ -45834,6 +45877,7 @@ async function fetchFormLinksFromCloud(masterId) {
       const rows = await res.json();
       if (Array.isArray(rows) && rows.length > 0) {
         const stored = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
+        const storedTokens = JSON.parse(localStorage.getItem('synapse_form_tokens') || '{}');
         let hasChanges = false;
         rows.forEach(r => {
           if (r.value && r.value.formId) {
@@ -45842,10 +45886,14 @@ async function fetchFormLinksFromCloud(masterId) {
               stored[k] = r.value;
               hasChanges = true;
             }
+            if (r.value.token) {
+              storedTokens[r.value.token] = r.value;
+            }
           }
         });
         if (hasChanges) {
           localStorage.setItem('synapse_form_links', JSON.stringify(stored));
+          localStorage.setItem('synapse_form_tokens', JSON.stringify(storedTokens));
           const curData = getCurrentAppointData();
           if (curData && curData.id === masterId) {
             renderAppointLinkedForms(curData);
@@ -45881,11 +45929,14 @@ function issueAppointForm(formId) {
   const issuerId = state.currentUser ? (state.currentUser.loginId || state.currentUser.id) : (localStorage.getItem('cos_logged_user') || localStorage.getItem('gf_current_user') || '');
   const issuerName = state.currentUser ? (state.currentUser.name || issuerId) : (issuerId || '');
 
+  // 🔑 推測不可能な英数字ハッシュ（セキュアトークン）を生成し、URLに内部情報を一切露出させない
+  const token = generateFormSecureToken(20);
   const origin = window.location.origin || '';
   const pathname = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
-  const formUrl = `${origin}${pathname}form-customize/view.html?id=${formId}&mid=${masterId}`;
+  const formUrl = `${origin}${pathname}form-customize/view.html?k=${token}`;
 
   const newLink = {
+    token: token,
     formId: formId,
     formName: formName,
     url: formUrl,
