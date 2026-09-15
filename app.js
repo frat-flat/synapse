@@ -12845,6 +12845,9 @@ function loadTabState(tab) {
   state.editingAppointId = data.id;
   state.connectedLinks = data.connectedLinks || {}; // 接続情報を復元
   document.getElementById('display-appoint-id').textContent = data.id;
+  if (typeof renderAppointLinkedForms === 'function') {
+    renderAppointLinkedForms(data);
+  }
 
   // 表示タイトルとボタン設定
   const isViewOnly = data.viewOnly || data.status === 'official' || data.status === 'cancelled';
@@ -13444,6 +13447,15 @@ function openTab(id, type, title, appointData = null) {
     fetchNewPartyId('synapse_appoint', true).then(realPartyId => {
       tab.appointData.isPartyIdLoading = false;
       tab.appointData.id = realPartyId;
+      const dockMasterEl = document.getElementById('dock-master-id');
+      if (dockMasterEl) dockMasterEl.textContent = realPartyId;
+      if (Array.isArray(tab.appointData.linkedForms)) {
+        tab.appointData.linkedForms.forEach(f => {
+          f.masterId = realPartyId;
+          if (f.url) f.url = f.url.replace(/([?&]mid=)[^&]+/, `$1${realPartyId}`);
+        });
+        if (typeof renderAppointLinkedForms === 'function') renderAppointLinkedForms(tab.appointData);
+      }
       
       // ローカルログの一時IDを本物のParty IDに差し替え
       replaceLocalPartyId(tempId, realPartyId);
@@ -45517,6 +45529,7 @@ if (document.readyState === 'loading') {
     initSpreadsheetMenuBar();
     initSpreadsheetCellContextMenu();
     initChartEditorEvents();
+    initAppointLinkedFormsEvents();
   });
 } else {
   initMobileBottomNavEvents();
@@ -45524,7 +45537,494 @@ if (document.readyState === 'loading') {
   initSpreadsheetMenuBar();
   initSpreadsheetCellContextMenu();
   initChartEditorEvents();
+  initAppointLinkedFormsEvents();
 }
+
+// ============================================================
+// 🌟 アポイント画面 連携フォーム管理 & 発行機能
+// ============================================================
+
+const APPOINT_AVAILABLE_FORMS = [
+  {
+    id: 'form_yosandas',
+    name: 'ヨサンダス申込フォーム',
+    desc: 'プラン選択、導入規模、契約希望時期など'
+  },
+  {
+    id: 'form_agency',
+    name: '代理店申込フォーム',
+    desc: 'インボイス番号、手数料振込先口座、取扱商材など'
+  }
+];
+
+function getCurrentAppointData() {
+  if (state.tabs && state.activeTabId) {
+    const currentTab = state.tabs.find(t => t.id === state.activeTabId);
+    if (currentTab && currentTab.type === 'appointment-screen' && currentTab.appointData) {
+      return currentTab.appointData;
+    }
+  }
+  if (state.activeAppointData) {
+    return state.activeAppointData;
+  }
+  // フォールバック: 画面上の表示IDから構築
+  const displayIdEl = document.getElementById('display-appoint-id');
+  const appointId = displayIdEl ? displayIdEl.textContent.trim() : '';
+  if (appointId && appointId !== '-' && !appointId.includes('取得中')) {
+    state.activeAppointData = { id: appointId, linkedForms: [] };
+    return state.activeAppointData;
+  }
+  return null;
+}
+
+function renderAppointLinkedForms(appointData) {
+  const data = appointData || getCurrentAppointData();
+  if (data) {
+    state.activeAppointData = data;
+  }
+  const dock = document.getElementById('appoint-linked-forms-dock');
+  if (!dock) return;
+
+  const masterId = data ? data.id : '-';
+  const masterIdEl = document.getElementById('dock-master-id');
+  if (masterIdEl) masterIdEl.textContent = masterId;
+
+  const container = document.getElementById('appoint-issued-forms-list');
+  if (!container) return;
+
+  if (!data) {
+    container.innerHTML = `<div id="appoint-no-forms-msg" style="font-size: 0.78rem; color: var(--text-muted); font-style: italic; padding: 0.25rem 0;">※ アポイント情報を読み込み中...</div>`;
+    return;
+  }
+
+  if (!Array.isArray(data.linkedForms)) {
+    data.linkedForms = [];
+  }
+
+  // synapse_form_links から最新状態を同期・復元
+  try {
+    const allStoredLinks = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
+    // 既存のリンクのステータス更新
+    data.linkedForms.forEach(formItem => {
+      const key = `${masterId}_${formItem.formId}`;
+      if (allStoredLinks[key] && allStoredLinks[key].status) {
+        formItem.status = allStoredLinks[key].status;
+        if (allStoredLinks[key].submittedAt) formItem.submittedAt = allStoredLinks[key].submittedAt;
+        if (allStoredLinks[key].reopenedAt) formItem.reopenedAt = allStoredLinks[key].reopenedAt;
+      }
+    });
+    // もしlinkedFormsに未登録だがstoredLinksに存在するものがあれば復元
+    Object.keys(allStoredLinks).forEach(key => {
+      const item = allStoredLinks[key];
+      if (item && item.masterId === masterId) {
+        if (!data.linkedForms.some(f => f.formId === item.formId)) {
+          data.linkedForms.push({ ...item });
+        }
+      }
+    });
+  } catch(e) {}
+
+  // クラウド（Supabase synapse_storage）からの最新ステータス非同期同期（別端末での回答検知）
+  if (masterId && masterId !== '-') {
+    const now = Date.now();
+    if (!data._lastCloudFetch || now - data._lastCloudFetch > 5000) {
+      data._lastCloudFetch = now;
+      fetchFormLinksFromCloud(masterId);
+    }
+  }
+
+  if (data.linkedForms.length === 0) {
+    container.innerHTML = `<div id="appoint-no-forms-msg" style="font-size: 0.78rem; color: var(--text-muted); font-style: italic; padding: 0.25rem 0;">※ 現在発行済みのフォームはありません。「フォームを発行」から選択してください。</div>`;
+    return;
+  }
+
+  container.innerHTML = '';
+  data.linkedForms.forEach(formItem => {
+    const row = document.createElement('div');
+    row.className = 'appoint-issued-form-row';
+
+    // ステータス表示
+    let statusBadgeHtml = '';
+    if (formItem.status === 'submitted') {
+      statusBadgeHtml = `<span class="appoint-form-status-tag status-submitted">回答済み</span>`;
+    } else if (formItem.status === 'requesting') {
+      statusBadgeHtml = `<span class="appoint-form-status-tag status-requesting">再有効化申請中</span>`;
+    } else if (formItem.status === 'reopened') {
+      statusBadgeHtml = `<span class="appoint-form-status-tag status-reopened">再有効化中</span>`;
+    } else {
+      statusBadgeHtml = `<span class="appoint-form-status-tag status-pending">未回答</span>`;
+    }
+
+    // アクションボタン
+    let actionButtonsHtml = `
+      <button type="button" class="btn-outline-custom" onclick="copyAppointFormLink('${formItem.url}', '${formItem.formName}')" title="リンクをコピー">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        <span>コピー</span>
+      </button>
+      <button type="button" class="btn-outline-custom" onclick="openAppointFormLink('${formItem.url}')" title="回答画面を開く">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        <span>開く</span>
+      </button>
+    `;
+
+    if (formItem.status === 'submitted') {
+      actionButtonsHtml += `
+        <button type="button" class="btn-outline-custom btn-action-request" onclick="requestAppointFormReopen('${formItem.formId}')" title="再有効化を申請">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+          <span>再有効化申請</span>
+        </button>
+      `;
+    } else if (formItem.status === 'requesting') {
+      const isAdmin = (typeof isUserAdmin === 'function' && isUserAdmin()) || (state.currentUser && state.currentUser.role === 'admin');
+      if (isAdmin) {
+        actionButtonsHtml += `
+          <button type="button" class="btn-outline-custom btn-action-approve" onclick="approveAppointFormReopen('${formItem.formId}')" title="管理者が承認してリンクを再有効化">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            <span>管理者承認</span>
+          </button>
+        `;
+      }
+    }
+
+    row.innerHTML = `
+      <div class="form-info-compact" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+        <span class="appoint-form-name-badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span>${escapeHtml(formItem.formName)}</span>
+        </span>
+        ${statusBadgeHtml}
+      </div>
+      <div class="form-row-actions" style="display: flex; align-items: center; gap: 0.35rem;">
+        ${actionButtonsHtml}
+      </div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function openAppointIssueModal() {
+  const data = getCurrentAppointData();
+  const masterId = data ? data.id : '-';
+
+  const modal = document.getElementById('modal-appoint-issue-form');
+  const targetIdEl = document.getElementById('modal-appoint-master-id-text');
+  if (targetIdEl) targetIdEl.textContent = masterId;
+
+  if (!Array.isArray(data?.linkedForms)) {
+    if (data) data.linkedForms = [];
+  }
+
+  const isYosandasIssued = data?.linkedForms?.some(f => f.formId === 'form_yosandas');
+  const isAgencyIssued = data?.linkedForms?.some(f => f.formId === 'form_agency');
+
+  const optY = document.getElementById('opt-issue-yosandas');
+  const btnY = document.getElementById('btn-select-yosandas');
+  if (optY && btnY) {
+    if (isYosandasIssued) {
+      optY.classList.add('disabled');
+      btnY.className = 'btn btn-sm btn-secondary';
+      btnY.textContent = '発行済み';
+      btnY.disabled = true;
+    } else {
+      optY.classList.remove('disabled');
+      btnY.className = 'btn btn-sm btn-primary';
+      btnY.textContent = '選択する';
+      btnY.disabled = false;
+    }
+  }
+
+  const optA = document.getElementById('opt-issue-agency');
+  const btnA = document.getElementById('btn-select-agency');
+  if (optA && btnA) {
+    if (isAgencyIssued) {
+      optA.classList.add('disabled');
+      btnA.className = 'btn btn-sm btn-secondary';
+      btnA.textContent = '発行済み';
+      btnA.disabled = true;
+    } else {
+      optA.classList.remove('disabled');
+      btnA.className = 'btn btn-sm btn-primary';
+      btnA.textContent = '選択する';
+      btnA.disabled = false;
+    }
+  }
+
+  if (modal) {
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+  }
+}
+
+function closeAppointIssueModal() {
+  const modal = document.getElementById('modal-appoint-issue-form');
+  if (modal) {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  }
+}
+
+function getSynapseFormLinks() {
+  try {
+    return JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
+  } catch(e) {
+    return {};
+  }
+}
+
+function saveSynapseFormLink(masterId, formId, linkData) {
+  try {
+    const links = getSynapseFormLinks();
+    const key = `${masterId}_${formId}`;
+    links[key] = {
+      ...(links[key] || {}),
+      ...linkData,
+      masterId: masterId,
+      formId: formId,
+      updatedAt: new Date().toISOString()
+    };
+    localStorage.setItem('synapse_form_links', JSON.stringify(links));
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel('synapse_form_channel');
+      bc.postMessage({ type: 'FORM_LINK_UPDATED', masterId, formId, status: linkData.status });
+      bc.close();
+    }
+
+    // クラウド（Supabase synapse_storage）へ非同期保存（端末間・別ブラウザ連携）
+    syncFormLinkToCloud(masterId, formId, links[key]);
+  } catch(e) {
+    console.warn('[SynapseForm] Failed to save form link:', e);
+  }
+}
+
+async function syncFormLinkToCloud(masterId, formId, linkData) {
+  try {
+    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+    const key = `synapse_form_link_${masterId}_${formId}`;
+    await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+      method: 'POST',
+      headers: {
+        'apikey': sbKey,
+        'Authorization': `Bearer ${sbKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({
+        key: key,
+        value: linkData,
+        updated_at: new Date().toISOString()
+      })
+    });
+  } catch(e) {
+    console.warn('[CloudFormLink] Save error:', e);
+  }
+}
+
+async function fetchFormLinksFromCloud(masterId) {
+  if (!masterId || masterId === '-') return;
+  try {
+    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+    const res = await fetch(`${sbUrl}/rest/v1/synapse_storage?key=like.synapse_form_link_${encodeURIComponent(masterId)}_*&select=key,value`, {
+      headers: { 'apikey': sbKey, 'Authorization': `Bearer ${sbKey}` }
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        const stored = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
+        let hasChanges = false;
+        rows.forEach(r => {
+          if (r.value && r.value.formId) {
+            const k = `${masterId}_${r.value.formId}`;
+            if (!stored[k] || stored[k].status !== r.value.status) {
+              stored[k] = r.value;
+              hasChanges = true;
+            }
+          }
+        });
+        if (hasChanges) {
+          localStorage.setItem('synapse_form_links', JSON.stringify(stored));
+          const curData = getCurrentAppointData();
+          if (curData && curData.id === masterId) {
+            renderAppointLinkedForms(curData);
+          }
+        }
+      }
+    }
+  } catch(e) {}
+}
+
+function issueAppointForm(formId) {
+  const data = getCurrentAppointData();
+  if (!data) {
+    if (typeof showToast === 'function') showToast('アポイント情報が見つかりません', 'error');
+    return;
+  }
+  if (!Array.isArray(data.linkedForms)) {
+    data.linkedForms = [];
+  }
+
+  const existing = data.linkedForms.find(f => f.formId === formId);
+  if (existing) {
+    if (typeof showToast === 'function') showToast('このフォームは既に発行されています', 'warning');
+    closeAppointIssueModal();
+    return;
+  }
+
+  const targetDef = APPOINT_AVAILABLE_FORMS.find(f => f.id === formId);
+  const formName = targetDef ? targetDef.name : formId;
+  const masterId = data.id;
+
+  const origin = window.location.origin || '';
+  const pathname = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+  const formUrl = `${origin}${pathname}form-customize/view.html?id=${formId}&mid=${masterId}`;
+
+  const newLink = {
+    formId: formId,
+    formName: formName,
+    url: formUrl,
+    masterId: masterId,
+    status: 'pending',
+    issuedAt: new Date().toISOString(),
+    submittedAt: null,
+    reopenedAt: null
+  };
+
+  data.linkedForms.push(newLink);
+  saveSynapseFormLink(masterId, formId, newLink);
+
+  renderAppointLinkedForms(data);
+  closeAppointIssueModal();
+  if (typeof showToast === 'function') {
+    showToast(`「${formName}」を発行しました。リンクをコピーして共有できます。`, 'success');
+  }
+}
+
+function copyAppointFormLink(url, formName) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      if (typeof showToast === 'function') showToast(`「${formName}」のリンクをコピーしました`, 'success');
+    }).catch(() => {
+      prompt('リンクをコピーしてください:', url);
+    });
+  } else {
+    prompt('リンクをコピーしてください:', url);
+  }
+}
+
+function openAppointFormLink(url) {
+  window.open(url, '_blank');
+}
+
+function requestAppointFormReopen(formId) {
+  const data = getCurrentAppointData();
+  if (!data || !Array.isArray(data.linkedForms)) return;
+  const target = data.linkedForms.find(f => f.formId === formId);
+  if (!target) return;
+
+  if (confirm(`「${target.formName}」の再有効化を管理者に申請しますか？\n誤送信や内容修正のためにリンクを再回答可能にします。`)) {
+    target.status = 'requesting';
+    target.requestedAt = new Date().toISOString();
+    saveSynapseFormLink(data.id, formId, target);
+    renderAppointLinkedForms(data);
+    if (typeof showToast === 'function') showToast(`「${target.formName}」の再有効化申請を送信しました（管理者承認待ち）`, 'info');
+  }
+}
+
+function approveAppointFormReopen(formId) {
+  const data = getCurrentAppointData();
+  if (!data || !Array.isArray(data.linkedForms)) return;
+  const target = data.linkedForms.find(f => f.formId === formId);
+  if (!target) return;
+
+  if (confirm(`「${target.formName}」の再有効化を承認しますか？\n回答者は同じURLから再度送信が可能になります。`)) {
+    target.status = 'reopened';
+    target.reopenedAt = new Date().toISOString();
+    saveSynapseFormLink(data.id, formId, target);
+    renderAppointLinkedForms(data);
+    if (typeof showToast === 'function') showToast(`「${target.formName}」を再有効化しました`, 'success');
+  }
+}
+
+function initAppointLinkedFormsEvents() {
+  const openBtn = document.getElementById('btn-open-appoint-form-modal');
+  if (openBtn) {
+    openBtn.addEventListener('click', openAppointIssueModal);
+  }
+
+  const closeBtn = document.getElementById('btn-close-appoint-form-modal');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeAppointIssueModal);
+  }
+
+  const modal = document.getElementById('modal-appoint-issue-form');
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeAppointIssueModal();
+    });
+  }
+
+  const btnY = document.getElementById('btn-select-yosandas');
+  if (btnY) {
+    btnY.addEventListener('click', (e) => {
+      e.stopPropagation();
+      issueAppointForm('form_yosandas');
+    });
+  }
+  const optY = document.getElementById('opt-issue-yosandas');
+  if (optY) {
+    optY.addEventListener('click', () => {
+      if (!optY.classList.contains('disabled')) issueAppointForm('form_yosandas');
+    });
+  }
+
+  const btnA = document.getElementById('btn-select-agency');
+  if (btnA) {
+    btnA.addEventListener('click', (e) => {
+      e.stopPropagation();
+      issueAppointForm('form_agency');
+    });
+  }
+  const optA = document.getElementById('opt-issue-agency');
+  if (optA) {
+    optA.addEventListener('click', () => {
+      if (!optA.classList.contains('disabled')) issueAppointForm('form_agency');
+    });
+  }
+
+  // リアルタイム同期リスナー（BroadcastChannel & storage イベント）
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      const bc = new BroadcastChannel('synapse_form_channel');
+      bc.onmessage = (e) => {
+        if (e.data && (e.data.type === 'FORM_SUBMITTED' || e.data.type === 'FORM_LINK_UPDATED')) {
+          const curData = getCurrentAppointData();
+          if (curData && (!e.data.masterId || curData.id === e.data.masterId)) {
+            renderAppointLinkedForms(curData);
+          }
+        }
+      };
+    } catch(e) {}
+  }
+
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'synapse_form_links') {
+      const curData = getCurrentAppointData();
+      if (curData) renderAppointLinkedForms(curData);
+    }
+  });
+}
+
+window.renderAppointLinkedForms = renderAppointLinkedForms;
+window.openAppointIssueModal = openAppointIssueModal;
+window.closeAppointIssueModal = closeAppointIssueModal;
+window.issueAppointForm = issueAppointForm;
+window.copyAppointFormLink = copyAppointFormLink;
+window.openAppointFormLink = openAppointFormLink;
+window.requestAppointFormReopen = requestAppointFormReopen;
+window.approveAppointFormReopen = approveAppointFormReopen;
+
 
 
 

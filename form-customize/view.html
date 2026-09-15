@@ -1111,6 +1111,70 @@
         </div>
       </div>
 
+      <!-- 🔒 1回回答制限・回答受付完了カード（線画SVGアイコン） -->
+      <div id="form-already-submitted-card" style="display: none; background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: var(--border-radius); border-top: 8px solid #0284c7; padding: 40px 32px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+        <div style="width: 56px; height: 56px; margin: 0 auto 18px; border-radius: 50%; background: #f0f9ff; display: flex; align-items: center; justify-content: center; border: 1.5px solid #bae6fd;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <h2 id="already-submitted-title" style="font-size: 1.3rem; font-weight: 700; color: var(--color-text-main); margin-bottom: 8px;">ご回答は既に受け付け済みです</h2>
+        <p id="already-submitted-desc" style="font-size: 0.9rem; color: var(--color-text-muted); line-height: 1.6; margin-bottom: 24px;">
+          このフォームリンクからのご回答は既に完了しております。<br>本フォームは1つのリンクにつき1回のみ回答いただけます。
+        </p>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 24px; text-align: left; font-size: 0.85rem; color: #475569; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #cbd5e1; padding-bottom: 6px;">
+            <span style="font-weight: 600; color: #64748b;">マスタID (アポイントID):</span>
+            <span id="submitted-master-id-val" style="font-family: monospace; font-weight: 700; color: #0f172a;">-</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #cbd5e1; padding-bottom: 6px;">
+            <span style="font-weight: 600; color: #64748b;">回答受付ステータス:</span>
+            <span style="color: #15803d; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              回答済み (受付確定)
+            </span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 600; color: #64748b;">受付日時:</span>
+            <span id="submitted-at-val" style="font-size: 0.8rem; color: #64748b;">-</span>
+          </div>
+        </div>
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px 16px; font-size: 0.82rem; color: #1e40af; margin-bottom: 24px; text-align: left; line-height: 1.5;">
+          <div style="font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 5px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            ご回答内容の修正をご希望の場合
+          </div>
+          誤送信や入力内容の変更が必要な場合は、担当者へ直接お問い合わせください。管理者による「再有効化」が行われると、再度このURLから修正・再回答が可能となります。
+        </div>
+        <button type="button" onclick="window.close()" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 24px; font-size: 0.88rem; cursor: pointer;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          このページを閉じる
+        </button>
+      </div>
+
+      <!-- 🔓 管理者再有効化バナー -->
+      <div id="form-reopened-banner" style="display: none; background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px;">
+        <div style="font-size: 0.88rem; font-weight: 700; color: #065f46; display: flex; align-items: center; gap: 6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+          管理者によりリンクが再有効化されました
+        </div>
+        <div style="font-size: 0.78rem; color: #047857; margin-top: 3px;">
+          前回の回答内容が引き継がれています。修正箇所をご確認の上、再送信してください。
+        </div>
+      </div>
+
+      <!-- 🔗 マスタID自動引継ぎバナー -->
+      <div id="master-prefilled-banner" style="display: none; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;">
+        <div style="font-size: 0.84rem; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 6px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+          マスタID連携中（会社情報・ご連絡先を自動引き継ぎました）
+        </div>
+        <div style="font-size: 0.74rem; color: #15803d; margin-top: 2px;">
+          前回の回答情報（会社名・代表者名・電話番号・メール等）が自動反映されています。
+        </div>
+      </div>
+
       <!-- フォーム本体コンテナ -->
       <div id="form-container" style="display: none; flex-direction: column; gap: 16px;">
         <!-- ヘッダーカード -->
@@ -1367,6 +1431,216 @@
         }
 
         // ==========================================
+        // 2.9 組み込みプリセットフォーム定義（ヨサンダス申込・代理店申込）
+        // ==========================================
+        const BUILTIN_PRESET_FORMS = [
+          {
+            id: 'form_yosandas',
+            formId: 'form_yosandas',
+            title: 'ヨサンダス申込フォーム',
+            description: 'サービスのお申し込みおよびプラン選択をお受けいたします。',
+            sections: [
+              {
+                id: 'sec_yosandas_main',
+                title: 'お申し込み基本情報',
+                description: 'ご契約法人・ご担当者様の基本情報をご入力ください。',
+                questions: [
+                  {
+                    id: 'q_corp_name',
+                    title: '会社名 / 屋号',
+                    type: 'text',
+                    required: true,
+                    dataKey: 'company_name',
+                    placeholder: '例: 合同会社frat flat'
+                  },
+                  {
+                    id: 'q_rep_name',
+                    title: '代表者名 / ご担当者名',
+                    type: 'text',
+                    required: true,
+                    dataKey: 'rep_name',
+                    placeholder: '例: 山田 太郎'
+                  },
+                  {
+                    id: 'q_tel',
+                    title: '電話番号',
+                    type: 'text',
+                    required: true,
+                    dataKey: 'tel',
+                    placeholder: '例: 090-1234-5678'
+                  },
+                  {
+                    id: 'q_email',
+                    title: 'メールアドレス',
+                    type: 'text',
+                    required: true,
+                    dataKey: 'email',
+                    placeholder: '例: info@example.com'
+                  },
+                  {
+                    id: 'q_plan',
+                    title: '希望プラン',
+                    type: 'radio',
+                    required: true,
+                    dataKey: 'plan',
+                    options: [
+                      'スタンダードプラン (月額5万円)',
+                      'プロフェッショナルプラン (月額10万円)',
+                      'エンタープライズプラン (別途お見積り)'
+                    ]
+                  },
+                  {
+                    id: 'q_notes',
+                    title: 'ご要望・備考',
+                    type: 'textarea',
+                    required: false,
+                    dataKey: 'notes',
+                    placeholder: 'ご質問や導入希望時期などがございましたらご自由にご記入ください。'
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            id: 'form_agency',
+            formId: 'form_agency',
+            title: '代理店申込フォーム',
+            description: 'パートナー代理店としての業務提携お申し込みを受け付けいたします。',
+            sections: [
+              {
+                id: 'sec_agency_main',
+                title: '代理店提携基本情報',
+                description: '貴社基本情報および手数料振込口座等をご入力ください。',
+                questions: [
+                  {
+                    id: 'q_agency_corp_name',
+                    title: '会社名 / 屋号',
+                    type: 'text',
+                    required: true,
+                    dataKey: 'company_name',
+                    placeholder: '例: 合同会社frat flat'
+                  },
+                  {
+                    id: 'q_agency_rep_name',
+                    title: '代表者名 / ご担当者名',
+                    type: 'text',
+                    required: true,
+                    dataKey: 'rep_name',
+                    placeholder: '例: 山田 太郎'
+                  },
+                  {
+                    id: 'q_agency_tel',
+                    title: '電話番号',
+                    type: 'text',
+                    required: true,
+                    dataKey: 'tel',
+                    placeholder: '例: 090-1234-5678'
+                  },
+                  {
+                    id: 'q_agency_email',
+                    title: 'メールアドレス',
+                    type: 'text',
+                    required: true,
+                    dataKey: 'email',
+                    placeholder: '例: info@example.com'
+                  },
+                  {
+                    id: 'q_agency_invoice',
+                    title: 'インボイス登録番号 (適格請求書発行事業者登録番号)',
+                    type: 'text',
+                    required: false,
+                    dataKey: 'invoice_number',
+                    placeholder: '例: T1234567890123 (T+13桁)'
+                  },
+                  {
+                    id: 'q_agency_bank',
+                    title: '手数料お振込指定口座',
+                    type: 'textarea',
+                    required: true,
+                    dataKey: 'bank_account',
+                    placeholder: '銀行名、支店名、口座種別（普通/当座）、口座番号、口座名義（カタカナ）をご入力ください。'
+                  }
+                ]
+              }
+            ]
+          }
+        ];
+
+        // 共通項目のキー正規化ヘルパー
+        function getProfileKeyForQuestion(q) {
+          const key = (q.dataKey || q.title || '').toLowerCase().replace(/[\s_\-]/g, '');
+          const title = (q.title || '').toLowerCase();
+
+          if (key.includes('company') || key.includes('corp') || title.includes('会社名') || title.includes('屋号') || title.includes('貴社名') || title.includes('法人名')) {
+            return 'company_name';
+          }
+          if (key.includes('rep') || key.includes('name') || title.includes('代表者') || title.includes('ご担当者') || title.includes('氏名') || title.includes('お名前')) {
+            return 'rep_name';
+          }
+          if (key.includes('tel') || key.includes('phone') || title.includes('電話番号') || title.includes('連絡先')) {
+            return 'tel';
+          }
+          if (key.includes('email') || key.includes('mail') || title.includes('メール')) {
+            return 'email';
+          }
+          if (key.includes('zip') || key.includes('post') || title.includes('郵便番号')) {
+            return 'zip_code';
+          }
+          if (key.includes('address') || title.includes('住所') || title.includes('所在地')) {
+            return 'address';
+          }
+          if (key.includes('invoice') || title.includes('インボイス') || title.includes('登録番号')) {
+            return 'invoice_number';
+          }
+          if (key.includes('bank') || title.includes('口座') || title.includes('振込先')) {
+            return 'bank_account';
+          }
+          return null;
+        }
+
+        const SB_STORAGE_URL = 'https://uefiuhywfsnrepiouofq.supabase.co';
+        const SB_STORAGE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+
+        // マスタプロファイルの取得
+        function getMasterProfile(masterId) {
+          if (!masterId) return null;
+          try {
+            const profiles = JSON.parse(localStorage.getItem('synapse_master_profiles') || '{}');
+            return profiles[masterId] || null;
+          } catch(e) { return null; }
+        }
+
+        // マスタプロファイルの保存・更新（ローカル＋Supabaseクラウド同期）
+        function saveMasterProfile(masterId, data) {
+          if (!masterId) return;
+          try {
+            const profiles = JSON.parse(localStorage.getItem('synapse_master_profiles') || '{}');
+            profiles[masterId] = {
+              ...(profiles[masterId] || {}),
+              ...data,
+              updatedAt: new Date().toISOString()
+            };
+            localStorage.setItem('synapse_master_profiles', JSON.stringify(profiles));
+
+            // クラウド（Supabase synapse_storage）へ非同期保存（端末間連携）
+            fetch(`${SB_STORAGE_URL}/rest/v1/synapse_storage`, {
+              method: 'POST',
+              headers: {
+                'apikey': SB_STORAGE_KEY,
+                'Authorization': `Bearer ${SB_STORAGE_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'resolution=merge-duplicates'
+              },
+              body: JSON.stringify({
+                key: `synapse_master_profile_${masterId}`,
+                value: profiles[masterId],
+                updated_at: new Date().toISOString()
+              })
+            }).catch(err => console.warn('[CloudProfile] Save error:', err));
+          } catch(e) {}
+        }
+
+        // ==========================================
         // 3. フォーム初期ロード
         // ==========================================
         async function loadForm() {
@@ -1542,6 +1816,13 @@
             } catch(e) {}
           }
 
+          // フォールバック3: 組み込みプリセットフォーム（ヨサンダス申込・代理店申込など）
+          if (!formDefinition) {
+            if (formId) {
+              formDefinition = BUILTIN_PRESET_FORMS.find(f => f && (f.id === formId || f.formId === formId));
+            }
+          }
+
           // 取得成功時は次回高速アクセスのためローカルストレージも更新キャッシュ
           if (formDefinition) {
             try {
@@ -1581,6 +1862,72 @@
 
           // フォーム名の設定
           document.title = formDefinition.title ? `${formDefinition.title} - フォーム回答` : 'フォーム回答';
+          window.formDefinition = formDefinition;
+          window.formValues = formValues;
+          window.applyValueToQuestion = applyValueToQuestion;
+
+          // ==========================================
+          // 🔗 マスタID（アポイント連動）判定 & 1回回答制限ロック
+          // ==========================================
+          const masterId = search.get('mid') || search.get('master_id');
+          window.FORM_MASTER_ID = masterId;
+
+          if (masterId) {
+            // クラウド（Supabase synapse_storage）から最新のリンク状態およびマスタプロファイルを非同期取得（別端末・別ブラウザ対応）
+            try {
+              const cloudRes = await fetch(`${SB_STORAGE_URL}/rest/v1/synapse_storage?key=in.(synapse_form_link_${encodeURIComponent(masterId)}_${encodeURIComponent(formDefinition.id)},synapse_master_profile_${encodeURIComponent(masterId)})&select=key,value`, {
+                headers: { 'apikey': SB_STORAGE_KEY, 'Authorization': `Bearer ${SB_STORAGE_KEY}` }
+              });
+              if (cloudRes.ok) {
+                const rows = await cloudRes.json();
+                if (Array.isArray(rows)) {
+                  rows.forEach(r => {
+                    if (r.key && r.key.startsWith('synapse_form_link_') && r.value) {
+                      const allLinks = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
+                      allLinks[`${masterId}_${formDefinition.id}`] = r.value;
+                      localStorage.setItem('synapse_form_links', JSON.stringify(allLinks));
+                    } else if (r.key && r.key.startsWith('synapse_master_profile_') && r.value) {
+                      const allProfs = JSON.parse(localStorage.getItem('synapse_master_profiles') || '{}');
+                      allProfs[masterId] = { ...(allProfs[masterId] || {}), ...r.value };
+                      localStorage.setItem('synapse_master_profiles', JSON.stringify(allProfs));
+                    }
+                  });
+                }
+              }
+            } catch(e) {}
+
+            try {
+              const allStoredLinks = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
+              const linkKey = `${masterId}_${formDefinition.id}`;
+              const linkInfo = allStoredLinks[linkKey];
+
+              // 🔒 1回回答済み（かつ管理者から再有効化されていない）場合 -> ロック画面を表示して回答を遮断
+              if (linkInfo && linkInfo.status === 'submitted') {
+                loadingBox.style.display = 'none';
+                formContainer.style.display = 'none';
+
+                const lockCard = document.getElementById('form-already-submitted-card');
+                if (lockCard) {
+                  lockCard.style.display = 'block';
+                  const midEl = document.getElementById('submitted-master-id-val');
+                  if (midEl) midEl.textContent = masterId;
+                  const atEl = document.getElementById('submitted-at-val');
+                  if (atEl && linkInfo.submittedAt) {
+                    atEl.textContent = new Date(linkInfo.submittedAt).toLocaleString('ja-JP');
+                  }
+                }
+                return;
+              }
+
+              // 🔓 管理者により再有効化されている場合 -> 再有効化バナーを表示
+              if (linkInfo && linkInfo.status === 'reopened') {
+                const reopenBanner = document.getElementById('form-reopened-banner');
+                if (reopenBanner) reopenBanner.style.display = 'block';
+              }
+            } catch(e) {
+              console.warn('[View MasterID] Error processing master link:', e);
+            }
+          }
 
           loadingBox.style.display = 'none';
           formContainer.style.display = 'flex';
@@ -1592,6 +1939,31 @@
 
           // 初期化
           initFormView();
+
+          // 🪄 マスタプロファイル（他フォームでの過去回答など）からの自動プレフィル（initFormView後に確実に適用）
+          if (masterId) {
+            try {
+              const masterProfile = getMasterProfile(masterId);
+              if (masterProfile) {
+                let prefilledCount = 0;
+                formDefinition.sections.forEach(s => {
+                  (s.questions || []).forEach(q => {
+                    const pKey = getProfileKeyForQuestion(q);
+                    if (pKey && masterProfile[pKey] && (formValues[q.id] === undefined || formValues[q.id] === '')) {
+                      applyValueToQuestion(q, masterProfile[pKey]);
+                      prefilledCount++;
+                    }
+                  });
+                });
+                if (prefilledCount > 0) {
+                  const prefBanner = document.getElementById('master-prefilled-banner');
+                  if (prefBanner) prefBanner.style.display = 'block';
+                }
+              }
+            } catch(e) {
+              console.warn('[View MasterID Prefill] Error:', e);
+            }
+          }
 
           // 途中再開（res_id）指定時の入力復元
           const resId = search.get('res_id');
@@ -6335,6 +6707,10 @@
             });
           });
 
+          if (window.FORM_MASTER_ID) {
+            submitData['master_id'] = window.FORM_MASTER_ID;
+          }
+
           console.log('[Form Submit] Submitted data:', submitData);
 
           const rowId = window.currentResumeRowId || ('row_' + Date.now());
@@ -6548,6 +6924,77 @@
             }
           } catch(emailErr) {
             console.warn('[AutoReply Mail Warning]', emailErr);
+          }
+
+          // ==========================================
+          // 4.5 マスタID連動: マスタプロファイル自動更新 & リンクステータス更新 (1回回答確定)
+          // ==========================================
+          if (window.FORM_MASTER_ID && formDefinition) {
+            try {
+              // プロファイル項目（会社名、代表者名、電話番号、メール、住所など）の抽出と保存
+              const profileUpdates = {};
+              formDefinition.sections.forEach(s => {
+                (s.questions || []).forEach(q => {
+                  const val = formValues[q.id];
+                  if (val !== undefined && val !== null && val !== '') {
+                    const pKey = getProfileKeyForQuestion(q);
+                    if (pKey) profileUpdates[pKey] = val;
+                  }
+                });
+              });
+              if (Object.keys(profileUpdates).length > 0) {
+                saveMasterProfile(window.FORM_MASTER_ID, profileUpdates);
+              }
+
+              // synapse_form_links の更新（ステータスを submitted に）
+              const links = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
+              const linkKey = `${window.FORM_MASTER_ID}_${formDefinition.id}`;
+              const submittedTime = new Date().toISOString();
+              links[linkKey] = {
+                ...(links[linkKey] || {}),
+                masterId: window.FORM_MASTER_ID,
+                formId: formDefinition.id,
+                formName: formDefinition.title || formDefinition.id,
+                status: 'submitted',
+                submittedAt: submittedTime
+              };
+              localStorage.setItem('synapse_form_links', JSON.stringify(links));
+
+              // クラウド（Supabase synapse_storage）へ保存（別端末・別ブラウザ連携）
+              fetch(`${SB_STORAGE_URL}/rest/v1/synapse_storage`, {
+                method: 'POST',
+                headers: {
+                  'apikey': SB_STORAGE_KEY,
+                  'Authorization': `Bearer ${SB_STORAGE_KEY}`,
+                  'Content-Type': 'application/json',
+                  'Prefer': 'resolution=merge-duplicates'
+                },
+                body: JSON.stringify({
+                  key: `synapse_form_link_${window.FORM_MASTER_ID}_${formDefinition.id}`,
+                  value: links[linkKey],
+                  updated_at: submittedTime
+                })
+              }).catch(err => console.warn('[CloudFormLink] Submit error:', err));
+
+              // BroadcastChannel でアポイント画面（親・別タブ）へリアルタイム通知
+              if (typeof BroadcastChannel !== 'undefined') {
+                const bc = new BroadcastChannel('synapse_form_channel');
+                bc.postMessage({
+                  type: 'FORM_SUBMITTED',
+                  masterId: window.FORM_MASTER_ID,
+                  formId: formDefinition.id,
+                  submittedAt: submittedTime
+                });
+                bc.close();
+              }
+            } catch(e) {
+              console.warn('[View MasterID Submit] Error:', e);
+            }
+
+            // 1回回答制限のため、「別の回答を送信」ボタンは非表示
+            if (btnSubmitAnother) {
+              btnSubmitAnother.style.display = 'none';
+            }
           }
 
           formContainer.style.display = 'none';

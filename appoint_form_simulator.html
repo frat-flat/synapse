@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>アポイントID ➔ マスタID昇格 & 複数フォーム連携 シミュレーター v4</title>
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --primary-light: #f0f9ff;
+      --success: #15803d;
+      --success-light: #f0fdf4;
+      --warning: #b45309;
+      --warning-light: #fffbeb;
+      --danger: #b91c1c;
+      --danger-light: #fef2f2;
+      --surface: #ffffff;
+      --background: #f8fafc;
+      --border: #cbd5e1;
+      --border-light: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    body { background: var(--background); color: var(--text); padding: 18px; line-height: 1.45; }
+
+    /* SVGアイコン共通スタイル */
+    .icon-svg {
+      display: inline-block;
+      vertical-align: middle;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      stroke: currentColor;
+      flex-shrink: 0;
+    }
+
+    /* 上部ヘッダー */
+    .header-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .header-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .header-title h1 {
+      font-size: 1.12rem;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge-master {
+      background: #0284c7;
+      color: #fff;
+      font-family: monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+    .role-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.76rem;
+      background: #f1f5f9;
+      border: 1px solid var(--border-light);
+      padding: 3px 10px;
+      border-radius: 16px;
+      color: #475569;
+    }
+
+    /* ステップナビ */
+    .step-bar {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .step-btn {
+      flex: 1;
+      min-width: 140px;
+      background: #ffffff;
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-align: left;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .step-btn:hover { background: #f1f5f9; }
+    .step-btn.active {
+      background: var(--primary-light);
+      border-color: var(--primary);
+      color: var(--primary-dark);
+      font-weight: 700;
+    }
+    .step-btn.completed {
+      background: var(--success-light);
+      border-color: #86efac;
+      color: var(--success);
+    }
+
+    /* ガイドバナー */
+    .guide-banner {
+      background: #f0f9ff;
+      border-left: 3px solid #0284c7;
+      border-radius: 4px;
+      padding: 9px 14px;
+      margin-top: 10px;
+      font-size: 0.82rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .btn-nav {
+      background: #0284c7;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 6px 14px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .btn-nav:hover { background: #0369a1; }
+
+    /* メイングリッド */
+    .simulator-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 980px) {
+      .simulator-grid { grid-template-columns: 1fr; }
+    }
+
+    /* パネルカード */
+    .panel-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .panel-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* 🌟 コンパクトな連携フォーム管理ドック（本番環境に組み込むUI） */
+    .compact-form-dock {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+    }
+    .dock-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .dock-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #334155;
+    }
+    .btn-issue-main {
+      background: #ffffff;
+      color: #0284c7;
+      border: 1px solid #0284c7;
+      padding: 4px 11px;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .btn-issue-main:hover { background: #f0f9ff; }
+    .btn-issue-main.highlight {
+      background: #0284c7;
+      color: #ffffff;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.25);
+    }
+
+    /* 発行済みフォーム一覧 */
+    .issued-forms-list {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .issued-form-row {
+      background: #f8fafc;
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.74rem;
+      transition: all 0.15s;
+    }
+    .issued-form-row.highlight {
+      border-color: #38bdf8;
+      background: #f0f9ff;
+    }
+    .form-info-compact {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .form-badge-name {
+      font-weight: 600;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* ステータスバッジ（シンプル・統一） */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .status-pending { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+    .status-submitted { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+    .status-requesting { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+    .status-reopened { background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; }
+
+    /* 線画ボタンスタイル（統一・シンプル） */
+    .form-row-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-action-outline {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      color: #334155;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.71rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+      line-height: 1.3;
+    }
+    .btn-action-outline:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+      color: #0f172a;
+    }
+    .btn-action-request {
+      border-color: #cbd5e1;
+      color: #475569;
+    }
+    .btn-action-request:hover {
+      background: #fff7ed;
+      border-color: #fdba74;
+      color: #c2410c;
+    }
+    .btn-action-approve {
+      background: #f0fdf4;
+      border-color: #86efac;
+      color: #15803d;
+      font-weight: 600;
+    }
+    .btn-action-approve:hover {
+      background: #dcfce7;
+      border-color: #4ade80;
+    }
+
+    /* トースト通知 */
+    .toast-msg {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1e293b;
+      color: #fff;
+      padding: 9px 16px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      animation: fadeInToast 0.2s ease-out;
+    }
+    @keyframes fadeInToast {
+      from { transform: translateY(8px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* アポイント本体の入力フォーム（本来のメイン業務画面） */
+    .appoint-main-form {
+      background: #ffffff;
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .main-form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .input-group label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 2px;
+    }
+    .input-group input, .input-group textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 5px 8px;
+      font-size: 0.78rem;
+      color: #1e293b;
+      background: #f8fafc;
+    }
+
+    /* 右: 顧客スマホ画面プレビュー（シミュレーター検証用） */
+    .device-mockup {
+      background: #1e293b;
+      border-radius: 20px;
+      padding: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      border: 2px solid #334155;
+      display: flex;
+      flex-direction: column;
+      height: 520px;
+    }
+    .device-note-badge {
+      background: #334155;
+      color: #94a3b8;
+      font-size: 0.65rem;
+      padding: 3px 6px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      text-align: center;
+    }
+    .device-top-bar {
+      color: #94a3b8;
+      font-size: 0.65rem;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 6px 4px;
+      font-weight: 500;
+    }
+    .device-url-bar {
+      background: #0f172a;
+      color: #38bdf8;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.65rem;
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .device-screen {
+      background: #ffffff;
+      border-radius: 12px;
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 顧客向けフォームスタイル */
+    .cust-card {
+      background: #ffffff;
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 8px;
+    }
+    .cust-field { margin-bottom: 8px; }
+    .cust-field label { display: block; font-size: 0.72rem; font-weight: 600; color: #475569; margin-bottom: 2px; }
+    .cust-field input, .cust-field select { width: 100%; border: 1px solid var(--border); border-radius: 4px; padding: 5px 7px; font-size: 0.78rem; background: #fff; }
+    .prefilled-tag { font-size: 0.65rem; background: #dcfce7; color: #15803d; padding: 1px 5px; border-radius: 3px; font-weight: 600; margin-left: 4px; }
+    .btn-submit-cust { width: 100%; background: #0284c7; color: #fff; border: none; padding: 8px; border-radius: 5px; font-weight: 600; font-size: 0.8rem; cursor: pointer; margin-top: 6px; }
+
+    /* ロック画面 */
+    .lock-box { text-align: center; padding: 26px 12px; }
+    .lock-icon-svg { margin-bottom: 8px; color: #64748b; }
+    .lock-title { font-size: 0.92rem; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
+    .lock-desc { font-size: 0.74rem; color: #64748b; line-height: 1.5; margin-bottom: 12px; }
+
+    /* DBテーブルプレビュー */
+    .db-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    table.data-table { width: 100%; border-collapse: collapse; font-size: 0.73rem; text-align: left; }
+    table.data-table th { background: #f8fafc; padding: 6px 8px; border-bottom: 2px solid var(--border); color: #475569; font-weight: 600; }
+    table.data-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-light); color: #334155; }
+    table.data-table tr.new-row { animation: highlightRow 1.5s ease-out; }
+    @keyframes highlightRow { 0% { background: #fef08a; } 100% { background: transparent; } }
+
+    /* フォーム発行モーダル */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      backdrop-filter: blur(1px);
+    }
+    .modal-box {
+      background: #ffffff;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 480px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .modal-header {
+      padding: 12px 16px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 700;
+      font-size: 0.88rem;
+      color: #1e293b;
+    }
+    .modal-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .form-select-item {
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .form-select-item:hover:not(.disabled) {
+      border-color: #0284c7;
+      background: #f0f9ff;
+    }
+    .form-select-item.disabled {
+      background: #f8fafc;
+      border-color: var(--border-light);
+      cursor: not-allowed;
+      opacity: 0.65;
+    }
+    .btn-select-action {
+      font-size: 0.72rem;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-select-action.btn-active-select {
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+    .btn-select-action.btn-disabled-select {
+      background: #e2e8f0;
+      color: #94a3b8;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ヘッダー・ステップ案内 -->
+  <div class="header-box">
+    <div class="header-title">
+      <h1>
+        <svg class="icon-svg" width="18" height="18" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+        アポイントID ➔ マスタID昇格 & 複数フォーム連携 シミュレーター
+      </h1>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="role-indicator">
+          <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <span>操作モード:</span>
+          <strong id="role-text" style="color:#0284c7;">アポインター (一般)</strong>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 0.78rem; color: var(--text-muted);">マスタID:</span>
+          <span class="badge-master" id="header-master-id">A3C9FPXT</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ステップナビゲーション -->
+    <div class="step-bar">
+      <button class="step-btn active" id="sbtn-1" onclick="jumpToStep(1)">1. フォーム選択発行</button>
+      <button class="step-btn" id="sbtn-2" onclick="jumpToStep(2)">2. 顧客が回答・送信</button>
+      <button class="step-btn" id="sbtn-3" onclick="jumpToStep(3)">3. 1回制限（ロック）確認</button>
+      <button class="step-btn" id="sbtn-4" onclick="jumpToStep(4)">4. 誤送信 ➔ 再有効化申請</button>
+      <button class="step-btn" id="sbtn-5" onclick="jumpToStep(5)">5. 代理店申込（自動プレフィル）</button>
+      <button class="step-btn" id="sbtn-6" onclick="jumpToStep(6)">6. DB統合（回答済み統一）</button>
+    </div>
+
+    <!-- ガイド解説 -->
+    <div class="guide-banner" id="guide-banner">
+      <div id="guide-text">
+        <strong>【Step 1】</strong> ドック右上の「<strong>フォームを発行</strong>」ボタンをクリックして、一覧から「ヨサンダス申込」を発行してみましょう。
+      </div>
+      <button class="btn-nav" id="btn-next-step" onclick="nextStep()">次へ進む ➔</button>
+    </div>
+  </div>
+
+  <!-- シミュレーター本体グリッド -->
+  <div class="simulator-grid">
+
+    <!-- 左カラム: 🖥️ アポインター画面（Synapse アポイント詳細 - 本番相当の画面） -->
+    <div class="panel-card">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg class="icon-svg" width="16" height="16" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+          Synapse アポイント詳細（マスタID: A3C9FPXT）
+        </div>
+        <span style="font-size: 0.72rem; color: #16a34a; font-weight: 600;">● 同期中</span>
+      </div>
+
+      <!-- 🌟 コンパクトな連携フォーム管理ドック（本番環境の実装対象） -->
+      <div class="compact-form-dock" id="form-dock-area">
+        <div class="dock-top">
+          <div class="dock-title">
+            <svg class="icon-svg" width="14" height="14" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            <span>連携フォーム管理（マスタID: A3C9FPXT 傘下）</span>
+          </div>
+          <!-- フォームを発行ボタン（線画アイコン） -->
+          <button class="btn-issue-main highlight" id="btn-open-issue-modal" onclick="openIssueModal()">
+            <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>フォームを発行</span>
+          </button>
+        </div>
+
+        <!-- 発行済みフォームの一覧（コンパクトな行表示） -->
+        <div class="issued-forms-list" id="issued-forms-container">
+          <div id="no-issued-forms" style="font-size: 0.73rem; color: #64748b; font-style: italic; padding: 2px 0;">
+            ※ 現在発行済みのフォームはありません。「フォームを発行」から選択してください。
+          </div>
+        </div>
+      </div>
+
+      <!-- アポイント本体の入力フォーム（本来のメイン業務画面） -->
+      <div class="appoint-main-form">
+        <div style="font-size: 0.78rem; font-weight: 700; color: #334155; border-bottom: 1px solid var(--border-light); padding-bottom: 4px; margin-bottom: 4px; display:flex; align-items:center; gap:5px;">
+          <svg class="icon-svg" width="14" height="14" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          アポイント基本情報・商談議事録
+        </div>
+        <div class="main-form-grid">
+          <div class="input-group">
+            <label>アポイントID (マスタID)</label>
+            <input type="text" value="A3C9FPXT" readonly style="font-family: monospace; font-weight: 700; color: #0284c7; background: #f1f5f9;">
+          </div>
+          <div class="input-group">
+            <label>相手先・会社名</label>
+            <input type="text" value="サイバーソリューションズ株式会社" id="appoint-corp-name">
+          </div>
+          <div class="input-group">
+            <label>ご担当者名</label>
+            <input type="text" value="佐藤 健一 様" id="appoint-rep-name">
+          </div>
+          <div class="input-group">
+            <label>面談日時</label>
+            <input type="text" value="2026/09/20 10:00">
+          </div>
+        </div>
+        <div class="input-group">
+          <label>商談メモ・事前トピック</label>
+          <textarea rows="2" style="resize: none;">ヨサンダス導入検討。初回面談にて課題ヒアリング後、代理店スキームも併せて案内予定。</textarea>
+        </div>
+      </div>
+
+      <div style="font-size: 0.72rem; color: #64748b; background: #f8fafc; border: 1px dashed var(--border); border-radius: 6px; padding: 7px 10px; margin-top: 10px; display:flex; align-items:center; gap:6px;">
+        <svg class="icon-svg" width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        <span><strong>設計仕様:</strong> 本番のアポイント画面には右側のスマホ枠は存在せず、上記のコンパクトドックのみが配置されます。</span>
+      </div>
+    </div>
+
+    <!-- 右カラム: 📱 顧客回答画面（※シミュレーター用の動作確認プレビュー） -->
+    <div class="device-mockup">
+      <div class="device-note-badge">
+        ※ 顧客が開くWeb画面（本番管理画面には非表示）
+      </div>
+      <div class="device-top-bar">
+        <span>12:00</span>
+        <span>5G 📶 100%</span>
+      </div>
+      <div class="device-url-bar" id="mock-url-display">
+        <svg class="icon-svg" width="11" height="11" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        https://synapse.app/form-customize/view.html
+      </div>
+      <div class="device-screen" id="mock-screen">
+        <!-- 初期状態 -->
+        <div style="text-align: center; padding: 40px 14px; color: #64748b;">
+          <svg class="icon-svg" width="32" height="32" viewBox="0 0 24 24" style="margin-bottom: 10px; stroke:#94a3b8;"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+          <div style="font-weight: 700; color: #1e293b; margin-bottom: 4px;">顧客の回答画面プレビュー</div>
+          <div style="font-size: 0.74rem; line-height: 1.5;">
+            左側の「フォームを発行」から選択すると、顧客が開く画面がここに再現されます。
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 下部: 📊 リアルタイム データベース連動テーブル（ステータス完全統一） -->
+  <div class="db-section">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+      <div style="font-weight: 700; font-size: 0.88rem; color: #0f172a; display: flex; align-items: center; gap: 6px;">
+        <svg class="icon-svg" width="15" height="15" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+        データベース格納状況（マスタID: A3C9FPXT で自動串刺し）
+      </div>
+      <span style="font-size: 0.71rem; color: #0284c7; font-weight: 600;">リアルタイム連動中</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+      <!-- テーブル①: ヨサンダス申込テーブル -->
+      <div style="background: #ffffff; border: 1px solid var(--border-light); border-radius: 6px; padding: 10px;">
+        <div style="font-weight: 600; font-size: 0.76rem; color: #0369a1; margin-bottom: 6px; display:flex; align-items:center; gap:5px;">
+          <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+          ヨサンダス申込テーブル (form_yosandas)
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="data-table" id="db-table-yosandas">
+            <thead>
+              <tr>
+                <th>マスタID</th>
+                <th>会社名</th>
+                <th>代表者</th>
+                <th>希望プラン</th>
+                <th>ステータス</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr id="empty-row-yosandas"><td colspan="5" style="text-align:center; color:#94a3b8; padding: 12px;">（回答データ未格納）</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- テーブル②: 代理店申込テーブル -->
+      <div style="background: #ffffff; border: 1px solid var(--border-light); border-radius: 6px; padding: 10px;">
+        <div style="font-weight: 600; font-size: 0.76rem; color: #15803d; margin-bottom: 6px; display:flex; align-items:center; gap:5px;">
+          <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+          代理店申込テーブル (form_agency)
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="data-table" id="db-table-agency">
+            <thead>
+              <tr>
+                <th>マスタID</th>
+                <th>会社名</th>
+                <th>インボイス番号</th>
+                <th>振込指定口座</th>
+                <th>ステータス</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr id="empty-row-agency"><td colspan="5" style="text-align:center; color:#94a3b8; padding: 12px;">（回答データ未格納）</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🌟 フォーム発行モーダル（線画アイコン & グレーアウト） -->
+  <div class="modal-backdrop" id="modal-issue-form">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <svg class="icon-svg" width="15" height="15" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+          <span>連携フォームの発行（フォーム選択）</span>
+        </div>
+        <button onclick="closeIssueModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:#94a3b8;">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size: 0.74rem; color: #64748b;">
+          現在のアポイント（マスタID: <strong style="color:#0284c7; font-family:monospace;">A3C9FPXT</strong>）に紐づけて発行するフォームを選択してください：
+        </div>
+        
+        <!-- 選択肢1: ヨサンダス申込 -->
+        <div class="form-select-item" id="opt-yosandas" onclick="trySelectFormOption('yosandas')">
+          <div>
+            <div style="font-weight: 600; color: #0f172a; font-size: 0.83rem; display:flex; align-items:center; gap:5px;">
+              <svg class="icon-svg" width="14" height="14" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+              ヨサンダス申込フォーム
+            </div>
+            <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px;">プラン選択、導入規模、契約希望時期など</div>
+          </div>
+          <button class="btn-select-action btn-active-select" id="btn-modal-yosandas">選択する</button>
+        </div>
+
+        <!-- 選択肢2: 代理店申込 -->
+        <div class="form-select-item" id="opt-agency" onclick="trySelectFormOption('agency')">
+          <div>
+            <div style="font-weight: 600; color: #0f172a; font-size: 0.83rem; display:flex; align-items:center; gap:5px;">
+              <svg class="icon-svg" width="14" height="14" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+              代理店申込フォーム
+            </div>
+            <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px;">インボイス番号、手数料振込先口座、取扱商材など</div>
+          </div>
+          <button class="btn-select-action btn-active-select" id="btn-modal-agency">選択する</button>
+        </div>
+
+        <div style="font-size: 0.7rem; color: #94a3b8;">
+          ※ 一度発行されたフォームは「発行済み」となり二重発行が防止されます。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- トースト表示要素 -->
+  <div class="toast-msg" id="toast-msg">
+    <svg class="icon-svg" width="14" height="14" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    <span id="toast-text">リンクをクリップボードにコピーしました</span>
+  </div>
+
+  <script>
+    const state = {
+      currentStep: 1,
+      masterId: 'A3C9FPXT',
+      customer: {
+        company: 'サイバーソリューションズ株式会社',
+        name: '佐藤 健一',
+        phone: '03-5555-1234',
+        email: 'sato@cybersolutions.co.jp'
+      },
+      yosandas: {
+        issued: false,
+        status: 'pending', // pending, submitted, requesting, reopened
+        data: {
+          plan: 'スタンダードプラン (月額5万円)',
+          period: '2026年10月〜'
+        }
+      },
+      agency: {
+        issued: false,
+        status: 'pending',
+        data: {
+          invoice: 'T1010001020304',
+          bank: '三井住友銀行 渋谷支店 普通 1234567'
+        }
+      }
+    };
+
+    function jumpToStep(step) {
+      state.currentStep = step;
+      updateStepNav();
+      renderStep(step);
+    }
+
+    function nextStep() {
+      if (state.currentStep < 6) jumpToStep(state.currentStep + 1);
+    }
+
+    function updateStepNav() {
+      for (let i = 1; i <= 6; i++) {
+        const btn = document.getElementById(`sbtn-${i}`);
+        if (!btn) continue;
+        btn.classList.remove('active', 'completed');
+        if (i === state.currentStep) btn.classList.add('active');
+        else if (i < state.currentStep) btn.classList.add('completed');
+      }
+    }
+
+    function renderStep(step) {
+      const guide = document.getElementById('guide-text');
+      const nextBtn = document.getElementById('btn-next-step');
+
+      if (step === 1) {
+        guide.innerHTML = `<strong>【Step 1】</strong> ドック右上の「<strong>フォームを発行</strong>」をクリックし、モーダルで「<strong>ヨサンダス申込</strong>」を発行してください。`;
+        nextBtn.style.display = 'inline-block';
+        document.getElementById('btn-open-issue-modal').classList.add('highlight');
+      } else if (step === 2) {
+        guide.innerHTML = `<strong>【Step 2】</strong> リンクが発行され「<strong>未回答</strong>」になりました。「<strong>コピー</strong>」で顧客に送る想定です。右画面の「<strong>送信する</strong>」を押してください。`;
+        document.getElementById('btn-open-issue-modal').classList.remove('highlight');
+        if (!state.yosandas.issued) issueFormDirect('yosandas');
+        openYosandasMock();
+      } else if (step === 3) {
+        guide.innerHTML = `<strong>【Step 3】</strong> 送信完了後、ステータスが「<strong>回答済み</strong>」に統一されました。顧客が同じURLを再読込しても受付完了画面が表示されます。`;
+        openYosandasLockedMock();
+      } else if (step === 4) {
+        guide.innerHTML = `<strong>【Step 4】</strong> 顧客から修正依頼！アポインターは「<strong>再有効化申請</strong>」をクリックし、管理者が承認してリンクを再有効化します。`;
+        highlightElement('btn-req-reopen-yosandas');
+      } else if (step === 5) {
+        guide.innerHTML = `<strong>【Step 5】</strong> 「<strong>フォームを発行</strong>」を開くとヨサンダス申込はグレーアウト！「<strong>代理店申込</strong>」を発行し、会社情報が自動引継ぎされるのを確認してください。`;
+        document.getElementById('btn-open-issue-modal').classList.add('highlight');
+      } else if (step === 6) {
+        guide.innerHTML = `<strong>【Step 6】</strong> 下部のテーブルをご覧ください。「ヨサンダス申込」「代理店申込」ともに「<strong>回答済み</strong>」で統一され、同一マスタIDで串刺しされました！`;
+        nextBtn.style.display = 'none';
+      }
+    }
+
+    function highlightElement(id) {
+      document.querySelectorAll('.issued-form-row, .btn-action-outline').forEach(el => el.classList.remove('highlight'));
+      const target = document.getElementById(id);
+      if (target) target.classList.add('highlight');
+    }
+
+    // モーダル開閉
+    function openIssueModal() {
+      updateModalOptions();
+      document.getElementById('modal-issue-form').style.display = 'flex';
+    }
+    function closeIssueModal() {
+      document.getElementById('modal-issue-form').style.display = 'none';
+    }
+
+    function updateModalOptions() {
+      const itemY = document.getElementById('opt-yosandas');
+      const btnY = document.getElementById('btn-modal-yosandas');
+      if (state.yosandas.issued) {
+        itemY.classList.add('disabled');
+        btnY.className = 'btn-select-action btn-disabled-select';
+        btnY.textContent = '発行済み';
+      } else {
+        itemY.classList.remove('disabled');
+        btnY.className = 'btn-select-action btn-active-select';
+        btnY.textContent = '選択する';
+      }
+
+      const itemA = document.getElementById('opt-agency');
+      const btnA = document.getElementById('btn-modal-agency');
+      if (state.agency.issued) {
+        itemA.classList.add('disabled');
+        btnA.className = 'btn-select-action btn-disabled-select';
+        btnA.textContent = '発行済み';
+      } else {
+        itemA.classList.remove('disabled');
+        btnA.className = 'btn-select-action btn-active-select';
+        btnA.textContent = '選択する';
+      }
+    }
+
+    function trySelectFormOption(formType) {
+      if (formType === 'yosandas' && state.yosandas.issued) {
+        showToast('このフォームは既に発行済みです。アポイント画面の「コピー」をご利用ください。');
+        return;
+      }
+      if (formType === 'agency' && state.agency.issued) {
+        showToast('このフォームは既に発行済みです。アポイント画面の「コピー」をご利用ください。');
+        return;
+      }
+      closeIssueModal();
+      issueFormDirect(formType);
+    }
+
+    // リンクコピー
+    function copyFormLink(formType) {
+      const url = `https://synapse.app/form-customize/view.html?id=form_${formType}&mid=${state.masterId}`;
+      navigator.clipboard?.writeText(url);
+      showToast(`${formType === 'yosandas' ? 'ヨサンダス申込' : '代理店申込'} のリンクをコピーしました`);
+    }
+
+    function showToast(text) {
+      const toast = document.getElementById('toast-msg');
+      document.getElementById('toast-text').textContent = text;
+      toast.style.display = 'flex';
+      setTimeout(() => { toast.style.display = 'none'; }, 2400);
+    }
+
+    // 発行処理（線画アイコンで構成）
+    function issueFormDirect(formType) {
+      const container = document.getElementById('issued-forms-container');
+      const emptyMsg = document.getElementById('no-issued-forms');
+      if (emptyMsg) emptyMsg.style.display = 'none';
+
+      if (formType === 'yosandas') {
+        state.yosandas.issued = true;
+        if (!document.getElementById('row-yosandas')) {
+          const row = document.createElement('div');
+          row.className = 'issued-form-row highlight';
+          row.id = 'row-yosandas';
+          row.innerHTML = `
+            <div class="form-info-compact">
+              <span class="form-badge-name">
+                <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                ヨサンダス申込
+              </span>
+              <span class="status-badge status-pending" id="badge-yosandas">未回答</span>
+            </div>
+            <div class="form-row-actions">
+              <button class="btn-action-outline" onclick="copyFormLink('yosandas')" title="リンクをコピー">
+                <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                コピー
+              </button>
+              <button class="btn-action-outline" onclick="openYosandasMock()" title="画面を開く">
+                <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                開く
+              </button>
+              <button class="btn-action-outline btn-action-request" id="btn-req-reopen-yosandas" style="display:none;" onclick="requestReopenYosandas()" title="再有効化を申請">
+                <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                再有効化申請
+              </button>
+              <button class="btn-action-outline btn-action-approve" id="btn-app-reopen-yosandas" style="display:none;" onclick="approveReopenYosandas()" title="管理者として承認">
+                <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                管理者承認
+              </button>
+            </div>
+          `;
+          container.appendChild(row);
+        }
+        if (state.currentStep === 1) jumpToStep(2);
+      } else if (formType === 'agency') {
+        state.agency.issued = true;
+        if (!document.getElementById('row-agency')) {
+          const row = document.createElement('div');
+          row.className = 'issued-form-row highlight';
+          row.id = 'row-agency';
+          row.innerHTML = `
+            <div class="form-info-compact">
+              <span class="form-badge-name">
+                <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                代理店申込
+              </span>
+              <span class="status-badge status-pending" id="badge-agency">未回答</span>
+            </div>
+            <div class="form-row-actions">
+              <button class="btn-action-outline" onclick="copyFormLink('agency')" title="リンクをコピー">
+                <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                コピー
+              </button>
+              <button class="btn-action-outline" onclick="openAgencyMock()" title="画面を開く">
+                <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                開く
+              </button>
+              <button class="btn-action-outline btn-action-request" id="btn-req-reopen-agency" style="display:none;" onclick="requestReopenAgency()" title="再有効化を申請">
+                <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                再有効化申請
+              </button>
+              <button class="btn-action-outline btn-action-approve" id="btn-app-reopen-agency" style="display:none;" onclick="approveReopenAgency()" title="管理者として承認">
+                <svg class="icon-svg" width="13" height="13" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                管理者承認
+              </button>
+            </div>
+          `;
+          container.appendChild(row);
+        }
+        openAgencyMock();
+      }
+      updateModalOptions();
+    }
+
+    // --- ヨサンダス申込画面 ---
+    function openYosandasMock() {
+      document.getElementById('mock-url-display').textContent = `https://synapse.app/form-customize/view.html?id=form_yosandas&mid=${state.masterId}`;
+      const screen = document.getElementById('mock-screen');
+      screen.innerHTML = `
+        <div class="cust-card">
+          <div style="font-weight: 700; font-size: 0.88rem; color: #0284c7; margin-bottom: 2px;">ヨサンダス申込フォーム</div>
+          <div style="font-size: 0.7rem; color: #64748b; margin-bottom: 10px;">マスタID: ${state.masterId} 連携中</div>
+          <div class="cust-field">
+            <label>会社名 / 屋号</label>
+            <input type="text" id="m-y-company" value="${state.customer.company}">
+          </div>
+          <div class="cust-field">
+            <label>代表者名</label>
+            <input type="text" id="m-y-name" value="${state.customer.name}">
+          </div>
+          <div class="cust-field">
+            <label>電話番号</label>
+            <input type="text" id="m-y-phone" value="${state.customer.phone}">
+          </div>
+          <div class="cust-field">
+            <label>メールアドレス</label>
+            <input type="email" id="m-y-email" value="${state.customer.email}">
+          </div>
+          <div class="cust-field">
+            <label>希望プラン</label>
+            <select id="m-y-plan">
+              <option value="スタンダードプラン (月額5万円)" selected>スタンダードプラン (月額5万円)</option>
+              <option value="プロフェッショナルプラン (月額10万円)">プロフェッショナルプラン (月額10万円)</option>
+            </select>
+          </div>
+          <button class="btn-submit-cust" onclick="submitYosandasMock()">ヨサンダス申込を送信する</button>
+        </div>
+      `;
+    }
+
+    function submitYosandasMock() {
+      state.yosandas.status = 'submitted';
+      state.yosandas.data.plan = document.getElementById('m-y-plan')?.value || state.yosandas.data.plan;
+
+      // 管理者/アポインター側の行更新（回答済みに統一）
+      const badge = document.getElementById('badge-yosandas');
+      if (badge) {
+        badge.className = 'status-badge status-submitted';
+        badge.textContent = '回答済み';
+      }
+      const reqBtn = document.getElementById('btn-req-reopen-yosandas');
+      if (reqBtn) reqBtn.style.display = 'inline-flex';
+      const appBtn = document.getElementById('btn-app-reopen-yosandas');
+      if (appBtn) appBtn.style.display = 'none';
+
+      // DBテーブルへ行追加（ステータスは「回答済み」に統一）
+      const tbody = document.querySelector('#db-table-yosandas tbody');
+      tbody.innerHTML = `
+        <tr class="new-row">
+          <td><span class="badge-master">${state.masterId}</span></td>
+          <td><strong>${state.customer.company}</strong></td>
+          <td>${state.customer.name}</td>
+          <td>${state.yosandas.data.plan}</td>
+          <td><span style="color:#15803d; font-weight:600;">回答済み</span></td>
+        </tr>
+      `;
+
+      // 顧客完了画面
+      const screen = document.getElementById('mock-screen');
+      screen.innerHTML = `
+        <div class="lock-box">
+          <svg class="icon-svg lock-icon-svg" width="36" height="36" viewBox="0 0 24 24" style="stroke:#15803d;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          <div class="lock-title">ヨサンダス申込が完了しました</div>
+          <div class="lock-desc">お申し込みありがとうございました。<br>ご登録内容を確認の上、担当者よりご連絡いたします。</div>
+          <div style="font-size:0.68rem; color:#94a3b8; font-family:monospace;">マスタID: ${state.masterId}</div>
+        </div>
+      `;
+
+      if (state.currentStep === 2) {
+        setTimeout(() => jumpToStep(3), 1000);
+      }
+    }
+
+    function openYosandasLockedMock() {
+      document.getElementById('mock-url-display').textContent = `https://synapse.app/form-customize/view.html?id=form_yosandas&mid=${state.masterId}`;
+      const screen = document.getElementById('mock-screen');
+      screen.innerHTML = `
+        <div class="lock-box">
+          <svg class="icon-svg lock-icon-svg" width="36" height="36" viewBox="0 0 24 24" style="stroke:#64748b;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <div class="lock-title">回答受付完了</div>
+          <div class="lock-desc">
+            「ヨサンダス申込」の回答は既に受付済みです。<br>
+            二重送信を防止するため、回答は1回のみに制限されています。<br><br>
+            <span style="color:#475569; font-weight:600;">※ 内容修正をご希望の場合は担当者までご連絡ください。</span>
+          </div>
+          <div style="background:#f1f5f9; padding:6px; border-radius:4px; font-size:0.68rem; color:#64748b;">
+            リンクID: ${state.masterId}_form_yosandas (ロック中)
+          </div>
+        </div>
+      `;
+    }
+
+    // アポインターによる「再有効化申請」
+    function requestReopenYosandas() {
+      state.yosandas.status = 'requesting';
+      const badge = document.getElementById('badge-yosandas');
+      if (badge) {
+        badge.className = 'status-badge status-requesting';
+        badge.textContent = '再有効化申請中';
+      }
+      document.getElementById('btn-req-reopen-yosandas').style.display = 'none';
+      const appBtn = document.getElementById('btn-app-reopen-yosandas');
+      if (appBtn) {
+        appBtn.style.display = 'inline-flex';
+        appBtn.classList.add('highlight');
+      }
+      showToast('管理者へ再有効化申請を送信しました（承認待ち）');
+
+      const guide = document.getElementById('guide-text');
+      guide.innerHTML = `<strong>【Step 4: 申請完了】</strong> アポインターが申請を行いました。緑の「<strong>管理者承認</strong>」ボタンをクリックしてリンクを再有効化してください。`;
+    }
+
+    // 管理者による「承認 & 再有効化」
+    function approveReopenYosandas() {
+      state.yosandas.status = 'reopened';
+      const badge = document.getElementById('badge-yosandas');
+      if (badge) {
+        badge.className = 'status-badge status-reopened';
+        badge.textContent = '再有効化中';
+      }
+      document.getElementById('btn-app-reopen-yosandas').style.display = 'none';
+
+      // 顧客画面でロック解除 & データ復元
+      document.getElementById('mock-url-display').textContent = `https://synapse.app/form-customize/view.html?id=form_yosandas&mid=${state.masterId}`;
+      const screen = document.getElementById('mock-screen');
+      screen.innerHTML = `
+        <div class="cust-card">
+          <div style="background:#f8fafc; border:1px solid #cbd5e1; color:#334155; font-size:0.7rem; padding:4px 8px; border-radius:4px; margin-bottom:8px; font-weight:600;">
+            管理者により再回答が承認されました（前回の入力内容を復元中）
+          </div>
+          <div style="font-weight: 700; font-size: 0.88rem; color: #0284c7; margin-bottom: 2px;">ヨサンダス申込 (再入力)</div>
+          <div class="cust-field">
+            <label>会社名 / 屋号</label>
+            <input type="text" value="${state.customer.company}">
+          </div>
+          <div class="cust-field">
+            <label>代表者名</label>
+            <input type="text" value="${state.customer.name}">
+          </div>
+          <div class="cust-field">
+            <label>電話番号</label>
+            <input type="text" value="${state.customer.phone}">
+          </div>
+          <div class="cust-field">
+            <label>メールアドレス</label>
+            <input type="email" value="${state.customer.email}">
+          </div>
+          <div class="cust-field">
+            <label>希望プラン (修正中)</label>
+            <select id="m-y-plan">
+              <option value="スタンダードプラン (月額5万円)">スタンダードプラン (月額5万円)</option>
+              <option value="プロフェッショナルプラン (月額10万円)" selected>プロフェッショナルプラン (月額10万円)</option>
+            </select>
+          </div>
+          <button class="btn-submit-cust" onclick="submitYosandasMock()">修正内容で再送信する</button>
+        </div>
+      `;
+      showToast('管理者が承認しました。リンクが再有効化されました');
+    }
+
+    // --- 代理店申込画面 ---
+    function openAgencyMock() {
+      document.getElementById('mock-url-display').textContent = `https://synapse.app/form-customize/view.html?id=form_agency&mid=${state.masterId}`;
+      const screen = document.getElementById('mock-screen');
+      screen.innerHTML = `
+        <div class="cust-card">
+          <div style="background: #f8fafc; border: 1px solid #cbd5e1; color: #1e40af; font-size: 0.68rem; padding: 5px 8px; border-radius: 4px; margin-bottom: 8px; font-weight: 600;">
+            マスタID (${state.masterId}) により、ヨサンダス申込の会社名・代表者名を自動引き継ぎました
+          </div>
+          <div style="font-weight: 700; font-size: 0.88rem; color: #15803d; margin-bottom: 2px;">代理店申込フォーム</div>
+          <div class="cust-field">
+            <label>会社名 / 屋号 <span class="prefilled-tag">自動引継</span></label>
+            <input type="text" value="${state.customer.company}">
+          </div>
+          <div class="cust-field">
+            <label>代表者名 <span class="prefilled-tag">自動引継</span></label>
+            <input type="text" value="${state.customer.name}">
+          </div>
+          <div class="cust-field">
+            <label>電話番号 <span class="prefilled-tag">自動引継</span></label>
+            <input type="text" value="${state.customer.phone}">
+          </div>
+          <div class="cust-field">
+            <label>インボイス登録番号 (T+13桁) <span style="color:#b91c1c; font-size:0.65rem;">*新規項目</span></label>
+            <input type="text" id="m-a-invoice" value="${state.agency.data.invoice}">
+          </div>
+          <div class="cust-field">
+            <label>手数料お振込指定口座 <span style="color:#b91c1c; font-size:0.65rem;">*新規項目</span></label>
+            <input type="text" id="m-a-bank" value="${state.agency.data.bank}">
+          </div>
+          <button class="btn-submit-cust" style="background:#15803d;" onclick="submitAgencyMock()">代理店申込を送信する</button>
+        </div>
+      `;
+    }
+
+    function submitAgencyMock() {
+      state.agency.status = 'submitted';
+      state.agency.data.invoice = document.getElementById('m-a-invoice')?.value || state.agency.data.invoice;
+      state.agency.data.bank = document.getElementById('m-a-bank')?.value || state.agency.data.bank;
+
+      // 管理者/アポインター側の行更新（回答済みに統一）
+      const badge = document.getElementById('badge-agency');
+      if (badge) {
+        badge.className = 'status-badge status-submitted';
+        badge.textContent = '回答済み';
+      }
+      const reqBtn = document.getElementById('btn-req-reopen-agency');
+      if (reqBtn) reqBtn.style.display = 'inline-flex';
+
+      // DBテーブルへ行追加（ステータスは「回答済み」に統一）
+      const tbody = document.querySelector('#db-table-agency tbody');
+      tbody.innerHTML = `
+        <tr class="new-row">
+          <td><span class="badge-master">${state.masterId}</span></td>
+          <td><strong>${state.customer.company}</strong></td>
+          <td>${state.agency.data.invoice}</td>
+          <td>${state.agency.data.bank}</td>
+          <td><span style="color:#15803d; font-weight:600;">回答済み</span></td>
+        </tr>
+      `;
+
+      // 完了画面
+      const screen = document.getElementById('mock-screen');
+      screen.innerHTML = `
+        <div class="lock-box">
+          <svg class="icon-svg lock-icon-svg" width="36" height="36" viewBox="0 0 24 24" style="stroke:#15803d;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          <div class="lock-title">代理店申込が完了しました</div>
+          <div class="lock-desc">
+            代理店加盟のお申し込みを受領いたしました。<br>
+            マスタID: ${state.masterId} にて全契約情報が紐づけられました。
+          </div>
+        </div>
+      `;
+
+      setTimeout(() => jumpToStep(6), 1000);
+    }
+
+    function requestReopenAgency() {
+      state.agency.status = 'requesting';
+      const badge = document.getElementById('badge-agency');
+      if (badge) {
+        badge.className = 'status-badge status-requesting';
+        badge.textContent = '再有効化申請中';
+      }
+      document.getElementById('btn-req-reopen-agency').style.display = 'none';
+      const appBtn = document.getElementById('btn-app-reopen-agency');
+      if (appBtn) appBtn.style.display = 'inline-flex';
+      showToast('管理者へ代理店申込の再有効化申請を送信しました');
+    }
+
+    function approveReopenAgency() {
+      state.agency.status = 'reopened';
+      const badge = document.getElementById('badge-agency');
+      if (badge) {
+        badge.className = 'status-badge status-reopened';
+        badge.textContent = '再有効化中';
+      }
+      document.getElementById('btn-app-reopen-agency').style.display = 'none';
+      openAgencyMock();
+      showToast('管理者が承認しました。代理店申込が再有効化されました');
+    }
+
+    // 初期化
+    window.addEventListener('DOMContentLoaded', () => {
+      jumpToStep(1);
+    });
+  </script>
+</body>
+</html>

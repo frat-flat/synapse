@@ -6807,4 +6807,91 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   font-weight: 700;
 }
 
+/* ============================================================
+   🌟 アポイント画面 連携フォーム管理ドック & モーダル
+   ============================================================ */
+.appoint-linked-forms-dock {
+  transition: all 0.2s ease;
+}
+.appoint-issued-form-row {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  transition: all 0.15s ease;
+}
+.appoint-issued-form-row:hover {
+  border-color: var(--primary);
+}
+.appoint-form-name-badge {
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.appoint-form-status-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.appoint-form-status-tag.status-pending {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+.appoint-form-status-tag.status-submitted {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+.appoint-form-status-tag.status-requesting {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+.appoint-form-status-tag.status-reopened {
+  background: #e0e7ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+}
+.btn-outline-custom {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.74rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.15s ease;
+  line-height: 1.3;
+}
+.btn-outline-custom:hover {
+  background: var(--bg-surface-elevated);
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+.appoint-form-select-item:hover:not(.disabled) {
+  border-color: var(--primary) !important;
+  background: rgba(2, 132, 199, 0.04) !important;
+}
+.appoint-form-select-item.disabled {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+  background: var(--bg-surface-elevated) !important;
+}
+
 

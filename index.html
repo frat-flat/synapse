@@ -2376,6 +2376,28 @@
     </div>
   </div>
 
+  <!-- 🌟 連携フォーム管理ドック（マスタID傘下のフォーム設定・発行） -->
+  <div id="appoint-linked-forms-dock" class="appoint-linked-forms-dock" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; box-shadow: var(--shadow-sm);">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-secondary);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+        <span style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary);">連携フォーム管理</span>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">(マスタID: <span id="dock-master-id" style="font-family: monospace; font-weight: 700; color: var(--primary);">-</span> 傘下)</span>
+      </div>
+      <button type="button" class="btn btn-outline-primary btn-sm" id="btn-open-appoint-form-modal" style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <span>フォームを発行</span>
+      </button>
+    </div>
+
+    <!-- 発行済みフォーム一覧コンテナ -->
+    <div id="appoint-issued-forms-list" style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+      <div id="appoint-no-forms-msg" style="font-size: 0.78rem; color: var(--text-muted); font-style: italic; padding: 0.25rem 0;">
+        ※ 現在発行済みのフォームはありません。「フォームを発行」から選択してください。
+      </div>
+    </div>
+  </div>
+
   <!-- 新規・既存アポイント切り替えトグル -->
   <div id="appointment-type-toggle-container" style="display: none; gap: 0.5rem; margin-bottom: 1.25rem;">
     <button type="button" class="btn btn-secondary active" id="toggle-cust-new" style="flex: 1; padding: 0.6rem; font-size: 0.85rem; font-weight: 600;">新規顧客アポイント</button>
@@ -4356,6 +4378,52 @@
     個数: 0 ▼
   </div>
   <div id="stats-dropdown-menu" class="stats-dropdown-menu" style="display: none;"></div>
+</div>
+
+<!-- ================= 🌟 アポイント連携フォーム発行モーダル ================= -->
+<div class="modal-overlay" id="modal-appoint-issue-form" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 20050; align-items: center; justify-content: center; backdrop-filter: blur(1px);">
+  <div class="modal-box" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 480px; max-width: 92%; box-shadow: var(--shadow-lg); overflow: hidden;">
+    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); background: var(--bg-surface-elevated);">
+      <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.95rem; color: var(--text-primary);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+        <span>連携フォームの発行（フォーム選択）</span>
+      </div>
+      <button type="button" id="btn-close-appoint-form-modal" style="background: none; border: none; font-size: 1.3rem; color: var(--text-muted); cursor: pointer; line-height: 1;">&times;</button>
+    </div>
+    <div class="modal-body" style="padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem;">
+      <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">
+        現在のアポイント（マスタID: <strong id="modal-appoint-master-id-text" style="font-family: monospace; color: var(--primary);">-</strong>）に紐づけて発行するフォームを選択してください：
+      </p>
+
+      <!-- 選択肢: ヨサンダス申込 -->
+      <div class="appoint-form-select-item" id="opt-issue-yosandas" style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.15s; background: var(--bg-surface-elevated);">
+        <div>
+          <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            <span>ヨサンダス申込フォーム</span>
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">プラン選択、導入規模、契約希望時期など</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-primary" id="btn-select-yosandas" style="font-size: 0.75rem; padding: 0.25rem 0.65rem;">選択する</button>
+      </div>
+
+      <!-- 選択肢: 代理店申込 -->
+      <div class="appoint-form-select-item" id="opt-issue-agency" style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.15s; background: var(--bg-surface-elevated);">
+        <div>
+          <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            <span>代理店申込フォーム</span>
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">インボイス番号、手数料振込先口座、取扱商材など</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-primary" id="btn-select-agency" style="font-size: 0.75rem; padding: 0.25rem 0.65rem;">選択する</button>
+      </div>
+
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">
+        ※ 一度発行されたフォームは「発行済み」となり二重発行が防止されます。
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ================= メモ暗証番号（4桁数字）モーダル ================= -->
