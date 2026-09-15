@@ -1384,15 +1384,13 @@
             </button>
           </div>
 
-          <!-- 🧪 テスト環境専用アクション（テストデータ消去） -->
-          <div id="share-test-tools-area" style="display: none; margin-top: 12px; padding: 10px 14px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; font-size: 0.76rem; color: #92400e; align-items: center; justify-content: space-between;">
+          <!-- 🧪 テスト環境案内（DB書き込みなし・テストテーブル不要の明示） -->
+          <div id="share-test-tools-area" style="display: none; margin-top: 12px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 0.76rem; color: #166534; align-items: center; gap: 8px;">
+            <span style="font-size: 1.1rem;">🛡️</span>
             <div>
-              <div style="font-weight: 700; color: #b45309;">🧪 テストデータ隔離管理</div>
-              <div style="font-size: 0.72rem; color: #92400e;">テスト送信したデータは本番と隔離された「(テスト)」テーブルに保存されます。</div>
+              <div style="font-weight: 700; color: #15803d;">DB書き込み完全遮断（テストテーブル廃止済み）</div>
+              <div style="font-size: 0.72rem; color: #166534; margin-top: 2px;">テスト送信時のデータはデータベース（本番・テスト）へ一切保存されません。そのためテストデータの消去作業も不要です。</div>
             </div>
-            <button type="button" id="btn-clear-test-data" class="btn btn-secondary btn-sm" style="font-size: 0.72rem; padding: 4px 10px; color: #dc2626; border-color: #fca5a5; background: #fff; cursor: pointer; white-space: nowrap;">
-              🗑️ テストデータを消去
-            </button>
           </div>
 
           <!-- フォーム定義JSON出力エリア（リンク発行モーダルの枠内に統合） -->

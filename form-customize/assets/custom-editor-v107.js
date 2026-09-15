@@ -16791,7 +16791,7 @@
           envNoticeTitle.style.color = '#b45309';
         }
         if (envNoticeDesc) {
-          envNoticeDesc.textContent = '公開前・公開後の動作検証用リンクです。編集内容は常に自動で即時反映されます（テスト環境への手動更新は一切不要です）。送信データは「(テスト)」テーブルへ完全隔離保存され、本番データには一切混ざりません。';
+          envNoticeDesc.textContent = '公開前・公開後の動作検証用リンクです。編集内容は常に自動で即時反映されます。テスト送信時はデータベースへの書き込みが一切行われないため、本番への混入や不要データの消去作業の心配なく何度でも安全に検証できます。';
         }
         if (urlLabel) urlLabel.textContent = 'テスト送信専用URL（動作検証用・本番隔離）';
         if (testStatusBadge) testStatusBadge.style.display = 'inline-block';
