@@ -1319,7 +1319,8 @@
         🖥️ デスクトップ
       </button>
       <button id="settings-tab-appoint-btn" class="settings-sub-tab" style="display: none; padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 700; border: none; background: none; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer; align-items: center; gap: 0.35rem; transition: all 0.2s;">
-        📅 アポイント設定
+        <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        <span>アポイント流入経路設定</span>
       </button>
     </div>
 
@@ -1480,32 +1481,57 @@
       <!-- 4. アポイント管理設定コンテンツ (管理者専用) -->
       <div id="settings-content-appoint" style="display: none; max-width: 540px; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; flex-direction: column; gap: 1.25rem;">
         <div style="border-left: 3px solid var(--primary); padding-left: 0.5rem;">
-          <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">
-            📅 アポイント設定（管理者専用）
+          <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span>アポイント流入経路設定（管理者専用）</span>
           </h3>
           <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">
-            アポイント登録時に選択可能な「オンライン種別 / 経路」の選択肢マスタを管理します。全ユーザーに共通して適用されます。
+            アポイント登録時に選択可能な「オンライン」および「オフライン」の詳細選択肢マスタを管理します。全ユーザーに共通して適用されます。
           </p>
         </div>
 
-        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <!-- オンライン選択肢管理 -->
+        <div style="display: flex; flex-direction: column; gap: 0.6rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem; background: var(--bg-surface);">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0;">オンライン種別 選択肢一覧:</label>
-            <span style="font-size: 0.72rem; color: var(--text-muted);">※初期選択肢「広告（）」は保護されています</span>
+            <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+              <span>オンライン選択肢一覧:</span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">※初期選択肢「広告（）」は保護</span>
           </div>
-          <div id="settings-online-options-list" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 220px; overflow-y: auto; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.6rem;">
+          <div id="settings-online-options-list" style="display: flex; flex-direction: column; gap: 0.35rem; max-height: 160px; overflow-y: auto; padding: 0.25rem 0;">
             <!-- JSで動的レンダリング -->
           </div>
-
           <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.25rem;">
-            <input type="text" id="settings-new-online-option-input" placeholder="新しい選択肢名を入力 (例: 紹介, SNS, HP 等)..." style="flex: 1; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-primary); outline: none;">
-            <button type="button" class="btn btn-primary" id="settings-add-online-option-btn" style="padding: 0.45rem 0.85rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
-              ➕ 追加
+            <input type="text" id="settings-new-online-option-input" placeholder="新しいオンライン選択肢名を入力..." style="flex: 1; padding: 0.4rem 0.6rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.8rem; background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+            <button type="button" class="btn btn-primary" id="settings-add-online-option-btn" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.25rem;">
+              <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>追加</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- オフライン選択肢管理 -->
+        <div style="display: flex; flex-direction: column; gap: 0.6rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem; background: var(--bg-surface);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path><line x1="3" y1="3" x2="21" y2="21"></line></svg>
+              <span>オフライン選択肢一覧:</span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">※初期選択肢「営業」は保護</span>
+          </div>
+          <div id="settings-offline-options-list" style="display: flex; flex-direction: column; gap: 0.35rem; max-height: 160px; overflow-y: auto; padding: 0.25rem 0;">
+            <!-- JSで動的レンダリング -->
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.25rem;">
+            <input type="text" id="settings-new-offline-option-input" placeholder="新しいオフライン選択肢名を入力..." style="flex: 1; padding: 0.4rem 0.6rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.8rem; background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
+            <button type="button" class="btn btn-primary" id="settings-add-offline-option-btn" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.25rem;">
+              <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>追加</span>
             </button>
           </div>
         </div>
       </div>
-
     </div>
   </div>
 </section>
@@ -2539,50 +2565,44 @@
           <input type="datetime-local" id="appoint-date" required>
         </div>
 
-        <!-- 形式（オンライン / オフライン）選択（必須・デフォルト未選択） -->
-        <div class="form-group required" id="appoint-meeting-type-group" style="margin-top: 1rem; margin-bottom: 1rem;">
-          <label style="font-weight: 700; margin-bottom: 0.4rem; display: block;">形式（オンライン / オフライン）</label>
-          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-            <label class="meeting-type-label-btn" id="label-meeting-type-online" style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.55rem 1.1rem; border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); font-size: 0.88rem; font-weight: 600; color: var(--text-primary); transition: all 0.2s; user-select: none;">
-              <input type="radio" name="appoint-meeting-type" id="appoint-type-online" value="online" style="cursor: pointer; width: 16px; height: 16px; margin: 0;">
-              <span>🌐 オンライン</span>
-            </label>
-            <label class="meeting-type-label-btn" id="label-meeting-type-offline" style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.55rem 1.1rem; border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); font-size: 0.88rem; font-weight: 600; color: var(--text-primary); transition: all 0.2s; user-select: none;">
-              <input type="radio" name="appoint-meeting-type" id="appoint-type-offline" value="offline" style="cursor: pointer; width: 16px; height: 16px; margin: 0;">
-              <span>🏢 オフライン</span>
-            </label>
+        <!-- 流入経路（オンライン / オフライン）選択（必須・デフォルト未選択） -->
+        <div class="form-group required" id="appoint-meeting-type-group" style="margin-top: 0.75rem; margin-bottom: 0.75rem;">
+          <label for="appoint-source-type" style="font-weight: 700; margin-bottom: 0.35rem; display: block;">流入経路</label>
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <!-- 1. 流入経路選択プルダウン (オンライン / オフライン) -->
+            <select id="appoint-source-type" style="min-width: 150px; flex: 0 1 180px; padding: 0.45rem 0.65rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; cursor: pointer;">
+              <option value="">-- 流入経路を選択 --</option>
+              <option value="online">オンライン</option>
+              <option value="offline">オフライン</option>
+            </select>
+
+            <!-- 2. 詳細候補プルダウン (オンラインまたはオフライン選択時に表示) -->
+            <div id="appoint-source-category-wrapper" style="display: none; flex: 1 1 180px; min-width: 160px;">
+              <select id="appoint-source-category" style="width: 100%; padding: 0.45rem 0.65rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; cursor: pointer;">
+                <!-- JSで動的にオプション生成 -->
+              </select>
+            </div>
+
+            <!-- 3. 管理者専用: 選択肢追加ボタン -->
+            <div id="admin-source-add-wrapper" style="display: none;">
+              <button type="button" class="btn btn-xs btn-outline-primary" id="btn-add-source-option" title="新しい選択肢を追加" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; height: 32px; border-radius: var(--radius-sm); white-space: nowrap;">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>選択肢を追加</span>
+              </button>
+            </div>
+
+            <!-- 4. 管理者専用: 補足メモ入力欄 (任意) -->
+            <div id="admin-source-subnote-wrapper" style="display: none; flex: 1 1 200px; min-width: 180px;">
+              <input type="text" id="appoint-source-subnote" placeholder="詳細補足 (例: Meta, Google など括弧内)" style="width: 100%; padding: 0.45rem 0.65rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; box-sizing: border-box;">
+            </div>
           </div>
 
-          <!-- オンライン選択時に展開される種別選択エリア -->
-          <div id="appoint-online-options-container" style="display: none; margin-top: 0.75rem; padding: 0.85rem 1rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-left: 3px solid var(--primary); border-radius: var(--radius-sm);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
-              <label for="appoint-online-category" style="font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0;">オンライン種別 / 経路:</label>
-              <!-- 選択肢追加ボタン (管理者のみ表示) -->
-              <div id="admin-online-add-wrapper" style="display: none;">
-                <button type="button" class="btn btn-xs btn-outline-primary" id="btn-add-online-option" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;">
-                  <span>+ 選択肢を追加</span>
-                </button>
-              </div>
-            </div>
-            
-            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-              <!-- 選択肢ドロップダウン (全ユーザー共通) -->
-              <select id="appoint-online-category" style="flex: 1; min-width: 180px; padding: 0.45rem 0.6rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
-                <!-- JSで動的にオプション生成 (初期値: 広告（）) -->
-              </select>
-
-              <!-- 補足メモ入力欄 (管理者のみ表示) -->
-              <div id="admin-online-subnote-wrapper" style="display: none; flex: 1; min-width: 200px;">
-                <input type="text" id="appoint-online-subnote" placeholder="詳細補足 (例: Meta, Google など括弧内)" style="width: 100%; padding: 0.45rem 0.6rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; box-sizing: border-box;">
-              </div>
-            </div>
-
-            <!-- 管理者用 インライン選択肢追加フォーム -->
-            <div id="add-online-option-inline-row" style="display: none; margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px dashed var(--border-color); align-items: center; gap: 0.5rem;">
-              <input type="text" id="new-online-option-input" placeholder="新しい選択肢名 (例: 紹介, SNS, HP経由 等)" style="flex: 1; padding: 0.4rem 0.6rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
-              <button type="button" class="btn btn-sm btn-primary" id="btn-confirm-add-online-option" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; cursor: pointer;">追加</button>
-              <button type="button" class="btn btn-sm btn-secondary" id="btn-cancel-add-online-option" style="padding: 0.35rem 0.5rem; font-size: 0.78rem; cursor: pointer;">キャンセル</button>
-            </div>
+          <!-- 管理者専用: インライン選択肢追加行 (ボタン押下時に展開) -->
+          <div id="add-source-option-inline-row" style="display: none; margin-top: 0.5rem; padding: 0.4rem 0.6rem; background: var(--bg-surface-elevated); border: 1px dashed var(--border-color); border-radius: var(--radius-sm); align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <span id="add-source-target-label" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; white-space: nowrap;">オンライン選択肢の追加:</span>
+            <input type="text" id="new-source-option-input" placeholder="新しい選択肢名を入力 (例: 紹介, SNS, HP経由 等)" style="flex: 1; min-width: 160px; padding: 0.35rem 0.55rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+            <button type="button" class="btn btn-sm btn-primary" id="btn-confirm-add-source-option" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; cursor: pointer;">追加</button>
+            <button type="button" class="btn btn-sm btn-secondary" id="btn-cancel-add-source-option" style="padding: 0.3rem 0.5rem; font-size: 0.75rem; cursor: pointer;">キャンセル</button>
           </div>
         </div>
         <div class="form-group required" id="customer-name-group">
