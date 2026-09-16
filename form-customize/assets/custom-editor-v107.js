@@ -15245,7 +15245,6 @@
     let lastLoadedFormTitle = "";
 
     const customF = function(masterState) {
-      console.log('[React Flow Bridge] Triggering render inside flowmap iframe...');
       if (masterState) {
         window.G = window.G || {};
         const isFormSwitched = (masterState.title !== lastLoadedFormTitle);
@@ -15276,9 +15275,10 @@
           updateHeaderActiveFormTitle(masterState.title);
         }
       }
-      const iframe = document.getElementById('flowmap-iframe');
-      if (iframe && iframe.contentWindow && iframe.contentWindow.triggerFlowmapRender) {
-        iframe.contentWindow.triggerFlowmapRender();
+      
+      // 🔀 Archify フローマップの直接レンダリング
+      if (window.archifyRenderer && window.G) {
+        window.archifyRenderer.render(window.G);
       }
     };
 
@@ -15286,29 +15286,13 @@
       Object.defineProperty(window, 'F', {
         get: () => customF,
         set: (val) => {
-          console.log('[Custom Flowmap] Blocked attempt to overwrite window.F with:', val);
+          console.log('[Archify Flowmap] Blocked attempt to overwrite window.F with:', val);
         },
         configurable: true
       });
-      console.log('[Custom Flowmap] window.F locked successfully!');
+      console.log('[Archify Flowmap] window.F locked to Archify engine successfully!');
     } catch (err) {
-      console.error('[Custom Flowmap] Failed to lock window.F:', err);
       window.F = customF;
-    }
-
-    const refreshBtn = document.getElementById('btn-refresh-flowmap');
-    if (refreshBtn) {
-      const newRefreshBtn = refreshBtn.cloneNode(true);
-      refreshBtn.parentNode.replaceChild(newRefreshBtn, refreshBtn);
-      newRefreshBtn.addEventListener('click', () => {
-        if (confirm('レイアウトを自動配置にリセットしますか？')) {
-          localStorage.removeItem('form_customize_flowmap_coords');
-        }
-        const iframe = document.getElementById('flowmap-iframe');
-        if (iframe && iframe.contentWindow && iframe.contentWindow.triggerFlowmapRender) {
-          iframe.contentWindow.triggerFlowmapRender();
-        }
-      });
     }
 
     if (window.G) {
@@ -17260,9 +17244,9 @@
   window.openShareUrlModal = openShareUrlModal;
 
 // ===================================================
-// フローマップ 凡例モーダル & クイック凡例トグル制御 (強固な即時実行 & デリゲーション)
+// サイドバー表示の正常化
 // ===================================================
-(function initFlowmapLegendAndSidebar() {
+(function initSidebarSetup() {
   function setup() {
     const sidebar = document.querySelector('.editor-sidebar');
     if (sidebar) {
@@ -17279,53 +17263,6 @@
   } else {
     setup();
   }
-
-  // グローバルイベントデリゲーションで確実にクリックをハンドリング
-  document.addEventListener('click', (e) => {
-    const modal = document.getElementById('flowmap-legend-modal');
-    
-    // 1. 凡例を開くボタン
-    if (e.target.closest('#btn-flowmap-legend') || e.target.closest('#btn-quick-legend-detail')) {
-      e.preventDefault();
-      if (modal) modal.classList.add('active');
-      return;
-    }
-
-    // 2. 凡例を閉じるボタン
-    if (e.target.closest('#btn-flowmap-legend-close') || e.target.closest('#btn-flowmap-legend-close-footer')) {
-      e.preventDefault();
-      if (modal) modal.classList.remove('active');
-      return;
-    }
-
-    // 3. モーダル背景クリックで閉じる
-    if (modal && e.target === modal) {
-      modal.classList.remove('active');
-      return;
-    }
-
-    // 4. クイック凡例の折りたたみトグル
-    if (e.target.closest('#btn-quick-legend-toggle')) {
-      e.preventDefault();
-      const quickLegend = document.getElementById('flowmap-quick-legend');
-      const btnToggle = document.getElementById('btn-quick-legend-toggle');
-      if (quickLegend && btnToggle) {
-        quickLegend.classList.toggle('collapsed');
-        btnToggle.textContent = quickLegend.classList.contains('collapsed') ? '＋' : '−';
-      }
-      return;
-    }
-  });
-
-  // ESCキーで閉じる
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      const modal = document.getElementById('flowmap-legend-modal');
-      if (modal && modal.classList.contains('active')) {
-        modal.classList.remove('active');
-      }
-    }
-  });
 })();
 
 // ===================================================
