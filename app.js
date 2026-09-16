@@ -758,6 +758,7 @@ const STORAGE_KEYS = {
   APPOINTMENTS: 'synapse_appointments',
   APPOINT_ONLINE_OPTIONS: 'synapse_appoint_online_options',
   APPOINT_OFFLINE_OPTIONS: 'synapse_appoint_offline_options',
+  APPOINT_LAYOUT: 'synapse_appoint_layout',
   PATTERNS: 'synapse_patterns',
   LOGGED_USER: 'synapse_logged_user',
   OFFICIAL_LINKS: 'synapse_official_links',
@@ -881,6 +882,8 @@ let state = {
   customers: [],
   appointments: [],
   patterns: {},
+  appointmentFormLayout: localStorage.getItem('synapse_appoint_layout') || 'layout-2-equal',
+  customFieldWidths: {},
   officialLinks: [],
   connectedLinks: {}, // 現在編集中のアポイントに関連付けられた接続情報
   syncQueue: [],      // Supabaseへの未送信タスクのキュー
@@ -14853,6 +14856,11 @@ function setupEventListeners() {
     initAppointMeetingTypeUI();
   }
 
+  // 入力欄の配置レイアウト（Windows Snap風セレクター）の初期化
+  if (typeof initAppointmentLayoutUI === 'function') {
+    initAppointmentLayoutUI();
+  }
+
   // フォーム内の任意の入力を検知してDirtyフラグを立てる ＆ 3秒無入力で自動一時保存
   let autoSaveTimeout = null;
   document.getElementById('appointment-form').addEventListener('input', () => {
@@ -18572,9 +18580,26 @@ function addCustomField(fieldType, value = '') {
       inputHtml = `<input type="text" id="custom-field-input-${fieldType}" name="${fieldType}" value="${value}" placeholder="${FIELD_LABELS[fieldType]}を入力" style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem;">`;
   }
 
+  const isFull = (state.customFieldWidths && state.customFieldWidths[fieldType] === 'full') ||
+                 (fieldType === 'corp_info' || fieldType === 'introducer');
+  if (isFull) {
+    row.classList.add('field-span-full');
+  }
+
+  // corp_infoとintroducer以外の通常フィールドに幅切替ボタンを提供
+  const showWidthToggle = (fieldType !== 'corp_info' && fieldType !== 'introducer');
+  const widthToggleBtnHtml = showWidthToggle ? `
+    <button type="button" class="btn-field-width-toggle ${isFull ? 'is-full' : ''}" id="btn-toggle-width-${fieldType}" onclick="toggleFieldWidth('${fieldType}')" title="項目の幅（全幅／標準）を切り替え">
+      <span>${isFull ? '全幅' : '標準'}</span>
+    </button>
+  ` : '';
+
   row.innerHTML = `
     <div class="form-group" style="flex: 1; position: relative; margin-bottom: 0;">
-      <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-secondary);">${FIELD_LABELS[fieldType]}</label>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0; color: var(--text-secondary);">${FIELD_LABELS[fieldType]}</label>
+        ${widthToggleBtnHtml}
+      </div>
       ${inputHtml}
     </div>
     <button type="button" class="btn-danger btn-icon-only" style="height: 42px; width: 42px; min-width: 42px; padding: 0; box-sizing: border-box; margin-bottom: 0px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="removeCustomField('${fieldType}')" title="削除">
@@ -19658,25 +19683,132 @@ window.toggleTabConnection = function(type, id, connect) {
 };
 
 // ==========================================
-// 10. マイパターン適用・保存機能
+// 10. マイパターン適用・保存機能 ＆ 入力欄レイアウト設定
 // ==========================================
+
+const APPOINT_LAYOUT_NAMES = {
+  'layout-1-col': '1列（全幅）',
+  'layout-2-equal': '2列均等 (50:50)',
+  'layout-2-unequal': '2列不均等 (65:35)',
+  'layout-3-equal': '3列均等',
+  'layout-2x2': '4分割 (2×2)',
+  'layout-split-stack': '左右非対称'
+};
+
+function getAppointLayoutDisplayName(layoutId) {
+  return APPOINT_LAYOUT_NAMES[layoutId] || '2列均等';
+}
+
+function setAppointmentFormLayout(layoutId, showNotification = true) {
+  const validLayoutId = APPOINT_LAYOUT_NAMES[layoutId] ? layoutId : 'layout-2-equal';
+  state.appointmentFormLayout = validLayoutId;
+  localStorage.setItem(STORAGE_KEYS.APPOINT_LAYOUT, validLayoutId);
+
+  const container = document.getElementById('custom-fields-list');
+  if (container) {
+    container.className = `custom-fields-grid ${validLayoutId}`;
+  }
+
+  // サイドバーカードのアクティブ状態更新
+  document.querySelectorAll('#snap-layout-selector .snap-layout-card').forEach(card => {
+    if (card.dataset.layout === validLayoutId) {
+      card.classList.add('active');
+    } else {
+      card.classList.remove('active');
+    }
+  });
+
+  // バッジと表示ラベルの更新
+  const chip = document.getElementById('current-layout-chip');
+  if (chip) chip.textContent = getAppointLayoutDisplayName(validLayoutId);
+
+  const textVal = document.getElementById('active-layout-text-val');
+  if (textVal) textVal.textContent = getAppointLayoutDisplayName(validLayoutId);
+
+  if (showNotification) {
+    showToast(`入力欄の配置を「${getAppointLayoutDisplayName(validLayoutId)}」に変更しました。`, 'info');
+  }
+}
+
+function initAppointmentLayoutUI() {
+  const selector = document.getElementById('snap-layout-selector');
+  if (!selector) return;
+
+  const savedLayout = localStorage.getItem(STORAGE_KEYS.APPOINT_LAYOUT) || state.appointmentFormLayout || 'layout-2-equal';
+  setAppointmentFormLayout(savedLayout, false);
+
+  selector.querySelectorAll('.snap-layout-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const layout = card.dataset.layout;
+      if (layout) {
+        setAppointmentFormLayout(layout, true);
+      }
+    });
+  });
+}
+
+function toggleFieldWidth(fieldType) {
+  const row = document.getElementById(`custom-field-row-${fieldType}`);
+  if (!row) return;
+
+  const btn = document.getElementById(`btn-toggle-width-${fieldType}`);
+  const isNowFull = row.classList.toggle('field-span-full');
+
+  if (!state.customFieldWidths) state.customFieldWidths = {};
+  if (isNowFull) {
+    state.customFieldWidths[fieldType] = 'full';
+    if (btn) {
+      btn.classList.add('is-full');
+      btn.innerHTML = '<span>全幅</span>';
+    }
+    showToast(`「${FIELD_LABELS[fieldType] || fieldType}」を全幅表示に設定しました。`, 'info');
+  } else {
+    delete state.customFieldWidths[fieldType];
+    if (btn) {
+      btn.classList.remove('is-full');
+      btn.innerHTML = '<span>標準</span>';
+    }
+    showToast(`「${FIELD_LABELS[fieldType] || fieldType}」を標準幅に戻しました。`, 'info');
+  }
+}
 
 // パターンの適用
 function applyPattern(patternId) {
-  const fields = state.patterns[patternId];
-  if (!fields) return;
+  const patternData = state.patterns[patternId];
+  if (!patternData) return;
+  
+  let fields = [];
+  let layout = 'layout-2-equal';
+  let fieldWidths = {};
+
+  if (Array.isArray(patternData)) {
+    // 従来の配列形式との完全互換
+    fields = patternData;
+    layout = state.appointmentFormLayout || 'layout-2-equal';
+  } else if (patternData && typeof patternData === 'object') {
+    // 拡張オブジェクト形式
+    fields = patternData.fields || [];
+    layout = patternData.layout || state.appointmentFormLayout || 'layout-2-equal';
+    fieldWidths = patternData.fieldWidths || {};
+  }
   
   // 現在追加されているカスタム項目を一旦全消去
   const currentFields = Array.from(state.addedCustomFields);
   currentFields.forEach(fieldType => {
     removeCustomField(fieldType);
   });
+
+  // レイアウトを適用
+  setAppointmentFormLayout(layout, false);
+  
+  // 幅設定の復元状態をセット
+  state.customFieldWidths = Object.assign({}, fieldWidths);
   
   // 新しいパターンの項目を追加
   fields.forEach(fieldType => {
     addCustomField(fieldType);
   });
-  showToast('マイパターンを適用しました。', 'success');
+  showToast(`マイパターン「${patternId}」を適用しました（配置: ${getAppointLayoutDisplayName(layout)}）。`, 'success');
 }
 
 // 現在のカスタム項目のマイパターン保存
@@ -19695,16 +19827,29 @@ function saveCustomPattern() {
   }
 
   const fieldList = Array.from(state.addedCustomFields);
+  const layout = state.appointmentFormLayout || 'layout-2-equal';
+  const fieldWidths = {};
+
+  fieldList.forEach(fieldType => {
+    const row = document.getElementById(`custom-field-row-${fieldType}`);
+    if (row && row.classList.contains('field-span-full')) {
+      fieldWidths[fieldType] = 'full';
+    }
+  });
   
-  // パターンの保存
-  state.patterns[name] = fieldList;
+  // パターンの保存（項目セット + レイアウト配置 + 個別幅）
+  state.patterns[name] = {
+    fields: fieldList,
+    layout: layout,
+    fieldWidths: fieldWidths
+  };
   localStorage.setItem(STORAGE_KEYS.PATTERNS, JSON.stringify(state.patterns));
 
   nameInput.value = '';
   if (window.renderPatternOptions) {
     window.renderPatternOptions();
   }
-  showToast(`パターン「${name}」を登録しました。`, 'success');
+  showToast(`パターン「${name}」を保存しました（配置: ${getAppointLayoutDisplayName(layout)}）。`, 'success');
 }
 
 // 保存済みパターンチップスの描画
