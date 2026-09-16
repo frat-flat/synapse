@@ -756,6 +756,7 @@ const STORAGE_KEYS = {
   PARTNER_SUPABASE_ANON_KEY: 'synapse_partner_supabase_anon_key',
   CUSTOMERS: 'synapse_customers',
   APPOINTMENTS: 'synapse_appointments',
+  APPOINT_ONLINE_OPTIONS: 'synapse_appoint_online_options',
   PATTERNS: 'synapse_patterns',
   LOGGED_USER: 'synapse_logged_user',
   OFFICIAL_LINKS: 'synapse_official_links',
@@ -4082,6 +4083,16 @@ function isOwnerUser() {
          state.currentUser.id === 'owner@synapse.management' ||
          state.currentUser.loginId === 'owner' ||
          state.currentUser.loginId === 'owner@synapse.management';
+}
+
+// ログイン中のユーザーが管理者（owner または admin）かを判定するヘルパー
+function isUserAdmin() {
+  if (!state.currentUser) return false;
+  if (isOwnerUser()) return true;
+  const r = (state.currentUser.role || '').toLowerCase();
+  const id = (state.currentUser.id || '').toLowerCase();
+  const loginId = (state.currentUser.loginId || '').toLowerCase();
+  return r === 'admin' || r === 'owner' || id === 'admin' || id === 'owner' || id === 'owner@synapse.management' || loginId === 'admin' || loginId === 'owner';
 }
 
 // ホーム画面（コントロールパネル）にアクセス可能かを判定するヘルパー
@@ -12789,6 +12800,9 @@ function saveTabState(tab) {
   if (!tab || tab.type !== 'appointment-screen') return;
 
   const dateVal = document.getElementById('appoint-date')?.value || '';
+  const meetingTypeVal = document.querySelector('input[name="appoint-meeting-type"]:checked')?.value || null;
+  const onlineCategoryVal = (meetingTypeVal === 'online') ? (document.getElementById('appoint-online-category')?.value || '') : '';
+  const onlineSubnoteVal = (meetingTypeVal === 'online') ? (document.getElementById('appoint-online-subnote')?.value.trim() || '') : '';
   const nameVal = document.getElementById('customer-name')?.value.trim() || '';
   const memoVal = document.getElementById('appoint-memo')?.value.trim() || '';
 
@@ -12813,6 +12827,9 @@ function saveTabState(tab) {
   tab.appointData = {
     id: state.editingAppointId,
     date: dateVal,
+    meetingType: meetingTypeVal,
+    onlineCategory: onlineCategoryVal,
+    onlineSubnote: onlineSubnoteVal,
     customerType: state.formMode,
     customerId: state.selectedExistingCustomer ? state.selectedExistingCustomer.id : null,
     customerName: nameVal,
@@ -12865,6 +12882,30 @@ function loadTabState(tab) {
   document.getElementById('appoint-date').readOnly = isViewOnly;
   document.getElementById('appoint-memo').value = data.memo || '';
   document.getElementById('appoint-memo').readOnly = isViewOnly;
+
+  // 形式（オンライン / オフライン）の復元
+  if (typeof setAppointMeetingType === 'function') {
+    setAppointMeetingType(data.meetingType || null, true);
+    if (data.meetingType === 'online') {
+      renderAppointOnlineOptions(data.onlineCategory || '広告（）');
+      const subnoteInput = document.getElementById('appoint-online-subnote');
+      if (subnoteInput) subnoteInput.value = data.onlineSubnote || '';
+    }
+  }
+  const onlineRadio = document.getElementById('appoint-type-online');
+  const offlineRadio = document.getElementById('appoint-type-offline');
+  const categorySelect = document.getElementById('appoint-online-category');
+  const subnoteInput = document.getElementById('appoint-online-subnote');
+  const btnAddOnline = document.getElementById('btn-add-online-option');
+  if (onlineRadio) onlineRadio.disabled = isViewOnly;
+  if (offlineRadio) offlineRadio.disabled = isViewOnly;
+  if (categorySelect) categorySelect.disabled = isViewOnly;
+  if (subnoteInput) subnoteInput.readOnly = isViewOnly;
+  if (btnAddOnline && isViewOnly) btnAddOnline.style.display = 'none';
+  const addWrapper = document.getElementById('admin-online-add-wrapper');
+  if (addWrapper && isViewOnly) addWrapper.style.display = 'none';
+  const inlineRow = document.getElementById('add-online-option-inline-row');
+  if (inlineRow && isViewOnly) inlineRow.style.display = 'none';
 
   const toggleContainer = document.getElementById('appointment-type-toggle-container');
   if (toggleContainer) {
@@ -13379,6 +13420,9 @@ function openTab(id, type, title, appointData = null) {
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         return now.toISOString().slice(0, 16);
       })(),
+      meetingType: null, // デフォルト未選択
+      onlineCategory: '',
+      onlineSubnote: '',
       customerType: id === 'appointment-existing' ? 'existing' : 'new',
       customerId: null,
       customerName: '',
@@ -13401,6 +13445,9 @@ function openTab(id, type, title, appointData = null) {
         state.appointments.push({
           id: defaultAppointData.id,
           date: defaultAppointData.date,
+          meetingType: defaultAppointData.meetingType,
+          onlineCategory: defaultAppointData.onlineCategory,
+          onlineSubnote: defaultAppointData.onlineSubnote,
           customerType: defaultAppointData.customerType,
           customerId: null,
           customerName: '',
@@ -14794,17 +14841,23 @@ function setupEventListeners() {
   document.getElementById('btn-save-draft').addEventListener('click', handleSaveDraft);
   document.getElementById('delete-draft-btn').addEventListener('click', handleDeleteDraft);
 
+  // 形式（オンライン/オフライン）およびオンライン選択肢の初期化
+  if (typeof initAppointMeetingTypeUI === 'function') {
+    initAppointMeetingTypeUI();
+  }
+
   // フォーム内の任意の入力を検知してDirtyフラグを立てる ＆ 3秒無入力で自動一時保存
   let autoSaveTimeout = null;
   document.getElementById('appointment-form').addEventListener('input', () => {
     state.isFormDirty = true;
     if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
     autoSaveTimeout = setTimeout(() => {
-      // 必須入力チェック
+      // 必須入力チェック（形式も必須）
       const dateVal = document.getElementById('appoint-date').value;
+      const meetingTypeVal = document.querySelector('input[name="appoint-meeting-type"]:checked')?.value;
       const nameVal = document.getElementById('customer-name').value.trim();
       const memoVal = document.getElementById('appoint-memo').value.trim();
-      if (dateVal && nameVal && memoVal) {
+      if (dateVal && meetingTypeVal && nameVal && memoVal) {
         console.log("[AutoSave] Auto-saving appointment draft...");
         autoSaveAppointmentDraft();
       }
@@ -16870,6 +16923,33 @@ function createAppointmentItem(appoint) {
     nameDiv.appendChild(cancelBadge);
   }
 
+  // 形式（オンライン / オフライン）のバッジ表示
+  if (appoint.meetingType === 'online') {
+    const meetingBadge = document.createElement('span');
+    meetingBadge.className = 'badge';
+    meetingBadge.style.background = 'rgba(59, 130, 246, 0.12)';
+    meetingBadge.style.color = '#2563eb';
+    meetingBadge.style.border = '1px solid rgba(59, 130, 246, 0.3)';
+    meetingBadge.style.marginLeft = '0.5rem';
+    meetingBadge.style.fontSize = '0.72rem';
+    let detail = '';
+    if (appoint.onlineCategory) {
+      detail = ` (${appoint.onlineCategory}${appoint.onlineSubnote ? ` - ${appoint.onlineSubnote}` : ''})`;
+    }
+    meetingBadge.textContent = `🌐 オンライン${detail}`;
+    nameDiv.appendChild(meetingBadge);
+  } else if (appoint.meetingType === 'offline') {
+    const meetingBadge = document.createElement('span');
+    meetingBadge.className = 'badge';
+    meetingBadge.style.background = 'rgba(107, 114, 128, 0.12)';
+    meetingBadge.style.color = '#4b5563';
+    meetingBadge.style.border = '1px solid rgba(107, 114, 128, 0.3)';
+    meetingBadge.style.marginLeft = '0.5rem';
+    meetingBadge.style.fontSize = '0.72rem';
+    meetingBadge.textContent = '🏢 オフライン';
+    nameDiv.appendChild(meetingBadge);
+  }
+
   const actionsDiv = document.createElement('div');
   actionsDiv.className = 'item-actions';
 
@@ -16928,6 +17008,396 @@ function renderAllHistory() {
 // 6. アポイント登録フォーム制御
 // ==========================================
 
+// ==========================================
+// 形式（オンライン / オフライン）およびオンライン選択肢マスタ管理
+// ==========================================
+
+// オンライン種別選択肢のデフォルト初期値（最初は「広告（）」のみ）
+const DEFAULT_APPOINT_ONLINE_OPTIONS = ['広告（）'];
+
+// オンライン種別選択肢を取得
+function getAppointOnlineOptions() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.APPOINT_ONLINE_OPTIONS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('[Appoint Online Options] Error loading options:', e);
+  }
+  return [...DEFAULT_APPOINT_ONLINE_OPTIONS];
+}
+
+// オンライン種別選択肢を保存
+function saveAppointOnlineOptions(options) {
+  if (!Array.isArray(options)) return;
+  localStorage.setItem(STORAGE_KEYS.APPOINT_ONLINE_OPTIONS, JSON.stringify(options));
+  if (typeof syncToSupabase === 'function') {
+    syncToSupabase('synapse_appoint_online_options', options);
+  }
+}
+
+// オンライン種別ドロップダウンの描画
+function renderAppointOnlineOptions(selectedVal) {
+  const selectEl = document.getElementById('appoint-online-category');
+  if (!selectEl) return;
+
+  const options = getAppointOnlineOptions();
+  selectEl.innerHTML = '';
+
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = '-- オンライン種別を選択 --';
+  selectEl.appendChild(defaultOption);
+
+  options.forEach(opt => {
+    const el = document.createElement('option');
+    el.value = opt;
+    el.textContent = opt;
+    selectEl.appendChild(el);
+  });
+
+  if (selectedVal) {
+    if (!options.includes(selectedVal)) {
+      const el = document.createElement('option');
+      el.value = selectedVal;
+      el.textContent = selectedVal;
+      selectEl.appendChild(el);
+    }
+    selectEl.value = selectedVal;
+  }
+}
+
+// 設定画面（管理者用）のオンライン選択肢一覧の描画
+function renderSettingsOnlineOptionsList() {
+  const container = document.getElementById('settings-online-options-list');
+  if (!container) return;
+
+  const options = getAppointOnlineOptions();
+  container.innerHTML = '';
+
+  if (options.length === 0) {
+    container.innerHTML = '<div style="font-size: 0.8rem; color: var(--text-muted); padding: 0.5rem; text-align: center;">選択肢が登録されていません</div>';
+    return;
+  }
+
+  options.forEach(opt => {
+    const item = document.createElement('div');
+    item.style.display = 'flex';
+    item.style.alignItems = 'center';
+    item.style.justifyContent = 'space-between';
+    item.style.padding = '0.35rem 0.6rem';
+    item.style.background = 'var(--bg-surface-elevated)';
+    item.style.border = '1px solid var(--border-color)';
+    item.style.borderRadius = 'var(--radius-xs)';
+    item.style.fontSize = '0.82rem';
+
+    const textSpan = document.createElement('span');
+    textSpan.textContent = opt;
+    textSpan.style.fontWeight = '600';
+    textSpan.style.color = 'var(--text-primary)';
+    item.appendChild(textSpan);
+
+    if (opt !== '広告（）') {
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn-icon';
+      delBtn.innerHTML = '🗑️';
+      delBtn.title = '削除';
+      delBtn.style.padding = '0.2rem';
+      delBtn.style.fontSize = '0.75rem';
+      delBtn.style.cursor = 'pointer';
+      delBtn.style.background = 'none';
+      delBtn.style.border = 'none';
+      delBtn.onclick = () => {
+        if (confirm(`選択肢「${opt}」を削除しますか？`)) {
+          const newOpts = options.filter(o => o !== opt);
+          saveAppointOnlineOptions(newOpts);
+          renderSettingsOnlineOptionsList();
+          renderAppointOnlineOptions(document.getElementById('appoint-online-category')?.value);
+          showToast(`選択肢「${opt}」を削除しました。`, 'info');
+        }
+      };
+      item.appendChild(delBtn);
+    } else {
+      const lockBadge = document.createElement('span');
+      lockBadge.textContent = '🔒 デフォルト保護';
+      lockBadge.style.fontSize = '0.7rem';
+      lockBadge.style.color = 'var(--text-muted)';
+      item.appendChild(lockBadge);
+    }
+
+    container.appendChild(item);
+  });
+}
+
+// 形式（オンライン / オフライン）のUI状態更新
+function setAppointMeetingType(type, silent = false) {
+  const onlineRadio = document.getElementById('appoint-type-online');
+  const offlineRadio = document.getElementById('appoint-type-offline');
+  const onlineLabel = document.getElementById('label-meeting-type-online');
+  const offlineLabel = document.getElementById('label-meeting-type-offline');
+  const optionsContainer = document.getElementById('appoint-online-options-container');
+
+  if (!onlineRadio || !offlineRadio) return;
+
+  if (type === 'online') {
+    onlineRadio.checked = true;
+    offlineRadio.checked = false;
+    if (optionsContainer) optionsContainer.style.display = 'block';
+
+    if (onlineLabel) {
+      onlineLabel.style.borderColor = 'var(--primary)';
+      onlineLabel.style.background = 'rgba(59, 130, 246, 0.08)';
+      onlineLabel.style.color = 'var(--primary)';
+    }
+    if (offlineLabel) {
+      offlineLabel.style.borderColor = 'var(--border-color)';
+      offlineLabel.style.background = 'var(--bg-surface-elevated)';
+      offlineLabel.style.color = 'var(--text-primary)';
+    }
+
+    const categorySelect = document.getElementById('appoint-online-category');
+    if (categorySelect && !categorySelect.value) {
+      renderAppointOnlineOptions('広告（）');
+    }
+  } else if (type === 'offline') {
+    onlineRadio.checked = false;
+    offlineRadio.checked = true;
+    if (optionsContainer) optionsContainer.style.display = 'none';
+
+    if (offlineLabel) {
+      offlineLabel.style.borderColor = 'var(--primary)';
+      offlineLabel.style.background = 'rgba(59, 130, 246, 0.08)';
+      offlineLabel.style.color = 'var(--primary)';
+    }
+    if (onlineLabel) {
+      onlineLabel.style.borderColor = 'var(--border-color)';
+      onlineLabel.style.background = 'var(--bg-surface-elevated)';
+      onlineLabel.style.color = 'var(--text-primary)';
+    }
+  } else {
+    // 未選択（デフォルト初期状態）
+    onlineRadio.checked = false;
+    offlineRadio.checked = false;
+    if (optionsContainer) optionsContainer.style.display = 'none';
+
+    if (onlineLabel) {
+      onlineLabel.style.borderColor = 'var(--border-color)';
+      onlineLabel.style.background = 'var(--bg-surface-elevated)';
+      onlineLabel.style.color = 'var(--text-primary)';
+    }
+    if (offlineLabel) {
+      offlineLabel.style.borderColor = 'var(--border-color)';
+      offlineLabel.style.background = 'var(--bg-surface-elevated)';
+      offlineLabel.style.color = 'var(--text-primary)';
+    }
+  }
+
+  updateAppointMeetingTypeRoleVisibility();
+
+  if (!silent) {
+    state.isFormDirty = true;
+  }
+}
+
+// ユーザー権限に応じたアポイント画面UI制御
+function updateAppointMeetingTypeRoleVisibility() {
+  const isAdmin = (typeof isUserAdmin === 'function') ? isUserAdmin() : false;
+
+  const addWrapper = document.getElementById('admin-online-add-wrapper');
+  const subnoteWrapper = document.getElementById('admin-online-subnote-wrapper');
+  if (addWrapper) {
+    addWrapper.style.display = isAdmin ? 'block' : 'none';
+  }
+  if (subnoteWrapper) {
+    subnoteWrapper.style.display = isAdmin ? 'block' : 'none';
+  }
+
+  const settingsAppointTabBtn = document.getElementById('settings-tab-appoint-btn');
+  if (settingsAppointTabBtn) {
+    settingsAppointTabBtn.style.display = isAdmin ? 'flex' : 'none';
+  }
+}
+
+// 形式および選択肢UIのイベントバインド初期化
+function initAppointMeetingTypeUI() {
+  const onlineRadio = document.getElementById('appoint-type-online');
+  const offlineRadio = document.getElementById('appoint-type-offline');
+  const onlineLabel = document.getElementById('label-meeting-type-online');
+  const offlineLabel = document.getElementById('label-meeting-type-offline');
+
+  if (onlineRadio) {
+    onlineRadio.addEventListener('change', () => {
+      if (onlineRadio.checked) setAppointMeetingType('online');
+    });
+  }
+  if (offlineRadio) {
+    offlineRadio.addEventListener('change', () => {
+      if (offlineRadio.checked) setAppointMeetingType('offline');
+    });
+  }
+
+  if (onlineLabel && onlineRadio) {
+    onlineLabel.addEventListener('click', (e) => {
+      if (e.target !== onlineRadio) {
+        onlineRadio.checked = true;
+        setAppointMeetingType('online');
+      }
+    });
+  }
+  if (offlineLabel && offlineRadio) {
+    offlineLabel.addEventListener('click', (e) => {
+      if (e.target !== offlineRadio) {
+        offlineRadio.checked = true;
+        setAppointMeetingType('offline');
+      }
+    });
+  }
+
+  const btnAddOnline = document.getElementById('btn-add-online-option');
+  const inlineRow = document.getElementById('add-online-option-inline-row');
+  const inputNew = document.getElementById('new-online-option-input');
+  const btnConfirmAdd = document.getElementById('btn-confirm-add-online-option');
+  const btnCancelAdd = document.getElementById('btn-cancel-add-online-option');
+
+  if (btnAddOnline && inlineRow) {
+    btnAddOnline.addEventListener('click', () => {
+      inlineRow.style.display = inlineRow.style.display === 'none' ? 'flex' : 'none';
+      if (inlineRow.style.display === 'flex' && inputNew) {
+        inputNew.focus();
+      }
+    });
+  }
+
+  if (btnCancelAdd && inlineRow) {
+    btnCancelAdd.addEventListener('click', () => {
+      inlineRow.style.display = 'none';
+      if (inputNew) inputNew.value = '';
+    });
+  }
+
+  const handleAddOption = () => {
+    if (!inputNew) return;
+    const val = inputNew.value.trim();
+    if (!val) {
+      showToast('選択肢名を入力してください。', 'warning');
+      return;
+    }
+    const current = getAppointOnlineOptions();
+    if (current.includes(val)) {
+      showToast('この選択肢は既に存在します。', 'warning');
+      return;
+    }
+    current.push(val);
+    saveAppointOnlineOptions(current);
+    renderAppointOnlineOptions(val);
+    renderSettingsOnlineOptionsList();
+    inlineRow.style.display = 'none';
+    inputNew.value = '';
+    state.isFormDirty = true;
+    showToast(`選択肢「${val}」を追加しました。`, 'success');
+  };
+
+  if (btnConfirmAdd) {
+    btnConfirmAdd.addEventListener('click', handleAddOption);
+  }
+  if (inputNew) {
+    inputNew.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleAddOption();
+      }
+    });
+  }
+
+  // 設定画面側のアドミンオンラインオプション追加ボタン
+  const settingsBtnAdd = document.getElementById('settings-add-online-option-btn');
+  const settingsInput = document.getElementById('settings-new-online-option-input');
+
+  const handleSettingsAddOption = () => {
+    if (!settingsInput) return;
+    const val = settingsInput.value.trim();
+    if (!val) {
+      showToast('選択肢名を入力してください。', 'warning');
+      return;
+    }
+    const current = getAppointOnlineOptions();
+    if (current.includes(val)) {
+      showToast('この選択肢は既に存在します。', 'warning');
+      return;
+    }
+    current.push(val);
+    saveAppointOnlineOptions(current);
+    renderSettingsOnlineOptionsList();
+    renderAppointOnlineOptions(document.getElementById('appoint-online-category')?.value);
+    settingsInput.value = '';
+    showToast(`選択肢「${val}」を追加しました。`, 'success');
+  };
+
+  if (settingsBtnAdd) {
+    settingsBtnAdd.addEventListener('click', handleSettingsAddOption);
+  }
+  if (settingsInput) {
+    settingsInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSettingsAddOption();
+      }
+    });
+  }
+
+  // 設定画面タブの切り替えにアポイント設定タブを追加連動
+  const settingsTabAppointBtn = document.getElementById('settings-tab-appoint-btn');
+  const settingsContentAppoint = document.getElementById('settings-content-appoint');
+  if (settingsTabAppointBtn && settingsContentAppoint) {
+    settingsTabAppointBtn.addEventListener('click', () => {
+      const profileBtn = document.getElementById('settings-tab-profile-btn');
+      const devicesBtn = document.getElementById('settings-tab-devices-btn');
+      const desktopBtn = document.getElementById('settings-tab-desktop-btn');
+      [profileBtn, devicesBtn, desktopBtn].forEach(b => {
+        if (b) {
+          b.classList.remove('active');
+          b.style.color = 'var(--text-secondary)';
+          b.style.borderBottomColor = 'transparent';
+        }
+      });
+      const cProfile = document.getElementById('settings-content-profile');
+      const cDevices = document.getElementById('settings-content-devices');
+      const cDesktop = document.getElementById('settings-content-desktop');
+      [cProfile, cDevices, cDesktop].forEach(c => {
+        if (c) c.style.display = 'none';
+      });
+
+      settingsTabAppointBtn.classList.add('active');
+      settingsTabAppointBtn.style.color = 'var(--primary)';
+      settingsTabAppointBtn.style.borderBottomColor = 'var(--primary)';
+      settingsContentAppoint.style.display = 'flex';
+      renderSettingsOnlineOptionsList();
+    });
+
+    const profileBtn = document.getElementById('settings-tab-profile-btn');
+    const devicesBtn = document.getElementById('settings-tab-devices-btn');
+    const desktopBtn = document.getElementById('settings-tab-desktop-btn');
+    [profileBtn, devicesBtn, desktopBtn].forEach(b => {
+      if (b) {
+        b.addEventListener('click', () => {
+          settingsTabAppointBtn.classList.remove('active');
+          settingsTabAppointBtn.style.color = 'var(--text-secondary)';
+          settingsTabAppointBtn.style.borderBottomColor = 'transparent';
+          settingsContentAppoint.style.display = 'none';
+        });
+      }
+    });
+  }
+
+  renderAppointOnlineOptions('広告（）');
+  updateAppointMeetingTypeRoleVisibility();
+}
+
 
 
 // 既存顧客選択時のUI処理
@@ -16973,11 +17443,20 @@ function selectCustomer(customer) {
           statusBadge = '<span class="badge" style="font-size: 0.65rem; padding: 0.05rem 0.25rem; margin-left: 0.5rem; background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3);">破棄済</span>';
         }
 
+        let meetingBadge = '';
+        if (appoint.meetingType === 'online') {
+          const detail = appoint.onlineCategory ? ` (${appoint.onlineCategory}${appoint.onlineSubnote ? ` - ${appoint.onlineSubnote}` : ''})` : '';
+          meetingBadge = `<span class="badge" style="font-size: 0.65rem; padding: 0.05rem 0.25rem; margin-left: 0.4rem; background: rgba(59, 130, 246, 0.12); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.3);">🌐 オンライン${detail}</span>`;
+        } else if (appoint.meetingType === 'offline') {
+          meetingBadge = `<span class="badge" style="font-size: 0.65rem; padding: 0.05rem 0.25rem; margin-left: 0.4rem; background: rgba(107, 114, 128, 0.12); color: #4b5563; border: 1px solid rgba(107, 114, 128, 0.3);">🏢 オフライン</span>`;
+        }
+
         historyItem.innerHTML = `
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <div>
               <span style="font-family: monospace; color: var(--secondary); font-weight: bold;">└─ ID: ${appoint.id}</span>
               <span style="color: var(--text-secondary); margin-left: 0.5rem;">(${formattedDate})</span>
+              ${meetingBadge}
               ${statusBadge}
             </div>
             <button type="button" class="btn-text" style="font-size: 0.75rem; text-decoration: underline; color: var(--primary); padding: 0; border: none; background: transparent; cursor: pointer;" onclick="viewAppointmentDetails('${appoint.id}')">詳細</button>
@@ -18631,6 +19110,7 @@ function renderCustomPatternChips() {
 // 一時保存（下書き）の処理
 function handleSaveDraft() {
   const dateVal = document.getElementById('appoint-date').value;
+  const meetingTypeVal = document.querySelector('input[name="appoint-meeting-type"]:checked')?.value;
   const nameVal = document.getElementById('customer-name').value.trim();
   const memoVal = document.getElementById('appoint-memo').value.trim();
 
@@ -18638,6 +19118,12 @@ function handleSaveDraft() {
   if (!dateVal) {
     showToast('一時保存にはアポイント日時が必須です。', 'error');
     document.getElementById('appoint-date').focus();
+    return;
+  }
+  if (!meetingTypeVal) {
+    showToast('一時保存には形式（オンラインまたはオフライン）の選択が必須です。', 'error');
+    const typeGroup = document.getElementById('appoint-meeting-type-group');
+    if (typeGroup) typeGroup.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
   if (!nameVal) {
@@ -18659,10 +19145,17 @@ function handleFormSubmit(e) {
   e.preventDefault();
   
   const dateVal = document.getElementById('appoint-date').value;
+  const meetingTypeVal = document.querySelector('input[name="appoint-meeting-type"]:checked')?.value;
   const nameVal = document.getElementById('customer-name').value.trim();
   const memoVal = document.getElementById('appoint-memo').value.trim();
 
-  if (!dateVal || !nameVal || !memoVal) {
+  if (!dateVal || !meetingTypeVal || !nameVal || !memoVal) {
+    if (!meetingTypeVal) {
+      showToast('形式（オンラインまたはオフライン）を選択してください。', 'error');
+      const typeGroup = document.getElementById('appoint-meeting-type-group');
+      if (typeGroup) typeGroup.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     showToast('必須項目を入力してください。', 'error');
     return;
   }
@@ -19217,10 +19710,14 @@ function syncBiDirectionalRelatedAppointmentIds(appointIdA, targetRelatedAppoint
 // バックグラウンドでアポイントの下書きを自動保存する（タブは閉じない）
 function autoSaveAppointmentDraft() {
   const dateVal = document.getElementById('appoint-date').value;
+  const meetingTypeVal = document.querySelector('input[name="appoint-meeting-type"]:checked')?.value;
   const nameVal = document.getElementById('customer-name').value.trim();
   const memoVal = document.getElementById('appoint-memo').value.trim();
 
-  if (!dateVal || !nameVal || !memoVal) return;
+  if (!dateVal || !meetingTypeVal || !nameVal || !memoVal) return;
+
+  const onlineCategoryVal = (meetingTypeVal === 'online') ? (document.getElementById('appoint-online-category')?.value || '') : '';
+  const onlineSubnoteVal = (meetingTypeVal === 'online') ? (document.getElementById('appoint-online-subnote')?.value.trim() || '') : '';
 
   const customFieldsData = {};
   state.addedCustomFields.forEach(fieldType => {
@@ -19252,6 +19749,9 @@ function autoSaveAppointmentDraft() {
   const appointData = {
     id: appointId,
     date: dateVal,
+    meetingType: meetingTypeVal,
+    onlineCategory: onlineCategoryVal,
+    onlineSubnote: onlineSubnoteVal,
     customerType: state.formMode,
     customerId: state.formMode === 'existing' ? state.selectedExistingCustomer.id : null,
     relatedAppointmentIds: relatedAppointmentIds,
@@ -19292,6 +19792,9 @@ function autoSaveAppointmentDraft() {
 // アポイントデータ保存ロジック本体
 function saveAppointmentData(status) {
   const dateVal = document.getElementById('appoint-date').value;
+  const meetingTypeVal = document.querySelector('input[name="appoint-meeting-type"]:checked')?.value || null;
+  const onlineCategoryVal = (meetingTypeVal === 'online') ? (document.getElementById('appoint-online-category')?.value || '') : '';
+  const onlineSubnoteVal = (meetingTypeVal === 'online') ? (document.getElementById('appoint-online-subnote')?.value.trim() || '') : '';
   const nameVal = document.getElementById('customer-name').value.trim();
   const memoVal = document.getElementById('appoint-memo').value.trim();
 
@@ -19328,6 +19831,9 @@ function saveAppointmentData(status) {
   const appointData = {
     id: appointId,
     date: dateVal,
+    meetingType: meetingTypeVal,
+    onlineCategory: onlineCategoryVal,
+    onlineSubnote: onlineSubnoteVal,
     customerType: state.formMode,
     customerId: state.formMode === 'existing' ? state.selectedExistingCustomer.id : null,
     relatedAppointmentIds: relatedAppointmentIds, // 関連アポイントIDを追加
@@ -19474,6 +19980,9 @@ function editAppointment(appointId) {
   const appointData = {
     id: appoint.id,
     date: appoint.date,
+    meetingType: appoint.meetingType || null,
+    onlineCategory: appoint.onlineCategory || '',
+    onlineSubnote: appoint.onlineSubnote || '',
     customerType: appoint.customerType,
     customerId: appoint.customerId,
     customerName: appoint.customerName,
@@ -19502,6 +20011,9 @@ function viewAppointmentDetails(appointId) {
   const appointData = {
     id: appoint.id,
     date: appoint.date,
+    meetingType: appoint.meetingType || null,
+    onlineCategory: appoint.onlineCategory || '',
+    onlineSubnote: appoint.onlineSubnote || '',
     customerType: appoint.customerType,
     customerId: appoint.customerId,
     relatedCustomerId: appoint.relatedCustomerId || '',

@@ -1318,6 +1318,9 @@
       <button id="settings-tab-desktop-btn" class="settings-sub-tab" style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 700; border: none; background: none; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 0.35rem; transition: all 0.2s;">
         🖥️ デスクトップ
       </button>
+      <button id="settings-tab-appoint-btn" class="settings-sub-tab" style="display: none; padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 700; border: none; background: none; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer; align-items: center; gap: 0.35rem; transition: all 0.2s;">
+        📅 アポイント設定
+      </button>
     </div>
 
     <!-- 設定コンテンツ表示エリア -->
@@ -1472,6 +1475,35 @@
           </div>
         </div>
 
+      </div>
+
+      <!-- 4. アポイント管理設定コンテンツ (管理者専用) -->
+      <div id="settings-content-appoint" style="display: none; max-width: 540px; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; flex-direction: column; gap: 1.25rem;">
+        <div style="border-left: 3px solid var(--primary); padding-left: 0.5rem;">
+          <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">
+            📅 アポイント設定（管理者専用）
+          </h3>
+          <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">
+            アポイント登録時に選択可能な「オンライン種別 / 経路」の選択肢マスタを管理します。全ユーザーに共通して適用されます。
+          </p>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0;">オンライン種別 選択肢一覧:</label>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">※初期選択肢「広告（）」は保護されています</span>
+          </div>
+          <div id="settings-online-options-list" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 220px; overflow-y: auto; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.6rem;">
+            <!-- JSで動的レンダリング -->
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.25rem;">
+            <input type="text" id="settings-new-online-option-input" placeholder="新しい選択肢名を入力 (例: 紹介, SNS, HP 等)..." style="flex: 1; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.82rem; background: var(--bg-surface); color: var(--text-primary); outline: none;">
+            <button type="button" class="btn btn-primary" id="settings-add-online-option-btn" style="padding: 0.45rem 0.85rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+              ➕ 追加
+            </button>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -2505,6 +2537,53 @@
         <div class="form-group required">
           <label for="appoint-date">アポイント日時</label>
           <input type="datetime-local" id="appoint-date" required>
+        </div>
+
+        <!-- 形式（オンライン / オフライン）選択（必須・デフォルト未選択） -->
+        <div class="form-group required" id="appoint-meeting-type-group" style="margin-top: 1rem; margin-bottom: 1rem;">
+          <label style="font-weight: 700; margin-bottom: 0.4rem; display: block;">形式（オンライン / オフライン）</label>
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <label class="meeting-type-label-btn" id="label-meeting-type-online" style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.55rem 1.1rem; border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); font-size: 0.88rem; font-weight: 600; color: var(--text-primary); transition: all 0.2s; user-select: none;">
+              <input type="radio" name="appoint-meeting-type" id="appoint-type-online" value="online" style="cursor: pointer; width: 16px; height: 16px; margin: 0;">
+              <span>🌐 オンライン</span>
+            </label>
+            <label class="meeting-type-label-btn" id="label-meeting-type-offline" style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.55rem 1.1rem; border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); font-size: 0.88rem; font-weight: 600; color: var(--text-primary); transition: all 0.2s; user-select: none;">
+              <input type="radio" name="appoint-meeting-type" id="appoint-type-offline" value="offline" style="cursor: pointer; width: 16px; height: 16px; margin: 0;">
+              <span>🏢 オフライン</span>
+            </label>
+          </div>
+
+          <!-- オンライン選択時に展開される種別選択エリア -->
+          <div id="appoint-online-options-container" style="display: none; margin-top: 0.75rem; padding: 0.85rem 1rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-left: 3px solid var(--primary); border-radius: var(--radius-sm);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+              <label for="appoint-online-category" style="font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0;">オンライン種別 / 経路:</label>
+              <!-- 選択肢追加ボタン (管理者のみ表示) -->
+              <div id="admin-online-add-wrapper" style="display: none;">
+                <button type="button" class="btn btn-xs btn-outline-primary" id="btn-add-online-option" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;">
+                  <span>+ 選択肢を追加</span>
+                </button>
+              </div>
+            </div>
+            
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+              <!-- 選択肢ドロップダウン (全ユーザー共通) -->
+              <select id="appoint-online-category" style="flex: 1; min-width: 180px; padding: 0.45rem 0.6rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+                <!-- JSで動的にオプション生成 (初期値: 広告（）) -->
+              </select>
+
+              <!-- 補足メモ入力欄 (管理者のみ表示) -->
+              <div id="admin-online-subnote-wrapper" style="display: none; flex: 1; min-width: 200px;">
+                <input type="text" id="appoint-online-subnote" placeholder="詳細補足 (例: Meta, Google など括弧内)" style="width: 100%; padding: 0.45rem 0.6rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none; box-sizing: border-box;">
+              </div>
+            </div>
+
+            <!-- 管理者用 インライン選択肢追加フォーム -->
+            <div id="add-online-option-inline-row" style="display: none; margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px dashed var(--border-color); align-items: center; gap: 0.5rem;">
+              <input type="text" id="new-online-option-input" placeholder="新しい選択肢名 (例: 紹介, SNS, HP経由 等)" style="flex: 1; padding: 0.4rem 0.6rem; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+              <button type="button" class="btn btn-sm btn-primary" id="btn-confirm-add-online-option" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; cursor: pointer;">追加</button>
+              <button type="button" class="btn btn-sm btn-secondary" id="btn-cancel-add-online-option" style="padding: 0.35rem 0.5rem; font-size: 0.78rem; cursor: pointer;">キャンセル</button>
+            </div>
+          </div>
         </div>
         <div class="form-group required" id="customer-name-group">
           <label for="customer-name" id="label-customer-name">相手の名前または呼称</label>
