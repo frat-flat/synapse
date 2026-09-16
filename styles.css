@@ -3921,8 +3921,12 @@ tr.grayed-out-access td {
 .filter-search-input,
 select,
 input[type="text"],
+input[type="tel"],
+input[type="email"],
 input[type="number"],
-input[type="password"] {
+input[type="password"],
+input[type="date"],
+input[type="datetime-local"] {
   padding: 0.35rem 0.6rem !important;
   font-size: 0.8rem !important;
 }
@@ -6893,5 +6897,105 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   cursor: not-allowed !important;
   background: var(--bg-surface-elevated) !important;
 }
+
+/* ============================================================================
+   アポイント画面 入力フォーム統一スタイル (高さ 42px / 文字サイズ 0.9rem)
+   ※ 内容メモ等の複数行想定項目を除き、全単行入力・選択欄の高さ・文字サイズ・枠線を統一
+   ============================================================================ */
+#appointment-form input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not(#source-option-manage-panel *),
+#appointment-form select:not(#source-option-manage-panel *) {
+  width: 100% !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  max-height: 42px !important;
+  padding: 0.6rem 0.75rem !important;
+  font-size: 0.9rem !important;
+  line-height: 1.5 !important;
+  box-sizing: border-box !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-sm) !important;
+  background-color: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-sans) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+  outline: none !important;
+}
+
+#appointment-form select#appoint-source-type {
+  width: auto !important;
+  flex: 1 !important;
+}
+
+#appointment-form input:focus,
+#appointment-form select:focus,
+#appointment-form textarea:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px var(--primary-glow) !important;
+}
+
+/* 複数行テキストエリア（内容メモ等）: 文字サイズ・余白・配色を統一し、複数行としての高さを維持 */
+#appointment-form textarea#appoint-memo {
+  width: 100% !important;
+  min-height: 120px !important;
+  padding: 0.6rem 0.75rem !important;
+  font-size: 0.9rem !important;
+  line-height: 1.5 !important;
+  box-sizing: border-box !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-sm) !important;
+  background-color: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-sans) !important;
+  resize: vertical !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+  outline: none !important;
+}
+
+/* プレースホルダー文字サイズ統一 */
+#appointment-form input::placeholder,
+#appointment-form textarea::placeholder {
+  font-size: 0.9rem !important;
+  color: var(--text-muted) !important;
+  opacity: 0.7 !important;
+}
+
+/* 項目ラベルの統一 */
+#appointment-form .form-group label {
+  display: block;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  margin-bottom: 0.4rem !important;
+  color: var(--text-secondary) !important;
+}
+
+/* 動的項目の削除ボタン（ゴミ箱アイコン）の高さ・整列を42px入力欄に完全一致 */
+.custom-field-row {
+  display: flex !important;
+  gap: 0.75rem !important;
+  align-items: flex-end !important;
+  margin-bottom: 1rem !important;
+}
+
+.custom-field-row .form-group {
+  margin-bottom: 0 !important;
+  flex: 1 !important;
+}
+
+.custom-field-row .btn-danger.btn-icon-only {
+  height: 42px !important;
+  min-height: 42px !important;
+  max-height: 42px !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: var(--radius-sm) !important;
+  margin-bottom: 0 !important;
+  flex-shrink: 0 !important;
+}
+
 
 

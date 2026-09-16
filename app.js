@@ -18505,38 +18505,38 @@ function addCustomField(fieldType, value = '') {
   // 各フィールドタイプに応じたフォームを生成
   switch (fieldType) {
     case 'rep_birthday':
-      inputHtml = `<input type="date" id="custom-field-input-rep_birthday" name="rep_birthday" value="${value}">`;
+      inputHtml = `<input type="date" id="custom-field-input-rep_birthday" name="rep_birthday" value="${value}" style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem;">`;
       break;
     case 'phone':
-      inputHtml = `<input type="tel" id="custom-field-input-phone" name="phone" value="${value}" placeholder="例: 090-1234-5678">`;
+      inputHtml = `<input type="tel" id="custom-field-input-phone" name="phone" value="${value}" placeholder="例: 090-1234-5678" style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem;">`;
       break;
     case 'email':
-      inputHtml = `<input type="email" id="custom-field-input-email" name="email" value="${value}" placeholder="例: sample@example.com">`;
+      inputHtml = `<input type="email" id="custom-field-input-email" name="email" value="${value}" placeholder="例: sample@example.com" style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem;">`;
       break;
     case 'zoom':
-      inputHtml = `<input type="text" id="custom-field-input-zoom" name="zoom" value="${value}" placeholder="https://zoom.us/j/...">`;
+      inputHtml = `<input type="text" id="custom-field-input-zoom" name="zoom" value="${value}" placeholder="https://zoom.us/j/..." style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem;">`;
       break;
     case 'corp_info':
       // 法人番号API連携用の特別なHTML
       inputHtml = `
         <div style="background: var(--bg-surface-elevated); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); width: 100%;">
           <div style="position: relative; margin-bottom: 0.75rem;">
-            <label style="font-size: 0.75rem;">法人検索 <span class="api-badge">国税庁API連携シミュレーター</span></label>
-            <input type="text" id="corp-search-api-input" placeholder="会社名で検索（例：トヨタ、ソニー）..." style="padding: 0.5rem; font-size: 0.8rem;">
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">法人検索 <span class="api-badge">国税庁API連携シミュレーター</span></label>
+            <input type="text" id="corp-search-api-input" placeholder="会社名で検索（例：トヨタ、ソニー）..." style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem;">
             <div id="corp-api-dropdown" class="search-results-dropdown"></div>
           </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.8rem;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.85rem;">
             <div>
-              <label style="font-size: 0.7rem;">正式法人名</label>
-              <input type="text" id="corp-info-name" name="corp_name" value="${value.name || ''}" placeholder="会社名" style="padding: 0.4rem; font-size: 0.8rem;">
+              <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">正式法人名</label>
+              <input type="text" id="corp-info-name" name="corp_name" value="${value.name || ''}" placeholder="会社名" style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem;">
             </div>
             <div>
-              <label style="font-size: 0.7rem;">法人番号</label>
-              <input type="text" id="corp-info-code" name="corp_code" value="${value.code || ''}" placeholder="法人番号" readonly style="padding: 0.4rem; font-size: 0.8rem; background: var(--bg-surface); opacity: 0.7;">
+              <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">法人番号</label>
+              <input type="text" id="corp-info-code" name="corp_code" value="${value.code || ''}" placeholder="法人番号" readonly style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem; background: var(--bg-surface); opacity: 0.7;">
             </div>
             <div style="grid-column: span 2;">
-              <label style="font-size: 0.7rem;">本店所在地</label>
-              <input type="text" id="corp-info-address" name="corp_address" value="${value.address || ''}" placeholder="本店所在地" readonly style="padding: 0.4rem; font-size: 0.8rem; background: var(--bg-surface); opacity: 0.7;">
+              <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">本店所在地</label>
+              <input type="text" id="corp-info-address" name="corp_address" value="${value.address || ''}" placeholder="本店所在地" readonly style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem; background: var(--bg-surface); opacity: 0.7;">
             </div>
           </div>
         </div>
@@ -18547,8 +18547,8 @@ function addCustomField(fieldType, value = '') {
       inputHtml = `
         <div style="background: var(--bg-surface-elevated); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); width: 100%;">
           <div style="position: relative; margin-bottom: 0.5rem;">
-            <label style="font-size: 0.75rem;">紹介者検索 <span class="api-badge" style="background: var(--primary-glow); color: var(--primary); border-color: rgba(99,102,241,0.3)">代理店DB連携</span></label>
-            <input type="text" id="introducer-search-input" placeholder="名前で検索（例：田中、高橋）..." style="padding: 0.5rem; font-size: 0.8rem;">
+            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">紹介者検索 <span class="api-badge" style="background: var(--primary-glow); color: var(--primary); border-color: rgba(99,102,241,0.3)">代理店DB連携</span></label>
+            <input type="text" id="introducer-search-input" placeholder="名前で検索（例：田中、高橋）..." style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem;">
             <div id="introducer-api-dropdown" class="search-results-dropdown"></div>
           </div>
           <div id="introducer-attached-box" style="display: ${value ? 'flex' : 'none'};">
@@ -18569,15 +18569,15 @@ function addCustomField(fieldType, value = '') {
       `;
       break;
     default:
-      inputHtml = `<input type="text" id="custom-field-input-${fieldType}" name="${fieldType}" value="${value}" placeholder="${FIELD_LABELS[fieldType]}を入力">`;
+      inputHtml = `<input type="text" id="custom-field-input-${fieldType}" name="${fieldType}" value="${value}" placeholder="${FIELD_LABELS[fieldType]}を入力" style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem;">`;
   }
 
   row.innerHTML = `
-    <div class="form-group" style="flex: 1; position: relative;">
-      <label>${FIELD_LABELS[fieldType]}</label>
+    <div class="form-group" style="flex: 1; position: relative; margin-bottom: 0;">
+      <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-secondary);">${FIELD_LABELS[fieldType]}</label>
       ${inputHtml}
     </div>
-    <button type="button" class="btn-danger btn-icon-only" style="height: 42px; margin-bottom: 0px; display: inline-flex; align-items: center; justify-content: center;" onclick="removeCustomField('${fieldType}')" title="削除">
+    <button type="button" class="btn-danger btn-icon-only" style="height: 42px; width: 42px; min-width: 42px; padding: 0; box-sizing: border-box; margin-bottom: 0px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="removeCustomField('${fieldType}')" title="削除">
       <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
     </button>
   `;
