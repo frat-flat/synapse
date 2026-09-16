@@ -2632,20 +2632,6 @@
           <textarea id="appoint-memo" placeholder="面談時の主要なトピック、ニーズ、次回アクションなど" required style="width: 100%; box-sizing: border-box; min-height: 120px; padding: 0.6rem 0.75rem; font-size: 0.9rem; line-height: 1.5;"></textarea>
         </div>
         
-        <!-- 関連するアポイントIDの紐付け -->
-        <div class="form-group" style="margin-top: 1rem; border-top: 1px dotted var(--border-color); padding-top: 1rem; margin-bottom: 1.5rem;">
-          <label>関連するアポイントID (本登録前)</label>
-          <div id="appoint-related-appoint-links-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.5rem;"></div>
-          <!-- 💡 過去の同一人物アポイント自動検知サジェストバナー -->
-          <div id="appoint-related-auto-suggest-box" style="display: none; margin-top: 0.6rem; padding: 0.5rem 0.75rem; background: rgba(99, 102, 241, 0.08); border: 1px dashed var(--primary); border-radius: var(--radius-sm); font-size: 0.8rem; align-items: center; justify-content: space-between; gap: 0.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary);">
-              <span>💡</span>
-              <span id="appoint-related-auto-suggest-text">同一人物と思われる過去のアポイントが見つかりました</span>
-            </div>
-            <button type="button" class="btn btn-sm btn-primary" id="btn-link-auto-suggested" style="font-size: 0.75rem; padding: 0.2rem 0.6rem; white-space: nowrap;">＋ 紐付ける</button>
-          </div>
-        </div>
-
         <div class="custom-fields-container" id="custom-fields-area">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.35rem;">
             <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0; color: var(--text-secondary);">追加された入力項目</h3>
@@ -2655,11 +2641,18 @@
             <!-- JSで動的にフィールド行が追加されます -->
           </div>
         </div>
+
+        <!-- 関連するアポイントIDの紐付け (追加項目の下に配置) -->
+        <div class="form-group" style="margin-top: 1.25rem; border-top: 1px dotted var(--border-color); padding-top: 1rem; margin-bottom: 0.5rem;">
+          <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">関連するアポイントID (本登録前)</label>
+          <div id="appoint-related-appoint-links-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.5rem;"></div>
+        </div>
+
         <div class="form-actions-bar" style="margin-top: 1.5rem;">
           <button type="button" class="btn btn-danger" id="delete-draft-btn" style="display: none;">下書きを破棄</button>
           <div style="margin-left: auto; display: flex; gap: 0.75rem;">
             <button type="button" class="btn btn-secondary" id="btn-save-draft" style="border-color: var(--warning); color: var(--warning);">一時保存（下書き）</button>
-            <button type="submit" class="btn btn-success" id="btn-submit-official">正式登録</button>
+            <button type="submit" class="btn btn-success" id="btn-submit-official">登録</button>
           </div>
         </div>
       </form>

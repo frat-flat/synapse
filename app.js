@@ -14647,13 +14647,19 @@ function setupEventListeners() {
       pickHistoryBtn.title = '過去のアポイント履歴から同一人物のアポイントを選択して紐付けます';
 
       pickHistoryBtn.addEventListener('click', () => {
-        openAppointHistoryPicker((selectedAppointId) => {
-          if (!selectedAppointId) return;
-          if (ids.includes(selectedAppointId)) {
-            showToast('このアポイントはすでに関連付けされています。', 'warning');
+        openAppointHistoryPicker((selectedAppointIds) => {
+          if (!selectedAppointIds || selectedAppointIds.length === 0) return;
+          let addedCount = 0;
+          selectedAppointIds.forEach(id => {
+            if (!ids.includes(id)) {
+              ids.push(id);
+              addedCount++;
+            }
+          });
+          if (addedCount === 0) {
+            showToast('選択されたアポイントはすでに関連付けされています。', 'info');
             return;
           }
-          ids.push(selectedAppointId);
           const newValString = ids.join(', ');
 
           if (state.editingAppointId) {
@@ -14665,7 +14671,7 @@ function setupEventListeners() {
             }
           }
           window.renderRelatedAppointIdLinks(newValString, isViewOnly);
-          showToast(`アポイントID: ${selectedAppointId} を紐付けました。`, 'success');
+          showToast(`${addedCount}件のアポイントを紐付けました。`, 'success');
         }, ids);
       });
 
@@ -14674,18 +14680,48 @@ function setupEventListeners() {
     }
   };
 
-  // 過去アポイント履歴選択モーダル
+  // 過去アポイント履歴選択モーダル（自身のアポ限定・複数選択・同一人物グルーピング・日時絞り込み対応）
   window.openAppointHistoryPicker = function(onSelectCallback, currentLinkedIds = []) {
     const existingModal = document.getElementById('modal-appoint-history-picker');
     if (existingModal) existingModal.remove();
 
     const currentEditingId = state.editingAppointId;
-    // 候補：現在編集中とすでに紐付いているID以外の過去アポイント
-    const candidateAppoints = (state.appointments || []).filter(a => {
+    const currentUserId = state.currentUser ? (state.currentUser.id || state.currentUser.loginId || '') : '';
+    const currentUserName = state.currentUser ? (state.currentUser.name || '') : '';
+
+    // 自身のアポイントのみを抽出（他のユーザーのアポは除外、未設定データは自分自身のアポとして扱う）
+    const myCandidateAppoints = (state.appointments || []).filter(a => {
       if (currentEditingId && a.id === currentEditingId) return false;
       if (currentLinkedIds.includes(a.id)) return false;
+
+      if (currentUserId || currentUserName) {
+        const uid = (a.userId || a.createdById || a.createdBy || '').toLowerCase();
+        const uname = (a.assignee || a.targetMember || a.createdByName || '').toLowerCase();
+        if (uid || uname) {
+          const matchId = currentUserId && uid.includes(currentUserId.toLowerCase());
+          const matchName = currentUserName && uname.includes(currentUserName.toLowerCase());
+          if (!matchId && !matchName) return false; // 他ユーザーのアポは除外
+        }
+      }
       return true;
-    }).sort((a, b) => new Date(b.datetime || 0) - new Date(a.datetime || 0));
+    }).sort((a, b) => new Date(b.date || b.datetime || 0) - new Date(a.date || a.datetime || 0));
+
+    // 同一人物または関連アポイント同士でグルーピング
+    const groupMap = new Map();
+    myCandidateAppoints.forEach(a => {
+      const groupKey = (a.customerName || a.name || '名称未設定').trim();
+      if (!groupMap.has(groupKey)) {
+        groupMap.set(groupKey, {
+          groupKey: groupKey,
+          name: groupKey,
+          latestDate: a.date || a.datetime || '',
+          appoints: []
+        });
+      }
+      groupMap.get(groupKey).appoints.push(a);
+    });
+
+    const groups = Array.from(groupMap.values());
 
     const modal = document.createElement('div');
     modal.id = 'modal-appoint-history-picker';
@@ -14694,29 +14730,61 @@ function setupEventListeners() {
     modal.style.left = '0';
     modal.style.width = '100vw';
     modal.style.height = '100vh';
-    modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    modal.style.backgroundColor = 'rgba(0, 0, 0, 0.55)';
     modal.style.display = 'flex';
     modal.style.alignItems = 'center';
     modal.style.justifyContent = 'center';
     modal.style.zIndex = '9999';
 
     modal.innerHTML = `
-      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 90%; max-width: 650px; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.25); overflow: hidden;">
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 92%; max-width: 720px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 12px 30px rgba(0,0,0,0.3); overflow: hidden;">
+        <!-- ヘッダー -->
         <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated);">
           <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <span style="font-size: 1.2rem;">📋</span>
-            <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--text-primary);">過去アポイント履歴から選択</h3>
+            <span style="font-size: 1.25rem;">📋</span>
+            <div>
+              <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--text-primary);">自身のアポイント過去履歴から選択</h3>
+              <p style="margin: 0.15rem 0 0 0; font-size: 0.75rem; color: var(--text-muted);">ご自身が対応した過去アポイントのみ表示されます。同一人物は1つに集約されています。</p>
+            </div>
           </div>
-          <button type="button" class="btn-text" id="btn-close-history-picker" style="font-size: 1.2rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+          <button type="button" class="btn-text" id="btn-close-history-picker" style="font-size: 1.3rem; cursor: pointer; color: var(--text-muted);">&times;</button>
         </div>
-        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border-color); background: var(--bg-surface);">
-          <input type="text" id="picker-search-input" placeholder="名前、電話番号、日時、担当者で検索..." style="width: 100%; box-sizing: border-box; height: 36px; padding: 0.4rem 0.75rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary);">
+
+        <!-- 検索・フィルターエリア -->
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border-color); background: var(--bg-surface); display: flex; flex-direction: column; gap: 0.5rem;">
+          <input type="text" id="picker-search-input" placeholder="相手の呼称、メモ、電話番号、IDで検索..." style="width: 100%; box-sizing: border-box; height: 36px; padding: 0.4rem 0.75rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary);">
+          
+          <!-- 日時絞り込みコントロール -->
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; font-size: 0.8rem;">
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+              <span style="color: var(--text-secondary); font-size: 0.75rem; font-weight: 600;">期間:</span>
+              <button type="button" class="btn-period-chip active" data-period="all" style="padding: 0.15rem 0.5rem; font-size: 0.72rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--primary); color: #fff; cursor: pointer;">全期間</button>
+              <button type="button" class="btn-period-chip" data-period="1week" style="padding: 0.15rem 0.5rem; font-size: 0.72rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-secondary); cursor: pointer;">過去1週間</button>
+              <button type="button" class="btn-period-chip" data-period="1month" style="padding: 0.15rem 0.5rem; font-size: 0.72rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-secondary); cursor: pointer;">過去1ヶ月</button>
+              <button type="button" class="btn-period-chip" data-period="3month" style="padding: 0.15rem 0.5rem; font-size: 0.72rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-secondary); cursor: pointer;">過去3ヶ月</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.3rem;">
+              <input type="date" id="picker-date-from" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary);">
+              <span style="color: var(--text-muted);">〜</span>
+              <input type="date" id="picker-date-to" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary);">
+            </div>
+          </div>
         </div>
-        <div id="picker-list-container" style="flex: 1; overflow-y: auto; padding: 0.5rem 1.25rem; max-height: 450px;">
+
+        <!-- アポイント一覧コンテナ -->
+        <div id="picker-list-container" style="flex: 1; overflow-y: auto; padding: 0.75rem 1.25rem; max-height: 440px;">
           <!-- 動的レンダリング -->
         </div>
-        <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; background: var(--bg-surface-elevated);">
-          <button type="button" class="btn btn-secondary" id="btn-cancel-history-picker" style="padding: 0.4rem 1rem; font-size: 0.85rem;">閉じる</button>
+
+        <!-- フッター（複数選択一括確定） -->
+        <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated);">
+          <div style="font-size: 0.8rem; color: var(--text-secondary);">
+            選択中: <strong id="picker-selected-count" style="color: var(--primary);">0</strong> 件のアポイント
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button type="button" class="btn btn-secondary" id="btn-cancel-history-picker" style="padding: 0.4rem 0.85rem; font-size: 0.82rem;">閉じる</button>
+            <button type="button" class="btn btn-primary" id="btn-submit-history-picker" style="padding: 0.4rem 1.1rem; font-size: 0.82rem; font-weight: bold;" disabled>選択したアポイントを紐付ける</button>
+          </div>
         </div>
       </div>
     `;
@@ -14727,6 +14795,14 @@ function setupEventListeners() {
     const searchInput = modal.querySelector('#picker-search-input');
     const closeBtn = modal.querySelector('#btn-close-history-picker');
     const cancelBtn = modal.querySelector('#btn-cancel-history-picker');
+    const submitBtn = modal.querySelector('#btn-submit-history-picker');
+    const countDisplay = modal.querySelector('#picker-selected-count');
+    const dateFromInput = modal.querySelector('#picker-date-from');
+    const dateToInput = modal.querySelector('#picker-date-to');
+    const periodChips = modal.querySelectorAll('.btn-period-chip');
+
+    let selectedIdsSet = new Set();
+    let currentPeriod = 'all';
 
     const closeModal = () => modal.remove();
     closeBtn.addEventListener('click', closeModal);
@@ -14735,86 +14811,224 @@ function setupEventListeners() {
       if (e.target === modal) closeModal();
     });
 
-    const renderList = (filterText = '') => {
-      const q = filterText.toLowerCase().trim();
-      const filtered = candidateAppoints.filter(a => {
-        if (!q) return true;
-        const name = (a.customerName || a.name || '').toLowerCase();
-        const phone = (a.phone || '').toLowerCase();
-        const rep = (a.assignee || a.targetMember || a.createdByName || '').toLowerCase();
-        const dt = (a.datetime || a.date || '').toLowerCase();
-        const memo = (a.memo || a.content || '').toLowerCase();
-        const id = (a.id || '').toLowerCase();
-        return name.includes(q) || phone.includes(q) || rep.includes(q) || dt.includes(q) || memo.includes(q) || id.includes(q);
-      });
+    const updateSubmitState = () => {
+      const count = selectedIdsSet.size;
+      countDisplay.textContent = count;
+      if (count > 0) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = `選択した ${count} 件のアポイントを紐付ける`;
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '選択したアポイントを紐付ける';
+      }
+    };
+
+    submitBtn.addEventListener('click', () => {
+      if (selectedIdsSet.size === 0) return;
+      const idsToLink = Array.from(selectedIdsSet);
+      closeModal();
+      onSelectCallback(idsToLink);
+    });
+
+    // 日時フィルター計算
+    const isDateInRange = (dateStr) => {
+      if (!dateStr) return true;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return true;
+
+      // クイック期間判定
+      if (currentPeriod !== 'all') {
+        const now = new Date();
+        const diffDays = (now - d) / (1000 * 60 * 60 * 24);
+        if (currentPeriod === '1week' && diffDays > 7) return false;
+        if (currentPeriod === '1month' && diffDays > 30) return false;
+        if (currentPeriod === '3month' && diffDays > 90) return false;
+      }
+
+      // 日付ピッカー範囲判定
+      if (dateFromInput.value) {
+        const fromDate = new Date(dateFromInput.value + 'T00:00:00');
+        if (d < fromDate) return false;
+      }
+      if (dateToInput.value) {
+        const toDate = new Date(dateToInput.value + 'T23:59:59');
+        if (d > toDate) return false;
+      }
+
+      return true;
+    };
+
+    const renderList = () => {
+      const query = searchInput.value.toLowerCase().trim();
+
+      // フィルター適用
+      const filteredGroups = groups.map(g => {
+        // グループ内のアポイントを検索・日時で絞り込み
+        const matchedAppoints = g.appoints.filter(a => {
+          if (!isDateInRange(a.date || a.datetime)) return false;
+          if (!query) return true;
+
+          const name = (a.customerName || a.name || '').toLowerCase();
+          const memo = (a.memo || a.content || '').toLowerCase();
+          const id = (a.id || '').toLowerCase();
+          const phone = ((a.customFields && a.customFields.phone) || a.phone || '').toLowerCase();
+          return name.includes(query) || memo.includes(query) || id.includes(query) || phone.includes(query);
+        });
+
+        if (matchedAppoints.length === 0) return null;
+
+        return {
+          groupKey: g.groupKey,
+          name: g.name,
+          latestDate: matchedAppoints[0].date || matchedAppoints[0].datetime || '',
+          appoints: matchedAppoints
+        };
+      }).filter(Boolean);
 
       listContainer.innerHTML = '';
-      if (filtered.length === 0) {
-        listContainer.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">該当する過去アポイントは見つかりませんでした。</div>`;
+      if (filteredGroups.length === 0) {
+        listContainer.innerHTML = `<div style="padding: 2.5rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">該当する自身のアポイント履歴は見つかりませんでした。</div>`;
         return;
       }
 
-      const table = document.createElement('table');
-      table.style.width = '100%';
-      table.style.borderCollapse = 'collapse';
-      table.style.fontSize = '0.82rem';
+      filteredGroups.forEach((group, idx) => {
+        const groupCard = document.createElement('div');
+        groupCard.style.background = 'var(--bg-surface-elevated)';
+        groupCard.style.border = '1px solid var(--border-color)';
+        groupCard.style.borderRadius = 'var(--radius-sm)';
+        groupCard.style.marginBottom = '0.65rem';
+        groupCard.style.overflow = 'hidden';
 
-      table.innerHTML = `
-        <thead>
-          <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary); text-align: left;">
-            <th style="padding: 0.5rem 0.4rem;">ID</th>
-            <th style="padding: 0.5rem 0.4rem;">相手の呼称</th>
-            <th style="padding: 0.5rem 0.4rem;">日時</th>
-            <th style="padding: 0.5rem 0.4rem;">担当</th>
-            <th style="padding: 0.5rem 0.4rem;">ステータス</th>
-            <th style="padding: 0.5rem 0.4rem; text-align: center;">操作</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      `;
+        const allGroupIds = group.appoints.map(a => a.id);
+        const isAllSelected = allGroupIds.every(id => selectedIdsSet.has(id));
+        const isSomeSelected = allGroupIds.some(id => selectedIdsSet.has(id));
 
-      const tbody = table.querySelector('tbody');
-      filtered.forEach(a => {
-        const tr = document.createElement('tr');
-        tr.style.borderBottom = '1px solid var(--border-color)';
-        tr.style.transition = 'background 0.15s ease';
-        tr.onmouseenter = () => tr.style.backgroundColor = 'var(--bg-surface-elevated)';
-        tr.onmouseleave = () => tr.style.backgroundColor = 'transparent';
+        const latestDtFormatted = group.latestDate ? group.latestDate.replace('T', ' ') : '-';
 
-        const name = a.customerName || a.name || '名称未設定';
-        const dt = a.datetime ? a.datetime.replace('T', ' ') : (a.date || '-');
-        const assignee = a.assignee || a.targetMember || a.createdByName || '-';
-        const status = a.status || '予定';
+        groupCard.innerHTML = `
+          <!-- グループヘッダー行 -->
+          <div class="group-header-row" style="padding: 0.6rem 0.85rem; display: flex; align-items: center; justify-content: space-between; cursor: pointer; background: var(--bg-surface); border-bottom: 1px solid transparent;">
+            <div style="display: flex; align-items: center; gap: 0.6rem; flex: 1;">
+              <input type="checkbox" class="group-checkbox" style="cursor: pointer; width: 16px; height: 16px;" ${isAllSelected ? 'checked' : ''}>
+              <div>
+                <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">${group.name}</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">直近日時: ${latestDtFormatted}</span>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="badge" style="background: rgba(99, 102, 241, 0.12); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.25); font-size: 0.72rem; padding: 0.15rem 0.5rem;">過去アポ ${group.appoints.length}件</span>
+              <button type="button" class="btn-text btn-toggle-group" style="font-size: 0.75rem; color: var(--text-secondary); cursor: pointer; padding: 0.2rem 0.4rem;">▼ 詳細</button>
+            </div>
+          </div>
+          
+          <!-- アポイント内訳リスト（アコーディオン） -->
+          <div class="group-details-container" style="display: none; padding: 0.4rem 0.85rem 0.6rem 0.85rem; background: var(--bg-surface-elevated); border-top: 1px solid var(--border-color);">
+            <div style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.3rem;">
+              ${group.appoints.map(a => {
+                const dt = (a.date || a.datetime || '-').replace('T', ' ');
+                const isSelected = selectedIdsSet.has(a.id);
+                const statusBadge = a.status === 'official' 
+                  ? '<span class="badge badge-official" style="font-size: 0.68rem; padding: 0.05rem 0.3rem;">登録済</span>'
+                  : '<span class="badge badge-draft" style="font-size: 0.68rem; padding: 0.05rem 0.3rem;">下書き</span>';
 
-        tr.innerHTML = `
-          <td style="padding: 0.45rem 0.4rem; font-family: monospace; color: var(--primary); font-weight: 600;">${a.id}</td>
-          <td style="padding: 0.45rem 0.4rem; font-weight: 600; color: var(--text-primary);">${name}</td>
-          <td style="padding: 0.45rem 0.4rem; color: var(--text-secondary);">${dt}</td>
-          <td style="padding: 0.45rem 0.4rem; color: var(--text-secondary);">${assignee}</td>
-          <td style="padding: 0.45rem 0.4rem;"><span class="badge" style="font-size: 0.7rem; padding: 0.1rem 0.35rem;">${status}</span></td>
-          <td style="padding: 0.45rem 0.4rem; text-align: center;">
-            <button type="button" class="btn btn-sm btn-primary btn-select-appoint" style="font-size: 0.75rem; padding: 0.2rem 0.55rem;">選択</button>
-          </td>
+                return `
+                  <div class="appoint-sub-row" data-id="${a.id}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.35rem 0.5rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-xs); font-size: 0.8rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1;">
+                      <input type="checkbox" class="sub-appoint-checkbox" data-id="${a.id}" style="cursor: pointer;" ${isSelected ? 'checked' : ''}>
+                      <code style="font-family: monospace; color: var(--primary); font-weight: 600;">${a.id}</code>
+                      <span style="color: var(--text-secondary); font-size: 0.75rem;">${dt}</span>
+                      ${statusBadge}
+                      <span style="color: var(--text-muted); font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px;">${a.memo ? a.memo.slice(0, 30) + '...' : ''}</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
         `;
 
-        tr.querySelector('.btn-select-appoint').addEventListener('click', () => {
-          closeModal();
-          onSelectCallback(a.id);
+        const groupChk = groupCard.querySelector('.group-checkbox');
+        const toggleBtn = groupCard.querySelector('.btn-toggle-group');
+        const detailsContainer = groupCard.querySelector('.group-details-container');
+        const headerRow = groupCard.querySelector('.group-header-row');
+
+        // トグル展開
+        const toggleExpand = () => {
+          const isHidden = detailsContainer.style.display === 'none';
+          detailsContainer.style.display = isHidden ? 'block' : 'none';
+          toggleBtn.textContent = isHidden ? '▲ 閉じる' : '▼ 詳細';
+        };
+
+        toggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleExpand();
         });
 
-        tbody.appendChild(tr);
+        headerRow.addEventListener('click', (e) => {
+          if (e.target !== groupChk) {
+            toggleExpand();
+          }
+        });
+
+        // グループ一括チェック
+        groupChk.addEventListener('change', (e) => {
+          e.stopPropagation();
+          const checked = e.target.checked;
+          allGroupIds.forEach(id => {
+            if (checked) {
+              selectedIdsSet.add(id);
+            } else {
+              selectedIdsSet.delete(id);
+            }
+          });
+          groupCard.querySelectorAll('.sub-appoint-checkbox').forEach(chk => chk.checked = checked);
+          updateSubmitState();
+        });
+
+        // サブアポイント個別チェック
+        groupCard.querySelectorAll('.sub-appoint-checkbox').forEach(subChk => {
+          subChk.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const id = e.target.dataset.id;
+            if (e.target.checked) {
+              selectedIdsSet.add(id);
+            } else {
+              selectedIdsSet.delete(id);
+            }
+            groupChk.checked = allGroupIds.every(x => selectedIdsSet.has(x));
+            updateSubmitState();
+          });
+        });
+
+        listContainer.appendChild(groupCard);
       });
 
-      listContainer.appendChild(table);
+      updateSubmitState();
     };
 
-    renderList();
+    // 期間クイックチップイベント
+    periodChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        periodChips.forEach(c => {
+          c.classList.remove('active');
+          c.style.background = 'var(--bg-surface-elevated)';
+          c.style.color = 'var(--text-secondary)';
+        });
+        chip.classList.add('active');
+        chip.style.background = 'var(--primary)';
+        chip.style.color = '#fff';
 
-    searchInput.addEventListener('input', (e) => {
-      renderList(e.target.value);
+        currentPeriod = chip.dataset.period;
+        renderList();
+      });
     });
 
-    setTimeout(() => searchInput.focus(), 50);
+    dateFromInput.addEventListener('change', renderList);
+    dateToInput.addEventListener('change', renderList);
+    searchInput.addEventListener('input', renderList);
+
+    renderList();
+    setTimeout(() => searchInput.focus(), 60);
   };
 
 
@@ -18208,20 +18422,37 @@ function selectCustomer(customer) {
   const nameGroup = document.getElementById('customer-name-group');
   
   if (customer) {
-    document.getElementById('ext-info-name').textContent = `${customer.name} (${customer.furigana})`;
-    document.getElementById('ext-info-id').textContent = customer.id;
-    document.getElementById('ext-info-phone').textContent = customer.phone;
-    document.getElementById('ext-info-email').textContent = customer.email;
+    document.getElementById('ext-info-name').textContent = `${customer.name} ${customer.furigana ? `(${customer.furigana})` : ''}`;
+
+    // 顧客ID表示（Party ID有無の区別）
+    const idEl = document.getElementById('ext-info-id');
+    if (idEl) {
+      if (customer.hasPartyId !== false && customer.id && customer.id !== '本登録前') {
+        idEl.textContent = customer.id;
+        idEl.style.color = 'var(--text-primary)';
+      } else {
+        idEl.innerHTML = '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.75rem; padding: 0.1rem 0.4rem; font-weight: normal;">未発行（本登録前）</span>';
+      }
+    }
+
+    document.getElementById('ext-info-phone').textContent = customer.phone || '未登録';
+    document.getElementById('ext-info-email').textContent = customer.email || '未登録';
     document.getElementById('ext-info-corp').textContent = customer.corp || '未登録';
-    document.getElementById('ext-info-service').textContent = customer.service || 'なし';
+    document.getElementById('ext-info-service').textContent = customer.serviceText || customer.service || 'なし';
     
     // 顧客IDに紐付く過去のアポイント履歴を取得して表示（ぶら下がりツリー構造）
     const historyListContainer = document.getElementById('ext-info-history-list');
     historyListContainer.innerHTML = '';
     
-    const relatedAppoints = state.appointments.filter(
-      a => a.customerId === customer.id && a.id !== state.editingAppointId
-    ).sort((a, b) => new Date(b.date) - new Date(a.date));
+    const relatedAppoints = state.appointments.filter(a => {
+      if (state.editingAppointId && a.id === state.editingAppointId) return false;
+      if (customer.hasPartyId !== false && customer.id && customer.id !== '本登録前') {
+        return a.customerId === customer.id;
+      } else {
+        return (customer.appointIds && customer.appointIds.includes(a.id)) ||
+               (a.customerName && a.customerName === customer.name);
+      }
+    }).sort((a, b) => new Date(b.date || b.datetime || 0) - new Date(a.date || a.datetime || 0));
 
     document.getElementById('ext-info-history').textContent = `${relatedAppoints.length}件`;
 
@@ -18229,7 +18460,7 @@ function selectCustomer(customer) {
       historyListContainer.innerHTML = '<div style="font-size: 0.8rem; color: var(--text-muted); padding: 0.25rem 0;">└─ 過去のアポイント履歴はありません</div>';
     } else {
       relatedAppoints.forEach(appoint => {
-        const dateObj = new Date(appoint.date);
+        const dateObj = new Date(appoint.date || appoint.datetime || 0);
         const formattedDate = `${dateObj.getFullYear()}/${dateObj.getMonth() + 1}/${dateObj.getDate()} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
         
         const historyItem = document.createElement('div');
@@ -18269,6 +18500,24 @@ function selectCustomer(customer) {
         historyListContainer.appendChild(historyItem);
       });
     }
+
+    // 🌟 本登録前（Party ID未発行）の場合、過去アポイントIDを自動的に「関連するアポイントID」にセットして連結！
+    if (customer.hasPartyId === false && relatedAppoints.length > 0) {
+      const autoAppointIds = relatedAppoints.map(a => a.id);
+      const linksVal = autoAppointIds.join(', ');
+      if (window.renderRelatedAppointIdLinks) {
+        window.renderRelatedAppointIdLinks(linksVal, isViewOnly);
+      }
+      if (state.editingAppointId) {
+        const appoint = state.appointments.find(a => a.id === state.editingAppointId);
+        if (appoint) {
+          appoint.relatedAppointmentIds = linksVal;
+          localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+          syncBiDirectionalRelatedAppointmentIds(state.editingAppointId, linksVal);
+        }
+      }
+      showToast(`過去アポイント (${autoAppointIds.length}件) を自動連結しました。`, 'info');
+    }
     
     banner.style.display = 'block';
     const placeholder = document.getElementById('existing-customer-placeholder');
@@ -18296,8 +18545,7 @@ function selectCustomer(customer) {
     let relatedId = customer.relatedCustomerId || '';
     
     // 遅延バインドの検知（新規顧客選択時の処理）：
-    // 顧客マスタ上で関連IDがまだ空の場合、他の顧客マスタレコードで関連IDが現在の顧客IDに一致するものを探す
-    if (!relatedId) {
+    if (!relatedId && customer.hasPartyId !== false) {
       const originCustomer = state.customers.find(
         c => c.id !== customer.id && c.relatedCustomerId && c.relatedCustomerId.split(',').map(x => x.trim()).includes(customer.id)
       );
@@ -18396,11 +18644,94 @@ function setFormMode(mode) {
 // ==========================================
 // 7. 顧客検索モーダル処理
 // ==========================================
+// 全候補リスト生成（Party ID保有顧客 ＋ 本登録前見込み客 ＋ 各種マスタ連携情報）
+function getAllCustomerCandidates() {
+  const map = new Map();
+
+  // 1. Party ID保有顧客 (state.customers)
+  (state.customers || []).forEach(c => {
+    const services = [];
+    if (state.joContracts && state.joContracts.some(jo => (jo.customerId === c.id || jo.customerPersonalityId === c.id))) {
+      services.push('JO契約');
+    }
+    if (state.apContracts && state.apContracts.some(ap => (ap.customerId === c.id || ap.customerPersonalityId === c.id))) {
+      services.push('申込者情報');
+    }
+    if (state.agContracts && state.agContracts.some(ag => (ag.customerId === c.id || ag.id === c.id))) {
+      services.push('代理店');
+    }
+    const pastAppoints = (state.appointments || []).filter(a => a.customerId === c.id);
+    if (pastAppoints.length > 0) {
+      services.push(`アポイント (${pastAppoints.length}件)`);
+    }
+    if (services.length === 0 && c.service) {
+      services.push(c.service);
+    }
+
+    map.set(`party_${c.id}`, {
+      hasPartyId: true,
+      id: c.id,
+      name: c.name,
+      furigana: c.furigana || '',
+      phone: c.phone || '',
+      email: c.email || '',
+      corp: c.corp || '',
+      serviceText: services.join(' / ') || '登録済',
+      services: services,
+      appointIds: pastAppoints.map(a => a.id),
+      historyCount: pastAppoints.length
+    });
+  });
+
+  // 2. 本登録前（Party ID未発行）の見込み客（state.appointments の中から customerId 未設定のアポを人物ごとに集約）
+  const prospectMap = new Map();
+  (state.appointments || []).forEach(a => {
+    if (!a.customerId || a.customerType === 'new') {
+      const name = (a.customerName || a.name || '').trim();
+      if (!name || name === '名称未設定') return;
+
+      // すでにParty ID持ちの顧客リストに同姓同名で存在する場合はスキップ
+      const alreadyHasParty = Array.from(map.values()).some(c => c.name === name);
+      if (alreadyHasParty) return;
+
+      if (!prospectMap.has(name)) {
+        prospectMap.set(name, {
+          name: name,
+          furigana: (a.customFields && a.customFields.furigana) || '',
+          phone: (a.customFields && a.customFields.phone) || a.phone || '',
+          email: (a.customFields && a.customFields.email) || a.email || '',
+          corp: (a.customFields && a.customFields.corp_info && a.customFields.corp_info.name) || '',
+          appoints: []
+        });
+      }
+      prospectMap.get(name).appoints.push(a);
+    }
+  });
+
+  prospectMap.forEach((val, name) => {
+    map.set(`prospect_${name}`, {
+      hasPartyId: false,
+      id: '本登録前',
+      name: val.name,
+      furigana: val.furigana,
+      phone: val.phone,
+      email: val.email,
+      corp: val.corp,
+      serviceText: `過去アポイント (${val.appoints.length}件)`,
+      services: [`過去アポイント (${val.appoints.length}件)`],
+      appointIds: val.appoints.map(a => a.id),
+      historyCount: val.appoints.length
+    });
+  });
+
+  return Array.from(map.values());
+}
+
 function openCustomerSearchModal() {
   document.getElementById('customer-search-modal').classList.add('active');
   document.getElementById('modal-search-input').value = '';
   document.getElementById('modal-search-input').focus();
-  renderModalCustomerList(state.customers);
+  renderModalCustomerList(getAllCustomerCandidates());
 }
 
 function closeModal() {
@@ -18413,20 +18744,46 @@ function renderModalCustomerList(list) {
   container.innerHTML = '';
 
   if (list.length === 0) {
-    container.innerHTML = '<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">一致する顧客は見つかりませんでした</div>';
+    container.innerHTML = '<div style="padding: 2.5rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">一致する顧客は見つかりませんでした</div>';
     return;
   }
 
   list.forEach(cust => {
     const item = document.createElement('div');
     item.className = 'search-result-item';
+    item.style.padding = '0.75rem 1rem';
+    item.style.borderBottom = '1px solid var(--border-color)';
+    item.style.cursor = 'pointer';
+    item.style.transition = 'background 0.15s ease';
+
+    // 👤 Party ID有無バッジ
+    const partyIdBadge = cust.hasPartyId
+      ? `<span class="badge" style="font-family: monospace; font-size: 0.73rem; padding: 0.15rem 0.5rem; background: rgba(59, 130, 246, 0.12); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 700;">👤 Party ID: ${cust.id}</span>`
+      : `<span class="badge" style="font-size: 0.73rem; padding: 0.15rem 0.5rem; background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700;">⏳ 本登録前</span>`;
+
+    // 📋 何に登録されているかバッジ
+    const serviceBadge = cust.hasPartyId
+      ? `<span class="badge" style="font-size: 0.73rem; padding: 0.15rem 0.5rem; background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 600;">契約: ${cust.serviceText}</span>`
+      : `<span class="badge" style="font-size: 0.73rem; padding: 0.15rem 0.5rem; background: rgba(107, 114, 128, 0.12); color: #4b5563; border: 1px solid rgba(107, 114, 128, 0.3); font-weight: 600;">登録元: 過去アポ (${cust.historyCount}件)</span>`;
+
     item.innerHTML = `
-      <div class="search-result-title">
-        ${cust.name} <span style="font-size: 0.75rem; font-weight: normal; color: var(--text-secondary);">(${cust.furigana})</span>
-        <span style="font-family: monospace; font-size: 0.8rem; background: rgba(6, 182, 212, 0.15); color: var(--secondary); padding: 0.1rem 0.4rem; border-radius: 4px; float: right;">ID: ${cust.id}</span>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap; gap: 0.4rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary);">${cust.name}</span>
+          ${cust.furigana ? `<span style="font-size: 0.75rem; color: var(--text-muted);">(${cust.furigana})</span>` : ''}
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.4rem;">
+          ${partyIdBadge}
+          ${serviceBadge}
+        </div>
       </div>
-      <div class="search-result-sub">会社名: ${cust.corp || 'なし'} | 電話: ${cust.phone} | サービス: ${cust.service}</div>
+      <div style="font-size: 0.78rem; color: var(--text-secondary); display: flex; gap: 1.2rem; flex-wrap: wrap;">
+        <span>🏢 会社名: ${cust.corp || '未登録'}</span>
+        <span>📞 電話: ${cust.phone || '未登録'}</span>
+        <span>✉️ メール: ${cust.email || '未登録'}</span>
+      </div>
     `;
+
     item.addEventListener('click', () => {
       if (typeof targetSearchMode !== 'undefined' && targetSearchMode === 'related') {
         const relatedInput = document.getElementById('ext-info-related-id');
@@ -18464,195 +18821,28 @@ function renderModalCustomerList(list) {
   });
 }
 
-// モーダル内検索フィルター
+// モーダル内検索フィルター（Party ID保有者＋本登録前見込み客の横断検索）
 function handleModalSearch(e) {
   const query = e.target.value.trim().toLowerCase();
+  const allCandidates = getAllCustomerCandidates();
+
   if (!query) {
-    renderModalCustomerList(state.customers);
+    renderModalCustomerList(allCandidates);
     return;
   }
 
-  const filteredMap = new Map();
-
-  // 1. 既存アポイント顧客 (state.customers) からの網羅的な検索
-  state.customers.forEach(c => {
-    let isMatch = false;
-
-    // 基本情報一致
-    if (
-      c.id.toLowerCase().includes(query) ||
-      c.name.toLowerCase().includes(query) ||
-      c.furigana.toLowerCase().includes(query) ||
-      c.phone.includes(query) ||
-      (c.corp && c.corp.toLowerCase().includes(query))
-    ) {
-      isMatch = true;
-    }
-
-    // JO契約情報との一致
-    if (!isMatch && state.joContracts) {
-      const associatedJo = state.joContracts.find(jo => 
-        (jo.customerPersonalityId && jo.customerPersonalityId === c.id) || 
-        (jo.customerId && jo.customerId === c.id)
-      );
-      if (associatedJo) {
-        if (
-          (associatedJo.customerId && associatedJo.customerId.toLowerCase().includes(query)) ||
-          (associatedJo.customerPersonalityId && associatedJo.customerPersonalityId.toLowerCase().includes(query)) ||
-          (associatedJo.corpName && associatedJo.corpName.toLowerCase().includes(query)) ||
-          (associatedJo.shopName && associatedJo.shopName.toLowerCase().includes(query)) ||
-          (associatedJo.repName && associatedJo.repName.toLowerCase().includes(query))
-        ) {
-          isMatch = true;
-        }
-      }
-    }
-
-    // 申込者情報との一致
-    if (!isMatch && state.apContracts) {
-      const associatedAp = state.apContracts.find(ap => ap.customerId === c.id || ap.customerPersonalityId === c.id);
-      if (associatedAp) {
-        if (
-          (associatedAp.customerId && associatedAp.customerId.toLowerCase().includes(query)) ||
-          (associatedAp.customerPersonalityId && associatedAp.customerPersonalityId.toLowerCase().includes(query)) ||
-          (associatedAp.name && associatedAp.name.toLowerCase().includes(query)) ||
-          (associatedAp.phone && associatedAp.phone.includes(query))
-        ) {
-          isMatch = true;
-        }
-      }
-    }
-
-    // 代理店情報との一致
-    if (!isMatch && state.agContracts) {
-      const associatedAg = state.agContracts.find(ag => ag.customerId === c.id);
-      if (associatedAg) {
-        if (
-          (associatedAg.customerId && associatedAg.customerId.toLowerCase().includes(query)) ||
-          (associatedAg.name && associatedAg.name.toLowerCase().includes(query)) ||
-          (associatedAg.company && associatedAg.company.toLowerCase().includes(query))
-        ) {
-          isMatch = true;
-        }
-      }
-    }
-
-    if (isMatch) {
-      filteredMap.set(c.id, { ...c });
-    }
+  const filtered = allCandidates.filter(c => {
+    return (
+      (c.id && c.id.toLowerCase().includes(query)) ||
+      (c.name && c.name.toLowerCase().includes(query)) ||
+      (c.furigana && c.furigana.toLowerCase().includes(query)) ||
+      (c.phone && c.phone.includes(query)) ||
+      (c.email && c.email.toLowerCase().includes(query)) ||
+      (c.corp && c.corp.toLowerCase().includes(query)) ||
+      (c.serviceText && c.serviceText.toLowerCase().includes(query))
+    );
   });
 
-  // 2. マスタデータ（JO、代理店、申込者、パートナーDB）から直接名前や法人名で横断検索
-  // 検索ワードが2文字以上の場合に動作
-  if (query.length >= 2) {
-    // J-One情報 (joContracts) から直接検索
-    if (state.joContracts) {
-      state.joContracts.forEach(jo => {
-        const matches = 
-          (jo.customerId && jo.customerId.toLowerCase().includes(query)) ||
-          (jo.customerPersonalityId && jo.customerPersonalityId.toLowerCase().includes(query)) ||
-          (jo.corpName && jo.corpName.toLowerCase().includes(query)) ||
-          (jo.shopName && jo.shopName.toLowerCase().includes(query)) ||
-          (jo.repName && jo.repName.toLowerCase().includes(query));
-
-        if (matches) {
-          const personalityId = jo.customerPersonalityId || jo.customerId;
-          if (!filteredMap.has(personalityId)) {
-            filteredMap.set(personalityId, {
-              id: personalityId,
-              name: jo.repName || '未登録',
-              furigana: jo.repFurigana || '',
-              phone: '',
-              email: '',
-              corp: jo.corpName || '',
-              service: 'JO契約',
-              historyCount: 0
-            });
-          }
-        }
-      });
-    }
-
-    // 代理店情報 (agContracts) から直接検索
-    if (state.agContracts) {
-      state.agContracts.forEach(ag => {
-        const matches = 
-          (ag.customerId && ag.customerId.toLowerCase().includes(query)) ||
-          (ag.name && ag.name.toLowerCase().includes(query)) ||
-          (ag.company && ag.company.toLowerCase().includes(query));
-
-        if (matches) {
-          const personalityId = ag.customerId;
-          if (!filteredMap.has(personalityId)) {
-            filteredMap.set(personalityId, {
-              id: personalityId,
-              name: ag.name || '未登録',
-              furigana: '',
-              phone: '',
-              email: '',
-              corp: ag.company || '',
-              service: '代理店',
-              historyCount: 0
-            });
-          }
-        }
-      });
-    }
-
-    // 申込者情報 (apContracts) から直接検索
-    if (state.apContracts) {
-      state.apContracts.forEach(ap => {
-        const matches = 
-          (ap.customerId && ap.customerId.toLowerCase().includes(query)) ||
-          (ap.customerPersonalityId && ap.customerPersonalityId.toLowerCase().includes(query)) ||
-          (ap.name && ap.name.toLowerCase().includes(query)) ||
-          (ap.phone && ap.phone.includes(query));
-
-        if (matches) {
-          const personalityId = ap.customerPersonalityId || ap.customerId;
-          if (!filteredMap.has(personalityId)) {
-            filteredMap.set(personalityId, {
-              id: personalityId,
-              name: ap.name || '未登録',
-              furigana: ap.furigana || '',
-              phone: ap.phone || '',
-              email: ap.email || '',
-              corp: '',
-              service: '申込者',
-              historyCount: 0
-            });
-          }
-        }
-      });
-    }
-
-    // パートナーDB (dbmakePartners) から直接検索
-    if (typeof dbmakePartners !== 'undefined' && dbmakePartners) {
-      dbmakePartners.forEach(pt => {
-        const matches = 
-          (pt.id && pt.id.toLowerCase().includes(query)) ||
-          (pt.registeredName && pt.registeredName.toLowerCase().includes(query)) ||
-          (pt.representativeName && pt.representativeName.toLowerCase().includes(query));
-
-        if (matches) {
-          if (!filteredMap.has(pt.id)) {
-            filteredMap.set(pt.id, {
-              id: pt.id,
-              name: pt.representativeName || '未登録',
-              furigana: pt.representativeNameKana || '',
-              phone: pt.phoneNumber || '',
-              email: pt.email || '',
-              corp: pt.registeredName || '',
-              service: 'パートナーDB',
-              historyCount: 0
-            });
-          }
-        }
-      });
-    }
-  }
-
-  const filtered = Array.from(filteredMap.values());
   renderModalCustomerList(filtered);
 }
 
@@ -18786,10 +18976,7 @@ function addCustomField(fieldType, value = '') {
       </div>
       ${inputHtml}
     </div>
-    <div class="custom-field-reorder-group" title="ドラッグまたは矢印で並び替え">
-      <button type="button" class="btn-reorder-arrow" onclick="moveCustomField('${fieldType}', -1)" title="上に移動">▲</button>
-      <button type="button" class="btn-reorder-arrow" onclick="moveCustomField('${fieldType}', 1)" title="下に移動">▼</button>
-    </div>
+    <div class="custom-field-drag-handle" title="掴んでドラッグして位置を並び替え">⠿</div>
     <button type="button" class="btn-danger btn-icon-only" style="height: 42px; width: 42px; min-width: 42px; padding: 0; box-sizing: border-box; margin-bottom: 0px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="removeCustomField('${fieldType}')" title="削除">
       <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
     </button>
@@ -18813,9 +19000,6 @@ function addCustomField(fieldType, value = '') {
       inputEl.addEventListener('input', (e) => {
         detectRelatedData(fieldType, e.target.value.trim());
         triggerCrossTableSearchOnInput();
-        if (fieldType === 'phone' || fieldType === 'email') {
-          checkSamePersonAppointSuggestions();
-        }
       });
     }
   }
@@ -18826,7 +19010,6 @@ function addCustomField(fieldType, value = '') {
     inputEl.addEventListener('input', (e) => {
       detectRelatedData('name_or_furigana', e.target.value.trim());
       triggerCrossTableSearchOnInput();
-      checkSamePersonAppointSuggestions();
     });
   }
 
@@ -18834,30 +19017,6 @@ function addCustomField(fieldType, value = '') {
   const chk = document.getElementById(`chk-field-${fieldType}`);
   if (chk) {
     chk.checked = true;
-  }
-}
-
-// カスタム項目の並び替え（上下ボタン）
-function moveCustomField(fieldType, direction) {
-  const container = document.getElementById('custom-fields-list');
-  if (!container) return;
-  const row = document.getElementById(`custom-field-row-${fieldType}`);
-  if (!row) return;
-
-  if (direction === -1) {
-    // 1つ上に移動
-    const prev = row.previousElementSibling;
-    if (prev && prev.classList.contains('custom-field-row')) {
-      container.insertBefore(row, prev);
-      syncCustomFieldsOrderFromDOM();
-    }
-  } else if (direction === 1) {
-    // 1つ下に移動
-    const next = row.nextElementSibling;
-    if (next && next.classList.contains('custom-field-row')) {
-      container.insertBefore(next, row);
-      syncCustomFieldsOrderFromDOM();
-    }
   }
 }
 
@@ -18876,7 +19035,7 @@ function syncCustomFieldsOrderFromDOM() {
   state.addedCustomFields = newSet;
 }
 
-// カスタム項目のドラッグ＆ドロップ並び替え設定
+// グリッド配置（横2列・3列・縦1列）対応のドラッグ＆ドロップ並び替え
 function setupCustomFieldDragAndDrop(row, fieldType) {
   row.setAttribute('draggable', 'true');
   row.dataset.fieldType = fieldType;
@@ -18890,7 +19049,7 @@ function setupCustomFieldDragAndDrop(row, fieldType) {
   row.addEventListener('dragend', () => {
     row.classList.remove('is-dragging');
     document.querySelectorAll('.custom-field-row').forEach(r => {
-      r.classList.remove('drag-over-top', 'drag-over-bottom');
+      r.classList.remove('drag-over-before', 'drag-over-after');
     });
   });
 
@@ -18898,23 +19057,27 @@ function setupCustomFieldDragAndDrop(row, fieldType) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     const rect = row.getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
-    if (e.clientY < midY) {
-      row.classList.add('drag-over-top');
-      row.classList.remove('drag-over-bottom');
+    // 横並び（グリッド）に対応：水平方向(X)および垂直方向(Y)の位置関係から挿入先（前か後か）を判定
+    const relX = (e.clientX - rect.left) / rect.width;
+    const relY = (e.clientY - rect.top) / rect.height;
+    const isBefore = (relX + relY) < 1.0;
+
+    if (isBefore) {
+      row.classList.add('drag-over-before');
+      row.classList.remove('drag-over-after');
     } else {
-      row.classList.add('drag-over-bottom');
-      row.classList.remove('drag-over-top');
+      row.classList.add('drag-over-after');
+      row.classList.remove('drag-over-before');
     }
   });
 
   row.addEventListener('dragleave', () => {
-    row.classList.remove('drag-over-top', 'drag-over-bottom');
+    row.classList.remove('drag-over-before', 'drag-over-after');
   });
 
   row.addEventListener('drop', (e) => {
     e.preventDefault();
-    row.classList.remove('drag-over-top', 'drag-over-bottom');
+    row.classList.remove('drag-over-before', 'drag-over-after');
     const draggedFieldType = e.dataTransfer.getData('text/plain');
     if (!draggedFieldType || draggedFieldType === fieldType) return;
 
@@ -18923,8 +19086,11 @@ function setupCustomFieldDragAndDrop(row, fieldType) {
     if (!container || !draggedRow) return;
 
     const rect = row.getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
-    if (e.clientY < midY) {
+    const relX = (e.clientX - rect.left) / rect.width;
+    const relY = (e.clientY - rect.top) / rect.height;
+    const isBefore = (relX + relY) < 1.0;
+
+    if (isBefore) {
       container.insertBefore(draggedRow, row);
     } else {
       container.insertBefore(draggedRow, row.nextElementSibling);
@@ -18939,7 +19105,6 @@ document.getElementById('customer-name').addEventListener('input', (e) => {
     detectRelatedData('name_or_furigana', e.target.value.trim());
   }
   triggerCrossTableSearchOnInput();
-  checkSamePersonAppointSuggestions();
 });
 
 // カスタム項目の削除
@@ -18963,7 +19128,6 @@ function removeCustomField(fieldType) {
 
   // 関連アラート非表示チェック（該当項目が消えたら消す）
   checkAlertVisibility();
-  checkSamePersonAppointSuggestions();
 }
 
 // アラートの表示条件チェック
@@ -18974,97 +19138,6 @@ function checkAlertVisibility() {
 
   if (!phoneVal && !emailVal && !nameVal) {
     document.getElementById('related-data-alert').style.display = 'none';
-  }
-}
-
-// 💡 同一人物と思われる過去のアポイントを自動検知してサジェストする機能
-function checkSamePersonAppointSuggestions() {
-  const box = document.getElementById('appoint-related-auto-suggest-box');
-  const textEl = document.getElementById('appoint-related-auto-suggest-text');
-  const linkBtn = document.getElementById('btn-link-auto-suggested');
-  if (!box || !textEl || !linkBtn) return;
-
-  const currentEditingId = state.editingAppointId;
-  const currentAppoint = currentEditingId ? state.appointments.find(a => a.id === currentEditingId) : null;
-  const alreadyLinkedIds = (currentAppoint && currentAppoint.relatedAppointmentIds)
-    ? currentAppoint.relatedAppointmentIds.split(',').map(s => s.trim()).filter(Boolean)
-    : [];
-
-  // 現在入力中のお客様名、電話番号、メールアドレスを取得
-  const nameInput = document.getElementById('customer-name')?.value.trim() || '';
-  const phoneInput = (document.getElementById('custom-field-input-phone')?.value || '').replace(/[^0-9]/g, '');
-  const emailInput = (document.getElementById('custom-field-input-email')?.value || '').toLowerCase().trim();
-
-  if (!nameInput && !phoneInput && !emailInput) {
-    box.style.display = 'none';
-    return;
-  }
-
-  // 過去アポイントから照合
-  const matched = (state.appointments || []).find(a => {
-    if (currentEditingId && a.id === currentEditingId) return false;
-    if (alreadyLinkedIds.includes(a.id)) return false;
-
-    // 1. 電話番号一致（7桁以上の数字一致）
-    if (phoneInput && phoneInput.length >= 7) {
-      const aPhone = (a.phone || '').replace(/[^0-9]/g, '');
-      if (aPhone && (aPhone === phoneInput || aPhone.endsWith(phoneInput) || phoneInput.endsWith(aPhone))) {
-        return true;
-      }
-    }
-
-    // 2. メールアドレス一致
-    if (emailInput && emailInput.length >= 5) {
-      const aEmail = (a.email || '').toLowerCase().trim();
-      if (aEmail && aEmail === emailInput) {
-        return true;
-      }
-    }
-
-    // 3. 氏名一致（2文字以上）
-    if (nameInput && nameInput.length >= 2) {
-      const aName = (a.customerName || a.name || '').trim();
-      if (aName && (aName === nameInput || aName.includes(nameInput) || nameInput.includes(aName))) {
-        return true;
-      }
-    }
-
-    return false;
-  });
-
-  if (matched) {
-    const mName = matched.customerName || matched.name || '名称未設定';
-    const mDate = matched.datetime ? matched.datetime.replace('T', ' ') : (matched.date || '-');
-    const mRep = matched.assignee || matched.targetMember || matched.createdByName || '-';
-
-    textEl.innerHTML = `同一人物の過去アポイントを検知: <strong>${mName}</strong> 様 (${mDate} / 担当: ${mRep} / ID: <code style="font-family: monospace; color: var(--primary); font-weight: bold;">${matched.id}</code>)`;
-    box.style.display = 'flex';
-
-    // 紐付けボタンのイベント
-    linkBtn.onclick = () => {
-      let ids = alreadyLinkedIds.slice();
-      if (!ids.includes(matched.id)) {
-        ids.push(matched.id);
-      }
-      const newValString = ids.join(', ');
-
-      if (state.editingAppointId) {
-        const appoint = state.appointments.find(a => a.id === state.editingAppointId);
-        if (appoint) {
-          appoint.relatedAppointmentIds = newValString;
-          localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
-          syncBiDirectionalRelatedAppointmentIds(state.editingAppointId, newValString);
-        }
-      }
-
-      if (window.renderRelatedAppointIdLinks) {
-        window.renderRelatedAppointIdLinks(newValString, false);
-      }
-      box.style.display = 'none';
-      showToast(`過去アポイント (ID: ${matched.id}) と紐付けました。`, 'success');
-    };
-  } else {
-    box.style.display = 'none';
   }
 }
 

@@ -7125,67 +7125,60 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   font-weight: 700;
 }
 
-/* 項目並び替え操作UI（上下ボタン＆ドラッグハンドル） */
-.custom-field-reorder-group {
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: center !important;
-  gap: 2px !important;
-  align-self: flex-end !important;
-  height: 42px !important;
-  box-sizing: border-box !important;
-  cursor: grab !important;
-  flex-shrink: 0 !important;
-  user-select: none !important;
-}
-
-.custom-field-reorder-group:active {
-  cursor: grabbing !important;
-}
-
-.btn-reorder-arrow {
-  background: var(--bg-surface-elevated) !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: var(--radius-xs) !important;
-  width: 20px !important;
-  min-width: 20px !important;
-  height: 18px !important;
-  min-height: 18px !important;
+/* 項目並び替え操作UI（ドラッグハンドル＆グリッド対応ドロップインジケーター） */
+.custom-field-drag-handle {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  cursor: pointer !important;
-  color: var(--text-secondary) !important;
-  font-size: 0.65rem !important;
-  padding: 0 !important;
-  line-height: 1 !important;
+  align-self: flex-end !important;
+  height: 42px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  box-sizing: border-box !important;
+  cursor: grab !important;
+  color: var(--text-muted) !important;
+  background: var(--bg-surface-elevated) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 1.15rem !important;
+  user-select: none !important;
   transition: all 0.15s ease !important;
+  flex-shrink: 0 !important;
 }
 
-.btn-reorder-arrow:hover {
-  background: var(--primary) !important;
-  color: #fff !important;
+.custom-field-drag-handle:hover {
+  color: var(--primary) !important;
   border-color: var(--primary) !important;
+  background: var(--primary-glow) !important;
+}
+
+.custom-field-drag-handle:active {
+  cursor: grabbing !important;
 }
 
 .custom-field-row {
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease !important;
 }
 
 .custom-field-row.is-dragging {
-  opacity: 0.45 !important;
-  border: 1.5px dashed var(--primary) !important;
+  opacity: 0.35 !important;
+  border: 2px dashed var(--primary) !important;
   border-radius: var(--radius-sm) !important;
+  transform: scale(0.98);
 }
 
-.custom-field-row.drag-over-top {
-  border-top: 3px solid var(--primary) !important;
-  transform: translateY(-2px);
+.custom-field-row.drag-over-before {
+  border-left: 4px solid var(--primary) !important;
+  border-top: 1px solid var(--primary) !important;
+  background: rgba(99, 102, 241, 0.04) !important;
+  box-shadow: -3px 0 8px rgba(99, 102, 241, 0.25) !important;
 }
 
-.custom-field-row.drag-over-bottom {
-  border-bottom: 3px solid var(--primary) !important;
-  transform: translateY(2px);
+.custom-field-row.drag-over-after {
+  border-right: 4px solid var(--primary) !important;
+  border-bottom: 1px solid var(--primary) !important;
+  background: rgba(99, 102, 241, 0.04) !important;
+  box-shadow: 3px 0 8px rgba(99, 102, 241, 0.25) !important;
 }
 
 /* ============================================================================
