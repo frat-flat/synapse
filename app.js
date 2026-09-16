@@ -14629,8 +14629,192 @@ function setupEventListeners() {
         input.focus();
       });
 
+      // 📋 過去履歴から選択ボタン
+      const pickHistoryBtn = document.createElement('button');
+      pickHistoryBtn.type = 'button';
+      pickHistoryBtn.className = 'btn-text';
+      pickHistoryBtn.style.fontSize = '0.8rem';
+      pickHistoryBtn.style.padding = '0.2rem 0.5rem';
+      pickHistoryBtn.style.border = '1px dashed var(--border-color)';
+      pickHistoryBtn.style.borderRadius = '20px';
+      pickHistoryBtn.style.background = 'var(--bg-surface-elevated)';
+      pickHistoryBtn.style.color = 'var(--text-secondary)';
+      pickHistoryBtn.style.cursor = 'pointer';
+      pickHistoryBtn.style.display = 'inline-flex';
+      pickHistoryBtn.style.alignItems = 'center';
+      pickHistoryBtn.style.gap = '0.25rem';
+      pickHistoryBtn.innerHTML = '📋 過去履歴から選択';
+      pickHistoryBtn.title = '過去のアポイント履歴から同一人物のアポイントを選択して紐付けます';
+
+      pickHistoryBtn.addEventListener('click', () => {
+        openAppointHistoryPicker((selectedAppointId) => {
+          if (!selectedAppointId) return;
+          if (ids.includes(selectedAppointId)) {
+            showToast('このアポイントはすでに関連付けされています。', 'warning');
+            return;
+          }
+          ids.push(selectedAppointId);
+          const newValString = ids.join(', ');
+
+          if (state.editingAppointId) {
+            const appoint = state.appointments.find(a => a.id === state.editingAppointId);
+            if (appoint) {
+              appoint.relatedAppointmentIds = newValString;
+              localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+              syncBiDirectionalRelatedAppointmentIds(state.editingAppointId, newValString);
+            }
+          }
+          window.renderRelatedAppointIdLinks(newValString, isViewOnly);
+          showToast(`アポイントID: ${selectedAppointId} を紐付けました。`, 'success');
+        }, ids);
+      });
+
       container.appendChild(addBtn);
+      container.appendChild(pickHistoryBtn);
     }
+  };
+
+  // 過去アポイント履歴選択モーダル
+  window.openAppointHistoryPicker = function(onSelectCallback, currentLinkedIds = []) {
+    const existingModal = document.getElementById('modal-appoint-history-picker');
+    if (existingModal) existingModal.remove();
+
+    const currentEditingId = state.editingAppointId;
+    // 候補：現在編集中とすでに紐付いているID以外の過去アポイント
+    const candidateAppoints = (state.appointments || []).filter(a => {
+      if (currentEditingId && a.id === currentEditingId) return false;
+      if (currentLinkedIds.includes(a.id)) return false;
+      return true;
+    }).sort((a, b) => new Date(b.datetime || 0) - new Date(a.datetime || 0));
+
+    const modal = document.createElement('div');
+    modal.id = 'modal-appoint-history-picker';
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100vw';
+    modal.style.height = '100vh';
+    modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+    modal.style.zIndex = '9999';
+
+    modal.innerHTML = `
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 90%; max-width: 650px; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.25); overflow: hidden;">
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated);">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.2rem;">📋</span>
+            <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--text-primary);">過去アポイント履歴から選択</h3>
+          </div>
+          <button type="button" class="btn-text" id="btn-close-history-picker" style="font-size: 1.2rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+        </div>
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border-color); background: var(--bg-surface);">
+          <input type="text" id="picker-search-input" placeholder="名前、電話番号、日時、担当者で検索..." style="width: 100%; box-sizing: border-box; height: 36px; padding: 0.4rem 0.75rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary);">
+        </div>
+        <div id="picker-list-container" style="flex: 1; overflow-y: auto; padding: 0.5rem 1.25rem; max-height: 450px;">
+          <!-- 動的レンダリング -->
+        </div>
+        <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; background: var(--bg-surface-elevated);">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-history-picker" style="padding: 0.4rem 1rem; font-size: 0.85rem;">閉じる</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const listContainer = modal.querySelector('#picker-list-container');
+    const searchInput = modal.querySelector('#picker-search-input');
+    const closeBtn = modal.querySelector('#btn-close-history-picker');
+    const cancelBtn = modal.querySelector('#btn-cancel-history-picker');
+
+    const closeModal = () => modal.remove();
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    const renderList = (filterText = '') => {
+      const q = filterText.toLowerCase().trim();
+      const filtered = candidateAppoints.filter(a => {
+        if (!q) return true;
+        const name = (a.customerName || a.name || '').toLowerCase();
+        const phone = (a.phone || '').toLowerCase();
+        const rep = (a.assignee || a.targetMember || a.createdByName || '').toLowerCase();
+        const dt = (a.datetime || a.date || '').toLowerCase();
+        const memo = (a.memo || a.content || '').toLowerCase();
+        const id = (a.id || '').toLowerCase();
+        return name.includes(q) || phone.includes(q) || rep.includes(q) || dt.includes(q) || memo.includes(q) || id.includes(q);
+      });
+
+      listContainer.innerHTML = '';
+      if (filtered.length === 0) {
+        listContainer.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">該当する過去アポイントは見つかりませんでした。</div>`;
+        return;
+      }
+
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      table.style.fontSize = '0.82rem';
+
+      table.innerHTML = `
+        <thead>
+          <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary); text-align: left;">
+            <th style="padding: 0.5rem 0.4rem;">ID</th>
+            <th style="padding: 0.5rem 0.4rem;">相手の呼称</th>
+            <th style="padding: 0.5rem 0.4rem;">日時</th>
+            <th style="padding: 0.5rem 0.4rem;">担当</th>
+            <th style="padding: 0.5rem 0.4rem;">ステータス</th>
+            <th style="padding: 0.5rem 0.4rem; text-align: center;">操作</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      `;
+
+      const tbody = table.querySelector('tbody');
+      filtered.forEach(a => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--border-color)';
+        tr.style.transition = 'background 0.15s ease';
+        tr.onmouseenter = () => tr.style.backgroundColor = 'var(--bg-surface-elevated)';
+        tr.onmouseleave = () => tr.style.backgroundColor = 'transparent';
+
+        const name = a.customerName || a.name || '名称未設定';
+        const dt = a.datetime ? a.datetime.replace('T', ' ') : (a.date || '-');
+        const assignee = a.assignee || a.targetMember || a.createdByName || '-';
+        const status = a.status || '予定';
+
+        tr.innerHTML = `
+          <td style="padding: 0.45rem 0.4rem; font-family: monospace; color: var(--primary); font-weight: 600;">${a.id}</td>
+          <td style="padding: 0.45rem 0.4rem; font-weight: 600; color: var(--text-primary);">${name}</td>
+          <td style="padding: 0.45rem 0.4rem; color: var(--text-secondary);">${dt}</td>
+          <td style="padding: 0.45rem 0.4rem; color: var(--text-secondary);">${assignee}</td>
+          <td style="padding: 0.45rem 0.4rem;"><span class="badge" style="font-size: 0.7rem; padding: 0.1rem 0.35rem;">${status}</span></td>
+          <td style="padding: 0.45rem 0.4rem; text-align: center;">
+            <button type="button" class="btn btn-sm btn-primary btn-select-appoint" style="font-size: 0.75rem; padding: 0.2rem 0.55rem;">選択</button>
+          </td>
+        `;
+
+        tr.querySelector('.btn-select-appoint').addEventListener('click', () => {
+          closeModal();
+          onSelectCallback(a.id);
+        });
+
+        tbody.appendChild(tr);
+      });
+
+      listContainer.appendChild(table);
+    };
+
+    renderList();
+
+    searchInput.addEventListener('input', (e) => {
+      renderList(e.target.value);
+    });
+
+    setTimeout(() => searchInput.focus(), 50);
   };
 
 
@@ -18602,6 +18786,10 @@ function addCustomField(fieldType, value = '') {
       </div>
       ${inputHtml}
     </div>
+    <div class="custom-field-reorder-group" title="ドラッグまたは矢印で並び替え">
+      <button type="button" class="btn-reorder-arrow" onclick="moveCustomField('${fieldType}', -1)" title="上に移動">▲</button>
+      <button type="button" class="btn-reorder-arrow" onclick="moveCustomField('${fieldType}', 1)" title="下に移動">▼</button>
+    </div>
     <button type="button" class="btn-danger btn-icon-only" style="height: 42px; width: 42px; min-width: 42px; padding: 0; box-sizing: border-box; margin-bottom: 0px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;" onclick="removeCustomField('${fieldType}')" title="削除">
       <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
     </button>
@@ -18609,6 +18797,9 @@ function addCustomField(fieldType, value = '') {
 
   container.appendChild(row);
   state.addedCustomFields.add(fieldType);
+
+  // ドラッグ＆ドロップ並び替えの設定
+  setupCustomFieldDragAndDrop(row, fieldType);
 
   // イベント設定
   if (fieldType === 'corp_info') {
@@ -18622,6 +18813,9 @@ function addCustomField(fieldType, value = '') {
       inputEl.addEventListener('input', (e) => {
         detectRelatedData(fieldType, e.target.value.trim());
         triggerCrossTableSearchOnInput();
+        if (fieldType === 'phone' || fieldType === 'email') {
+          checkSamePersonAppointSuggestions();
+        }
       });
     }
   }
@@ -18632,6 +18826,7 @@ function addCustomField(fieldType, value = '') {
     inputEl.addEventListener('input', (e) => {
       detectRelatedData('name_or_furigana', e.target.value.trim());
       triggerCrossTableSearchOnInput();
+      checkSamePersonAppointSuggestions();
     });
   }
 
@@ -18642,12 +18837,109 @@ function addCustomField(fieldType, value = '') {
   }
 }
 
+// カスタム項目の並び替え（上下ボタン）
+function moveCustomField(fieldType, direction) {
+  const container = document.getElementById('custom-fields-list');
+  if (!container) return;
+  const row = document.getElementById(`custom-field-row-${fieldType}`);
+  if (!row) return;
+
+  if (direction === -1) {
+    // 1つ上に移動
+    const prev = row.previousElementSibling;
+    if (prev && prev.classList.contains('custom-field-row')) {
+      container.insertBefore(row, prev);
+      syncCustomFieldsOrderFromDOM();
+    }
+  } else if (direction === 1) {
+    // 1つ下に移動
+    const next = row.nextElementSibling;
+    if (next && next.classList.contains('custom-field-row')) {
+      container.insertBefore(next, row);
+      syncCustomFieldsOrderFromDOM();
+    }
+  }
+}
+
+// DOMの並び順から state.addedCustomFields の順序を同期
+function syncCustomFieldsOrderFromDOM() {
+  const container = document.getElementById('custom-fields-list');
+  if (!container) return;
+  const rows = container.querySelectorAll('.custom-field-row');
+  const newSet = new Set();
+  rows.forEach(r => {
+    const fType = r.dataset.fieldType;
+    if (fType) {
+      newSet.add(fType);
+    }
+  });
+  state.addedCustomFields = newSet;
+}
+
+// カスタム項目のドラッグ＆ドロップ並び替え設定
+function setupCustomFieldDragAndDrop(row, fieldType) {
+  row.setAttribute('draggable', 'true');
+  row.dataset.fieldType = fieldType;
+
+  row.addEventListener('dragstart', (e) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', fieldType);
+    row.classList.add('is-dragging');
+  });
+
+  row.addEventListener('dragend', () => {
+    row.classList.remove('is-dragging');
+    document.querySelectorAll('.custom-field-row').forEach(r => {
+      r.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+  });
+
+  row.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = row.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    if (e.clientY < midY) {
+      row.classList.add('drag-over-top');
+      row.classList.remove('drag-over-bottom');
+    } else {
+      row.classList.add('drag-over-bottom');
+      row.classList.remove('drag-over-top');
+    }
+  });
+
+  row.addEventListener('dragleave', () => {
+    row.classList.remove('drag-over-top', 'drag-over-bottom');
+  });
+
+  row.addEventListener('drop', (e) => {
+    e.preventDefault();
+    row.classList.remove('drag-over-top', 'drag-over-bottom');
+    const draggedFieldType = e.dataTransfer.getData('text/plain');
+    if (!draggedFieldType || draggedFieldType === fieldType) return;
+
+    const container = document.getElementById('custom-fields-list');
+    const draggedRow = document.getElementById(`custom-field-row-${draggedFieldType}`);
+    if (!container || !draggedRow) return;
+
+    const rect = row.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    if (e.clientY < midY) {
+      container.insertBefore(draggedRow, row);
+    } else {
+      container.insertBefore(draggedRow, row.nextElementSibling);
+    }
+    syncCustomFieldsOrderFromDOM();
+  });
+}
+
 // 相手の名前基本フィールドも監視
 document.getElementById('customer-name').addEventListener('input', (e) => {
   if (state.formMode === 'new') {
     detectRelatedData('name_or_furigana', e.target.value.trim());
   }
   triggerCrossTableSearchOnInput();
+  checkSamePersonAppointSuggestions();
 });
 
 // カスタム項目の削除
@@ -18671,6 +18963,7 @@ function removeCustomField(fieldType) {
 
   // 関連アラート非表示チェック（該当項目が消えたら消す）
   checkAlertVisibility();
+  checkSamePersonAppointSuggestions();
 }
 
 // アラートの表示条件チェック
@@ -18681,6 +18974,97 @@ function checkAlertVisibility() {
 
   if (!phoneVal && !emailVal && !nameVal) {
     document.getElementById('related-data-alert').style.display = 'none';
+  }
+}
+
+// 💡 同一人物と思われる過去のアポイントを自動検知してサジェストする機能
+function checkSamePersonAppointSuggestions() {
+  const box = document.getElementById('appoint-related-auto-suggest-box');
+  const textEl = document.getElementById('appoint-related-auto-suggest-text');
+  const linkBtn = document.getElementById('btn-link-auto-suggested');
+  if (!box || !textEl || !linkBtn) return;
+
+  const currentEditingId = state.editingAppointId;
+  const currentAppoint = currentEditingId ? state.appointments.find(a => a.id === currentEditingId) : null;
+  const alreadyLinkedIds = (currentAppoint && currentAppoint.relatedAppointmentIds)
+    ? currentAppoint.relatedAppointmentIds.split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+
+  // 現在入力中のお客様名、電話番号、メールアドレスを取得
+  const nameInput = document.getElementById('customer-name')?.value.trim() || '';
+  const phoneInput = (document.getElementById('custom-field-input-phone')?.value || '').replace(/[^0-9]/g, '');
+  const emailInput = (document.getElementById('custom-field-input-email')?.value || '').toLowerCase().trim();
+
+  if (!nameInput && !phoneInput && !emailInput) {
+    box.style.display = 'none';
+    return;
+  }
+
+  // 過去アポイントから照合
+  const matched = (state.appointments || []).find(a => {
+    if (currentEditingId && a.id === currentEditingId) return false;
+    if (alreadyLinkedIds.includes(a.id)) return false;
+
+    // 1. 電話番号一致（7桁以上の数字一致）
+    if (phoneInput && phoneInput.length >= 7) {
+      const aPhone = (a.phone || '').replace(/[^0-9]/g, '');
+      if (aPhone && (aPhone === phoneInput || aPhone.endsWith(phoneInput) || phoneInput.endsWith(aPhone))) {
+        return true;
+      }
+    }
+
+    // 2. メールアドレス一致
+    if (emailInput && emailInput.length >= 5) {
+      const aEmail = (a.email || '').toLowerCase().trim();
+      if (aEmail && aEmail === emailInput) {
+        return true;
+      }
+    }
+
+    // 3. 氏名一致（2文字以上）
+    if (nameInput && nameInput.length >= 2) {
+      const aName = (a.customerName || a.name || '').trim();
+      if (aName && (aName === nameInput || aName.includes(nameInput) || nameInput.includes(aName))) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+
+  if (matched) {
+    const mName = matched.customerName || matched.name || '名称未設定';
+    const mDate = matched.datetime ? matched.datetime.replace('T', ' ') : (matched.date || '-');
+    const mRep = matched.assignee || matched.targetMember || matched.createdByName || '-';
+
+    textEl.innerHTML = `同一人物の過去アポイントを検知: <strong>${mName}</strong> 様 (${mDate} / 担当: ${mRep} / ID: <code style="font-family: monospace; color: var(--primary); font-weight: bold;">${matched.id}</code>)`;
+    box.style.display = 'flex';
+
+    // 紐付けボタンのイベント
+    linkBtn.onclick = () => {
+      let ids = alreadyLinkedIds.slice();
+      if (!ids.includes(matched.id)) {
+        ids.push(matched.id);
+      }
+      const newValString = ids.join(', ');
+
+      if (state.editingAppointId) {
+        const appoint = state.appointments.find(a => a.id === state.editingAppointId);
+        if (appoint) {
+          appoint.relatedAppointmentIds = newValString;
+          localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+          syncBiDirectionalRelatedAppointmentIds(state.editingAppointId, newValString);
+        }
+      }
+
+      if (window.renderRelatedAppointIdLinks) {
+        window.renderRelatedAppointIdLinks(newValString, false);
+      }
+      box.style.display = 'none';
+      showToast(`過去アポイント (ID: ${matched.id}) と紐付けました。`, 'success');
+    };
+  } else {
+    box.style.display = 'none';
   }
 }
 
@@ -19687,16 +20071,13 @@ window.toggleTabConnection = function(type, id, connect) {
 // ==========================================
 
 const APPOINT_LAYOUT_NAMES = {
-  'layout-1-col': '1列（全幅）',
-  'layout-2-equal': '2列均等 (50:50)',
-  'layout-2-unequal': '2列不均等 (65:35)',
-  'layout-3-equal': '3列均等',
-  'layout-2x2': '4分割 (2×2)',
-  'layout-split-stack': '左右非対称'
+  'layout-1-col': '縦1列',
+  'layout-2-equal': '横2列',
+  'layout-3-equal': '横3列'
 };
 
 function getAppointLayoutDisplayName(layoutId) {
-  return APPOINT_LAYOUT_NAMES[layoutId] || '2列均等';
+  return APPOINT_LAYOUT_NAMES[layoutId] || '横2列';
 }
 
 function setAppointmentFormLayout(layoutId, showNotification = true) {

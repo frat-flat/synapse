@@ -7055,11 +7055,11 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   gap: 3px;
 }
 
-.snap-preview-box.snap-grid-2x2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 2px;
+.snap-preview-box.snap-flex-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 3px;
 }
 
 .snap-cell {
@@ -7125,8 +7125,71 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   font-weight: 700;
 }
 
+/* 項目並び替え操作UI（上下ボタン＆ドラッグハンドル） */
+.custom-field-reorder-group {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  align-self: flex-end !important;
+  height: 42px !important;
+  box-sizing: border-box !important;
+  cursor: grab !important;
+  flex-shrink: 0 !important;
+  user-select: none !important;
+}
+
+.custom-field-reorder-group:active {
+  cursor: grabbing !important;
+}
+
+.btn-reorder-arrow {
+  background: var(--bg-surface-elevated) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-xs) !important;
+  width: 20px !important;
+  min-width: 20px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  color: var(--text-secondary) !important;
+  font-size: 0.65rem !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  transition: all 0.15s ease !important;
+}
+
+.btn-reorder-arrow:hover {
+  background: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary) !important;
+}
+
+.custom-field-row {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+
+.custom-field-row.is-dragging {
+  opacity: 0.45 !important;
+  border: 1.5px dashed var(--primary) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.custom-field-row.drag-over-top {
+  border-top: 3px solid var(--primary) !important;
+  transform: translateY(-2px);
+}
+
+.custom-field-row.drag-over-bottom {
+  border-bottom: 3px solid var(--primary) !important;
+  transform: translateY(2px);
+}
+
 /* ============================================================================
-   追加項目グリッドレイアウト（動的配置エンジン）
+   追加項目グリッドレイアウト（3パターン：縦1列、横2列、横3列）
    ============================================================================ */
 .custom-fields-grid {
   display: grid;
@@ -7135,7 +7198,7 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 1. 1列（全幅縦並び） */
+/* 1. 縦1列（全幅縦並び） */
 .custom-fields-grid.layout-1-col {
   grid-template-columns: 1fr;
 }
@@ -7143,7 +7206,7 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   grid-column: span 1;
 }
 
-/* 2. 2列均等 (50% : 50%) */
+/* 2. 横2列 (50% : 50%) */
 .custom-fields-grid.layout-2-equal {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -7156,20 +7219,7 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   grid-column: 1 / -1;
 }
 
-/* 3. 2列不均等 (65% : 35%) */
-.custom-fields-grid.layout-2-unequal {
-  grid-template-columns: 1.65fr 1fr;
-}
-.custom-fields-grid.layout-2-unequal .custom-field-row {
-  grid-column: span 1;
-}
-.custom-fields-grid.layout-2-unequal .custom-field-row.field-span-full,
-.custom-fields-grid.layout-2-unequal #custom-field-row-corp_info,
-.custom-fields-grid.layout-2-unequal #custom-field-row-introducer {
-  grid-column: 1 / -1;
-}
-
-/* 4. 3列均等 (33% : 33% : 33%) */
+/* 3. 横3列 (33% : 33% : 33%) */
 .custom-fields-grid.layout-3-equal {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -7179,32 +7229,6 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
 .custom-fields-grid.layout-3-equal .custom-field-row.field-span-full,
 .custom-fields-grid.layout-3-equal #custom-field-row-corp_info,
 .custom-fields-grid.layout-3-equal #custom-field-row-introducer {
-  grid-column: 1 / -1;
-}
-
-/* 5. 4分割 (2×2グリッド) */
-.custom-fields-grid.layout-2x2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.custom-fields-grid.layout-2x2 .custom-field-row {
-  grid-column: span 1;
-}
-.custom-fields-grid.layout-2x2 .custom-field-row.field-span-full,
-.custom-fields-grid.layout-2x2 #custom-field-row-corp_info,
-.custom-fields-grid.layout-2x2 #custom-field-row-introducer {
-  grid-column: 1 / -1;
-}
-
-/* 6. 左右非対称 (左大・右2段) */
-.custom-fields-grid.layout-split-stack {
-  grid-template-columns: 1fr 1fr;
-}
-.custom-fields-grid.layout-split-stack .custom-field-row {
-  grid-column: span 1;
-}
-.custom-fields-grid.layout-split-stack .custom-field-row.field-span-full,
-.custom-fields-grid.layout-split-stack #custom-field-row-corp_info,
-.custom-fields-grid.layout-split-stack #custom-field-row-introducer {
   grid-column: 1 / -1;
 }
 

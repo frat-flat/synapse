@@ -2636,12 +2636,20 @@
         <div class="form-group" style="margin-top: 1rem; border-top: 1px dotted var(--border-color); padding-top: 1rem; margin-bottom: 1.5rem;">
           <label>関連するアポイントID (本登録前)</label>
           <div id="appoint-related-appoint-links-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.5rem;"></div>
+          <!-- 💡 過去の同一人物アポイント自動検知サジェストバナー -->
+          <div id="appoint-related-auto-suggest-box" style="display: none; margin-top: 0.6rem; padding: 0.5rem 0.75rem; background: rgba(99, 102, 241, 0.08); border: 1px dashed var(--primary); border-radius: var(--radius-sm); font-size: 0.8rem; align-items: center; justify-content: space-between; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary);">
+              <span>💡</span>
+              <span id="appoint-related-auto-suggest-text">同一人物と思われる過去のアポイントが見つかりました</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-primary" id="btn-link-auto-suggested" style="font-size: 0.75rem; padding: 0.2rem 0.6rem; white-space: nowrap;">＋ 紐付ける</button>
+          </div>
         </div>
 
         <div class="custom-fields-container" id="custom-fields-area">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.35rem;">
             <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0; color: var(--text-secondary);">追加された入力項目</h3>
-            <span id="active-layout-display-text" style="font-size: 0.75rem; color: var(--text-muted);">配置: <strong id="active-layout-text-val" style="color: var(--primary);">2列均等</strong></span>
+            <span id="active-layout-display-text" style="font-size: 0.75rem; color: var(--text-muted);">配置: <strong id="active-layout-text-val" style="color: var(--primary);">横2列</strong></span>
           </div>
           <div id="custom-fields-list" class="custom-fields-grid layout-2-equal">
             <!-- JSで動的にフィールド行が追加されます -->
@@ -2674,75 +2682,45 @@
         </div>
       </div>
       
-      <!-- 📐 入力欄の配置レイアウト設定 (Windows Snap風ビジュアルセレクター) -->
+      <!-- 📐 入力欄の配置レイアウト設定 (縦1列、横2列、横3列の3パターン) -->
       <div class="sidebar-card" style="margin-top: 1rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
           <h3 style="margin-bottom: 0; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem;">
             <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="3" x2="12" y2="21"></line></svg>
             <span>入力欄の配置</span>
           </h3>
-          <span id="current-layout-chip" class="badge" style="font-size: 0.7rem; padding: 0.15rem 0.45rem; background: var(--primary-glow); color: var(--primary); border: 1px solid rgba(99,102,241,0.3);">2列均等</span>
+          <span id="current-layout-chip" class="badge" style="font-size: 0.7rem; padding: 0.15rem 0.45rem; background: var(--primary-glow); color: var(--primary); border: 1px solid rgba(99,102,241,0.3);">横2列</span>
         </div>
         <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.5rem;">追加項目を含む入力欄の分割レイアウトを選択します。</p>
         
-        <div class="snap-layout-container" id="snap-layout-selector">
-          <!-- 1. 1列（全幅縦並び） -->
-          <div class="snap-layout-card" data-layout="layout-1-col" title="1列（全幅縦並び）">
-            <div class="snap-preview-box">
-              <div class="snap-cell snap-cell-full"></div>
+        <div class="snap-layout-container" id="snap-layout-selector" style="grid-template-columns: repeat(3, 1fr);">
+          <!-- 1. 縦1列 (全幅縦並び) -->
+          <div class="snap-layout-card" data-layout="layout-1-col" title="縦に一列（全幅）">
+            <div class="snap-preview-box snap-flex-col">
+              <div class="snap-cell" style="height: 6px; width: 100%;"></div>
+              <div class="snap-cell" style="height: 6px; width: 100%;"></div>
+              <div class="snap-cell" style="height: 6px; width: 100%;"></div>
             </div>
-            <span class="snap-label">1列</span>
+            <span class="snap-label">縦1列</span>
           </div>
 
-          <!-- 2. 2列均等 (50% : 50%) -->
-          <div class="snap-layout-card active" data-layout="layout-2-equal" title="2列均等（50% : 50%）">
-            <div class="snap-preview-box snap-flex-row">
-              <div class="snap-cell"></div>
-              <div class="snap-cell"></div>
-            </div>
-            <span class="snap-label">2列均等</span>
-          </div>
-
-          <!-- 3. 2列不均等 (65% : 35%) -->
-          <div class="snap-layout-card" data-layout="layout-2-unequal" title="2列不均等（65% : 35%）">
-            <div class="snap-preview-box snap-flex-row">
-              <div class="snap-cell" style="flex: 1.8;"></div>
-              <div class="snap-cell" style="flex: 1;"></div>
-            </div>
-            <span class="snap-label">2列不均等</span>
-          </div>
-
-          <!-- 4. 3列均等 (33% : 33% : 33%) -->
-          <div class="snap-layout-card" data-layout="layout-3-equal" title="3列均等（33% : 33% : 33%）">
-            <div class="snap-preview-box snap-flex-row">
-              <div class="snap-cell"></div>
-              <div class="snap-cell"></div>
-              <div class="snap-cell"></div>
-            </div>
-            <span class="snap-label">3列均等</span>
-          </div>
-
-          <!-- 5. 4分割 (2×2グリッド) -->
-          <div class="snap-layout-card" data-layout="layout-2x2" title="4分割（2×2グリッド）">
-            <div class="snap-preview-box snap-grid-2x2">
-              <div class="snap-cell"></div>
-              <div class="snap-cell"></div>
-              <div class="snap-cell"></div>
-              <div class="snap-cell"></div>
-            </div>
-            <span class="snap-label">4分割</span>
-          </div>
-
-          <!-- 6. 左右非対称 (左大・右2段) -->
-          <div class="snap-layout-card" data-layout="layout-split-stack" title="左右非対称（左大・右2段）">
+          <!-- 2. 横2列 (50% : 50%) -->
+          <div class="snap-layout-card active" data-layout="layout-2-equal" title="横2列（50% : 50%）">
             <div class="snap-preview-box snap-flex-row">
               <div class="snap-cell" style="flex: 1; height: 100%;"></div>
-              <div style="flex: 1; display: flex; flex-direction: column; gap: 2px; height: 100%;">
-                <div class="snap-cell" style="flex: 1;"></div>
-                <div class="snap-cell" style="flex: 1;"></div>
-              </div>
+              <div class="snap-cell" style="flex: 1; height: 100%;"></div>
             </div>
-            <span class="snap-label">左右非対称</span>
+            <span class="snap-label">横2列</span>
+          </div>
+
+          <!-- 3. 横3列 (33% : 33% : 33%) -->
+          <div class="snap-layout-card" data-layout="layout-3-equal" title="横3列（33% : 33% : 33%）">
+            <div class="snap-preview-box snap-flex-row">
+              <div class="snap-cell" style="flex: 1; height: 100%;"></div>
+              <div class="snap-cell" style="flex: 1; height: 100%;"></div>
+              <div class="snap-cell" style="flex: 1; height: 100%;"></div>
+            </div>
+            <span class="snap-label">横3列</span>
           </div>
         </div>
       </div>
