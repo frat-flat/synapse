@@ -12907,15 +12907,12 @@ function loadTabState(tab) {
   if (offlineRadio) offlineRadio.disabled = isViewOnly;
   if (categorySelect) categorySelect.disabled = isViewOnly;
   if (subnoteInput) subnoteInput.readOnly = isViewOnly;
-  if (btnAddSource && isViewOnly) btnAddSource.style.display = 'none';
   const btnEditSource = document.getElementById('btn-edit-source-option');
   if (btnEditSource && isViewOnly) btnEditSource.style.display = 'none';
   const addWrapper = document.getElementById('admin-source-add-wrapper') || document.getElementById('admin-online-add-wrapper');
   if (addWrapper && isViewOnly) addWrapper.style.display = 'none';
-  const inlineRow = document.getElementById('add-source-option-inline-row') || document.getElementById('add-online-option-inline-row');
-  if (inlineRow && isViewOnly) inlineRow.style.display = 'none';
-  const editInlineRow = document.getElementById('edit-source-option-inline-row');
-  if (editInlineRow && isViewOnly) editInlineRow.style.display = 'none';
+  const managePanel = document.getElementById('source-option-manage-panel');
+  if (managePanel && isViewOnly) managePanel.style.display = 'none';
 
   const toggleContainer = document.getElementById('appointment-type-toggle-container');
   if (toggleContainer) {
@@ -17555,14 +17552,13 @@ function renderSettingsOfflineOptionsList() {
 }
 
 // 流入経路（オンライン / オフライン）のUI状態更新
+// 流入経路（オンライン / オフライン）のUI状態更新
 function setAppointMeetingType(type, silent = false) {
   const sourceSelect = document.getElementById('appoint-source-type');
   const onlineRadio = document.getElementById('appoint-type-online');
   const offlineRadio = document.getElementById('appoint-type-offline');
   const categoryWrapper = document.getElementById('appoint-source-category-wrapper') || document.getElementById('appoint-online-options-container');
-  const targetLabel = document.getElementById('add-source-target-label');
-  const inlineRow = document.getElementById('add-source-option-inline-row') || document.getElementById('add-online-option-inline-row');
-  const editInlineRow = document.getElementById('edit-source-option-inline-row');
+  const managePanel = document.getElementById('source-option-manage-panel');
 
   if (sourceSelect) {
     sourceSelect.value = type || '';
@@ -17573,16 +17569,19 @@ function setAppointMeetingType(type, silent = false) {
   if (type === 'online') {
     if (categoryWrapper) categoryWrapper.style.display = 'block';
     renderAppointSourceCategories('広告（）');
-    if (targetLabel) targetLabel.textContent = 'オンライン選択肢の追加:';
+    if (managePanel && managePanel.style.display !== 'none') {
+      renderSourceManagePanel();
+    }
   } else if (type === 'offline') {
     if (categoryWrapper) categoryWrapper.style.display = 'block';
     renderAppointSourceCategories('営業');
-    if (targetLabel) targetLabel.textContent = 'オフライン選択肢の追加:';
+    if (managePanel && managePanel.style.display !== 'none') {
+      renderSourceManagePanel();
+    }
   } else {
     // 未選択
     if (categoryWrapper) categoryWrapper.style.display = 'none';
-    if (inlineRow) inlineRow.style.display = 'none';
-    if (editInlineRow) editInlineRow.style.display = 'none';
+    if (managePanel) managePanel.style.display = 'none';
   }
 
   updateAppointMeetingTypeRoleVisibility();
@@ -17602,11 +17601,183 @@ function updateAppointMeetingTypeRoleVisibility() {
   if (addWrapper) {
     addWrapper.style.display = (isAdmin && hasType) ? 'inline-flex' : 'none';
   }
+  const managePanel = document.getElementById('source-option-manage-panel');
+  if (managePanel && (!isAdmin || !hasType)) {
+    managePanel.style.display = 'none';
+  }
 
   const settingsAppointTabBtn = document.getElementById('settings-tab-appoint-btn');
   if (settingsAppointTabBtn) {
     settingsAppointTabBtn.style.display = isAdmin ? 'flex' : 'none';
   }
+}
+
+// アポイント画面の選択肢管理パネルの描画（編集・追加・削除の一元管理）
+function renderSourceManagePanel() {
+  const panel = document.getElementById('source-option-manage-panel');
+  const listContainer = document.getElementById('source-manage-options-list');
+  const titleEl = document.getElementById('source-manage-panel-title');
+  const currentType = document.getElementById('appoint-source-type')?.value;
+
+  if (!panel || !listContainer) return;
+
+  if (!currentType) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  const isOnline = (currentType === 'online');
+  if (titleEl) {
+    titleEl.textContent = isOnline ? 'オンライン選択肢の管理（編集・追加）' : 'オフライン選択肢の管理（編集・追加）';
+  }
+
+  const options = isOnline ? getAppointOnlineOptions() : getAppointOfflineOptions();
+  listContainer.innerHTML = '';
+
+  if (options.length === 0) {
+    listContainer.innerHTML = '<div style="font-size: 0.8rem; color: var(--text-muted); padding: 0.4rem; text-align: center;">選択肢が登録されていません</div>';
+    return;
+  }
+
+  options.forEach(opt => {
+    const item = document.createElement('div');
+    item.style.display = 'flex';
+    item.style.alignItems = 'center';
+    item.style.justifyContent = 'space-between';
+    item.style.padding = '0.3rem 0.5rem';
+    item.style.background = 'var(--bg-surface)';
+    item.style.border = '1px solid var(--border-color)';
+    item.style.borderRadius = 'var(--radius-xs)';
+    item.style.fontSize = '0.82rem';
+
+    const textSpan = document.createElement('span');
+    textSpan.textContent = opt;
+    textSpan.style.fontWeight = '600';
+    textSpan.style.color = 'var(--text-primary)';
+    item.appendChild(textSpan);
+
+    const btnGroup = document.createElement('div');
+    btnGroup.style.display = 'flex';
+    btnGroup.style.alignItems = 'center';
+    btnGroup.style.gap = '0.25rem';
+
+    // 編集ボタン（SVG鉛筆）
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'btn-icon';
+    editBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>';
+    editBtn.title = '名称を変更';
+    editBtn.style.padding = '0.2rem';
+    editBtn.style.cursor = 'pointer';
+    editBtn.style.background = 'none';
+    editBtn.style.border = 'none';
+    editBtn.style.color = 'var(--text-secondary)';
+    editBtn.onclick = () => {
+      // インライン編集モード
+      item.innerHTML = '';
+      const inputEl = document.createElement('input');
+      inputEl.type = 'text';
+      inputEl.value = opt;
+      inputEl.style.flex = '1';
+      inputEl.style.padding = '0.2rem 0.4rem';
+      inputEl.style.fontSize = '0.8rem';
+      inputEl.style.border = '1px solid var(--primary)';
+      inputEl.style.borderRadius = 'var(--radius-xs)';
+      inputEl.style.background = 'var(--bg-surface-elevated)';
+      inputEl.style.color = 'var(--text-primary)';
+      inputEl.style.outline = 'none';
+
+      const saveAction = () => {
+        const val = inputEl.value.trim();
+        if (val && val !== opt) {
+          const success = isOnline ? editAppointOnlineOption(opt, val) : editAppointOfflineOption(opt, val);
+          if (success) {
+            renderSourceManagePanel();
+          }
+        } else {
+          renderSourceManagePanel();
+        }
+      };
+
+      inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          saveAction();
+        } else if (e.key === 'Escape') {
+          renderSourceManagePanel();
+        }
+      });
+
+      const actionGroup = document.createElement('div');
+      actionGroup.style.display = 'flex';
+      actionGroup.style.alignItems = 'center';
+      actionGroup.style.gap = '0.2rem';
+
+      const saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.className = 'btn-icon';
+      saveBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" stroke="var(--primary)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+      saveBtn.title = '保存';
+      saveBtn.style.padding = '0.2rem';
+      saveBtn.style.cursor = 'pointer';
+      saveBtn.style.background = 'none';
+      saveBtn.style.border = 'none';
+      saveBtn.onclick = saveAction;
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'btn-icon';
+      cancelBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" stroke="var(--text-muted)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+      cancelBtn.title = 'キャンセル';
+      cancelBtn.style.padding = '0.2rem';
+      cancelBtn.style.cursor = 'pointer';
+      cancelBtn.style.background = 'none';
+      cancelBtn.style.border = 'none';
+      cancelBtn.onclick = () => renderSourceManagePanel();
+
+      actionGroup.appendChild(saveBtn);
+      actionGroup.appendChild(cancelBtn);
+      item.appendChild(inputEl);
+      item.appendChild(actionGroup);
+      inputEl.focus();
+      inputEl.select();
+    };
+    btnGroup.appendChild(editBtn);
+
+    // 削除ボタン（SVGゴミ箱）
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn-icon';
+    delBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" stroke="var(--danger)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+    delBtn.title = '削除';
+    delBtn.style.padding = '0.2rem';
+    delBtn.style.cursor = 'pointer';
+    delBtn.style.background = 'none';
+    delBtn.style.border = 'none';
+    delBtn.onclick = () => {
+      if (options.length <= 1) {
+        showToast('選択肢は最低1つ登録されている必要があります。', 'warning');
+        return;
+      }
+      if (confirm(`選択肢「${opt}」を削除しますか？`)) {
+        const newOpts = options.filter(o => o !== opt);
+        if (isOnline) {
+          saveAppointOnlineOptions(newOpts);
+          renderSettingsOnlineOptionsList();
+        } else {
+          saveAppointOfflineOptions(newOpts);
+          renderSettingsOfflineOptionsList();
+        }
+        renderAppointSourceCategories(document.getElementById('appoint-source-category')?.value);
+        renderSourceManagePanel();
+        showToast(`選択肢「${opt}」を削除しました。`, 'info');
+      }
+    };
+    btnGroup.appendChild(delBtn);
+
+    item.appendChild(btnGroup);
+    listContainer.appendChild(item);
+  });
 }
 
 // 流入経路および選択肢UIのイベントバインド初期化
@@ -17631,43 +17802,47 @@ function initAppointMeetingTypeUI() {
     });
   }
 
-  // 選択肢の追加機能（アポイント画面インライン）
-  const btnAddSource = document.getElementById('btn-add-source-option') || document.getElementById('btn-add-online-option');
-  const inlineRow = document.getElementById('add-source-option-inline-row') || document.getElementById('add-online-option-inline-row');
-  const inputNew = document.getElementById('new-source-option-input') || document.getElementById('new-online-option-input');
-  const btnConfirmAdd = document.getElementById('btn-confirm-add-source-option') || document.getElementById('btn-confirm-add-online-option');
-  const btnCancelAdd = document.getElementById('btn-cancel-add-source-option') || document.getElementById('btn-cancel-add-online-option');
-
-  // 選択肢の編集機能（アポイント画面インライン）
+  // 選択肢編集ボタン（ここからパネルを展開して編集・追加・削除が一元可能）
   const btnEditSource = document.getElementById('btn-edit-source-option');
-  const editInlineRow = document.getElementById('edit-source-option-inline-row');
-  const inputEdit = document.getElementById('edit-source-option-input');
-  const editTargetLabel = document.getElementById('edit-source-target-label');
-  const btnConfirmEdit = document.getElementById('btn-confirm-edit-source-option');
-  const btnCancelEdit = document.getElementById('btn-cancel-edit-source-option');
+  const managePanel = document.getElementById('source-option-manage-panel');
+  const btnClosePanel = document.getElementById('btn-close-source-manage-panel');
+  const inputNewInPanel = document.getElementById('input-new-source-in-panel');
+  const btnAddInPanel = document.getElementById('btn-add-source-in-panel');
 
-  if (btnAddSource && inlineRow) {
-    btnAddSource.addEventListener('click', () => {
-      if (editInlineRow) editInlineRow.style.display = 'none';
-      inlineRow.style.display = inlineRow.style.display === 'none' ? 'flex' : 'none';
-      if (inlineRow.style.display === 'flex' && inputNew) {
-        inputNew.focus();
+  if (btnEditSource && managePanel) {
+    btnEditSource.addEventListener('click', () => {
+      const currentType = document.getElementById('appoint-source-type')?.value;
+      if (!currentType) {
+        showToast('先に流入経路（オンラインまたはオフライン）を選択してください。', 'warning');
+        return;
+      }
+      const isCurrentlyOpen = (managePanel.style.display === 'flex');
+      if (isCurrentlyOpen) {
+        managePanel.style.display = 'none';
+      } else {
+        managePanel.style.display = 'flex';
+        renderSourceManagePanel();
+        if (inputNewInPanel) {
+          inputNewInPanel.value = '';
+          inputNewInPanel.focus();
+        }
       }
     });
   }
 
-  if (btnCancelAdd && inlineRow) {
-    btnCancelAdd.addEventListener('click', () => {
-      inlineRow.style.display = 'none';
-      if (inputNew) inputNew.value = '';
+  if (btnClosePanel && managePanel) {
+    btnClosePanel.addEventListener('click', () => {
+      managePanel.style.display = 'none';
+      if (inputNewInPanel) inputNewInPanel.value = '';
     });
   }
 
-  const handleAddOption = () => {
-    if (!inputNew) return;
-    const val = inputNew.value.trim();
+  // パネル内での新規選択肢追加アクション
+  const handleAddInPanel = () => {
+    if (!inputNewInPanel) return;
+    const val = inputNewInPanel.value.trim();
     if (!val) {
-      showToast('選択肢名を入力してください。', 'warning');
+      showToast('新しい選択肢名を入力してください。', 'warning');
       return;
     }
     const currentType = document.getElementById('appoint-source-type')?.value || 'online';
@@ -17693,91 +17868,22 @@ function initAppointMeetingTypeUI() {
       renderSettingsOfflineOptionsList();
     }
 
-    if (inlineRow) inlineRow.style.display = 'none';
-    inputNew.value = '';
+    inputNewInPanel.value = '';
+    renderSourceManagePanel();
     state.isFormDirty = true;
     showToast(`選択肢「${val}」を追加しました。`, 'success');
   };
 
-  if (btnConfirmAdd) {
-    btnConfirmAdd.addEventListener('click', handleAddOption);
+  if (btnAddInPanel) {
+    btnAddInPanel.addEventListener('click', handleAddInPanel);
   }
-  if (inputNew) {
-    inputNew.addEventListener('keydown', (e) => {
+  if (inputNewInPanel) {
+    inputNewInPanel.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        handleAddOption();
+        handleAddInPanel();
       } else if (e.key === 'Escape') {
-        if (inlineRow) inlineRow.style.display = 'none';
-      }
-    });
-  }
-
-  // 選択肢編集ボタンのイベントバインド
-  if (btnEditSource && editInlineRow) {
-    btnEditSource.addEventListener('click', () => {
-      const currentCategory = document.getElementById('appoint-source-category')?.value || '';
-      if (!currentCategory) {
-        showToast('編集する選択肢をプルダウンで選択してください。', 'warning');
-        return;
-      }
-      if (inlineRow) inlineRow.style.display = 'none';
-      editInlineRow.style.display = editInlineRow.style.display === 'none' ? 'flex' : 'none';
-      if (editInlineRow.style.display === 'flex' && inputEdit) {
-        if (editTargetLabel) {
-          editTargetLabel.textContent = `選択中の項目を変更:`;
-        }
-        inputEdit.value = currentCategory;
-        inputEdit.focus();
-        inputEdit.select();
-      }
-    });
-  }
-
-  if (btnCancelEdit && editInlineRow) {
-    btnCancelEdit.addEventListener('click', () => {
-      editInlineRow.style.display = 'none';
-      if (inputEdit) inputEdit.value = '';
-    });
-  }
-
-  const handleEditOption = () => {
-    if (!inputEdit) return;
-    const currentCategory = document.getElementById('appoint-source-category')?.value || '';
-    if (!currentCategory) {
-      showToast('編集対象の選択肢が選択されていません。', 'warning');
-      return;
-    }
-    const val = inputEdit.value.trim();
-    if (!val) {
-      showToast('新しい選択肢名を入力してください。', 'warning');
-      return;
-    }
-    const currentType = document.getElementById('appoint-source-type')?.value || 'online';
-    let success = false;
-    if (currentType === 'online') {
-      success = editAppointOnlineOption(currentCategory, val);
-    } else {
-      success = editAppointOfflineOption(currentCategory, val);
-    }
-
-    if (success) {
-      if (editInlineRow) editInlineRow.style.display = 'none';
-      inputEdit.value = '';
-      state.isFormDirty = true;
-    }
-  };
-
-  if (btnConfirmEdit) {
-    btnConfirmEdit.addEventListener('click', handleEditOption);
-  }
-  if (inputEdit) {
-    inputEdit.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        handleEditOption();
-      } else if (e.key === 'Escape') {
-        if (editInlineRow) editInlineRow.style.display = 'none';
+        if (managePanel) managePanel.style.display = 'none';
       }
     });
   }
