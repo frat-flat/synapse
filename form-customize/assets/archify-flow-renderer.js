@@ -515,6 +515,7 @@
 
       // ヘッダーテキスト
       const headerText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      headerText.setAttribute('class', 'archify-lane-title');
       headerText.setAttribute('x', lane.x + 12);
       headerText.setAttribute('y', lane.y + 22);
       headerText.setAttribute('fill', '#64748b');
@@ -576,6 +577,7 @@
 
       // タイトル（質問名 / 選択肢名）
       const title = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      title.setAttribute('class', 'archify-node-title');
       title.setAttribute('x', node.x + 14);
       title.setAttribute('y', node.y + (node.subText ? 22 : node.height / 2 + 5));
       title.setAttribute('fill', '#1e293b');
@@ -587,6 +589,7 @@
       // サブテキスト（質問タイプ / 分岐先）
       if (node.subText) {
         const sub = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        sub.setAttribute('class', 'archify-node-subtext');
         sub.setAttribute('x', node.x + 14);
         sub.setAttribute('y', node.y + 40);
         sub.setAttribute('fill', node.type === 'option' ? '#ea580c' : '#64748b');

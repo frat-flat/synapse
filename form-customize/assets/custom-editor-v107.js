@@ -2648,7 +2648,13 @@
       });
     }
 
-    // 分岐ドロップダウン変更時にフローマップをリアルタイム更新
+    let renderDebounceTimer = null;
+    const debouncedRenderFlowmap = (delay = 80) => {
+      clearTimeout(renderDebounceTimer);
+      renderDebounceTimer = setTimeout(renderFlowmap, delay);
+    };
+
+    // 分岐ドロップダウン変更・入力変更時にフローマップをリアルタイム更新
     document.addEventListener('change', (e) => {
       const target = e.target;
       if (!target) return;
@@ -2657,9 +2663,29 @@
           target.classList.contains('option-next-select') ||
           target.closest('.question-item') ||
           target.closest('.section-meta-edit')) {
-        setTimeout(renderFlowmap, 60);
+        debouncedRenderFlowmap(50);
       }
     });
+
+    document.addEventListener('input', (e) => {
+      const target = e.target;
+      if (!target) return;
+      if (target.closest('.question-item') || target.closest('.section-meta-edit') || target.id === 'form-title-input') {
+        debouncedRenderFlowmap(200);
+      }
+    });
+
+    // セクション編集DOMの変更（質問の追加・削除・並び替えなど）を監視して自動同期
+    if (sectionsPane && window.MutationObserver) {
+      const secObserver = new MutationObserver((mutations) => {
+        // 余計な属性変更ループを防ぐため、子ノード変更のみを対象
+        const hasChildChanges = mutations.some(m => m.type === 'childList');
+        if (hasChildChanges) {
+          debouncedRenderFlowmap(150);
+        }
+      });
+      secObserver.observe(sectionsPane, { childList: true, subtree: true });
+    }
 
     // 質問項目やセクションカードをクリックしたときに、フローマップ側の該当ルートを自動ハイライト
     document.addEventListener('click', (e) => {
