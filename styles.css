@@ -6921,9 +6921,22 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   outline: none !important;
 }
 
-#appointment-form select#appoint-source-type {
+#appointment-form select#appoint-source-type,
+#appointment-form select#appoint-source-category {
   width: auto !important;
   flex: 1 !important;
+  height: 42px !important;
+  font-size: 0.9rem !important;
+  box-sizing: border-box !important;
+  transition: all 0.2s ease !important;
+}
+
+#appointment-form select#appoint-source-category:disabled {
+  background-color: var(--bg-surface-elevated) !important;
+  color: var(--text-muted) !important;
+  opacity: 0.65 !important;
+  cursor: not-allowed !important;
+  border-color: var(--border-color) !important;
 }
 
 #appointment-form input:focus,

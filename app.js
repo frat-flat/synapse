@@ -12804,8 +12804,8 @@ function saveTabState(tab) {
   if (!tab || tab.type !== 'appointment-screen') return;
 
   const dateVal = document.getElementById('appoint-date')?.value || '';
-  const meetingTypeVal = document.getElementById('appoint-source-type')?.value || document.querySelector('input[name="appoint-meeting-type"]:checked')?.value || null;
-  const onlineCategoryVal = meetingTypeVal ? (document.getElementById('appoint-source-category')?.value || document.getElementById('appoint-online-category')?.value || '') : '';
+  const rawOnlineCat = document.getElementById('appoint-source-category')?.value || document.getElementById('appoint-online-category')?.value || '';
+  const onlineCategoryVal = (meetingTypeVal && rawOnlineCat !== '__manage_options__') ? rawOnlineCat : '';
   const onlineSubnoteVal = meetingTypeVal ? (document.getElementById('appoint-source-subnote')?.value.trim() || document.getElementById('appoint-online-subnote')?.value.trim() || '') : '';
   const nameVal = document.getElementById('customer-name')?.value.trim() || '';
   const memoVal = document.getElementById('appoint-memo')?.value.trim() || '';
@@ -12907,13 +12907,10 @@ function loadTabState(tab) {
   const btnAddSource = document.getElementById('btn-add-source-option') || document.getElementById('btn-add-online-option');
   if (sourceSelect) sourceSelect.disabled = isViewOnly;
   if (onlineRadio) onlineRadio.disabled = isViewOnly;
-  if (offlineRadio) offlineRadio.disabled = isViewOnly;
-  if (categorySelect) categorySelect.disabled = isViewOnly;
+  if (categorySelect) {
+    categorySelect.disabled = isViewOnly || !data.meetingType;
+  }
   if (subnoteInput) subnoteInput.readOnly = isViewOnly;
-  const btnEditSource = document.getElementById('btn-edit-source-option');
-  if (btnEditSource && isViewOnly) btnEditSource.style.display = 'none';
-  const addWrapper = document.getElementById('admin-source-add-wrapper') || document.getElementById('admin-online-add-wrapper');
-  if (addWrapper && isViewOnly) addWrapper.style.display = 'none';
   const managePanel = document.getElementById('source-option-manage-panel');
   if (managePanel && isViewOnly) managePanel.style.display = 'none';
 
@@ -17503,13 +17500,38 @@ function saveAppointOfflineOptions(options) {
   }
 }
 
-// アポイント詳細候補ドロップダウンの描画（オンラインまたはオフラインに応じて切り替え）
+// アポイント詳細候補ドロップダウンの描画（オンラインまたはオフラインに応じて切り替え、常時設置・未選択時はグレーアウト）
 function renderAppointSourceCategories(selectedVal) {
   const categorySelect = document.getElementById('appoint-source-category') || document.getElementById('appoint-online-category');
   const sourceType = document.getElementById('appoint-source-type')?.value;
   if (!categorySelect) return;
 
+  const isAdmin = (typeof isUserAdmin === 'function') ? isUserAdmin() : false;
+
   categorySelect.innerHTML = '';
+
+  // 流入経路が未選択の場合はグレーアウト（非活性）
+  if (!sourceType) {
+    categorySelect.disabled = true;
+    categorySelect.style.background = 'var(--bg-surface-elevated)';
+    categorySelect.style.color = 'var(--text-muted)';
+    categorySelect.style.opacity = '0.65';
+    categorySelect.style.cursor = 'not-allowed';
+
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = '-- 先に流入経路を選択 --';
+    categorySelect.appendChild(defaultOption);
+    categorySelect.value = '';
+    return;
+  }
+
+  // 流入経路選択済みの場合は活性化
+  categorySelect.disabled = false;
+  categorySelect.style.background = 'var(--bg-surface)';
+  categorySelect.style.color = 'var(--text-primary)';
+  categorySelect.style.opacity = '1';
+  categorySelect.style.cursor = 'pointer';
 
   if (sourceType === 'online') {
     const options = getAppointOnlineOptions();
@@ -17526,7 +17548,7 @@ function renderAppointSourceCategories(selectedVal) {
     });
 
     const targetVal = selectedVal || '広告（）';
-    if (targetVal) {
+    if (targetVal && targetVal !== '__manage_options__') {
       if (!options.includes(targetVal)) {
         const el = document.createElement('option');
         el.value = targetVal;
@@ -17534,6 +17556,22 @@ function renderAppointSourceCategories(selectedVal) {
         categorySelect.appendChild(el);
       }
       categorySelect.value = targetVal;
+      categorySelect.dataset.lastSelected = targetVal;
+    }
+
+    // 管理者の場合、プルダウン末尾に「⚙ 選択肢を編集・追加...」を組み込み
+    if (isAdmin) {
+      const sep = document.createElement('option');
+      sep.disabled = true;
+      sep.textContent = '──────────';
+      categorySelect.appendChild(sep);
+
+      const manageOpt = document.createElement('option');
+      manageOpt.value = '__manage_options__';
+      manageOpt.textContent = '⚙ 選択肢を編集・追加...';
+      manageOpt.style.color = 'var(--primary)';
+      manageOpt.style.fontWeight = 'bold';
+      categorySelect.appendChild(manageOpt);
     }
   } else if (sourceType === 'offline') {
     const options = getAppointOfflineOptions();
@@ -17550,7 +17588,7 @@ function renderAppointSourceCategories(selectedVal) {
     });
 
     const targetVal = selectedVal || '営業';
-    if (targetVal) {
+    if (targetVal && targetVal !== '__manage_options__') {
       if (!options.includes(targetVal)) {
         const el = document.createElement('option');
         el.value = targetVal;
@@ -17558,6 +17596,22 @@ function renderAppointSourceCategories(selectedVal) {
         categorySelect.appendChild(el);
       }
       categorySelect.value = targetVal;
+      categorySelect.dataset.lastSelected = targetVal;
+    }
+
+    // 管理者の場合、プルダウン末尾に「⚙ 選択肢を編集・追加...」を組み込み
+    if (isAdmin) {
+      const sep = document.createElement('option');
+      sep.disabled = true;
+      sep.textContent = '──────────';
+      categorySelect.appendChild(sep);
+
+      const manageOpt = document.createElement('option');
+      manageOpt.value = '__manage_options__';
+      manageOpt.textContent = '⚙ 選択肢を編集・追加...';
+      manageOpt.style.color = 'var(--primary)';
+      manageOpt.style.fontWeight = 'bold';
+      categorySelect.appendChild(manageOpt);
     }
   }
 }
@@ -17958,7 +18012,6 @@ function renderSettingsOfflineOptionsList() {
 }
 
 // 流入経路（オンライン / オフライン）のUI状態更新
-// 流入経路（オンライン / オフライン）のUI状態更新
 function setAppointMeetingType(type, silent = false) {
   const sourceSelect = document.getElementById('appoint-source-type');
   const onlineRadio = document.getElementById('appoint-type-online');
@@ -17972,21 +18025,24 @@ function setAppointMeetingType(type, silent = false) {
   if (onlineRadio) onlineRadio.checked = (type === 'online');
   if (offlineRadio) offlineRadio.checked = (type === 'offline');
 
+  // プルダウン項目自体はあらかじめ常時設置（非表示にしない）
+  if (categoryWrapper) {
+    categoryWrapper.style.display = 'block';
+  }
+
   if (type === 'online') {
-    if (categoryWrapper) categoryWrapper.style.display = 'block';
     renderAppointSourceCategories('広告（）');
     if (managePanel && managePanel.style.display !== 'none') {
       renderSourceManagePanel();
     }
   } else if (type === 'offline') {
-    if (categoryWrapper) categoryWrapper.style.display = 'block';
     renderAppointSourceCategories('営業');
     if (managePanel && managePanel.style.display !== 'none') {
       renderSourceManagePanel();
     }
   } else {
-    // 未選択
-    if (categoryWrapper) categoryWrapper.style.display = 'none';
+    // 未選択時はグレーアウト表示
+    renderAppointSourceCategories('');
     if (managePanel) managePanel.style.display = 'none';
   }
 
@@ -18003,10 +18059,12 @@ function updateAppointMeetingTypeRoleVisibility() {
   const sourceType = document.getElementById('appoint-source-type')?.value;
   const hasType = !!sourceType;
 
+  // 外部の独立した「選択肢を編集」ボタンは廃止
   const addWrapper = document.getElementById('admin-source-add-wrapper') || document.getElementById('admin-online-add-wrapper');
   if (addWrapper) {
-    addWrapper.style.display = (isAdmin && hasType) ? 'inline-flex' : 'none';
+    addWrapper.style.display = 'none';
   }
+
   const managePanel = document.getElementById('source-option-manage-panel');
   if (managePanel && (!isAdmin || !hasType)) {
     managePanel.style.display = 'none';
@@ -18208,33 +18266,38 @@ function initAppointMeetingTypeUI() {
     });
   }
 
-  // 選択肢編集ボタン（ここからパネルを展開して編集・追加・削除が一元可能）
-  const btnEditSource = document.getElementById('btn-edit-source-option');
+  // プルダウン内「⚙ 選択肢を編集・追加...」の選択検知（別ボタンを廃止し入力項目欄内に組み込み）
+  const categorySelect = document.getElementById('appoint-source-category') || document.getElementById('appoint-online-category');
   const managePanel = document.getElementById('source-option-manage-panel');
   const btnClosePanel = document.getElementById('btn-close-source-manage-panel');
   const inputNewInPanel = document.getElementById('input-new-source-in-panel');
   const btnAddInPanel = document.getElementById('btn-add-source-in-panel');
 
-  if (btnEditSource && managePanel) {
-    btnEditSource.addEventListener('click', () => {
-      const currentType = document.getElementById('appoint-source-type')?.value;
-      if (!currentType) {
-        showToast('先に流入経路（オンラインまたはオフライン）を選択してください。', 'warning');
-        return;
-      }
-      const isCurrentlyOpen = (managePanel.style.display === 'flex');
-      if (isCurrentlyOpen) {
-        managePanel.style.display = 'none';
-      } else {
-        managePanel.style.display = 'flex';
-        renderSourceManagePanel();
-        if (inputNewInPanel) {
-          inputNewInPanel.value = '';
-          inputNewInPanel.focus();
+  if (categorySelect) {
+    categorySelect.addEventListener('change', () => {
+      if (categorySelect.value === '__manage_options__') {
+        // 直前の有効な選択肢に戻す（保存データが壊れないよう保護）
+        const fallback = (sourceSelect?.value === 'offline') ? '営業' : '広告（）';
+        categorySelect.value = categorySelect.dataset.lastSelected || fallback;
+
+        // 管理パネルを展開
+        if (managePanel) {
+          managePanel.style.display = 'flex';
+          renderSourceManagePanel();
+          if (inputNewInPanel) {
+            inputNewInPanel.value = '';
+            inputNewInPanel.focus();
+          }
         }
+      } else {
+        categorySelect.dataset.lastSelected = categorySelect.value;
+        state.isFormDirty = true;
       }
     });
   }
+
+  // 初期描画（未選択時はグレーアウト）
+  renderAppointSourceCategories(categorySelect?.value || '');
 
   if (btnClosePanel && managePanel) {
     btnClosePanel.addEventListener('click', () => {
@@ -20932,7 +20995,8 @@ function autoSaveAppointmentDraft() {
 
   if (!dateVal || !meetingTypeVal || !nameVal || !memoVal) return;
 
-  const onlineCategoryVal = meetingTypeVal ? (document.getElementById('appoint-source-category')?.value || document.getElementById('appoint-online-category')?.value || '') : '';
+  const rawOnlineCat = document.getElementById('appoint-source-category')?.value || document.getElementById('appoint-online-category')?.value || '';
+  const onlineCategoryVal = (meetingTypeVal && rawOnlineCat !== '__manage_options__') ? rawOnlineCat : '';
   const onlineSubnoteVal = meetingTypeVal ? (document.getElementById('appoint-source-subnote')?.value.trim() || document.getElementById('appoint-online-subnote')?.value.trim() || '') : '';
 
   const customFieldsData = {};
@@ -21009,7 +21073,8 @@ function autoSaveAppointmentDraft() {
 function saveAppointmentData(status) {
   const dateVal = document.getElementById('appoint-date').value;
   const meetingTypeVal = document.getElementById('appoint-source-type')?.value || document.querySelector('input[name="appoint-meeting-type"]:checked')?.value || null;
-  const onlineCategoryVal = meetingTypeVal ? (document.getElementById('appoint-source-category')?.value || document.getElementById('appoint-online-category')?.value || '') : '';
+  const rawOnlineCat = document.getElementById('appoint-source-category')?.value || document.getElementById('appoint-online-category')?.value || '';
+  const onlineCategoryVal = (meetingTypeVal && rawOnlineCat !== '__manage_options__') ? rawOnlineCat : '';
   const onlineSubnoteVal = meetingTypeVal ? (document.getElementById('appoint-source-subnote')?.value.trim() || document.getElementById('appoint-online-subnote')?.value.trim() || '') : '';
   const nameVal = document.getElementById('customer-name').value.trim();
   const memoVal = document.getElementById('appoint-memo').value.trim();
