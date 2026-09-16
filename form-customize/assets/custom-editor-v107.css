@@ -5987,3 +5987,245 @@ button.btn-sec-reorder {
   font-family: 'Kaisei Decol', serif !important;
 }
 
+/* ============================================================
+   🔀 Archify フローマップ & サブタブ・スプリットビュー スタイル
+   ============================================================ */
+
+/* 1. 最上部グローバルタブの整理（フローマップ・回答プレビューの非表示化） */
+#btn-tab-flowmap,
+#btn-tab-preview,
+#panel-preview,
+#panel-flowmap {
+  display: none !important;
+}
+
+/* 2. サブタブ配置の拡張 */
+.overview-subtabs {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  border-bottom: 2px solid var(--color-border, #e2e8f0) !important;
+  margin-bottom: 1.25rem !important;
+  padding-bottom: 2px !important;
+}
+
+.subtabs-nav-group {
+  display: flex !important;
+  gap: 8px !important;
+}
+
+.subtab-btn {
+  background: none !important;
+  border: none !important;
+  border-bottom: 3px solid transparent !important;
+  padding: 8px 16px !important;
+  font-weight: 700 !important;
+  font-size: 0.9rem !important;
+  color: var(--color-text-muted, #64748b) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.subtab-btn.active {
+  border-bottom: 3px solid var(--color-primary, #3182ce) !important;
+  color: var(--color-text, #1e293b) !important;
+}
+
+/* 3. スプリットビュートグルボタン */
+.btn-split-toggle {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 5px 12px !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--color-border, #cbd5e0) !important;
+  background: var(--color-bg-card, #ffffff) !important;
+  color: var(--color-text, #334155) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.btn-split-toggle:hover {
+  background: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+}
+
+.btn-split-toggle.active {
+  background: #eff6ff !important;
+  border-color: #3b82f6 !important;
+  color: #1d4ed8 !important;
+}
+
+/* 4. スプリットビュー（2画面同時表示）レイアウト */
+.overview-editor-container.split-mode-active {
+  display: grid !important;
+  grid-template-columns: 45% 55% !important;
+  gap: 16px !important;
+  align-items: start !important;
+  width: 100% !important;
+}
+
+/* スプリットモード時はライブプレビューを隠して中央2ペインを最大活用 */
+.editor-main:has(.split-mode-active) .editor-live-preview-pane,
+body.split-active .editor-live-preview-pane {
+  display: none !important;
+}
+
+.overview-editor-container.split-mode-active .overview-subtabs {
+  grid-column: 1 / -1 !important;
+}
+
+.overview-editor-container.split-mode-active .split-left-pane {
+  min-width: 0 !important;
+  max-height: calc(100vh - 170px) !important;
+  overflow-y: auto !important;
+  padding-right: 8px !important;
+}
+
+.overview-editor-container.split-mode-active #overview-sections-list {
+  grid-template-columns: 1fr !important;
+}
+
+.overview-editor-container.split-mode-active .overview-section-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.overview-editor-container.split-mode-active .overview-section-card h4,
+.overview-editor-container.split-mode-active .overview-section-card [class*="title"] {
+  white-space: normal !important;
+  word-break: break-word !important;
+}
+
+.overview-editor-container.split-mode-active .overview-flowmap-pane {
+  display: flex !important;
+  grid-column: 2 !important;
+  min-width: 0 !important;
+  height: calc(100vh - 170px) !important;
+}
+
+/* 5. Archifyフローマップコンテナ */
+.overview-flowmap-pane {
+  flex-direction: column !important;
+  background: #ffffff !important;
+  border: 1px solid var(--color-border, #cbd5e0) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.04) !important;
+}
+
+.overview-flowmap-pane.full-tab-mode {
+  width: 100% !important;
+  height: calc(100vh - 200px) !important;
+  min-height: 650px !important;
+}
+
+/* ツールバー */
+.archify-flowmap-toolbar {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 6px 12px !important;
+  background: #f8fafc !important;
+  border-bottom: 1px solid var(--color-border, #e2e8f0) !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+.archify-flowmap-toolbar .flowmap-title-info {
+  display: flex !important;
+  align-items: center !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.archify-flowmap-toolbar .flowmap-title-info span:first-child {
+  white-space: nowrap !important;
+  font-weight: 700 !important;
+  font-size: 0.82rem !important;
+  color: #1e293b !important;
+}
+
+.archify-flowmap-toolbar .flowmap-title-info span:last-child {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 0.7rem !important;
+  color: #64748b !important;
+  margin-left: 8px !important;
+}
+
+.archify-flowmap-toolbar .flowmap-controls {
+  display: flex !important;
+  gap: 4px !important;
+  flex-shrink: 0 !important;
+}
+
+.btn-flow-tool {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e0 !important;
+  padding: 3px 8px !important;
+  border-radius: 4px !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  transition: all 0.15s ease !important;
+}
+
+.btn-flow-tool:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* SVGビューポート */
+.archify-flowmap-viewport {
+  flex: 1 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: #f8fafc !important;
+  overflow: hidden !important;
+  position: relative !important;
+  cursor: grab !important;
+}
+
+/* ルート道筋ハイライトエフェクト */
+.archify-node-group.is-dimmed,
+.archify-edge-group.is-dimmed {
+  opacity: 0.18 !important;
+  transition: opacity 0.25s ease !important;
+}
+
+.archify-node-group.is-active-route rect {
+  stroke: #10b981 !important;
+  stroke-width: 2px !important;
+  filter: url(#glow-highlight) !important;
+}
+
+.archify-node-group.is-focused-node rect {
+  stroke: #3b82f6 !important;
+  stroke-width: 2.5px !important;
+}
+
+.archify-edge-group.is-active-route path {
+  animation: archifyFlowDash 1s linear infinite !important;
+}
+
+@keyframes archifyFlowDash {
+  from {
+    stroke-dashoffset: 20;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+

@@ -2535,48 +2535,160 @@
   function setupOverviewSubtabs() {
     const btnGlobal = document.getElementById('btn-subtab-global-settings');
     const btnSection = document.getElementById('btn-subtab-section-design');
+    const btnFlowmap = document.getElementById('btn-subtab-flowmap');
+    const btnSplit = document.getElementById('btn-subtab-split-toggle');
+    
+    const overviewContainer = document.getElementById('form-overview-editor');
     const globalCard = document.querySelector('#form-overview-editor > .form-title-desc-card');
-    const secHeader = document.querySelector('#form-overview-editor > .overview-sections-header');
-    const secList = document.querySelector('#form-overview-editor > #overview-sections-list');
-    const secFooter = document.querySelector('#form-overview-editor > .overview-add-section-footer');
+    const sectionsPane = document.getElementById('overview-sections-pane');
+    const flowmapContainer = document.getElementById('overview-flowmap-container');
 
-    if (!btnGlobal || !btnSection || !globalCard || !secHeader || !secList || !secFooter) return;
+    if (!btnGlobal || !btnSection || !btnFlowmap || !globalCard || !sectionsPane || !flowmapContainer) return;
 
-    const showGlobal = () => {
-      btnGlobal.classList.add('active');
-      btnGlobal.style.borderBottom = '3px solid var(--color-primary)';
-      btnGlobal.style.color = 'var(--color-text)';
-      
-      btnSection.classList.remove('active');
-      btnSection.style.borderBottom = '3px solid transparent';
-      btnSection.style.color = 'var(--color-text-muted)';
+    let currentTab = 'global';
+    let isSplitMode = false;
+    try {
+      isSplitMode = localStorage.getItem('form_customize_split_mode') === 'true';
+    } catch(e) {}
 
-      globalCard.style.display = 'block';
-      secHeader.style.display = 'none';
-      secList.style.display = 'none';
-      secFooter.style.display = 'none';
+    const renderFlowmap = () => {
+      if (window.archifyRenderer && window.G) {
+        window.archifyRenderer.render(window.G);
+      }
+    };
+    window.refreshFlowmap = renderFlowmap;
+
+    const setTabStyle = (activeBtn) => {
+      [btnGlobal, btnSection, btnFlowmap].forEach(b => {
+        if (!b) return;
+        if (b === activeBtn) {
+          b.classList.add('active');
+          b.style.borderBottom = '3px solid var(--color-primary, #3182ce)';
+          b.style.color = 'var(--color-text, #1e293b)';
+        } else {
+          b.classList.remove('active');
+          b.style.borderBottom = '3px solid transparent';
+          b.style.color = 'var(--color-text-muted, #64748b)';
+        }
+      });
     };
 
-    const showSection = () => {
-      btnSection.classList.add('active');
-      btnSection.style.borderBottom = '3px solid var(--color-primary)';
-      btnSection.style.color = 'var(--color-text)';
-      
-      btnGlobal.classList.remove('active');
-      btnGlobal.style.borderBottom = '3px solid transparent';
-      btnGlobal.style.color = 'var(--color-text-muted)';
+    const updateViews = () => {
+      if (!overviewContainer) return;
 
-      globalCard.style.display = 'none';
-      secHeader.style.display = 'flex';
-      secList.style.display = 'grid';
-      secFooter.style.display = 'block';
+      if (btnSplit) {
+        btnSplit.classList.toggle('active', isSplitMode);
+        btnSplit.style.display = (currentTab === 'section' || isSplitMode) ? 'inline-flex' : 'inline-flex';
+      }
+
+      // 2画面同時表示（スプリットモード）: セクション一覧表示時かつスプリットON
+      if (isSplitMode && currentTab === 'section') {
+        overviewContainer.classList.add('split-mode-active');
+        
+        globalCard.style.display = 'none';
+        sectionsPane.style.display = 'block';
+        flowmapContainer.style.display = 'flex';
+        flowmapContainer.classList.remove('full-tab-mode');
+
+        setTabStyle(btnSection);
+        setTimeout(renderFlowmap, 50);
+        return;
+      }
+
+      // 通常（単一タブ）モード
+      overviewContainer.classList.remove('split-mode-active');
+
+      if (currentTab === 'global') {
+        setTabStyle(btnGlobal);
+        globalCard.style.display = 'block';
+        sectionsPane.style.display = 'none';
+        flowmapContainer.style.display = 'none';
+      } else if (currentTab === 'section') {
+        setTabStyle(btnSection);
+        globalCard.style.display = 'none';
+        sectionsPane.style.display = 'block';
+        flowmapContainer.style.display = 'none';
+      } else if (currentTab === 'flowmap') {
+        setTabStyle(btnFlowmap);
+        globalCard.style.display = 'none';
+        sectionsPane.style.display = 'none';
+        flowmapContainer.style.display = 'flex';
+        flowmapContainer.classList.add('full-tab-mode');
+        setTimeout(renderFlowmap, 50);
+      }
     };
 
-    btnGlobal.addEventListener('click', showGlobal);
-    btnSection.addEventListener('click', showSection);
+    btnGlobal.addEventListener('click', () => {
+      currentTab = 'global';
+      updateViews();
+    });
 
-    // 初期状態は「全体設定」を表示
-    showGlobal();
+    btnSection.addEventListener('click', () => {
+      currentTab = 'section';
+      updateViews();
+    });
+
+    btnFlowmap.addEventListener('click', () => {
+      currentTab = 'flowmap';
+      // フローマップ単独タブ表示時はスプリット表示ではなく全体表示
+      updateViews();
+    });
+
+    if (btnSplit) {
+      btnSplit.addEventListener('click', () => {
+        isSplitMode = !isSplitMode;
+        try {
+          localStorage.setItem('form_customize_split_mode', isSplitMode ? 'true' : 'false');
+        } catch(e) {}
+
+        if (isSplitMode) {
+          currentTab = 'section';
+        }
+        updateViews();
+      });
+    }
+
+    // 分岐ドロップダウン変更時にフローマップをリアルタイム更新
+    document.addEventListener('change', (e) => {
+      const target = e.target;
+      if (!target) return;
+      if (target.id === 'editor-section-next' || 
+          target.classList.contains('question-branch-select') ||
+          target.classList.contains('option-next-select') ||
+          target.closest('.question-item') ||
+          target.closest('.section-meta-edit')) {
+        setTimeout(renderFlowmap, 60);
+      }
+    });
+
+    // 質問項目やセクションカードをクリックしたときに、フローマップ側の該当ルートを自動ハイライト
+    document.addEventListener('click', (e) => {
+      const qItem = e.target.closest('.question-item');
+      if (qItem && window.archifyRenderer) {
+        const qId = qItem.dataset.questionId || qItem.id;
+        if (qId) {
+          window.archifyRenderer.highlightRouteForNode(qId);
+        }
+      }
+    });
+
+    // 初期状態の反映
+    updateViews();
+
+    // フォーム切り替え時にフローマップを自動再描画するフック
+    setTimeout(() => {
+      if (typeof window.X === 'function' && !window.X._archifyHooked) {
+        const origX = window.X;
+        window.X = function(...args) {
+          const res = origX.apply(this, args);
+          setTimeout(() => {
+            if (window.refreshFlowmap) window.refreshFlowmap();
+          }, 100);
+          return res;
+        };
+        window.X._archifyHooked = true;
+      }
+    }, 500);
   }
 
   function enforceLightHeader() {
@@ -2602,6 +2714,13 @@
       headerNav.style.setProperty('background-color', '#f1f5f9', 'important');
       headerNav.style.setProperty('border-color', '#e2e8f0', 'important');
     }
+    // グローバルナビのフローマップ・回答プレビューは不要のため確実に非表示
+    const flowmapTab = document.getElementById('btn-tab-flowmap');
+    if (flowmapTab) flowmapTab.style.setProperty('display', 'none', 'important');
+    const previewTab = document.getElementById('btn-tab-preview');
+    if (previewTab) previewTab.style.setProperty('display', 'none', 'important');
+    const previewPanel = document.getElementById('panel-preview');
+    if (previewPanel) previewPanel.style.setProperty('display', 'none', 'important');
 
     // アクティブなタブ（選択箇所）の文字色を「白(#ffffff)」に、背景を「青」に強制固定する
     const activeTabs = document.querySelectorAll('.nav-tab.active');

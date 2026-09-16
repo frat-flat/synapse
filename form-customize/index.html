@@ -63,6 +63,11 @@
         document.head.appendChild(link);
         
         // JS of injection
+        const scriptArchify = document.createElement('script');
+        scriptArchify.src = './assets/archify-flow-renderer.js?v=' + ts;
+        scriptArchify.defer = true;
+        document.head.appendChild(scriptArchify);
+
         const script = document.createElement('script');
         script.src = './assets/custom-editor-v107.js?v=' + ts;
         script.defer = true;
@@ -89,7 +94,7 @@
           <span class="tab-icon">✏️</span>
           <span class="tab-text">フォーム編集</span>
         </button>
-        <button id="btn-tab-flowmap" class="nav-tab" data-tab="flowmap" data-tooltip="フローマップ">
+        <button id="btn-tab-flowmap" class="nav-tab" data-tab="flowmap" data-tooltip="フローマップ" style="display: none !important;">
           <span class="tab-icon flowmap-tab-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 12h5" />
@@ -101,7 +106,7 @@
           </span>
           <span class="tab-text">フローマップ</span>
         </button>
-        <button id="btn-tab-preview" class="nav-tab" data-tab="preview" data-tooltip="回答プレビュー">
+        <button id="btn-tab-preview" class="nav-tab" data-tab="preview" data-tooltip="回答プレビュー" style="display: none !important;">
           <span class="tab-icon">👁️</span>
           <span class="tab-text">回答プレビュー</span>
         </button>
@@ -333,15 +338,26 @@
              <!-- A. 【全体概要画面】フォームに入ったら最初に見えるセクション一覧 -->
             <div id="form-overview-editor" class="overview-editor-container">
               <!-- 全体の概要画面内のサブタブ -->
-              <div class="overview-subtabs" style="display: flex; gap: 8px; border-bottom: 2px solid var(--color-border); margin-bottom: 1.25rem; padding-bottom: 1px;">
-                <button type="button" id="btn-subtab-global-settings" class="subtab-btn active" data-tooltip="フォーム全体設定" style="background: none; border: none; border-bottom: 3px solid var(--color-primary); padding: 8px 16px; font-weight: bold; font-size: 0.9rem; color: var(--color-text); cursor: pointer; transition: all 0.2s;">
-                  <span class="subtab-icon">⚙️</span>
-                  <span class="subtab-text">フォーム全体設定</span>
-                </button>
-                <button type="button" id="btn-subtab-section-design" class="subtab-btn" data-tooltip="セクション構成一覧" style="background: none; border: none; border-bottom: 3px solid transparent; padding: 8px 16px; font-weight: bold; font-size: 0.9rem; color: var(--color-text-muted); cursor: pointer; transition: all 0.2s;">
-                  <span class="subtab-icon">📋</span>
-                  <span class="subtab-text">セクション構成一覧</span>
-                </button>
+              <div class="overview-subtabs">
+                <div class="subtabs-nav-group" style="display: flex; gap: 8px;">
+                  <button type="button" id="btn-subtab-global-settings" class="subtab-btn active" data-tooltip="フォーム全体設定">
+                    <span class="subtab-icon">⚙️</span>
+                    <span class="subtab-text">フォーム全体設定</span>
+                  </button>
+                  <button type="button" id="btn-subtab-section-design" class="subtab-btn" data-tooltip="セクション構成一覧">
+                    <span class="subtab-icon">📋</span>
+                    <span class="subtab-text">セクション構成一覧</span>
+                  </button>
+                  <button type="button" id="btn-subtab-flowmap" class="subtab-btn" data-tooltip="分岐フローマップ">
+                    <span class="subtab-icon">🔀</span>
+                    <span class="subtab-text">フローマップ</span>
+                  </button>
+                </div>
+                <div class="subtabs-right" style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+                  <button type="button" id="btn-subtab-split-toggle" class="btn-split-toggle" title="セクション一覧とフローマップを左右に2画面同時表示します">
+                    <span>◫</span> <span class="split-text">2画面表示</span>
+                  </button>
+                </div>
               </div>
 
               <div class="form-title-desc-card">
@@ -969,17 +985,38 @@
                 </div>
               </div>
 
-              <div class="overview-sections-header">
-                <h3>セクション構成一覧</h3>
-                <span id="overview-sections-count" class="badge">0個のセクション</span>
+              <!-- セクション構成一覧ペイン -->
+              <div id="overview-sections-pane" class="split-left-pane" style="display: none;">
+                <div class="overview-sections-header">
+                  <h3>セクション構成一覧</h3>
+                  <span id="overview-sections-count" class="badge">0個のセクション</span>
+                </div>
+
+                <div id="overview-sections-list" class="overview-sections-grid">
+                  <!-- JSでセクション全体図がカードリストでレンダリングされます -->
+                </div>
+
+                <div class="overview-add-section-footer" style="margin-top: 1.5rem; text-align: center;">
+                  <button id="btn-overview-add-section" class="btn btn-secondary">＋ 新しいセクションを追加</button>
+                </div>
               </div>
 
-              <div id="overview-sections-list" class="overview-sections-grid">
-                <!-- JSでセクション全体図がカードリストでレンダリングされます -->
-              </div>
-
-              <div class="overview-add-section-footer" style="margin-top: 1.5rem; text-align: center;">
-                <button id="btn-overview-add-section" class="btn btn-secondary">＋ 新しいセクションを追加</button>
+              <!-- C. 【Archifyフローマップ画面】 -->
+              <div id="overview-flowmap-container" class="overview-flowmap-pane full-tab-mode" style="display: none;">
+                <div class="archify-flowmap-toolbar">
+                  <div class="flowmap-title-info">
+                    <span style="font-weight: 700; font-size: 0.85rem; color: #1e293b;">🔀 フローマップ</span>
+                  </div>
+                  <div class="flowmap-controls">
+                    <button type="button" id="btn-flow-fit" class="btn-flow-tool" title="全体を表示">🔍 全体表示</button>
+                    <button type="button" id="btn-flow-zoom-in" class="btn-flow-tool" title="拡大">＋</button>
+                    <button type="button" id="btn-flow-zoom-out" class="btn-flow-tool" title="縮小">－</button>
+                    <button type="button" id="btn-flow-reset-route" class="btn-flow-tool" title="ハイライト解除">✨ ハイライト解除</button>
+                  </div>
+                </div>
+                <div id="archify-flowmap-viewport" class="archify-flowmap-viewport">
+                  <svg id="archify-flowmap-svg" width="100%" height="100%"></svg>
+                </div>
               </div>
             </div>
 
