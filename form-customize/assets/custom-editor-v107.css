@@ -6539,4 +6539,17 @@ body.split-active .editor-live-preview-pane,
   }
 }
 
+.archify-node-group:hover rect {
+  filter: drop-shadow(0 4px 8px rgba(15, 23, 42, 0.14)) !important;
+}
+
+.archify-node-group.node-type-partial_submit:hover rect {
+  stroke: #0284c7 !important;
+}
+
+.archify-node-group.node-type-partial_submit.is-focused-node rect {
+  stroke: #0284c7 !important;
+  stroke-width: 2.5px !important;
+}
+
 

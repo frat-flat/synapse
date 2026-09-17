@@ -60,6 +60,9 @@
         <marker id="marker-arrow-subq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
           <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
         </marker>
+        <marker id="marker-arrow-partial" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#0284c7" />
+        </marker>
         <marker id="marker-arrow-highlight" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
         </marker>
@@ -399,6 +402,44 @@
           }
         });
 
+        // 💾 途中送信（コード確定＆続きリンク発行）チェックポイントノードの自動配置
+        const hasSectionPartialSubmit = sec.nextAction === 'partial_submit';
+        const hasOptionPartialSubmit = (sec.questions || []).some(q => 
+          (q.options || []).some(opt => opt && opt.nextSectionId === 'partial_submit')
+        );
+        const needsPartialSubmitNode = hasSectionPartialSubmit || hasOptionPartialSubmit;
+
+        if (needsPartialSubmitNode) {
+          const partialNodeId = `partial_submit_${sec.id}`;
+          nodes.push({
+            id: partialNodeId,
+            type: 'partial_submit',
+            title: '💾 途中送信（コード確定）',
+            subText: '8桁コード確定・再開リンク発行',
+            secId: sec.id,
+            secIdx: secIdx,
+            x: secX + 10,
+            y: curY,
+            width: nodeWidth,
+            height: nodeHeight
+          });
+
+          // セクションの通常フローが途中送信の場合、セクション内最終設問から途中送信ノードへ接続
+          if (hasSectionPartialSubmit && sec.questions && sec.questions.length > 0) {
+            const lastQ = sec.questions[sec.questions.length - 1];
+            edges.push({
+              id: `edge-to-partial-${sec.id}`,
+              from: lastQ.id,
+              to: partialNodeId,
+              type: 'to-partial',
+              dashed: false,
+              color: '#0284c7'
+            });
+          }
+
+          curY += rowHeight;
+        }
+
         const laneHeight = Math.max(curY - startY + 16, 140);
         lanes.push({
           id: `lane_${sec.id}`,
@@ -455,19 +496,54 @@
         const lastQ = sec.questions[sec.questions.length - 1];
         const branchingOpts = (lastQ.options || []).filter(opt => opt && opt.nextSectionId && opt.nextSectionId !== 'next');
         
-        // 全選択肢に個別分岐がある場合はセクション末尾のデフォルト遷移を省略
-        if (branchingOpts.length > 0 && branchingOpts.length === (lastQ.options || []).length) return;
-
+        const hasAllBranches = branchingOpts.length > 0 && branchingOpts.length === (lastQ.options || []).length;
         let act = sec.nextAction || 'next';
+
+        // 💾 セクションの完了後動作が「途中送信」の場合
+        if (act === 'partial_submit') {
+          const nextSec = findNextEligibleSection(secIdx + 1, sec);
+          const targetId = nextSec ? getSectionTargetId(nextSec.id) : 'submit';
+          const partialNodeId = `partial_submit_${sec.id}`;
+          edges.push({
+            id: `edge-partial-next-${sec.id}`,
+            from: partialNodeId,
+            to: targetId,
+            type: 'partial-submit',
+            label: nextSec ? '途中送信（コード確定＆次へ）' : '途中送信（コード確定＆完了）',
+            dashed: true,
+            color: '#0284c7'
+          });
+          return;
+        }
+
+        // 💾 選択肢に途中送信があるが、セクション自体は別のアクションの場合の途中送信出口エッジ
+        const hasOptionPartialSubmit = (sec.questions || []).some(q => 
+          (q.options || []).some(opt => opt && opt.nextSectionId === 'partial_submit')
+        );
+        if (hasOptionPartialSubmit) {
+          const nextSec = findNextEligibleSection(secIdx + 1, sec);
+          const pTargetId = nextSec ? getSectionTargetId(nextSec.id) : 'submit';
+          const partialNodeId = `partial_submit_${sec.id}`;
+          edges.push({
+            id: `edge-partial-next-${sec.id}`,
+            from: partialNodeId,
+            to: pTargetId,
+            type: 'partial-submit',
+            label: nextSec ? '途中送信（コード確定＆次へ）' : '途中送信（コード確定＆完了）',
+            dashed: true,
+            color: '#0284c7'
+          });
+        }
+
+        // 全選択肢に個別分岐がある場合はセクション末尾のデフォルト遷移を省略
+        if (hasAllBranches) return;
+
         let targetId = '';
         let label = '次のセクションへ';
 
-        if (act === 'next' || act === 'partial_submit') {
+        if (act === 'next') {
           const nextSec = findNextEligibleSection(secIdx + 1, sec);
           targetId = nextSec ? getSectionTargetId(nextSec.id) : 'submit';
-          if (act === 'partial_submit') {
-            label = '次のセクションへ（途中送信可）';
-          }
         } else if (act === 'submit') {
           targetId = 'submit';
           label = '送信して完了';
@@ -526,6 +602,19 @@
               return;
             }
 
+            if (opt.nextSectionId === 'partial_submit') {
+              edges.push({
+                id: `edge-branch-partial-${optId}`,
+                from: optId,
+                to: `partial_submit_${sec.id}`,
+                type: 'option-partial',
+                label: '途中送信へ',
+                dashed: true,
+                color: '#0284c7'
+              });
+              return;
+            }
+
             let targetId = opt.nextSectionId;
             let label = `「${opt.label}」選択時`;
 
@@ -545,7 +634,9 @@
               if (hasSiblingSubQ) {
                 // セクションの次アクションへ直通
                 const act = sec.nextAction || 'next';
-                if (act === 'next' || act === 'partial_submit') {
+                if (act === 'partial_submit') {
+                  targetId = `partial_submit_${sec.id}`;
+                } else if (act === 'next') {
                   const nextSec = findNextEligibleSection(secIdx + 1, sec);
                   targetId = nextSec ? getSectionTargetId(nextSec.id) : 'submit';
                 } else if (act === 'submit') {
@@ -599,6 +690,7 @@
 
     getBranchTargetLabel(act, sections, currentSecId) {
       if (!act || act === 'next') return '次の項目';
+      if (act === 'partial_submit') return '💾 途中送信（コード確定）';
       if (act === 'submit') return '🏁 送信完了';
       const targetSec = sections.find(s => s.id === act);
       return targetSec ? `セクション「${targetSec.title || '無題'}」` : '指定セクション';
@@ -716,6 +808,10 @@
       } else if (node.type === 'submit') {
         borderLeftColor = '#ef4444';
         bgColor = '#fef2f2';
+      } else if (node.type === 'partial_submit') {
+        borderLeftColor = '#0284c7';
+        borderColor = '#7dd3fc';
+        bgColor = '#f0f9ff';
       }
 
       // 背景カード
@@ -758,9 +854,12 @@
         sub.setAttribute('class', 'archify-node-subtext');
         sub.setAttribute('x', node.x + 14);
         sub.setAttribute('y', node.y + 40);
-        sub.setAttribute('fill', node.type === 'option' ? '#ea580c' : '#64748b');
+        let subColor = '#64748b';
+        if (node.type === 'option') subColor = '#ea580c';
+        else if (node.type === 'partial_submit') subColor = '#0284c7';
+        sub.setAttribute('fill', subColor);
         sub.setAttribute('font-size', '10');
-        sub.setAttribute('font-weight', node.type === 'option' ? '600' : '400');
+        sub.setAttribute('font-weight', (node.type === 'option' || node.type === 'partial_submit') ? '600' : '400');
         sub.textContent = this.truncateText(node.subText, 22);
         g.appendChild(sub);
       }
@@ -790,7 +889,7 @@
       let x1, y1, x2, y2;
       let pathD = '';
 
-      if (edge.type === 'sequence') {
+      if (edge.type === 'sequence' || edge.type === 'to-partial') {
         // 同一セクション内の縦接続
         x1 = fromNode.x + fromNode.width / 2;
         y1 = fromNode.y + fromNode.height;
@@ -804,6 +903,14 @@
         x2 = toNode.x;
         y2 = toNode.y + toNode.height / 2;
         pathD = `M ${x1} ${y1} V ${y2} H ${x2}`;
+      } else if (edge.type === 'option-partial') {
+        // 選択肢からセクション下部の途中送信ノードへの接続（同一セクション内：右側をコンパクトに迂回して下へ接続）
+        const outX = Math.max(fromNode.x + fromNode.width, toNode.x + toNode.width) + 8;
+        x1 = fromNode.x + fromNode.width;
+        y1 = fromNode.y + fromNode.height / 2;
+        x2 = toNode.x + toNode.width;
+        y2 = toNode.y + toNode.height / 2;
+        pathD = `M ${x1} ${y1} H ${outX} V ${y2} H ${x2}`;
       } else if (edge.type === 'subq-branch') {
         // 同一セクション内の条件付き質問への分岐（右側を迂回して接続）
         const outX = Math.max(fromNode.x + fromNode.width, toNode.x + toNode.width) + 16;
@@ -837,6 +944,7 @@
       let markerId = 'marker-arrow-default';
       if (edge.type === 'subq-branch') markerId = 'marker-arrow-subq';
       else if (edge.type === 'branch') markerId = 'marker-arrow-branch';
+      else if (edge.type === 'partial-submit' || edge.type === 'to-partial' || edge.type === 'option-partial') markerId = 'marker-arrow-partial';
       else if (edge.type === 'section-transition' || edge.type === 'start') markerId = 'marker-arrow-section';
       path.setAttribute('marker-end', `url(#${markerId})`);
 
@@ -855,14 +963,27 @@
           midY = (y1 + y2) / 2;
           textAnchor = 'start';
           labelColor = '#059669';
+        } else if (edge.type === 'option-partial') {
+          const outX = Math.max(fromNode.x + fromNode.width, toNode.x + toNode.width) + 8;
+          midX = outX + 5;
+          midY = (y1 + y2) / 2;
+          textAnchor = 'start';
+          labelColor = '#0284c7';
+        } else if (edge.type === 'partial-submit') {
+          labelColor = '#0284c7';
+          midY = (y1 + y2) / 2 + 12; // 下側にオフセットして上側のセクション遷移ラベルとの重複を回避
         }
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', midX);
         text.setAttribute('y', midY);
         text.setAttribute('fill', labelColor);
-        text.setAttribute('font-size', '9');
-        text.setAttribute('font-weight', '600');
+        text.setAttribute('stroke', '#ffffff');
+        text.setAttribute('stroke-width', '3.5');
+        text.setAttribute('paint-order', 'stroke fill');
+        text.setAttribute('stroke-linejoin', 'round');
+        text.setAttribute('font-size', '9.5');
+        text.setAttribute('font-weight', '700');
         text.setAttribute('text-anchor', textAnchor);
         text.textContent = edge.label;
         g.appendChild(text);
@@ -968,6 +1089,7 @@
             let m = 'marker-arrow-default';
             if (edge.type === 'subq-branch') m = 'marker-arrow-subq';
             else if (edge.type === 'branch') m = 'marker-arrow-branch';
+            else if (edge.type === 'partial-submit' || edge.type === 'to-partial' || edge.type === 'option-partial') m = 'marker-arrow-partial';
             else if (edge.type === 'section-transition' || edge.type === 'start') m = 'marker-arrow-section';
             path.setAttribute('marker-end', `url(#${m})`);
           }
@@ -998,6 +1120,7 @@
           let m = 'marker-arrow-default';
           if (edge.type === 'subq-branch') m = 'marker-arrow-subq';
           else if (edge.type === 'branch') m = 'marker-arrow-branch';
+          else if (edge.type === 'partial-submit' || edge.type === 'to-partial' || edge.type === 'option-partial') m = 'marker-arrow-partial';
           else if (edge.type === 'section-transition' || edge.type === 'start') m = 'marker-arrow-section';
           path.setAttribute('marker-end', `url(#${m})`);
         }
@@ -1019,6 +1142,13 @@
       }
       if (sec && sec.questions && sec.questions.length > 0) {
         this.highlightRouteForNode(sec.questions[0].id);
+      } else if (sec) {
+        const partialNode = this.graph.nodes.find(n => n.id === `partial_submit_${sec.id}`);
+        if (partialNode) {
+          this.highlightRouteForNode(partialNode.id);
+        } else {
+          this.clearHighlight();
+        }
       } else {
         this.clearHighlight();
       }

@@ -11496,6 +11496,11 @@
           if (curSec) {
             curSec.nextAction = e.target.value;
             if (window.S) window.S();
+            if (typeof window.refreshFlowmap === 'function') {
+              window.refreshFlowmap();
+            } else if (window.archifyRenderer && (window.G || window.n)) {
+              window.archifyRenderer.render(window.G || window.n);
+            }
           }
         });
       }
