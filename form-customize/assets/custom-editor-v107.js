@@ -11522,6 +11522,65 @@
       updateHint();
     }
 
+    // --- 設問内・各選択肢の分岐先プルダウン（.option-branch-select）への途中送信オプション注入 ---
+    const injectOptionPartialSubmit = () => {
+      const branchSelects = document.querySelectorAll('.option-branch-select, .option-transition-select');
+      const curSec = sec || (window.n && window.n.sections ? window.n.sections.find(s => s.id === window.r) : null);
+      branchSelects.forEach(sel => {
+        let pOpt = sel.querySelector('option[value="partial_submit"]');
+        if (!pOpt) {
+          pOpt = document.createElement('option');
+          pOpt.value = 'partial_submit';
+          pOpt.textContent = '💾 途中送信（コード確定＆続きリンク発行）';
+          const submitOpt = sel.querySelector('option[value="submit"]');
+          if (submitOpt) {
+            submitOpt.insertAdjacentElement('afterend', pOpt);
+          } else {
+            sel.appendChild(pOpt);
+          }
+        }
+
+        // 親行・質問データから現在の nextSectionId を確認して反映
+        const optRow = sel.closest('.option-edit-row');
+        const qCard = sel.closest('.question-card');
+        if (optRow && qCard && curSec && curSec.questions) {
+          const qId = qCard.dataset.questionId;
+          const qDef = curSec.questions.find(q => q.id === qId);
+          if (qDef && qDef.options) {
+            const allRows = Array.from(qCard.querySelectorAll('.option-edit-row'));
+            const optIdx = allRows.indexOf(optRow);
+            if (optIdx !== -1 && qDef.options[optIdx]) {
+              if (qDef.options[optIdx].nextSectionId === 'partial_submit') {
+                sel.value = 'partial_submit';
+              }
+            }
+          }
+        }
+
+        if (!sel._hasPartialSubmitSyncHandler) {
+          sel._hasPartialSubmitSyncHandler = true;
+          sel.addEventListener('change', () => {
+            if (typeof window.refreshFlowmap === 'function') {
+              window.refreshFlowmap();
+            } else if (window.archifyRenderer && (window.G || window.n)) {
+              window.archifyRenderer.render(window.G || window.n);
+            }
+          });
+        }
+      });
+    };
+    injectOptionPartialSubmit();
+
+    // 選択肢追加やタイプ変更を監視して自動注入
+    const qContainer = document.getElementById('questions-container');
+    if (qContainer && !qContainer._hasPartialSubmitObserver) {
+      qContainer._hasPartialSubmitObserver = true;
+      const optObserver = new MutationObserver(() => {
+        injectOptionPartialSubmit();
+      });
+      optObserver.observe(qContainer, { childList: true, subtree: true });
+    }
+
     // --- 質問の並び替え（▲ / ▼）ボタンの注入（全モード共通） ---
     const allQCards = document.querySelectorAll('#questions-container .question-card');
     allQCards.forEach((qCard, idx) => {
@@ -14567,12 +14626,14 @@
     if (force) {
       if (_livePreviewRaf) { cancelAnimationFrame(_livePreviewRaf); _livePreviewRaf = null; }
       renderLivePreview();
+      if (typeof window.refreshFlowmap === 'function') window.refreshFlowmap();
       return;
     }
     if (_livePreviewRaf) return;
     _livePreviewRaf = requestAnimationFrame(() => {
       _livePreviewRaf = null;
       renderLivePreview();
+      if (typeof window.refreshFlowmap === 'function') window.refreshFlowmap();
     });
   }
   window.triggerLivePreview = debouncedTriggerLivePreview;
@@ -15141,7 +15202,7 @@
         `;
       } else if (node.type === 'option') {
         const activeState = window.G;
-        let optionsHtml = '<option value="next">デフォルト（次の項目へ）</option><option value="submit">回答を送信して終了</option>';
+        let optionsHtml = '<option value="next">デフォルト（次の項目へ）</option><option value="partial_submit" ' + (node.nextSectionId==='partial_submit'?'selected':'') + '>💾 途中送信（コード確定＆続きリンク発行）</option><option value="submit" ' + (node.nextSectionId==='submit'?'selected':'') + '>回答を送信して終了</option>';
         activeState.sections.forEach(sec => {
           optionsHtml += `<option value="${sec.id}" ${node.nextSectionId===sec.id?'selected':''}>セクションへ移動: ${sec.title || sec.id}</option>`;
         });
