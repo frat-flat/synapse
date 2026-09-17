@@ -182,16 +182,16 @@
         maxY = Math.max(maxY, l.y + l.height);
       });
 
-      const padding = 50;
+      const padding = 32;
       const graphWidth = (maxX - minX) + padding * 2;
       const graphHeight = (maxY - minY) + padding * 2;
 
       const scaleX = rect.width / graphWidth;
       const scaleY = rect.height / graphHeight;
-      this.scale = Math.min(Math.max(Math.min(scaleX, scaleY), 0.4), 1.2);
+      this.scale = Math.min(Math.max(Math.min(scaleX, scaleY), 0.15), 1.1);
 
-      this.translateX = (rect.width - graphWidth * this.scale) / 2 - minX * this.scale + padding * this.scale;
-      this.translateY = (rect.height - graphHeight * this.scale) / 2 - minY * this.scale + padding * this.scale;
+      this.translateX = (rect.width - (maxX - minX) * this.scale) / 2 - minX * this.scale;
+      this.translateY = (rect.height - (maxY - minY) * this.scale) / 2 - minY * this.scale;
       this.applyTransform();
     }
 

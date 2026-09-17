@@ -354,9 +354,40 @@
                   </button>
                 </div>
                 <div class="subtabs-right" style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
-                  <button type="button" id="btn-subtab-split-toggle" class="btn-split-toggle" title="セクション一覧とフローマップを左右に2画面同時表示します">
-                    <span>◫</span> <span class="split-text">2画面表示</span>
-                  </button>
+                  <div class="split-control-group">
+                    <button type="button" id="btn-subtab-split-toggle" class="btn-split-toggle" title="2画面同時表示のON/OFFを切り替えます">
+                      <span>◫</span> <span class="split-text">2画面表示</span>
+                    </button>
+                    <button type="button" id="btn-split-pair-dropdown-toggle" class="btn-split-dropdown-toggle" title="2画面表示の組み合わせを選択" aria-label="組み合わせ選択" aria-expanded="false">
+                      <span class="dropdown-arrow" style="font-size: 0.65rem; margin-left: 2px;">▼</span>
+                    </button>
+                    
+                    <!-- 組み合わせ選択ドロップダウンメニュー -->
+                    <div id="split-pair-dropdown-menu" class="split-pair-menu" style="display: none;">
+                      <div class="split-pair-menu-header">2画面表示の組み合わせ</div>
+                      <label class="split-pair-option" data-pair="global_flowmap">
+                        <input type="radio" name="split-pair-radio" value="global_flowmap" checked />
+                        <div class="split-pair-option-text">
+                          <div class="split-pair-title">⚙️ 全体設定 ＋ 🔀 フローマップ <span class="badge-recommended">標準</span></div>
+                          <div class="split-pair-desc">基本情報・設定と分岐フローを並べて編集・確認</div>
+                        </div>
+                      </label>
+                      <label class="split-pair-option" data-pair="section_flowmap">
+                        <input type="radio" name="split-pair-radio" value="section_flowmap" />
+                        <div class="split-pair-option-text">
+                          <div class="split-pair-title">📋 セクション構成 ＋ 🔀 フローマップ</div>
+                          <div class="split-pair-desc">セクション一覧と分岐フローを並べて確認</div>
+                        </div>
+                      </label>
+                      <label class="split-pair-option" data-pair="global_section">
+                        <input type="radio" name="split-pair-radio" value="global_section" />
+                        <div class="split-pair-option-text">
+                          <div class="split-pair-title">⚙️ 全体設定 ＋ 📋 セクション構成</div>
+                          <div class="split-pair-desc">全体設定とセクション構成一覧を同時に確認</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -6034,15 +6034,42 @@ button.btn-sec-reorder {
   color: var(--color-text, #1e293b) !important;
 }
 
-/* 3. スプリットビュートグルボタン */
+/* 3. スプリットビュートグルボタングループ & 組み合わせ選択 */
+.split-control-group {
+  display: inline-flex !important;
+  align-items: stretch !important;
+  position: relative !important;
+}
+
 .btn-split-toggle {
   display: inline-flex !important;
   align-items: center !important;
   gap: 6px !important;
-  padding: 5px 12px !important;
+  padding: 5px 10px !important;
   font-size: 0.8rem !important;
   font-weight: 600 !important;
-  border-radius: 6px !important;
+  border-top-left-radius: 6px !important;
+  border-bottom-left-radius: 6px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border: 1px solid var(--color-border, #cbd5e0) !important;
+  border-right: none !important;
+  background: var(--color-bg-card, #ffffff) !important;
+  color: var(--color-text, #334155) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.btn-split-dropdown-toggle {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 5px 8px !important;
+  font-size: 0.75rem !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-top-right-radius: 6px !important;
+  border-bottom-right-radius: 6px !important;
   border: 1px solid var(--color-border, #cbd5e0) !important;
   background: var(--color-bg-card, #ffffff) !important;
   color: var(--color-text, #334155) !important;
@@ -6050,15 +6077,112 @@ button.btn-sec-reorder {
   transition: all 0.2s ease !important;
 }
 
-.btn-split-toggle:hover {
+.btn-split-toggle:hover,
+.btn-split-dropdown-toggle:hover {
   background: #f1f5f9 !important;
   border-color: #94a3b8 !important;
 }
 
-.btn-split-toggle.active {
+.btn-split-toggle.active,
+.split-control-group.active .btn-split-toggle {
   background: #eff6ff !important;
   border-color: #3b82f6 !important;
   color: #1d4ed8 !important;
+}
+
+.split-control-group.active .btn-split-dropdown-toggle {
+  background: #eff6ff !important;
+  border-color: #3b82f6 !important;
+  color: #1d4ed8 !important;
+}
+
+/* 組み合わせ選択ドロップダウンメニュー */
+.split-pair-menu {
+  display: none !important;
+  position: absolute !important;
+  top: calc(100% + 6px) !important;
+  right: 0 !important;
+  width: 290px !important;
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  z-index: 1000 !important;
+  padding: 6px !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+}
+
+.split-pair-menu.show {
+  display: flex !important;
+}
+
+.split-pair-menu-header {
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  color: #64748b !important;
+  padding: 5px 8px 3px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  margin-bottom: 2px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.03em !important;
+}
+
+.split-pair-option {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  padding: 7px 8px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease !important;
+  margin: 0 !important;
+  user-select: none !important;
+}
+
+.split-pair-option:hover {
+  background: #f8fafc !important;
+}
+
+.split-pair-option.selected {
+  background: #eff6ff !important;
+}
+
+.split-pair-option input[type="radio"] {
+  margin-top: 2px !important;
+  cursor: pointer !important;
+  accent-color: #2563eb !important;
+}
+
+.split-pair-option-text {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+  flex: 1 !important;
+}
+
+.split-pair-title {
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.split-pair-desc {
+  font-size: 0.7rem !important;
+  color: #64748b !important;
+  line-height: 1.25 !important;
+}
+
+.badge-recommended {
+  font-size: 0.62rem !important;
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+  padding: 1px 5px !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
 }
 
 /* 4. スプリットビュー（2画面同時表示）& フル幅展開レイアウト */
@@ -6116,11 +6240,32 @@ body.split-active .editor-live-preview-pane,
   width: 100% !important;
 }
 
+/* スプリットモード時：全体設定カード（Column 1） */
+.overview-editor-container.split-mode-active .form-title-desc-card {
+  grid-column: 1 !important;
+  min-width: 380px !important;
+  max-height: calc(100vh - 145px) !important;
+  overflow-y: auto !important;
+  padding-right: 8px !important;
+  margin: 0 !important;
+}
+
+/* スプリットモード時：セクション構成ペイン */
 .overview-editor-container.split-mode-active .split-left-pane {
   min-width: 380px !important;
   max-height: calc(100vh - 145px) !important;
   overflow-y: auto !important;
   padding-right: 8px !important;
+}
+
+/* global_section ペア時：セクション構成ペインが Column 2（右側）に配置される */
+.overview-editor-container.split-mode-active[data-split-pair="global_section"] #overview-sections-pane {
+  grid-column: 2 !important;
+  min-width: 0 !important;
+  max-height: calc(100vh - 145px) !important;
+  overflow-y: auto !important;
+  padding-right: 8px !important;
+  margin: 0 !important;
 }
 
 /* セクション一覧カードが極小幅に潰れるのを完全防止 */
