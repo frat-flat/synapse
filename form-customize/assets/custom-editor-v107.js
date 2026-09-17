@@ -2562,6 +2562,9 @@
 
     const renderFlowmap = () => {
       if (window.archifyRenderer && window.G) {
+        if (typeof sanitizeFormBranchingLogic === 'function') {
+          sanitizeFormBranchingLogic(window.G);
+        }
         window.archifyRenderer.render(window.G);
       }
     };
@@ -15435,6 +15438,11 @@
         }
       }
       
+      // 🛡️ フォーム分岐ロジックの自己修復＆サニタイズ
+      if (window.G && typeof sanitizeFormBranchingLogic === 'function') {
+        sanitizeFormBranchingLogic(window.G);
+      }
+
       // 🔀 Archify フローマップの直接レンダリング
       if (window.archifyRenderer && window.G) {
         window.archifyRenderer.render(window.G);
@@ -17669,6 +17677,87 @@
   }
 
   // =========================================================================
+  // 🛡️ フォーム分岐ロジック整合性ガード＆自動サニタイズ（自己修復エンジン）
+  // =========================================================================
+  function sanitizeFormBranchingLogic(forms) {
+    if (!forms) return { forms, hasModified: false };
+    const formList = Array.isArray(forms) ? forms : [forms];
+    let hasModified = false;
+
+    formList.forEach(form => {
+      if (!form || !Array.isArray(form.sections)) return;
+
+      const allQuestionIds = new Set();
+      form.sections.forEach(sec => {
+        (sec.questions || []).forEach(q => {
+          if (q && q.id) allQuestionIds.add(q.id);
+        });
+      });
+
+      form.sections.forEach(sec => {
+        const questions = sec.questions || [];
+        questions.forEach(q => {
+          if (!q) return;
+
+          // 1. 都道府県等の汎用select項目で全選択肢が誤って他セクションを指している等の誤爆正規化
+          const isPrefSelect = q.type === 'select' && (q.title && (q.title.includes('都道府県') || q.title.includes('住所')));
+          if (isPrefSelect && Array.isArray(q.options)) {
+            q.options.forEach(opt => {
+              if (opt && opt.nextSectionId && opt.nextSectionId !== 'next') {
+                opt.nextSectionId = 'next';
+                hasModified = true;
+              }
+            });
+          }
+
+          // 2. 選択肢の nextSectionId に質問IDが入ってしまっている場合の正規化
+          if (Array.isArray(q.options)) {
+            q.options.forEach(opt => {
+              if (!opt) return;
+              if (opt.nextSectionId && allQuestionIds.has(opt.nextSectionId)) {
+                console.warn(`[Sanitize] Option "${opt.label}" had questionId "${opt.nextSectionId}" as nextSectionId. Reset to "next".`);
+                opt.nextSectionId = 'next';
+                hasModified = true;
+              }
+            });
+          }
+
+          // 3. 同一セクション内でこの質問の選択肢に依存して表示される後続質問（インボイス登録番号など）がある場合、
+          // その選択肢が勝手に別セクションへ飛ぶのを防ぐ！
+          const dependentSubQs = questions.filter(otherQ => {
+            if (!otherQ || otherQ.id === q.id) return false;
+            const sl = otherQ.skipLogic;
+            return sl && sl.dependsOn === q.id;
+          });
+
+          if (dependentSubQs.length > 0 && Array.isArray(q.options)) {
+            q.options.forEach(opt => {
+              if (!opt) return;
+              const activatesSubQ = dependentSubQs.some(subQ => {
+                const sl = subQ.skipLogic;
+                if (sl.action === 'hide' && sl.condition === 'not_equals' && sl.value === opt.label) return true;
+                if (sl.action === 'show' && sl.condition === 'equals' && sl.value === opt.label) return true;
+                return false;
+              });
+
+              if (activatesSubQ) {
+                if (opt.nextSectionId && opt.nextSectionId !== 'next' && opt.nextSectionId !== 'same') {
+                  console.warn(`[Sanitize] Option "${opt.label}" displays sub-question within the same section, but had nextSectionId="${opt.nextSectionId}". Reset to "next".`);
+                  opt.nextSectionId = 'next';
+                  hasModified = true;
+                }
+              }
+            });
+          }
+        });
+      });
+    });
+
+    return { forms, hasModified };
+  }
+  window.sanitizeFormBranchingLogic = sanitizeFormBranchingLogic;
+
+  // =========================================================================
   // ☁️ クラウド（Supabase）自動同期モジュール (全ブラウザ・端末共有)
   // =========================================================================
   let _cloudSyncDebounceTimer = null;
@@ -17686,6 +17775,8 @@
       } catch(e) {}
     }
     if (!forms || !Array.isArray(forms) || forms.length === 0) return;
+
+    sanitizeFormBranchingLogic(forms);
 
     clearTimeout(_cloudSyncDebounceTimer);
 
@@ -17783,6 +17874,7 @@
 
       if (cloudForms && cloudForms.length > 0) {
         console.log('[Cloud Sync] Loaded', cloudForms.length, 'forms from cloud.');
+        sanitizeFormBranchingLogic(cloudForms);
         
         // 破壊的事故防止: ローカルにユーザーが作成した質問が多数ある場合、クラウドが初期状態（1問のみ等）なら上書きを阻止
         const countQuestions = (formsList) => {
@@ -17831,13 +17923,19 @@
   // localStorage.setItem のフック: form_customize_all_forms への書き込み時にクラウドへ自動保存
   const _origSetItem = localStorage.setItem;
   localStorage.setItem = function(key, value) {
-    _origSetItem.apply(this, arguments);
     if (key === 'form_customize_all_forms') {
       try {
         const parsed = JSON.parse(value);
+        const { hasModified } = sanitizeFormBranchingLogic(parsed);
+        if (hasModified) {
+          arguments[1] = JSON.stringify(parsed);
+        }
+        _origSetItem.apply(this, arguments);
         syncFormsToCloud(parsed);
+        return;
       } catch(e) {}
     }
+    _origSetItem.apply(this, arguments);
   };
 
   // 起動時の初期同期

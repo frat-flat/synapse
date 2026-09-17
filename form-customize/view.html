@@ -4101,27 +4101,106 @@
                 }
 
                 if (opt && opt.nextSectionId) {
-                  const resolved = resolveTargetSectionFromIdOrRef(opt.nextSectionId, sections, section, cleanVal);
-                  if (resolved) return resolved;
+                  // 🛡️ セーフガード：同一セクション内に、この選択肢によって表示される後続質問（インボイス登録番号など）が存在するか判定
+                  const hasVisibleSubQuestions = questions.some(otherQ => {
+                    if (otherQ.id === q.id) return false;
+                    const sl = otherQ.skipLogic;
+                    if (!sl || sl.dependsOn !== q.id) return false;
+                    if (sl.action === 'hide' && sl.condition === 'not_equals' && sl.value === opt.label) return true;
+                    if (sl.action === 'show' && sl.condition === 'equals' && sl.value === opt.label) return true;
+                    return false;
+                  });
+
+                  // 後続質問が存在する場合は、選択肢のnextSectionIdによる早期セクション離脱を行わない！
+                  if (!hasVisibleSubQuestions) {
+                    const resolved = resolveTargetSectionFromIdOrRef(opt.nextSectionId, sections, section, cleanVal);
+                    if (resolved) return resolved;
+                  }
                 }
               }
             }
+          }
+
+          // セクションが法人専用か個人専用かを判定するヘルパー（タイトルまたは質問内容から精緻に判定）
+          function getSectionAudience(sec) {
+            if (!sec) return 'common';
+            const title = String(sec.title || '');
+            if (title.includes('法人')) return 'corp';
+            if (title.includes('個人') && !title.includes('法人')) return 'personal';
+
+            const qs = sec.questions || [];
+            const hasCorpQ = qs.some(q => {
+              const t = String(q.title || '');
+              const k = String(q.dataKey || '');
+              const id = String(q.id || '');
+              return t.includes('法人名') || t.includes('法人番号') || k.includes('corp') || id.includes('corp');
+            });
+            if (hasCorpQ) return 'corp';
+
+            const hasPersonalQ = qs.some(q => {
+              const t = String(q.title || '');
+              const k = String(q.dataKey || '');
+              const id = String(q.id || '');
+              return t.includes('屋号') || (t.includes('氏名') && !t.includes('代表')) || k.includes('trade_name') || id.includes('trade');
+            });
+            if (hasPersonalQ) return 'personal';
+
+            return 'common';
+          }
+
+          // 排他セクション（法人向け vs 個人向け）を自動スキップして適切な次のセクションを探索するヘルパー
+          function findNextEligibleSection(startIndex, curSec) {
+            let targetIdx = startIndex;
+            let userAudience = 'common';
+
+            // 回答値からユーザーの属性を判定
+            for (const val of Object.values(formValues)) {
+              if (typeof val === 'string') {
+                if (val.includes('法人')) { userAudience = 'corp'; break; }
+                if (val.includes('個人') && !val.includes('法人')) { userAudience = 'personal'; break; }
+              }
+            }
+            // 回答値がまだ無ければ現在セクションの属性をフォールバック
+            if (userAudience === 'common' && curSec) {
+              const curAudience = getSectionAudience(curSec);
+              if (curAudience !== 'common') userAudience = curAudience;
+            }
+
+            while (targetIdx < sections.length) {
+              const candSec = sections[targetIdx];
+              if (!candSec) { targetIdx++; continue; }
+              const candAudience = getSectionAudience(candSec);
+
+              // 法人ユーザーが個人専用セクションに出会ったらスキップ
+              if (userAudience === 'corp' && candAudience === 'personal') {
+                targetIdx++;
+                continue;
+              }
+              // 個人ユーザーが法人専用セクションに出会ったらスキップ
+              if (userAudience === 'personal' && candAudience === 'corp') {
+                targetIdx++;
+                continue;
+              }
+              return candSec;
+            }
+            return null;
           }
 
           // 2. セクション定義のアクション設定
           const act = section.nextAction || 'next';
           if (act === 'submit') return 'submit';
           if (act === 'next' || act === 'partial_submit') {
-            const nextSec = (curIdx !== -1 && curIdx < sections.length - 1) ? sections[curIdx + 1] : null;
+            const nextSec = (curIdx !== -1) ? findNextEligibleSection(curIdx + 1, section) : null;
             return nextSec ? nextSec.id : 'submit';
           }
 
           const resolvedAct = resolveTargetSectionFromIdOrRef(act, sections, section);
           if (resolvedAct) return resolvedAct;
 
-          // 3. デフォルト fallback：順番通りの次のセクション、無ければ submit
-          if (curIdx !== -1 && curIdx < sections.length - 1) {
-            return sections[curIdx + 1].id;
+          // 3. デフォルト fallback：順番通りの次のセクション（排他セクションはスキップ）、無ければ submit
+          if (curIdx !== -1) {
+            const nextSec = findNextEligibleSection(curIdx + 1, section);
+            if (nextSec) return nextSec.id;
           }
           return 'submit';
         }

@@ -57,6 +57,9 @@
         <marker id="marker-arrow-branch" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
           <path d="M 0 1 L 10 5 L 0 9 z" fill="#f97316" />
         </marker>
+        <marker id="marker-arrow-subq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
+        </marker>
         <marker id="marker-arrow-highlight" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
         </marker>
@@ -232,18 +235,25 @@
           
           let branchingOpts = [];
           if (!isPrefectureQuestion && Array.isArray(q.options) && q.options.length > 0) {
-            // 有効なジャンプ先（nextや空文字以外）を持つ選択肢のみを抽出
-            const validTargets = q.options.filter(opt => {
-              if (!opt || !opt.nextSectionId) return false;
-              const target = opt.nextSectionId.trim();
-              return target !== '' && target !== 'next' && target !== 'same' && target !== sec.id;
+            // 🎯 条件分岐を持つ選択肢の検出：
+            // A. 有効なジャンプ先（nextや空文字以外）を持つ選択肢
+            // B. 同一セクション内にその選択肢によって表示される後続質問（インボイス登録番号など）を持つ選択肢
+            const hasAnyBranch = q.options.some(opt => {
+              if (!opt) return false;
+              const target = (opt.nextSectionId || '').trim();
+              if (target !== '' && target !== 'next' && target !== 'same' && target !== sec.id) return true;
+              return (sec.questions || []).some(otherQ => {
+                if (otherQ.id === q.id) return false;
+                const sl = otherQ.skipLogic;
+                if (!sl || sl.dependsOn !== q.id) return false;
+                if (sl.action === 'hide' && sl.condition === 'not_equals' && sl.value === opt.label) return true;
+                if (sl.action === 'show' && sl.condition === 'equals' && sl.value === opt.label) return true;
+                return false;
+              });
             });
 
-            // 全選択肢が同一の行き先を指している場合は分岐（分岐によって道が分かれること）ではないため除外
-            const uniqueTargets = new Set(validTargets.map(opt => opt.nextSectionId.trim()));
-            if (uniqueTargets.size >= 1 && validTargets.length <= 12) {
-              // 選択肢によって行き先が分かれる場合、または特定の選択肢だけ別のセクションへジャンプする場合のみ採用
-              branchingOpts = validTargets;
+            if (hasAnyBranch && q.options.length <= 12) {
+              branchingOpts = q.options;
             }
           }
 
@@ -267,14 +277,19 @@
           // セクション内直列エッジ
           if (qIdx > 0) {
             const prevQ = sec.questions[qIdx - 1];
-            edges.push({
-              id: `edge-${prevQ.id}-${q.id}`,
-              from: prevQ.id,
-              to: q.id,
-              type: 'sequence',
-              dashed: false,
-              color: '#94a3b8'
-            });
+            // もしqが直前のprevQの特定選択肢に依存して出現する条件付き項目の場合、
+            // 直前の本体からの直通実線ではなく、選択肢からの条件エッジで接続する
+            const isConditionalSubQ = q.skipLogic && q.skipLogic.dependsOn === prevQ.id;
+            if (!isConditionalSubQ) {
+              edges.push({
+                id: `edge-${prevQ.id}-${q.id}`,
+                from: prevQ.id,
+                to: q.id,
+                type: 'sequence',
+                dashed: false,
+                color: '#94a3b8'
+              });
+            }
           }
 
           curY += rowHeight;
@@ -285,11 +300,28 @@
               const originalIdx = q.options.indexOf(opt);
               const optId = `${q.id}_opt_${opt.id || originalIdx}`;
 
+              // 同一セクション内の条件付き後続質問を検索
+              const dependentSubQ = (sec.questions || []).find(otherQ => {
+                if (otherQ.id === q.id) return false;
+                const sl = otherQ.skipLogic;
+                if (!sl || sl.dependsOn !== q.id) return false;
+                if (sl.action === 'hide' && sl.condition === 'not_equals' && sl.value === opt.label) return true;
+                if (sl.action === 'show' && sl.condition === 'equals' && sl.value === opt.label) return true;
+                return false;
+              });
+
+              let subText = '';
+              if (dependentSubQ) {
+                subText = `➔ 入力欄「${dependentSubQ.title}」へ`;
+              } else {
+                subText = '➔ ' + this.getBranchTargetLabel(opt.nextSectionId, sections, sec.id);
+              }
+
               nodes.push({
                 id: optId,
                 type: 'option',
                 title: opt.label || `選択肢 ${originalIdx + 1}`,
-                subText: '➔ ' + this.getBranchTargetLabel(opt.nextSectionId, sections, sec.id),
+                subText: subText,
                 parentQId: q.id,
                 secId: sec.id,
                 secIdx: secIdx,
@@ -297,7 +329,7 @@
                 y: curY,
                 width: nodeWidth - 20,
                 height: 44,
-                targetId: opt.nextSectionId
+                targetId: dependentSubQ ? dependentSubQ.id : opt.nextSectionId
               });
 
               // 質問から選択肢への縦エッジ
@@ -404,11 +436,34 @@
 
       // 5. 分岐選択肢からの遷移エッジ（実体のあるoptionノードからのみ接続）
       const existingOptNodeIds = new Set(nodes.filter(n => n.type === 'option').map(n => n.id));
-      sections.forEach(sec => {
+      sections.forEach((sec, secIdx) => {
         (sec.questions || []).forEach(q => {
           (q.options || []).forEach((opt, originalIdx) => {
             const optId = `${q.id}_opt_${opt.id || originalIdx}`;
             if (!existingOptNodeIds.has(optId)) return;
+
+            // 同一セクション内の条件付き後続質問を検索
+            const dependentSubQ = (sec.questions || []).find(otherQ => {
+              if (otherQ.id === q.id) return false;
+              const sl = otherQ.skipLogic;
+              if (!sl || sl.dependsOn !== q.id) return false;
+              if (sl.action === 'hide' && sl.condition === 'not_equals' && sl.value === opt.label) return true;
+              if (sl.action === 'show' && sl.condition === 'equals' && sl.value === opt.label) return true;
+              return false;
+            });
+
+            if (dependentSubQ) {
+              edges.push({
+                id: `edge-subq-${optId}-${dependentSubQ.id}`,
+                from: optId,
+                to: dependentSubQ.id,
+                type: 'subq-branch',
+                label: `「${opt.label}」選択時（入力欄出現）`,
+                dashed: true,
+                color: '#10b981'
+              });
+              return;
+            }
 
             let targetId = opt.nextSectionId;
             let label = `「${opt.label}」選択時`;
@@ -418,7 +473,29 @@
             } else if (targetId && targetId !== 'next' && targetId !== 'same') {
               targetId = getSectionTargetId(targetId);
             } else {
-              targetId = null;
+              // もし同セクション内に別の選択肢で出現する条件付き質問があり、
+              // かつこの選択肢ではそれがスキップされてセクション末尾に至る場合
+              const hasSiblingSubQ = (sec.questions || []).some(otherQ => {
+                if (otherQ.id === q.id) return false;
+                const sl = otherQ.skipLogic;
+                return sl && sl.dependsOn === q.id;
+              });
+
+              if (hasSiblingSubQ) {
+                // セクションの次アクションへ直通
+                const act = sec.nextAction || 'next';
+                if (act === 'next' || act === 'partial_submit') {
+                  const nextSec = sections[secIdx + 1];
+                  targetId = nextSec ? getSectionTargetId(nextSec.id) : 'submit';
+                } else if (act === 'submit') {
+                  targetId = 'submit';
+                } else {
+                  targetId = getSectionTargetId(act);
+                }
+                label = `「${opt.label}」選択時（入力不要）`;
+              } else {
+                targetId = null;
+              }
             }
 
             if (targetId) {
@@ -660,6 +737,14 @@
         x2 = toNode.x;
         y2 = toNode.y + toNode.height / 2;
         pathD = `M ${x1} ${y1} V ${y2} H ${x2}`;
+      } else if (edge.type === 'subq-branch') {
+        // 同一セクション内の条件付き質問への分岐（右側を迂回して接続）
+        const outX = Math.max(fromNode.x + fromNode.width, toNode.x + toNode.width) + 16;
+        x1 = fromNode.x + fromNode.width;
+        y1 = fromNode.y + fromNode.height / 2;
+        x2 = toNode.x + toNode.width;
+        y2 = toNode.y + toNode.height / 2;
+        pathD = `M ${x1} ${y1} H ${outX} V ${y2} H ${x2}`;
       } else {
         // セクション間遷移または分岐（右から左へのスムーズベジェ）
         x1 = fromNode.x + fromNode.width;
@@ -683,7 +768,8 @@
 
       // マーカー
       let markerId = 'marker-arrow-default';
-      if (edge.type === 'branch') markerId = 'marker-arrow-branch';
+      if (edge.type === 'subq-branch') markerId = 'marker-arrow-subq';
+      else if (edge.type === 'branch') markerId = 'marker-arrow-branch';
       else if (edge.type === 'section-transition' || edge.type === 'start') markerId = 'marker-arrow-section';
       path.setAttribute('marker-end', `url(#${markerId})`);
 
@@ -691,16 +777,26 @@
 
       // ラベル（分岐条件など）
       if (edge.label) {
-        const midX = (x1 + x2) / 2;
-        const midY = (y1 + y2) / 2 - 6;
+        let midX = (x1 + x2) / 2;
+        let midY = (y1 + y2) / 2 - 6;
+        let textAnchor = 'middle';
+        let labelColor = edge.type === 'branch' ? '#ea580c' : '#2563eb';
+
+        if (edge.type === 'subq-branch') {
+          const outX = Math.max(fromNode.x + fromNode.width, toNode.x + toNode.width) + 16;
+          midX = outX + 6;
+          midY = (y1 + y2) / 2;
+          textAnchor = 'start';
+          labelColor = '#059669';
+        }
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', midX);
         text.setAttribute('y', midY);
-        text.setAttribute('fill', edge.type === 'branch' ? '#ea580c' : '#2563eb');
+        text.setAttribute('fill', labelColor);
         text.setAttribute('font-size', '9');
         text.setAttribute('font-weight', '600');
-        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('text-anchor', textAnchor);
         text.textContent = edge.label;
         g.appendChild(text);
       }
@@ -803,7 +899,8 @@
             path.setAttribute('stroke', edge.color || '#94a3b8');
             path.setAttribute('stroke-width', edge.type === 'branch' ? '2' : '1.5');
             let m = 'marker-arrow-default';
-            if (edge.type === 'branch') m = 'marker-arrow-branch';
+            if (edge.type === 'subq-branch') m = 'marker-arrow-subq';
+            else if (edge.type === 'branch') m = 'marker-arrow-branch';
             else if (edge.type === 'section-transition' || edge.type === 'start') m = 'marker-arrow-section';
             path.setAttribute('marker-end', `url(#${m})`);
           }
@@ -832,7 +929,8 @@
           path.setAttribute('stroke', edge.color || '#94a3b8');
           path.setAttribute('stroke-width', edge.type === 'branch' ? '2' : '1.5');
           let m = 'marker-arrow-default';
-          if (edge.type === 'branch') m = 'marker-arrow-branch';
+          if (edge.type === 'subq-branch') m = 'marker-arrow-subq';
+          else if (edge.type === 'branch') m = 'marker-arrow-branch';
           else if (edge.type === 'section-transition' || edge.type === 'start') m = 'marker-arrow-section';
           path.setAttribute('marker-end', `url(#${m})`);
         }
