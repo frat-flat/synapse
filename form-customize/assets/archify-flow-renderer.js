@@ -224,6 +224,58 @@
         return 'submit';
       };
 
+      // セクションが法人専用か個人専用かを判定するヘルパー（タイトルまたは質問内容から判定）
+      const getSectionAudience = (sec) => {
+        if (!sec) return 'common';
+        const title = String(sec.title || '');
+        if (title.includes('法人')) return 'corp';
+        if (title.includes('個人') && !title.includes('法人')) return 'personal';
+
+        const qs = sec.questions || [];
+        const hasCorpQ = qs.some(q => {
+          const t = String(q.title || '');
+          const k = String(q.dataKey || '');
+          const id = String(q.id || '');
+          return t.includes('法人名') || t.includes('法人番号') || k.includes('corp') || id.includes('corp');
+        });
+        if (hasCorpQ) return 'corp';
+
+        const hasPersonalQ = qs.some(q => {
+          const t = String(q.title || '');
+          const k = String(q.dataKey || '');
+          const id = String(q.id || '');
+          return t.includes('屋号') || (t.includes('氏名') && !t.includes('代表')) || k.includes('trade_name') || id.includes('trade');
+        });
+        if (hasPersonalQ) return 'personal';
+
+        return 'common';
+      };
+
+      // 排他セクション（法人向け vs 個人向け）を自動スキップして適切な次のセクションを探索するヘルパー
+      const findNextEligibleSection = (fromIdx, curSec) => {
+        let targetIdx = fromIdx;
+        const curAudience = getSectionAudience(curSec);
+
+        while (targetIdx < sections.length) {
+          const candSec = sections[targetIdx];
+          if (!candSec) { targetIdx++; continue; }
+          const candAudience = getSectionAudience(candSec);
+
+          // 法人セクションからの遷移で個人専用セクションに出会ったらスキップ
+          if (curAudience === 'corp' && candAudience === 'personal') {
+            targetIdx++;
+            continue;
+          }
+          // 個人セクションからの遷移で法人専用セクションに出会ったらスキップ
+          if (curAudience === 'personal' && candAudience === 'corp') {
+            targetIdx++;
+            continue;
+          }
+          return candSec;
+        }
+        return null;
+      };
+
       // 1. 各セクションのノードとレーンを配置
       sections.forEach((sec, secIdx) => {
         const secX = startX + secIdx * (colWidth + colGap);
@@ -410,15 +462,24 @@
         let targetId = '';
         let label = '次のセクションへ';
 
-        if (act === 'next') {
-          const nextSec = sections[secIdx + 1];
+        if (act === 'next' || act === 'partial_submit') {
+          const nextSec = findNextEligibleSection(secIdx + 1, sec);
           targetId = nextSec ? getSectionTargetId(nextSec.id) : 'submit';
+          if (act === 'partial_submit') {
+            label = '次のセクションへ（途中送信可）';
+          }
         } else if (act === 'submit') {
           targetId = 'submit';
           label = '送信して完了';
         } else {
-          targetId = getSectionTargetId(act);
-          label = '指定先へ';
+          const resolvedSec = sections.find(s => s.id === act);
+          if (resolvedSec) {
+            targetId = getSectionTargetId(resolvedSec.id);
+            label = '指定先へ';
+          } else {
+            const nextSec = findNextEligibleSection(secIdx + 1, sec);
+            targetId = nextSec ? getSectionTargetId(nextSec.id) : 'submit';
+          }
         }
 
         if (targetId) {
@@ -485,12 +546,18 @@
                 // セクションの次アクションへ直通
                 const act = sec.nextAction || 'next';
                 if (act === 'next' || act === 'partial_submit') {
-                  const nextSec = sections[secIdx + 1];
+                  const nextSec = findNextEligibleSection(secIdx + 1, sec);
                   targetId = nextSec ? getSectionTargetId(nextSec.id) : 'submit';
                 } else if (act === 'submit') {
                   targetId = 'submit';
                 } else {
-                  targetId = getSectionTargetId(act);
+                  const resolvedSec = sections.find(s => s.id === act);
+                  if (resolvedSec) {
+                    targetId = getSectionTargetId(resolvedSec.id);
+                  } else {
+                    const nextSec = findNextEligibleSection(secIdx + 1, sec);
+                    targetId = nextSec ? getSectionTargetId(nextSec.id) : 'submit';
+                  }
                 }
                 label = `「${opt.label}」選択時（入力不要）`;
               } else {
