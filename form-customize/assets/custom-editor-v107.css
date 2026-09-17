@@ -18,13 +18,15 @@
 .editor-main {
   flex: 1 !important;
   height: 100% !important;
-  overflow-y: auto !important;
-  padding: 30px !important;
+  max-height: calc(100vh - 65px) !important;
+  overflow: hidden !important;
+  padding: 12px 18px 14px 18px !important;
   background: #ffffff !important;
   box-sizing: border-box !important;
   display: flex !important;
-  gap: 30px !important;
-  align-items: flex-start !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  align-items: stretch !important;
   position: relative !important;
 }
 
@@ -6198,22 +6200,81 @@ button.btn-sec-reorder {
   min-width: 0 !important;
 }
 
-/* メイン編集エリアのパディング最適化 */
+/* メイン編集エリア（最上部サブタブバー + ワークスペースボディの縦並び配置） */
 .editor-main {
-  padding: 16px 20px !important;
-  gap: 20px !important;
+  flex: 1 !important;
+  height: 100% !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+  padding: 12px 20px 16px 20px !important;
+  background: #f8fafc !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+  position: relative !important;
 }
 
 body.split-active .editor-main,
 .editor-main:has(.split-mode-active) {
-  padding: 12px 16px !important;
-  gap: 0 !important;
+  padding: 10px 16px 14px 16px !important;
+  gap: 8px !important;
+}
+
+/* 🌟 サブタブバー（最上部固定バー） */
+.overview-subtabs {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  border-bottom: 2px solid var(--color-border, #e2e8f0) !important;
+  background: #ffffff !important;
+  padding: 4px 6px 8px 6px !important;
+  width: 100% !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+  margin-bottom: 0 !important;
+}
+
+/* 🌟 ワークスペースボディ（エディタ ＋ フローマップ ＋ プレビュー） */
+.editor-workspace-body {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  height: calc(100% - 46px) !important;
+  gap: 16px !important;
+  align-items: stretch !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* 通常モード（単一画面表示時）のエディタ領域 */
+.editor-workspace-body > .overview-editor-container,
+.editor-workspace-body > .section-editor-card {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  padding-right: 6px !important;
+  box-sizing: border-box !important;
+}
+
+/* 通常モードのライブプレビューペイン */
+.editor-workspace-body > .editor-live-preview-pane {
+  width: 440px !important;
+  min-width: 440px !important;
+  max-width: 440px !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
 }
 
 /* スプリットモード時はライブプレビュー（スマホ）を100%確実に非表示化して横幅を完全開放 */
 body.split-active .editor-live-preview-pane,
-.editor-main:has(.split-mode-active) .editor-live-preview-pane,
-.overview-editor-container.split-mode-active ~ .editor-live-preview-pane {
+.editor-workspace-body.split-mode-active .editor-live-preview-pane,
+.editor-main:has(.split-mode-active) .editor-live-preview-pane {
   display: none !important;
   width: 0 !important;
   min-width: 0 !important;
@@ -6225,94 +6286,156 @@ body.split-active .editor-live-preview-pane,
   pointer-events: none !important;
 }
 
-.overview-editor-container.split-mode-active {
-  display: grid !important;
-  grid-template-columns: 46% 54% !important;
-  gap: 16px !important;
-  align-items: start !important;
+/* 🌟 スプリットモード時：左ペイン（セクション質問項目設定 または 全体設定） */
+.editor-workspace-body.split-mode-active > .section-editor-card,
+.editor-workspace-body.split-mode-active > .overview-editor-container {
+  flex: 1 1 50% !important;
+  width: 50% !important;
+  max-width: 50% !important;
+  min-width: 420px !important;
+  height: 100% !important;
+  max-height: calc(100vh - 145px) !important;
+  overflow-y: auto !important;
+  padding-right: 14px !important;
+  border-right: 1px solid var(--color-border, #e2e8f0) !important;
+  box-sizing: border-box !important;
+}
+
+/* 🌟 スプリットモード時：右ペイン（フローマップ） */
+.editor-workspace-body.split-mode-active > .overview-flowmap-pane {
+  display: flex !important;
+  flex: 1 1 50% !important;
+  width: 50% !important;
+  max-width: 50% !important;
+  min-width: 420px !important;
+  height: 100% !important;
+  min-height: calc(100vh - 145px) !important;
+  max-height: calc(100vh - 145px) !important;
+  overflow: hidden !important;
+  background: #ffffff !important;
+  border: 1px solid var(--color-border, #cbd5e0) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.04) !important;
+  box-sizing: border-box !important;
+}
+
+/* global_section ペア時（全体設定＋セクション構成） */
+.editor-workspace-body.split-mode-active[data-split-pair="global_section"] > .overview-editor-container {
+  flex: 1 1 100% !important;
   width: 100% !important;
   max-width: 100% !important;
-  margin: 0 !important;
+  border-right: none !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 16px !important;
 }
 
-.overview-editor-container.split-mode-active .overview-subtabs {
-  grid-column: 1 / -1 !important;
-  width: 100% !important;
-}
-
-/* スプリットモード時：全体設定カード（Column 1） */
-.overview-editor-container.split-mode-active .form-title-desc-card {
+.editor-workspace-body.split-mode-active[data-split-pair="global_section"] .form-title-desc-card {
   grid-column: 1 !important;
-  min-width: 380px !important;
-  max-height: calc(100vh - 145px) !important;
+  min-width: 0 !important;
   overflow-y: auto !important;
-  padding-right: 8px !important;
-  margin: 0 !important;
+  height: 100% !important;
 }
 
-/* スプリットモード時：セクション構成ペイン */
-.overview-editor-container.split-mode-active .split-left-pane {
-  min-width: 380px !important;
-  max-height: calc(100vh - 145px) !important;
-  overflow-y: auto !important;
-  padding-right: 8px !important;
-}
-
-/* global_section ペア時：セクション構成ペインが Column 2（右側）に配置される */
-.overview-editor-container.split-mode-active[data-split-pair="global_section"] #overview-sections-pane {
+.editor-workspace-body.split-mode-active[data-split-pair="global_section"] #overview-sections-pane {
   grid-column: 2 !important;
   min-width: 0 !important;
-  max-height: calc(100vh - 145px) !important;
   overflow-y: auto !important;
-  padding-right: 8px !important;
-  margin: 0 !important;
+  height: 100% !important;
 }
 
-/* セクション一覧カードが極小幅に潰れるのを完全防止 */
-.overview-editor-container.split-mode-active #overview-sections-list {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 12px !important;
+/* セクション一覧カードの崩れ防止 */
+.overview-section-card {
   width: 100% !important;
-}
-
-.overview-editor-container.split-mode-active .overview-section-card {
-  width: 100% !important;
-  min-width: 360px !important;
   box-sizing: border-box !important;
-  padding: 14px 16px !important;
 }
 
-.overview-editor-container.split-mode-active .overview-section-card h4,
-.overview-editor-container.split-mode-active .overview-section-card [class*="title"],
-.overview-editor-container.split-mode-active .overview-section-card p,
-.overview-editor-container.split-mode-active .overview-section-card div {
+.overview-section-card h4,
+.overview-section-card [class*="title"],
+.overview-section-card p,
+.overview-section-card div {
   white-space: normal !important;
   word-break: break-word !important;
 }
 
-.overview-editor-container.split-mode-active .overview-flowmap-pane {
-  display: flex !important;
-  grid-column: 2 !important;
-  min-width: 0 !important;
-  height: calc(100vh - 145px) !important;
-  width: 100% !important;
-}
-
 /* 5. Archifyフローマップコンテナ */
 .overview-flowmap-pane {
+  display: flex !important;
   flex-direction: column !important;
   background: #ffffff !important;
   border: 1px solid var(--color-border, #cbd5e0) !important;
   border-radius: 8px !important;
   overflow: hidden !important;
   box-shadow: 0 2px 4px rgba(0,0,0,0.04) !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .overview-flowmap-pane.full-tab-mode {
   width: 100% !important;
-  height: calc(100vh - 200px) !important;
-  min-height: 650px !important;
+  height: calc(100vh - 145px) !important;
+  min-height: 600px !important;
+  flex: 1 !important;
+}
+
+/* ビューポートとSVG描画エリア（確実な領域確保） */
+#archify-flowmap-viewport,
+.archify-flowmap-viewport {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: calc(100% - 42px) !important;
+  min-height: calc(100% - 42px) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  background: #fafbfc !important;
+}
+
+#archify-flowmap-svg,
+.archify-flowmap-viewport svg {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+}
+
+/* 質問項目ヘッダーの折り返し・文字崩れ防止 */
+.questions-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  margin-top: 18px !important;
+  margin-bottom: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.questions-header h3 {
+  margin: 0 !important;
+  white-space: nowrap !important;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  color: var(--color-text, #1e293b) !important;
+  flex-shrink: 0 !important;
+}
+
+.editor-question-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+}
+
+.editor-question-actions select {
+  max-width: 200px !important;
+}
+
+.editor-question-actions .btn {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
 }
 
 /* ツールバー */

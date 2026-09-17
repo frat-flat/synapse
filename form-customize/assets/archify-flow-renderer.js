@@ -1003,6 +1003,26 @@
         }
       });
     }
+
+    // セクション指定のハイライト
+    highlightSection(sectionIndexOrId) {
+      if (!this.state || !this.state.sections) return;
+      let sec = null;
+      if (typeof sectionIndexOrId === 'number') {
+        sec = this.state.sections[sectionIndexOrId];
+      } else if (typeof sectionIndexOrId === 'string') {
+        sec = this.state.sections.find(s => s.id === sectionIndexOrId);
+        if (!sec) {
+          const idx = parseInt(sectionIndexOrId, 10);
+          if (!isNaN(idx)) sec = this.state.sections[idx];
+        }
+      }
+      if (sec && sec.questions && sec.questions.length > 0) {
+        this.highlightRouteForNode(sec.questions[0].id);
+      } else {
+        this.clearHighlight();
+      }
+    }
   }
 
   window.ArchifyFlowRenderer = ArchifyFlowRenderer;

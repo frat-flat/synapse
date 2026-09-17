@@ -335,10 +335,8 @@
 
            <!-- メイン編集エリア -->
            <div class="editor-main" style="position: relative;">
-             <!-- A. 【全体概要画面】フォームに入ったら最初に見えるセクション一覧 -->
-            <div id="form-overview-editor" class="overview-editor-container">
-              <!-- 全体の概要画面内のサブタブ -->
-              <div class="overview-subtabs">
+              <!-- 🌟 全体共通サブタブ ＆ 2画面表示バー -->
+              <div class="overview-subtabs" id="editor-subtabs-bar">
                 <div class="subtabs-nav-group" style="display: flex; gap: 8px;">
                   <button type="button" id="btn-subtab-global-settings" class="subtab-btn active" data-tooltip="フォーム全体設定">
                     <span class="subtab-icon">⚙️</span>
@@ -355,7 +353,7 @@
                 </div>
                 <div class="subtabs-right" style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
                   <div class="split-control-group">
-                    <button type="button" id="btn-subtab-split-toggle" class="btn-split-toggle" title="2画面同時表示のON/OFFを切り替えます">
+                    <button type="button" id="btn-subtab-split-toggle" class="btn-split-toggle" title="質問項目の設定画面とフローマップを左右に2画面同時表示します">
                       <span>◫</span> <span class="split-text">2画面表示</span>
                     </button>
                     <button type="button" id="btn-split-pair-dropdown-toggle" class="btn-split-dropdown-toggle" title="2画面表示の組み合わせを選択" aria-label="組み合わせ選択" aria-expanded="false">
@@ -365,18 +363,18 @@
                     <!-- 組み合わせ選択ドロップダウンメニュー -->
                     <div id="split-pair-dropdown-menu" class="split-pair-menu" style="display: none;">
                       <div class="split-pair-menu-header">2画面表示の組み合わせ</div>
-                      <label class="split-pair-option" data-pair="global_flowmap">
-                        <input type="radio" name="split-pair-radio" value="global_flowmap" checked />
+                      <label class="split-pair-option" data-pair="section_flowmap">
+                        <input type="radio" name="split-pair-radio" value="section_flowmap" checked />
                         <div class="split-pair-option-text">
-                          <div class="split-pair-title">⚙️ 全体設定 ＋ 🔀 フローマップ <span class="badge-recommended">標準</span></div>
-                          <div class="split-pair-desc">基本情報・設定と分岐フローを並べて編集・確認</div>
+                          <div class="split-pair-title">📝 質問項目 ＋ 🔀 フローマップ <span class="badge-recommended">標準</span></div>
+                          <div class="split-pair-desc">実際の質問設定画面と分岐フローを見比べながら編集</div>
                         </div>
                       </label>
-                      <label class="split-pair-option" data-pair="section_flowmap">
-                        <input type="radio" name="split-pair-radio" value="section_flowmap" />
+                      <label class="split-pair-option" data-pair="global_flowmap">
+                        <input type="radio" name="split-pair-radio" value="global_flowmap" />
                         <div class="split-pair-option-text">
-                          <div class="split-pair-title">📋 セクション構成 ＋ 🔀 フローマップ</div>
-                          <div class="split-pair-desc">セクション一覧と分岐フローを並べて確認</div>
+                          <div class="split-pair-title">⚙️ 全体設定 ＋ 🔀 フローマップ</div>
+                          <div class="split-pair-desc">基本情報・モード設定と分岐フローを並べて編集</div>
                         </div>
                       </label>
                       <label class="split-pair-option" data-pair="global_section">
@@ -390,6 +388,11 @@
                   </div>
                 </div>
               </div>
+
+              <!-- 🌟 エディタワークスペース（左：設定/質問画面、右：フローマップ または プレビュー） -->
+              <div class="editor-workspace-body" id="editor-workspace-body">
+                <!-- A. 【全体概要画面】フォームに入ったら最初に見えるセクション一覧 -->
+                <div id="form-overview-editor" class="overview-editor-container">
 
               <div class="form-title-desc-card">
                 <!-- 簡易版 / プロ版 モード切り替えスイッチ -->
@@ -1031,24 +1034,6 @@
                   <button id="btn-overview-add-section" class="btn btn-secondary">＋ 新しいセクションを追加</button>
                 </div>
               </div>
-
-              <!-- C. 【Archifyフローマップ画面】 -->
-              <div id="overview-flowmap-container" class="overview-flowmap-pane full-tab-mode" style="display: none;">
-                <div class="archify-flowmap-toolbar">
-                  <div class="flowmap-title-info">
-                    <span style="font-weight: 700; font-size: 0.85rem; color: #1e293b;">🔀 フローマップ</span>
-                  </div>
-                  <div class="flowmap-controls">
-                    <button type="button" id="btn-flow-fit" class="btn-flow-tool" title="全体を表示">🔍 全体表示</button>
-                    <button type="button" id="btn-flow-zoom-in" class="btn-flow-tool" title="拡大">＋</button>
-                    <button type="button" id="btn-flow-zoom-out" class="btn-flow-tool" title="縮小">－</button>
-                    <button type="button" id="btn-flow-reset-route" class="btn-flow-tool" title="ハイライト解除">✨ ハイライト解除</button>
-                  </div>
-                </div>
-                <div id="archify-flowmap-viewport" class="archify-flowmap-viewport">
-                  <svg id="archify-flowmap-svg" width="100%" height="100%"></svg>
-                </div>
-              </div>
             </div>
 
             <!-- B. 【詳細編集画面】選択されたセクションの質問編集 -->
@@ -1103,6 +1088,24 @@
               <div class="section-footer-actions-row">
                 <button id="btn-back-to-overview" class="btn btn-secondary">← 全体概要に戻る</button>
                 <button id="btn-delete-section" class="btn btn-danger">このセクションを削除</button>
+              </div>
+            </div>
+
+            <!-- C. 【Archifyフローマップ画面】（スプリット表示時またはフローマップ単独表示時） -->
+            <div id="overview-flowmap-container" class="overview-flowmap-pane" style="display: none;">
+              <div class="archify-flowmap-toolbar">
+                <div class="flowmap-title-info">
+                  <span style="font-weight: 700; font-size: 0.85rem; color: #1e293b;">🔀 フローマップ</span>
+                </div>
+                <div class="flowmap-controls">
+                  <button type="button" id="btn-flow-fit" class="btn-flow-tool" title="全体を表示">🔍 全体表示</button>
+                  <button type="button" id="btn-flow-zoom-in" class="btn-flow-tool" title="拡大">＋</button>
+                  <button type="button" id="btn-flow-zoom-out" class="btn-flow-tool" title="縮小">－</button>
+                  <button type="button" id="btn-flow-reset-route" class="btn-flow-tool" title="ハイライト解除">✨ ハイライト解除</button>
+                </div>
+              </div>
+              <div id="archify-flowmap-viewport" class="archify-flowmap-viewport">
+                <svg id="archify-flowmap-svg" width="100%" height="100%" style="width: 100% !important; height: 100% !important; min-height: 100% !important; display: block !important;"></svg>
               </div>
             </div>
 
@@ -1168,7 +1171,7 @@
               </div>
             </div>
           </div>
-        </div>
+        </div> <!-- editor-workspace-body の閉じタグ -->
       </div>
       </section>
 
