@@ -6254,7 +6254,9 @@ body.split-active .editor-main,
 .editor-workspace-body > .section-editor-card {
   flex: 1 1 auto !important;
   min-width: 0 !important;
+  min-height: 0 !important;
   height: 100% !important;
+  max-height: calc(100vh - 145px) !important;
   overflow-y: auto !important;
   padding-right: 6px !important;
   box-sizing: border-box !important;
@@ -6265,10 +6267,31 @@ body.split-active .editor-main,
   width: 440px !important;
   min-width: 440px !important;
   max-width: 440px !important;
+  min-height: 0 !important;
   height: 100% !important;
+  max-height: calc(100vh - 145px) !important;
   overflow-y: auto !important;
   flex-shrink: 0 !important;
   box-sizing: border-box !important;
+}
+
+/* セクションメタ編集欄の「このセクション完了後の動作：」を綺麗に縦並び・全幅化 */
+.section-meta-edit .inline-group {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 6px !important;
+}
+
+.section-meta-edit .inline-group label {
+  font-weight: 600 !important;
+  color: var(--color-text, #1e293b) !important;
+  font-size: 0.85rem !important;
+}
+
+.section-meta-edit .inline-select {
+  width: 100% !important;
+  min-width: 0 !important;
 }
 
 /* スプリットモード時はライブプレビュー（スマホ）を100%確実に非表示化して横幅を完全開放 */
