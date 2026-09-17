@@ -227,7 +227,26 @@
         let curY = startY + 44; // セクションヘッダー分の余白
 
         (sec.questions || []).forEach((q, qIdx) => {
-          const branchingOpts = (q.options || []).filter(opt => opt && opt.nextSectionId && opt.nextSectionId !== 'next');
+          // 都道府県項目や、回答で行き先が変わらない通常の選択項目は、選択肢ノードを一切展開しない
+          const isPrefectureQuestion = (q.title && q.title.includes('都道府県')) || q.dataKey === 'pref' || q.type === 'prefecture';
+          
+          let branchingOpts = [];
+          if (!isPrefectureQuestion && Array.isArray(q.options) && q.options.length > 0) {
+            // 有効なジャンプ先（nextや空文字以外）を持つ選択肢のみを抽出
+            const validTargets = q.options.filter(opt => {
+              if (!opt || !opt.nextSectionId) return false;
+              const target = opt.nextSectionId.trim();
+              return target !== '' && target !== 'next' && target !== 'same' && target !== sec.id;
+            });
+
+            // 全選択肢が同一の行き先を指している場合は分岐（分岐によって道が分かれること）ではないため除外
+            const uniqueTargets = new Set(validTargets.map(opt => opt.nextSectionId.trim()));
+            if (uniqueTargets.size >= 1 && validTargets.length <= 12) {
+              // 選択肢によって行き先が分かれる場合、または特定の選択肢だけ別のセクションへジャンプする場合のみ採用
+              branchingOpts = validTargets;
+            }
+          }
+
           const hasBranch = branchingOpts.length > 0;
 
           // 質問ノード
@@ -260,7 +279,7 @@
 
           curY += rowHeight;
 
-          // 分岐選択肢ノード（分岐がある場合のみ表示）
+          // 分岐選択肢ノード（回答によって真に行き先が変わる選択肢のみ表示）
           if (hasBranch) {
             branchingOpts.forEach((opt) => {
               const originalIdx = q.options.indexOf(opt);
@@ -277,7 +296,7 @@
                 x: secX + 30,
                 y: curY,
                 width: nodeWidth - 20,
-                height: 48,
+                height: 44,
                 targetId: opt.nextSectionId
               });
 
@@ -291,7 +310,7 @@
                 color: '#cbd5e0'
               });
 
-              curY += rowHeight - 12;
+              curY += rowHeight - 16;
             });
           }
         });
@@ -383,20 +402,23 @@
         }
       });
 
-      // 5. 分岐選択肢からの遷移エッジ
+      // 5. 分岐選択肢からの遷移エッジ（実体のあるoptionノードからのみ接続）
+      const existingOptNodeIds = new Set(nodes.filter(n => n.type === 'option').map(n => n.id));
       sections.forEach(sec => {
         (sec.questions || []).forEach(q => {
-          const branchingOpts = (q.options || []).filter(opt => opt && opt.nextSectionId && opt.nextSectionId !== 'next');
-          branchingOpts.forEach(opt => {
-            const originalIdx = q.options.indexOf(opt);
+          (q.options || []).forEach((opt, originalIdx) => {
             const optId = `${q.id}_opt_${opt.id || originalIdx}`;
+            if (!existingOptNodeIds.has(optId)) return;
+
             let targetId = opt.nextSectionId;
             let label = `「${opt.label}」選択時`;
 
             if (targetId === 'submit') {
               targetId = 'submit';
-            } else if (targetId && targetId !== 'next') {
+            } else if (targetId && targetId !== 'next' && targetId !== 'same') {
               targetId = getSectionTargetId(targetId);
+            } else {
+              targetId = null;
             }
 
             if (targetId) {

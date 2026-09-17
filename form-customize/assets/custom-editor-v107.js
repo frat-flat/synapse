@@ -2581,9 +2581,13 @@
         btnSplit.style.display = (currentTab === 'section' || isSplitMode) ? 'inline-flex' : 'inline-flex';
       }
 
+      const livePreviewPane = document.querySelector('.editor-live-preview-pane');
+
       // 2画面同時表示（スプリットモード）: セクション一覧表示時かつスプリットON
       if (isSplitMode && currentTab === 'section') {
         overviewContainer.classList.add('split-mode-active');
+        document.body.classList.add('split-active');
+        if (livePreviewPane) livePreviewPane.style.setProperty('display', 'none', 'important');
         
         globalCard.style.display = 'none';
         sectionsPane.style.display = 'block';
@@ -2591,12 +2595,17 @@
         flowmapContainer.classList.remove('full-tab-mode');
 
         setTabStyle(btnSection);
-        setTimeout(renderFlowmap, 50);
+        renderFlowmap();
+        setTimeout(() => {
+          if (window.archifyRenderer) window.archifyRenderer.fitView();
+        }, 120);
         return;
       }
 
       // 通常（単一タブ）モード
       overviewContainer.classList.remove('split-mode-active');
+      document.body.classList.remove('split-active');
+      if (livePreviewPane) livePreviewPane.style.removeProperty('display');
 
       if (currentTab === 'global') {
         setTabStyle(btnGlobal);
@@ -2614,7 +2623,11 @@
         sectionsPane.style.display = 'none';
         flowmapContainer.style.display = 'flex';
         flowmapContainer.classList.add('full-tab-mode');
-        setTimeout(renderFlowmap, 50);
+        if (livePreviewPane) livePreviewPane.style.setProperty('display', 'none', 'important');
+        renderFlowmap();
+        setTimeout(() => {
+          if (window.archifyRenderer) window.archifyRenderer.fitView();
+        }, 120);
       }
     };
 
