@@ -6812,6 +6812,34 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
 }
 
 /* ============================================================
+   🌟 アポイント画面 メインレイアウトグリッド ＆ 右サイドバー
+   ============================================================ */
+.appointment-main-layout-grid {
+  display: grid;
+  grid-template-columns: 1fr minmax(320px, 360px);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.appointment-right-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ワイドディスプレイ（1440px以上）では右側サイドバー内で2つのカード（連携フォーム管理と入力項目設定）が横に2列で並ぶ配置 */
+@media (min-width: 1440px) {
+  .appointment-main-layout-grid {
+    grid-template-columns: 1fr minmax(580px, 660px);
+  }
+  .appointment-right-sidebar {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1.25rem !important;
+  }
+}
+
+/* ============================================================
    🌟 アポイント画面 連携フォーム管理ドック & モーダル
    ============================================================ */
 .appoint-linked-forms-dock {

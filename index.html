@@ -2434,28 +2434,6 @@
     </div>
   </div>
 
-  <!-- 🌟 連携フォーム管理ドック（マスタID傘下のフォーム設定・発行） -->
-  <div id="appoint-linked-forms-dock" class="appoint-linked-forms-dock" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; box-shadow: var(--shadow-sm);">
-    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;">
-      <div style="display: flex; align-items: center; gap: 0.5rem;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-secondary);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-        <span style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary);">連携フォーム管理</span>
-        <span style="font-size: 0.75rem; color: var(--text-muted);">(マスタID: <span id="dock-master-id" style="font-family: monospace; font-weight: 700; color: var(--primary);">-</span> 傘下)</span>
-      </div>
-      <button type="button" class="btn btn-outline-primary btn-sm" id="btn-open-appoint-form-modal" style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-        <span>フォームを発行</span>
-      </button>
-    </div>
-
-    <!-- 発行済みフォーム一覧コンテナ -->
-    <div id="appoint-issued-forms-list" style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
-      <div id="appoint-no-forms-msg" style="font-size: 0.78rem; color: var(--text-muted); font-style: italic; padding: 0.25rem 0;">
-        ※ 現在発行済みのフォームはありません。「フォームを発行」から選択してください。
-      </div>
-    </div>
-  </div>
-
   <!-- 新規・既存アポイント切り替えトグル -->
   <div id="appointment-type-toggle-container" style="display: none; gap: 0.5rem; margin-bottom: 1.25rem;">
     <button type="button" class="btn btn-secondary active" id="toggle-cust-new" style="flex: 1; padding: 0.6rem; font-size: 0.85rem; font-weight: 600;">新規顧客アポイント</button>
@@ -2548,7 +2526,7 @@
     </div>
   </div>
 
-  <div style="display: grid; grid-template-columns: 1fr 280px; gap: 1.5rem; align-items: start;">
+  <div class="appointment-main-layout-grid">
     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; box-shadow: var(--shadow-md);">
       <div id="related-data-alert" class="related-detection-alert" style="display: none; margin-bottom: 1.25rem;">
         <span class="related-alert-icon">⚠️</span>
@@ -2650,79 +2628,123 @@
       </form>
     </div>
 
-    <div class="sidebar-panel">
-      <div class="sidebar-card">
-        <h3>⚙️ 入力項目の追加</h3>
-        <p style="font-size: 0.8rem; margin-bottom: 0.75rem;">必要な項目を複数選択してアポイントフォームに追加できます。</p>
-        
-        <!-- マルチセレクトドロップダウン -->
-        <div id="field-multiselect" style="position: relative; margin-bottom: 1rem;">
-          <div id="field-multiselect-box" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer;">
-            <span id="multiselect-label-text" style="font-size: 0.85rem; color: var(--text-secondary);">項目を選択して追加...</span>
-            <span style="font-size: 0.7rem; color: var(--text-muted);">▼</span>
+    <!-- 🌟 右側サイドバーパネル（連携フォーム管理 ＆ 入力項目設定の2大ブロック並列配置） -->
+    <div class="sidebar-panel appointment-right-sidebar" id="appointment-right-sidebar">
+      
+      <!-- 📄 ブロック1: 連携フォーム管理ドック（マスタID傘下のフォーム設定・発行） -->
+      <div id="appoint-linked-forms-dock" class="sidebar-card appoint-linked-forms-dock" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; box-shadow: var(--shadow-sm);">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            <h3 style="margin-bottom: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">連携フォーム管理</h3>
           </div>
-          <div id="multiselect-checkboxes-container" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem; z-index: 10; max-height: 250px; overflow-y: auto; box-shadow: var(--shadow-md); display: flex; flex-direction: column; gap: 0.4rem;">
-            <!-- JSで動的にチェックボックスが生成される -->
+          <button type="button" class="btn btn-outline-primary btn-sm" id="btn-open-appoint-form-modal" style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.65rem; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>フォームを発行</span>
+          </button>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+          マスタID: <span id="dock-master-id" style="font-family: monospace; font-weight: 700; color: var(--primary);">-</span> 傘下
+        </div>
+
+        <!-- 発行済みフォーム一覧コンテナ -->
+        <div id="appoint-issued-forms-list" style="display: flex; flex-direction: column; gap: 0.5rem; min-height: 40px;">
+          <div id="appoint-no-forms-msg" style="font-size: 0.78rem; color: var(--text-muted); font-style: italic; padding: 0.25rem 0;">
+            ※ 現在発行済みのフォームはありません。「フォームを発行」から選択してください。
           </div>
         </div>
       </div>
-      
-      <!-- 📐 入力欄の配置レイアウト設定 (縦1列、横2列、横3列の3パターン) -->
-      <div class="sidebar-card" style="margin-top: 1rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-          <h3 style="margin-bottom: 0; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem;">
-            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="3" x2="12" y2="21"></line></svg>
-            <span>入力欄の配置</span>
+
+      <!-- ⚙️ ブロック2: 入力項目・レイアウト・マイパターン統合設定カード -->
+      <div class="sidebar-card" id="appoint-fields-combined-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; box-shadow: var(--shadow-sm);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+          <h3 style="margin-bottom: 0; font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary);">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            <span>入力項目・配置設定</span>
           </h3>
-          <span id="current-layout-chip" class="badge" style="font-size: 0.7rem; padding: 0.15rem 0.45rem; background: var(--primary-glow); color: var(--primary); border: 1px solid rgba(99,102,241,0.3);">横2列</span>
         </div>
-        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.5rem;">追加項目を含む入力欄の分割レイアウトを選択します。</p>
-        
-        <div class="snap-layout-container" id="snap-layout-selector" style="grid-template-columns: repeat(3, 1fr);">
-          <!-- 1. 縦1列 (全幅縦並び) -->
-          <div class="snap-layout-card" data-layout="layout-1-col" title="縦に一列（全幅）">
-            <div class="snap-preview-box snap-flex-col">
-              <div class="snap-cell" style="height: 6px; width: 100%;"></div>
-              <div class="snap-cell" style="height: 6px; width: 100%;"></div>
-              <div class="snap-cell" style="height: 6px; width: 100%;"></div>
-            </div>
-            <span class="snap-label">縦1列</span>
-          </div>
 
-          <!-- 2. 横2列 (50% : 50%) -->
-          <div class="snap-layout-card active" data-layout="layout-2-equal" title="横2列（50% : 50%）">
-            <div class="snap-preview-box snap-flex-row">
-              <div class="snap-cell" style="flex: 1; height: 100%;"></div>
-              <div class="snap-cell" style="flex: 1; height: 100%;"></div>
-            </div>
-            <span class="snap-label">横2列</span>
+        <!-- 1. 入力項目の追加 -->
+        <div style="margin-bottom: 1rem;">
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.35rem;">
+            <span>⚙️ 入力項目の追加</span>
           </div>
+          <p style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 0.6rem;">必要な項目を複数選択してアポイントフォームに追加できます。</p>
+          
+          <!-- マルチセレクトドロップダウン -->
+          <div id="field-multiselect" style="position: relative;">
+            <div id="field-multiselect-box" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.7rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer;">
+              <span id="multiselect-label-text" style="font-size: 0.82rem; color: var(--text-secondary);">項目を選択して追加...</span>
+              <span style="font-size: 0.7rem; color: var(--text-muted);">▼</span>
+            </div>
+            <div id="multiselect-checkboxes-container" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem; z-index: 20; max-height: 250px; overflow-y: auto; box-shadow: var(--shadow-md);">
+              <!-- JSで動的にチェックボックスが生成される -->
+            </div>
+          </div>
+        </div>
 
-          <!-- 3. 横3列 (33% : 33% : 33%) -->
-          <div class="snap-layout-card" data-layout="layout-3-equal" title="横3列（33% : 33% : 33%）">
-            <div class="snap-preview-box snap-flex-row">
-              <div class="snap-cell" style="flex: 1; height: 100%;"></div>
-              <div class="snap-cell" style="flex: 1; height: 100%;"></div>
-              <div class="snap-cell" style="flex: 1; height: 100%;"></div>
+        <!-- 2. 入力欄の配置レイアウト設定 (縦1列、横2列、横3列) -->
+        <div style="border-top: 1px dashed var(--border-color); padding-top: 0.85rem; margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 0.35rem;">
+              <span>▥ 入力欄の配置</span>
             </div>
-            <span class="snap-label">横3列</span>
+            <span id="current-layout-chip" class="badge" style="font-size: 0.7rem; padding: 0.15rem 0.45rem; background: var(--primary-glow); color: var(--primary); border: 1px solid rgba(99,102,241,0.3);">横2列</span>
+          </div>
+          <p style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 0.5rem;">追加項目を含む入力欄の分割レイアウトを選択します。</p>
+          
+          <div class="snap-layout-container" id="snap-layout-selector" style="grid-template-columns: repeat(3, 1fr); margin-top: 0.4rem;">
+            <!-- 1. 縦1列 (全幅縦並び) -->
+            <div class="snap-layout-card" data-layout="layout-1-col" title="縦に一列（全幅）">
+              <div class="snap-preview-box snap-flex-col">
+                <div class="snap-cell" style="height: 6px; width: 100%;"></div>
+                <div class="snap-cell" style="height: 6px; width: 100%;"></div>
+                <div class="snap-cell" style="height: 6px; width: 100%;"></div>
+              </div>
+              <span class="snap-label">縦1列</span>
+            </div>
+
+            <!-- 2. 横2列 (50% : 50%) -->
+            <div class="snap-layout-card active" data-layout="layout-2-equal" title="横2列（50% : 50%）">
+              <div class="snap-preview-box snap-flex-row">
+                <div class="snap-cell" style="flex: 1; height: 100%;"></div>
+                <div class="snap-cell" style="flex: 1; height: 100%;"></div>
+              </div>
+              <span class="snap-label">横2列</span>
+            </div>
+
+            <!-- 3. 横3列 (33% : 33% : 33%) -->
+            <div class="snap-layout-card" data-layout="layout-3-equal" title="横3列（33% : 33% : 33%）">
+              <div class="snap-preview-box snap-flex-row">
+                <div class="snap-cell" style="flex: 1; height: 100%;"></div>
+                <div class="snap-cell" style="flex: 1; height: 100%;"></div>
+                <div class="snap-cell" style="flex: 1; height: 100%;"></div>
+              </div>
+              <span class="snap-label">横3列</span>
+            </div>
           </div>
         </div>
-      </div>
-      
-      <div class="sidebar-card" style="margin-top: 1rem;">
-        <h3>📁 マイパターン</h3>
-        <p style="font-size: 0.8rem; margin-bottom: 0.75rem;">よく使用する項目のセットを選択または新規保存して適用します。</p>
-        <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem;">
-          <select id="select-apply-pattern" style="width: 100%; padding: 0.4rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.8rem; outline: none; cursor: pointer;">
-            <!-- JSで動的にオプションが生成される -->
-          </select>
+
+        <!-- 3. マイパターン -->
+        <div style="border-top: 1px dashed var(--border-color); padding-top: 0.85rem;">
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.25rem;">
+            📁 マイパターン
+          </div>
+          <p style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 0.5rem;">よく使用する項目のセットを選択または新規保存して適用します。</p>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.6rem;">
+            <select id="select-apply-pattern" style="width: 100%; padding: 0.4rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.8rem; outline: none; cursor: pointer;">
+              <!-- JSで動的にオプションが生成される -->
+            </select>
+          </div>
+          <div style="background: var(--bg-surface-elevated); padding: 0.6rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.4rem;">
+            <span style="font-size: 0.72rem; font-weight: 600; color: var(--text-secondary);">現在の項目セットを保存:</span>
+            <div style="display: flex; gap: 0.4rem; align-items: center;">
+              <input type="text" id="new-pattern-name" placeholder="パターン名..." style="flex: 1; min-width: 0; padding: 0.35rem 0.5rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.8rem;">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-save-custom-pattern" style="padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;">保存</button>
+            </div>
+          </div>
         </div>
-        <div style="border-top: 1px dashed var(--border-color); padding-top: 0.75rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
-          <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">現在の項目セットを保存:</span>
-          <input type="text" id="new-pattern-name" placeholder="パターン名を入力..." style="width: 100%; padding: 0.35rem 0.5rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.8rem;">
-          <button type="button" class="btn btn-secondary btn-sm" id="btn-save-custom-pattern" style="width: 100%; font-size: 0.8rem; padding: 0.4rem; cursor: pointer;">パターンを保存</button>
-        </div>
+
       </div>
     </div>
   </div>
