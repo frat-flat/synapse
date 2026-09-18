@@ -6575,4 +6575,100 @@ body.split-active .editor-live-preview-pane,
   stroke-width: 2.5px !important;
 }
 
+/* ==========================================================================
+   🌟 画面固定・左側質問項目一覧（サイドバー）独立スクロール完全最適化
+   ・画面全体（body・ヘッダー・フローマップバー）は常に固定
+   ・左側サイドバー（質問項目一覧）のみを内部独立スクロール
+   ・中央の質問編集画面・フローマップも画面内で快適に独立表示・スクロール
+   ========================================================================== */
+html, body {
+  height: 100% !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+}
+
+.app-content {
+  height: calc(100vh - 70px) !important;
+  max-height: calc(100vh - 70px) !important;
+  overflow: hidden !important;
+  flex: 1 1 auto !important;
+}
+
+.tab-panel#panel-editor {
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  flex: 1 1 auto !important;
+}
+
+.editor-layout {
+  display: flex !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  background-color: #f7fafc !important;
+}
+
+/* 🌟 左側サイドバー（質問項目・セクション一覧）：画面高さいっぱいで独立スクロール */
+.editor-sidebar {
+  width: 260px !important;
+  min-width: 260px !important;
+  max-width: 260px !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex-shrink: 0 !important;
+  border-right: 1px solid #e2e8f0 !important;
+  background-color: #ffffff !important;
+  box-sizing: border-box !important;
+}
+
+.editor-sidebar .sidebar-list {
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 10px !important;
+  margin: 0 !important;
+  list-style: none !important;
+}
+
+/* 🌟 メイン編集エリア：全体固定・上部タブバー固定 */
+.editor-main {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+}
+
+.editor-workspace-body {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  height: calc(100% - 46px) !important;
+  max-height: calc(100% - 46px) !important;
+  overflow: hidden !important;
+}
+
+.editor-workspace-body > .overview-editor-container,
+.editor-workspace-body > .section-editor-card {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+}
+
+.editor-workspace-body > .editor-live-preview-pane {
+  min-height: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+}
+
 
