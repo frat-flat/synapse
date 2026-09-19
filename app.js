@@ -50467,59 +50467,28 @@ function initAgencyNetworkDOMEvents() {
     if (agNetChartInstance) agNetChartInstance.zoomOut();
   });
 
-  // ID / 名称検索
+  // 統合検索 (代理店名 / 代理店ID / 営業ID / 担当営業名)
   const searchInput = document.getElementById('ag-net-search-input');
   const clearSearchBtn = document.getElementById('ag-net-btn-clear-search');
   searchInput?.addEventListener('input', (e) => {
     const val = e.target.value.trim();
-    clearSearchBtn.style.display = val ? 'inline' : 'none';
-    handleAgencyIdSearch(val);
+    handleUnifiedAgencySearch(val);
   });
   clearSearchBtn?.addEventListener('click', () => {
     if (searchInput) searchInput.value = '';
-    clearSearchBtn.style.display = 'none';
-    handleAgencyIdSearch('');
+    handleUnifiedAgencySearch('');
   });
 
   // 検索スコープ解除ボタン
   document.getElementById('ag-net-btn-reset-scope')?.addEventListener('click', () => {
-    agNetScopedQuery = '';
-    agNetScopedNodeIds = null;
-    document.getElementById('ag-net-search-scope-banner').style.display = 'none';
     if (searchInput) searchInput.value = '';
-    clearSearchBtn.style.display = 'none';
-    refreshAgencyNetworkChart();
+    handleUnifiedAgencySearch('');
   });
 
-  // 営業担当者ID検索
-  const repInput = document.getElementById('ag-net-sales-rep-input');
-  const clearRepBtn = document.getElementById('ag-net-btn-clear-rep');
-  repInput?.addEventListener('input', (e) => {
-    const val = e.target.value.trim();
-    clearRepBtn.style.display = val ? 'inline' : 'none';
-    agNetActiveRepQuery = val;
-    const banner = document.getElementById('ag-net-rep-banner');
-    if (val) {
-      banner.style.display = 'flex';
-      document.getElementById('ag-net-rep-banner-name').textContent = val;
-    } else {
-      banner.style.display = 'none';
-    }
-    refreshAgencyNetworkChart();
-  });
-  clearRepBtn?.addEventListener('click', () => {
-    if (repInput) repInput.value = '';
-    clearRepBtn.style.display = 'none';
-    agNetActiveRepQuery = '';
-    document.getElementById('ag-net-rep-banner').style.display = 'none';
-    refreshAgencyNetworkChart();
-  });
+  // 営業ハイライト解除ボタン
   document.getElementById('ag-net-btn-reset-rep')?.addEventListener('click', () => {
-    if (repInput) repInput.value = '';
-    clearRepBtn.style.display = 'none';
-    agNetActiveRepQuery = '';
-    document.getElementById('ag-net-rep-banner').style.display = 'none';
-    refreshAgencyNetworkChart();
+    if (searchInput) searchInput.value = '';
+    handleUnifiedAgencySearch('');
   });
 
   // 派生を一括枠囲みボタン (上部コントロール)
@@ -50618,54 +50587,143 @@ function initAgencyNetworkDOMEvents() {
   });
 }
 
-// ID検索処理 (前後2階層・計5階層 / ユーザ登録ID全階層連結)
-function handleAgencyIdSearch(query) {
+// 統合検索処理 (代理店名 / 代理店ID / 営業ID / 担当営業名 / ユーザ登録ID)
+function handleUnifiedAgencySearch(query) {
+  const q = (query || '').trim().toLowerCase();
   agNetScopedQuery = query;
-  const banner = document.getElementById('ag-net-search-scope-banner');
-  const bannerText = document.getElementById('ag-net-search-scope-text');
 
-  if (!query) {
+  const scopeBanner = document.getElementById('ag-net-search-scope-banner');
+  const scopeText = document.getElementById('ag-net-search-scope-text');
+  const repBanner = document.getElementById('ag-net-rep-banner');
+  const repBannerName = document.getElementById('ag-net-rep-banner-name');
+  const clearBtn = document.getElementById('ag-net-btn-clear-search');
+
+  if (clearBtn) clearBtn.style.display = q ? 'inline' : 'none';
+
+  // 空文字の場合はすべての検索・スコープ・ハイライトをリセット
+  if (!q) {
     agNetScopedNodeIds = null;
-    banner.style.display = 'none';
+    agNetActiveRepQuery = '';
+    agNetIsUserRegisteredScoped = false;
+    if (scopeBanner) scopeBanner.style.display = 'none';
+    if (repBanner) repBanner.style.display = 'none';
     refreshAgencyNetworkChart();
     return;
   }
 
   const allData = buildAgencyNetworkDataset();
-  const matched = allData.find(d => 
-    (d.id && d.id.toLowerCase() === query.toLowerCase()) ||
-    (d.masterId && d.masterId.toLowerCase().includes(query.toLowerCase())) ||
-    (d.name && d.name.toLowerCase().includes(query.toLowerCase()))
+
+  // 1. 営業担当者（営業ID または 営業担当者名）の一致を判定
+  const matchedByRep = allData.filter(d => 
+    d.salesRep && (
+      (d.salesRep.id && d.salesRep.id.toLowerCase().includes(q)) ||
+      (d.salesRep.name && d.salesRep.name.toLowerCase().includes(q))
+    )
   );
 
-  if (!matched) {
+  // 2. 代理店（代理店ID, masterId, 代理店社名, 担当者名）の一致を判定
+  const matchedAgencyExact = allData.find(d => 
+    (d.id && d.id.toLowerCase() === q) ||
+    (d.masterId && d.masterId.toLowerCase() === q) ||
+    (d.name && d.name.toLowerCase() === q)
+  );
+  const matchedAgencyPartial = allData.find(d => 
+    (d.id && d.id.toLowerCase().includes(q)) ||
+    (d.masterId && d.masterId.toLowerCase().includes(q)) ||
+    (d.name && d.name.toLowerCase().includes(q)) ||
+    (d.contact && d.contact.toLowerCase().includes(q))
+  );
+  const matchedAgency = matchedAgencyExact || matchedAgencyPartial;
+
+  // 営業ID形式（"rep" から始まる）または、代理店の完全一致がなく営業担当者にヒットした場合 ➔ 営業担当ハイライトモード
+  const isExplicitRepSearch = q.startsWith('rep');
+  const isRepMatch = matchedByRep.length > 0 && (isExplicitRepSearch || !matchedAgencyExact);
+
+  if (isRepMatch) {
+    // === 営業担当者ハイライトモード ===
+    agNetActiveRepQuery = q;
+    agNetScopedNodeIds = null; // 全体ツリーを展開したままハイライト
+    agNetIsUserRegisteredScoped = false;
+    if (scopeBanner) scopeBanner.style.display = 'none';
+
+    const firstRep = matchedByRep[0].salesRep;
+    const repDisplayName = firstRep ? `${firstRep.name} (${firstRep.id})` : q;
+    if (repBanner) {
+      repBanner.style.display = 'flex';
+      if (repBannerName) {
+        repBannerName.textContent = `${repDisplayName} 【担当: ${matchedByRep.length}社】`;
+      }
+    }
+
+    refreshAgencyNetworkChart();
+
+    // 最初の該当代理店を選択・中央フォーカス
+    if (matchedByRep.length > 0) {
+      agNetSelectedNodeId = matchedByRep[0].id;
+      setTimeout(() => {
+        try {
+          if (agNetChartInstance) {
+            agNetChartInstance.setCentered(matchedByRep[0].id).render();
+          }
+        } catch (e) {}
+      }, 100);
+    }
+    return;
+  }
+
+  // === 代理店検索（スコープモード） ===
+  if (repBanner) repBanner.style.display = 'none';
+  agNetActiveRepQuery = '';
+
+  if (!matchedAgency) {
+    // どちらにもヒットしなかった場合
     agNetScopedNodeIds = [];
-    banner.style.display = 'flex';
-    bannerText.innerHTML = `⚠️ 「${query}」に一致する代理店・IDは見つかりませんでした。`;
+    if (scopeBanner) {
+      scopeBanner.style.display = 'flex';
+      if (scopeText) {
+        scopeText.innerHTML = `⚠️ 「${query}」に一致する代理店・営業担当者は見つかりませんでした。`;
+      }
+    }
     refreshAgencyNetworkChart();
     return;
   }
 
   // ユーザ登録されているIDかどうかを判定
-  const isRegisteredUser = isSynapseUserRegisteredId(query) || isSynapseUserRegisteredId(matched.masterId) || isSynapseUserRegisteredId(matched.id);
+  const isRegisteredUser = isSynapseUserRegisteredId(query) || isSynapseUserRegisteredId(matchedAgency.masterId) || isSynapseUserRegisteredId(matchedAgency.id);
 
   if (isRegisteredUser) {
     // ユーザ登録されているID ➔ 階層になっているところはすべて連結して全展開表示
     agNetIsUserRegisteredScoped = true;
     agNetScopedNodeIds = null; // 全体連結表示
-    banner.style.display = 'flex';
-    bannerText.innerHTML = `👤 ユーザ登録ID <strong>【${matched.name} (${matched.masterId})】</strong> の全階層を連結表示中`;
-    agNetSelectedNodeId = matched.id;
+    if (scopeBanner) {
+      scopeBanner.style.display = 'flex';
+      if (scopeText) {
+        scopeText.innerHTML = `👤 ユーザ登録ID <strong>【${matchedAgency.name} (${matchedAgency.masterId})】</strong> の全階層を連結表示中`;
+      }
+    }
+    agNetSelectedNodeId = matchedAgency.id;
   } else {
     // 一般のID ➔ 前後2階層まで（計5階層）にスコープを絞り込み
     agNetIsUserRegisteredScoped = false;
-    agNetScopedNodeIds = getScoped5TierNodeIds(allData, matched.id);
-    banner.style.display = 'flex';
-    bannerText.innerHTML = `🔍 <strong>【${matched.name} (${matched.masterId})】</strong> の前後2階層（計5階層）に絞り込んで表示中`;
-    agNetSelectedNodeId = matched.id;
+    agNetScopedNodeIds = getScoped5TierNodeIds(allData, matchedAgency.id);
+    if (scopeBanner) {
+      scopeBanner.style.display = 'flex';
+      if (scopeText) {
+        scopeText.innerHTML = `🔍 <strong>【${matchedAgency.name} (${matchedAgency.masterId})】</strong> の前後2階層（計5階層）に絞り込んで表示中`;
+      }
+    }
+    agNetSelectedNodeId = matchedAgency.id;
   }
 
   refreshAgencyNetworkChart();
+
+  setTimeout(() => {
+    try {
+      if (agNetChartInstance) {
+        agNetChartInstance.setCentered(matchedAgency.id).render();
+      }
+    } catch (e) {}
+  }, 100);
 }
 
 // チャートの更新・再描画

@@ -7477,7 +7477,13 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   background: var(--bg-surface, #131b2e);
   border: 1px solid var(--border-color, #223150);
   border-radius: var(--radius-sm, 6px);
-  padding: 4px 8px;
+  padding: 4px 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ag-net-search-box:focus-within {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4);
 }
 
 .ag-net-search-box input {
@@ -7486,7 +7492,7 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   color: var(--text-primary, #f8fafc);
   font-size: 12px;
   outline: none;
-  width: 170px;
+  width: 250px;
 }
 
 .ag-net-banner {

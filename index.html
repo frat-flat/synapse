@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-title" content="Synapse">
 <meta name="theme-color" content="#ffffff">
 
-<link rel="stylesheet" href="styles.css?v=2.6">
+<link rel="stylesheet" href="styles.css?v=2.7">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -3041,18 +3041,11 @@
 
         <div class="toolbar-separator" style="height: 18px; margin: 0 4px;"></div>
 
-        <!-- 代理店ID・名称 検索バー (前後2階層 / ユーザ登録ID全階層) -->
-        <div class="ag-net-search-box">
-          <i data-lucide="search" style="width: 13px; height: 13px; color: var(--text-muted);"></i>
-          <input type="text" id="ag-net-search-input" placeholder="代理店名 / ID検索 (前後2階層)..." autocomplete="off">
-          <button id="ag-net-btn-clear-search" style="display: none; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0;">✕</button>
-        </div>
-
-        <!-- 営業担当者ID 検索バー -->
-        <div class="ag-net-search-box" style="border-color: rgba(16, 185, 129, 0.4);">
-          <i data-lucide="user-check" style="width: 13px; height: 13px; color: #10b981;"></i>
-          <input type="text" id="ag-net-sales-rep-input" placeholder="営業ID検索 (例: REP-101)..." autocomplete="off">
-          <button id="ag-net-btn-clear-rep" style="display: none; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0;">✕</button>
+        <!-- 統合検索バー (代理店名 / 代理店ID / 営業ID / 担当営業名) -->
+        <div class="ag-net-search-box" style="min-width: 270px;">
+          <i data-lucide="search" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+          <input type="text" id="ag-net-search-input" placeholder="代理店名 / 代理店ID / 営業ID / 担当営業..." autocomplete="off" style="width: 230px;">
+          <button id="ag-net-btn-clear-search" style="display: none; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0 4px; font-size: 13px;" title="検索解除">✕</button>
         </div>
 
         <!-- 選択中の代理店の全派生を枠囲みボタン -->
