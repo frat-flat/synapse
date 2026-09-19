@@ -1720,6 +1720,8 @@
               if (tokenInfo.masterId) window.FORM_MASTER_ID = tokenInfo.masterId;
               if (tokenInfo.issuerId) window.FORM_ISSUER_ID = tokenInfo.issuerId;
               if (tokenInfo.issuerName) window.FORM_ISSUER_NAME = tokenInfo.issuerName;
+              if (tokenInfo.introducerId) window.FORM_INTRODUCER_ID = tokenInfo.introducerId;
+              if (tokenInfo.introducerName) window.FORM_INTRODUCER_NAME = tokenInfo.introducerName;
             }
           }
 
@@ -1951,6 +1953,33 @@
               if (linkInfo && linkInfo.issuerId && !window.FORM_ISSUER_ID) {
                 window.FORM_ISSUER_ID = linkInfo.issuerId;
                 window.FORM_ISSUER_NAME = linkInfo.issuerName || '';
+              }
+
+              // ⚠️ 連携により無効化されたリンク（status === 'invalidated'）の場合 -> 無効化案内を表示して回答を遮断
+              if (linkInfo && linkInfo.status === 'invalidated') {
+                loadingBox.style.display = 'none';
+                formContainer.style.display = 'none';
+
+                let invalidCard = document.getElementById('form-invalidated-card');
+                if (!invalidCard) {
+                  invalidCard = document.createElement('div');
+                  invalidCard.id = 'form-invalidated-card';
+                  invalidCard.style.cssText = 'background: #fff; border: 1px solid #e2e8f0; border-top: 6px solid #ef4444; border-radius: 8px; padding: 32px 24px; text-align: center; max-width: 600px; width: 90%; margin: 40px auto; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);';
+                  invalidCard.innerHTML = `
+                    <div style="font-size: 2.5rem; margin-bottom: 12px;">⚠️</div>
+                    <h2 style="font-size: 1.25rem; font-weight: 700; color: #1e293b; margin-bottom: 8px;">このリンクは無効化されています</h2>
+                    <p style="font-size: 0.88rem; color: #64748b; line-height: 1.6; margin-bottom: 16px;">
+                      本フォームリンクは、別のアポイントとの情報連携・統合に伴い無効化されました。<br>
+                      恐れ入りますが、担当者より改めて共有された最新のリンクからご回答いただきますようお願いいたします。
+                    </p>
+                    <div style="font-size: 0.76rem; color: #94a3b8; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 10px; display: inline-block;">
+                      無効化日時: ${linkInfo.invalidatedAt ? new Date(linkInfo.invalidatedAt).toLocaleString('ja-JP') : '連携時'}
+                    </div>
+                  `;
+                  document.body.appendChild(invalidCard);
+                }
+                invalidCard.style.display = 'block';
+                return;
               }
 
               // 🔒 1回回答済み（かつ管理者から再有効化されていない）場合 -> ロック画面を表示して回答を遮断
@@ -6861,6 +6890,24 @@
           if (currentIssuerId) {
             submitData['issuer_id'] = currentIssuerId;
             if (currentIssuerName) submitData['issuer_name'] = currentIssuerName;
+          }
+
+          // 紹介者ID（introducer_id / introducer_name）の紐づけ
+          let currentIntroducerId = window.FORM_INTRODUCER_ID;
+          let currentIntroducerName = '';
+          if (window.FORM_MASTER_ID) {
+            try {
+              const allLinks = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
+              const lk = allLinks[`${window.FORM_MASTER_ID}_${formDefinition.id}`] || window.FORM_TOKEN_INFO;
+              if (lk) {
+                if (!currentIntroducerId && lk.introducerId) currentIntroducerId = lk.introducerId;
+                if (lk.introducerName) currentIntroducerName = lk.introducerName;
+              }
+            } catch(e) {}
+          }
+          if (currentIntroducerId) {
+            submitData['introducer_id'] = currentIntroducerId;
+            if (currentIntroducerName) submitData['introducer_name'] = currentIntroducerName;
           }
 
           console.log('[Form Submit] Submitted data:', submitData);

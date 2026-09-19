@@ -2593,6 +2593,47 @@
             </div>
           </div>
         </div>
+
+        <!-- 🌟 流入経路「営業」選択時に自動展開される紹介者マスタ横断検索UI -->
+        <div class="form-group" id="appoint-sales-introducer-group" style="display: none; margin-bottom: 1rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem; box-shadow: var(--shadow-sm);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+            <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <span>紹介者検索（顧客ID・名前・電話番号でマスタ横断検索）</span>
+            </label>
+            <span class="badge" style="font-size: 0.68rem; padding: 0.15rem 0.45rem; background: rgba(99, 102, 241, 0.12); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.25);">営業流入専用</span>
+          </div>
+          <div style="display: flex; gap: 0.5rem; width: 100%;">
+            <input type="text" id="appoint-introducer-search-input" placeholder="紹介者の顧客ID、名前、または電話番号を入力..." style="flex: 1; padding: 0.5rem 0.75rem; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+            <button type="button" class="btn btn-primary btn-sm" id="appoint-introducer-search-btn" style="padding: 0.5rem 1rem; font-size: 0.82rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; white-space: nowrap;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <span>検索</span>
+            </button>
+          </div>
+          <!-- 検索結果一覧コンテナ -->
+          <div id="appoint-introducer-search-results" style="display: none; margin-top: 0.5rem; max-height: 200px; overflow-y: auto; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); box-shadow: var(--shadow-sm);"></div>
+          <!-- 選択済み紹介者バッジ表示エリア -->
+          <div id="appoint-selected-introducer-box" style="display: none; margin-top: 0.5rem; padding: 0.5rem 0.75rem; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-sm); align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              <div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+                  <span id="appoint-selected-intro-name">-</span>
+                  <span class="badge" id="appoint-selected-intro-type-badge" style="font-size: 0.65rem; padding: 0.1rem 0.35rem; background: var(--primary); color: #fff;">本登録Party ID</span>
+                </div>
+                <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.1rem;" id="appoint-selected-intro-meta">-</div>
+              </div>
+            </div>
+            <button type="button" id="btn-remove-appoint-introducer" class="btn btn-sm btn-outline-danger" style="padding: 0.2rem 0.55rem; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.2rem; cursor: pointer;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              <span>解除</span>
+            </button>
+          </div>
+          <input type="hidden" id="appoint-hidden-introducer-id" value="">
+          <input type="hidden" id="appoint-hidden-introducer-name" value="">
+          <input type="hidden" id="appoint-hidden-introducer-type" value="">
+        </div>
+
         <div class="form-group required" id="customer-name-group">
           <label for="customer-name" id="label-customer-name">相手の名前または呼称</label>
           <input type="text" id="customer-name" placeholder="氏名または「〇〇様紹介の男性」など" required style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem;">
@@ -3168,45 +3209,121 @@
   </div>
 </section>
 
-<!-- ================= 操作ログ履歴 ================= -->
+<!-- ================= 操作ログ履歴 ＆ TimeCell Recovery ================= -->
 <section id="audit-log-screen" class="screen-view">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-    <h1 style="margin-bottom: 0; display: flex; align-items: center; gap: 0.5rem;">📈 操作ログ履歴</h1>
-    <button class="btn btn-danger" id="audit-log-clear-btn">🗑️ 履歴をクリア</button>
-  </div>
-
-  <!-- 検索・フィルターバー -->
-  <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; box-shadow: var(--shadow-sm);">
-    <div style="display: flex; align-items: center; gap: 0.5rem;">
-      <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">操作者:</span>
-      <input type="text" id="audit-log-filter-user" placeholder="すべてのユーザー" style="padding: 0.4rem 0.6rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.85rem; outline: none; width: 160px;" />
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+    <div style="display: flex; align-items: center; gap: 0.6rem;">
+      <h1 style="margin-bottom: 0; font-size: 1.35rem; display: flex; align-items: center; gap: 0.5rem;">
+        <span id="audit-log-header-icon"></span>
+        <span>操作ログ履歴 ＆ TimeCell Recovery</span>
+      </h1>
+      <span style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 0.15rem 0.55rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 600;">Googleスプレッドシート上位互換・選択的タイムトラベル</span>
     </div>
     <div style="display: flex; align-items: center; gap: 0.5rem;">
-      <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">テーブル:</span>
-      <input type="text" id="audit-log-filter-table" placeholder="すべてのテーブル" style="padding: 0.4rem 0.6rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.85rem; outline: none; width: 160px;" />
+      <button class="btn btn-primary" id="timecell-recovery-bulk-btn" style="display: none; padding: 0.35rem 0.8rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem;">
+        <span id="timecell-bulk-btn-icon"></span> <span>TimeCell 一括復元</span> <span id="timecell-selected-count" style="background: rgba(255,255,255,0.25); padding: 0.05rem 0.4rem; border-radius: 10px; font-size: 0.72rem;">0</span>
+      </button>
+      <button class="btn btn-secondary" id="audit-log-clear-btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
+        <span id="audit-clear-btn-icon"></span> <span>履歴クリア</span>
+      </button>
     </div>
   </div>
 
+  <!-- 3大多重複合フィルターバー -->
+  <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 0.85rem; box-shadow: var(--shadow-sm);">
+    
+    <!-- 1段目: 操作種別トグル & 日時指定モード -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+      <!-- 操作種別マルチセレクトチップス -->
+      <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+        <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; margin-right: 0.25rem;">操作種別:</span>
+        <button type="button" class="btn-secondary audit-type-chip active" data-type="ALL" style="padding: 0.2rem 0.6rem; font-size: 0.76rem; border-radius: 20px;">すべて</button>
+        <button type="button" class="btn-secondary audit-type-chip" data-type="EDIT" style="padding: 0.2rem 0.6rem; font-size: 0.76rem; border-radius: 20px;"><span class="icon-edit"></span> 編集</button>
+        <button type="button" class="btn-secondary audit-type-chip" data-type="DELETE" style="padding: 0.2rem 0.6rem; font-size: 0.76rem; border-radius: 20px;"><span class="icon-trash"></span> 削除</button>
+        <button type="button" class="btn-secondary audit-type-chip" data-type="RESTORE" style="padding: 0.2rem 0.6rem; font-size: 0.76rem; border-radius: 20px;"><span class="icon-rewind"></span> 復元</button>
+      </div>
+
+      <!-- クイック期間プリセット -->
+      <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+        <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; margin-right: 0.25rem;">クイック:</span>
+        <button type="button" class="btn-secondary audit-quick-date-btn" data-range="all" style="padding: 0.18rem 0.5rem; font-size: 0.73rem;">全期間</button>
+        <button type="button" class="btn-secondary audit-quick-date-btn" data-range="1h" style="padding: 0.18rem 0.5rem; font-size: 0.73rem;">直近1時間</button>
+        <button type="button" class="btn-secondary audit-quick-date-btn" data-range="24h" style="padding: 0.18rem 0.5rem; font-size: 0.73rem;">直近24時間</button>
+        <button type="button" class="btn-secondary audit-quick-date-btn" data-range="today" style="padding: 0.18rem 0.5rem; font-size: 0.73rem;">今日</button>
+        <button type="button" class="btn-secondary audit-quick-date-btn" data-range="yesterday" style="padding: 0.18rem 0.5rem; font-size: 0.73rem;">昨日</button>
+      </div>
+    </div>
+
+    <!-- 2段目: ユーザー複数選択 & 日時詳細指定 & テーブル・ワード検索 -->
+    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+      <!-- ユーザー複数選択マルチセレクト -->
+      <div style="position: relative;" id="audit-user-multiselect-container">
+        <button type="button" class="btn-secondary" id="audit-user-multiselect-btn" style="padding: 0.35rem 0.7rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; min-width: 160px; justify-content: space-between;">
+          <span style="display: flex; align-items: center; gap: 0.35rem;"><span id="icon-user-filter"></span> <span id="audit-user-selected-label">すべての操作者</span></span>
+          <span id="icon-user-chevron"></span>
+        </button>
+        <div id="audit-user-dropdown" class="filter-dropdown" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 4px; z-index: 100; min-width: 220px; max-height: 280px; overflow-y: auto; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem; box-shadow: var(--shadow-md);">
+          <!-- JSでユーザーチェックボックス動的描画 -->
+        </div>
+      </div>
+
+      <!-- 日時モード切り替え & 入力 -->
+      <div style="display: flex; align-items: center; gap: 0.35rem; background: var(--bg-surface-elevated); padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+        <span id="icon-clock-filter"></span>
+        <select id="audit-date-mode-select" style="background: transparent; border: none; font-size: 0.78rem; color: var(--text-secondary); outline: none; cursor: pointer;">
+          <option value="range">期間 (From - To)</option>
+          <option value="single">特定日 (1日)</option>
+          <option value="multi">特定複数日</option>
+        </select>
+        <div id="audit-date-inputs-container" style="display: flex; align-items: center; gap: 0.35rem;">
+          <!-- 期間指定モード -->
+          <div id="audit-date-range-box" style="display: flex; align-items: center; gap: 0.25rem;">
+            <input type="datetime-local" id="audit-filter-date-from" style="padding: 0.2rem 0.4rem; font-size: 0.78rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary);" />
+            <span style="font-size: 0.75rem; color: var(--text-muted);">〜</span>
+            <input type="datetime-local" id="audit-filter-date-to" style="padding: 0.2rem 0.4rem; font-size: 0.78rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary);" />
+          </div>
+          <!-- 特定日単日モード -->
+          <div id="audit-date-single-box" style="display: none; align-items: center; gap: 0.25rem;">
+            <input type="date" id="audit-filter-date-single" style="padding: 0.2rem 0.4rem; font-size: 0.78rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary);" />
+          </div>
+          <!-- 特定複数日モード -->
+          <div id="audit-date-multi-box" style="display: none; align-items: center; gap: 0.35rem;">
+            <input type="date" id="audit-filter-date-multi-input" style="padding: 0.2rem 0.4rem; font-size: 0.78rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary);" />
+            <button type="button" class="btn btn-secondary" id="audit-date-multi-add-btn" style="padding: 0.2rem 0.45rem; font-size: 0.75rem;">＋ 追加</button>
+            <div id="audit-date-multi-chips" style="display: flex; gap: 0.25rem; flex-wrap: wrap;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- テーブル絞り込み -->
+      <input type="text" id="audit-log-filter-table" placeholder="対象テーブル..." style="padding: 0.35rem 0.6rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.8rem; outline: none; width: 140px;" />
+
+      <!-- ワード検索 -->
+      <input type="text" id="audit-log-filter-word" placeholder="キーワード (セル値・カラム名)..." style="padding: 0.35rem 0.6rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); font-size: 0.8rem; outline: none; flex: 1; min-width: 160px;" />
+
+      <button class="btn btn-secondary" id="audit-log-reset-btn" style="padding: 0.35rem 0.7rem; font-size: 0.78rem;">リセット</button>
+    </div>
+  </div>
+
+  <!-- Googleスプレッドシート風 連続操作グループ化テーブル -->
   <div class="list-section">
-    <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md); max-height: calc(100vh - 300px);">
-      <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-        <thead>
-          <tr style="background: var(--bg-surface-elevated); border-bottom: 1px solid var(--border-color); text-align: left; position: sticky; top: 0; z-index: 10;">
-            <th style="padding: 0.75rem 1rem; width: 160px;">日時 (ミリ秒)</th>
-            <th style="padding: 0.75rem 1rem; width: 100px;">操作者</th>
-            <th style="padding: 0.75rem 1rem; width: 120px;">対象テーブル</th>
-            <th style="padding: 0.75rem 1rem; width: 80px;">セル</th>
-            <th style="padding: 0.75rem 1rem; width: 120px;">カラム名</th>
-            <th style="padding: 0.75rem 1rem;">変更前</th>
-            <th style="padding: 0.75rem 1rem;">変更後</th>
-          </tr>
-        </thead>
-        <tbody id="audit-log-table-body">
-          <!-- JSでログが動的に表示されます -->
-        </tbody>
-      </table>
-      <div id="audit-log-empty" style="padding: 3rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
-        履歴がありません。
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">
+      <div>
+        <span>表示中のアクティビティグループ: <strong id="audit-group-count" style="color: var(--text-primary);">0</strong> 件</span>
+        <span style="margin-left: 0.75rem;">総操作数: <strong id="audit-total-log-count" style="color: var(--text-primary);">0</strong> 件</span>
+      </div>
+      <div style="display: flex; gap: 0.5rem;">
+        <button type="button" id="audit-expand-all-btn" class="btn-secondary" style="padding: 0.15rem 0.5rem; font-size: 0.73rem;">すべて展開</button>
+        <button type="button" id="audit-collapse-all-btn" class="btn-secondary" style="padding: 0.15rem 0.5rem; font-size: 0.73rem;">すべて折りたたむ</button>
+      </div>
+    </div>
+
+    <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md); max-height: calc(100vh - 340px); background: var(--bg-surface);">
+      <div id="audit-groups-container" style="display: flex; flex-direction: column;">
+        <!-- JSでGoogleスプレッドシート風グループが動的に描画されます -->
+      </div>
+      <div id="audit-log-empty" style="padding: 3.5rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+        該当する操作ログ履歴がありません。
       </div>
     </div>
   </div>
@@ -4599,6 +4716,71 @@
 
       <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">
         ※ 一度発行されたフォームは「発行済み」となり二重発行が防止されます。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ⚠️ アポイント本登録ID重複解決モーダル (パターン4) ================= -->
+<div class="modal-overlay" id="modal-appoint-conflict-resolution" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 20060; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+  <div class="modal-box" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 560px; max-width: 95%; box-shadow: var(--shadow-lg); overflow: hidden;">
+    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); background: rgba(239, 68, 68, 0.08);">
+      <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.95rem; color: var(--danger);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        <span>本登録Party IDの重複競合（連結ブロック）</span>
+      </div>
+      <button type="button" id="btn-close-appoint-conflict-modal" style="background: none; border: none; font-size: 1.3rem; color: var(--text-muted); cursor: pointer; line-height: 1;">&times;</button>
+    </div>
+    <div class="modal-body" style="padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+      <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0; line-height: 1.5;">
+        関連付けようとした過去アポイントと現在のアポイントの<strong>双方に異なる本登録Party ID</strong>が存在します。<br>
+        同一人物に複数の本登録Party IDは共存できないため、連結処理を一時ブロックしました。統合先を選択してください。
+      </p>
+
+      <!-- 2つの案件の対比カード -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <!-- 過去案件 -->
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem;">
+          <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.25rem;">過去案件（既存本登録）</div>
+          <div style="font-family: monospace; font-size: 0.95rem; font-weight: 700; color: var(--primary);" id="conflict-past-party-id">-</div>
+          <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-primary); margin-top: 0.2rem;" id="conflict-past-name">-</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted);" id="conflict-past-meta">-</div>
+        </div>
+        <!-- 現在案件 -->
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem;">
+          <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.25rem;">現在案件（新規本登録）</div>
+          <div style="font-family: monospace; font-size: 0.95rem; font-weight: 700; color: var(--primary);" id="conflict-current-party-id">-</div>
+          <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-primary); margin-top: 0.2rem;" id="conflict-current-name">-</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted);" id="conflict-current-meta">-</div>
+        </div>
+      </div>
+
+      <!-- 解決方法の選択ボタンリスト -->
+      <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.25rem;">
+        <!-- 選択肢1: 過去本登録維持 -->
+        <button type="button" class="btn btn-outline-primary" id="btn-resolve-conflict-keep-past" style="text-align: left; padding: 0.75rem; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 0.2rem; cursor: pointer;">
+          <div style="font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
+            <span>① 【推奨】過去の既存本登録Party IDを維持して連結</span>
+            <span class="badge badge-success" style="font-size: 0.65rem;">推奨</span>
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-secondary);">
+            過去案件のParty IDをマスターとして維持し、現在案件は追加アポイントとして連結します（現在案件の独立Party IDは解除されます）。
+          </div>
+        </button>
+
+        <!-- 選択肢2: 現在案件を昇格、過去案件を降格 -->
+        <button type="button" class="btn btn-outline-secondary" id="btn-resolve-conflict-promote-current" style="text-align: left; padding: 0.75rem; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 0.2rem; cursor: pointer;">
+          <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary);">
+            ② 現在案件をマスター本登録IDに昇格し、過去案件を降格
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-secondary);">
+            現在案件のParty IDを最新マスターとし、過去案件を通常のアポイント履歴に降格します（顧客マスタの管理IDが現在案件に差し替えられます）。
+          </div>
+        </button>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+        <button type="button" class="btn btn-secondary" id="btn-cancel-conflict-resolution" style="font-size: 0.8rem; padding: 0.35rem 0.8rem;">キャンセル（連結しない）</button>
       </div>
     </div>
   </div>

@@ -1009,19 +1009,62 @@ let state = {
   dbmakeLastSelectedRow: null,
   dbmakeLastSelectedCol: null,
   dbmakeColumns: [
-    { id: 'id', name: '企業コード' },
-    { id: 'registeredName', name: '企業名/パートナー名' },
-    { id: 'registeredNameKana', name: 'フリガナ' },
-    { id: 'representativeName', name: '代表者名' },
-    { id: 'phoneNumber', name: '電話番号' },
-    { id: 'email', name: 'メールアドレス' },
-    { id: 'invoiceNum', name: 'インボイス登録番号' },
+    { id: 'id', name: 'コード' },
+    { id: 'type', name: '種別' },
+    { id: 'parentPartnerCode', name: '所属元パートナーコード' },
+    { id: 'systemName', name: 'システム登録名' },
+    { id: 'systemNameKana', name: 'システム登録名カナ' },
+    { id: 'systemNameSyncMode', name: 'システム名自動連動(MANUAL/CORPORATE/REPRESENTATIVE)' },
+    { id: 'recordedAt', name: 'パートナー登録日時' },
+    { id: 'roles', name: '役割(コロン/カンマ区切り)' },
     { id: 'corpNum', name: '法人番号' },
-    { id: 'status', name: 'ステータス' },
-    { id: 'recordedBy', name: '登録者' },
-    { id: 'recordedAt', name: '登録日時' },
-    { id: 'reward', name: '報酬体系' },
-    { id: 'remarks', name: '備考' }
+    { id: 'establishedDate', name: '設立・開業年月' },
+    { id: 'registeredName', name: '法人名/屋号' },
+    { id: 'registeredNameKana', name: '法人名カナ/屋号カナ' },
+    { id: 'legalNameEffectiveDate', name: '法人名適用開始日' },
+    { id: 'capital', name: '資本金' },
+    { id: 'capitalEffectiveDate', name: '資本金適用開始日' },
+    { id: 'fiscalMonth', name: '決算月' },
+    { id: 'fiscalMonthEffectiveDate', name: '決算月適用開始日' },
+    { id: 'representativeName', name: '代表者名/個人名' },
+    { id: 'representativeNameKana', name: '代表者名カナ/個人名カナ' },
+    { id: 'repEffectiveDate', name: '代表者適用開始日' },
+    { id: 'birthday', name: '生年月日' },
+    { id: 'blueReturn', name: '青色申告(TRUE/FALSE)' },
+    { id: 'blueReturnApprovedDate', name: '青色申告承認年月日' },
+    { id: 'hasPic', name: '担当者有無(TRUE/FALSE)' },
+    { id: 'picName', name: '担当者名' },
+    { id: 'picNameKana', name: '担当者カナ' },
+    { id: 'picPhone', name: '担当者電話' },
+    { id: 'picEmail', name: '担当者メール' },
+    { id: 'addressEffectiveDate', name: '所在地適用開始日' },
+    { id: 'zipCode', name: '郵便番号' },
+    { id: 'pref', name: '都道府県' },
+    { id: 'city', name: '市区町村' },
+    { id: 'addr1', name: '番地など' },
+    { id: 'addr2', name: '建物名' },
+    { id: 'phoneNumber', name: '代表電話番号' },
+    { id: 'email', name: '代表メールアドレス' },
+    { id: 'hpUrl', name: '企業HPリンク' },
+    { id: 'remarks', name: '備考' },
+    { id: 'invoiceNum', name: 'インボイス登録番号' },
+    { id: 'invoiceDate', name: 'インボイス登録年月日' },
+    { id: 'altAddressUsage', name: '別住所用途' },
+    { id: 'altRecipientName', name: '別宛名' },
+    { id: 'altZipCode', name: '別郵便番号' },
+    { id: 'altPref', name: '別都道府県' },
+    { id: 'altCity', name: '別市区町村' },
+    { id: 'altAddr1', name: '別番地など' },
+    { id: 'altAddr2', name: '別建物名' },
+    { id: 'altAddressEffectiveDate', name: '別所在地適用開始日' },
+    { id: 'bankEffectiveDate', name: '銀行口座適用開始日' },
+    { id: 'bankCode', name: '銀行コード' },
+    { id: 'bankName', name: '銀行名' },
+    { id: 'branchCode', name: '支店コード' },
+    { id: 'branchName', name: '支店名' },
+    { id: 'accType', name: '口座種類' },
+    { id: 'accNum', name: '口座番号' },
+    { id: 'accHolder', name: '口座名義カナ' }
   ],
   
   // フォーム編集時の一時状態
@@ -3724,7 +3767,90 @@ function ensureStandardTablesInState() {
       }
     }
   });
+
+  // 🌟 フォーム別専用テーブル（Synapse公開以前の過去データ一括インポート・同一テーブル完全共有）
+  const formDedicatedTables = [
+    {
+      id: 'table_form_basic',
+      name: 'フォーム① 基本情報受付テーブル',
+      formTitle: '基本情報受付フォーム',
+      isFormDedicatedTable: true,
+      parentMenuId: 'root',
+      columns: [
+        { id: 'id', name: 'マスターID / コード', label: 'マスターID / コード', type: 'text' },
+        { id: 'registeredName', name: '会社名・屋号 / 氏名', label: '会社名・屋号 / 氏名', type: 'text' },
+        { id: 'registeredNameKana', name: 'フリガナ', label: 'フリガナ', type: 'text' },
+        { id: 'repName', name: '代表者氏名', label: '代表者氏名', type: 'text' },
+        { id: 'repTel', name: '代表電話番号', label: '代表電話番号', type: 'text' },
+        { id: 'email', name: 'メールアドレス', label: 'メールアドレス', type: 'text' },
+        { id: 'postalCode', name: '郵便番号', label: '郵便番号', type: 'text' },
+        { id: 'prefecture', name: '都道府県', label: '都道府県', type: 'text' },
+        { id: 'city', name: '市区町村', label: '市区町村', type: 'text' },
+        { id: 'address', name: '番地・ビル名', label: '番地・ビル名', type: 'text' },
+        { id: 'corpNum', name: '13桁法人番号', label: '13桁法人番号', type: 'text' },
+        { id: 'submittedAt', name: '回答日時 / 登録日時', label: '回答日時 / 登録日時', type: 'text' },
+        { id: 'status', name: 'ステータス', label: 'ステータス', type: 'text' }
+      ]
+    },
+    {
+      id: 'table_form_bank',
+      name: 'フォーム② 口座・担当者受付テーブル',
+      formTitle: '口座・担当者受付フォーム',
+      isFormDedicatedTable: true,
+      parentMenuId: 'root',
+      columns: [
+        { id: 'id', name: 'マスターID / コード', label: 'マスターID / コード', type: 'text' },
+        { id: 'registeredName', name: '会社名・屋号', label: '会社名・屋号', type: 'text' },
+        { id: 'repName', name: '代表者名', label: '代表者名', type: 'text' },
+        { id: 'invoiceNum', name: 'インボイス登録番号', label: 'インボイス登録番号', type: 'text' },
+        { id: 'bankName', name: '金融機関名', label: '金融機関名', type: 'text' },
+        { id: 'branchName', name: '支店名', label: '支店名', type: 'text' },
+        { id: 'accountType', name: '預金種目', label: '預金種目', type: 'text' },
+        { id: 'accountNumber', name: '口座番号', label: '口座番号', type: 'text' },
+        { id: 'accountHolderKana', name: '口座名義 (カナ)', label: '口座名義 (カナ)', type: 'text' },
+        { id: 'picName', name: '担当者氏名', label: '担当者氏名', type: 'text' },
+        { id: 'picTel', name: '担当者連絡先', label: '担当者連絡先', type: 'text' },
+        { id: 'picEmail', name: '担当者メール', label: '担当者メール', type: 'text' },
+        { id: 'submittedAt', name: '回答日時 / 登録日時', label: '回答日時 / 登録日時', type: 'text' },
+        { id: 'status', name: 'ステータス', label: 'ステータス', type: 'text' }
+      ]
+    }
+  ];
+
+  formDedicatedTables.forEach(fTable => {
+    let existing = state.customTables.find(t => t.id === fTable.id);
+    if (!existing) {
+      const defaultWidths = {};
+      fTable.columns.forEach(col => { defaultWidths[col.id] = 130; });
+      const tblObj = {
+        id: fTable.id,
+        name: fTable.name,
+        formTitle: fTable.formTitle,
+        isFormDedicatedTable: true,
+        parentMenuId: fTable.parentMenuId,
+        columns: fTable.columns,
+        visibleColumns: fTable.columns.map(c => c.id),
+        columnWidths: defaultWidths,
+        rowHeights: {},
+        fixedCol: 'none',
+        fixedRow: 'none',
+        cellStyles: {},
+        rows: []
+      };
+      state.customTables.push(tblObj);
+    } else {
+      existing.name = fTable.name;
+      existing.formTitle = fTable.formTitle;
+      existing.isFormDedicatedTable = true;
+      if (!existing.columns || existing.columns.length === 0) {
+        existing.columns = fTable.columns;
+        existing.visibleColumns = fTable.columns.map(c => c.id);
+      }
+      if (!existing.rows) existing.rows = [];
+    }
+  });
 }
+
 
 function getUserItemIconHtml(itemId, defaultIcon = null) {
   const userId = state.currentUser ? state.currentUser.id : 'default';
@@ -3960,40 +4086,53 @@ function saveAuditLogs() {
   localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(state.auditLogs));
 }
 
-function logCellEdit(tableId, rowId, colId, oldValue, newValue) {
-  if (oldValue === newValue) return;
+function logCellEdit(tableId, rowId, colId, oldValue, newValue, actionType = null, restoredFrom = null) {
+  // 自動種別判定: 指定がない場合、値が空になったらDELETE、それ以外はEDIT
+  let resolvedType = actionType;
+  if (!resolvedType) {
+    if ((oldValue !== undefined && oldValue !== null && String(oldValue).trim() !== '') &&
+        (newValue === undefined || newValue === null || String(newValue).trim() === '')) {
+      resolvedType = 'DELETE';
+    } else {
+      resolvedType = 'EDIT';
+    }
+  }
+
+  // 編集で値が変わっていない場合はスキップ
+  if (resolvedType === 'EDIT' && oldValue === newValue) return;
 
   let tableName = tableId;
   let columnName = colId;
 
-  if (tableId === 'jo-info-screen') {
+  if (tableId === 'jo-info-screen' || tableId === 'jo' || tableId === 'jo-contracts') {
     tableName = 'JO情報';
     const col = state.joColumns.find(c => c.id === colId);
     if (col) columnName = col.label;
-  } else if (tableId === 'applicant-info-screen') {
+  } else if (tableId === 'applicant-info-screen' || tableId === 'ap' || tableId === 'ap-contracts') {
     tableName = '申込者情報';
     const col = state.apColumns.find(c => c.id === colId);
     if (col) columnName = col.label;
-  } else if (tableId === 'agency-info-screen') {
+  } else if (tableId === 'agency-info-screen' || tableId === 'ag' || tableId === 'ag-contracts') {
     tableName = '代理店情報';
     const col = state.agColumns.find(c => c.id === colId);
     if (col) columnName = col.label;
-  } else if (tableId === 'dbmake-screen') {
+  } else if (tableId === 'dbmake-screen' || tableId === 'dbmake' || tableId === 'dbmake-partners') {
     tableName = 'パートナーDB';
     const col = state.dbmakeColumns.find(c => c.id === colId);
     if (col) columnName = col.label;
-  } else if (tableId.startsWith('custom-table-')) {
+  } else if (tableId.startsWith('custom-table-') || (state.customTables && state.customTables.some(t => t.id === tableId))) {
     const tblId = tableId.replace('custom-table-', '');
-    const tbl = state.customTables.find(t => t.id === tblId);
+    const tbl = (state.customTables || []).find(t => t.id === tblId);
     if (tbl) {
       tableName = tbl.name;
-      const col = tbl.columns.find(c => c.id === colId);
-      if (col) columnName = col.label;
+      const col = (tbl.columns || []).find(c => c.id === colId);
+      if (col) columnName = col.label || col.name;
     }
   }
 
   const log = {
     id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    type: resolvedType, // 🌟 'EDIT' | 'DELETE' | 'RESTORE'
     timestamp: new Date().toISOString(),
     userId: state.currentUser ? (state.currentUser.loginId || state.currentUser.id) : 'system',
     userName: state.currentUser ? state.currentUser.name : 'システム',
@@ -4003,9 +4142,11 @@ function logCellEdit(tableId, rowId, colId, oldValue, newValue) {
     columnId: colId,
     columnName: columnName,
     oldValue: oldValue || '',
-    newValue: newValue || ''
+    newValue: newValue || '',
+    restoredFrom: restoredFrom || null // 🌟 復元トレーサビリティ（誰がいつのデータに復元したか）
   };
 
+  if (!state.auditLogs) state.auditLogs = [];
   state.auditLogs.unshift(log);
   saveAuditLogs();
 }
@@ -7524,7 +7665,7 @@ function renderCustomTable(tableId) {
       td.dataset.colId = col.id;
 
       const cellKey = `${row.id}:${col.id}`;
-      const style = tbl.cellStyles[cellKey] || {};
+      const style = (tbl.cellStyles && tbl.cellStyles[cellKey]) || {};
       applyInlineStylesToCell(td, style);
 
       const previewBg = getPreviewCellBgColor(`custom-table-${tbl.id}`, col.id, rowIndex);
@@ -7705,6 +7846,13 @@ function renderCustomTable(tableId) {
           logCellEdit(`custom-table-${tbl.id}`, row.id, col.id, oldVal, newVal);
           row[col.id] = newVal;
           saveCustomTables();
+
+          // フォーム専用テーブルの場合はパートナーDBへ自動連携・同期
+          const isFormTable = tbl.isFormDedicatedTable || tbl.formTitle || (tbl.id && tbl.id.startsWith('table_form_'));
+          if (isFormTable && typeof syncFormTableRowToPartnerDb === 'function') {
+            syncFormTableRowToPartnerDb(tbl, row);
+          }
+
           renderCustomTable(tbl.id);
         };
 
@@ -9938,7 +10086,18 @@ const SYNAPSE_LINE_ICONS = {
   search: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`,
   close: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
   rotate: (s = 13) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; display: inline-block;"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>`,
-  merge: (s = 14) => `<svg class="synapse-merge-line-icon" width="${s}" height="${s}" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><rect x="2.5" y="3" width="5" height="14" rx="1"></rect><rect x="12.5" y="3" width="5" height="14" rx="1"></rect><path d="M7.5 10h5"></path><path d="M9.5 8.5l-1.5 1.5 1.5 1.5"></path><path d="M10.5 8.5l1.5 1.5-1.5 1.5"></path></svg>`
+  merge: (s = 14) => `<svg class="synapse-merge-line-icon" width="${s}" height="${s}" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><rect x="2.5" y="3" width="5" height="14" rx="1"></rect><rect x="12.5" y="3" width="5" height="14" rx="1"></rect><path d="M7.5 10h5"></path><path d="M9.5 8.5l-1.5 1.5 1.5 1.5"></path><path d="M10.5 8.5l1.5 1.5-1.5 1.5"></path></svg>`,
+  edit: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`,
+  trash: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`,
+  rewind: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>`,
+  restore: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>`,
+  clock: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
+  calendar: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`,
+  user: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
+  chevronDown: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><polyline points="6 9 12 15 18 9"></polyline></svg>`,
+  chevronRight: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><polyline points="9 18 15 12 9 6"></polyline></svg>`,
+  filter: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>`,
+  check: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; display: inline-block;"><polyline points="20 6 9 17 4 12"></polyline></svg>`
 };
 window.SYNAPSE_LINE_ICONS = SYNAPSE_LINE_ICONS;
 
@@ -11842,6 +12001,12 @@ function renderTableControlBar(tableId, parentContainerEl) {
             if (!newRow.id) newRow.id = `row_${Date.now()}_${i}_${Math.floor(Math.random() * 1000)}`;
           }
 
+          // フォーム専用テーブルの場合、コード自動採番 & パートナーDBへフォーム同様に自動同期
+          const isFormTable = meta.isFormDedicatedTable || meta.formTitle || (meta.id && meta.id.startsWith('table_form_'));
+          if (isFormTable && typeof syncFormTableRowToPartnerDb === 'function') {
+            syncFormTableRowToPartnerDb(meta, newRow);
+          }
+
           meta.rows.push(newRow);
           importedCount++;
         }
@@ -12913,6 +13078,24 @@ function loadTabState(tab) {
   if (subnoteInput) subnoteInput.readOnly = isViewOnly;
   const managePanel = document.getElementById('source-option-manage-panel');
   if (managePanel && isViewOnly) managePanel.style.display = 'none';
+
+  // 営業紹介者の復元と可視性同期
+  if (typeof updateSalesIntroducerVisibility === 'function') {
+    updateSalesIntroducerVisibility();
+  }
+  if (typeof selectAppointIntroducer === 'function') {
+    if (data.introducerId) {
+      selectAppointIntroducer({
+        id: data.introducerId,
+        name: data.introducerName || data.introducerId,
+        sub: `ID: ${data.introducerId}`,
+        type: data.introducerType || 'party',
+        typeLabel: (data.introducerType === 'temp') ? '見込み客（仮ID）' : '本登録Party ID'
+      });
+    } else {
+      selectAppointIntroducer(null);
+    }
+  }
 
   const toggleContainer = document.getElementById('appointment-type-toggle-container');
   if (toggleContainer) {
@@ -14593,18 +14776,23 @@ function setupEventListeners() {
             return;
           }
 
-          ids.push(newId);
-          const newValString = ids.join(', ');
-
-          if (state.editingAppointId) {
-            const appoint = state.appointments.find(a => a.id === state.editingAppointId);
-            if (appoint) {
-              appoint.relatedAppointmentIds = newValString;
+          const currentAppoint = state.editingAppointId ? state.appointments.find(a => a.id === state.editingAppointId) : null;
+          if (currentAppoint) {
+            evaluateAppointmentLinking(currentAppoint, newId, () => {
+              ids.push(newId);
+              const newValString = ids.join(', ');
+              currentAppoint.relatedAppointmentIds = newValString;
               localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
               syncBiDirectionalRelatedAppointmentIds(state.editingAppointId, newValString);
-            }
+              window.renderRelatedAppointIdLinks(newValString, isViewOnly);
+              if (typeof renderAppointLinkedForms === 'function') {
+                renderAppointLinkedForms(currentAppoint);
+              }
+            });
+          } else {
+            ids.push(newId);
+            window.renderRelatedAppointIdLinks(ids.join(', '), isViewOnly);
           }
-          window.renderRelatedAppointIdLinks(newValString, isViewOnly);
         };
 
         confirmBtn.addEventListener('click', handleAdd);
@@ -14646,29 +14834,34 @@ function setupEventListeners() {
       pickHistoryBtn.addEventListener('click', () => {
         openAppointHistoryPicker((selectedAppointIds) => {
           if (!selectedAppointIds || selectedAppointIds.length === 0) return;
-          let addedCount = 0;
-          selectedAppointIds.forEach(id => {
-            if (!ids.includes(id)) {
-              ids.push(id);
-              addedCount++;
-            }
-          });
-          if (addedCount === 0) {
-            showToast('選択されたアポイントはすでに関連付けされています。', 'info');
-            return;
-          }
-          const newValString = ids.join(', ');
+          const currentAppoint = state.editingAppointId ? state.appointments.find(a => a.id === state.editingAppointId) : null;
 
-          if (state.editingAppointId) {
-            const appoint = state.appointments.find(a => a.id === state.editingAppointId);
-            if (appoint) {
-              appoint.relatedAppointmentIds = newValString;
-              localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
-              syncBiDirectionalRelatedAppointmentIds(state.editingAppointId, newValString);
+          const processNext = (idx) => {
+            if (idx >= selectedAppointIds.length) {
+              const newValString = ids.join(', ');
+              if (currentAppoint) {
+                currentAppoint.relatedAppointmentIds = newValString;
+                localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+                syncBiDirectionalRelatedAppointmentIds(state.editingAppointId, newValString);
+                if (typeof renderAppointLinkedForms === 'function') {
+                  renderAppointLinkedForms(currentAppoint);
+                }
+              }
+              window.renderRelatedAppointIdLinks(newValString, isViewOnly);
+              return;
             }
-          }
-          window.renderRelatedAppointIdLinks(newValString, isViewOnly);
-          showToast(`${addedCount}件のアポイントを紐付けました。`, 'success');
+            const targetId = selectedAppointIds[idx];
+            if (!ids.includes(targetId) && currentAppoint) {
+              evaluateAppointmentLinking(currentAppoint, targetId, () => {
+                ids.push(targetId);
+                processNext(idx + 1);
+              });
+            } else {
+              processNext(idx + 1);
+            }
+          };
+
+          processNext(0);
         }, ids);
       });
 
@@ -18047,6 +18240,9 @@ function setAppointMeetingType(type, silent = false) {
   }
 
   updateAppointMeetingTypeRoleVisibility();
+  if (typeof updateSalesIntroducerVisibility === 'function') {
+    updateSalesIntroducerVisibility();
+  }
 
   if (!silent) {
     state.isFormDirty = true;
@@ -18293,11 +18489,20 @@ function initAppointMeetingTypeUI() {
         categorySelect.dataset.lastSelected = categorySelect.value;
         state.isFormDirty = true;
       }
+      if (typeof updateSalesIntroducerVisibility === 'function') {
+        updateSalesIntroducerVisibility();
+      }
     });
   }
 
   // 初期描画（未選択時はグレーアウト）
   renderAppointSourceCategories(categorySelect?.value || '');
+  if (typeof updateSalesIntroducerVisibility === 'function') {
+    updateSalesIntroducerVisibility();
+  }
+  if (typeof initAppointIntroducerSearchEvents === 'function') {
+    initAppointIntroducerSearchEvents();
+  }
 
   if (btnClosePanel && managePanel) {
     btnClosePanel.addEventListener('click', () => {
@@ -20468,6 +20673,15 @@ function handleFormSubmitMessage(event) {
     return;
   }
 
+  // フォーム専用テーブル / 関連テーブルのオープン要求ハンドリング
+  if (event.data.type === 'OPEN_FORM_TABLE' || event.data.type === 'FORM_OPEN_ASSOCIATED_TABLE') {
+    const { tableId, formTitle } = event.data;
+    if (typeof window.openFormDedicatedTable === 'function') {
+      window.openFormDedicatedTable(tableId || formTitle);
+    }
+    return;
+  }
+
   // 1. 一時保存・途中再開データ取得の要求をハンドリング
   if (event.data.type === 'FORM_GET_TEMPORARY_DATA') {
     const { rowId, formTitle } = event.data;
@@ -20690,131 +20904,20 @@ function handleFormSubmitMessage(event) {
   }
 
   // ----------------------------------------------------
-  // 2. パートナーDBへの転送処理（カラムが一致するもののみ）
+  // 2. パートナーDBへの自動抽出・承認・多段更新処理（全56カラム完全対応）
   // ----------------------------------------------------
-  // カラムの日本語名と英語物理キーのマッピング定義
-  const mapping = {
-    registeredName: ['会社名', '企業名', '登録名', '法人名', '商号', '会社', '企業'],
-    registeredNameKana: ['会社名カナ', '企業名カナ', '登録名カナ', 'フリガナ', 'カナ'],
-    representativeName: ['代表者名', '代表者', '代表', '代表名'],
-    status: ['ステータス', '状態'],
-    phoneNumber: ['電話番号', '電話', '連絡先', 'TEL', 'tel'],
-    email: ['メールアドレス', 'メール', 'アドレス', 'Email', 'email'],
-    corpNum: ['法人番号', 'マイナンバー'],
-    invoiceNum: ['インボイス登録番号', 'インボイス番号', '登録番号'],
-    zipCode: ['郵便番号', '郵便', '〒'],
-    pref: ['都道府県', '県', '都', '道', '府'],
-    city: ['市区町村', '市区', '町村'],
-    addr1: ['町名・番地・建物名', '町名', '番地', '住所1', '住所'],
-    addr2: ['建物名', '部屋番号', 'アパート名', '住所2'],
-    bank: ['銀行名', '金融機関名', '銀行', '金融機関'],
-    branch: ['支店名', '支店', '店舗名'],
-    accType: ['口座種別', '種別', '預金種目'],
-    accNum: ['口座番号', '番号'],
-    accHolder: ['口座名義', '名義', '口座名義人'],
-    reward: ['報酬額', '報酬', '金額'],
-    remarks: ['備考', 'その他', 'Remarks', 'remarks']
-  };
-
-  // 送信された回答データのキーから、パートナーDBのカラムに該当する値をインテリジェントに抽出するヘルパー
-  const getValueByMapping = (field) => {
-    // 直接英語物理キーがデータ内にあれば優先する
-    if (data[field] !== undefined && data[field] !== '') {
-      return String(data[field]).trim();
-    }
-    // マッピングで定義された日本語キーワードで前方一致/完全一致を検証
-    const keys = mapping[field] || [];
-    for (const key of keys) {
-      // data内のキーを走査し、マッピングキーワードを含むか確認
-      const matchedKey = Object.keys(data).find(dk => dk.includes(key));
-      if (matchedKey && data[matchedKey] !== undefined && data[matchedKey] !== '') {
-        return String(data[matchedKey]).trim();
+  if (!isTestSubmission) {
+    // マスターIDの特定（送信パラメータ、データキー、または既存紐付けから取得）
+    const detectedMasterId = data['master_id'] || data['mid'] || data['コード'] || data['アポイントID'] || targetRow.partnerId || null;
+    
+    // パートナーDB自動抽出・承認ゲート・多段更新パイプラインの実行
+    processFormSubmissionToPartnerDb(data, effectiveTableName, detectedMasterId, (finalPartnerId) => {
+      if (finalPartnerId) {
+        targetRow.partnerId = finalPartnerId;
+        targetRow.registrationCode = finalPartnerId;
+        localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
       }
-    }
-    return '';
-  };
-
-  // 送信された項目の中に、会社名/企業名があるか確認（最低限これがないとパートナーレコードとして不適切）
-  // ※ 🧪 テスト送信時は本番パートナーDBの汚染を防ぐため転送処理を完全にスキップ
-  const partnerName = (!isTestSubmission) ? getValueByMapping('registeredName') : '';
-  if (partnerName) {
-    let existingPartner = null;
-    
-    // カスタムテーブル行に紐づくパートナーIDがある場合はそれを使用
-    if (targetRow.partnerId) {
-      existingPartner = dbmakePartners.find(p => p.id === targetRow.partnerId);
-    }
-    
-    // ない場合は名前で検索
-    if (!existingPartner) {
-      existingPartner = dbmakePartners.find(p => p.registeredName === partnerName);
-    }
-
-    if (existingPartner) {
-      // 既存パートナーの上書き更新
-      existingPartner.registeredNameKana = getValueByMapping('registeredNameKana') || existingPartner.registeredNameKana;
-      existingPartner.representativeName = getValueByMapping('representativeName') || existingPartner.representativeName;
-      existingPartner.phoneNumber = getValueByMapping('phoneNumber') || existingPartner.phoneNumber;
-      existingPartner.email = getValueByMapping('email') || existingPartner.email;
-      existingPartner.corpNum = getValueByMapping('corpNum') || existingPartner.corpNum;
-      existingPartner.invoiceNum = getValueByMapping('invoiceNum') || existingPartner.invoiceNum;
-      existingPartner.zipCode = getValueByMapping('zipCode') || existingPartner.zipCode;
-      existingPartner.pref = getValueByMapping('pref') || existingPartner.pref;
-      existingPartner.city = getValueByMapping('city') || existingPartner.city;
-      existingPartner.addr1 = getValueByMapping('addr1') || existingPartner.addr1;
-      existingPartner.addr2 = getValueByMapping('addr2') || existingPartner.addr2;
-      existingPartner.bank = getValueByMapping('bank') || existingPartner.bank;
-      existingPartner.branch = getValueByMapping('branch') || existingPartner.branch;
-      existingPartner.accType = getValueByMapping('accType') || existingPartner.accType;
-      existingPartner.accNum = getValueByMapping('accNum') || existingPartner.accNum;
-      existingPartner.accHolder = getValueByMapping('accHolder') || existingPartner.accHolder;
-      existingPartner.reward = getValueByMapping('reward') || existingPartner.reward;
-      existingPartner.remarks = getValueByMapping('remarks') || existingPartner.remarks;
-      existingPartner.recordedAt = new Date().toISOString();
-
-      targetRow.partnerId = existingPartner.id; // マッピングの記録
-      console.log("%c[Backend DB Connection]%c Updated existing Partner DB record.", "color: #10b981; font-weight: bold;", "color: inherit;", existingPartner);
-    } else {
-      // パートナーの新規作成
-      const partnerId = generate8DigitId();
-      const newPartner = {
-        id: partnerId,
-        registeredName: partnerName,
-        registeredNameKana: getValueByMapping('registeredNameKana'),
-        representativeName: getValueByMapping('representativeName'),
-        status: getValueByMapping('status') || 'active',
-        phoneNumber: getValueByMapping('phoneNumber'),
-        email: getValueByMapping('email'),
-        corpNum: getValueByMapping('corpNum'),
-        invoiceNum: getValueByMapping('invoiceNum'),
-        zipCode: getValueByMapping('zipCode'),
-        pref: getValueByMapping('pref'),
-        city: getValueByMapping('city'),
-        addr1: getValueByMapping('addr1'),
-        addr2: getValueByMapping('addr2'),
-        bank: getValueByMapping('bank'),
-        branch: getValueByMapping('branch'),
-        accType: getValueByMapping('accType') || '普通',
-        accNum: getValueByMapping('accNum'),
-        accHolder: getValueByMapping('accHolder'),
-        reward: getValueByMapping('reward') || '0',
-        remarks: getValueByMapping('remarks'),
-        recordedAt: new Date().toISOString(),
-        recordedBy: state.currentUser ? state.currentUser.name : 'System',
-        isFavorite: false
-      };
-
-      dbmakePartners.push(newPartner);
-      targetRow.partnerId = partnerId; // マッピングの記録
-      console.log("%c[Backend DB Connection]%c Auto-transferred record to Partner DB successfully.", "color: #10b981; font-weight: bold;", "color: inherit;", newPartner);
-    }
-
-    saveDbmakePartners();
-    
-    // パートナーDB画面が開かれている場合は、リアルタイム再描画
-    if (state.currentView === 'dbmake-screen') {
-      renderDbmakePartners();
-    }
+    });
   }
 
   // 登録コード（partnerIdまたは一般登録コード）を決定
@@ -20986,6 +21089,444 @@ function syncBiDirectionalRelatedAppointmentIds(appointIdA, targetRelatedAppoint
   localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
 }
 
+// ============================================================================
+// 🔗 アポイント連結・4パターン整合性判定エンジン & 本登録ID重複解決 & カスケード更新
+// ============================================================================
+
+// 1. 循環参照ループ検知（A -> B -> A の連結ループを防止）
+function detectLinkingLoop(currentId, targetId) {
+  if (!currentId || !targetId) return false;
+  if (currentId === targetId) return true;
+
+  const visited = new Set();
+  const queue = [targetId];
+
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (!cur || visited.has(cur)) continue;
+    if (cur === currentId) return true;
+    visited.add(cur);
+
+    const ap = state.appointments?.find(a => a.id === cur);
+    if (ap && ap.relatedAppointmentIds) {
+      const rels = ap.relatedAppointmentIds.split(',').map(s => s.trim()).filter(Boolean);
+      rels.forEach(r => {
+        if (!visited.has(r)) queue.push(r);
+      });
+    }
+  }
+  return false;
+}
+
+// 2. 指定アポイントIDに紐づく未回答フォームリンクを一括無効化
+function invalidateAppointFormLinks(appointId) {
+  if (!appointId) return;
+  try {
+    const allLinks = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
+    let changed = false;
+    Object.keys(allLinks).forEach(key => {
+      const item = allLinks[key];
+      if (item && item.masterId === appointId && item.status !== 'submitted') {
+        item.status = 'invalidated';
+        item.invalidatedAt = new Date().toISOString();
+        changed = true;
+        if (typeof syncFormLinkToCloud === 'function') {
+          syncFormLinkToCloud(appointId, item.formId, item);
+        }
+      }
+    });
+    if (changed) {
+      localStorage.setItem('synapse_form_links', JSON.stringify(allLinks));
+    }
+  } catch(e) {
+    console.warn('[InvalidateFormLinks] Error:', e);
+  }
+}
+
+// 3. アポイント連結時の4パターン判定エンジン
+function evaluateAppointmentLinking(currentAppoint, targetAppointId, onApproved) {
+  if (!currentAppoint || !targetAppointId) return;
+
+  // 循環参照チェック
+  if (detectLinkingLoop(currentAppoint.id, targetAppointId)) {
+    showToast('指定されたアポイントと循環参照（ループ）が発生するため連結できません。', 'error');
+    return;
+  }
+
+  const targetAppoint = state.appointments.find(a => a.id === targetAppointId);
+  if (!targetAppoint) {
+    onApproved();
+    return;
+  }
+
+  const curContext = getEffectiveAppointMasterContext(currentAppoint);
+  const targetContext = getEffectiveAppointMasterContext(targetAppoint);
+
+  const curHasParty = curContext.isOfficial && curContext.officialPartyId;
+  const targetHasParty = targetContext.isOfficial && targetContext.officialPartyId;
+
+  // ⚠️ パターン4: 双方本登録後、かつ異なるParty ID（重複競合）
+  if (curHasParty && targetHasParty && curContext.officialPartyId !== targetContext.officialPartyId) {
+    openPartyIdConflictModal(targetContext, curContext, currentAppoint, targetAppoint, onApproved);
+    return;
+  }
+
+  // 🌟 パターン1: 双方本登録前
+  if (!curHasParty && !targetHasParty) {
+    const curTime = currentAppoint.date ? new Date(currentAppoint.date).getTime() : 0;
+    const targetTime = targetAppoint.date ? new Date(targetAppoint.date).getTime() : 0;
+    const olderAppoint = curTime < targetTime ? currentAppoint : targetAppoint;
+    
+    // 古い方のアポのフォームリンクを無効化
+    invalidateAppointFormLinks(olderAppoint.id);
+    onApproved();
+    showToast('アポイントを連結しました（過去アポイントのフォームリンクは無効化されました）。', 'success');
+    return;
+  }
+
+  // 🌟 パターン2: 過去側が本登録済、現在側が本登録前
+  if (targetHasParty && !curHasParty) {
+    invalidateAppointFormLinks(currentAppoint.id);
+    onApproved();
+    showToast(`本登録顧客（ID: ${targetContext.officialPartyId}）にアポイントを連結しました。`, 'success');
+    return;
+  }
+
+  // 🌟 パターン3: 現在側が本登録済、過去側が本登録前
+  if (curHasParty && !targetHasParty) {
+    invalidateAppointFormLinks(targetAppoint.id);
+    onApproved();
+    showToast(`本登録顧客（ID: ${curContext.officialPartyId}）に過去アポイントを連結しました。`, 'success');
+    return;
+  }
+
+  // 同一Party IDの場合はそのまま連結
+  onApproved();
+}
+
+// 4. 重複Party ID解決モーダル（パターン4）の表示
+function openPartyIdConflictModal(pastContext, currentContext, currentAppoint, targetAppoint, onResolved) {
+  const modal = document.getElementById('modal-appoint-conflict-resolution');
+  if (!modal) {
+    onResolved();
+    return;
+  }
+
+  const pastPartyEl = document.getElementById('conflict-past-party-id');
+  const pastNameEl = document.getElementById('conflict-past-name');
+  const pastMetaEl = document.getElementById('conflict-past-meta');
+
+  const curPartyEl = document.getElementById('conflict-current-party-id');
+  const curNameEl = document.getElementById('conflict-current-name');
+  const curMetaEl = document.getElementById('conflict-current-meta');
+
+  const pastCust = state.customers?.find(c => c.id === pastContext.officialPartyId);
+  const curCust = state.customers?.find(c => c.id === currentContext.officialPartyId);
+
+  if (pastPartyEl) pastPartyEl.textContent = pastContext.officialPartyId;
+  if (pastNameEl) pastNameEl.textContent = pastCust?.name || targetAppoint.customerName || '顧客名未設定';
+  if (pastMetaEl) pastMetaEl.textContent = `アポID: ${targetAppoint.id} | 日時: ${targetAppoint.date || '未設定'}`;
+
+  if (curPartyEl) curPartyEl.textContent = currentContext.officialPartyId;
+  if (curNameEl) curNameEl.textContent = curCust?.name || currentAppoint.customerName || '顧客名未設定';
+  if (curMetaEl) curMetaEl.textContent = `アポID: ${currentAppoint.id} | 日時: ${currentAppoint.date || '未設定'}`;
+
+  modal.style.display = 'flex';
+  modal.classList.add('active');
+
+  const closeModal = () => {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  };
+
+  const closeBtn = document.getElementById('btn-close-appoint-conflict-modal');
+  const cancelBtn = document.getElementById('btn-cancel-conflict-resolution');
+  if (closeBtn) closeBtn.onclick = closeModal;
+  if (cancelBtn) cancelBtn.onclick = closeModal;
+
+  // 選択肢1: 過去本登録維持
+  const btnKeepPast = document.getElementById('btn-resolve-conflict-keep-past');
+  if (btnKeepPast) {
+    btnKeepPast.onclick = () => {
+      closeModal();
+      resolvePartyIdConflict(pastContext.officialPartyId, currentContext.officialPartyId, currentAppoint, targetAppoint, 'keep_past');
+      onResolved();
+    };
+  }
+
+  // 選択肢2: 現在案件昇格・過去降格
+  const btnPromoteCur = document.getElementById('btn-resolve-conflict-promote-current');
+  if (btnPromoteCur) {
+    btnPromoteCur.onclick = () => {
+      closeModal();
+      resolvePartyIdConflict(pastContext.officialPartyId, currentContext.officialPartyId, currentAppoint, targetAppoint, 'promote_current');
+      onResolved();
+    };
+  }
+}
+
+// 5. 重複解決の実行（昇格/降格・マスタ付け替え）
+function resolvePartyIdConflict(pastPartyId, currentPartyId, currentAppoint, targetAppoint, mode) {
+  if (mode === 'keep_past') {
+    currentAppoint.customerId = pastPartyId;
+    currentAppoint.customerType = 'existing';
+    invalidateAppointFormLinks(currentAppoint.id);
+    cascadeUpdateIntroducerAndTempIds(currentPartyId, pastPartyId, 'party');
+    showToast(`過去のParty ID（${pastPartyId}）をマスターとして維持し連結しました。`, 'success');
+  } else if (mode === 'promote_current') {
+    targetAppoint.customerId = currentPartyId;
+    targetAppoint.customerType = 'existing';
+    if (Array.isArray(state.customers)) {
+      const pastIdx = state.customers.findIndex(c => c.id === pastPartyId);
+      if (pastIdx !== -1) {
+        state.customers[pastIdx].relatedCustomerId = `${state.customers[pastIdx].relatedCustomerId || ''}, ${pastPartyId}`.trim();
+        state.customers[pastIdx].id = currentPartyId;
+      }
+    }
+    invalidateAppointFormLinks(targetAppoint.id);
+    cascadeUpdateIntroducerAndTempIds(pastPartyId, currentPartyId, 'party');
+    showToast(`現在案件のParty ID（${currentPartyId}）をマスターに昇格して連結しました。`, 'success');
+  }
+
+  localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(state.customers));
+  localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+  if (typeof renderAppointLinkedForms === 'function') {
+    renderAppointLinkedForms(currentAppoint);
+  }
+}
+
+// 6. 仮ID変遷・確定Party IDの追従カスケード更新
+function cascadeUpdateIntroducerAndTempIds(oldId, newId, newType = 'party') {
+  if (!oldId || !newId || oldId === newId) return;
+
+  // 1. 全アポイントの introducerId を更新
+  if (Array.isArray(state.appointments)) {
+    let appChanged = false;
+    state.appointments.forEach(ap => {
+      if (ap.introducerId === oldId) {
+        ap.introducerId = newId;
+        if (newType) ap.introducerType = newType;
+        appChanged = true;
+      }
+    });
+    if (appChanged) {
+      localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+    }
+  }
+
+  // 2. synapse_form_links 内の introducerId を更新
+  try {
+    const links = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
+    let linksChanged = false;
+    Object.keys(links).forEach(k => {
+      if (links[k].introducerId === oldId) {
+        links[k].introducerId = newId;
+        linksChanged = true;
+        if (typeof syncFormLinkToCloud === 'function') {
+          syncFormLinkToCloud(links[k].masterId, links[k].formId, links[k]);
+        }
+      }
+    });
+    if (linksChanged) {
+      localStorage.setItem('synapse_form_links', JSON.stringify(links));
+    }
+  } catch(e) {}
+
+  // 3. localStorage 上の form_responses_* 内の introducer_id を追従更新
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('form_responses_')) {
+        const raw = localStorage.getItem(k);
+        if (raw && raw.includes(oldId)) {
+          const resps = JSON.parse(raw);
+          if (Array.isArray(resps)) {
+            resps.forEach(r => {
+              if (r.data) {
+                if (r.data.introducer_id === oldId) r.data.introducer_id = newId;
+                if (r.data.introducerId === oldId) r.data.introducerId = newId;
+              }
+              if (r.introducer_id === oldId) r.introducer_id = newId;
+              if (r.introducerId === oldId) r.introducerId = newId;
+            });
+            localStorage.setItem(k, JSON.stringify(resps));
+          }
+        }
+      }
+    }
+  } catch(e) {}
+}
+
+// 7. 流入経路「営業」選択時の紹介者マスタ横断検索ロジック
+function searchIntroducerCandidates(query) {
+  if (!query) return [];
+  const cleanQuery = query.trim().toLowerCase();
+
+  const candidates = [];
+  const addedIds = new Set();
+
+  // A. マスタ横断検索（顧客マスタ、JO、申込者、代理店、パートナー）
+  if (typeof executeGlobalMasterSearch === 'function') {
+    const masterResults = executeGlobalMasterSearch(cleanQuery);
+    masterResults.forEach(r => {
+      candidates.push({
+        id: r.id,
+        name: r.name,
+        sub: `${r.corp !== '（法人名未設定）' ? r.corp + ' | ' : ''}${r.sources.join(' / ')}`,
+        type: 'party',
+        typeLabel: '本登録Party ID'
+      });
+      addedIds.add(r.id);
+    });
+  }
+
+  // B. 本登録前のアポイント見込み客（チェーン最新仮ID）
+  if (Array.isArray(state.appointments)) {
+    state.appointments.forEach(ap => {
+      if (ap.status === 'cancelled') return;
+      if (ap.customerId && addedIds.has(ap.customerId)) return;
+
+      const apId = ap.id || '';
+      const apName = ap.customerName || '';
+      const phone = ap.customFields?.phone || '';
+      const email = ap.customFields?.email || '';
+
+      const matchId = apId.toLowerCase().includes(cleanQuery);
+      const matchName = apName.toLowerCase().includes(cleanQuery);
+      const matchPhone = phone.replace(/[^0-9]/g, '').includes(cleanQuery.replace(/[^0-9]/g, ''));
+      const matchEmail = email.toLowerCase().includes(cleanQuery);
+
+      if (matchId || matchName || (phone && matchPhone) || (email && matchEmail)) {
+        const ctx = getEffectiveAppointMasterContext(ap);
+        const tempId = ctx.masterId || apId;
+        if (!addedIds.has(tempId)) {
+          addedIds.add(tempId);
+          candidates.push({
+            id: tempId,
+            name: apName || '名前未設定',
+            sub: `アポID: ${apId} | 面談日: ${ap.date || '未設定'}${phone ? ' | 電話: ' + phone : ''}`,
+            type: ctx.isOfficial ? 'party' : 'temp',
+            typeLabel: ctx.isOfficial ? '本登録Party ID' : '見込み客（仮ID）'
+          });
+        }
+      }
+    });
+  }
+
+  return candidates;
+}
+
+function selectAppointIntroducer(intro) {
+  const hiddenId = document.getElementById('appoint-hidden-introducer-id');
+  const hiddenName = document.getElementById('appoint-hidden-introducer-name');
+  const hiddenType = document.getElementById('appoint-hidden-introducer-type');
+  const box = document.getElementById('appoint-selected-introducer-box');
+  const nameEl = document.getElementById('appoint-selected-intro-name');
+  const metaEl = document.getElementById('appoint-selected-intro-meta');
+  const typeBadge = document.getElementById('appoint-selected-intro-type-badge');
+  const resultsContainer = document.getElementById('appoint-introducer-search-results');
+  const inputEl = document.getElementById('appoint-introducer-search-input');
+
+  if (!intro) {
+    if (hiddenId) hiddenId.value = '';
+    if (hiddenName) hiddenName.value = '';
+    if (hiddenType) hiddenType.value = '';
+    if (box) box.style.display = 'none';
+    return;
+  }
+
+  if (hiddenId) hiddenId.value = intro.id;
+  if (hiddenName) hiddenName.value = intro.name;
+  if (hiddenType) hiddenType.value = intro.type;
+
+  if (nameEl) nameEl.textContent = `${intro.name} (${intro.id})`;
+  if (metaEl) metaEl.textContent = intro.sub;
+  if (typeBadge) {
+    typeBadge.textContent = intro.typeLabel || (intro.type === 'party' ? '本登録Party ID' : '見込み客（仮ID）');
+    typeBadge.style.background = (intro.type === 'party') ? 'var(--primary)' : 'var(--warning)';
+  }
+  if (box) box.style.display = 'flex';
+  if (resultsContainer) resultsContainer.style.display = 'none';
+  if (inputEl) inputEl.value = '';
+
+  state.isFormDirty = true;
+  if (typeof showToast === 'function') {
+    showToast(`紹介者「${intro.name}」を紐付けました。`, 'success');
+  }
+}
+
+function updateSalesIntroducerVisibility() {
+  const sourceType = document.getElementById('appoint-source-type')?.value;
+  const category = document.getElementById('appoint-source-category')?.value;
+  const introGroup = document.getElementById('appoint-sales-introducer-group');
+  if (!introGroup) return;
+
+  const isSales = (sourceType === 'offline' && category === '営業');
+  introGroup.style.display = isSales ? 'block' : 'none';
+  if (!isSales) {
+    const results = document.getElementById('appoint-introducer-search-results');
+    if (results) results.style.display = 'none';
+  }
+}
+
+function initAppointIntroducerSearchEvents() {
+  const searchInput = document.getElementById('appoint-introducer-search-input');
+  const searchBtn = document.getElementById('appoint-introducer-search-btn');
+  const resultsContainer = document.getElementById('appoint-introducer-search-results');
+  const removeBtn = document.getElementById('btn-remove-appoint-introducer');
+
+  const executeSearch = () => {
+    if (!searchInput || !resultsContainer) return;
+    const query = searchInput.value.trim();
+    if (!query) {
+      if (typeof showToast === 'function') showToast('検索キーワードを入力してください。', 'warning');
+      return;
+    }
+
+    const list = searchIntroducerCandidates(query);
+    resultsContainer.innerHTML = '';
+
+    if (list.length === 0) {
+      resultsContainer.innerHTML = '<div style="padding: 0.75rem; font-size: 0.8rem; color: var(--text-muted); text-align: center;">該当する紹介者候補が見つかりませんでした。</div>';
+    } else {
+      list.forEach(item => {
+        const row = document.createElement('div');
+        row.style.cssText = 'padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: background 0.15s;';
+        row.onmouseover = () => { row.style.background = 'var(--bg-surface-elevated)'; };
+        row.onmouseout = () => { row.style.background = 'transparent'; };
+        row.innerHTML = `
+          <div>
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">${escapeHtml(item.name)} <span style="font-family: monospace; font-size: 0.76rem; color: var(--primary); margin-left: 0.3rem;">${escapeHtml(item.id)}</span></div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem;">${escapeHtml(item.sub)}</div>
+          </div>
+          <span class="badge" style="font-size: 0.65rem; background: ${item.type === 'party' ? 'var(--primary)' : 'var(--warning)'}; color: #fff;">${escapeHtml(item.typeLabel)}</span>
+        `;
+        row.onclick = () => {
+          selectAppointIntroducer(item);
+        };
+        resultsContainer.appendChild(row);
+      });
+    }
+    resultsContainer.style.display = 'block';
+  };
+
+  if (searchBtn) searchBtn.onclick = executeSearch;
+  if (searchInput) {
+    searchInput.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        executeSearch();
+      }
+    };
+  }
+  if (removeBtn) {
+    removeBtn.onclick = () => {
+      selectAppointIntroducer(null);
+      if (typeof showToast === 'function') showToast('紹介者を解除しました。', 'info');
+    };
+  }
+}
+
 // バックグラウンドでアポイントの下書きを自動保存する（タブは閉じない）
 function autoSaveAppointmentDraft() {
   const dateVal = document.getElementById('appoint-date').value;
@@ -21037,6 +21578,9 @@ function autoSaveAppointmentDraft() {
     relatedAppointmentIds: relatedAppointmentIds,
     customerName: nameVal,
     memo: memoVal,
+    introducerId: document.getElementById('appoint-hidden-introducer-id')?.value || '',
+    introducerName: document.getElementById('appoint-hidden-introducer-name')?.value || '',
+    introducerType: document.getElementById('appoint-hidden-introducer-type')?.value || '',
     customFields: customFieldsData,
     connectedLinks: state.connectedLinks || {},
     status: 'draft',
@@ -21120,6 +21664,9 @@ function saveAppointmentData(status) {
     relatedAppointmentIds: relatedAppointmentIds, // 関連アポイントIDを追加
     customerName: nameVal,
     memo: memoVal,
+    introducerId: document.getElementById('appoint-hidden-introducer-id')?.value || '',
+    introducerName: document.getElementById('appoint-hidden-introducer-name')?.value || '',
+    introducerType: document.getElementById('appoint-hidden-introducer-type')?.value || '',
     customFields: customFieldsData,
     connectedLinks: state.connectedLinks || {}, // 接続データを保存
     status: status,
@@ -28895,6 +29442,72 @@ const DEFAULT_DBMAKE_PARTNERS = [
   }
 ];
 
+// パートナーDB全56カラムの完全仕様およびシノニム辞書
+const PARTNER_DB_COLUMNS_SPEC = [
+  { id: 'id', name: 'コード', synonyms: ['master_id', 'mid', 'アポイントID', 'コード', '企業コード', 'パートナーコード'] },
+  { id: 'type', name: '種別', synonyms: ['種別', '法人・個人', '事業形態', '形態', '法人/個人', '組織形態'] },
+  { id: 'parentPartnerCode', name: '所属元パートナーコード', synonyms: ['所属元パートナーコード', '所属元', '紹介元コード', '親パートナーコード', '親パートナー'] },
+  { id: 'systemName', name: 'システム登録名', synonyms: ['システム登録名', 'システム名', '表示名', 'アカウント名'] },
+  { id: 'systemNameKana', name: 'システム登録名カナ', synonyms: ['システム登録名カナ', 'システム名カナ', '表示名カナ'] },
+  { id: 'systemNameSyncMode', name: 'システム名自動連動(MANUAL/CORPORATE/REPRESENTATIVE)', synonyms: ['システム名自動連動', '連動設定', '自動連動'] },
+  { id: 'recordedAt', name: 'パートナー登録日時', synonyms: ['パートナー登録日時', '登録日時', '作成日時', '送信日時'] },
+  { id: 'roles', name: '役割(コロン/カンマ区切り)', synonyms: ['役割', 'ロール', 'パートナー区分', '区分'] },
+  { id: 'corpNum', name: '法人番号', synonyms: ['法人番号', 'マイナンバー', '13桁法人番号'] },
+  { id: 'establishedDate', name: '設立・開業年月', synonyms: ['設立・開業年月', '設立年月', '開業年月', '設立日', '創業年月', '設立', '開業'] },
+  { id: 'registeredName', name: '法人名/屋号', synonyms: ['法人名/屋号', '会社名', '法人名', '屋号', '貴社名', '御社名', '商号', '企業名', '正式名称'] },
+  { id: 'registeredNameKana', name: '法人名カナ/屋号カナ', synonyms: ['法人名カナ/屋号カナ', 'フリガナ', '会社名カナ', '法人名カナ', '屋号カナ', 'カイシャメイ', 'カナ'] },
+  { id: 'legalNameEffectiveDate', name: '法人名適用開始日', synonyms: ['法人名適用開始日', '社名変更日', '社名適用日'] },
+  { id: 'capital', name: '資本金', synonyms: ['資本金', '出資金', '出資額'] },
+  { id: 'capitalEffectiveDate', name: '資本金適用開始日', synonyms: ['資本金適用開始日', '増資日'] },
+  { id: 'fiscalMonth', name: '決算月', synonyms: ['決算月', '決算期', '事業年度終了月'] },
+  { id: 'fiscalMonthEffectiveDate', name: '決算月適用開始日', synonyms: ['決算月適用開始日'] },
+  { id: 'representativeName', name: '代表者名/個人名', synonyms: ['代表者名/個人名', '代表者名', '代表者', '代表取締役', '事業主名', '代表者氏名', '氏名', 'お名前'] },
+  { id: 'representativeNameKana', name: '代表者名カナ/個人名カナ', synonyms: ['代表者名カナ/個人名カナ', '代表者名カナ', '代表者カナ', '氏名カナ', 'お名前カナ', '代表フリガナ'] },
+  { id: 'repEffectiveDate', name: '代表者適用開始日', synonyms: ['代表者適用開始日', '代表就任日', '就任日'] },
+  { id: 'birthday', name: '生年月日', synonyms: ['生年月日', '代表者生年月日', '誕生日'] },
+  { id: 'blueReturn', name: '青色申告(TRUE/FALSE)', synonyms: ['青色申告', '青色申告の有無', '青色申告区分'] },
+  { id: 'blueReturnApprovedDate', name: '青色申告承認年月日', synonyms: ['青色申告承認年月日', '青色承認日', '青色承認年月日'] },
+  { id: 'hasPic', name: '担当者有無(TRUE/FALSE)', synonyms: ['担当者有無', '窓口担当者有無', '担当者の有無'] },
+  { id: 'picName', name: '担当者名', synonyms: ['担当者名', 'ご担当者名', 'ご担当者', '窓口担当者名', '窓口担当者'] },
+  { id: 'picNameKana', name: '担当者カナ', synonyms: ['担当者カナ', 'ご担当者カナ', '担当者フリガナ', '窓口担当者カナ'] },
+  { id: 'picPhone', name: '担当者電話', synonyms: ['担当者電話', '担当電話', '担当者携帯', '担当携帯', '直通電話', '担当者TEL'] },
+  { id: 'picEmail', name: '担当者メール', synonyms: ['担当者メール', '担当メール', '担当Email', '担当者連絡先メール'] },
+  { id: 'addressEffectiveDate', name: '所在地適用開始日', synonyms: ['所在地適用開始日', '移転日', '住所適用開始日'] },
+  { id: 'zipCode', name: '郵便番号', synonyms: ['郵便番号', '〒', '郵便', '本社郵便番号'] },
+  { id: 'pref', name: '都道府県', synonyms: ['都道府県', '本社都道府県'] },
+  { id: 'city', name: '市区町村', synonyms: ['市区町村', '本社市区町村'] },
+  { id: 'addr1', name: '番地など', synonyms: ['番地など', '番地', '町名・番地', '丁目・番地', '住所1', '住所', '所在地', '本店所在地'] },
+  { id: 'addr2', name: '建物名', synonyms: ['建物名', 'ビル名', 'マンション名', '号室', '住所2'] },
+  { id: 'phoneNumber', name: '代表電話番号', synonyms: ['代表電話番号', '代表電話', '会社電話', 'TEL', '電話番号', '連絡先電話番号'] },
+  { id: 'email', name: '代表メールアドレス', synonyms: ['代表メールアドレス', '代表メール', '会社メール', 'Email', 'メールアドレス', '連絡先メール'] },
+  { id: 'hpUrl', name: '企業HPリンク', synonyms: ['企業HPリンク', '企業HP', 'ホームページ', 'URL', 'Webサイト', '自社サイト'] },
+  { id: 'remarks', name: '備考', synonyms: ['備考', 'その他', '特記事項', 'ご要望', 'メモ'] },
+  { id: 'invoiceNum', name: 'インボイス登録番号', synonyms: ['インボイス登録番号', 'インボイス番号', '登録番号', '適格請求書発行事業者番号'] },
+  { id: 'invoiceDate', name: 'インボイス登録年月日', synonyms: ['インボイス登録年月日', 'インボイス発行日', '登録年月日'] },
+  { id: 'altAddressUsage', name: '別住所用途', synonyms: ['別住所用途', '送付先用途', '書類送付先用途'] },
+  { id: 'altRecipientName', name: '別宛名', synonyms: ['別宛名', '送付先宛名', '送付先名称'] },
+  { id: 'altZipCode', name: '別郵便番号', synonyms: ['別郵便番号', '送付先郵便番号'] },
+  { id: 'altPref', name: '別都道府県', synonyms: ['別都道府県', '送付先都道府県'] },
+  { id: 'altCity', name: '別市区町村', synonyms: ['別市区町村', '送付先市区町村'] },
+  { id: 'altAddr1', name: '別番地など', synonyms: ['別番地など', '送付先番地'] },
+  { id: 'altAddr2', name: '別建物名', synonyms: ['別建物名', '送付先建物名'] },
+  { id: 'altAddressEffectiveDate', name: '別所在地適用開始日', synonyms: ['別所在地適用開始日', '別送先適用日'] },
+  { id: 'bankEffectiveDate', name: '銀行口座適用開始日', synonyms: ['銀行口座適用開始日', '口座適用開始日', '口座登録日'] },
+  { id: 'bankCode', name: '銀行コード', synonyms: ['銀行コード', '金融機関コード'] },
+  { id: 'bankName', name: '銀行名', synonyms: ['銀行名', '金融機関名', '振込先銀行', '銀行'] },
+  { id: 'branchCode', name: '支店コード', synonyms: ['支店コード', '支店番号'] },
+  { id: 'branchName', name: '支店名', synonyms: ['支店名', '振込先支店', '支店'] },
+  { id: 'accType', name: '口座種類', synonyms: ['口座種類', '口座種別', '預金種別', '預金種目', '種目'] },
+  { id: 'accNum', name: '口座番号', synonyms: ['口座番号', '口座'] },
+  { id: 'accHolder', name: '口座名義カナ', synonyms: ['口座名義カナ', '口座名義', '口座名義人', '名義カナ', '振込先名義'] }
+];
+
+// 56項目の空レコード雛形
+const DEFAULT_EMPTY_PARTNER_56_RECORD = PARTNER_DB_COLUMNS_SPEC.reduce((acc, col) => {
+  acc[col.id] = '';
+  return acc;
+}, {});
+
 let dbmakePartners = [];
 let dbmakeFilterFav = false;
 let dbmakeDuplicateData = null;
@@ -28917,6 +29530,14 @@ function loadDbmakePartners() {
     dbmakePartners = [...DEFAULT_DBMAKE_PARTNERS];
     localStorage.setItem('synapse_dbmake_partners', JSON.stringify(dbmakePartners));
   }
+
+  // 🌟 パートナーDBカラム定義の全56カラム自動補完マイグレーション
+  if (!state.dbmakeColumns || state.dbmakeColumns.length < PARTNER_DB_COLUMNS_SPEC.length) {
+    state.dbmakeColumns = PARTNER_DB_COLUMNS_SPEC.map(col => ({ id: col.id, name: col.name }));
+    const dbmakeSuffix = getUserIdSuffix();
+    localStorage.setItem(`SYNAPSE_DBMAKE_COLUMNS${dbmakeSuffix}`, JSON.stringify(state.dbmakeColumns));
+  }
+
   const userId = getUserIdSuffix();
   state.dbmakeCellStyles = JSON.parse(localStorage.getItem(`SYNAPSE_DBMAKE_CELL_STYLES${userId}`)) || {};
   state.dbmakeRowHeights = JSON.parse(localStorage.getItem(`SYNAPSE_DBMAKE_ROW_HEIGHTS${userId}`)) || {};
@@ -28927,6 +29548,537 @@ function saveDbmakePartners() {
   const userId = getUserIdSuffix();
   localStorage.setItem(`SYNAPSE_DBMAKE_CELL_STYLES${userId}`, JSON.stringify(state.dbmakeCellStyles));
 }
+
+// ----------------------------------------------------
+// パートナーDB (全56カラム) 自動抽出・承認・多段更新パイプライン
+// ----------------------------------------------------
+
+// シノニム照合ヘルパー
+function findValueBySynonyms(data, synonyms) {
+  if (!synonyms || !Array.isArray(synonyms) || !data) return null;
+  const dataKeys = Object.keys(data);
+  for (const syn of synonyms) {
+    const synLower = syn.toLowerCase();
+    // 1. 完全一致優先
+    const exactKey = dataKeys.find(k => k.toLowerCase() === synLower);
+    if (exactKey && data[exactKey] !== undefined && String(data[exactKey]).trim() !== '') {
+      return { matchedKey: exactKey, value: String(data[exactKey]).trim() };
+    }
+    // 2. 部分一致（キーワードを含む）
+    const partialKey = dataKeys.find(k => k.toLowerCase().includes(synLower));
+    if (partialKey && data[partialKey] !== undefined && String(data[partialKey]).trim() !== '') {
+      return { matchedKey: partialKey, value: String(data[partialKey]).trim() };
+    }
+  }
+  return null;
+}
+
+// カラム名取得ヘルパー
+function getPartnerColLabel(colId) {
+  const col = PARTNER_DB_COLUMNS_SPEC.find(c => c.id === colId);
+  return col ? col.name : colId;
+}
+
+// 厳格な名寄せ（同定）ロジック
+// 🌟 コード完全一致 または 13桁法人番号完全一致 のみ自動統合を許可
+// 🌟 代表者名や電話番号のみの一致では勝手に統合せず、別コードを新規自動採番する！
+function resolvePartnerIdentity(fields) {
+  loadDbmakePartners();
+  const incomingId = fields['id'] || fields['master_id'] || fields['code'] || fields['コード'] || fields['アポイントID'];
+  const incomingCorpNum = fields['corpNum'] || fields['法人番号'];
+
+  // 1. コードの完全一致（絶対条件）
+  if (incomingId && String(incomingId).trim() !== '') {
+    const matched = dbmakePartners.find(p => String(p.id).trim().toUpperCase() === String(incomingId).trim().toUpperCase());
+    if (matched) return { matchType: 'ID', partner: matched, masterId: matched.id };
+  }
+
+  // 2. 13桁法人番号の完全一致（絶対条件）
+  if (incomingCorpNum && String(incomingCorpNum).trim().length === 13) {
+    const cleanCorpNum = String(incomingCorpNum).trim();
+    const matched = dbmakePartners.find(p => p.corpNum && String(p.corpNum).trim() === cleanCorpNum);
+    if (matched) return { matchType: 'CORP_NUM', partner: matched, masterId: matched.id };
+  }
+
+  // 3. それ以外（氏名一致、電話番号一致など）は勝手に統合しない！
+  // 🌟 新規コード（8桁英数字）を自動採番して独立レコードとして管理（既存指定コードがあれば尊重）
+  const newMasterId = (incomingId && String(incomingId).trim() !== '')
+    ? String(incomingId).trim().toUpperCase()
+    : ((typeof generate8DigitId === 'function') ? generate8DigitId() : ('P' + Math.random().toString(36).substr(2, 7).toUpperCase()));
+  return { matchType: 'NEW', partner: null, masterId: newMasterId };
+}
+
+// タイムスリップ復元関数（指定日時点での法人・契約データの再現）
+function getPartnerAtDate(partnerOrId, targetDate) {
+  loadDbmakePartners();
+  const partner = (typeof partnerOrId === 'object' && partnerOrId !== null)
+    ? partnerOrId
+    : dbmakePartners.find(p => p.id === partnerOrId);
+  if (!partner) return null;
+
+  if (!partner.timeline || partner.timeline.length === 0) {
+    return { ...partner };
+  }
+
+  const targetTs = new Date(targetDate).getTime();
+  // 過去スロットの中から targetDate 以下の最新スロットまでを累積適用
+  const effectiveSlots = partner.timeline
+    .filter(slot => new Date(slot.effectiveDate).getTime() <= targetTs)
+    .sort((a, b) => new Date(a.effectiveDate).getTime() - new Date(b.effectiveDate).getTime());
+
+  if (effectiveSlots.length === 0) {
+    // 指定日より前のデータがない場合、最も古いスロットの空状態
+    return { ...DEFAULT_EMPTY_PARTNER_56_RECORD, id: partner.id, recordedAt: partner.recordedAt };
+  }
+
+  // スロットを順次累積マージして当時の完全な状態を再現
+  let reconstructed = { ...DEFAULT_EMPTY_PARTNER_56_RECORD, id: partner.id, recordedAt: partner.recordedAt };
+  effectiveSlots.forEach(slot => {
+    reconstructed = { ...reconstructed, ...slot.data };
+  });
+
+  return reconstructed;
+}
+
+// パートナーDBコミット処理（時系列調停・Timeline Snapshot・差分検知）
+function commitPartnerDbRecord(extractedFields, formTitle, submittedAt = null, callback = null) {
+  loadDbmakePartners();
+
+  // コールバック引数の正規化（第3引数が関数の場合）
+  let effectiveCallback = callback;
+  let effectiveSubmittedAt = submittedAt;
+  if (typeof submittedAt === 'function') {
+    effectiveCallback = submittedAt;
+    effectiveSubmittedAt = null;
+  }
+  const eventTime = effectiveSubmittedAt ? new Date(effectiveSubmittedAt).toISOString() : new Date().toISOString();
+
+  // 🌟 厳格な名寄せ判定
+  const identity = resolvePartnerIdentity(extractedFields);
+  const masterId = identity.masterId;
+  extractedFields['id'] = masterId;
+
+  let existingPartner = identity.partner;
+
+  if (existingPartner) {
+    // ----------------------------------------------------
+    // 既存パートナー更新（時系列調停 ＆ Timeline Snapshot）
+    // ----------------------------------------------------
+    existingPartner.timeline = existingPartner.timeline || [];
+    existingPartner._fieldEffectiveDates = existingPartner._fieldEffectiveDates || {};
+
+    // 🌟 1. パートナー登録日時の最古イベント日時採用（Min-Timestamp 原則）
+    // 遅いフォームを先に入れ、後から古いフォームが入ってきた場合は最古日時に巻き戻し補正！
+    if (existingPartner.recordedAt) {
+      const existingRecordedTs = new Date(existingPartner.recordedAt).getTime();
+      const eventTs = new Date(eventTime).getTime();
+      if (eventTs < existingRecordedTs) {
+        existingPartner.recordedAt = eventTime;
+        console.log(`%c[Partner DB Time-Series]%c Corrected recordedAt to earlier event timestamp: ${eventTime}`, "color: #0284c7; font-weight: bold;", "color: inherit;");
+      }
+    } else {
+      existingPartner.recordedAt = eventTime;
+    }
+
+    // 🌟 2. Timeline Snapshot（時系列スロット）の自動割り込み挿入
+    const newSlot = {
+      effectiveDate: eventTime,
+      formTitle: formTitle,
+      sourceLogId: `slot_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      data: { ...extractedFields }
+    };
+    existingPartner.timeline.push(newSlot);
+    // 回答日時の昇順（古い順）に自動ソート
+    existingPartner.timeline.sort((a, b) => new Date(a.effectiveDate).getTime() - new Date(b.effectiveDate).getTime());
+
+    // 🌟 3. 最新値の更新判定（有効時間に基づく上書きガード）
+    const changedFields = [];
+    const addedFields = [];
+    const guardedFields = [];
+
+    Object.keys(extractedFields).forEach(key => {
+      if (key === 'id' || key === 'recordedAt' || key === 'timeline' || key === '_fieldEffectiveDates') return;
+      const newVal = extractedFields[key];
+      if (newVal === undefined || newVal === '') return; // 未回収項目は空欄のまま保持
+
+      const oldVal = existingPartner[key] || '';
+      const existingFieldTs = existingPartner._fieldEffectiveDates[key] ? new Date(existingPartner._fieldEffectiveDates[key]).getTime() : 0;
+      const incomingEventTs = new Date(eventTime).getTime();
+
+      if (oldVal !== '' && oldVal !== newVal) {
+        // 既存値がある場合の競合判定
+        if (incomingEventTs >= existingFieldTs) {
+          // 今回のデータの方が時間軸的に新しい（または同等） ➔ 最新値で更新
+          logCellEdit('dbmake', existingPartner.id, key, oldVal, newVal, 'EDIT');
+          existingPartner[key] = newVal;
+          existingPartner._fieldEffectiveDates[key] = eventTime;
+          changedFields.push({ key, oldVal, newVal });
+        } else {
+          // 既存データの方が新しい ➔ 上書きをガード（保護）し、最新値を維持！
+          guardedFields.push({ key, oldVal, incomingOldVal: newVal });
+          console.log(`%c[Time-Series Guard]%c Guarded field "${key}". Kept newer value "${oldVal}" against older value "${newVal}".`, "color: #eab308; font-weight: bold;", "color: inherit;");
+        }
+      } else if (oldVal === '' && newVal !== '') {
+        // 既存が空欄で新値が入った場合 ➔ 過去・未来問わず安全に穴埋め補完
+        logCellEdit('dbmake', existingPartner.id, key, '', newVal, 'EDIT');
+        existingPartner[key] = newVal;
+        existingPartner._fieldEffectiveDates[key] = eventTime;
+        addedFields.push({ key, newVal });
+      }
+    });
+
+    if (changedFields.length > 0 || addedFields.length > 0) {
+      existingPartner.lastUpdatedBy = `「${formTitle}」から更新 (${formatDateOnly(eventTime)})`;
+      existingPartner.lastUpdatedAt = new Date().toISOString();
+
+      const dateStr = new Date(eventTime).toLocaleDateString('ja-JP');
+      const details = [];
+      if (changedFields.length > 0) details.push(`変更: ${changedFields.map(f => getPartnerColLabel(f.key)).join(', ')}`);
+      if (addedFields.length > 0) details.push(`補完: ${addedFields.map(f => getPartnerColLabel(f.key)).join(', ')}`);
+      if (guardedFields.length > 0) details.push(`保護: ${guardedFields.map(f => getPartnerColLabel(f.key)).join(', ')}`);
+      const historyEntry = `[${dateStr} 「${formTitle}」から更新 (${details.join('; ')})]`;
+
+      if (!existingPartner.remarks) existingPartner.remarks = historyEntry;
+      else existingPartner.remarks += `\n${historyEntry}`;
+
+      showToast(`パートナー「${existingPartner.registeredName || masterId}」を更新しました（${formTitle}）。`, 'success');
+    }
+
+  } else {
+    // ----------------------------------------------------
+    // 初回新規登録（フォーム① または 新規インポート）
+    // ----------------------------------------------------
+    const fieldDates = {};
+    Object.keys(extractedFields).forEach(k => {
+      if (extractedFields[k]) fieldDates[k] = eventTime;
+    });
+
+    const newPartner = {
+      ...DEFAULT_EMPTY_PARTNER_56_RECORD,
+      ...extractedFields,
+      id: masterId,
+      recordedAt: eventTime, // 🌟 顧客の回答日時を登録日時としてセット
+      recordedBy: `初回登録 (${formTitle})`,
+      status: extractedFields['status'] || 'ACTIVE',
+      isFavorite: false,
+      _fieldEffectiveDates: fieldDates,
+      timeline: [
+        {
+          effectiveDate: eventTime,
+          formTitle: formTitle,
+          sourceLogId: `slot_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          data: { ...extractedFields, id: masterId }
+        }
+      ]
+    };
+
+    // システム名自動連動の初期評価
+    if (!newPartner.systemName && newPartner.registeredName) {
+      newPartner.systemName = newPartner.registeredName;
+    }
+    if (!newPartner.systemNameKana && newPartner.registeredNameKana) {
+      newPartner.systemNameKana = newPartner.registeredNameKana;
+    }
+    if (!newPartner.systemNameSyncMode) {
+      newPartner.systemNameSyncMode = newPartner.type === 'INDIVIDUAL' ? 'REPRESENTATIVE' : 'CORPORATE';
+    }
+
+    dbmakePartners.push(newPartner);
+    logCellEdit('dbmake', masterId, 'id', '', masterId, 'EDIT');
+    showToast(`パートナー「${newPartner.registeredName || masterId}」を新規登録しました（コード: ${masterId}）。`, 'success');
+  }
+
+  saveDbmakePartners();
+
+  if (state.currentView === 'dbmake-screen') {
+    renderDbmakePartners();
+  }
+
+  if (effectiveCallback) effectiveCallback(masterId);
+  return masterId;
+}
+
+function formatDateOnly(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+}
+
+// シノニム推論時の確認・承認モーダル
+function showPartnerDbApprovalModal({ masterId, formTitle, directFields, inferredFields, onCommit }) {
+  if (typeof window !== 'undefined' && typeof window.showPartnerDbApprovalModal === 'function' && window.showPartnerDbApprovalModal !== showPartnerDbApprovalModal) {
+    return window.showPartnerDbApprovalModal({ masterId, formTitle, directFields, inferredFields, onCommit });
+  }
+
+  // 既存モーダルがあれば削除
+  const oldModal = document.getElementById('partner-db-approval-modal');
+  if (oldModal) oldModal.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'partner-db-approval-modal';
+  overlay.style.position = 'fixed';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.width = '100vw';
+  overlay.style.height = '100vh';
+  overlay.style.backgroundColor = 'rgba(15, 23, 42, 0.6)';
+  overlay.style.zIndex = '99999';
+  overlay.style.display = 'flex';
+  overlay.style.alignItems = 'center';
+  overlay.style.justifyContent = 'center';
+  overlay.style.padding = '20px';
+  overlay.style.backdropFilter = 'blur(4px)';
+
+  const card = document.createElement('div');
+  card.style.backgroundColor = 'var(--bg-surface, #ffffff)';
+  card.style.color = 'var(--text-primary, #0f172a)';
+  card.style.borderRadius = '12px';
+  card.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)';
+  card.style.maxWidth = '680px';
+  card.style.width = '100%';
+  card.style.maxHeight = '85vh';
+  card.style.display = 'flex';
+  card.style.flexDirection = 'column';
+  card.style.overflow = 'hidden';
+  card.style.border = '1px solid var(--border-color, #cbd5e1)';
+
+  // ヘッダー
+  const header = document.createElement('div');
+  header.style.padding = '18px 24px';
+  header.style.borderBottom = '1px solid var(--border-color, #e2e8f0)';
+  header.style.backgroundColor = 'var(--bg-surface-elevated, #f8fafc)';
+  header.innerHTML = `
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+        <span>🛢️ パートナーDB 自動反映の確認・承認</span>
+      </div>
+      <span style="font-size: 0.75rem; background: #e0f2fe; color: #0284c7; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-family: monospace;">MID: ${escapeHtml(masterId)}</span>
+    </div>
+    <p style="font-size: 0.82rem; color: var(--text-muted, #64748b); margin: 6px 0 0 0; line-height: 1.4;">
+      フォーム「<strong>${escapeHtml(formTitle)}</strong>」の回答から、以下の項目が設問タイトルにより自動推論されました。<br>
+      誤補填を防ぐため、反映する項目をチェックして承認してください。
+    </p>
+  `;
+  card.appendChild(header);
+
+  // コンテンツ（推論項目リスト）
+  const body = document.createElement('div');
+  body.style.padding = '18px 24px';
+  body.style.overflowY = 'auto';
+  body.style.flex = '1';
+
+  let itemsHtml = `
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+      <thead>
+        <tr style="background: var(--bg-surface-elevated, #f1f5f9); text-align: left;">
+          <th style="padding: 8px; width: 40px; text-align: center;"><input type="checkbox" id="approval-check-all" checked></th>
+          <th style="padding: 8px;">パートナーDBカラム</th>
+          <th style="padding: 8px;">フォーム設問タイトル</th>
+          <th style="padding: 8px;">抽出値</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  const inferredKeys = Object.keys(inferredFields);
+  inferredKeys.forEach(colId => {
+    const info = inferredFields[colId];
+    itemsHtml += `
+      <tr style="border-bottom: 1px solid var(--border-color, #e2e8f0);">
+        <td style="padding: 8px; text-align: center;">
+          <input type="checkbox" class="approval-item-checkbox" data-col-id="${colId}" checked>
+        </td>
+        <td style="padding: 8px; font-weight: 600;">${escapeHtml(info.label)}</td>
+        <td style="padding: 8px; color: var(--text-muted); font-size: 0.8rem;">${escapeHtml(info.matchedKey)}</td>
+        <td style="padding: 8px; font-family: monospace; word-break: break-all; color: var(--primary, #0284c7);">${escapeHtml(info.value)}</td>
+      </tr>
+    `;
+  });
+
+  itemsHtml += `
+      </tbody>
+    </table>
+  `;
+
+  // 直接一致項目（レイヤー1）があれば参考表示
+  const directKeys = Object.keys(directFields).filter(k => k !== 'id' && k !== 'recordedAt');
+  if (directKeys.length > 0) {
+    itemsHtml += `
+      <div style="margin-top: 16px; padding: 10px 14px; background: rgba(16, 185, 129, 0.08); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2); font-size: 0.78rem;">
+        <span style="font-weight: 700; color: #059669;">✓ dataKey 直接一致項目（自動承認済）:</span>
+        <span style="color: var(--text-secondary); margin-left: 6px;">${directKeys.map(k => getPartnerColLabel(k)).join(', ')}</span>
+      </div>
+    `;
+  }
+
+  body.innerHTML = itemsHtml;
+  card.appendChild(body);
+
+  // フッター（アクションボタン）
+  const footer = document.createElement('div');
+  footer.style.padding = '14px 24px';
+  footer.style.borderTop = '1px solid var(--border-color, #e2e8f0)';
+  footer.style.display = 'flex';
+  footer.style.justifyContent = 'flex-end';
+  footer.style.gap = '10px';
+  footer.style.backgroundColor = 'var(--bg-surface-elevated, #f8fafc)';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn-secondary';
+  cancelBtn.textContent = 'スキップ（推論項目を除外）';
+  cancelBtn.style.padding = '8px 16px';
+  cancelBtn.style.fontSize = '0.85rem';
+  cancelBtn.onclick = () => {
+    overlay.remove();
+    // 推論項目は除外して、直接確定項目のみコミット
+    if (onCommit) onCommit(directFields);
+    showToast('シノニム推論項目の反映をスキップしました。', 'info');
+  };
+
+  const approveBtn = document.createElement('button');
+  approveBtn.className = 'btn-primary';
+  approveBtn.textContent = '✓ チェックした項目を承認して反映';
+  approveBtn.style.padding = '8px 18px';
+  approveBtn.style.fontSize = '0.85rem';
+  approveBtn.style.fontWeight = '700';
+  approveBtn.onclick = () => {
+    const checkedCols = {};
+    overlay.querySelectorAll('.approval-item-checkbox:checked').forEach(cb => {
+      const cId = cb.dataset.colId;
+      if (inferredFields[cId]) {
+        checkedCols[cId] = inferredFields[cId].value;
+      }
+    });
+    overlay.remove();
+    const finalFields = { ...directFields, ...checkedCols };
+    if (onCommit) onCommit(finalFields);
+  };
+
+  footer.appendChild(cancelBtn);
+  footer.appendChild(approveBtn);
+  card.appendChild(footer);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  // 全選択チェックボックスの連動
+  const checkAll = overlay.querySelector('#approval-check-all');
+  if (checkAll) {
+    checkAll.addEventListener('change', (e) => {
+      overlay.querySelectorAll('.approval-item-checkbox').forEach(cb => {
+        cb.checked = e.target.checked;
+      });
+    });
+  }
+}
+
+// フォーム回答からパートナーDBへの統合抽出・判定エントリポイント
+function processFormSubmissionToPartnerDb(data, formTitle, masterId, callback, customSubmittedAt = null) {
+  loadDbmakePartners();
+
+  const directFields = {};
+  const inferredFields = {};
+  const eventTime = customSubmittedAt || data['submittedAt'] || data['回答日時'] || data['登録日時'] || new Date().toISOString();
+
+  PARTNER_DB_COLUMNS_SPEC.forEach(col => {
+    // レイヤー1: dataKey直接一致（物理キーまたは日本語正式名称）
+    if (data[col.id] !== undefined && String(data[col.id]).trim() !== '') {
+      directFields[col.id] = String(data[col.id]).trim();
+    } else if (data[col.name] !== undefined && String(data[col.name]).trim() !== '') {
+      directFields[col.id] = String(data[col.name]).trim();
+    } else {
+      // レイヤー2: シノニム辞書による推論照合
+      const synMatch = findValueBySynonyms(data, col.synonyms);
+      if (synMatch) {
+        inferredFields[col.id] = {
+          label: col.name,
+          matchedKey: synMatch.matchedKey,
+          value: synMatch.value
+        };
+      }
+    }
+  });
+
+  // レイヤー3: マスターIDおよび特殊コンテキスト連動
+  const effectiveId = masterId || directFields['id'] || (typeof generate8DigitId === 'function' ? generate8DigitId() : ('P' + Math.random().toString(36).substr(2, 7).toUpperCase()));
+  directFields['id'] = effectiveId;
+
+  // 種別の自動判定（法人番号がある場合、または設問から）
+  if (!directFields['type']) {
+    if (directFields['corpNum'] || (inferredFields['corpNum'] && inferredFields['corpNum'].value)) {
+      directFields['type'] = 'CORPORATE';
+    } else if (directFields['registeredName'] || (inferredFields['registeredName'] && inferredFields['registeredName'].value)) {
+      const n = directFields['registeredName'] || inferredFields['registeredName'].value;
+      if (n.includes('株式会社') || n.includes('合同会社') || n.includes('有限会社') || n.includes('一般社団') || n.includes('法人')) {
+        directFields['type'] = 'CORPORATE';
+      }
+    }
+  }
+
+  // 担当者有無の自動補完
+  if (directFields['picName'] || (inferredFields['picName'] && inferredFields['picName'].value)) {
+    directFields['hasPic'] = 'TRUE';
+  }
+
+  // シノニム推論項目が存在する場合 ➔ 承認ゲートモーダルを起動
+  if (Object.keys(inferredFields).length > 0) {
+    showPartnerDbApprovalModal({
+      masterId: directFields['id'],
+      formTitle: formTitle,
+      directFields: directFields,
+      inferredFields: inferredFields,
+      onCommit: (approvedFields) => {
+        commitPartnerDbRecord(approvedFields, formTitle, eventTime, callback);
+      }
+    });
+  } else {
+    // 推論項目がなく全て直接確定項目の場合は即時コミット
+    commitPartnerDbRecord(directFields, formTitle, eventTime, callback);
+  }
+}
+
+// フォーム専用テーブルの行データをパートナーDBへ自動同期（一括入力・編集用）
+function syncFormTableRowToPartnerDb(tbl, row) {
+  if (!tbl || !row) return;
+  const formTitle = tbl.formTitle || tbl.name || 'フォーム一括入力';
+
+  const data = {};
+  if (tbl.columns) {
+    tbl.columns.forEach(col => {
+      if (row[col.id] !== undefined && row[col.id] !== '') {
+        data[col.name || col.label || col.id] = String(row[col.id]).trim();
+        data[col.id] = String(row[col.id]).trim();
+      }
+    });
+  }
+
+  // コード欄（id または code）が空の場合は8桁コードを自動採番
+  let masterId = row.id && !row.id.startsWith('row_') ? row.id : (row['id'] || row['コード'] || row['マスターID / コード'] || null);
+  if (!masterId || masterId.startsWith('row_')) {
+    masterId = typeof generate8DigitId === 'function' ? generate8DigitId() : Math.floor(10000000 + Math.random() * 90000000).toString();
+    row.id = masterId;
+    row['id'] = masterId;
+    data['id'] = masterId;
+  }
+
+  const submittedAt = row['submittedAt'] || row['回答日時'] || row['登録日時'] || new Date().toISOString();
+
+  processFormSubmissionToPartnerDb(data, formTitle, masterId, (finalPartnerId) => {
+    if (finalPartnerId && row.id !== finalPartnerId) {
+      row.id = finalPartnerId;
+      row['id'] = finalPartnerId;
+      if (typeof saveCustomTables === 'function') saveCustomTables();
+    }
+  }, submittedAt);
+}
+
+// フォーム専用テーブルをどこからでも開く共通ヘルパー
+window.openFormDedicatedTable = function(tableIdOrTitle) {
+  const tbl = (state.customTables || []).find(t => t.id === tableIdOrTitle || t.name === tableIdOrTitle || t.formTitle === tableIdOrTitle);
+  if (tbl) {
+    openTab(`custom-table-${tbl.id}`, 'custom-table-screen', `📋 ${tbl.name}`);
+  }
+};
+
 
 function openDbmakePage() {
   openTab('dbmake-screen', 'dbmake-screen', '🛢️ パートナーDB');
@@ -35009,91 +36161,724 @@ function renderUserBasedPermissionList(activeUserId = null) {
   }
 }
 
-function initAuditLogScreen() {
-  renderAuditLogs();
+// ============================================================================
+// ⏪ TimeCell Recovery & 操作ログ履歴 エンジン
+// ============================================================================
 
-  const applyBtn = document.getElementById('audit-log-filter-btn');
-  if (applyBtn) {
-    const newApplyBtn = applyBtn.cloneNode(true);
-    applyBtn.parentNode.replaceChild(newApplyBtn, applyBtn);
-    newApplyBtn.addEventListener('click', () => renderAuditLogs());
-  }
-
-  const resetBtn = document.getElementById('audit-log-reset-btn');
-  if (resetBtn) {
-    const newResetBtn = resetBtn.cloneNode(true);
-    resetBtn.parentNode.replaceChild(newResetBtn, resetBtn);
-    newResetBtn.addEventListener('click', () => {
-      const userFilter = document.getElementById('audit-log-filter-user');
-      const tableFilter = document.getElementById('audit-log-filter-table');
-      const wordFilter = document.getElementById('audit-log-filter-word');
-      if (userFilter) userFilter.value = '';
-      if (tableFilter) tableFilter.value = '';
-      if (wordFilter) wordFilter.value = '';
-      renderAuditLogs();
-    });
-  }
+let auditFilterState = {
+  types: ['ALL'], // 'ALL' or array of 'EDIT', 'DELETE', 'RESTORE'
+  users: [],      // empty = all users
+  dateMode: 'range', // 'range' | 'single' | 'multi'
+  dateFrom: '',
+  dateTo: '',
+  singleDate: '',
+  multiDates: [],
+  table: '',
+  word: '',
+  expandedGroupIds: new Set()
+};
+if (typeof window !== 'undefined') {
+  window.auditFilterState = auditFilterState;
 }
 
-function renderAuditLogs() {
-  const tbody = document.getElementById('audit-log-table-body');
-  if (!tbody) return;
-  tbody.innerHTML = '';
+// ログの自動グループ化（同一ユーザー × 同一テーブル × 10分以内の連続操作・スマートセッションバッチ）
+function groupAuditLogs(logs) {
+  if (!logs || logs.length === 0) return [];
+  const groups = [];
+  const GAP_MS = 10 * 60 * 1000; // 10分
 
-  const userVal = document.getElementById('audit-log-filter-user')?.value.trim().toLowerCase();
-  const tableVal = document.getElementById('audit-log-filter-table')?.value.trim().toLowerCase();
-  const wordVal = document.getElementById('audit-log-filter-word')?.value.trim().toLowerCase();
-
-  const filtered = state.auditLogs.filter(log => {
-    if (userVal && !String(log.userId || '').toLowerCase().includes(userVal)) return false;
-    if (tableVal && !String(log.tableName || '').toLowerCase().includes(tableVal)) return false;
+  logs.forEach(log => {
+    const logTime = new Date(log.timestamp).getTime();
     
-    if (wordVal) {
-      const matchWord = 
-        String(log.oldValue || '').toLowerCase().includes(wordVal) ||
-        String(log.newValue || '').toLowerCase().includes(wordVal) ||
-        String(log.columnName || '').toLowerCase().includes(wordVal);
-      if (!matchWord) return false;
+    // 直近のグループの中から、同一ユーザー × 同一テーブル かつ 時間差が10分以内のものを検索
+    const matchingGroup = groups.find(g => 
+      g.userId === log.userId && 
+      g.tableId === log.tableId && 
+      Math.abs(g.lastTime - logTime) <= GAP_MS
+    );
+
+    if (matchingGroup) {
+      matchingGroup.logs.push(log);
+      matchingGroup.lastTime = Math.min(matchingGroup.lastTime, logTime);
+      matchingGroup.startTime = new Date(Math.max(new Date(matchingGroup.startTime).getTime(), logTime)).toISOString();
+      if (!matchingGroup.types.includes(log.type || 'EDIT')) {
+        matchingGroup.types.push(log.type || 'EDIT');
+      }
+    } else {
+      groups.push({
+        id: `grp_${log.id}`,
+        userId: log.userId,
+        userName: log.userName || log.userId,
+        tableId: log.tableId,
+        tableName: log.tableName || log.tableId,
+        startTime: log.timestamp,
+        lastTime: logTime,
+        types: [log.type || 'EDIT'],
+        logs: [log]
+      });
     }
-    return true;
   });
 
-  if (filtered.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="6" style="text-align:center; padding:2rem; color:var(--text-muted);">操作ログ履歴がありません。</td>
-      </tr>
-    `;
+  return groups;
+}
+
+// TimeCell Recovery 復元実行エンジン（管理者専用権限ガード）
+function executeTimeCellRecovery(targetLogs, confirmMsg = null) {
+  // 1. 厳格な管理者権限チェック
+  const isMasterAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.role === 'admin' || state.currentUser.role === 'owner' || state.currentUser.id === 'admin'));
+  if (!isMasterAdmin) {
+    showToast('TimeCell Recovery を実行する管理者権限がありません。', 'error');
+    console.error('[Security] Unauthorized attempt to execute TimeCell Recovery.');
     return;
   }
 
-  filtered.forEach(log => {
-    const tr = document.createElement('tr');
-    tr.style.borderBottom = '1px solid var(--border-color)';
-    tr.style.height = '35px';
+  if (!targetLogs || targetLogs.length === 0) {
+    showToast('復元対象の操作ログがありません。', 'warning');
+    return;
+  }
 
-    const formatDate = (ts) => {
-      if (!ts) return '';
-      const d = new Date(ts);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const h = String(d.getHours()).padStart(2, '0');
-      const min = String(d.getMinutes()).padStart(2, '0');
-      const s = String(d.getSeconds()).padStart(2, '0');
-      const ms = String(d.getMilliseconds()).padStart(3, '0');
-      return `${y}-${m}-${day} ${h}:${min}:${s}.${ms}`;
-    };
+  const promptText = confirmMsg || `選択した ${targetLogs.length} 件のセル変更を、変更前の過去データへ復元（TimeCell Recovery）します。\n他のユーザーの入力は一切変更されません。よろしいですか？`;
+  if (!confirm(promptText)) return;
 
-    tr.innerHTML = `
-      <td style="padding:0.5rem 1rem; color:var(--text-muted); font-size:0.8rem; font-family:monospace;">${formatDate(log.timestamp)}</td>
-      <td style="padding:0.5rem 1rem; font-weight:bold; color:var(--text-primary);">${log.userId}</td>
-      <td style="padding:0.5rem 1rem; color:var(--text-secondary);">${log.tableName}</td>
-      <td style="padding:0.5rem 1rem; color:var(--text-muted); font-family:monospace;">${log.columnName} (行 ID: ${log.rowId})</td>
-      <td style="padding:0.5rem 1rem; color:var(--text-secondary); background:rgba(239, 68, 68, 0.05); text-decoration:line-through; font-family:monospace; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${log.oldValue}">${log.oldValue || '(空)'}</td>
-      <td style="padding:0.5rem 1rem; color:var(--text-primary); background:rgba(16, 185, 129, 0.05); font-weight:bold; font-family:monospace; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${log.newValue}">${log.newValue || '(空)'}</td>
+  // 2. 最新の操作から順に巻き戻すため「降順（新しい順）」にソート
+  const sortedLogs = [...targetLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  // 3. テーブルごとにグループ化してコミット
+  const groupedByTable = {};
+  sortedLogs.forEach(log => {
+    if (!groupedByTable[log.tableId]) groupedByTable[log.tableId] = [];
+    groupedByTable[log.tableId].push(log);
+  });
+
+  const currentUser = state.currentUser ? (state.currentUser.name || state.currentUser.id) : '管理者';
+  let restoredCount = 0;
+
+  Object.keys(groupedByTable).forEach(tableId => {
+    let normId = tableId;
+    if (tableId.startsWith('custom-table-')) normId = tableId.replace('custom-table-', '');
+    if (tableId === 'dbmake-partners' || tableId === 'dbmake-screen') normId = 'dbmake';
+    if (tableId === 'jo-contracts' || tableId === 'jo-info-screen') normId = 'jo';
+    if (tableId === 'ap-contracts' || tableId === 'applicant-info-screen') normId = 'ap';
+    if (tableId === 'ag-contracts' || tableId === 'agency-info-screen') normId = 'ag';
+
+    const meta = getTableMeta(normId);
+    if (!meta || !meta.rows) return;
+
+    groupedByTable[tableId].forEach(log => {
+      const row = meta.rows.find(r => (r.id === log.rowId || r.customerId === log.rowId || r.customerPersonalityId === log.rowId));
+      if (row) {
+        const currentVal = row[log.columnId] !== undefined ? row[log.columnId] : '';
+        const restoreVal = log.oldValue !== undefined ? log.oldValue : '';
+
+        // 対象セルの値を復元
+        row[log.columnId] = restoreVal;
+        restoredCount++;
+
+        // 🌟 復元ログ（RESTORE）の新規記録（トレーサビリティの永久保持）
+        const restoreLog = {
+          id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          type: 'RESTORE',
+          timestamp: new Date().toISOString(),
+          userId: state.currentUser ? (state.currentUser.loginId || state.currentUser.id) : 'admin',
+          userName: currentUser,
+          tableId: tableId,
+          tableName: log.tableName,
+          rowId: log.rowId,
+          columnId: log.columnId,
+          columnName: log.columnName,
+          oldValue: currentVal,
+          newValue: restoreVal,
+          restoredFrom: {
+            targetLogId: log.id,
+            originalTimestamp: log.timestamp,
+            originalUser: log.userName || log.userId,
+            originalType: log.type || 'EDIT'
+          }
+        };
+        state.auditLogs.unshift(restoreLog);
+      }
+    });
+
+    if (typeof meta.save === 'function') meta.save();
+    if (typeof meta.render === 'function') meta.render();
+  });
+
+  saveAuditLogs();
+  renderAuditLogs();
+  showToast(`${restoredCount} 件のデータを TimeCell Recovery で復元しました。`, 'success');
+}
+
+function initAuditLogScreen() {
+  // アイコン描画
+  const headerIcon = document.getElementById('audit-log-header-icon');
+  if (headerIcon && window.SYNAPSE_LINE_ICONS) {
+    headerIcon.innerHTML = SYNAPSE_LINE_ICONS.clock(22);
+  }
+  const bulkBtnIcon = document.getElementById('timecell-bulk-btn-icon');
+  if (bulkBtnIcon && window.SYNAPSE_LINE_ICONS) {
+    bulkBtnIcon.innerHTML = SYNAPSE_LINE_ICONS.rewind(15);
+  }
+  const clearBtnIcon = document.getElementById('audit-clear-btn-icon');
+  if (clearBtnIcon && window.SYNAPSE_LINE_ICONS) {
+    clearBtnIcon.innerHTML = SYNAPSE_LINE_ICONS.trash(15);
+  }
+  const userFilterIcon = document.getElementById('icon-user-filter');
+  if (userFilterIcon && window.SYNAPSE_LINE_ICONS) {
+    userFilterIcon.innerHTML = SYNAPSE_LINE_ICONS.user(14);
+  }
+  const userChevronIcon = document.getElementById('icon-user-chevron');
+  if (userChevronIcon && window.SYNAPSE_LINE_ICONS) {
+    userChevronIcon.innerHTML = SYNAPSE_LINE_ICONS.chevronDown(13);
+  }
+  const clockFilterIcon = document.getElementById('icon-clock-filter');
+  if (clockFilterIcon && window.SYNAPSE_LINE_ICONS) {
+    clockFilterIcon.innerHTML = SYNAPSE_LINE_ICONS.calendar(14);
+  }
+
+  // 1. 操作種別チップのイベント
+  document.querySelectorAll('.audit-type-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const type = chip.dataset.type;
+      if (type === 'ALL') {
+        auditFilterState.types = ['ALL'];
+        document.querySelectorAll('.audit-type-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      } else {
+        // ALLを解除
+        const allChip = document.querySelector('.audit-type-chip[data-type="ALL"]');
+        if (allChip) allChip.classList.remove('active');
+        if (auditFilterState.types.includes('ALL')) auditFilterState.types = [];
+
+        if (auditFilterState.types.includes(type)) {
+          auditFilterState.types = auditFilterState.types.filter(t => t !== type);
+          chip.classList.remove('active');
+        } else {
+          auditFilterState.types.push(type);
+          chip.classList.add('active');
+        }
+
+        if (auditFilterState.types.length === 0) {
+          auditFilterState.types = ['ALL'];
+          if (allChip) allChip.classList.add('active');
+        }
+      }
+      renderAuditLogs();
+    });
+  });
+
+  // 2. クイック期間ボタンのイベント
+  document.querySelectorAll('.audit-quick-date-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const range = btn.dataset.range;
+      const now = new Date();
+      const dateModeSelect = document.getElementById('audit-date-mode-select');
+      const fromInput = document.getElementById('audit-filter-date-from');
+      const toInput = document.getElementById('audit-filter-date-to');
+
+      if (dateModeSelect) dateModeSelect.value = 'range';
+      toggleAuditDateMode('range');
+
+      if (range === 'all') {
+        auditFilterState.dateFrom = '';
+        auditFilterState.dateTo = '';
+        if (fromInput) fromInput.value = '';
+        if (toInput) toInput.value = '';
+      } else if (range === '1h') {
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        auditFilterState.dateFrom = oneHourAgo.toISOString().slice(0, 16);
+        auditFilterState.dateTo = now.toISOString().slice(0, 16);
+        if (fromInput) fromInput.value = auditFilterState.dateFrom;
+        if (toInput) toInput.value = auditFilterState.dateTo;
+      } else if (range === '24h') {
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        auditFilterState.dateFrom = oneDayAgo.toISOString().slice(0, 16);
+        auditFilterState.dateTo = now.toISOString().slice(0, 16);
+        if (fromInput) fromInput.value = auditFilterState.dateFrom;
+        if (toInput) toInput.value = auditFilterState.dateTo;
+      } else if (range === 'today') {
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        auditFilterState.dateFrom = todayStart.toISOString().slice(0, 16);
+        auditFilterState.dateTo = now.toISOString().slice(0, 16);
+        if (fromInput) fromInput.value = auditFilterState.dateFrom;
+        if (toInput) toInput.value = auditFilterState.dateTo;
+      } else if (range === 'yesterday') {
+        const yStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
+        const yEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
+        auditFilterState.dateFrom = yStart.toISOString().slice(0, 16);
+        auditFilterState.dateTo = yEnd.toISOString().slice(0, 16);
+        if (fromInput) fromInput.value = auditFilterState.dateFrom;
+        if (toInput) toInput.value = auditFilterState.dateTo;
+      }
+      renderAuditLogs();
+    });
+  });
+
+  // 3. ユーザーマルチセレクトドロップダウン
+  const userBtn = document.getElementById('audit-user-multiselect-btn');
+  const userDropdown = document.getElementById('audit-user-dropdown');
+  if (userBtn && userDropdown) {
+    userBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      userDropdown.style.display = userDropdown.style.display === 'none' ? 'block' : 'none';
+      renderAuditUserDropdown();
+    });
+    document.addEventListener('click', (e) => {
+      if (!userBtn.contains(e.target) && !userDropdown.contains(e.target)) {
+        userDropdown.style.display = 'none';
+      }
+    });
+  }
+
+  // 4. 日時モードセレクト
+  const dateModeSelect = document.getElementById('audit-date-mode-select');
+  if (dateModeSelect) {
+    dateModeSelect.addEventListener('change', (e) => {
+      toggleAuditDateMode(e.target.value);
+      renderAuditLogs();
+    });
+  }
+
+  const fromInput = document.getElementById('audit-filter-date-from');
+  const toInput = document.getElementById('audit-filter-date-to');
+  if (fromInput) fromInput.addEventListener('change', (e) => { auditFilterState.dateFrom = e.target.value; renderAuditLogs(); });
+  if (toInput) toInput.addEventListener('change', (e) => { auditFilterState.dateTo = e.target.value; renderAuditLogs(); });
+
+  const singleInput = document.getElementById('audit-filter-date-single');
+  if (singleInput) singleInput.addEventListener('change', (e) => { auditFilterState.singleDate = e.target.value; renderAuditLogs(); });
+
+  const multiAddBtn = document.getElementById('audit-date-multi-add-btn');
+  const multiInput = document.getElementById('audit-filter-date-multi-input');
+  if (multiAddBtn && multiInput) {
+    multiAddBtn.addEventListener('click', () => {
+      const val = multiInput.value;
+      if (val && !auditFilterState.multiDates.includes(val)) {
+        auditFilterState.multiDates.push(val);
+        renderMultiDateChips();
+        renderAuditLogs();
+      }
+    });
+  }
+
+  // テーブル・ワード検索
+  const tableInput = document.getElementById('audit-log-filter-table');
+  if (tableInput) tableInput.addEventListener('input', (e) => { auditFilterState.table = e.target.value; renderAuditLogs(); });
+
+  const wordInput = document.getElementById('audit-log-filter-word');
+  if (wordInput) wordInput.addEventListener('input', (e) => { auditFilterState.word = e.target.value; renderAuditLogs(); });
+
+  // リセットボタン
+  const resetBtn = document.getElementById('audit-log-reset-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      auditFilterState = {
+        types: ['ALL'],
+        users: [],
+        dateMode: 'range',
+        dateFrom: '',
+        dateTo: '',
+        singleDate: '',
+        multiDates: [],
+        table: '',
+        word: '',
+        expandedGroupIds: new Set()
+      };
+      if (tableInput) tableInput.value = '';
+      if (wordInput) wordInput.value = '';
+      if (fromInput) fromInput.value = '';
+      if (toInput) toInput.value = '';
+      if (singleInput) singleInput.value = '';
+      if (dateModeSelect) dateModeSelect.value = 'range';
+      toggleAuditDateMode('range');
+      document.querySelectorAll('.audit-type-chip').forEach(c => {
+        if (c.dataset.type === 'ALL') c.classList.add('active');
+        else c.classList.remove('active');
+      });
+      renderAuditLogs();
+    });
+  }
+
+  // 展開・折りたたみボタン
+  const expandAllBtn = document.getElementById('audit-expand-all-btn');
+  const collapseAllBtn = document.getElementById('audit-collapse-all-btn');
+  if (expandAllBtn) {
+    expandAllBtn.addEventListener('click', () => {
+      document.querySelectorAll('.audit-group-item').forEach(el => {
+        el.classList.add('expanded');
+        const rows = el.querySelector('.audit-group-rows');
+        if (rows) rows.style.display = 'block';
+        const chevron = el.querySelector('.audit-group-chevron');
+        if (chevron && window.SYNAPSE_LINE_ICONS) chevron.innerHTML = SYNAPSE_LINE_ICONS.chevronDown(14);
+      });
+    });
+  }
+  if (collapseAllBtn) {
+    collapseAllBtn.addEventListener('click', () => {
+      document.querySelectorAll('.audit-group-item').forEach(el => {
+        el.classList.remove('expanded');
+        const rows = el.querySelector('.audit-group-rows');
+        if (rows) rows.style.display = 'none';
+        const chevron = el.querySelector('.audit-group-chevron');
+        if (chevron && window.SYNAPSE_LINE_ICONS) chevron.innerHTML = SYNAPSE_LINE_ICONS.chevronRight(14);
+      });
+    });
+  }
+
+  // 履歴クリアボタン
+  const clearBtn = document.getElementById('audit-log-clear-btn');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      const isMasterAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.role === 'admin' || state.currentUser.role === 'owner' || state.currentUser.id === 'admin'));
+      if (!isMasterAdmin) {
+        showToast('操作ログをクリアする権限がありません。', 'error');
+        return;
+      }
+      if (confirm('すべての操作ログ履歴を完全に消去しますか？（この操作は元に戻せません）')) {
+        state.auditLogs = [];
+        saveAuditLogs();
+        renderAuditLogs();
+        showToast('操作ログ履歴をクリアしました。', 'info');
+      }
+    });
+  }
+
+  renderAuditLogs();
+}
+
+function toggleAuditDateMode(mode) {
+  auditFilterState.dateMode = mode;
+  const rangeBox = document.getElementById('audit-date-range-box');
+  const singleBox = document.getElementById('audit-date-single-box');
+  const multiBox = document.getElementById('audit-date-multi-box');
+  if (rangeBox) rangeBox.style.display = mode === 'range' ? 'flex' : 'none';
+  if (singleBox) singleBox.style.display = mode === 'single' ? 'flex' : 'none';
+  if (multiBox) multiBox.style.display = mode === 'multi' ? 'flex' : 'none';
+}
+
+function renderMultiDateChips() {
+  const container = document.getElementById('audit-date-multi-chips');
+  if (!container) return;
+  container.innerHTML = '';
+  auditFilterState.multiDates.forEach(d => {
+    const chip = document.createElement('span');
+    chip.style.cssText = 'background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.72rem; display: flex; align-items: center; gap: 0.25rem;';
+    chip.innerHTML = `<span>${d}</span> <span style="cursor: pointer; font-weight: bold;">&times;</span>`;
+    chip.querySelector('span:last-child').addEventListener('click', () => {
+      auditFilterState.multiDates = auditFilterState.multiDates.filter(item => item !== d);
+      renderMultiDateChips();
+      renderAuditLogs();
+    });
+    container.appendChild(chip);
+  });
+}
+
+function renderAuditUserDropdown() {
+  const dropdown = document.getElementById('audit-user-dropdown');
+  if (!dropdown) return;
+  dropdown.innerHTML = '';
+
+  const uniqueUsers = Array.from(new Set(state.auditLogs.map(l => l.userId || 'system'))).filter(Boolean);
+  if (uniqueUsers.length === 0) {
+    dropdown.innerHTML = '<div style="font-size:0.75rem; color:var(--text-muted); padding:0.4rem;">ユーザーがいません</div>';
+    return;
+  }
+
+  const allLabel = document.createElement('label');
+  allLabel.style.cssText = 'display: flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.4rem; font-size: 0.78rem; cursor: pointer; border-bottom: 1px solid var(--border-color); margin-bottom: 0.25rem; font-weight: 600;';
+  allLabel.innerHTML = `<input type="checkbox" id="audit-user-all-cb" ${auditFilterState.users.length === 0 ? 'checked' : ''} /> <span>すべて選択</span>`;
+  allLabel.querySelector('input').addEventListener('change', (e) => {
+    if (e.target.checked) {
+      auditFilterState.users = [];
+      dropdown.querySelectorAll('.audit-user-item-cb').forEach(cb => cb.checked = false);
+    }
+    updateAuditUserLabel();
+    renderAuditLogs();
+  });
+  dropdown.appendChild(allLabel);
+
+  uniqueUsers.forEach(uId => {
+    const logItem = state.auditLogs.find(l => l.userId === uId);
+    const uName = logItem ? logItem.userName || uId : uId;
+    const isChecked = auditFilterState.users.includes(uId);
+
+    const itemLabel = document.createElement('label');
+    itemLabel.style.cssText = 'display: flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.4rem; font-size: 0.78rem; cursor: pointer; border-radius: 4px;';
+    itemLabel.innerHTML = `<input type="checkbox" class="audit-user-item-cb" value="${uId}" ${isChecked ? 'checked' : ''} /> <span>${uName} <small style="color:var(--text-muted);">(${uId})</small></span>`;
+    
+    itemLabel.querySelector('input').addEventListener('change', (e) => {
+      const allCb = document.getElementById('audit-user-all-cb');
+      if (allCb) allCb.checked = false;
+
+      if (e.target.checked) {
+        if (!auditFilterState.users.includes(uId)) auditFilterState.users.push(uId);
+      } else {
+        auditFilterState.users = auditFilterState.users.filter(id => id !== uId);
+      }
+      if (auditFilterState.users.length === 0 && allCb) allCb.checked = true;
+
+      updateAuditUserLabel();
+      renderAuditLogs();
+    });
+    dropdown.appendChild(itemLabel);
+  });
+}
+
+function updateAuditUserLabel() {
+  const label = document.getElementById('audit-user-selected-label');
+  if (!label) return;
+  if (auditFilterState.users.length === 0) {
+    label.textContent = 'すべての操作者';
+  } else if (auditFilterState.users.length === 1) {
+    const u = auditFilterState.users[0];
+    const logItem = state.auditLogs.find(l => l.userId === u);
+    label.textContent = logItem ? (logItem.userName || u) : u;
+  } else {
+    label.textContent = `${auditFilterState.users.length} 名を選択中`;
+  }
+}
+
+// 🌟 複合フィルターの評価エンジン
+function filterAuditLogs(logs = (state.auditLogs || [])) {
+  if (!logs || logs.length === 0) return [];
+  return logs.filter(log => {
+    // 1. 操作種別フィルター
+    if (auditFilterState.types && !auditFilterState.types.includes('ALL')) {
+      const logType = log.type || 'EDIT';
+      if (!auditFilterState.types.includes(logType)) return false;
+    }
+
+    // 2. ユーザーフィルター（複数指定対応）
+    if (auditFilterState.users && auditFilterState.users.length > 0) {
+      if (!auditFilterState.users.includes(log.userId)) return false;
+    }
+
+    // 3. 日時フィルター（3モード対応）
+    const logDate = new Date(log.timestamp);
+    if (auditFilterState.dateMode === 'range') {
+      if (auditFilterState.dateFrom && new Date(log.timestamp) < new Date(auditFilterState.dateFrom)) return false;
+      if (auditFilterState.dateTo && new Date(log.timestamp) > new Date(auditFilterState.dateTo)) return false;
+    } else if (auditFilterState.dateMode === 'single') {
+      if (auditFilterState.singleDate) {
+        const logDateStr = logDate.toISOString().slice(0, 10);
+        if (logDateStr !== auditFilterState.singleDate) return false;
+      }
+    } else if (auditFilterState.dateMode === 'multi') {
+      if (auditFilterState.multiDates && auditFilterState.multiDates.length > 0) {
+        const logDateStr = logDate.toISOString().slice(0, 10);
+        if (!auditFilterState.multiDates.includes(logDateStr)) return false;
+      }
+    }
+
+    // 4. テーブルフィルター
+    if (auditFilterState.table && !String(log.tableName || '').toLowerCase().includes(auditFilterState.table.toLowerCase())) return false;
+
+    // 5. ワード検索
+    if (auditFilterState.word) {
+      const w = auditFilterState.word.toLowerCase();
+      const matchWord = 
+        String(log.oldValue || '').toLowerCase().includes(w) ||
+        String(log.newValue || '').toLowerCase().includes(w) ||
+        String(log.columnName || '').toLowerCase().includes(w);
+      if (!matchWord) return false;
+    }
+
+    return true;
+  });
+}
+
+function renderAuditLogs() {
+  const container = document.getElementById('audit-groups-container');
+  const emptyNotice = document.getElementById('audit-log-empty');
+  const groupCountEl = document.getElementById('audit-group-count');
+  const totalCountEl = document.getElementById('audit-total-log-count');
+  const bulkBtn = document.getElementById('timecell-recovery-bulk-btn');
+  const bulkCountSpan = document.getElementById('timecell-selected-count');
+  if (!container) return;
+
+  container.innerHTML = '';
+  if (!state.auditLogs) state.auditLogs = [];
+
+  const isMasterAdmin = isOwnerUser() || (state.currentUser && (state.currentUser.role === 'admin' || state.currentUser.role === 'owner' || state.currentUser.id === 'admin'));
+
+  // 🌟 複合フィルターの評価
+  const filtered = filterAuditLogs(state.auditLogs);
+
+  if (groupCountEl) groupCountEl.textContent = '0';
+  if (totalCountEl) totalCountEl.textContent = filtered.length;
+
+  // 管理者専用 TimeCell 一括復元ボタンの表示制御
+  if (bulkBtn) {
+    if (isMasterAdmin && filtered.length > 0) {
+      bulkBtn.style.display = 'flex';
+      if (bulkCountSpan) bulkCountSpan.textContent = filtered.length;
+      bulkBtn.onclick = () => {
+        executeTimeCellRecovery(filtered, `現在絞り込まれている ${filtered.length} 件の操作をすべて一括復元（TimeCell Recovery）します。\n他のユーザーの入力は一切破壊されません。よろしいですか？`);
+      };
+    } else {
+      bulkBtn.style.display = 'none';
+    }
+  }
+
+  if (filtered.length === 0) {
+    if (emptyNotice) emptyNotice.style.display = 'block';
+    return;
+  }
+  if (emptyNotice) emptyNotice.style.display = 'none';
+
+  // 🌟 Googleスプレッドシート風 連続操作の自動グループ化
+  const groups = groupAuditLogs(filtered);
+  if (groupCountEl) groupCountEl.textContent = groups.length;
+
+  const formatDate = (ts) => {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    const s = String(d.getSeconds()).padStart(2, '0');
+    return `${m}/${day} ${h}:${min}:${s}`;
+  };
+
+  const getActionBadgeHtml = (type) => {
+    if (type === 'DELETE') {
+      return `<span style="display:inline-flex; align-items:center; gap:0.25rem; background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; padding:0.1rem 0.45rem; border-radius:4px; font-size:0.72rem; font-weight:700;">${SYNAPSE_LINE_ICONS.trash(12)} 削除</span>`;
+    } else if (type === 'RESTORE') {
+      return `<span style="display:inline-flex; align-items:center; gap:0.25rem; background:#f3e8ff; color:#7e22ce; border:1px solid #e9d5ff; padding:0.1rem 0.45rem; border-radius:4px; font-size:0.72rem; font-weight:700;">${SYNAPSE_LINE_ICONS.rewind(12)} 復元</span>`;
+    } else {
+      return `<span style="display:inline-flex; align-items:center; gap:0.25rem; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:0.1rem 0.45rem; border-radius:4px; font-size:0.72rem; font-weight:700;">${SYNAPSE_LINE_ICONS.edit(12)} 編集</span>`;
+    }
+  };
+
+  groups.forEach(grp => {
+    const groupCard = document.createElement('div');
+    groupCard.className = 'audit-group-item';
+    groupCard.style.cssText = 'border-bottom: 1px solid var(--border-color); background: var(--bg-surface);';
+
+    const isExpanded = auditFilterState.expandedGroupIds.has(grp.id);
+
+    // グループヘッダー
+    const header = document.createElement('div');
+    header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 1rem; cursor: pointer; background: var(--bg-surface-elevated); border-bottom: 1px solid rgba(0,0,0,0.05); user-select: none;';
+    
+    header.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+        <span class="audit-group-chevron" style="color: var(--text-secondary); display: flex; align-items: center;">
+          ${isExpanded ? SYNAPSE_LINE_ICONS.chevronDown(14) : SYNAPSE_LINE_ICONS.chevronRight(14)}
+        </span>
+        <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); font-family: monospace;">
+          ${formatDate(grp.startTime)} ${grp.startTime !== grp.lastTime ? '〜 ' + formatDate(grp.lastTime) : ''}
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.1rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+          ${SYNAPSE_LINE_ICONS.user(12)} ${grp.userName}
+        </span>
+        <span style="color: var(--text-secondary); font-size: 0.8rem;">${grp.tableName}</span>
+        <span style="background: rgba(59, 130, 246, 0.1); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.2); padding: 0.05rem 0.45rem; border-radius: 10px; font-size: 0.72rem; font-weight: 700;">
+          ${grp.logs.length} 件の操作
+        </span>
+        <div style="display: flex; gap: 0.25rem;">
+          ${grp.types.map(t => getActionBadgeHtml(t)).join(' ')}
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        ${isMasterAdmin ? `
+          <button type="button" class="btn btn-secondary audit-group-restore-btn" style="padding: 0.2rem 0.55rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.3rem; color: #0284c7; border-color: #bae6fd;">
+            ${SYNAPSE_LINE_ICONS.rewind(13)} <span>このグループを一括復元</span>
+          </button>
+        ` : ''}
+      </div>
     `;
-    tbody.appendChild(tr);
+
+    // グループ開閉制御
+    header.addEventListener('click', (e) => {
+      if (e.target.closest('.audit-group-restore-btn')) return;
+      const rowsBox = groupCard.querySelector('.audit-group-rows');
+      const chevron = groupCard.querySelector('.audit-group-chevron');
+      if (rowsBox.style.display === 'none') {
+        rowsBox.style.display = 'block';
+        chevron.innerHTML = SYNAPSE_LINE_ICONS.chevronDown(14);
+        auditFilterState.expandedGroupIds.add(grp.id);
+      } else {
+        rowsBox.style.display = 'none';
+        chevron.innerHTML = SYNAPSE_LINE_ICONS.chevronRight(14);
+        auditFilterState.expandedGroupIds.delete(grp.id);
+      }
+    });
+
+    // グループ一括復元ボタン
+    const grpRestoreBtn = header.querySelector('.audit-group-restore-btn');
+    if (grpRestoreBtn) {
+      grpRestoreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        executeTimeCellRecovery(grp.logs, `このグループ（${grp.logs.length} 件の操作）をすべて変更前の値へ復元します。\nよろしいですか？`);
+      });
+    }
+
+    // グループ詳細行テーブル
+    const rowsBox = document.createElement('div');
+    rowsBox.className = 'audit-group-rows';
+    rowsBox.style.display = isExpanded ? 'block' : 'none';
+
+    const table = document.createElement('table');
+    table.style.cssText = 'width: 100%; border-collapse: collapse; font-size: 0.8rem; background: var(--bg-surface);';
+    table.innerHTML = `
+      <thead>
+        <tr style="background: rgba(0,0,0,0.02); border-bottom: 1px solid var(--border-color); color: var(--text-secondary); text-align: left;">
+          <th style="padding: 0.4rem 1rem; width: 140px;">日時</th>
+          <th style="padding: 0.4rem 0.75rem; width: 90px;">種別</th>
+          <th style="padding: 0.4rem 0.75rem; width: 140px;">カラム名</th>
+          <th style="padding: 0.4rem 0.75rem; width: 100px;">対象ID</th>
+          <th style="padding: 0.4rem 0.75rem;">変更前</th>
+          <th style="padding: 0.4rem 0.75rem;">変更後</th>
+          <th style="padding: 0.4rem 0.75rem; width: 160px;">復元元情報</th>
+          ${isMasterAdmin ? '<th style="padding: 0.4rem 0.75rem; width: 70px; text-align: center;">操作</th>' : ''}
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+
+    const tbody = table.querySelector('tbody');
+    grp.logs.forEach(log => {
+      const tr = document.createElement('tr');
+      tr.style.cssText = 'border-bottom: 1px solid var(--border-color); transition: background 0.15s;';
+      tr.onmouseenter = () => tr.style.background = 'rgba(0,0,0,0.02)';
+      tr.onmouseleave = () => tr.style.background = 'transparent';
+
+      const restoreInfoHtml = log.restoredFrom 
+        ? `<span style="font-size:0.72rem; color:#7e22ce;" title="復元元ログ: ${log.restoredFrom.targetLogId}">↪ ${formatDate(log.restoredFrom.originalTimestamp)} (${log.restoredFrom.originalUser})</span>`
+        : '<span style="color:var(--text-muted); font-size:0.72rem;">-</span>';
+
+      tr.innerHTML = `
+        <td style="padding:0.4rem 1rem; color:var(--text-muted); font-family:monospace; font-size:0.75rem;">${formatDate(log.timestamp)}</td>
+        <td style="padding:0.4rem 0.75rem;">${getActionBadgeHtml(log.type || 'EDIT')}</td>
+        <td style="padding:0.4rem 0.75rem; font-weight:600; color:var(--text-primary);">${log.columnName || log.columnId}</td>
+        <td style="padding:0.4rem 0.75rem; color:var(--text-secondary); font-family:monospace; font-size:0.75rem;">${log.rowId}</td>
+        <td style="padding:0.4rem 0.75rem; color:var(--text-secondary); background:rgba(239, 68, 68, 0.04); text-decoration:line-through; font-family:monospace; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${log.oldValue}">${log.oldValue || '(空)'}</td>
+        <td style="padding:0.4rem 0.75rem; color:var(--text-primary); background:rgba(16, 185, 129, 0.04); font-weight:bold; font-family:monospace; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${log.newValue}">${log.newValue || '(空)'}</td>
+        <td style="padding:0.4rem 0.75rem;">${restoreInfoHtml}</td>
+        ${isMasterAdmin ? `
+          <td style="padding:0.4rem 0.75rem; text-align:center;">
+            <button type="button" class="btn btn-secondary audit-single-restore-btn" style="padding:0.15rem 0.45rem; font-size:0.72rem; display:inline-flex; align-items:center; gap:0.2rem;" title="このセル変更のみを元に戻す">
+              ${SYNAPSE_LINE_ICONS.rewind(12)} <span>復元</span>
+            </button>
+          </td>
+        ` : ''}
+      `;
+
+      // 個別セル復元ボタン
+      const singleRestoreBtn = tr.querySelector('.audit-single-restore-btn');
+      if (singleRestoreBtn) {
+        singleRestoreBtn.addEventListener('click', () => {
+          executeTimeCellRecovery([log], `このセル（${log.columnName}）の値を「${log.newValue}」から変更前の「${log.oldValue || '(空)'}」へ復元します。\nよろしいですか？`);
+        });
+      }
+
+      tbody.appendChild(tr);
+    });
+
+    rowsBox.appendChild(table);
+    groupCard.appendChild(header);
+    groupCard.appendChild(rowsBox);
+    container.appendChild(groupCard);
   });
 }
 
@@ -47370,6 +49155,99 @@ function getCurrentAppointData() {
   return null;
 }
 
+// 🌟 チェーン内（関連アポイント群）の有効なマスタIDと発行権限を解決するエンジン
+function getEffectiveAppointMasterContext(appointData) {
+  if (!appointData) return { masterId: '-', isOfficial: false, officialPartyId: null, authorityAppointId: null, canIssue: false };
+
+  const allAppointIds = new Set();
+  if (appointData.id) allAppointIds.add(appointData.id);
+
+  // チェーン内の全アポイントIDを収集
+  const queue = [appointData.id];
+  const visited = new Set();
+  while (queue.length > 0) {
+    const curId = queue.shift();
+    if (!curId || visited.has(curId)) continue;
+    visited.add(curId);
+    allAppointIds.add(curId);
+
+    const ap = state.appointments?.find(a => a.id === curId);
+    if (ap && ap.relatedAppointmentIds) {
+      const rels = ap.relatedAppointmentIds.split(',').map(s => s.trim()).filter(Boolean);
+      rels.forEach(r => {
+        if (!visited.has(r)) queue.push(r);
+      });
+    }
+  }
+
+  const chainAppoints = [];
+  allAppointIds.forEach(id => {
+    const ap = (appointData.id === id) ? appointData : state.appointments?.find(a => a.id === id);
+    if (ap) chainAppoints.push(ap);
+  });
+
+  // 1. 本登録Party ID（または本登録済みアポ）が存在するか探索
+  let officialPartyId = null;
+  let officialAppoint = null;
+
+  if (appointData.customerId) {
+    officialPartyId = appointData.customerId;
+    officialAppoint = appointData;
+  }
+
+  if (!officialPartyId) {
+    for (const ap of chainAppoints) {
+      if (ap.customerId) {
+        officialPartyId = ap.customerId;
+        officialAppoint = ap;
+        break;
+      }
+      if (ap.status === 'official') {
+        officialPartyId = ap.id;
+        officialAppoint = ap;
+        break;
+      }
+    }
+  }
+
+  if (officialPartyId) {
+    // 既存顧客（本登録済み）が存在する場合:
+    // 最新アポイント画面にも本登録IDが紐づいたフォームを表示・管理・発行可能とする
+    return {
+      masterId: officialPartyId,
+      isOfficial: true,
+      officialPartyId: officialPartyId,
+      authorityAppointId: appointData.id,
+      canIssue: true,
+      chainAppoints: chainAppoints
+    };
+  }
+
+  // 2. 本登録が存在しない場合（全員本登録前 / 見込み客）:
+  // チェーン内で最も日時の新しい「最新アポイント」が仮IDとなり、唯一の発行権限を持つ
+  let latestAppoint = appointData;
+  let latestDate = appointData.date ? new Date(appointData.date).getTime() : 0;
+
+  chainAppoints.forEach(ap => {
+    const apTime = ap.date ? new Date(ap.date).getTime() : 0;
+    if (apTime > latestDate) {
+      latestDate = apTime;
+      latestAppoint = ap;
+    }
+  });
+
+  const isCurrentLatest = (latestAppoint.id === appointData.id);
+  return {
+    masterId: latestAppoint.id,
+    isOfficial: false,
+    officialPartyId: null,
+    authorityAppointId: latestAppoint.id,
+    canIssue: isCurrentLatest,
+    isCurrentLatest: isCurrentLatest,
+    chainAppoints: chainAppoints
+  };
+}
+
 function renderAppointLinkedForms(appointData) {
   const data = appointData || getCurrentAppointData();
   if (data) {
@@ -47378,9 +49256,32 @@ function renderAppointLinkedForms(appointData) {
   const dock = document.getElementById('appoint-linked-forms-dock');
   if (!dock) return;
 
-  const masterId = data ? data.id : '-';
+  // 🌟 チェーン内の有効なマスタコンテキストを判定
+  const ctx = getEffectiveAppointMasterContext(data);
+  const masterId = ctx.masterId;
   const masterIdEl = document.getElementById('dock-master-id');
-  if (masterIdEl) masterIdEl.textContent = masterId;
+  if (masterIdEl) {
+    masterIdEl.textContent = masterId;
+    if (ctx.isOfficial) {
+      masterIdEl.innerHTML = `${escapeHtml(masterId)} <span class="badge badge-success" style="font-size: 0.65rem; margin-left: 0.25rem; padding: 0.05rem 0.35rem;">本登録Party ID</span>`;
+    }
+  }
+
+  // 発行ボタンの権限制御
+  const openIssueBtn = document.getElementById('btn-open-appoint-form-modal');
+  if (openIssueBtn) {
+    if (ctx.canIssue) {
+      openIssueBtn.disabled = false;
+      openIssueBtn.style.opacity = '1';
+      openIssueBtn.style.cursor = 'pointer';
+      openIssueBtn.title = '連携フォームを発行します';
+    } else {
+      openIssueBtn.disabled = true;
+      openIssueBtn.style.opacity = '0.5';
+      openIssueBtn.style.cursor = 'not-allowed';
+      openIssueBtn.title = `最新アポイント（ID: ${ctx.authorityAppointId}）からのみ発行可能です`;
+    }
+  }
 
   const container = document.getElementById('appoint-issued-forms-list');
   if (!container) return;
@@ -47394,30 +49295,35 @@ function renderAppointLinkedForms(appointData) {
     data.linkedForms = [];
   }
 
-  // synapse_form_links から最新状態を同期・復元
+  // synapse_form_links から最新状態を同期・復元（本登録Party IDまたは最新仮IDに紐づくリンクを網羅）
   try {
     const allStoredLinks = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
-    // 既存のリンクのステータス更新
-    data.linkedForms.forEach(formItem => {
-      const key = `${masterId}_${formItem.formId}`;
-      if (allStoredLinks[key] && allStoredLinks[key].status) {
-        formItem.status = allStoredLinks[key].status;
-        if (allStoredLinks[key].submittedAt) formItem.submittedAt = allStoredLinks[key].submittedAt;
-        if (allStoredLinks[key].reopenedAt) formItem.reopenedAt = allStoredLinks[key].reopenedAt;
-      }
+    
+    // 対象とするマスタID一覧（有効マスターID、および自身のアポID）
+    const targetMasterIds = new Set([masterId, data.id]);
+    if (ctx.chainAppoints) {
+      ctx.chainAppoints.forEach(a => { if (a.id) targetMasterIds.add(a.id); });
+    }
+
+    // storedLinksから該当するフォームを復元
+    const resolvedFormsMap = new Map();
+    data.linkedForms.forEach(f => {
+      resolvedFormsMap.set(f.formId, { ...f });
     });
-    // もしlinkedFormsに未登録だがstoredLinksに存在するものがあれば復元
+
     Object.keys(allStoredLinks).forEach(key => {
       const item = allStoredLinks[key];
-      if (item && item.masterId === masterId) {
-        if (!data.linkedForms.some(f => f.formId === item.formId)) {
-          data.linkedForms.push({ ...item });
+      if (item && targetMasterIds.has(item.masterId)) {
+        if (!resolvedFormsMap.has(item.formId) || item.masterId === masterId) {
+          resolvedFormsMap.set(item.formId, { ...item });
         }
       }
     });
+
+    data.linkedForms = Array.from(resolvedFormsMap.values());
   } catch(e) {}
 
-  // クラウド（Supabase synapse_storage）からの最新ステータス非同期同期（別端末での回答検知）
+  // クラウド（Supabase synapse_storage）からの最新ステータス非同期同期
   if (masterId && masterId !== '-') {
     const now = Date.now();
     if (!data._lastCloudFetch || now - data._lastCloudFetch > 5000) {
@@ -47444,51 +49350,56 @@ function renderAppointLinkedForms(appointData) {
       statusBadgeHtml = `<span class="appoint-form-status-tag status-requesting">再有効化申請中</span>`;
     } else if (formItem.status === 'reopened') {
       statusBadgeHtml = `<span class="appoint-form-status-tag status-reopened">再有効化中</span>`;
+    } else if (formItem.status === 'invalidated') {
+      statusBadgeHtml = `<span class="appoint-form-status-tag status-invalidated" title="別アポイントとの連携により無効化されました">無効</span>`;
     } else {
       statusBadgeHtml = `<span class="appoint-form-status-tag status-pending">未回答</span>`;
     }
 
-    // アクションボタン
-    let actionButtonsHtml = `
-      <button type="button" class="btn-outline-custom" onclick="copyAppointFormLink('${formItem.url}', '${formItem.formName}')" title="リンクをコピー">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-        <span>コピー</span>
-      </button>
-      <button type="button" class="btn-outline-custom" onclick="openAppointFormLink('${formItem.url}')" title="回答画面を開く">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-        <span>開く</span>
-      </button>
-    `;
-
-    if (formItem.status === 'submitted') {
-      actionButtonsHtml += `
-        <button type="button" class="btn-outline-custom btn-action-request" onclick="requestAppointFormReopen('${formItem.formId}')" title="再有効化を申請">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-          <span>再有効化申請</span>
+    // 🌟 アクションボタン（ユーザー指示: コピーはアイコンのみ、開くもスッキリしたUI）
+    let actionButtonsHtml = '';
+    if (formItem.status === 'invalidated') {
+      actionButtonsHtml = `<span style="font-size: 0.7rem; color: var(--text-muted); font-style: italic;">※ 連結により無効化</span>`;
+    } else {
+      actionButtonsHtml = `
+        <button type="button" class="btn-icon-custom" onclick="copyAppointFormLink(this, '${formItem.url}', '${escapeHtml(formItem.formName)}')" title="リンクをコピー">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        </button>
+        <button type="button" class="btn-icon-custom" onclick="openAppointFormLink('${formItem.url}')" title="回答画面を開く">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
         </button>
       `;
-    } else if (formItem.status === 'requesting') {
-      const isAdmin = (typeof isUserAdmin === 'function' && isUserAdmin()) || (state.currentUser && state.currentUser.role === 'admin');
-      if (isAdmin) {
+
+      if (formItem.status === 'submitted') {
         actionButtonsHtml += `
-          <button type="button" class="btn-outline-custom btn-action-approve" onclick="approveAppointFormReopen('${formItem.formId}')" title="管理者が承認してリンクを再有効化">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-            <span>管理者承認</span>
+          <button type="button" class="btn-outline-custom btn-action-request" onclick="requestAppointFormReopen('${formItem.formId}')" title="再有効化を申請">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+            <span>再申請</span>
           </button>
         `;
+      } else if (formItem.status === 'requesting') {
+        const isAdmin = (typeof isUserAdmin === 'function' && isUserAdmin()) || (state.currentUser && state.currentUser.role === 'admin');
+        if (isAdmin) {
+          actionButtonsHtml += `
+            <button type="button" class="btn-outline-custom btn-action-approve" onclick="approveAppointFormReopen('${formItem.formId}')" title="管理者が承認してリンクを再有効化">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+              <span>承認</span>
+            </button>
+          `;
+        }
       }
     }
 
     row.innerHTML = `
-      <div class="form-info-compact" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-        <span class="appoint-form-name-badge">
+      <div class="form-info-compact" style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; flex: 1; min-width: 0;">
+        <span class="appoint-form-name-badge" style="font-size: 0.8rem; font-weight: 600;">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
           <span>${escapeHtml(formItem.formName)}</span>
         </span>
         ${statusBadgeHtml}
-        ${formItem.issuerId ? `<span style="font-size: 0.72rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 3px; background: rgba(0,0,0,0.03); padding: 1px 6px; border-radius: 4px;" title="発行者: ${escapeHtml(formItem.issuerName || formItem.issuerId)}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>${escapeHtml(formItem.issuerName || formItem.issuerId)}</span>` : ''}
+        ${formItem.issuerName ? `<span style="font-size: 0.7rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 2px; background: rgba(0,0,0,0.03); padding: 1px 5px; border-radius: 4px;" title="発行者: ${escapeHtml(formItem.issuerName)}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>${escapeHtml(formItem.issuerName)}</span>` : ''}
       </div>
-      <div class="form-row-actions" style="display: flex; align-items: center; gap: 0.35rem;">
+      <div class="form-row-actions">
         ${actionButtonsHtml}
       </div>
     `;
@@ -47498,18 +49409,24 @@ function renderAppointLinkedForms(appointData) {
 
 function openAppointIssueModal() {
   const data = getCurrentAppointData();
-  const masterId = data ? data.id : '-';
+  const ctx = getEffectiveAppointMasterContext(data);
+  const masterId = ctx.masterId || '-';
 
   const modal = document.getElementById('modal-appoint-issue-form');
   const targetIdEl = document.getElementById('modal-appoint-master-id-text');
-  if (targetIdEl) targetIdEl.textContent = masterId;
+  if (targetIdEl) {
+    targetIdEl.textContent = masterId;
+    if (ctx.isOfficial) {
+      targetIdEl.innerHTML = `${escapeHtml(masterId)} <span class="badge badge-success" style="font-size: 0.65rem; margin-left: 0.25rem;">本登録Party ID</span>`;
+    }
+  }
 
   if (!Array.isArray(data?.linkedForms)) {
     if (data) data.linkedForms = [];
   }
 
-  const isYosandasIssued = data?.linkedForms?.some(f => f.formId === 'form_yosandas');
-  const isAgencyIssued = data?.linkedForms?.some(f => f.formId === 'form_agency');
+  const isYosandasIssued = data?.linkedForms?.some(f => f.formId === 'form_yosandas' && f.status !== 'invalidated');
+  const isAgencyIssued = data?.linkedForms?.some(f => f.formId === 'form_agency' && f.status !== 'invalidated');
 
   const optY = document.getElementById('opt-issue-yosandas');
   const btnY = document.getElementById('btn-select-yosandas');
@@ -47606,7 +49523,7 @@ function saveSynapseFormLink(masterId, formId, linkData) {
       bc.close();
     }
 
-    // クラウド（Supabase synapse_storage）へ非同期保存（端末間・別ブラウザ連携）
+    // クラウド（Supabase synapse_storage）へ非同期保存
     syncFormLinkToCloud(masterId, formId, links[key]);
   } catch(e) {
     console.warn('[SynapseForm] Failed to save form link:', e);
@@ -47618,7 +49535,7 @@ async function syncFormLinkToCloud(masterId, formId, linkData) {
     const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
     const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
     
-    // 1. マスタIDキーでの保存（社内管理画面での検索用）
+    // 1. マスタIDキーでの保存
     const key = `synapse_form_link_${masterId}_${formId}`;
     await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
       method: 'POST',
@@ -47688,7 +49605,7 @@ async function fetchFormLinksFromCloud(masterId) {
           localStorage.setItem('synapse_form_links', JSON.stringify(stored));
           localStorage.setItem('synapse_form_tokens', JSON.stringify(storedTokens));
           const curData = getCurrentAppointData();
-          if (curData && curData.id === masterId) {
+          if (curData) {
             renderAppointLinkedForms(curData);
           }
         }
@@ -47707,22 +49624,30 @@ function issueAppointForm(formId) {
     data.linkedForms = [];
   }
 
-  const existing = data.linkedForms.find(f => f.formId === formId);
+  const existing = data.linkedForms.find(f => f.formId === formId && f.status !== 'invalidated');
   if (existing) {
-    if (typeof showToast === 'function') showToast('このフォームは既に発行されています', 'warning');
+    if (typeof showToast === 'function') showToast('このフォームは既に有効発行されています', 'warning');
     closeAppointIssueModal();
     return;
   }
 
+  // 🌟 有効なマスターID（本登録Party ID、または最新仮ID）を解決
+  const ctx = getEffectiveAppointMasterContext(data);
+  const masterId = ctx.masterId || data.id;
+
   const targetDef = APPOINT_AVAILABLE_FORMS.find(f => f.id === formId);
   const formName = targetDef ? targetDef.name : formId;
-  const masterId = data.id;
 
-  // フォーム発行ユーザー（アポインター / 担当者）のID・名前
+  // フォーム発行ユーザー（担当者）
   const issuerId = state.currentUser ? (state.currentUser.loginId || state.currentUser.id) : (localStorage.getItem('cos_logged_user') || localStorage.getItem('gf_current_user') || '');
   const issuerName = state.currentUser ? (state.currentUser.name || issuerId) : (issuerId || '');
 
-  // 🔑 推測不可能な英数字ハッシュ（セキュアトークン）を生成し、URLに内部情報を一切露出させない
+  // 営業選択時の紹介者IDを取得
+  const introducerId = document.getElementById('appoint-hidden-introducer-id')?.value || data.introducerId || '';
+  const introducerName = document.getElementById('appoint-hidden-introducer-name')?.value || data.introducerName || '';
+  const introducerType = document.getElementById('appoint-hidden-introducer-type')?.value || data.introducerType || '';
+
+  // 🔑 推測不可能な英数字ハッシュ（セキュアトークン）を生成
   const token = generateFormSecureToken(20);
   const origin = window.location.origin || '';
   const pathname = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
@@ -47734,8 +49659,12 @@ function issueAppointForm(formId) {
     formName: formName,
     url: formUrl,
     masterId: masterId,
+    appointId: data.id,
     issuerId: issuerId,
     issuerName: issuerName,
+    introducerId: introducerId,
+    introducerName: introducerName,
+    introducerType: introducerType,
     status: 'pending',
     issuedAt: new Date().toISOString(),
     submittedAt: null,
@@ -47748,19 +49677,44 @@ function issueAppointForm(formId) {
   renderAppointLinkedForms(data);
   closeAppointIssueModal();
   if (typeof showToast === 'function') {
-    showToast(`「${formName}」を発行しました。リンクをコピーして共有できます。`, 'success');
+    showToast(`「${formName}」を発行しました（マスタID: ${masterId}）。`, 'success');
   }
 }
 
-function copyAppointFormLink(url, formName) {
+// 🌟 アイコンのみ＆コピー完了視覚フィードバック付きコピー関数
+function copyAppointFormLink(targetEl, url, formName) {
+  let btnEl = null;
+  let actualUrl = url;
+  let actualName = formName;
+
+  if (typeof targetEl === 'string') {
+    actualUrl = targetEl;
+    actualName = url;
+  } else if (targetEl && targetEl.nodeType) {
+    btnEl = targetEl;
+  }
+
+  const onSuccess = () => {
+    if (btnEl) {
+      btnEl.classList.add('copied');
+      const origHtml = btnEl.innerHTML;
+      btnEl.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      setTimeout(() => {
+        btnEl.classList.remove('copied');
+        btnEl.innerHTML = origHtml;
+      }, 1800);
+    }
+    if (typeof showToast === 'function') {
+      showToast(`「${actualName || 'フォーム'}」のリンクをコピーしました`, 'success');
+    }
+  };
+
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(url).then(() => {
-      if (typeof showToast === 'function') showToast(`「${formName}」のリンクをコピーしました`, 'success');
-    }).catch(() => {
-      prompt('リンクをコピーしてください:', url);
+    navigator.clipboard.writeText(actualUrl).then(onSuccess).catch(() => {
+      prompt('リンクをコピーしてください:', actualUrl);
     });
   } else {
-    prompt('リンクをコピーしてください:', url);
+    prompt('リンクをコピーしてください:', actualUrl);
   }
 }
 
@@ -47875,6 +49829,23 @@ window.copyAppointFormLink = copyAppointFormLink;
 window.openAppointFormLink = openAppointFormLink;
 window.requestAppointFormReopen = requestAppointFormReopen;
 window.approveAppointFormReopen = approveAppointFormReopen;
+
+// 🌟 TimeCell Recovery & パートナーDB & フォーム連携グローバル参照
+if (typeof window !== 'undefined') {
+  window.state = state;
+  window.auditFilterState = auditFilterState;
+  window.groupAuditLogs = groupAuditLogs;
+  window.filterAuditLogs = filterAuditLogs;
+  window.executeTimeCellRecovery = executeTimeCellRecovery;
+  window.getDbmakePartners = () => dbmakePartners;
+  window.setDbmakePartners = (val) => { dbmakePartners = val; };
+  window.loadDbmakePartners = loadDbmakePartners;
+  window.saveDbmakePartners = saveDbmakePartners;
+  window.getPartnerAtDate = getPartnerAtDate;
+  window.processFormSubmissionToPartnerDb = processFormSubmissionToPartnerDb;
+  window.commitPartnerDbRecord = commitPartnerDbRecord;
+}
+
 
 
 
