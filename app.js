@@ -50435,23 +50435,21 @@ function initAgencyNetworkDOMEvents() {
   if (agNetEventsInitialized) return;
   agNetEventsInitialized = true;
 
-  // 水平 / 垂直 レイアウト切り替え
-  document.getElementById('ag-net-btn-layout-horizontal')?.addEventListener('click', () => {
-    agNetCurrentLayout = 'left';
-    document.getElementById('ag-net-btn-layout-horizontal').classList.add('active');
-    document.getElementById('ag-net-btn-layout-vertical').classList.remove('active');
-    if (agNetChartInstance) {
-      agNetChartInstance.layout('left').render().fit();
-      setTimeout(updateAgZoneBoxVisual, 350);
+  // 水平 / 垂直 レイアウト切り替え (1ボタントグル)
+  document.getElementById('ag-net-btn-toggle-layout')?.addEventListener('click', () => {
+    agNetCurrentLayout = (agNetCurrentLayout === 'left') ? 'top' : 'left';
+    const isLeft = (agNetCurrentLayout === 'left');
+    const label = document.getElementById('ag-net-layout-label');
+    const icon = document.getElementById('ag-net-layout-icon');
+    if (label) label.textContent = isLeft ? '水平展開' : '垂直展開';
+    if (icon) {
+      icon.setAttribute('data-lucide', isLeft ? 'arrow-left-right' : 'arrow-up-down');
+      if (window.lucide && typeof lucide.createIcons === 'function') {
+        lucide.createIcons();
+      }
     }
-  });
-
-  document.getElementById('ag-net-btn-layout-vertical')?.addEventListener('click', () => {
-    agNetCurrentLayout = 'top';
-    document.getElementById('ag-net-btn-layout-vertical').classList.add('active');
-    document.getElementById('ag-net-btn-layout-horizontal').classList.remove('active');
     if (agNetChartInstance) {
-      agNetChartInstance.layout('top').render().fit();
+      agNetChartInstance.layout(agNetCurrentLayout).render().fit();
       setTimeout(updateAgZoneBoxVisual, 350);
     }
   });

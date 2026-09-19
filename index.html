@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-title" content="Synapse">
 <meta name="theme-color" content="#ffffff">
 
-<link rel="stylesheet" href="styles.css?v=2.7">
+<link rel="stylesheet" href="styles.css?v=2.8">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -3022,15 +3022,11 @@
       </div>
 
       <div class="ag-net-controls-group">
-        <!-- レイアウト切り替え (水平マインドマップ / 垂直組織図) -->
-        <div class="btn-group-segmented">
-          <button class="btn-segmented active" id="ag-net-btn-layout-horizontal" title="水平展開 (左→右マインドマップ)">
-            <i data-lucide="git-branch" style="width: 14px; height: 14px;"></i> 水平展開
-          </button>
-          <button class="btn-segmented" id="ag-net-btn-layout-vertical" title="垂直展開 (上→下組織図)">
-            <i data-lucide="network" style="width: 14px; height: 14px;"></i> 垂直展開
-          </button>
-        </div>
+        <!-- レイアウト切り替え (水平 ⇄ 垂直 トグルボタン) -->
+        <button class="btn-secondary-sm" id="ag-net-btn-toggle-layout" title="展開方向を切り替え (水平マインドマップ ⇄ 垂直組織図)">
+          <i data-lucide="arrow-left-right" id="ag-net-layout-icon" style="width: 13px; height: 13px;"></i>
+          <span id="ag-net-layout-label">水平展開</span>
+        </button>
 
         <!-- ズーム・全体表示コントロール -->
         <button class="btn-secondary-sm" id="ag-net-btn-fit" title="全体を画面に収める">
