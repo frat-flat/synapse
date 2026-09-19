@@ -12509,18 +12509,23 @@ function updateUIForCurrentMode() {
 
   // 管理者メニューボタンの表示制御
   const agencyInfoBtn = document.getElementById('menu-agency-info');
+  const agencyNetworkBtn = document.getElementById('menu-agency-network');
   const joInfoBtn = document.getElementById('menu-jo-info');
   const applicantInfoBtn = document.getElementById('menu-applicant-info');
   const dbmakeBtn = document.getElementById('menu-dbmake');
   
   if (pendingUser) {
     if (agencyInfoBtn) agencyInfoBtn.style.display = 'none';
+    if (agencyNetworkBtn) agencyNetworkBtn.style.display = 'none';
     if (joInfoBtn) joInfoBtn.style.display = 'none';
     if (applicantInfoBtn) applicantInfoBtn.style.display = 'none';
     if (dbmakeBtn) dbmakeBtn.style.display = 'none';
   } else {
     if (agencyInfoBtn) {
       agencyInfoBtn.style.display = (mode !== 'support' && checkTableAccess('agency-info-screen').visible) ? 'block' : 'none';
+    }
+    if (agencyNetworkBtn) {
+      agencyNetworkBtn.style.display = (mode !== 'support' && checkTableAccess('agency-info-screen').visible) ? 'block' : 'none';
     }
     if (joInfoBtn) {
       joInfoBtn.style.display = checkTableAccess('jo-info-screen').visible ? 'block' : 'none';
