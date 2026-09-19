@@ -5818,6 +5818,20 @@ function renderCustomTableList() {
         btn.innerHTML = `${tableIcon}<span class="nav-item-text">${tbl.name}</span>`;
 
         attachSidebarItemActions(btn, tbl.id, tbl.name, 'table');
+
+        // ★ 標準テーブルおよび流入相関図へのクリックを確実に発火
+        btn.onclick = (e) => {
+          if (e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn')) return;
+          if (tbl.id === 'agency-network-screen') {
+            openTab('agency-network-screen', 'agency-network-screen', '🌐 代理店 流入相関図');
+          } else if (tbl.id === 'agency-info-screen') {
+            openTab('agency-info-screen', 'agency-info-screen', '📊 代理店・基本マスタ');
+          } else if (tbl.id === 'jo-info-screen') {
+            openTab('jo-info-screen', 'jo-info-screen', '📊 JO・基本マスタ');
+          } else if (tbl.id === 'applicant-info-screen') {
+            openTab('applicant-info-screen', 'applicant-info-screen', '📊 申込者・基本マスタ');
+          }
+        };
       } else {
         // 新規カスタムテーブルボタンを動的生成
         btn = document.createElement('button');
@@ -5840,9 +5854,14 @@ function renderCustomTableList() {
 
         attachSidebarItemActions(btn, tbl.id, tbl.name, 'table');
 
-        btn.addEventListener('click', () => {
-          openTab(`custom-table-${tbl.id}-tab`, `custom-table-${tbl.id}-screen`, `📊 ${tbl.name}`);
-          renderCustomTable(tbl.id);
+        btn.addEventListener('click', (e) => {
+          if (e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn')) return;
+          if (tbl.id === 'agency-network-screen') {
+            openTab('agency-network-screen', 'agency-network-screen', '🌐 代理店 流入相関図');
+          } else {
+            openTab(`custom-table-${tbl.id}-tab`, `custom-table-${tbl.id}-screen`, `📊 ${tbl.name}`);
+            renderCustomTable(tbl.id);
+          }
         });
       }
 
@@ -13855,10 +13874,6 @@ function activateTab(id) {
     if (tab.chartId && typeof renderChartSheetView === 'function') {
       renderChartSheetView(tab.chartId);
     }
-  } else if (tab.type === 'agency-network-screen') {
-    if (typeof renderAgencyNetworkScreen === 'function') {
-      renderAgencyNetworkScreen();
-    }
   }
 
   // 画面表示切り替え
@@ -13880,6 +13895,19 @@ function activateTab(id) {
   }
   renderTabBar();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // 🌐 代理店相関図の描画（画面要素が display: flex で表示されサイズ確定した後に安全実行）
+  if (tab.type === 'agency-network-screen') {
+    setTimeout(() => {
+      try {
+        if (typeof renderAgencyNetworkScreen === 'function') {
+          renderAgencyNetworkScreen();
+        }
+      } catch (err) {
+        console.error('[Agency Network] Render error in activateTab:', err);
+      }
+    }, 50);
+  }
 
   if (tab.type === 'presence-settings-screen') {
     if (typeof initPresenceUserSelector === 'function') initPresenceUserSelector();
@@ -50163,6 +50191,7 @@ function buildAgencyNetworkDataset() {
         return tB - tA;
       });
       const latestApp = appList[0];
+      if (!latestApp) return;
 
       // すでに本登録ID紐付け（officialLinks）が存在するか確認
       let officialId = latestApp.officialId || null;
@@ -50176,18 +50205,19 @@ function buildAgencyNetworkDataset() {
 
       // もし本登録IDがない場合 ➔ 「最終アポイントID」を仮IDとしてネットワークに組み込む
       if (!officialId) {
-        const tempId = latestApp.id; // 最終アポイント時のID
+        const tempId = latestApp.id || generate8DigitId(); // 最終アポイント時のID
         const existNode = dataset.find(d => d.id === tempId || d.tempAppointId === tempId);
         if (!existNode) {
           // 紹介元（親）の特定
           let parentNodeId = "AGY-1002"; // デフォルトB社配下等
           if (latestApp.referralSource || latestApp.introducer) {
-            const refQuery = (latestApp.referralSource || latestApp.introducer).trim();
-            const matchedParent = dataset.find(d => d.name.includes(refQuery) || d.masterId === refQuery || d.id === refQuery);
+            const refQuery = String(latestApp.referralSource || latestApp.introducer).trim();
+            const matchedParent = dataset.find(d => (d.name && d.name.includes(refQuery)) || d.masterId === refQuery || d.id === refQuery);
             if (matchedParent) parentNodeId = matchedParent.id;
           }
 
-          const appDate = (latestApp.dateTime || latestApp.date || '2024-03-01').split('T')[0].split(' ')[0];
+          const rawDate = latestApp.dateTime || latestApp.date || latestApp.createdAt || '2024-03-01';
+          const appDate = String(rawDate).split('T')[0].split(' ')[0];
           dataset.push({
             id: `TEMP-${tempId}`,
             tempAppointId: tempId,
@@ -50362,29 +50392,40 @@ function getScoped5TierNodeIds(dataset, targetNodeId) {
 
 // マインドマップ画面の初期化・描画
 function renderAgencyNetworkScreen() {
-  const screen = document.getElementById('agency-network-screen');
-  if (!screen) return;
+  try {
+    const screen = document.getElementById('agency-network-screen');
+    if (!screen) {
+      console.warn('[Agency Network] #agency-network-screen element not found.');
+      return;
+    }
 
-  const allDataset = buildAgencyNetworkDataset();
+    const allDataset = buildAgencyNetworkDataset();
+    if (!Array.isArray(allDataset) || allDataset.length === 0) {
+      console.warn('[Agency Network] Dataset is empty.');
+      return;
+    }
 
-  // 初期日付
-  if (!agNetSelectedDate || agNetSelectedDate === '2026-09-18') {
-    const dates = allDataset.map(d => d.joinedDate).filter(Boolean).sort();
-    if (dates.length > 0) {
-      agNetSelectedDate = dates[dates.length - 1]; // 最新日
-      const datePicker = document.getElementById('ag-net-date-picker');
-      if (datePicker) {
-        datePicker.value = agNetSelectedDate;
-        datePicker.min = dates[0];
-        datePicker.max = agNetSelectedDate;
+    // 初期日付
+    if (!agNetSelectedDate || agNetSelectedDate === '2026-09-18') {
+      const dates = allDataset.map(d => d.joinedDate).filter(Boolean).sort();
+      if (dates.length > 0) {
+        agNetSelectedDate = dates[dates.length - 1]; // 最新日
+        const datePicker = document.getElementById('ag-net-date-picker');
+        if (datePicker) {
+          datePicker.value = agNetSelectedDate;
+          datePicker.min = dates[0];
+          datePicker.max = agNetSelectedDate;
+        }
       }
     }
-  }
 
-  initAgencyNetworkDOMEvents();
-  refreshAgencyNetworkChart();
-  if (window.lucide && typeof lucide.createIcons === 'function') {
-    lucide.createIcons();
+    initAgencyNetworkDOMEvents();
+    refreshAgencyNetworkChart();
+    if (window.lucide && typeof lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
+  } catch (err) {
+    console.error('[Agency Network] Error in renderAgencyNetworkScreen:', err);
   }
 }
 
@@ -50629,12 +50670,18 @@ function handleAgencyIdSearch(query) {
 
 // チャートの更新・再描画
 function refreshAgencyNetworkChart() {
-  if (typeof d3 === 'undefined' || typeof d3.OrgChart === 'undefined') {
-    console.warn('[Agency Network] d3.OrgChart library is not loaded yet.');
-    return;
-  }
+  try {
+    if (typeof d3 === 'undefined' || typeof d3.OrgChart === 'undefined') {
+      console.warn('[Agency Network] d3.OrgChart library is not loaded yet. Retrying in 250ms...');
+      setTimeout(() => {
+        if (typeof d3 !== 'undefined' && typeof d3.OrgChart !== 'undefined') {
+          refreshAgencyNetworkChart();
+        }
+      }, 250);
+      return;
+    }
 
-  let fullDataset = buildAgencyNetworkDataset();
+    let fullDataset = buildAgencyNetworkDataset();
 
   // 検索スコープ（前後2階層）が有効な場合のデータフィルタリング
   if (agNetScopedNodeIds !== null) {
@@ -50782,6 +50829,9 @@ function refreshAgencyNetworkChart() {
 
   if (window.lucide && typeof lucide.createIcons === 'function') {
     lucide.createIcons();
+  }
+  } catch (err) {
+    console.error('[Agency Network] Error in refreshAgencyNetworkChart:', err);
   }
 }
 
