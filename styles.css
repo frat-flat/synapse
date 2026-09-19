@@ -7312,9 +7312,54 @@ th.synapse-merged-header-th .th-wrapper span.th-label {
   .custom-fields-grid .custom-field-row {
     grid-column: span 1 !important;
   }
+}
+
 /* ============================================================================
    代理店 流入相関図（d3-org-chart マインドマップ）スタイル
    ============================================================================ */
+
+#agency-network-screen {
+  --bg-main: #0b1120 !important;
+  --bg-surface: #131b2e !important;
+  --bg-surface-elevated: #1e2942 !important;
+  --border-color: #223150 !important;
+  --text-primary: #f8fafc !important;
+  --text-secondary: #94a3b8 !important;
+  --text-muted: #64748b !important;
+  background-color: #0b1120 !important;
+  color: #f8fafc !important;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 110px);
+  position: relative;
+  overflow: hidden;
+  font-family: 'Plus Jakarta Sans', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+#agency-network-screen * {
+  box-sizing: border-box;
+}
+
+#agency-network-screen .ag-net-header {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #223150 !important;
+  padding: 8px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+  flex-shrink: 0;
+}
+
+#agency-network-screen .ag-net-chart-container {
+  background: radial-gradient(circle at 50% 50%, #1e293b 0%, #0b1120 100%) !important;
+}
+
+#agency-network-screen .link {
+  stroke: #475569 !important;
+  stroke-width: 2px !important;
+}
 
 .ag-net-header {
   background: var(--bg-surface-elevated, #1e2942);

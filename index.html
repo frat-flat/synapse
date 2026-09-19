@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-title" content="Synapse">
 <meta name="theme-color" content="#ffffff">
 
-<link rel="stylesheet" href="styles.css?v=2.5">
+<link rel="stylesheet" href="styles.css?v=2.6">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -3010,7 +3010,7 @@
 </section>
 
 <!-- ================= 代理店 流入相関図（マインドマップ）画面 ================= -->
-<section id="agency-network-screen" class="screen-view" style="display: none; padding: 0; height: calc(100vh - 110px); flex-direction: column; overflow: hidden; position: relative;">
+<section id="agency-network-screen" class="screen-view" style="display: none; padding: 0; height: calc(100vh - 110px); flex-direction: column; overflow: hidden; position: relative; background: #0b1120; color: #f8fafc;">
   <!-- ヘッダー・操作コントロールバー -->
   <header class="ag-net-header">
     <div class="ag-net-top-row">
@@ -3146,7 +3146,7 @@
     </div>
 
     <!-- 右側詳細閲覧パネル（ドロワー：完全Read-Only） -->
-    <div class="ag-net-drawer" id="agency-sidebar-drawer">
+    <div class="ag-net-drawer collapsed" id="agency-sidebar-drawer">
       <div class="ag-net-drawer-header">
         <div style="display: flex; align-items: center; gap: 8px;">
           <i data-lucide="file-text" style="color: #38bdf8; width: 16px; height: 16px;"></i>

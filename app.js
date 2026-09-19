@@ -13906,7 +13906,7 @@ function activateTab(id) {
       } catch (err) {
         console.error('[Agency Network] Render error in activateTab:', err);
       }
-    }, 50);
+    }, 100);
   }
 
   if (tab.type === 'presence-settings-screen') {
@@ -50825,7 +50825,18 @@ function refreshAgencyNetworkChart() {
   } else {
     agNetChartInstance.data(activeData).render();
     if (agNetIsZoneActive) setTimeout(updateAgZoneBoxVisual, 50);
+    setTimeout(() => {
+      try {
+        if (agNetChartInstance) agNetChartInstance.fit();
+      } catch (e) {}
+    }, 80);
   }
+
+  setTimeout(() => {
+    try {
+      if (agNetChartInstance) agNetChartInstance.fit();
+    } catch (e) {}
+  }, 150);
 
   if (window.lucide && typeof lucide.createIcons === 'function') {
     lucide.createIcons();
