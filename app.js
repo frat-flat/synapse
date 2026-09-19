@@ -3748,6 +3748,7 @@ function ensureStandardTablesInState() {
 
   const stds = [
     { id: 'agency-info-screen', name: '代理店 基本マスタ', parentMenuId: 'agency-accordion' },
+    { id: 'agency-network-screen', name: '代理店 流入相関図', parentMenuId: 'agency-accordion' },
     { id: 'jo-info-screen', name: 'JO 基本マスタ', parentMenuId: 'jo-accordion' },
     { id: 'applicant-info-screen', name: '申込者 基本マスタ', parentMenuId: 'applicant-accordion' }
   ];
@@ -3872,6 +3873,9 @@ function getUserItemIconHtml(itemId, defaultIcon = null) {
   }
 
   // テーブル(📊)とその他機能(📝)でデフォルトアイコンを判別
+  if (itemId === 'agency-network-screen') {
+    return `<span class="user-custom-icon user-custom-icon-emoji">🌐</span>`;
+  }
   const isSubMenu = ['appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link'].includes(itemId);
   const autoIcon = isSubMenu ? '📝' : '📊';
   return `<span class="user-custom-icon user-custom-icon-emoji">${autoIcon}</span>`;
@@ -4345,7 +4349,7 @@ function getParentFolderIdForTable(tableId) {
       'appoint-screen', 'appointment-new', 'appointment-existing',
       'drafts-view-screen', 'history-view-screen', 'official-id-link', 'link-official-screen'
     ],
-    'agency-accordion': ['agency-info-screen'],
+    'agency-accordion': ['agency-info-screen', 'agency-network-screen'],
     'jo-accordion': ['jo-info-screen'],
     'applicant-accordion': ['applicant-info-screen']
   };
@@ -4435,7 +4439,7 @@ function checkTableAccess(tableId) {
   const stdSystemTables = [
     'appoint-screen', 'appointment-new', 'appointment-existing',
     'drafts-view-screen', 'history-view-screen', 'official-id-link', 'link-official-screen',
-    'agency-info-screen', 'jo-info-screen', 'applicant-info-screen'
+    'agency-info-screen', 'agency-network-screen', 'jo-info-screen', 'applicant-info-screen'
   ];
 
   if (stdSystemTables.includes(tableId)) {
@@ -5628,6 +5632,7 @@ function renderCustomTableList() {
   if (!cachedSysTables) {
     cachedSysTables = {
       'agency-info-screen': document.getElementById('menu-agency-info'),
+      'agency-network-screen': document.getElementById('menu-agency-network'),
       'jo-info-screen': document.getElementById('menu-jo-info'),
       'applicant-info-screen': document.getElementById('menu-applicant-info')
     };
