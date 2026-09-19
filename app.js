@@ -13845,6 +13845,10 @@ function activateTab(id) {
     if (tab.chartId && typeof renderChartSheetView === 'function') {
       renderChartSheetView(tab.chartId);
     }
+  } else if (tab.type === 'agency-network-screen') {
+    if (typeof renderAgencyNetworkScreen === 'function') {
+      renderAgencyNetworkScreen();
+    }
   }
 
   // 画面表示切り替え
@@ -13852,7 +13856,7 @@ function activateTab(id) {
   views.forEach(v => {
     if (v.id === tab.type) {
       v.classList.add('active');
-      v.style.display = (tab.type === 'chart-sheet-screen' || tab.type === 'form-customize-screen') ? 'flex' : 'block';
+      v.style.display = (tab.type === 'chart-sheet-screen' || tab.type === 'form-customize-screen' || tab.type === 'agency-network-screen') ? 'flex' : 'block';
       applyZoom(tab.zoomLevel || 100);
     } else {
       v.classList.remove('active');
@@ -14232,6 +14236,7 @@ function setupEventListeners() {
     { id: 'menu-history-list', tab: 'history-view-screen' },
     { id: 'menu-link-official', tab: 'link-official-screen' },
     { id: 'menu-agency-info', tab: 'agency-info-screen' },
+    { id: 'menu-agency-network', tab: 'agency-network-screen' },
     { id: 'menu-jo-info', tab: 'jo-info-screen' },
     { id: 'menu-applicant-info', tab: 'applicant-info-screen' },
     { id: 'menu-dbmake', tab: 'dbmake-screen' },
@@ -14272,6 +14277,9 @@ function setupEventListeners() {
         } else if (btn.tab === 'agency-info-screen') {
           title = '📊 代理店・基本マスタ';
           type = 'agency-info-screen';
+        } else if (btn.tab === 'agency-network-screen') {
+          title = '🌐 代理店 流入相関図';
+          type = 'agency-network-screen';
         } else if (btn.tab === 'jo-info-screen') {
           title = '📊 JO・基本マスタ';
           type = 'jo-info-screen';
@@ -49891,6 +49899,1264 @@ if (typeof window !== 'undefined') {
   window.processFormSubmissionToPartnerDb = processFormSubmissionToPartnerDb;
   window.commitPartnerDbRecord = commitPartnerDbRecord;
 }
+
+// ============================================================================
+// 🌐 代理店 流入相関図（d3-org-chart マインドマップ）本番モジュール
+// ============================================================================
+
+let agNetChartInstance = null;
+let agNetCurrentLayout = 'left'; // 'left': 水平展開 (左→右), 'top': 垂直展開
+let agNetSelectedDate = '2026-09-18';
+let agNetSelectedNodeId = null;
+let agNetCohortMode = 'ALL';
+let agNetIsPlaying = false;
+let agNetPlayTimer = null;
+let agNetActiveRepQuery = '';
+
+// 派生枠 (Zone Box) 管理
+let agNetIsZoneActive = false;
+let agNetZoneNodeIds = [];
+let agNetZoneFilterRole = 'ALL';
+
+// ID検索スコープ管理 (前後2階層・計5階層 / ユーザ登録ID全階層)
+let agNetScopedQuery = '';
+let agNetScopedNodeIds = null;
+let agNetIsUserRegisteredScoped = false;
+
+// Chart.js アナリティクス管理
+let agNetChartJsInstance = null;
+let agNetCurrentChartTab = 'timeline-area';
+
+// デモ・検証用マスターデータ（初期未登録時のシードデータ）
+const DEFAULT_AGENCY_NETWORK_SEEDS = [
+  {
+    id: "AGY-0001",
+    masterId: "AGY-0001",
+    parentId: "",
+    name: "株式会社A (本部直結)",
+    contact: "佐藤 本部長",
+    cardTitle: "総代理店",
+    salesRep: { id: "REP-101", name: "佐藤 健一 (営業1課)" },
+    rank: "PLATINUM",
+    rankHistory: [{ date: "2023-01-15", rank: "PLATINUM", grade: "本部Aランク", note: "創業時登録" }],
+    roles: ["総代理店", "エリア統括", "認定トレーナー"],
+    joinedDate: "2023-01-15",
+    phone: "03-1111-2222",
+    email: "hq-agency-a@example.com"
+  },
+  {
+    id: "AGY-1002",
+    masterId: "AGY-1002",
+    parentId: "AGY-0001",
+    name: "株式会社B",
+    contact: "山田 太郎",
+    cardTitle: "一次代理店",
+    salesRep: { id: "REP-101", name: "佐藤 健一 (営業1課)" },
+    rank: "GOLD",
+    rankHistory: [
+      { date: "2023-04-10", rank: "BRONZE", grade: "ランクC", note: "新規加盟" },
+      { date: "2023-08-01", rank: "SILVER", grade: "ランクB", note: "目標件数達成により昇格" },
+      { date: "2024-01-15", rank: "GOLD", grade: "ランクA", note: "年間最優秀代理店表彰で昇格" }
+    ],
+    roles: ["一次代理店", "セミナー講師", "関東統括"],
+    joinedDate: "2023-04-10",
+    phone: "03-2222-3333",
+    email: "agency-b@example.com"
+  },
+  {
+    id: "AGY-1003",
+    masterId: "AGY-1003",
+    parentId: "AGY-0001",
+    name: "株式会社C",
+    contact: "田中 次郎",
+    cardTitle: "紹介パートナー",
+    salesRep: { id: "REP-102", name: "鈴木 雅也 (営業2課)" },
+    rank: "SILVER",
+    rankHistory: [
+      { date: "2023-05-18", rank: "BRONZE", grade: "ランクC", note: "パートナー登録" },
+      { date: "2023-09-01", rank: "SILVER", grade: "ランクB", note: "定期紹介実績により昇格" }
+    ],
+    roles: ["紹介パートナー", "サポート窓口"],
+    joinedDate: "2023-05-18",
+    phone: "03-3333-4444",
+    email: "agency-c@example.com"
+  },
+  {
+    id: "AGY-1004",
+    masterId: "AGY-1004",
+    parentId: "AGY-0001",
+    name: "合同会社D",
+    contact: "鈴木 一郎",
+    cardTitle: "特約店",
+    salesRep: { id: "REP-102", name: "鈴木 雅也 (営業2課)" },
+    rank: "GOLD",
+    rankHistory: [{ date: "2023-06-01", rank: "GOLD", grade: "ランクA", note: "大手提携特約店として参入" }],
+    roles: ["特約店", "エリア統括"],
+    joinedDate: "2023-06-01",
+    phone: "03-4444-5555",
+    email: "agency-d@example.com"
+  },
+  {
+    id: "AGY-1005",
+    masterId: "AGY-1005",
+    parentId: "AGY-0001",
+    name: "株式会社E",
+    contact: "高橋 健太",
+    cardTitle: "一次代理店",
+    salesRep: { id: "REP-101", name: "佐藤 健一 (営業1課)" },
+    rank: "SILVER",
+    rankHistory: [
+      { date: "2023-07-22", rank: "BRONZE", grade: "ランクC", note: "一次代理店 加盟時" },
+      { date: "2023-12-01", rank: "SILVER", grade: "ランクB", note: "半年実績達成で昇格" }
+    ],
+    roles: ["一次代理店"],
+    joinedDate: "2023-07-22",
+    phone: "03-5555-6666",
+    email: "agency-e@example.com"
+  },
+  {
+    id: "AGY-1006",
+    masterId: "AGY-1006",
+    parentId: "AGY-0001",
+    name: "株式会社F",
+    contact: "伊藤 誠",
+    cardTitle: "取次店",
+    salesRep: { id: "REP-103", name: "高橋 麗華 (営業3課)" },
+    rank: "SILVER",
+    rankHistory: [{ date: "2023-08-11", rank: "SILVER", grade: "ランクB", note: "取次店 加盟" }],
+    roles: ["取次店", "サポート窓口"],
+    joinedDate: "2023-08-11",
+    phone: "03-6666-7777",
+    email: "agency-f@example.com"
+  },
+  {
+    id: "AGY-2007",
+    masterId: "AGY-2007",
+    parentId: "AGY-1002",
+    name: "株式会社G",
+    contact: "小林 翼",
+    cardTitle: "地域サポーター",
+    salesRep: { id: "REP-101", name: "佐藤 健一 (営業1課)" },
+    rank: "BRONZE",
+    rankHistory: [{ date: "2023-09-05", rank: "BRONZE", grade: "ランクC", note: "新規参入" }],
+    roles: ["地域サポーター", "個別窓口"],
+    joinedDate: "2023-09-05",
+    phone: "06-1111-2222",
+    email: "agency-g@example.com"
+  },
+  {
+    id: "AGY-2008",
+    masterId: "AGY-2008",
+    parentId: "AGY-1002",
+    name: "株式会社H",
+    contact: "加藤 秀樹",
+    cardTitle: "個別窓口",
+    salesRep: { id: "REP-102", name: "鈴木 雅也 (営業2課)" },
+    rank: "SILVER",
+    rankHistory: [
+      { date: "2023-10-25", rank: "BRONZE", grade: "ランクC", note: "窓口開設" },
+      { date: "2024-02-01", rank: "SILVER", grade: "ランクB", note: "顧客対応高評価により昇格" }
+    ],
+    roles: ["個別窓口"],
+    joinedDate: "2023-10-25",
+    phone: "06-2222-3333",
+    email: "agency-h@example.com"
+  },
+  {
+    id: "AGY-2009",
+    masterId: "AGY-2009",
+    parentId: "AGY-1002",
+    name: "合同会社I",
+    contact: "渡辺 英明",
+    cardTitle: "研修パートナー",
+    salesRep: { id: "REP-103", name: "高橋 麗華 (営業3課)" },
+    rank: "BRONZE",
+    rankHistory: [{ date: "2023-11-30", rank: "BRONZE", grade: "ランクC", note: "加盟時登録" }],
+    roles: ["研修パートナー", "サポート窓口"],
+    joinedDate: "2023-11-30",
+    phone: "06-3333-4444",
+    email: "agency-i@example.com"
+  },
+  {
+    id: "AGY-3010",
+    masterId: "AGY-3010",
+    parentId: "AGY-2007",
+    name: "株式会社J",
+    contact: "松本 潤一",
+    cardTitle: "地域取次所",
+    salesRep: { id: "REP-101", name: "佐藤 健一 (営業1課)" },
+    rank: "BRONZE",
+    rankHistory: [{ date: "2024-01-10", rank: "BRONZE", grade: "ランクC", note: "G社紹介により開設" }],
+    roles: ["地域取次所"],
+    joinedDate: "2024-01-10",
+    phone: "092-111-2222",
+    email: "agency-j@example.com"
+  }
+];
+
+// Synapse内マスタ・アポイント・本登録IDからネットワークノード群を動的統合生成
+function buildAgencyNetworkDataset() {
+  let dataset = [];
+  const registeredSeeds = JSON.parse(JSON.stringify(DEFAULT_AGENCY_NETWORK_SEEDS));
+
+  // 1. state.agContracts（代理店契約マスタ）の読み込み
+  if (Array.isArray(state.agContracts) && state.agContracts.length > 0) {
+    state.agContracts.forEach((ag, idx) => {
+      const id = ag.customerId || `AGY-AUTO-${idx + 1}`;
+      // シードデータに同一IDがあればシード側を優先・補完
+      const seedMatch = registeredSeeds.find(s => s.id === id || s.masterId === id);
+      if (seedMatch) {
+        // マスタ側の最新名や会社名で上書き
+        if (ag.name) seedMatch.name = ag.company ? `${ag.company} (${ag.name})` : ag.name;
+        if (ag.status) seedMatch.status = ag.status;
+      } else {
+        // 新規代理店マスタレコードの変換
+        dataset.push({
+          id: id,
+          masterId: id,
+          parentId: ag.parentId || "AGY-0001", // 親未設定は本部配下
+          name: ag.company ? `${ag.company} (${ag.name || '代理店'})` : (ag.name || '代理店'),
+          contact: ag.contact || ag.name || '-',
+          cardTitle: ag.cardTitle || ag.status || '代理店',
+          salesRep: ag.salesRep || { id: ag.salesRepId || 'REP-101', name: '担当営業' },
+          rank: ag.rank || 'BRONZE',
+          rankHistory: ag.rankHistory || [{ date: ag.createdAt ? ag.createdAt.split('T')[0] : '2024-01-01', rank: ag.rank || 'BRONZE', grade: '初期登録', note: 'マスタ登録' }],
+          roles: Array.isArray(ag.roles) ? ag.roles : [ag.status || '代理店'],
+          joinedDate: ag.createdAt ? ag.createdAt.split('T')[0] : '2024-01-01',
+          phone: ag.phone || '-',
+          email: ag.email || '-',
+          isTempId: false
+        });
+      }
+    });
+  }
+
+  // シードデータをベースに追加
+  dataset = [...registeredSeeds, ...dataset];
+
+  // 2. パーティーID未確定者のアポイント連動（最終アポイントIDの仮ID発番 & 変遷追従）
+  if (Array.isArray(state.appointments) && state.appointments.length > 0) {
+    // 顧客名または電話番号ごとにアポイントをグループ化
+    const appointsByPerson = {};
+    state.appointments.forEach(app => {
+      const key = app.customerName || app.phone || app.id;
+      if (!appointsByPerson[key]) appointsByPerson[key] = [];
+      appointsByPerson[key].push(app);
+    });
+
+    Object.keys(appointsByPerson).forEach(key => {
+      const appList = appointsByPerson[key];
+      // 日付降順（最新順）にソートして最終アポイントを特定
+      appList.sort((a, b) => {
+        const tA = new Date(a.dateTime || a.date || a.createdAt || 0).getTime();
+        const tB = new Date(b.dateTime || b.date || b.createdAt || 0).getTime();
+        return tB - tA;
+      });
+      const latestApp = appList[0];
+
+      // すでに本登録ID紐付け（officialLinks）が存在するか確認
+      let officialId = latestApp.officialId || null;
+      if (!officialId && Array.isArray(state.officialLinks)) {
+        const link = state.officialLinks.find(l => 
+          (l.customerName && l.customerName === latestApp.customerName) ||
+          (Array.isArray(l.appointmentIds) && l.appointmentIds.includes(latestApp.id))
+        );
+        if (link) officialId = link.officialId;
+      }
+
+      // もし本登録IDがない場合 ➔ 「最終アポイントID」を仮IDとしてネットワークに組み込む
+      if (!officialId) {
+        const tempId = latestApp.id; // 最終アポイント時のID
+        const existNode = dataset.find(d => d.id === tempId || d.tempAppointId === tempId);
+        if (!existNode) {
+          // 紹介元（親）の特定
+          let parentNodeId = "AGY-1002"; // デフォルトB社配下等
+          if (latestApp.referralSource || latestApp.introducer) {
+            const refQuery = (latestApp.referralSource || latestApp.introducer).trim();
+            const matchedParent = dataset.find(d => d.name.includes(refQuery) || d.masterId === refQuery || d.id === refQuery);
+            if (matchedParent) parentNodeId = matchedParent.id;
+          }
+
+          const appDate = (latestApp.dateTime || latestApp.date || '2024-03-01').split('T')[0].split(' ')[0];
+          dataset.push({
+            id: `TEMP-${tempId}`,
+            tempAppointId: tempId,
+            masterId: `仮ID: ${tempId}`,
+            parentId: parentNodeId,
+            name: `${latestApp.customerName || '見込み代理店'} (アポ${appList.length}件)`,
+            contact: latestApp.customerName || '担当者未定',
+            cardTitle: '⏳ 審査・申請中',
+            salesRep: { id: latestApp.salesRep || latestApp.recordedBy || 'REP-101', name: latestApp.salesRep || latestApp.recordedBy || '営業担当' },
+            rank: 'PENDING',
+            rankHistory: [{ date: appDate, rank: 'PENDING', grade: '仮ID (未確定)', note: `最終アポ(${tempId})連動` }],
+            roles: ['アポイント取得済', '本登録前'],
+            joinedDate: appDate,
+            phone: latestApp.phone || '-',
+            email: latestApp.email || '-',
+            isTempId: true,
+            lastAppointInfo: `${tempId} (${appDate}) - ${appList.length}回目アポ`
+          });
+        }
+      }
+    });
+  }
+
+  return dataset;
+}
+
+// ユーザー登録ID判定 (state.users, 営業ID等に該当するか)
+function isSynapseUserRegisteredId(queryId) {
+  if (!queryId) return false;
+  const q = String(queryId).trim().toLowerCase();
+  
+  // 1. state.users チェック
+  try {
+    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [];
+    if (users.some(u => 
+      (u.id && String(u.id).toLowerCase() === q) ||
+      (u.code && String(u.code).toLowerCase() === q) ||
+      (u.email && String(u.email).toLowerCase() === q) ||
+      (u.name && String(u.name).toLowerCase() === q)
+    )) {
+      return true;
+    }
+  } catch (e) {}
+
+  // 2. 営業担当者コード (REP-xxx等)
+  if (q.startsWith('rep-') || q.includes('営業')) {
+    return true;
+  }
+
+  return false;
+}
+
+// 指定日時点のランク・可視性算出
+function getAgencyDataAtDate(dataset, targetDateStr, cohortFilter = 'ALL') {
+  const targetTime = new Date(targetDateStr).getTime();
+
+  return dataset
+    .filter(item => {
+      const joinTime = new Date(item.joinedDate).getTime();
+      return joinTime <= targetTime;
+    })
+    .map(item => {
+      let activeRank = item.rank || 'BRONZE';
+      let activeGrade = item.cardTitle || '代理店';
+
+      if (item.isTempId) {
+        activeRank = 'PENDING';
+        activeGrade = '仮ID (未確定)';
+      } else if (item.rankHistory && item.rankHistory.length > 0) {
+        const validHistories = item.rankHistory
+          .filter(h => new Date(h.date).getTime() <= targetTime)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        if (validHistories.length > 0) {
+          activeRank = validHistories[0].rank;
+          activeGrade = validHistories[0].grade || activeRank;
+        } else {
+          activeRank = item.rankHistory[0].rank;
+          activeGrade = item.rankHistory[0].grade || activeRank;
+        }
+      }
+
+      // コホートフィルタリング
+      let isCohortTarget = false;
+      let isDimmedByCohort = false;
+
+      if (cohortFilter === 'CURRENT_RANK_A') {
+        const currentRank = item.rank;
+        if (currentRank === 'PLATINUM' || currentRank === 'GOLD') isCohortTarget = true;
+        else isDimmedByCohort = true;
+      } else if (cohortFilter === 'CURRENT_RANK_B_PLUS') {
+        const currentRank = item.rank;
+        if (['PLATINUM', 'GOLD', 'SILVER'].includes(currentRank)) isCohortTarget = true;
+        else isDimmedByCohort = true;
+      } else if (cohortFilter === 'DATE_RANK_B_PLUS') {
+        if (!['PLATINUM', 'GOLD', 'SILVER'].includes(activeRank)) isDimmedByCohort = true;
+        else isCohortTarget = true;
+      }
+
+      // 営業担当者検索フィルタ
+      let isRepMatched = false;
+      let isDimmedByRep = false;
+      if (agNetActiveRepQuery) {
+        const rq = agNetActiveRepQuery.toLowerCase();
+        const rep = item.salesRep || {};
+        if ((rep.id && rep.id.toLowerCase().includes(rq)) || (rep.name && rep.name.toLowerCase().includes(rq))) {
+          isRepMatched = true;
+        } else {
+          isDimmedByRep = true;
+        }
+      }
+
+      return {
+        ...item,
+        currentRank: activeRank,
+        currentGrade: activeGrade,
+        isCohortTarget: isCohortTarget,
+        isDimmedByCohort: isDimmedByCohort || isDimmedByRep,
+        isRepMatched: isRepMatched
+      };
+    });
+}
+
+// 配下の全派生ノードID群の収集 (再帰)
+function getAgSubtreeNodeIds(dataset, rootId, includeRoot = true) {
+  let result = includeRoot ? [rootId] : [];
+  function collect(parentId) {
+    dataset.forEach(node => {
+      if (node.parentId === parentId) {
+        result.push(node.id);
+        collect(node.id);
+      }
+    });
+  }
+  collect(rootId);
+  return result;
+}
+
+// ID検索時の前後2階層（計5階層）のノード抽出ロジック
+function getScoped5TierNodeIds(dataset, targetNodeId) {
+  const target = dataset.find(d => d.id === targetNodeId || d.masterId === targetNodeId || d.name.includes(targetNodeId));
+  if (!target) return null;
+
+  const nodeMap = new Map(dataset.map(d => [d.id, d]));
+  const scopedIds = new Set();
+  scopedIds.add(target.id);
+
+  // 親方向 (最大2階層上)
+  let p1 = target.parentId ? nodeMap.get(target.parentId) : null;
+  if (p1) {
+    scopedIds.add(p1.id);
+    let p2 = p1.parentId ? nodeMap.get(p1.parentId) : null;
+    if (p2) {
+      scopedIds.add(p2.id);
+    }
+  }
+
+  // 子方向 (最大2階層下)
+  dataset.forEach(n => {
+    if (n.parentId === target.id) {
+      scopedIds.add(n.id); // 子 (1階層下)
+      dataset.forEach(subN => {
+        if (subN.parentId === n.id) {
+          scopedIds.add(subN.id); // 孫 (2階層下)
+        }
+      });
+    }
+  });
+
+  return Array.from(scopedIds);
+}
+
+// マインドマップ画面の初期化・描画
+function renderAgencyNetworkScreen() {
+  const screen = document.getElementById('agency-network-screen');
+  if (!screen) return;
+
+  const allDataset = buildAgencyNetworkDataset();
+
+  // 初期日付
+  if (!agNetSelectedDate || agNetSelectedDate === '2026-09-18') {
+    const dates = allDataset.map(d => d.joinedDate).filter(Boolean).sort();
+    if (dates.length > 0) {
+      agNetSelectedDate = dates[dates.length - 1]; // 最新日
+      const datePicker = document.getElementById('ag-net-date-picker');
+      if (datePicker) {
+        datePicker.value = agNetSelectedDate;
+        datePicker.min = dates[0];
+        datePicker.max = agNetSelectedDate;
+      }
+    }
+  }
+
+  initAgencyNetworkDOMEvents();
+  refreshAgencyNetworkChart();
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
+}
+
+// イベントリスナー初期化（1回のみ登録）
+let agNetEventsInitialized = false;
+function initAgencyNetworkDOMEvents() {
+  if (agNetEventsInitialized) return;
+  agNetEventsInitialized = true;
+
+  // 水平 / 垂直 レイアウト切り替え
+  document.getElementById('ag-net-btn-layout-horizontal')?.addEventListener('click', () => {
+    agNetCurrentLayout = 'left';
+    document.getElementById('ag-net-btn-layout-horizontal').classList.add('active');
+    document.getElementById('ag-net-btn-layout-vertical').classList.remove('active');
+    if (agNetChartInstance) {
+      agNetChartInstance.layout('left').render().fit();
+      setTimeout(updateAgZoneBoxVisual, 350);
+    }
+  });
+
+  document.getElementById('ag-net-btn-layout-vertical')?.addEventListener('click', () => {
+    agNetCurrentLayout = 'top';
+    document.getElementById('ag-net-btn-layout-vertical').classList.add('active');
+    document.getElementById('ag-net-btn-layout-horizontal').classList.remove('active');
+    if (agNetChartInstance) {
+      agNetChartInstance.layout('top').render().fit();
+      setTimeout(updateAgZoneBoxVisual, 350);
+    }
+  });
+
+  // ズーム・Fit
+  document.getElementById('ag-net-btn-fit')?.addEventListener('click', () => {
+    if (agNetChartInstance) agNetChartInstance.fit();
+  });
+  document.getElementById('ag-net-btn-zoom-in')?.addEventListener('click', () => {
+    if (agNetChartInstance) agNetChartInstance.zoomIn();
+  });
+  document.getElementById('ag-net-btn-zoom-out')?.addEventListener('click', () => {
+    if (agNetChartInstance) agNetChartInstance.zoomOut();
+  });
+
+  // ID / 名称検索
+  const searchInput = document.getElementById('ag-net-search-input');
+  const clearSearchBtn = document.getElementById('ag-net-btn-clear-search');
+  searchInput?.addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    clearSearchBtn.style.display = val ? 'inline' : 'none';
+    handleAgencyIdSearch(val);
+  });
+  clearSearchBtn?.addEventListener('click', () => {
+    if (searchInput) searchInput.value = '';
+    clearSearchBtn.style.display = 'none';
+    handleAgencyIdSearch('');
+  });
+
+  // 検索スコープ解除ボタン
+  document.getElementById('ag-net-btn-reset-scope')?.addEventListener('click', () => {
+    agNetScopedQuery = '';
+    agNetScopedNodeIds = null;
+    document.getElementById('ag-net-search-scope-banner').style.display = 'none';
+    if (searchInput) searchInput.value = '';
+    clearSearchBtn.style.display = 'none';
+    refreshAgencyNetworkChart();
+  });
+
+  // 営業担当者ID検索
+  const repInput = document.getElementById('ag-net-sales-rep-input');
+  const clearRepBtn = document.getElementById('ag-net-btn-clear-rep');
+  repInput?.addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    clearRepBtn.style.display = val ? 'inline' : 'none';
+    agNetActiveRepQuery = val;
+    const banner = document.getElementById('ag-net-rep-banner');
+    if (val) {
+      banner.style.display = 'flex';
+      document.getElementById('ag-net-rep-banner-name').textContent = val;
+    } else {
+      banner.style.display = 'none';
+    }
+    refreshAgencyNetworkChart();
+  });
+  clearRepBtn?.addEventListener('click', () => {
+    if (repInput) repInput.value = '';
+    clearRepBtn.style.display = 'none';
+    agNetActiveRepQuery = '';
+    document.getElementById('ag-net-rep-banner').style.display = 'none';
+    refreshAgencyNetworkChart();
+  });
+  document.getElementById('ag-net-btn-reset-rep')?.addEventListener('click', () => {
+    if (repInput) repInput.value = '';
+    clearRepBtn.style.display = 'none';
+    agNetActiveRepQuery = '';
+    document.getElementById('ag-net-rep-banner').style.display = 'none';
+    refreshAgencyNetworkChart();
+  });
+
+  // 派生を一括枠囲みボタン (上部コントロール)
+  document.getElementById('ag-net-btn-bound-selected')?.addEventListener('click', () => {
+    if (!agNetSelectedNodeId) {
+      showToast('対象の代理店カードをタップして選択してください。', 'info');
+      return;
+    }
+    triggerSubtreeBounding(agNetSelectedNodeId);
+  });
+
+  // ドロワー内の派生囲みボタン
+  document.getElementById('ag-net-btn-bound-from-drawer')?.addEventListener('click', () => {
+    if (agNetSelectedNodeId) {
+      triggerSubtreeBounding(agNetSelectedNodeId);
+    }
+  });
+
+  // 派生枠解除ボタン
+  document.getElementById('agency-zone-close')?.addEventListener('click', clearAgZoneSelection);
+
+  // ドロワー閉じるボタン
+  document.getElementById('ag-net-drawer-close')?.addEventListener('click', () => {
+    document.getElementById('agency-sidebar-drawer')?.classList.add('collapsed');
+  });
+
+  // タイムトラベル制御
+  const datePicker = document.getElementById('ag-net-date-picker');
+  const timeSlider = document.getElementById('ag-net-time-slider');
+  const playBtn = document.getElementById('ag-net-btn-play');
+
+  datePicker?.addEventListener('change', (e) => {
+    agNetSelectedDate = e.target.value;
+    refreshAgencyNetworkChart();
+  });
+
+  timeSlider?.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value, 10);
+    const allDataset = buildAgencyNetworkDataset();
+    const dates = Array.from(new Set(allDataset.map(d => d.joinedDate).filter(Boolean))).sort();
+    if (dates.length > 0) {
+      const idx = Math.min(dates.length - 1, Math.floor((val / 100) * dates.length));
+      agNetSelectedDate = dates[idx];
+      if (datePicker) datePicker.value = agNetSelectedDate;
+      refreshAgencyNetworkChart();
+    }
+  });
+
+  playBtn?.addEventListener('click', toggleAgNetTimelinePlay);
+
+  // コホートモード切り替え
+  document.getElementById('ag-net-cohort-mode')?.addEventListener('change', (e) => {
+    agNetCohortMode = e.target.value;
+    refreshAgencyNetworkChart();
+  });
+
+  // アナリティクスモーダル開閉
+  document.getElementById('ag-net-btn-analytics')?.addEventListener('click', openAgAnalyticsModal);
+  document.getElementById('ag-net-modal-close')?.addEventListener('click', closeAgAnalyticsModal);
+
+  // アナリティクスタブ切り替え
+  document.querySelectorAll('.ag-net-analytics-tabs .analytics-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.ag-net-analytics-tabs .analytics-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      agNetCurrentChartTab = btn.dataset.chart;
+      renderAgAnalyticsChart();
+    });
+  });
+
+  // エクスポートメニュー
+  const exportBtn = document.getElementById('ag-net-btn-export');
+  const exportMenu = document.getElementById('ag-net-export-menu');
+  exportBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    exportMenu.style.display = (exportMenu.style.display === 'none' || !exportMenu.style.display) ? 'block' : 'none';
+  });
+  document.addEventListener('click', () => {
+    if (exportMenu) exportMenu.style.display = 'none';
+  });
+  document.getElementById('ag-net-export-png')?.addEventListener('click', () => {
+    if (agNetChartInstance) agNetChartInstance.exportImg({ full: true });
+  });
+  document.getElementById('ag-net-export-svg')?.addEventListener('click', () => {
+    if (agNetChartInstance) agNetChartInstance.exportSvg();
+  });
+  document.getElementById('ag-net-export-json')?.addEventListener('click', () => {
+    const data = buildAgencyNetworkDataset();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `synapse_agency_network_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+// ID検索処理 (前後2階層・計5階層 / ユーザ登録ID全階層連結)
+function handleAgencyIdSearch(query) {
+  agNetScopedQuery = query;
+  const banner = document.getElementById('ag-net-search-scope-banner');
+  const bannerText = document.getElementById('ag-net-search-scope-text');
+
+  if (!query) {
+    agNetScopedNodeIds = null;
+    banner.style.display = 'none';
+    refreshAgencyNetworkChart();
+    return;
+  }
+
+  const allData = buildAgencyNetworkDataset();
+  const matched = allData.find(d => 
+    (d.id && d.id.toLowerCase() === query.toLowerCase()) ||
+    (d.masterId && d.masterId.toLowerCase().includes(query.toLowerCase())) ||
+    (d.name && d.name.toLowerCase().includes(query.toLowerCase()))
+  );
+
+  if (!matched) {
+    agNetScopedNodeIds = [];
+    banner.style.display = 'flex';
+    bannerText.innerHTML = `⚠️ 「${query}」に一致する代理店・IDは見つかりませんでした。`;
+    refreshAgencyNetworkChart();
+    return;
+  }
+
+  // ユーザ登録されているIDかどうかを判定
+  const isRegisteredUser = isSynapseUserRegisteredId(query) || isSynapseUserRegisteredId(matched.masterId) || isSynapseUserRegisteredId(matched.id);
+
+  if (isRegisteredUser) {
+    // ユーザ登録されているID ➔ 階層になっているところはすべて連結して全展開表示
+    agNetIsUserRegisteredScoped = true;
+    agNetScopedNodeIds = null; // 全体連結表示
+    banner.style.display = 'flex';
+    bannerText.innerHTML = `👤 ユーザ登録ID <strong>【${matched.name} (${matched.masterId})】</strong> の全階層を連結表示中`;
+    agNetSelectedNodeId = matched.id;
+  } else {
+    // 一般のID ➔ 前後2階層まで（計5階層）にスコープを絞り込み
+    agNetIsUserRegisteredScoped = false;
+    agNetScopedNodeIds = getScoped5TierNodeIds(allData, matched.id);
+    banner.style.display = 'flex';
+    bannerText.innerHTML = `🔍 <strong>【${matched.name} (${matched.masterId})】</strong> の前後2階層（計5階層）に絞り込んで表示中`;
+    agNetSelectedNodeId = matched.id;
+  }
+
+  refreshAgencyNetworkChart();
+}
+
+// チャートの更新・再描画
+function refreshAgencyNetworkChart() {
+  if (typeof d3 === 'undefined' || typeof d3.OrgChart === 'undefined') {
+    console.warn('[Agency Network] d3.OrgChart library is not loaded yet.');
+    return;
+  }
+
+  let fullDataset = buildAgencyNetworkDataset();
+
+  // 検索スコープ（前後2階層）が有効な場合のデータフィルタリング
+  if (agNetScopedNodeIds !== null) {
+    fullDataset = fullDataset.filter(d => agNetScopedNodeIds.includes(d.id));
+    // スコープ内の最上位ノードの親を一時的に "" にしてルート化
+    const scopedIdsSet = new Set(fullDataset.map(d => d.id));
+    fullDataset.forEach(d => {
+      if (!scopedIdsSet.has(d.parentId)) {
+        d._originalParentId = d.parentId;
+        d.parentId = "";
+      }
+    });
+  }
+
+  const activeData = getAgencyDataAtDate(fullDataset, agNetSelectedDate, agNetCohortMode);
+
+  // 日付ラベル・件数の更新
+  const dateLabel = document.getElementById('ag-net-active-date-label');
+  const countLabel = document.getElementById('ag-net-active-count-label');
+  if (dateLabel) dateLabel.textContent = agNetSelectedDate;
+  if (countLabel) countLabel.textContent = activeData.filter(d => !d.isDimmedByCohort).length;
+
+  const container = document.querySelector('#agency-chart-container');
+  if (!container) return;
+
+  if (!agNetChartInstance) {
+    container.innerHTML = `
+      <div class="ag-net-zone-box" id="agency-zone-box" style="display: none;">
+        <div class="ag-net-zone-header">
+          <span style="font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 4px;" id="agency-zone-title">
+            <i data-lucide="focus" style="width: 14px; height: 14px;"></i> 派生グループ枠:
+          </span>
+          <div class="ag-net-zone-pills" id="agency-zone-pills"></div>
+          <button class="ag-net-zone-close" id="agency-zone-close" title="枠を解除">✕</button>
+        </div>
+      </div>
+    `;
+
+    agNetChartInstance = new d3.OrgChart()
+      .container('#agency-chart-container')
+      .data(activeData)
+      .nodeWidth(d => 280)
+      .nodeHeight(d => 165)
+      .childrenMargin(d => 65)
+      .compactMarginBetween(d => 30)
+      .compactMarginPair(d => 30)
+      .neighbourMargin(d => 25)
+      .compact(false)
+      .layout(agNetCurrentLayout)
+      // 🌟 社数バッジの表示専用化（クリックによる折りたたみ無効化）
+      .buttonContent(({ node, state }) => {
+        const count = (node.children ? node.children.length : 0) + (node._children ? node._children.length : 0);
+        return `<div style="display:flex; align-items:center; justify-content:center; background:#1e293b; color:#94a3b8; border:1px solid #475569; border-radius:4px; padding:2px 6px; font-size:10px; font-weight:700; pointer-events:none !important; user-select:none; box-shadow:0 2px 4px rgba(0,0,0,0.3);">${count}社</div>`;
+      })
+      .onButtonClick((e, d) => {
+        // 折りたたみクリックイベントを完全に無効化（誤操作・枠ズレ防止）
+        if (e) e.stopPropagation();
+      })
+      .nodeContent((d, i, arr, state) => {
+        const item = d.data;
+        const isSelected = item.id === agNetSelectedNodeId;
+        const childCount = (d.children ? d.children.length : 0) + (d._children ? d._children.length : 0);
+
+        let cardClasses = [];
+        if (item.isTempId) cardClasses.push("is-temp-id");
+        if (isSelected) cardClasses.push("is-selected");
+        if (item.isRepMatched) cardClasses.push("is-rep-matched");
+
+        if (agNetIsZoneActive) {
+          const inZone = agNetZoneNodeIds.includes(item.id);
+          if (inZone) {
+            const matchesRole = (agNetZoneFilterRole === "ALL") || (item.cardTitle === agNetZoneFilterRole) || (item.roles && item.roles.includes(agNetZoneFilterRole));
+            if (matchesRole) cardClasses.push("is-zone-matched");
+            else cardClasses.push("is-zone-dimmed");
+          } else {
+            cardClasses.push("is-dimmed");
+          }
+        } else {
+          if (item.isCohortTarget) cardClasses.push("is-cohort-target");
+          else if (item.isDimmedByCohort) cardClasses.push("is-dimmed");
+        }
+
+        const roles = item.roles || [];
+        const rolesHtml = roles.slice(0, 3).map(r => `<span class="role-pill"># ${r}</span>`).join("");
+        const repName = item.salesRep ? (item.salesRep.name || item.salesRep.id) : '-';
+
+        return `
+          <div class="agency-card ${cardClasses.join(' ')}"
+               id="node-card-${item.id}"
+               data-node-id="${item.id}"
+               onclick="handleAgCardClick('${item.id}', event)">
+            <div class="card-rank-bar rank-bar-${item.currentRank}"></div>
+
+            <div class="card-header-row">
+              <div style="display: flex; align-items: center; gap: 5px;">
+                <span class="card-title-badge">
+                  ${item.cardTitle || "代理店"}
+                </span>
+                <span class="card-master-id">${item.masterId}</span>
+              </div>
+              <span class="card-rank-badge rank-${item.currentRank}">
+                ★ ${item.currentRank} (${item.currentGrade})
+              </span>
+            </div>
+
+            <div class="card-main-info">
+              <div class="agency-name" title="${item.name}">${item.name}</div>
+              <div class="agency-meta">
+                <span>担当: <strong>${item.contact || '-'}</strong></span>
+                <span class="sales-rep-tag">営業: ${repName}</span>
+              </div>
+            </div>
+
+            <div class="card-roles-row">
+              ${rolesHtml}
+            </div>
+
+            <div class="card-footer-row">
+              <span>加盟: ${item.joinedDate || '-'}</span>
+              <button class="btn-subtree-bound" onclick="handleAgSubtreeClick('${item.id}', event)" title="この代理店配下の全派生を枠囲み">
+                派生囲み (${childCount}社)
+              </button>
+            </div>
+          </div>
+        `;
+      })
+      .render();
+
+    agNetChartInstance.expandAll();
+    agNetChartInstance.fit();
+
+    // ズーム・パン時に枠を追従
+    setTimeout(() => {
+      const svg = d3.select('#agency-chart-container svg');
+      if (!svg.empty()) {
+        svg.on('wheel.zone zoom.zone', () => {
+          if (agNetIsZoneActive) updateAgZoneBoxVisual();
+        });
+      }
+    }, 500);
+  } else {
+    agNetChartInstance.data(activeData).render();
+    if (agNetIsZoneActive) setTimeout(updateAgZoneBoxVisual, 50);
+  }
+
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
+}
+
+// カードタップ時の詳細閲覧ドロワー表示 (完全Read-Only)
+window.handleAgCardClick = function(nodeId, e) {
+  if (e) e.stopPropagation();
+  agNetSelectedNodeId = nodeId;
+
+  // カード選択クラスを反映
+  document.querySelectorAll('.agency-card').forEach(c => c.classList.remove('is-selected'));
+  document.getElementById(`node-card-${nodeId}`)?.classList.add('is-selected');
+
+  populateAgencyDrawer(nodeId);
+};
+
+// 詳細閲覧ドロワーへデータをバインド (Read-Only)
+function populateAgencyDrawer(nodeId) {
+  const allData = buildAgencyNetworkDataset();
+  const node = allData.find(d => d.id === nodeId);
+  if (!node) return;
+
+  const drawer = document.getElementById('agency-sidebar-drawer');
+  if (drawer) drawer.classList.remove('collapsed');
+
+  // 親代理店名
+  let parentName = "本部直結 (最上位)";
+  if (node.parentId) {
+    const parent = allData.find(d => d.id === node.parentId);
+    parentName = parent ? `${parent.name} (${parent.masterId})` : node.parentId;
+  }
+
+  document.getElementById('ag-net-detail-id').textContent = node.masterId || node.id;
+  document.getElementById('ag-net-detail-status').innerHTML = node.isTempId ? 
+    `<span style="color: #f59e0b; font-weight: 700;">⏳ 仮ID (未確定)</span>` : 
+    `<span style="color: #10b981; font-weight: 700;">正式登録済</span>`;
+  document.getElementById('ag-net-detail-parent').textContent = parentName;
+  document.getElementById('ag-net-detail-sales-rep').textContent = node.salesRep ? `${node.salesRep.name} (${node.salesRep.id})` : '-';
+  document.getElementById('ag-net-detail-rank').textContent = `★ ${node.currentRank || node.rank} (${node.currentGrade || '-'})`;
+
+  document.getElementById('ag-net-detail-card-title').textContent = node.cardTitle || '代理店';
+  document.getElementById('ag-net-detail-name').textContent = node.name || '-';
+
+  // 兼務役割タグ
+  const rolesContainer = document.getElementById('ag-net-detail-roles');
+  if (rolesContainer) {
+    const roles = node.roles || [];
+    if (roles.length > 0) {
+      rolesContainer.innerHTML = roles.map(r => `<span class="role-pill"># ${r}</span>`).join('');
+    } else {
+      rolesContainer.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-muted);">設定なし</span>`;
+    }
+  }
+
+  document.getElementById('ag-net-detail-joined').textContent = node.joinedDate || '-';
+  document.getElementById('ag-net-detail-contact').textContent = node.contact || '-';
+  document.getElementById('ag-net-detail-phone').textContent = node.phone || '-';
+  document.getElementById('ag-net-detail-email').textContent = node.email || '-';
+  document.getElementById('ag-net-detail-last-appoint').textContent = node.lastAppointInfo || (node.isTempId ? node.masterId : '該当なし (本登録済)');
+}
+
+// 派生一括枠囲みの実行
+window.handleAgSubtreeClick = function(nodeId, e) {
+  if (e) e.stopPropagation();
+  triggerSubtreeBounding(nodeId);
+};
+
+function triggerSubtreeBounding(nodeId) {
+  agNetSelectedNodeId = nodeId;
+  const allData = buildAgencyNetworkDataset();
+  const node = allData.find(d => d.id === nodeId);
+  if (!node) return;
+
+  const subIds = getAgSubtreeNodeIds(allData, nodeId, true);
+  setAgZoneSelection(subIds, `【${node.name}】配下の全派生 (${subIds.length}社)`);
+}
+
+function setAgZoneSelection(nodeIds, titleLabel = "派生グループ枠") {
+  if (!nodeIds || nodeIds.length === 0) {
+    clearAgZoneSelection();
+    return;
+  }
+  agNetIsZoneActive = true;
+  agNetZoneNodeIds = nodeIds;
+  agNetZoneFilterRole = "ALL";
+
+  const allData = buildAgencyNetworkDataset();
+  document.getElementById('agency-zone-title').innerHTML = `<i data-lucide="focus" style="width: 14px; height: 14px;"></i> ${titleLabel}:`;
+
+  // 役割ごとの社数を集計
+  const roleCounts = { "ALL": nodeIds.length };
+  nodeIds.forEach(id => {
+    const n = allData.find(item => item.id === id);
+    if (n) {
+      const r = n.cardTitle || '代理店';
+      roleCounts[r] = (roleCounts[r] || 0) + 1;
+    }
+  });
+
+  const pillsContainer = document.getElementById('agency-zone-pills');
+  if (pillsContainer) {
+    pillsContainer.innerHTML = "";
+    Object.keys(roleCounts).forEach(role => {
+      const pill = document.createElement('span');
+      pill.className = `zone-role-pill ${role === agNetZoneFilterRole ? 'active' : ''}`;
+      pill.textContent = `${role === 'ALL' ? 'すべて表示' : role} (${roleCounts[role]})`;
+      pill.onclick = (e) => {
+        e.stopPropagation();
+        agNetZoneFilterRole = role;
+        document.querySelectorAll('.zone-role-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        if (agNetChartInstance) agNetChartInstance.render();
+        setTimeout(updateAgZoneBoxVisual, 50);
+      };
+      pillsContainer.appendChild(pill);
+    });
+  }
+
+  if (agNetChartInstance) agNetChartInstance.render();
+  setTimeout(updateAgZoneBoxVisual, 50);
+  if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+}
+
+function clearAgZoneSelection() {
+  agNetIsZoneActive = false;
+  agNetZoneNodeIds = [];
+  const box = document.getElementById('agency-zone-box');
+  if (box) box.style.display = 'none';
+  if (agNetChartInstance) agNetChartInstance.render();
+}
+
+// 枠オーバーレイの座標更新
+function updateAgZoneBoxVisual() {
+  if (!agNetIsZoneActive || agNetZoneNodeIds.length === 0) return;
+
+  const container = document.getElementById('agency-chart-container');
+  if (!container) return;
+  const containerRect = container.getBoundingClientRect();
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let visibleCount = 0;
+
+  agNetZoneNodeIds.forEach(id => {
+    const el = document.getElementById(`node-card-${id}`);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      const relLeft = r.left - containerRect.left;
+      const relTop = r.top - containerRect.top;
+      const relRight = relLeft + r.width;
+      const relBottom = relTop + r.height;
+
+      if (relLeft < minX) minX = relLeft;
+      if (relTop < minY) minY = relTop;
+      if (relRight > maxX) maxX = relRight;
+      if (relBottom > maxY) maxY = relBottom;
+      visibleCount++;
+    }
+  });
+
+  const zoneBox = document.getElementById('agency-zone-box');
+  if (!zoneBox) return;
+
+  if (visibleCount === 0 || minX === Infinity) {
+    zoneBox.style.display = 'none';
+    return;
+  }
+
+  const padding = 22;
+  zoneBox.style.display = 'block';
+  zoneBox.style.left = `${Math.max(10, minX - padding)}px`;
+  zoneBox.style.top = `${Math.max(44, minY - padding)}px`;
+  zoneBox.style.width = `${(maxX - minX) + (padding * 2)}px`;
+  zoneBox.style.height = `${(maxY - minY) + (padding * 2)}px`;
+}
+
+// タイムラインアニメーション再生制御
+function toggleAgNetTimelinePlay() {
+  const playBtn = document.getElementById('ag-net-btn-play');
+  const playIcon = document.getElementById('ag-net-play-icon');
+  const playText = document.getElementById('ag-net-play-text');
+
+  if (agNetIsPlaying) {
+    clearInterval(agNetPlayTimer);
+    agNetIsPlaying = false;
+    if (playText) playText.textContent = "再生";
+    if (playIcon) playIcon.setAttribute('data-lucide', 'play');
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  const allData = buildAgencyNetworkDataset();
+  const dates = Array.from(new Set(allData.map(d => d.joinedDate).filter(Boolean))).sort();
+  if (dates.length <= 1) return;
+
+  agNetIsPlaying = true;
+  if (playText) playText.textContent = "一時停止";
+  if (playIcon) playIcon.setAttribute('data-lucide', 'pause');
+  if (window.lucide) lucide.createIcons();
+
+  let curIdx = dates.indexOf(agNetSelectedDate);
+  if (curIdx < 0 || curIdx >= dates.length - 1) curIdx = 0;
+
+  agNetPlayTimer = setInterval(() => {
+    curIdx++;
+    if (curIdx >= dates.length) {
+      clearInterval(agNetPlayTimer);
+      agNetIsPlaying = false;
+      if (playText) playText.textContent = "再生";
+      if (playIcon) playIcon.setAttribute('data-lucide', 'play');
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+    agNetSelectedDate = dates[curIdx];
+    const datePicker = document.getElementById('ag-net-date-picker');
+    const timeSlider = document.getElementById('ag-net-time-slider');
+    if (datePicker) datePicker.value = agNetSelectedDate;
+    if (timeSlider) timeSlider.value = Math.floor((curIdx / (dates.length - 1)) * 100);
+    refreshAgencyNetworkChart();
+  }, 1000);
+}
+
+// アナリティクスモーダル開閉
+function openAgAnalyticsModal() {
+  const modal = document.getElementById('agency-analytics-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+    renderAgAnalyticsChart();
+  }
+}
+
+function closeAgAnalyticsModal() {
+  const modal = document.getElementById('agency-analytics-modal');
+  if (modal) modal.style.display = 'none';
+  if (agNetChartJsInstance) {
+    agNetChartJsInstance.destroy();
+    agNetChartJsInstance = null;
+  }
+}
+
+// Chart.js 4種グラフ描画
+function renderAgAnalyticsChart() {
+  if (typeof Chart === 'undefined') return;
+  const canvas = document.getElementById('agency-analytics-canvas');
+  if (!canvas) return;
+
+  if (agNetChartJsInstance) {
+    agNetChartJsInstance.destroy();
+    agNetChartJsInstance = null;
+  }
+
+  const allData = buildAgencyNetworkDataset();
+  const ctx = canvas.getContext('2d');
+
+  if (agNetCurrentChartTab === 'timeline-area') {
+    // 1. 時系列・役割登録推移
+    const dateCountMap = {};
+    allData.forEach(d => {
+      const ym = (d.joinedDate || '2023-01').substring(0, 7);
+      dateCountMap[ym] = (dateCountMap[ym] || 0) + 1;
+    });
+    const sortedYMs = Object.keys(dateCountMap).sort();
+    let cum = 0;
+    const cumData = sortedYMs.map(ym => {
+      cum += dateCountMap[ym];
+      return cum;
+    });
+
+    agNetChartJsInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: sortedYMs,
+        datasets: [{
+          label: '累積代理店数 (社)',
+          data: cumData,
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56, 189, 248, 0.2)',
+          fill: true,
+          tension: 0.35
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#f8fafc' } } },
+        scales: {
+          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' }, beginAtZero: true }
+        }
+      }
+    });
+  } else if (agNetCurrentChartTab === 'role-donut') {
+    // 2. 役割構成比
+    const roleMap = {};
+    allData.forEach(d => {
+      const r = d.cardTitle || '代理店';
+      roleMap[r] = (roleMap[r] || 0) + 1;
+    });
+    const labels = Object.keys(roleMap);
+    const data = labels.map(l => roleMap[l]);
+
+    agNetChartJsInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: ['#6366f1', '#38bdf8', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#94a3b8']
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { color: '#f8fafc' } } }
+      }
+    });
+  } else if (agNetCurrentChartTab === 'rank-stacked-bar') {
+    // 3. ランク別 × 役割分布
+    const ranks = ['PLATINUM', 'GOLD', 'SILVER', 'BRONZE', 'PENDING'];
+    const rankCounts = ranks.map(rnk => allData.filter(d => d.rank === rnk).length);
+
+    agNetChartJsInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['本部/特約店 (A)', '一次代理店 (B)', '紹介/取次 (C)', '一般パートナー (D)', '仮ID (未確定)'],
+        datasets: [{
+          label: '社数',
+          data: rankCounts,
+          backgroundColor: ['#38bdf8', '#f59e0b', '#94a3b8', '#fb923c', '#fbbf24']
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' }, beginAtZero: true }
+        }
+      }
+    });
+  } else if (agNetCurrentChartTab === 'inflow-ranking') {
+    // 4. 紹介元別 派生数ランキング
+    const parentCountMap = {};
+    allData.forEach(d => {
+      if (d.parentId) {
+        const p = allData.find(item => item.id === d.parentId);
+        const name = p ? p.name : d.parentId;
+        parentCountMap[name] = (parentCountMap[name] || 0) + 1;
+      }
+    });
+    const sortedParents = Object.keys(parentCountMap).sort((a, b) => parentCountMap[b] - parentCountMap[a]);
+
+    agNetChartJsInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: sortedParents,
+        datasets: [{
+          label: '直接紹介・派生数 (社)',
+          data: sortedParents.map(k => parentCountMap[k]),
+          backgroundColor: '#8b5cf6'
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' }, beginAtZero: true },
+          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+        }
+      }
+    });
+  }
+}
+
+// グローバル公開
+if (typeof window !== 'undefined') {
+  window.renderAgencyNetworkScreen = renderAgencyNetworkScreen;
+  window.buildAgencyNetworkDataset = buildAgencyNetworkDataset;
+  window.handleAgCardClick = handleAgCardClick;
+  window.handleAgSubtreeClick = handleAgSubtreeClick;
+  window.triggerSubtreeBounding = triggerSubtreeBounding;
+  window.refreshAgencyNetworkChart = refreshAgencyNetworkChart;
+}
+
 
 
 

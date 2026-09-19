@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>代理店流入・紹介ネットワーク マインドマップ (d3-org-chart デモ)</title>
+  <!-- D3.js & d3-org-chart Dependencies -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-flextree@2.1.2/build/d3-flextree.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-org-chart@3.1.0"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-canvas: #0b1120;
+      --bg-panel: #1e293b;
+      --border-color: #334155;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      
+      --rank-platinum: #38bdf8;
+      --rank-gold: #f59e0b;
+      --rank-silver: #94a3b8;
+      --rank-bronze: #fb923c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    header {
+      background-color: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 8px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 100;
+      flex-shrink: 0;
+    }
+
+    .header-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-title h1 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-demo {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .controls-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* Sub Bar: Analysis Target & Timeline */
+    .time-travel-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #0f172a;
+      border: 1px solid #334155;
+      padding: 6px 14px;
+      border-radius: 8px;
+      gap: 14px;
+    }
+
+    .cohort-selector-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-right: 14px;
+      border-right: 1px solid #334155;
+    }
+
+    .cohort-select {
+      background: #1e293b;
+      color: #f8fafc;
+      font-weight: 600;
+      border: 1px solid #38bdf8;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .time-travel-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .date-input {
+      background-color: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .time-slider {
+      flex: 1;
+      accent-color: #38bdf8;
+      cursor: pointer;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background-color: #334155;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      padding: 5px 11px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn:hover { background-color: #475569; border-color: #64748b; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      border-color: #3b82f6;
+    }
+    .btn-primary:hover { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+
+    .btn-selected-subtree {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: #38bdf8;
+      color: #38bdf8;
+      font-weight: 600;
+    }
+    .btn-selected-subtree:hover {
+      background: #38bdf8;
+      color: #0f172a;
+    }
+
+    .btn-analytics {
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      border-color: #8b5cf6;
+      color: #fff;
+      font-weight: 600;
+    }
+    .btn-analytics:hover { background: linear-gradient(135deg, #7c3aed, #4f46e5); }
+
+    .search-input {
+      background-color: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      padding: 5px 9px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+      width: 175px;
+    }
+    .search-input:focus { border-color: #38bdf8; }
+
+    /* Sales Rep Banner */
+    .sales-rep-banner {
+      display: none;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid #10b981;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .sales-rep-chips {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .rep-agency-chip {
+      background: #0f172a;
+      border: 1px solid #10b981;
+      color: #a7f3d0;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .rep-agency-chip:hover {
+      background: #10b981;
+      color: #0f172a;
+    }
+
+    /* Main Area Layout */
+    .app-body {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 100px);
+      position: relative;
+    }
+
+    .chart-container {
+      flex: 1;
+      height: 100%;
+      position: relative;
+      background: radial-gradient(circle at 50% 50%, #1e293b 0%, #0b1120 100%);
+      overflow: hidden;
+    }
+
+    /* Bounding Zone Box */
+    .zone-box {
+      position: absolute;
+      border: 2px solid #38bdf8;
+      background: rgba(56, 189, 248, 0.04);
+      border-radius: 16px;
+      box-shadow: 0 0 35px rgba(56, 189, 248, 0.3), inset 0 0 20px rgba(56, 189, 248, 0.06);
+      pointer-events: auto;
+      z-index: 40;
+      display: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .zone-box-header {
+      position: absolute;
+      top: -38px;
+      left: 8px;
+      background: #0f172a;
+      border: 1px solid #38bdf8;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+      border-radius: 8px;
+      padding: 4px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: #f8fafc;
+      z-index: 45;
+      white-space: nowrap;
+    }
+
+    .zone-role-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .zone-role-pill {
+      background: #1e293b;
+      border: 1px solid #475569;
+      color: #94a3b8;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 10px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .zone-role-pill.active {
+      background: #38bdf8;
+      color: #0f172a;
+      border-color: #38bdf8;
+    }
+
+    .zone-close-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .zone-close-btn:hover {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+    }
+
+    /* Node Card Custom Styles */
+    .agency-card {
+      background: #1e293b;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+      width: 100%;
+      height: 100%;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.25s ease, filter 0.25s ease;
+      overflow: hidden;
+    }
+
+    .agency-card:hover {
+      transform: translateY(-2px);
+      border-color: #60a5fa;
+      box-shadow: 0 12px 24px -4px rgba(59, 130, 246, 0.3);
+    }
+
+    .agency-card.is-selected {
+      border-color: #38bdf8 !important;
+      box-shadow: 0 0 0 2px #38bdf8, 0 12px 30px rgba(56, 189, 248, 0.4) !important;
+    }
+
+    .agency-card.is-rep-matched {
+      border-color: #10b981 !important;
+      box-shadow: 0 0 0 2px #10b981, 0 12px 28px rgba(16, 185, 129, 0.4) !important;
+      transform: scale(1.02);
+    }
+
+    .agency-card.is-zone-matched {
+      border-color: #38bdf8 !important;
+      box-shadow: 0 0 0 2px #38bdf8, 0 10px 25px rgba(56, 189, 248, 0.45) !important;
+      transform: scale(1.02);
+    }
+
+    .agency-card.is-cohort-target {
+      border-color: #f59e0b !important;
+      box-shadow: 0 0 0 2px #f59e0b, 0 12px 28px rgba(245, 158, 11, 0.35) !important;
+      transform: scale(1.02);
+    }
+
+    .agency-card.is-dimmed, .agency-card.is-zone-dimmed {
+      opacity: 0.18 !important;
+      filter: grayscale(100%) !important;
+      border-color: #334155 !important;
+      box-shadow: none !important;
+    }
+
+    .card-rank-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      transition: background 0.3s ease;
+    }
+    .rank-bar-PLATINUM { background: linear-gradient(90deg, #38bdf8, #818cf8); }
+    .rank-bar-GOLD     { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .rank-bar-SILVER   { background: linear-gradient(90deg, #94a3b8, #cbd5e1); }
+    .rank-bar-BRONZE   { background: linear-gradient(90deg, #fb923c, #ea580c); }
+
+    .card-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 2px;
+      margin-bottom: 4px;
+    }
+
+    .card-title-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      letter-spacing: 0.02em;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .title-root     { background-color: rgba(139, 92, 246, 0.25); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.4); }
+    .title-primary  { background-color: rgba(59, 130, 246, 0.25);  color: #93c5fd; border-color: rgba(59, 130, 246, 0.4); }
+    .title-partner  { background-color: rgba(16, 185, 129, 0.25); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.4); }
+    .title-outlet   { background-color: rgba(245, 158, 11, 0.25); color: #fde68a; border-color: rgba(245, 158, 11, 0.4); }
+    .title-custom   { background-color: rgba(236, 72, 153, 0.25); color: #f472b6; border-color: rgba(236, 72, 153, 0.4); }
+
+    .card-rank-badge {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.3s ease;
+    }
+    .rank-PLATINUM { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .rank-GOLD     { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .rank-SILVER   { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+    .rank-BRONZE   { background: rgba(251, 146, 60, 0.15); color: #fb923c; border: 1px solid rgba(251, 146, 60, 0.3); }
+
+    .agency-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #f8fafc;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+
+    .agency-meta {
+      font-size: 10px;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .sales-rep-tag {
+      background: rgba(16, 185, 129, 0.15);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 9px;
+      font-weight: 600;
+    }
+
+    .card-roles-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .role-pill {
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 999px;
+      background-color: #334155;
+      color: #cbd5e1;
+      border: 1px solid #475569;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      white-space: nowrap;
+    }
+
+    .card-footer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+      padding-top: 4px;
+      border-top: 1px dashed #334155;
+      font-size: 9px;
+      color: #64748b;
+    }
+
+    /* 1-Click Subtree Bounding Button on Card */
+    .btn-subtree-bound {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid #38bdf8;
+      color: #38bdf8;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-subtree-bound:hover {
+      background: #38bdf8;
+      color: #0f172a;
+    }
+
+    /* Right Sidebar */
+    .sidebar-drawer {
+      width: 390px;
+      background-color: var(--bg-panel);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      transform: translateX(0);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 60;
+    }
+
+    .sidebar-drawer.collapsed {
+      transform: translateX(100%);
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+    }
+
+    .drawer-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .drawer-content {
+      padding: 18px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .form-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .form-input {
+      background-color: #0f172a;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    /* Analytics Dashboard Modal */
+    .analytics-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(11, 17, 32, 0.85);
+      backdrop-filter: blur(16px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .analytics-modal-content {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      width: 1000px;
+      max-width: 95vw;
+      height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      overflow: hidden;
+    }
+
+    .analytics-modal-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #0f172a;
+    }
+
+    .analytics-tabs {
+      display: flex;
+      gap: 8px;
+      padding: 10px 24px;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+    }
+
+    .analytics-tab-btn {
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .analytics-tab-btn.active {
+      background: #38bdf8;
+      color: #0f172a;
+      border-color: #38bdf8;
+    }
+
+    .analytics-body {
+      flex: 1;
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .chart-wrapper {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .link {
+      stroke: #475569 !important;
+      stroke-width: 2px !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="header-top-row">
+      <div class="header-title">
+        <i data-lucide="git-branch" style="color: #38bdf8;"></i>
+        <h1>代理店 流入・紹介ネットワーク</h1>
+        <span class="badge-demo">派生一括囲み ＆ 統合グラフ分析</span>
+      </div>
+
+      <div class="controls-group">
+        <!-- Replaced Pulldown with "Bound Selected Subtree" Button (User's Exact Feedback!) -->
+        <button class="btn btn-selected-subtree" id="btn-bound-selected-subtree" title="選択した代理店（または検索したID）の配下の全派生を一括で枠囲みします">
+          <i data-lucide="target"></i>
+          <span id="bound-selected-label">🎯 選択した代理店の全派生を囲む</span>
+        </button>
+
+        <!-- Search (Handles Agency ID and Sales Rep ID) -->
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <input type="text" class="search-input" id="search-input" placeholder="代理店ID / 営業ID / 社名">
+          <button class="btn" id="btn-search"><i data-lucide="search"></i></button>
+        </div>
+
+        <!-- Open Analytics Graphs Modal -->
+        <button class="btn btn-analytics" id="btn-open-analytics">
+          <i data-lucide="bar-chart-3"></i> 📊 役割・登録推移グラフ
+        </button>
+
+        <button class="btn" id="btn-toggle-layout" title="水平（マインドマップ）と垂直（組織図）を切り替え">
+          <i data-lucide="arrow-left-right"></i>
+          <span id="layout-label">水平展開</span>
+        </button>
+
+        <button class="btn" id="btn-expand-all"><i data-lucide="maximize-2"></i> 全展開</button>
+        <button class="btn" id="btn-fit"><i data-lucide="crosshair"></i> 全体表示</button>
+      </div>
+    </div>
+
+    <!-- Sales Rep Result Banner -->
+    <div class="sales-rep-banner" id="sales-rep-banner">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <i data-lucide="user-check" style="color: #10b981; width: 16px; height: 16px;"></i>
+        <span>💼 営業担当者 <strong id="sales-rep-name-label" style="color: #f8fafc;">-</strong> が獲得・担当している代理店ブロック:</span>
+      </div>
+      <div class="sales-rep-chips" id="sales-rep-chips-container"></div>
+      <button class="btn" id="btn-clear-rep-search" style="padding: 2px 8px; font-size: 11px;">解除</button>
+    </div>
+
+    <!-- Time-Travel & Cohort Tracking Bar -->
+    <div class="time-travel-bar">
+      <div class="cohort-selector-group">
+        <span style="font-size: 11px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 4px;">
+          <i data-lucide="target" style="width: 14px; height: 14px;"></i> 追跡対象:
+        </span>
+        <select class="cohort-select" id="cohort-mode-select">
+          <option value="ALL">1. 🌐 全登録代理店を追跡 (全体)</option>
+          <option value="CURRENT_RANK_A">2. 🏆 【現Aランク層】の成長軌跡を追跡 (コホート)</option>
+          <option value="CURRENT_RANK_B_PLUS">3. ⭐ 【現Bランク以上】の成長軌跡を追跡</option>
+          <option value="DATE_RANK_B_PLUS">4. 🎖️ 【指定日時点でB以上】のみ表示</option>
+        </select>
+      </div>
+
+      <div class="time-travel-controls">
+        <input type="date" class="date-input" id="date-picker" value="2024-03-01" min="2023-01-01" max="2024-03-01">
+        <input type="range" class="time-slider" id="time-slider" min="0" max="100" value="100">
+        <button class="btn" id="btn-play-timeline" style="padding: 3px 8px;" title="アニメーション再生">
+          <i data-lucide="play" style="width: 13px; height: 13px;"></i> 再生
+        </button>
+      </div>
+
+      <div style="font-size: 11px; color: #94a3b8;">
+        基準日: <strong id="active-date-label" style="color: #f8fafc;">2024-03-01</strong>
+        (<span id="active-count-label" style="color: #38bdf8; font-weight: bold;">10</span> 社表示)
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Body -->
+  <div class="app-body">
+    <div class="chart-container" id="chart-container">
+      <!-- Active Filter Zone Box (Bounding Frame with Role Pills) -->
+      <div class="zone-box" id="zone-box">
+        <div class="zone-box-header" id="zone-box-header">
+          <span style="font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 4px;" id="zone-title-label">
+            <i data-lucide="focus" style="width: 14px; height: 14px;"></i> 派生グループ枠:
+          </span>
+          <div class="zone-role-tabs" id="zone-role-pills-container"></div>
+          <button class="zone-close-btn" id="btn-close-zone" title="枠を解除">✕</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar -->
+    <div class="sidebar-drawer" id="sidebar-drawer">
+      <div class="drawer-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="database" style="color: #38bdf8; width: 16px; height: 16px;"></i>
+          <h3>代理店マスタ詳細 & 営業情報</h3>
+        </div>
+        <button class="btn" id="btn-close-drawer" style="padding: 3px 6px; font-size: 11px;">閉じる</button>
+      </div>
+
+      <div class="drawer-content">
+        <div style="background: #0f172a; padding: 12px; border-radius: 8px; font-size: 12px; border: 1px solid #334155; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #64748b;">マスタ管理ID:</span>
+            <strong id="info-master-id" style="color: #38bdf8; font-family: monospace;">-</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #64748b;">紹介元（親代理店）:</span>
+            <strong id="info-parent-name" style="color: #cbd5e1;">-</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #64748b;">担当営業 (個人ID):</span>
+            <strong id="info-sales-rep" style="color: #10b981;">-</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #64748b;">指定日時点のランク:</span>
+            <span id="info-current-rank" style="font-weight: 700; color: #f59e0b;">-</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="edit-card-title">カードタイトル (役割名・肩書き)</label>
+          <input type="text" class="form-input" id="edit-card-title">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="edit-agency-name">代理店・企業名</label>
+          <input type="text" class="form-input" id="edit-agency-name">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">兼務している役割 (マルチロール)</label>
+          <div class="tag-chips-container" id="roles-chip-container"></div>
+        </div>
+
+        <!-- Button to trigger subtree bounding from sidebar as well -->
+        <button class="btn btn-primary" id="btn-bound-from-sidebar" style="justify-content: center; padding: 9px; margin-top: 6px;">
+          <i data-lucide="target"></i> この代理店の全派生を枠囲み
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Analytics Modal -->
+  <div class="analytics-modal" id="analytics-modal">
+    <div class="analytics-modal-content">
+      <div class="analytics-modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <i data-lucide="bar-chart-2" style="color: #8b5cf6;"></i>
+          <h2 style="font-size: 16px; font-weight: 700; color: #f8fafc;">代理店役割・登録推移アナリティクス</h2>
+          <span class="badge-demo">Chart.js 統合分析</span>
+        </div>
+        <button class="btn" id="btn-close-analytics" style="padding: 4px 10px;">閉じる ✕</button>
+      </div>
+
+      <div class="analytics-tabs">
+        <button class="analytics-tab-btn active" data-chart-type="timeline-area">
+          📈 1. 時期別・役割登録推移 (時系列エリア)
+        </button>
+        <button class="analytics-tab-btn" data-chart-type="role-donut">
+          🍩 2. 役割構成比 (ドーナツ円グラフ)
+        </button>
+        <button class="analytics-tab-btn" data-chart-type="rank-stacked-bar">
+          📊 3. ランク別 × 役割分布 (積み上げ棒)
+        </button>
+        <button class="analytics-tab-btn" data-chart-type="inflow-ranking">
+          🏆 4. 紹介元別 派生数ランキング (横棒)
+        </button>
+      </div>
+
+      <div class="analytics-body">
+        <div class="chart-wrapper">
+          <canvas id="analytics-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allAgencyMasterData = [
+      {
+        id: "A",
+        masterId: "AGY-0001",
+        parentId: "",
+        name: "株式会社A (本部直結)",
+        contact: "佐藤 本部長",
+        cardTitle: "総代理店",
+        salesRep: { id: "REP-101", name: "佐藤 健一 (営業1課)" },
+        rankHistory: [{ date: "2023-01-15", rank: "PLATINUM", grade: "本部Aランク", note: "創業時登録" }],
+        roles: ["総代理店", "エリア統括", "認定トレーナー"],
+        inflow: "直営・創業初期",
+        joinedDate: "2023-01-15"
+      },
+      {
+        id: "B",
+        masterId: "AGY-1002",
+        parentId: "A",
+        name: "株式会社B",
+        contact: "山田 太郎",
+        cardTitle: "一次代理店",
+        salesRep: { id: "REP-101", name: "佐藤 健一 (営業1課)" },
+        rankHistory: [
+          { date: "2023-04-10", rank: "BRONZE", grade: "ランクC", note: "一次代理店 加盟時" },
+          { date: "2023-07-01", rank: "SILVER", grade: "ランクB", note: "紹介実績10社達成で昇格" },
+          { date: "2023-11-01", rank: "GOLD",   grade: "ランクA", note: "年間売上目標達成で最上位昇格" }
+        ],
+        roles: ["一次代理店", "セミナー講師", "関東統括"],
+        inflow: "A社 直接紹介",
+        joinedDate: "2023-04-10"
+      },
+      {
+        id: "C",
+        masterId: "AGY-1003",
+        parentId: "A",
+        name: "株式会社C",
+        contact: "田中 次郎",
+        cardTitle: "紹介パートナー",
+        salesRep: { id: "REP-102", name: "鈴木 雅也 (営業2課)" },
+        rankHistory: [
+          { date: "2023-05-18", rank: "BRONZE", grade: "ランクC", note: "パートナー登録" },
+          { date: "2023-09-01", rank: "SILVER", grade: "ランクB", note: "定期紹介実績により昇格" }
+        ],
+        roles: ["紹介パートナー", "サポート窓口"],
+        inflow: "A社 セミナー経由",
+        joinedDate: "2023-05-18"
+      },
+      {
+        id: "D",
+        masterId: "AGY-1004",
+        parentId: "A",
+        name: "合同会社D",
+        contact: "鈴木 一郎",
+        cardTitle: "特約店",
+        salesRep: { id: "REP-102", name: "鈴木 雅也 (営業2課)" },
+        rankHistory: [{ date: "2023-06-01", rank: "GOLD", grade: "ランクA", note: "大手提携特約店として参入" }],
+        roles: ["特約店", "エリア統括"],
+        inflow: "A社 直接紹介",
+        joinedDate: "2023-06-01"
+      },
+      {
+        id: "E",
+        masterId: "AGY-1005",
+        parentId: "A",
+        name: "株式会社E",
+        contact: "高橋 健太",
+        cardTitle: "一次代理店",
+        salesRep: { id: "REP-101", name: "佐藤 健一 (営業1課)" },
+        rankHistory: [
+          { date: "2023-07-22", rank: "BRONZE", grade: "ランクC", note: "一次代理店 加盟時" },
+          { date: "2023-12-01", rank: "SILVER", grade: "ランクB", note: "半年実績達成で昇格" }
+        ],
+        roles: ["一次代理店"],
+        inflow: "A社 パートナー提携",
+        joinedDate: "2023-07-22"
+      },
+      {
+        id: "F",
+        masterId: "AGY-1006",
+        parentId: "A",
+        name: "株式会社F",
+        contact: "伊藤 誠",
+        cardTitle: "取次店",
+        salesRep: { id: "REP-103", name: "高橋 麗華 (営業3課)" },
+        rankHistory: [{ date: "2023-08-11", rank: "SILVER", grade: "ランクB", note: "取次店 加盟" }],
+        roles: ["取次店", "サポート窓口"],
+        inflow: "A社 直接紹介",
+        joinedDate: "2023-08-11"
+      },
+      {
+        id: "G",
+        masterId: "AGY-2007",
+        parentId: "B",
+        name: "株式会社G",
+        contact: "小林 翼",
+        cardTitle: "地域サポーター",
+        salesRep: { id: "REP-101", name: "佐藤 健一 (営業1課)" },
+        rankHistory: [{ date: "2023-09-05", rank: "BRONZE", grade: "ランクC", note: "新規参入" }],
+        roles: ["地域サポーター", "個別窓口"],
+        inflow: "B社 勉強会経由",
+        joinedDate: "2023-09-05"
+      },
+      {
+        id: "H",
+        masterId: "AGY-2008",
+        parentId: "B",
+        name: "株式会社H",
+        contact: "加藤 秀樹",
+        cardTitle: "個別窓口",
+        salesRep: { id: "REP-102", name: "鈴木 雅也 (営業2課)" },
+        rankHistory: [
+          { date: "2023-10-19", rank: "BRONZE", grade: "ランクC", note: "顧客から代理店へ昇格" },
+          { date: "2024-01-15", rank: "SILVER", grade: "ランクB", note: "実績多数により昇格" }
+        ],
+        roles: ["個別窓口"],
+        inflow: "B社 顧客からの昇格",
+        joinedDate: "2023-10-19"
+      },
+      {
+        id: "I",
+        masterId: "AGY-2009",
+        parentId: "B",
+        name: "合同会社I",
+        contact: "渡辺 美咲",
+        cardTitle: "研修パートナー",
+        salesRep: { id: "REP-103", name: "高橋 麗華 (営業3課)" },
+        rankHistory: [{ date: "2023-11-30", rank: "BRONZE", grade: "ランクC", note: "新規加盟" }],
+        roles: ["研修パートナー", "サポート窓口"],
+        inflow: "B社 直接紹介",
+        joinedDate: "2023-11-30"
+      },
+      {
+        id: "J",
+        masterId: "AGY-2010",
+        parentId: "D",
+        name: "株式会社J サテライト",
+        contact: "松本 亮",
+        cardTitle: "サテライト店",
+        salesRep: { id: "REP-102", name: "鈴木 雅也 (営業2課)" },
+        rankHistory: [{ date: "2024-01-10", rank: "BRONZE", grade: "ランクC", note: "地方展開" }],
+        roles: ["サテライト店"],
+        inflow: "D社 地方支店化",
+        joinedDate: "2024-01-10"
+      }
+    ];
+
+    let currentLayout = "left";
+    let selectedNodeId = "B"; // default selected node
+    let chartInstance = null;
+    let selectedDate = "2024-03-01";
+    let cohortMode = "ALL";
+
+    let isZoneActive = false;
+    let zoneNodeIds = [];
+    let zoneFilterRole = "ALL";
+    let activeRepId = null;
+
+    const timelineDates = [
+      "2023-01-15", "2023-04-10", "2023-05-18", "2023-06-01", "2023-07-01",
+      "2023-07-22", "2023-08-11", "2023-09-01", "2023-09-05", "2023-10-19",
+      "2023-11-01", "2023-11-30", "2023-12-01", "2024-01-10", "2024-01-15", "2024-03-01"
+    ];
+
+    function getTitleClass(title) {
+      if (!title) return "title-custom";
+      if (title.includes("総代理店")) return "title-root";
+      if (title.includes("一次")) return "title-primary";
+      if (title.includes("パートナー")) return "title-partner";
+      if (title.includes("特約") || title.includes("取次")) return "title-outlet";
+      return "title-custom";
+    }
+
+    function getLatestRank(item) {
+      if (!item.rankHistory || item.rankHistory.length === 0) return "BRONZE";
+      return item.rankHistory[item.rankHistory.length - 1].rank;
+    }
+
+    function getEffectiveRankAtDate(item, targetDate) {
+      if (!item.rankHistory || item.rankHistory.length === 0) return { rank: "BRONZE", grade: "ランクC" };
+      const valid = item.rankHistory.filter(h => h.date <= targetDate);
+      if (valid.length === 0) return { rank: item.rankHistory[0].rank, grade: item.rankHistory[0].grade };
+      const latest = valid[valid.length - 1];
+      return { rank: latest.rank, grade: latest.grade };
+    }
+
+    function getDataAtDate(targetDate) {
+      const active = allAgencyMasterData.filter(item => item.joinedDate <= targetDate);
+      return active.map(item => {
+        const rankInfo = getEffectiveRankAtDate(item, targetDate);
+        const latestRank = getLatestRank(item);
+
+        let isCohortTarget = false;
+        let isDimmedByCohort = false;
+
+        if (cohortMode === "CURRENT_RANK_A") {
+          if (latestRank === "GOLD" || latestRank === "PLATINUM") isCohortTarget = true;
+          else isDimmedByCohort = true;
+        } else if (cohortMode === "CURRENT_RANK_B_PLUS") {
+          if (latestRank === "GOLD" || latestRank === "PLATINUM" || latestRank === "SILVER") isCohortTarget = true;
+          else isDimmedByCohort = true;
+        } else if (cohortMode === "DATE_RANK_B_PLUS") {
+          if (rankInfo.rank !== "GOLD" && rankInfo.rank !== "PLATINUM" && rankInfo.rank !== "SILVER") isDimmedByCohort = true;
+        }
+
+        let isRepMatched = false;
+        let isDimmedByRep = false;
+        if (activeRepId) {
+          if (item.salesRep && item.salesRep.id === activeRepId) isRepMatched = true;
+          else isDimmedByRep = true;
+        }
+
+        return {
+          ...item,
+          currentRank: rankInfo.rank,
+          currentGrade: rankInfo.grade,
+          isCohortTarget: isCohortTarget,
+          isDimmedByCohort: isDimmedByCohort || isDimmedByRep,
+          isRepMatched: isRepMatched
+        };
+      });
+    }
+
+    // Subtree Node IDs calculation (Root + all descendants)
+    function getSubtreeNodeIds(rootId, includeRoot = true) {
+      let result = includeRoot ? [rootId] : [];
+      function collect(parentId) {
+        allAgencyMasterData.forEach(node => {
+          if (node.parentId === parentId) {
+            result.push(node.id);
+            collect(node.id);
+          }
+        });
+      }
+      collect(rootId);
+      return result;
+    }
+
+    function updateSelectedSubtreeButtonLabel() {
+      const btn = document.getElementById('bound-selected-label');
+      if (!selectedNodeId) {
+        btn.textContent = "🎯 代理店を選択して派生を囲む";
+        return;
+      }
+      const node = allAgencyMasterData.find(n => n.id === selectedNodeId);
+      if (node) {
+        const subIds = getSubtreeNodeIds(selectedNodeId, false); // count of children
+        btn.textContent = `🎯 【${node.name} (${node.masterId})】の全派生を囲む (${subIds.length}社)`;
+      }
+    }
+
+    function initChart() {
+      const activeData = getDataAtDate(selectedDate);
+      document.getElementById('active-date-label').textContent = selectedDate;
+      document.getElementById('active-count-label').textContent = activeData.filter(d => !d.isDimmedByCohort).length;
+
+      chartInstance = new d3.OrgChart()
+        .container('#chart-container')
+        .data(activeData)
+        .nodeWidth(d => 280)
+        .nodeHeight(d => 165)
+        .childrenMargin(d => 65)
+        .compactMarginBetween(d => 30)
+        .compactMarginPair(d => 30)
+        .neighbourMargin(d => 25)
+        .compact(false)
+        .layout(currentLayout)
+        .nodeContent((d, i, arr, state) => {
+          const item = d.data;
+          const isSelected = item.id === selectedNodeId;
+          const childCount = (d.children ? d.children.length : 0) + (d._children ? d._children.length : 0);
+          
+          let cardClasses = [];
+          if (isSelected) cardClasses.push("is-selected");
+          if (item.isRepMatched) cardClasses.push("is-rep-matched");
+
+          if (isZoneActive) {
+            const inZone = zoneNodeIds.includes(item.id);
+            if (inZone) {
+              const matchesRole = (zoneFilterRole === "ALL") || (item.cardTitle === zoneFilterRole) || (item.roles && item.roles.includes(zoneFilterRole));
+              if (matchesRole) cardClasses.push("is-zone-matched");
+              else cardClasses.push("is-zone-dimmed");
+            } else {
+              cardClasses.push("is-dimmed");
+            }
+          } else {
+            if (item.isCohortTarget) cardClasses.push("is-cohort-target");
+            else if (item.isDimmedByCohort) cardClasses.push("is-dimmed");
+          }
+
+          const roles = item.roles || [];
+          let rolesHtml = roles.slice(0, 3).map(r => `<span class="role-pill"># ${r}</span>`).join("");
+          const titleClass = getTitleClass(item.cardTitle);
+
+          return `
+            <div class="agency-card ${cardClasses.join(' ')}" 
+                 id="node-card-${item.id}"
+                 data-node-id="${item.id}"
+                 onclick="handleCardClick('${item.id}', event)">
+              <div class="card-rank-bar rank-bar-${item.currentRank}"></div>
+
+              <div class="card-header-row">
+                <div style="display: flex; align-items: center; gap: 5px;">
+                  <span class="card-title-badge ${titleClass}">
+                    ${item.cardTitle || "代理店"}
+                  </span>
+                  <span class="card-master-id">${item.masterId}</span>
+                </div>
+                <span class="card-rank-badge rank-${item.currentRank}">
+                  ★ ${item.currentRank} (${item.currentGrade})
+                </span>
+              </div>
+
+              <div>
+                <div class="agency-name" title="${item.name}">${item.name}</div>
+                <div class="agency-meta">
+                  <span>👤 ${item.contact || "未設定"}</span>
+                  <span class="sales-rep-tag" title="担当営業: ${item.salesRep ? item.salesRep.name : '未設定'}">
+                    💼 ${item.salesRep ? item.salesRep.name.split(' ')[0] : '担当なし'}
+                  </span>
+                </div>
+              </div>
+
+              <div class="card-roles-row">
+                ${rolesHtml || '<span style="font-size: 9px; color: #64748b;">役割タグなし</span>'}
+              </div>
+
+              <div class="card-footer-row">
+                <span>加盟: ${item.joinedDate || "-"}</span>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  ${childCount > 0 ? `
+                    <!-- 1-Click Subtree Bounding Button on Card (User's Exact Need!) -->
+                    <button class="btn-subtree-bound" onclick="handleSubtreeClick('${item.id}', event)" title="この代理店と配下の全派生を枠で囲みます">
+                      🎯 派生囲み (${childCount}社)
+                    </button>
+                  ` : '<span>末端パートナー</span>'}
+                </div>
+              </div>
+            </div>
+          `;
+        })
+        .render();
+
+      chartInstance.expandAll();
+      chartInstance.fit();
+      updateSelectedSubtreeButtonLabel();
+
+      setTimeout(() => {
+        const svg = d3.select('#chart-container svg');
+        if (!svg.empty()) {
+          svg.on('wheel.zone zoom.zone', () => {
+            if (isZoneActive) updateZoneBoxVisual();
+          });
+        }
+      }, 500);
+    }
+
+    function updateDateFilter(newDate) {
+      selectedDate = newDate;
+      document.getElementById('date-picker').value = newDate;
+      const activeData = getDataAtDate(selectedDate);
+      document.getElementById('active-date-label').textContent = selectedDate;
+      document.getElementById('active-count-label').textContent = activeData.filter(d => !d.isDimmedByCohort).length;
+
+      chartInstance.data(activeData).render();
+      if (isZoneActive) updateZoneBoxVisual();
+      if (selectedNodeId) populateDrawer(selectedNodeId);
+    }
+
+    // Zone Bounding Box
+    function setZoneSelection(nodeIds, titleLabel = "派生グループ枠") {
+      if (!nodeIds || nodeIds.length === 0) {
+        clearZoneSelection();
+        return;
+      }
+      isZoneActive = true;
+      zoneNodeIds = nodeIds;
+      zoneFilterRole = "ALL";
+      document.getElementById('zone-title-label').innerHTML = `<i data-lucide="focus" style="width: 14px; height: 14px;"></i> ${titleLabel}:`;
+
+      const roleCounts = { "ALL": nodeIds.length };
+      nodeIds.forEach(id => {
+        const n = allAgencyMasterData.find(item => item.id === id);
+        if (n) {
+          const r = n.cardTitle;
+          roleCounts[r] = (roleCounts[r] || 0) + 1;
+        }
+      });
+
+      const pillsContainer = document.getElementById('zone-role-pills-container');
+      pillsContainer.innerHTML = "";
+      Object.keys(roleCounts).forEach(role => {
+        const pill = document.createElement('span');
+        pill.className = `zone-role-pill ${role === zoneFilterRole ? 'active' : ''}`;
+        pill.textContent = `${role === 'ALL' ? 'すべて表示' : role} (${roleCounts[role]})`;
+        pill.onclick = (e) => {
+          e.stopPropagation();
+          zoneFilterRole = role;
+          document.querySelectorAll('.zone-role-pill').forEach(p => p.classList.remove('active'));
+          pill.classList.add('active');
+          chartInstance.render();
+          setTimeout(updateZoneBoxVisual, 50);
+        };
+        pillsContainer.appendChild(pill);
+      });
+
+      chartInstance.render();
+      setTimeout(updateZoneBoxVisual, 50);
+      lucide.createIcons();
+    }
+
+    function clearZoneSelection() {
+      isZoneActive = false;
+      zoneNodeIds = [];
+      document.getElementById('zone-box').style.display = 'none';
+      chartInstance.render();
+    }
+    document.getElementById('btn-close-zone').addEventListener('click', clearZoneSelection);
+
+    function updateZoneBoxVisual() {
+      if (!isZoneActive || zoneNodeIds.length === 0) return;
+
+      const container = document.getElementById('chart-container');
+      const containerRect = container.getBoundingClientRect();
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let visibleInZoneCount = 0;
+
+      zoneNodeIds.forEach(id => {
+        const el = document.getElementById(`node-card-${id}`);
+        if (el) {
+          const r = el.getBoundingClientRect();
+          const relLeft = r.left - containerRect.left;
+          const relTop = r.top - containerRect.top;
+          const relRight = relLeft + r.width;
+          const relBottom = relTop + r.height;
+
+          if (relLeft < minX) minX = relLeft;
+          if (relTop < minY) minY = relTop;
+          if (relRight > maxX) maxX = relRight;
+          if (relBottom > maxY) maxY = relBottom;
+          visibleInZoneCount++;
+        }
+      });
+
+      const zoneBox = document.getElementById('zone-box');
+      if (visibleInZoneCount === 0 || minX === Infinity) {
+        zoneBox.style.display = 'none';
+        return;
+      }
+
+      const padding = 22;
+      zoneBox.style.display = 'block';
+      zoneBox.style.left = `${Math.max(10, minX - padding)}px`;
+      zoneBox.style.top = `${Math.max(44, minY - padding)}px`;
+      zoneBox.style.width = `${(maxX - minX) + (padding * 2)}px`;
+      zoneBox.style.height = `${(maxY - minY) + (padding * 2)}px`;
+    }
+
+    // Trigger Subtree Bounding from Card Button
+    window.handleSubtreeClick = function(nodeId, e) {
+      if (e) e.stopPropagation();
+      selectedNodeId = nodeId;
+      const node = allAgencyMasterData.find(n => n.id === nodeId);
+      const subIds = getSubtreeNodeIds(nodeId, true);
+      setZoneSelection(subIds, `【${node.name}】配下の全派生 (${subIds.length}社)`);
+      updateSelectedSubtreeButtonLabel();
+    };
+
+    // Header Button: Bound Selected Subtree (User's Exact Requirement!)
+    document.getElementById('btn-bound-selected-subtree').addEventListener('click', () => {
+      if (!selectedNodeId) {
+        alert("マップ上の代理店カードをクリックするか、検索して対象の代理店を選択してください。");
+        return;
+      }
+      const node = allAgencyMasterData.find(n => n.id === selectedNodeId);
+      const subIds = getSubtreeNodeIds(selectedNodeId, true);
+      setZoneSelection(subIds, `【${node.name}】配下の全派生 (${subIds.length}社)`);
+    });
+
+    document.getElementById('btn-bound-from-sidebar').addEventListener('click', () => {
+      if (!selectedNodeId) return;
+      const node = allAgencyMasterData.find(n => n.id === selectedNodeId);
+      const subIds = getSubtreeNodeIds(selectedNodeId, true);
+      setZoneSelection(subIds, `【${node.name}】配下の全派生 (${subIds.length}社)`);
+    });
+
+    // Search: ID, Agency Name, Sales Rep
+    function performSearch() {
+      const q = document.getElementById('search-input').value.trim().toLowerCase();
+      if (!q) return;
+
+      // 1. Check Sales Rep match
+      const matchedByRep = allAgencyMasterData.filter(item => 
+        item.salesRep && (
+          item.salesRep.id.toLowerCase().includes(q) || 
+          item.salesRep.name.toLowerCase().includes(q)
+        )
+      );
+
+      if (matchedByRep.length > 0) {
+        activeRepId = matchedByRep[0].salesRep.id;
+        const repName = matchedByRep[0].salesRep.name;
+
+        const banner = document.getElementById('sales-rep-banner');
+        banner.style.display = 'flex';
+        document.getElementById('sales-rep-name-label').textContent = `${repName} [${activeRepId}]`;
+
+        const chipsContainer = document.getElementById('sales-rep-chips-container');
+        chipsContainer.innerHTML = "";
+        matchedByRep.forEach(agency => {
+          const chip = document.createElement('span');
+          chip.className = 'rep-agency-chip';
+          chip.innerHTML = `🏢 ${agency.name} (${agency.cardTitle})`;
+          chip.onclick = () => {
+            handleCardClick(agency.id);
+            chartInstance.setCentered(agency.id).render();
+          };
+          chipsContainer.appendChild(chip);
+        });
+
+        updateDateFilter(selectedDate);
+        return;
+      }
+
+      // 2. Normal Agency ID or Name match
+      const found = allAgencyMasterData.find(item => 
+        item.id.toLowerCase() === q || item.masterId.toLowerCase().includes(q) || item.name.toLowerCase().includes(q)
+      );
+
+      if (found) {
+        handleCardClick(found.id);
+        chartInstance.setCentered(found.id).render();
+      } else {
+        alert(`該当する代理店IDまたは営業担当者が見つかりませんでした: "${q}"`);
+      }
+    }
+
+    document.getElementById('btn-search').addEventListener('click', performSearch);
+    document.getElementById('search-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') performSearch();
+    });
+
+    document.getElementById('btn-clear-rep-search').addEventListener('click', () => {
+      activeRepId = null;
+      document.getElementById('sales-rep-banner').style.display = 'none';
+      document.getElementById('search-input').value = "";
+      updateDateFilter(selectedDate);
+    });
+
+    // Analytics Dashboard
+    let analyticsChartInstance = null;
+    let currentChartType = "timeline-area";
+
+    document.getElementById('btn-open-analytics').addEventListener('click', () => {
+      document.getElementById('analytics-modal').style.display = 'flex';
+      renderAnalyticsChart(currentChartType);
+    });
+
+    document.getElementById('btn-close-analytics').addEventListener('click', () => {
+      document.getElementById('analytics-modal').style.display = 'none';
+    });
+
+    document.querySelectorAll('.analytics-tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.analytics-tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentChartType = btn.getAttribute('data-chart-type');
+        renderAnalyticsChart(currentChartType);
+      });
+    });
+
+    function renderAnalyticsChart(type) {
+      const ctx = document.getElementById('analytics-canvas').getContext('2d');
+      if (analyticsChartInstance) analyticsChartInstance.destroy();
+      const activeData = getDataAtDate(selectedDate);
+
+      if (type === "timeline-area") {
+        const months = ["2023-01", "2023-04", "2023-06", "2023-08", "2023-10", "2023-12", "2024-03"];
+        analyticsChartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: months,
+            datasets: [
+              { label: '一次代理店', data: [0, 1, 1, 2, 2, 2, 2], fill: true, backgroundColor: 'rgba(59, 130, 246, 0.3)', borderColor: '#3b82f6', tension: 0.3 },
+              { label: '紹介パートナー/特約店', data: [0, 0, 2, 2, 2, 2, 2], fill: true, backgroundColor: 'rgba(16, 185, 129, 0.3)', borderColor: '#10b981', tension: 0.3 },
+              { label: '取次店/サポーター/窓口', data: [0, 0, 0, 1, 3, 4, 5], fill: true, backgroundColor: 'rgba(245, 158, 11, 0.3)', borderColor: '#f59e0b', tension: 0.3 },
+              { label: '総代理店 (本部)', data: [1, 1, 1, 1, 1, 1, 1], fill: true, backgroundColor: 'rgba(139, 92, 246, 0.3)', borderColor: '#8b5cf6', tension: 0.3 }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { title: { display: true, text: '時期別・役割ごとの加盟社数推移 (時系列エリア)', color: '#f8fafc', font: { size: 14, weight: 'bold' } }, legend: { labels: { color: '#cbd5e1' } } },
+            scales: { x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, y: { stacked: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } } }
+          }
+        });
+      } else if (type === "role-donut") {
+        const roleCounts = {};
+        activeData.forEach(d => { roleCounts[d.cardTitle] = (roleCounts[d.cardTitle] || 0) + 1; });
+        analyticsChartInstance = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: Object.keys(roleCounts),
+            datasets: [{ data: Object.values(roleCounts), backgroundColor: ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#38bdf8', '#fb923c'] }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { title: { display: true, text: '現在の役割別 構成比 (ドーナツグラフ)', color: '#f8fafc', font: { size: 14, weight: 'bold' } }, legend: { position: 'right', labels: { color: '#cbd5e1' } } }
+          }
+        });
+      } else if (type === "rank-stacked-bar") {
+        analyticsChartInstance = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['プラチナ (A本部)', 'ゴールド (Aランク)', 'シルバー (Bランク)', 'ブロンズ (Cランク)'],
+            datasets: [
+              { label: '総代理店/一次代理店', data: [1, 1, 1, 1], backgroundColor: '#3b82f6' },
+              { label: '紹介パートナー/特約店', data: [0, 1, 1, 0], backgroundColor: '#10b981' },
+              { label: '窓口/取次/サポーター', data: [0, 0, 2, 2], backgroundColor: '#f59e0b' }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { title: { display: true, text: 'ランク階層別 × 保持役割の分布 (積み上げ棒グラフ)', color: '#f8fafc', font: { size: 14, weight: 'bold' } }, legend: { labels: { color: '#cbd5e1' } } },
+            scales: { x: { stacked: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, y: { stacked: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } } }
+          }
+        });
+      } else if (type === "inflow-ranking") {
+        const introducerCounts = { "株式会社A (直系)": 5, "株式会社B (二次派生)": 3, "合同会社D (支店派生)": 1 };
+        analyticsChartInstance = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: Object.keys(introducerCounts),
+            datasets: [{ label: '直接紹介・派生数 (社)', data: Object.values(introducerCounts), backgroundColor: ['#38bdf8', '#f59e0b', '#10b981'] }]
+          },
+          options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: { title: { display: true, text: '紹介元代理店別 派生創出ランキング (横棒グラフ)', color: '#f8fafc', font: { size: 14, weight: 'bold' } }, legend: { labels: { color: '#cbd5e1' } } },
+            scales: { x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } } }
+          }
+        });
+      }
+    }
+
+    function populateDrawer(nodeId) {
+      const nodeData = allAgencyMasterData.find(n => n.id === nodeId);
+      if (!nodeData) return;
+      const parentData = allAgencyMasterData.find(n => n.id === nodeData.parentId);
+      const rankInfo = getEffectiveRankAtDate(nodeData, selectedDate);
+
+      document.getElementById('info-master-id').textContent = nodeData.masterId;
+      document.getElementById('info-parent-name').textContent = parentData ? `${parentData.name} (${parentData.cardTitle})` : 'なし (本部直結)';
+      document.getElementById('info-sales-rep').textContent = nodeData.salesRep ? `${nodeData.salesRep.name} [${nodeData.salesRep.id}]` : '未設定';
+      document.getElementById('info-current-rank').textContent = `★ ${rankInfo.rank} (${rankInfo.grade})`;
+      
+      document.getElementById('edit-card-title').value = nodeData.cardTitle || "";
+      document.getElementById('edit-agency-name').value = nodeData.name || "";
+
+      const container = document.getElementById('roles-chip-container');
+      container.innerHTML = (nodeData.roles || []).map(r => `<span class="tag-chip">${r}</span>`).join("");
+
+      document.getElementById('sidebar-drawer').classList.remove('collapsed');
+      updateSelectedSubtreeButtonLabel();
+    }
+
+    window.handleCardClick = function(nodeId, e) {
+      if (e) e.stopPropagation();
+      selectedNodeId = nodeId;
+      populateDrawer(nodeId);
+      chartInstance.render();
+      if (isZoneActive) updateZoneBoxVisual();
+    };
+
+    document.getElementById('btn-close-drawer').addEventListener('click', () => {
+      document.getElementById('sidebar-drawer').classList.add('collapsed');
+      selectedNodeId = null;
+      updateSelectedSubtreeButtonLabel();
+      chartInstance.render();
+    });
+
+    document.getElementById('cohort-mode-select').addEventListener('change', (e) => {
+      cohortMode = e.target.value;
+      updateDateFilter(selectedDate);
+    });
+
+    document.getElementById('time-slider').addEventListener('input', (e) => {
+      const idx = Math.round((e.target.value / 100) * (timelineDates.length - 1));
+      updateDateFilter(timelineDates[idx]);
+    });
+
+    document.getElementById('date-picker').addEventListener('change', (e) => {
+      updateDateFilter(e.target.value);
+    });
+
+    document.getElementById('btn-toggle-layout').addEventListener('click', () => {
+      currentLayout = (currentLayout === "left") ? "top" : "left";
+      document.getElementById('layout-label').textContent = (currentLayout === "left") ? "水平展開" : "垂直展開";
+      chartInstance.layout(currentLayout).render().fit();
+      setTimeout(() => { if (isZoneActive) updateZoneBoxVisual(); }, 300);
+    });
+
+    document.getElementById('btn-expand-all').addEventListener('click', () => {
+      chartInstance.expandAll().fit();
+      setTimeout(() => { if (isZoneActive) updateZoneBoxVisual(); }, 300);
+    });
+
+    document.getElementById('btn-fit').addEventListener('click', () => {
+      chartInstance.fit();
+      setTimeout(() => { if (isZoneActive) updateZoneBoxVisual(); }, 300);
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      initChart();
+      // Auto select B and show its subtree bounding on load
+      setTimeout(() => {
+        handleSubtreeClick("B");
+      }, 600);
+    });
+  </script>
+</body>
+</html>
