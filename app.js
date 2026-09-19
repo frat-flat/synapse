@@ -13008,6 +13008,9 @@ function saveTabState(tab) {
     selectedExistingCustomer: state.selectedExistingCustomer,
     addedCustomFields: Array.from(state.addedCustomFields),
     selectedIntroducer: state.selectedIntroducer,
+    introducerId: document.getElementById('appoint-hidden-introducer-id')?.value || (tab.appointData?.introducerId || ''),
+    introducerName: document.getElementById('appoint-hidden-introducer-name')?.value || (tab.appointData?.introducerName || ''),
+    introducerType: document.getElementById('appoint-hidden-introducer-type')?.value || (tab.appointData?.introducerType || ''),
     status: tab.appointData.status,
     viewOnly: tab.appointData.viewOnly,
     isFormDirty: state.isFormDirty
@@ -13622,6 +13625,9 @@ function openTab(id, type, title, appointData = null) {
       addedCustomFields: [],
       selectedExistingCustomer: null,
       selectedIntroducer: null,
+      introducerId: '',
+      introducerName: '',
+      introducerType: '',
       status: 'draft',
       viewOnly: false,
       isFormDirty: false,
@@ -13642,6 +13648,9 @@ function openTab(id, type, title, appointData = null) {
           customerId: null,
           customerName: '',
           memo: '',
+          introducerId: defaultAppointData.introducerId || '',
+          introducerName: defaultAppointData.introducerName || '',
+          introducerType: defaultAppointData.introducerType || '',
           customFields: {},
           connectedLinks: {}, // 接続データを初期化
           status: 'draft',
@@ -18782,6 +18791,11 @@ function selectCustomer(customer) {
           appoint.relatedAppointmentIds = linksVal;
           localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
           syncBiDirectionalRelatedAppointmentIds(state.editingAppointId, linksVal);
+          relatedAppoints.forEach(pastAp => {
+            if (typeof evaluateAppointmentLinking === 'function') {
+              evaluateAppointmentLinking(appoint, pastAp.id, () => {});
+            }
+          });
         }
       }
       showToast(`過去アポイント (${autoAppointIds.length}件) を自動連結しました。`, 'info');
@@ -18883,6 +18897,15 @@ function selectCustomer(customer) {
       appoint.customerId = customer ? customer.id : null;
       appoint.customerName = customer ? customer.name : document.getElementById('customer-name').value.trim();
       localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+    }
+    const currentTab = state.tabs.find(t => t.id === state.activeTabId);
+    if (currentTab && currentTab.appointData) {
+      currentTab.appointData.customerType = state.formMode;
+      currentTab.appointData.customerId = customer ? customer.id : null;
+      currentTab.appointData.customerName = customer ? customer.name : document.getElementById('customer-name').value.trim();
+    }
+    if (typeof renderAppointLinkedForms === 'function') {
+      renderAppointLinkedForms(appoint || currentTab?.appointData);
     }
   }
 }
@@ -21297,16 +21320,22 @@ function resolvePartyIdConflict(pastPartyId, currentPartyId, currentAppoint, tar
 
 // 6. 仮ID変遷・確定Party IDの追従カスケード更新
 function cascadeUpdateIntroducerAndTempIds(oldId, newId, newType = 'party') {
-  if (!oldId || !newId || oldId === newId) return;
+  if (!oldId || !newId) return;
+  if (oldId === newId && !newType) return;
+  const isIdChange = (oldId !== newId);
 
   // 1. 全アポイントの introducerId を更新
   if (Array.isArray(state.appointments)) {
     let appChanged = false;
     state.appointments.forEach(ap => {
       if (ap.introducerId === oldId) {
-        ap.introducerId = newId;
-        if (newType) ap.introducerType = newType;
-        appChanged = true;
+        if (isIdChange) ap.introducerId = newId;
+        if (newType && ap.introducerType !== newType) {
+          ap.introducerType = newType;
+          appChanged = true;
+        } else if (isIdChange) {
+          appChanged = true;
+        }
       }
     });
     if (appChanged) {
@@ -21320,7 +21349,8 @@ function cascadeUpdateIntroducerAndTempIds(oldId, newId, newType = 'party') {
     let linksChanged = false;
     Object.keys(links).forEach(k => {
       if (links[k].introducerId === oldId) {
-        links[k].introducerId = newId;
+        if (isIdChange) links[k].introducerId = newId;
+        if (newType) links[k].introducerType = newType;
         linksChanged = true;
         if (typeof syncFormLinkToCloud === 'function') {
           syncFormLinkToCloud(links[k].masterId, links[k].formId, links[k]);
@@ -21461,7 +21491,7 @@ function updateSalesIntroducerVisibility() {
   const introGroup = document.getElementById('appoint-sales-introducer-group');
   if (!introGroup) return;
 
-  const isSales = (sourceType === 'offline' && category === '営業');
+  const isSales = (sourceType === 'offline' && (category === '営業' || (typeof category === 'string' && category.includes('営業'))));
   introGroup.style.display = isSales ? 'block' : 'none';
   if (!isSales) {
     const results = document.getElementById('appoint-introducer-search-results');
@@ -21660,7 +21690,7 @@ function saveAppointmentData(status) {
     onlineCategory: onlineCategoryVal,
     onlineSubnote: onlineSubnoteVal,
     customerType: state.formMode,
-    customerId: state.formMode === 'existing' ? state.selectedExistingCustomer.id : null,
+    customerId: state.formMode === 'existing' ? (state.selectedExistingCustomer ? state.selectedExistingCustomer.id : null) : (status === 'official' ? appointId : null),
     relatedAppointmentIds: relatedAppointmentIds, // 関連アポイントIDを追加
     customerName: nameVal,
     memo: memoVal,
@@ -21739,12 +21769,12 @@ function saveAppointmentData(status) {
     }
   }
 
-  // 新規顧客で正式登録された場合、顧客DBにも自動追加する
+  // 新規顧客で正式登録された場合、顧客DBにも自動追加する（アポイントIDがそのまま本登録Party IDとなる）
   if (state.formMode === 'new' && status === 'official') {
-    const exists = state.customers.some(c => c.name === nameVal);
+    const exists = state.customers.some(c => c.name === nameVal || c.id === appointId);
     if (!exists) {
       const newCust = {
-        id: generate8DigitId(), // 以前伝えている要件でのID（8桁暗号学的一意ID）を付与
+        id: appointId, // アポイントIDが本登録Party IDとなる
         name: nameVal,
         furigana: customFieldsData.furigana || '',
         phone: customFieldsData.phone || '',
@@ -21755,6 +21785,11 @@ function saveAppointmentData(status) {
       };
       state.customers.push(newCust);
       localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(state.customers));
+    }
+    appointData.customerId = appointId;
+    appointData.customerType = 'existing';
+    if (typeof cascadeUpdateIntroducerAndTempIds === 'function') {
+      cascadeUpdateIntroducerAndTempIds(appointId, appointId, 'party');
     }
   }
 
@@ -49190,14 +49225,14 @@ function getEffectiveAppointMasterContext(appointData) {
   let officialPartyId = null;
   let officialAppoint = null;
 
-  if (appointData.customerId) {
+  if (appointData.customerId && appointData.customerId !== '本登録前') {
     officialPartyId = appointData.customerId;
     officialAppoint = appointData;
   }
 
   if (!officialPartyId) {
     for (const ap of chainAppoints) {
-      if (ap.customerId) {
+      if (ap.customerId && ap.customerId !== '本登録前') {
         officialPartyId = ap.customerId;
         officialAppoint = ap;
         break;
@@ -49230,7 +49265,9 @@ function getEffectiveAppointMasterContext(appointData) {
 
   chainAppoints.forEach(ap => {
     const apTime = ap.date ? new Date(ap.date).getTime() : 0;
-    if (apTime > latestDate) {
+    const apReg = ap.registeredAt ? new Date(ap.registeredAt).getTime() : 0;
+    const latestReg = latestAppoint.registeredAt ? new Date(latestAppoint.registeredAt).getTime() : 0;
+    if (apTime > latestDate || (apTime === latestDate && (apReg > latestReg || ap.id > latestAppoint.id))) {
       latestDate = apTime;
       latestAppoint = ap;
     }
@@ -49267,8 +49304,9 @@ function renderAppointLinkedForms(appointData) {
     }
   }
 
-  // 発行ボタンの権限制御
+  // 発行ボタンの権限制御 & ガイダンス表示
   const openIssueBtn = document.getElementById('btn-open-appoint-form-modal');
+  const lockedNoticeEl = document.getElementById('appoint-issue-locked-notice');
   if (openIssueBtn) {
     if (ctx.canIssue) {
       openIssueBtn.disabled = false;
@@ -49280,6 +49318,14 @@ function renderAppointLinkedForms(appointData) {
       openIssueBtn.style.opacity = '0.5';
       openIssueBtn.style.cursor = 'not-allowed';
       openIssueBtn.title = `最新アポイント（ID: ${ctx.authorityAppointId}）からのみ発行可能です`;
+    }
+  }
+  if (lockedNoticeEl) {
+    if (!ctx.canIssue) {
+      lockedNoticeEl.style.display = 'block';
+      lockedNoticeEl.innerHTML = `⚠️ ※本登録前のため、最新アポイント（ID: <strong>${escapeHtml(ctx.authorityAppointId)}</strong>）からのみフォームを発行できます。`;
+    } else {
+      lockedNoticeEl.style.display = 'none';
     }
   }
 

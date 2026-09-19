@@ -1718,6 +1718,7 @@
             if (tokenInfo) {
               window.FORM_TOKEN_INFO = tokenInfo;
               if (tokenInfo.masterId) window.FORM_MASTER_ID = tokenInfo.masterId;
+              if (tokenInfo.appointId) window.FORM_APPOINT_ID = tokenInfo.appointId;
               if (tokenInfo.issuerId) window.FORM_ISSUER_ID = tokenInfo.issuerId;
               if (tokenInfo.issuerName) window.FORM_ISSUER_NAME = tokenInfo.issuerName;
               if (tokenInfo.introducerId) window.FORM_INTRODUCER_ID = tokenInfo.introducerId;
@@ -1953,6 +1954,9 @@
               if (linkInfo && linkInfo.issuerId && !window.FORM_ISSUER_ID) {
                 window.FORM_ISSUER_ID = linkInfo.issuerId;
                 window.FORM_ISSUER_NAME = linkInfo.issuerName || '';
+              }
+              if (linkInfo && linkInfo.appointId && !window.FORM_APPOINT_ID) {
+                window.FORM_APPOINT_ID = linkInfo.appointId;
               }
 
               // ⚠️ 連携により無効化されたリンク（status === 'invalidated'）の場合 -> 無効化案内を表示して回答を遮断
@@ -6908,6 +6912,19 @@
           if (currentIntroducerId) {
             submitData['introducer_id'] = currentIntroducerId;
             if (currentIntroducerName) submitData['introducer_name'] = currentIntroducerName;
+          }
+
+          // アポイントID（本登録後にParty IDとなるアポID）の記録
+          let currentAppointId = window.FORM_APPOINT_ID;
+          if (!currentAppointId && window.FORM_MASTER_ID) {
+            try {
+              const allLinks = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
+              const lk = allLinks[`${window.FORM_MASTER_ID}_${formDefinition.id}`] || window.FORM_TOKEN_INFO;
+              if (lk && lk.appointId) currentAppointId = lk.appointId;
+            } catch(e) {}
+          }
+          if (currentAppointId) {
+            submitData['appoint_id'] = currentAppointId;
           }
 
           console.log('[Form Submit] Submitted data:', submitData);
