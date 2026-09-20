@@ -3673,8 +3673,9 @@
               formTitleEl.style.fontSize = '2.1rem';
             }
           }
-          if (formDefinition.subtitle) {
-            formSubtitleEl.textContent = formDefinition.subtitle;
+          const effectiveSubtitle = formDefinition.subtitle || (formDefinition.header && formDefinition.header.subtitle);
+          if (effectiveSubtitle) {
+            formSubtitleEl.textContent = effectiveSubtitle;
             formSubtitleEl.style.display = 'block';
           } else {
             formSubtitleEl.style.display = 'none';

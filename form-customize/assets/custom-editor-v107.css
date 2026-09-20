@@ -3145,6 +3145,36 @@ input:-webkit-autofill:active {
   transform: rotate(180deg);
 }
 
+/* 📊 ヘッダーのテーブル連携・作成ボタン */
+#btn-header-column-preview {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #bfdbfe !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  padding: 6px 13px !important;
+  font-size: 0.85rem !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  margin-right: 8px !important;
+}
+
+#btn-header-column-preview:hover {
+  background: #dbeafe !important;
+  border-color: #93c5fd !important;
+  color: #1e40af !important;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.12) !important;
+}
+
+#btn-header-column-preview.hidden,
+#btn-header-column-preview[style*="display: none"] {
+  display: none !important;
+}
+
 .share-dropdown-menu {
   display: none;
   position: absolute;
@@ -4912,6 +4942,40 @@ button.btn-sec-reorder {
   font-size: 0.82rem !important;
 }
 
+/* 🗑️ 選択肢削除ボタン（統一線画ゴミ箱アイコン対応） */
+.option-edit-row .btn-delete-option {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  padding: 0 !important;
+  background: var(--color-bg-subtle, rgba(255, 255, 255, 0.04)) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--border-radius-sm, 6px) !important;
+  color: var(--color-text-muted, #94a3b8) !important;
+  cursor: pointer !important;
+  transition: all var(--transition-fast, 0.15s ease) !important;
+  flex-shrink: 0 !important;
+}
+
+.option-edit-row .btn-delete-option:hover,
+.option-edit-row .btn-delete-option:active {
+  color: var(--color-danger, #ef4444) !important;
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.15) !important;
+}
+
+.option-edit-row .btn-delete-option svg {
+  width: 15px !important;
+  height: 15px !important;
+  stroke: currentColor !important;
+  stroke-width: 2 !important;
+  display: block !important;
+}
+
 /* =========================================================================
    🤖 正規表現AIアシスタント（Google Gemini連携）UI拡張スタイル
    ========================================================================= */
@@ -5993,11 +6057,12 @@ button.btn-sec-reorder {
    🔀 Archify フローマップ & サブタブ・スプリットビュー スタイル
    ============================================================ */
 
-/* 1. 最上部グローバルタブの整理（フローマップ・回答プレビューの非表示化） */
+/* 1. 最上部グローバルタブおよびフォーム一覧メニューの整理（フローマップ・回答プレビューの非表示化） */
 #btn-tab-flowmap,
 #btn-tab-preview,
 #panel-preview,
-#panel-flowmap {
+#panel-flowmap,
+#gf-context-menu .preview-item {
   display: none !important;
 }
 
@@ -6671,4 +6736,210 @@ html, body {
   overflow-y: auto !important;
 }
 
+/* =========================================================================
+   📱 スマホ向け 長押し（Long Press）ツールチップ
+   ========================================================================= */
+.synapse-mobile-tooltip {
+  position: fixed !important;
+  z-index: 10000000 !important;
+  pointer-events: none !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  color: #f8fafc !important;
+  padding: 6px 12px !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  white-space: nowrap !important;
+  animation: synapseTooltipPop 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  transition: opacity 0.15s ease, transform 0.15s ease !important;
+}
 
+.synapse-mobile-tooltip::after {
+  content: '' !important;
+  position: absolute !important;
+  width: 8px !important;
+  height: 8px !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  transform: rotate(45deg) !important;
+  bottom: -5px !important;
+  left: calc(50% - 4px) !important;
+}
+
+.synapse-mobile-tooltip.placement-bottom::after {
+  top: -5px !important;
+  bottom: auto !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+@keyframes synapseTooltipPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* =========================================================================
+   🍞 Undo（元に戻す）トーストシステム
+   ========================================================================= */
+.synapse-undo-toast-container {
+  position: fixed !important;
+  bottom: 24px !important;
+  bottom: max(24px, env(safe-area-inset-bottom, 24px)) !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 9999999 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 8px !important;
+  pointer-events: none !important;
+  max-width: 92vw !important;
+  width: auto !important;
+}
+
+.synapse-undo-toast {
+  pointer-events: auto !important;
+  background: rgba(15, 23, 42, 0.96) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 1px rgba(255, 255, 255, 0.25) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: #f8fafc !important;
+  padding: 10px 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  font-size: 0.88rem !important;
+  animation: synapseUndoToastSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  transition: opacity 0.2s ease, transform 0.2s ease !important;
+}
+
+.synapse-undo-toast.hiding {
+  opacity: 0 !important;
+  transform: translateY(12px) scale(0.96) !important;
+}
+
+.synapse-undo-toast-message {
+  color: #f1f5f9 !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 280px !important;
+}
+
+.synapse-undo-toast-btn {
+  background: rgba(99, 102, 241, 0.22) !important;
+  border: 1px solid #6366f1 !important;
+  color: #a5b4fc !important;
+  font-weight: 600 !important;
+  font-size: 0.82rem !important;
+  padding: 5px 12px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap !important;
+  touch-action: manipulation !important;
+}
+
+.synapse-undo-toast-btn:hover,
+.synapse-undo-toast-btn:active {
+  background: #6366f1 !important;
+  color: #ffffff !important;
+  transform: scale(1.03) !important;
+}
+
+.synapse-undo-toast-close {
+  background: none !important;
+  border: none !important;
+  color: #94a3b8 !important;
+  cursor: pointer !important;
+  padding: 2px 6px !important;
+  font-size: 1.1rem !important;
+  line-height: 1 !important;
+  border-radius: 4px !important;
+  transition: color 0.15s !important;
+  touch-action: manipulation !important;
+}
+
+.synapse-undo-toast-close:hover,
+.synapse-undo-toast-close:active {
+  color: #ffffff !important;
+}
+
+@keyframes synapseUndoToastSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 🏷️ フォーム一覧 タイトル・サブタイトル同時表示レイアウト */
+.gf-list-title-text-group {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+}
+
+.gf-list-title-text {
+  color: var(--color-text, #212529) !important;
+  font-weight: 500 !important;
+  font-size: 0.95rem !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  flex-shrink: 0 !important;
+}
+
+.gf-list-subtitle-text {
+  color: var(--color-text-muted, #6c757d) !important;
+  font-size: 0.83rem !important;
+  font-weight: 400 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  min-width: 0 !important;
+  flex: 1 !important;
+  opacity: 0.85 !important;
+}
+
+.card-preview-title-text {
+  color: var(--color-text, #212529) !important;
+}
+
+.card-preview-subtitle-text {
+  color: var(--color-text-muted, #6c757d) !important;
+  font-size: 0.78rem !important;
+  font-weight: normal !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  min-width: 0 !important;
+  flex: 1 !important;
+  opacity: 0.85 !important;
+}

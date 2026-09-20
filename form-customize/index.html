@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Inter:wght@300;400;500;600;700&family=Kaisei+Decol:wght@500;700&family=M+PLUS+Rounded+1c:wght@400;700;800&family=Noto+Sans+JP:wght@300;400;500;700;900&family=Noto+Serif+JP:wght@500;700;900&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap" rel="stylesheet">
-    <script type="module" src="./assets/index-W0nnFdhS-v6.js?v=6.0.3"></script>
+    <script type="module" src="./assets/index-W0nnFdhS-v6.js?v=6.0.5"></script>
     <link rel="stylesheet" href="./assets/index-BlN3q3Ff.css?v=2.2.0">
     <script>
       // 🚀 回答者向けアクセス（active_tab=preview または res_id / mode=view）の即時自動転送
@@ -121,13 +121,18 @@
         <button id="btn-header-merge-prod" class="btn btn-success" data-tooltip="最新の編集内容を本番公開リンクへ統合・更新" style="display: none !important;">
           <span>🚀</span> <span class="btn-text">本番へ統合</span>
         </button>
-        <!-- 🚀 本番連携・公開ボタングループ（プレビュー以外を1箇所に集約） -->
+        <!-- 📊 Supabaseテーブル連携・作成ボタン（常時直接クリック可能） -->
+        <button type="button" id="btn-header-column-preview" class="btn btn-secondary" data-tooltip="Supabaseテーブル連携カラムの確認・事前作成" style="display: none; align-items: center; gap: 6px; font-weight: 600; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; cursor: pointer; border-radius: 6px; padding: 6px 12px; font-size: 0.85rem; margin-right: 8px;">
+          <span class="btn-icon">📊</span>
+          <span class="btn-text">テーブル連携・作成</span>
+        </button>
+        <!-- 🚀 フォーム公開・共有ボタングループ -->
         <div class="share-export-btn-group" id="share-export-group" style="display: none;">
-          <button id="btn-share-form-url" class="btn btn-share-link" data-tooltip="本番公開・連携メニュー" style="display: inline-flex; align-items: center; gap: 6px;">
+          <button id="btn-share-form-url" class="btn btn-share-link" data-tooltip="フォームの公開・回答リンク共有メニュー" style="display: inline-flex; align-items: center; gap: 6px;">
             <span class="btn-icon">🚀</span>
-            <span class="btn-text" id="share-btn-main-label">本番・連携</span>
+            <span class="btn-text" id="share-btn-main-label">公開・共有</span>
           </button>
-          <button type="button" id="btn-share-dropdown-toggle" class="btn btn-share-dropdown-toggle" data-tooltip="連携・出力メニューを開く" aria-label="連携・出力メニューを開く">
+          <button type="button" id="btn-share-dropdown-toggle" class="btn btn-share-dropdown-toggle" data-tooltip="公開・共有メニューを開く" aria-label="公開・共有メニューを開く">
             <span class="dropdown-arrow">▼</span>
           </button>
           <div class="share-dropdown-menu" id="share-dropdown-menu" style="min-width: 270px;">
@@ -136,6 +141,13 @@
               <div class="menu-text-group">
                 <span class="menu-title" style="color: #16a34a; font-weight: 700;">本番へ統合</span>
                 <span class="menu-desc">最新の編集内容を本番公開リンクへ反映</span>
+              </div>
+            </div>
+            <div class="share-dropdown-item" id="menu-item-test-link">
+              <span class="menu-icon">🧪</span>
+              <div class="menu-text-group">
+                <span class="menu-title" style="color: #d97706; font-weight: 700;">テスト用リンクを開く</span>
+                <span class="menu-desc">編集内容を別タブで安全に動作検証（DB保存なし）</span>
               </div>
             </div>
             <div class="share-dropdown-item" id="menu-item-column-preview">
@@ -1606,8 +1618,51 @@
         background-color: var(--color-bg-card-hover) !important;
       }
 
+      .gf-list-title-text-group {
+        display: flex !important;
+        align-items: baseline !important;
+        gap: 8px !important;
+        min-width: 0 !important;
+        flex: 1 !important;
+        overflow: hidden !important;
+      }
+
       .gf-list-title-text {
         color: var(--color-text) !important;
+        font-weight: 500 !important;
+        font-size: 0.95rem !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        flex-shrink: 0 !important;
+      }
+
+      .gf-list-subtitle-text {
+        color: var(--color-text-muted) !important;
+        font-size: 0.83rem !important;
+        font-weight: 400 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        min-width: 0 !important;
+        flex: 1 !important;
+        opacity: 0.85 !important;
+      }
+
+      .card-preview-title-text {
+        color: var(--color-text) !important;
+      }
+
+      .card-preview-subtitle-text {
+        color: var(--color-text-muted) !important;
+        font-size: 0.78rem !important;
+        font-weight: normal !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        min-width: 0 !important;
+        flex: 1 !important;
+        opacity: 0.85 !important;
       }
 
       .gf-list-owner-area, .gf-list-time-area {

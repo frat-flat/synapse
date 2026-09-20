@@ -941,9 +941,9 @@
         if (showDelete) {
           const delBtn = document.createElement('button');
           delBtn.type = 'button';
-          delBtn.className = 'btn-delete-template-direct';
-          delBtn.innerHTML = '🗑️';
+          delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:-2px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
           delBtn.title = 'テンプレートを削除';
+          delBtn.setAttribute('aria-label', 'テンプレートを削除');
           
           delBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -2099,7 +2099,7 @@
       allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]');
     } catch(e) {}
 
-    const idx = allForms.findIndex(f => f.title === titleText);
+    const idx = allForms.findIndex(f => f.title === titleText || `${f.title} ${f.subtitle || (f.header && f.header.subtitle) || ''}`.trim() === titleText);
     if (idx !== -1) {
       allForms.splice(idx, 1);
       localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
@@ -4426,12 +4426,34 @@
     }
   }
 
+  // 🧭 現在表示中の画面（タブ）をDOM状態から高信頼で判定
+  function detectActiveTab() {
+    try {
+      const editorPanel = document.getElementById('panel-editor');
+      if (editorPanel && editorPanel.classList.contains('active')) return 'editor';
+      const flowmapPanel = document.getElementById('panel-flowmap');
+      if (flowmapPanel && flowmapPanel.classList.contains('active')) return 'flowmap';
+      const previewPanel = document.getElementById('panel-preview');
+      if (previewPanel && previewPanel.classList.contains('active')) return 'preview';
+      const activeNav = document.querySelector('.nav-tab.active');
+      if (activeNav && activeNav.dataset.tab) return activeNav.dataset.tab;
+      const dashPanel = document.getElementById('panel-dashboard');
+      if (dashPanel && dashPanel.classList.contains('active')) return 'dashboard';
+      return localStorage.getItem('form_customize_active_tab') || 'dashboard';
+    } catch(e) {
+      return 'dashboard';
+    }
+  }
+
   // 🔗 共通ヘッダーの「リンクを発行」ボタングループの表示状態を動的に切り替える
   function updateHeaderShareButtons(tabName) {
     try {
+      const activeTab = tabName || detectActiveTab();
       const shareGroup = document.getElementById('share-export-group');
       const headerMergeBtn = document.getElementById('btn-header-merge-prod');
-      const isEditingActiveForm = tabName && tabName !== 'dashboard' && tabName !== 'templates';
+      const headerColBtn = document.getElementById('btn-header-column-preview');
+      const isEditingActiveForm = activeTab && activeTab !== 'dashboard' && activeTab !== 'templates';
+
       if (shareGroup) {
         // ホーム（ダッシュボード）やテンプレート一覧画面では非表示、個別フォーム作業中（editor, flow, preview等）のみ表示
         if (isEditingActiveForm) {
@@ -4440,6 +4462,15 @@
         } else {
           shareGroup.style.setProperty('display', 'none', 'important');
           shareGroup.classList.add('hidden');
+        }
+      }
+      if (headerColBtn) {
+        if (isEditingActiveForm) {
+          headerColBtn.style.setProperty('display', 'inline-flex', 'important');
+          headerColBtn.classList.remove('hidden');
+        } else {
+          headerColBtn.style.setProperty('display', 'none', 'important');
+          headerColBtn.classList.add('hidden');
         }
       }
       if (!isEditingActiveForm && headerMergeBtn) {
@@ -4455,9 +4486,10 @@
   // 🔙 共通ヘッダーの「←（戻る）」ボタンおよびアクションの表示状態を動的に切り替える
   function updateHeaderBackButton(tabName) {
     try {
+      const activeTab = tabName || detectActiveTab();
       const backBtn = document.getElementById('btn-back-to-dashboard');
       if (backBtn) {
-        if (tabName && tabName !== 'dashboard') {
+        if (activeTab && activeTab !== 'dashboard') {
           backBtn.style.setProperty('display', 'inline-flex', 'important');
         } else {
           backBtn.style.setProperty('display', 'none', 'important');
@@ -4465,7 +4497,7 @@
       }
 
       // 🔗 「リンクを発行」ボタングループの表示状態の動的切り替え
-      updateHeaderShareButtons(tabName);
+      updateHeaderShareButtons(activeTab);
     } catch(e) {
       console.error('[BackButton] Failed to update state:', e);
     }
@@ -4996,7 +5028,15 @@
       const simpleTitle = document.getElementById('editor-form-title');
       if (simpleTitle) simpleTitle.value = v;
     });
-    bindInput('editor-pro-subtitle', v => window.G.header.subtitle = v);
+    bindInput('editor-pro-subtitle', v => {
+      window.G.header.subtitle = v;
+      window.G.subtitle = v;
+      if (window.U && window.U[window.W]) {
+        window.U[window.W].subtitle = v;
+        window.U[window.W].header = window.U[window.W].header || {};
+        window.U[window.W].header.subtitle = v;
+      }
+    });
     bindInput('editor-pro-disclaimer', v => {
       window.G.header.disclaimer = v;
       window.G.description = v; // 簡易版説明も同期
@@ -15046,6 +15086,13 @@
     // 1. 未装飾のセレクトボックスの装飾
     const deleteBtns = editorPanel.querySelectorAll('.btn-delete-option');
     deleteBtns.forEach(btn => {
+      // 統一したゴミ箱の線画アイコンに自動補正
+      if (!btn.querySelector('svg')) {
+        btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
+        btn.title = '選択肢を削除';
+        btn.setAttribute('aria-label', '選択肢を削除');
+      }
+
       const parent = btn.parentElement;
       if (!parent) return;
 
@@ -17056,7 +17103,7 @@
       const menuItemMerge = document.getElementById('menu-item-merge-prod');
       if (menuItemMerge) menuItemMerge.style.display = 'none';
       const mainBtnLabel = document.getElementById('share-btn-main-label');
-      if (mainBtnLabel) mainBtnLabel.innerHTML = '本番・連携';
+      if (mainBtnLabel) mainBtnLabel.innerHTML = '公開・共有';
     } else {
       if (syncArea) {
         syncArea.style.borderColor = '#f59e0b';
@@ -17077,7 +17124,7 @@
       const menuItemMerge = document.getElementById('menu-item-merge-prod');
       if (menuItemMerge) menuItemMerge.style.display = 'flex';
       const mainBtnLabel = document.getElementById('share-btn-main-label');
-      if (mainBtnLabel) mainBtnLabel.innerHTML = '本番・連携 <span style="background:#ef4444; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">要統合</span>';
+      if (mainBtnLabel) mainBtnLabel.innerHTML = '公開・共有 <span style="background:#ef4444; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">要統合</span>';
       if (headerMergeBtn) headerMergeBtn.style.setProperty('display', 'none', 'important');
     }
   }
@@ -17257,8 +17304,8 @@
   }
 
   function initShareUrlFeature() {
-    // 初期タブに応じた表示切り替え（ホーム表示時は非表示）
-    const initialTab = localStorage.getItem('form_customize_active_tab') || 'dashboard';
+    // 初期タブに応じた表示切り替え（DOMから確実に判定）
+    const initialTab = (typeof detectActiveTab === 'function') ? detectActiveTab() : (localStorage.getItem('form_customize_active_tab') || 'dashboard');
     if (typeof updateHeaderShareButtons === 'function') {
       updateHeaderShareButtons(initialTab);
     }
@@ -17322,6 +17369,19 @@
           if (confirm(`「${title}」の最新編集内容を本番公開リンクへ統合（公開更新）しますか？\n\n・新バージョン: v${nextVer}\n・配布済みの本番URLは変更されず、回答画面が最新版へ切り替わります。\n・過去のテスト送信データが本番に混ざることはありません。`)) {
             mergeFormToProduction(idx);
           }
+        });
+      }
+
+      const menuTestLink = document.getElementById('menu-item-test-link');
+      if (menuTestLink && !menuTestLink._hooked) {
+        menuTestLink._hooked = true;
+        menuTestLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          const testUrl = getPublicFormShareUrl(undefined, true, 'test');
+          window.open(testUrl, '_blank');
+          showGlobalShareToast('🧪 テスト送信モード（DB保存なし）で別タブを開きました！');
         });
       }
 
@@ -17462,21 +17522,72 @@
       closeFooterBtn.addEventListener('click', closeShareUrlModal);
     }
 
-    // 5. コンテキストメニュー（⋮）への「🔗 リンクをコピー」自動注入
+    // 5. コンテキストメニュー（⋮）への「🔗 リンクをコピー」および「📊 テーブル連携確認・作成」自動注入
     const contextMenu = document.getElementById('gf-context-menu');
-    if (contextMenu && !contextMenu._shareHooked) {
-      contextMenu._shareHooked = true;
+    if (contextMenu) {
       const previewItem = contextMenu.querySelector('.preview-item');
       if (previewItem) {
+        previewItem.remove();
+      }
+      if (!contextMenu._shareHooked) {
+        contextMenu._shareHooked = true;
         const copyItem = document.createElement('div');
         copyItem.className = 'menu-item copy-link-item';
         copyItem.innerHTML = '🔗 リンクをコピー';
         copyItem.addEventListener('click', (e) => {
           e.stopPropagation();
+          const fIdx = contextMenu.dataset.formIndex !== undefined ? parseInt(contextMenu.dataset.formIndex, 10) : undefined;
           contextMenu.remove();
-          copyFormShareUrl();
+          copyFormShareUrl(fIdx);
         });
-        previewItem.insertAdjacentElement('afterend', copyItem);
+
+        const testItem = document.createElement('div');
+        testItem.className = 'menu-item test-link-item';
+        testItem.innerHTML = '🧪 テスト用リンクを開く';
+        testItem.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const fIdx = contextMenu.dataset.formIndex !== undefined ? parseInt(contextMenu.dataset.formIndex, 10) : undefined;
+          contextMenu.remove();
+          const testUrl = getPublicFormShareUrl(fIdx, true, 'test');
+          window.open(testUrl, '_blank');
+          showGlobalShareToast('🧪 テスト送信モード（DB保存なし）で別タブを開きました！');
+        });
+
+        const tableItem = document.createElement('div');
+        tableItem.className = 'menu-item table-link-item';
+        tableItem.innerHTML = '📊 テーブル連携確認・作成';
+        tableItem.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const fIdx = contextMenu.dataset.formIndex !== undefined ? parseInt(contextMenu.dataset.formIndex, 10) : undefined;
+          contextMenu.remove();
+          let targetForm = null;
+          if (fIdx !== undefined && window.U && window.U[fIdx]) {
+            targetForm = window.U[fIdx];
+          } else {
+            targetForm = window.G || window.L;
+          }
+          if (typeof openFormColumnMappingModal === 'function') {
+            openFormColumnMappingModal(targetForm);
+          }
+        });
+
+        const editItem = contextMenu.querySelector('.edit-item');
+        if (editItem) {
+          editItem.insertAdjacentElement('afterend', copyItem);
+          copyItem.insertAdjacentElement('afterend', testItem);
+          testItem.insertAdjacentElement('afterend', tableItem);
+        } else {
+          const deleteItem = contextMenu.querySelector('.delete-item');
+          if (deleteItem) {
+            deleteItem.insertAdjacentElement('beforebegin', copyItem);
+            deleteItem.insertAdjacentElement('beforebegin', testItem);
+            deleteItem.insertAdjacentElement('beforebegin', tableItem);
+          } else {
+            contextMenu.appendChild(copyItem);
+            contextMenu.appendChild(testItem);
+            contextMenu.appendChild(tableItem);
+          }
+        }
       }
     }
 
@@ -17490,14 +17601,14 @@
         if (!isNaN(targetIdx) && window.U && window.U[targetIdx]) {
           if (window.W !== targetIdx) {
             if (typeof window.X === 'function') {
-              window.X(targetIdx, urlParams.get('active_tab') || 'preview');
+              window.X(targetIdx, urlParams.get('active_tab') || 'editor');
             } else {
               window.W = targetIdx;
               window.G = window.U[targetIdx];
               window.n = window.G;
               localStorage.setItem('form_customize_active_index', targetIdx.toString());
               if (typeof window.Z === 'function') {
-                window.Z(urlParams.get('active_tab') || 'preview');
+                window.Z(urlParams.get('active_tab') || 'editor');
               }
             }
           }
@@ -18598,6 +18709,16 @@
     containers.forEach(container => {
       const rows = Array.from(container.querySelectorAll('.option-edit-row'));
       if (rows.length === 0) return;
+
+      // 🗑️ 選択肢削除ボタンの統一線画ゴミ箱アイコンを確実に維持
+      rows.forEach(r => {
+        const btn = r.querySelector('.btn-delete-option');
+        if (btn && !btn.querySelector('svg')) {
+          btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
+          btn.title = '選択肢を削除';
+          btn.setAttribute('aria-label', '選択肢を削除');
+        }
+      });
 
       let rowsWrap = container.querySelector('.options-edit-rows-wrap');
       
@@ -20260,8 +20381,15 @@
     const btn = document.getElementById('btn-header-column-preview');
     if (btn && !btn.dataset.bound) {
       btn.dataset.bound = 'true';
-      btn.addEventListener('click', () => {
-        openFormColumnMappingModal(window.L);
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        let targetForm = window.G || window.n || window.L;
+        if (typeof getCurrentFormObject === 'function') {
+          const cur = getCurrentFormObject();
+          if (cur && cur.formObj) targetForm = cur.formObj;
+        }
+        openFormColumnMappingModal(targetForm);
       });
     }
   }
@@ -20286,4 +20414,221 @@
     setupHeaderColumnPreviewButton();
   }
 })();
+
+// =========================================================================
+// 📱 スマホ向け 長押し（Long Press）ツールチップ ＆ Undo（元に戻す）トーストシステム
+// =========================================================================
+(function() {
+  // --- 1. Undo（元に戻す）トーストシステム ---
+  let undoContainer = null;
+  let undoTimer = null;
+
+  window.showUndoToast = function({ message, undoText = '元に戻す', onUndo, duration = 5500 }) {
+    if (!undoContainer) {
+      undoContainer = document.querySelector('.synapse-undo-toast-container');
+      if (!undoContainer) {
+        undoContainer = document.createElement('div');
+        undoContainer.className = 'synapse-undo-toast-container';
+        document.body.appendChild(undoContainer);
+      }
+    }
+
+    if (undoTimer) {
+      clearTimeout(undoTimer);
+      undoTimer = null;
+    }
+    undoContainer.innerHTML = '';
+
+    const toast = document.createElement('div');
+    toast.className = 'synapse-undo-toast';
+
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'synapse-undo-toast-message';
+    msgSpan.textContent = message;
+
+    const undoBtn = document.createElement('button');
+    undoBtn.type = 'button';
+    undoBtn.className = 'synapse-undo-toast-btn';
+    undoBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px;"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>' + undoText;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'synapse-undo-toast-close';
+    closeBtn.setAttribute('aria-label', '閉じる');
+    closeBtn.textContent = '✕';
+
+    toast.appendChild(msgSpan);
+    toast.appendChild(undoBtn);
+    toast.appendChild(closeBtn);
+    undoContainer.appendChild(toast);
+
+    function dismiss(anim = true) {
+      if (undoTimer) {
+        clearTimeout(undoTimer);
+        undoTimer = null;
+      }
+      if (!anim) {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+        return;
+      }
+      toast.classList.add('hiding');
+      setTimeout(() => {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 200);
+    }
+
+    undoBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dismiss(false);
+      if (typeof onUndo === 'function') {
+        try {
+          onUndo();
+        } catch (err) {
+          console.error('[UndoToast] Failed to execute onUndo:', err);
+        }
+      }
+    });
+
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dismiss(true);
+    });
+
+    undoTimer = setTimeout(() => {
+      dismiss(true);
+    }, duration);
+  };
+
+  // --- 2. スマホ向け 長押し（Long Press）ツールチップ ---
+  let longPressTimer = null;
+  let isLongPressTriggered = false;
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let activeTipEl = null;
+
+  function hideMobileTooltip() {
+    if (activeTipEl && activeTipEl.parentNode) {
+      activeTipEl.parentNode.removeChild(activeTipEl);
+    }
+    activeTipEl = null;
+  }
+
+  function showMobileTooltip(targetEl, text) {
+    hideMobileTooltip();
+    const tip = document.createElement('div');
+    tip.className = 'synapse-mobile-tooltip';
+    tip.textContent = text;
+    document.body.appendChild(tip);
+
+    const rect = targetEl.getBoundingClientRect();
+    const tipRect = tip.getBoundingClientRect();
+
+    let left = rect.left + rect.width / 2 - tipRect.width / 2;
+    let top = rect.top - tipRect.height - 10;
+
+    if (top < 10) {
+      top = rect.bottom + 10;
+      tip.classList.add('placement-bottom');
+    }
+
+    left = Math.max(10, Math.min(window.innerWidth - tipRect.width - 10, left));
+
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+    activeTipEl = tip;
+  }
+
+  // 長押し後の誤タップ（ボタン実行）を防止するキャプチャリスナー
+  document.addEventListener('click', function(e) {
+    if (window._suppressNextClick) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      window._suppressNextClick = false;
+      return false;
+    }
+  }, true);
+
+  document.addEventListener('touchstart', function(e) {
+    if (!e.touches || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const target = e.target.closest('[data-tooltip], [title], [aria-label]');
+    if (!target) return;
+
+    const text = target.getAttribute('data-tooltip') || target.getAttribute('title') || target.getAttribute('aria-label');
+    if (!text || !text.trim()) return;
+
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    isLongPressTriggered = false;
+
+    clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(function() {
+      isLongPressTriggered = true;
+      window._suppressNextClick = true;
+      if (navigator.vibrate) {
+        try { navigator.vibrate(20); } catch (_) {}
+      }
+      showMobileTooltip(target, text.trim());
+    }, 380);
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!longPressTimer && !isLongPressTriggered) return;
+    if (!e.touches || e.touches.length === 0) return;
+    const touch = e.touches[0];
+    const dist = Math.hypot(touch.clientX - touchStartX, touch.clientY - touchStartY);
+    if (dist > 10) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+      if (isLongPressTriggered) {
+        hideMobileTooltip();
+        isLongPressTriggered = false;
+      }
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', function(e) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+    if (isLongPressTriggered) {
+      window._suppressNextClick = true;
+      setTimeout(function() {
+        window._suppressNextClick = false;
+      }, 400);
+      setTimeout(function() {
+        hideMobileTooltip();
+        isLongPressTriggered = false;
+      }, 800);
+    }
+  }, { passive: false });
+
+  document.addEventListener('touchcancel', function() {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+    hideMobileTooltip();
+    isLongPressTriggered = false;
+  });
+})();
+
+// =========================================================================
+// 🎯 ホーム一覧からのフォーム選択時のヘッダー表示即時同期
+// =========================================================================
+(function() {
+  document.addEventListener('click', function(e) {
+    const row = e.target.closest('.gf-list-row');
+    if (row && !e.target.closest('.gf-list-action-area')) {
+      localStorage.setItem('form_customize_active_tab', 'editor');
+      setTimeout(function() {
+        if (typeof updateHeaderBackButton === 'function') {
+          updateHeaderBackButton('editor');
+        }
+      }, 30);
+    }
+  }, true);
+})();
+
+
 
