@@ -4465,13 +4465,8 @@
         }
       }
       if (headerColBtn) {
-        if (isEditingActiveForm) {
-          headerColBtn.style.setProperty('display', 'inline-flex', 'important');
-          headerColBtn.classList.remove('hidden');
-        } else {
-          headerColBtn.style.setProperty('display', 'none', 'important');
-          headerColBtn.classList.add('hidden');
-        }
+        headerColBtn.style.setProperty('display', 'none', 'important');
+        headerColBtn.classList.add('hidden');
       }
       if (!isEditingActiveForm && headerMergeBtn) {
         headerMergeBtn.style.setProperty('display', 'none', 'important');
@@ -17022,6 +17017,10 @@
       settings: formObj.settings ? JSON.parse(JSON.stringify(formObj.settings)) : null,
       appearance: formObj.appearance ? JSON.parse(JSON.stringify(formObj.appearance)) : null,
       estimatedTime: formObj.estimatedTime || null,
+      targetTableMode: formObj.targetTableType === 'dedicated' ? 'dedicated' : 'unified',
+      targetTableId: formObj.targetTableId || (formObj.createDedicatedTable ? 'dedicated' : 'table_all_form_responses'),
+      createDedicatedTable: !!formObj.createDedicatedTable,
+      isUnpublished: !!formObj.isUnpublished,
       publishedVersion: nextVersion,
       publishedAt: new Date().toISOString()
     };
@@ -17061,11 +17060,388 @@
     }
   }
 
+  // 📊 フォーム専用独立テーブル作成共通ヘルパー
+  async function createDedicatedTableForForm(formDef) {
+    if (!formDef) return null;
+    const formTitle = formDef.title || '無題のフォーム';
+    const sections = formDef.sections || [];
+    const newTableId = `ctbl_${Date.now()}`;
+    const columns = [
+      { id: 'master_id', label: 'マスターID / コード', type: 'text', required: false },
+      { id: 'form_title', label: 'フォーム名', type: 'text', required: false }
+    ];
+
+    sections.forEach((sec) => {
+      (sec.questions || []).forEach(q => {
+        const colName = q.title || q.dataKey || q.id;
+        let colType = 'text';
+        if (q.type === 'date') colType = 'date';
+        else if (q.type === 'select' || q.type === 'radio') colType = 'select';
+        else if (q.type === 'number') colType = 'number';
+
+        columns.push({
+          id: q.dataKey || `col_${q.id}`,
+          label: colName,
+          name: colName,
+          type: colType,
+          required: q.required || false,
+          choices: q.options ? q.options.map(opt => ({ value: opt })) : undefined
+        });
+      });
+    });
+
+    columns.push(
+      { id: 'status', label: 'ステータス', type: 'select', choices: [{ value: '回答完了', color: '#10b981' }, { value: '途中送信', color: '#f59e0b' }], required: false },
+      { id: 'registration_code', label: '確定登録コード', type: 'text', required: false },
+      { id: 'resume_url', label: '再開用URL', type: 'text', required: false },
+      { id: 'created_at', label: '送信日時', type: 'date', required: false }
+    );
+
+    const defaultWidths = {};
+    columns.forEach(col => { defaultWidths[col.id] = 130; });
+
+    const newTable = {
+      id: newTableId,
+      name: formTitle,
+      formTitle: formTitle,
+      isFormDedicatedTable: true,
+      parentMenuId: 'root',
+      columns: columns,
+      visibleColumns: columns.map(c => c.id),
+      columnWidths: defaultWidths,
+      rowHeights: {},
+      fixedCol: 'none',
+      fixedRow: 'none',
+      cellStyles: {},
+      rows: []
+    };
+
+    let curTables = [];
+    try { curTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
+    const existingIdx = curTables.findIndex(t => t.id === newTableId || t.name === formTitle);
+    if (existingIdx !== -1) {
+      curTables[existingIdx] = newTable;
+    } else {
+      curTables.push(newTable);
+    }
+    localStorage.setItem('synapse_custom_tables', JSON.stringify(curTables));
+    localStorage.setItem(`synapse_table_${newTableId}`, JSON.stringify(newTable));
+
+    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+
+    try {
+      await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: {
+          apikey: sbKey,
+          Authorization: `Bearer ${sbKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          key: `synapse_table_${newTableId}`,
+          value: newTable,
+          updated_at: new Date().toISOString()
+        })
+      });
+
+      await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: {
+          apikey: sbKey,
+          Authorization: `Bearer ${sbKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          key: 'synapse_custom_tables',
+          value: curTables,
+          updated_at: new Date().toISOString()
+        })
+      });
+    } catch (netErr) {
+      console.warn('[Supabase Sync] Network error during table registration:', netErr);
+    }
+
+    formDef.createDedicatedTable = true;
+    formDef.targetTableId = newTableId;
+    formDef.targetTableType = 'dedicated';
+
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'SYNAPSE_TABLE_CREATED', table: newTable }, '*');
+    }
+
+    return newTable;
+  }
+  window.createDedicatedTableForForm = createDedicatedTableForForm;
+
+  // 🚀 本番公開・統合モーダル（公開時に専用テーブル作成を選択可能）
+  let _mergeModalTargetIndex = null;
+
+  function openMergeProductionModal(formIndex) {
+    const { formObj, idx } = getCurrentFormObject(formIndex);
+    if (!formObj) return;
+    _mergeModalTargetIndex = idx;
+
+    const modal = document.getElementById('modal-merge-production');
+    if (!modal) {
+      // モーダル要素がない場合は従来の確認ダイアログ
+      const title = formObj.title || 'フォーム';
+      const nextVer = ((formObj && formObj.publishedVersion) || 1) + 1;
+      if (confirm(`「${title}」の最新編集内容を本番公開リンクへ統合（公開更新）しますか？\n\n・新バージョン: v${nextVer}\n・配布済みの本番URLは変更されず、回答画面が最新版へ切り替わります。\n・過去のテスト送信データが本番に混ざることはありません。`)) {
+        mergeFormToProduction(idx);
+      }
+      return;
+    }
+
+    const titleEl = document.getElementById('merge-modal-form-title');
+    const verEl = document.getElementById('merge-modal-version-text');
+    const dedicatedToggle = document.getElementById('merge-create-dedicated-table');
+    const tableCard = document.getElementById('merge-target-table-card');
+    const tableDesc = document.getElementById('merge-target-table-desc');
+
+    const formTitle = formObj.title || '無題のフォーム';
+    const curVer = formObj.publishedVersion || 1;
+    const nextVer = curVer + 1;
+
+    if (titleEl) titleEl.textContent = formTitle;
+    if (verEl) verEl.textContent = `v${curVer} → v${nextVer}`;
+
+    // 専用テーブルの有無判定
+    let existingTables = [];
+    try { existingTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
+    const dedicatedTable = existingTables.find(t => t && (t.id === formObj.targetTableId || t.name === formTitle || (t.formTitle && t.formTitle === formTitle)));
+
+    const isDedicated = !!(formObj.createDedicatedTable === true || formObj.targetTableType === 'dedicated' || dedicatedTable);
+
+    if (dedicatedToggle) {
+      dedicatedToggle.checked = isDedicated;
+    }
+
+    const updateMergeModalTableUI = (checked) => {
+      if (!tableCard || !tableDesc) return;
+      if (checked) {
+        tableCard.style.borderColor = '#86efac';
+        tableCard.style.background = '#f0fdf4';
+        if (dedicatedTable) {
+          tableDesc.innerHTML = `✅ フォーム専用テーブル「<strong>${formTitle}</strong>」と連携中（回答は専用テーブルと「全フォーム回答データ」の両方に記録されます）。`;
+        } else {
+          tableDesc.innerHTML = `⚡ 本番公開と同時にフォーム専用テーブル「<strong>${formTitle}</strong>」が自動作成され、全問のカラムがマッピングされます（回答は専用テーブルと「全フォーム回答データ」の両方に記録されます）。`;
+        }
+        tableDesc.style.color = '#15803d';
+      } else {
+        tableCard.style.borderColor = '#cbd5e1';
+        tableCard.style.background = '#f8fafc';
+        tableDesc.innerHTML = `💡 選択しない場合：回答はすべて統合テーブル「<strong>全フォーム回答データ</strong>」に保存されます（専用テーブルは作成されません）。`;
+        tableDesc.style.color = '#64748b';
+      }
+    };
+
+    updateMergeModalTableUI(isDedicated);
+
+    if (dedicatedToggle && !dedicatedToggle._hooked) {
+      dedicatedToggle._hooked = true;
+      dedicatedToggle.addEventListener('change', (e) => {
+        updateMergeModalTableUI(e.target.checked);
+      });
+    }
+
+    // モーダル内ボタンのイベント紐付け
+    const closeBtn = document.getElementById('btn-close-merge-modal');
+    const cancelBtn = document.getElementById('btn-cancel-merge-modal');
+    const executeBtn = document.getElementById('btn-execute-merge-prod');
+
+    if (closeBtn && !closeBtn._hooked) {
+      closeBtn._hooked = true;
+      closeBtn.onclick = closeMergeProductionModal;
+    }
+    if (cancelBtn && !cancelBtn._hooked) {
+      cancelBtn._hooked = true;
+      cancelBtn.onclick = closeMergeProductionModal;
+    }
+    if (executeBtn && !executeBtn._hooked) {
+      executeBtn._hooked = true;
+      executeBtn.onclick = executeMergeProductionFromModal;
+    }
+
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+  }
+  window.openMergeProductionModal = openMergeProductionModal;
+
+  function closeMergeProductionModal() {
+    const modal = document.getElementById('modal-merge-production');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.style.display = 'none';
+    }
+  }
+  window.closeMergeProductionModal = closeMergeProductionModal;
+
+  async function executeMergeProductionFromModal() {
+    const { formObj, idx } = getCurrentFormObject(_mergeModalTargetIndex);
+    if (!formObj) return;
+
+    const executeBtn = document.getElementById('btn-execute-merge-prod');
+    if (executeBtn) {
+      executeBtn.disabled = true;
+      executeBtn.textContent = '⏳ 本番公開・反映中...';
+    }
+
+    try {
+      const dedicatedToggle = document.getElementById('merge-create-dedicated-table');
+      const wantDedicated = dedicatedToggle ? dedicatedToggle.checked : false;
+
+      if (wantDedicated) {
+        let existingTables = [];
+        try { existingTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
+        const formTitle = formObj.title || '無題のフォーム';
+        const dedicatedTable = existingTables.find(t => t && (t.id === formObj.targetTableId || t.name === formTitle || (t.formTitle && t.formTitle === formTitle)));
+
+        if (!dedicatedTable) {
+          await createDedicatedTableForForm(formObj);
+        } else {
+          formObj.createDedicatedTable = true;
+          formObj.targetTableId = dedicatedTable.id;
+          formObj.targetTableType = 'dedicated';
+        }
+      } else {
+        formObj.createDedicatedTable = false;
+        formObj.targetTableType = 'consolidated';
+        formObj.targetTableId = 'table_all_form_responses';
+      }
+
+      if (typeof syncGlobalTargetTableSelect === 'function') {
+        syncGlobalTargetTableSelect(wantDedicated);
+      }
+
+      mergeFormToProduction(idx);
+      closeMergeProductionModal();
+    } catch(err) {
+      console.error('Error during production merge:', err);
+      alert('本番統合中にエラーが発生しました: ' + err.message);
+    } finally {
+      if (executeBtn) {
+        executeBtn.disabled = false;
+        executeBtn.textContent = '🚀 本番環境へ統合して公開';
+      }
+    }
+  }
+
+  // 🔒 フォームの非公開・公開（受付停止・再開）切り替え
+  async function toggleFormPublishStatus(formIndex) {
+    const { formObj, idx } = getCurrentFormObject(formIndex);
+    if (!formObj) return;
+
+    const currentlyUnpublished = !!formObj.isUnpublished;
+    const newUnpublished = !currentlyUnpublished;
+    const formTitle = formObj.title || '無題のフォーム';
+
+    const confirmMsg = newUnpublished
+      ? `「${formTitle}」を【非公開（受付停止）】にしますか？\n\n・本番URLにアクセスした回答者には受付停止案内が表示されます。\n・いつでも再度公開（受付再開）することができます。`
+      : `「${formTitle}」の【公開（受付再開）】を行いますか？\n\n・本番URLで回答者が再度フォームへアクセス・回答できるようになります。`;
+
+    if (!confirm(confirmMsg)) return;
+
+    formObj.isUnpublished = newUnpublished;
+    if (formObj.publishedSnapshot) {
+      formObj.publishedSnapshot.isUnpublished = newUnpublished;
+    }
+
+    if (window.U && window.U[idx]) {
+      window.U[idx] = formObj;
+    }
+
+    try {
+      const allFormsRaw = localStorage.getItem('form_customize_all_forms');
+      let allForms = allFormsRaw ? JSON.parse(allFormsRaw) : [];
+      if (allForms[idx]) {
+        allForms[idx] = formObj;
+      } else {
+        const fIdx = allForms.findIndex(f => f && (f.id === formObj.id || f.title === formObj.title));
+        if (fIdx !== -1) allForms[fIdx] = formObj;
+        else allForms.push(formObj);
+      }
+      localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+    } catch(e) {
+      console.warn('[Unpublish] Failed to update localStorage:', e);
+    }
+
+    if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+    if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+
+    updatePublishSyncUI(idx);
+
+    const toastMsg = newUnpublished
+      ? `🔒「${formTitle}」を非公開（受付停止）にしました。本番リンクでの回答が停止されました。`
+      : `🟢「${formTitle}」を公開（受付再開）しました。本番リンクでの回答受付を再開しました。`;
+
+    showGlobalShareToast(toastMsg);
+    if (typeof showToast === 'function') {
+      showToast(toastMsg, newUnpublished ? 'warning' : 'success');
+    }
+  }
+  window.toggleFormPublishStatus = toggleFormPublishStatus;
+
   function updatePublishSyncUI(targetIndex) {
     const { formObj, idx } = getCurrentFormObject(targetIndex);
     if (!formObj) return;
 
     const status = checkFormPublishStatus(formObj);
+    const isUnpublished = !!formObj.isUnpublished;
+
+    // 🔒 非公開（受付停止）状態のUI反映
+    const statusBar = document.getElementById('share-publish-status-bar');
+    const statusText = document.getElementById('share-publish-status-text');
+    const statusIcon = document.getElementById('share-publish-status-icon');
+    const statusLabel = document.getElementById('share-publish-status-label');
+    const modalToggleBtn = document.getElementById('btn-modal-toggle-publish');
+    const menuToggleTitle = document.getElementById('menu-toggle-publish-title');
+    const menuToggleIcon = document.getElementById('menu-toggle-publish-icon');
+    const menuToggleDesc = document.getElementById('menu-toggle-publish-desc');
+
+    if (statusBar) {
+      if (isUnpublished) {
+        statusBar.style.background = '#fef2f2';
+        statusBar.style.borderColor = '#fca5a5';
+      } else {
+        statusBar.style.background = '#f0fdf4';
+        statusBar.style.borderColor = '#bbf7d0';
+      }
+    }
+    if (statusText) {
+      statusText.style.color = isUnpublished ? '#991b1b' : '#166534';
+    }
+    if (statusIcon) {
+      statusIcon.textContent = isUnpublished ? '🔴' : '🟢';
+    }
+    if (statusLabel) {
+      statusLabel.textContent = isUnpublished ? '本番受付停止中（非公開）' : '本番受付中（公開中）';
+    }
+    if (modalToggleBtn) {
+      if (isUnpublished) {
+        modalToggleBtn.innerHTML = '🔓 フォームを公開（受付再開）';
+        modalToggleBtn.style.color = '#15803d';
+        modalToggleBtn.style.background = '#f0fdf4';
+        modalToggleBtn.style.borderColor = '#86efac';
+      } else {
+        modalToggleBtn.innerHTML = '🔒 フォームを非公開にする';
+        modalToggleBtn.style.color = '#dc2626';
+        modalToggleBtn.style.background = '#fef2f2';
+        modalToggleBtn.style.borderColor = '#f87171';
+      }
+    }
+    if (menuToggleTitle) {
+      menuToggleTitle.textContent = isUnpublished ? 'フォームを公開（受付再開）する' : 'フォームを非公開にする';
+      menuToggleTitle.style.color = isUnpublished ? '#15803d' : '#dc2626';
+    }
+    if (menuToggleIcon) {
+      menuToggleIcon.textContent = isUnpublished ? '🔓' : '🔒';
+    }
+    if (menuToggleDesc) {
+      menuToggleDesc.textContent = isUnpublished ? '本番リンクでの回答受付を再開します' : '本番リンクの回答受付を停止します';
+    }
 
     // モーダル内要素
     const syncArea = document.getElementById('share-publish-sync-area');
@@ -17103,7 +17479,11 @@
       const menuItemMerge = document.getElementById('menu-item-merge-prod');
       if (menuItemMerge) menuItemMerge.style.display = 'none';
       const mainBtnLabel = document.getElementById('share-btn-main-label');
-      if (mainBtnLabel) mainBtnLabel.innerHTML = '公開・共有';
+      if (mainBtnLabel) {
+        mainBtnLabel.innerHTML = isUnpublished
+          ? '公開・共有 <span style="background:#dc2626; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">非公開中</span>'
+          : '公開・共有';
+      }
     } else {
       if (syncArea) {
         syncArea.style.borderColor = '#f59e0b';
@@ -17124,7 +17504,13 @@
       const menuItemMerge = document.getElementById('menu-item-merge-prod');
       if (menuItemMerge) menuItemMerge.style.display = 'flex';
       const mainBtnLabel = document.getElementById('share-btn-main-label');
-      if (mainBtnLabel) mainBtnLabel.innerHTML = '公開・共有 <span style="background:#ef4444; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">要統合</span>';
+      if (mainBtnLabel) {
+        if (isUnpublished) {
+          mainBtnLabel.innerHTML = '公開・共有 <span style="background:#dc2626; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">非公開中</span> <span style="background:#ef4444; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:2px; font-weight:700;">要統合</span>';
+        } else {
+          mainBtnLabel.innerHTML = '公開・共有 <span style="background:#ef4444; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">要統合</span>';
+        }
+      }
       if (headerMergeBtn) headerMergeBtn.style.setProperty('display', 'none', 'important');
     }
   }
@@ -17276,12 +17662,17 @@
       mergeBtn._hooked = true;
       mergeBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        const { formObj } = getCurrentFormObject(_currentShareModalFormIndex);
-        const title = formObj && formObj.title ? formObj.title : 'フォーム';
-        const nextVer = ((formObj && formObj.publishedVersion) || 1) + 1;
-        if (confirm(`「${title}」の最新編集内容を本番公開リンクへ統合（公開更新）しますか？\n\n・新バージョン: v${nextVer}\n・配布済みの本番URLは変更されず、回答画面が最新版へ切り替わります。\n・過去のテスト送信データが本番に混ざることはありません。`)) {
-          mergeFormToProduction(_currentShareModalFormIndex);
-        }
+        openMergeProductionModal(_currentShareModalFormIndex);
+      });
+    }
+
+    // 🔒 フォーム非公開・公開（受付停止・再開）ボタンのイベント紐付け
+    const modalTogglePublishBtn = document.getElementById('btn-modal-toggle-publish');
+    if (modalTogglePublishBtn && !modalTogglePublishBtn._hooked) {
+      modalTogglePublishBtn._hooked = true;
+      modalTogglePublishBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleFormPublishStatus(_currentShareModalFormIndex);
       });
     }
 
@@ -17316,12 +17707,7 @@
       headerMergeBtn._hooked = true;
       headerMergeBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        const { formObj, idx } = getCurrentFormObject();
-        const title = formObj && formObj.title ? formObj.title : 'フォーム';
-        const nextVer = ((formObj && formObj.publishedVersion) || 1) + 1;
-        if (confirm(`「${title}」の最新編集内容を本番公開リンクへ統合（公開更新）しますか？\n\n・新バージョン: v${nextVer}\n・配布済みの本番URLは変更されず、回答画面が最新版へ切り替わります。\n・過去のテスト送信データが本番に混ざることはありません。`)) {
-          mergeFormToProduction(idx);
-        }
+        openMergeProductionModal();
       });
     }
 
@@ -17363,12 +17749,19 @@
           e.preventDefault();
           dropdownMenu.classList.remove('active');
           if (exportGroup) exportGroup.classList.remove('open');
-          const { formObj, idx } = getCurrentFormObject();
-          const title = formObj && formObj.title ? formObj.title : 'このフォーム';
-          const nextVer = ((formObj && formObj.publishedVersion) || 1) + 1;
-          if (confirm(`「${title}」の最新編集内容を本番公開リンクへ統合（公開更新）しますか？\n\n・新バージョン: v${nextVer}\n・配布済みの本番URLは変更されず、回答画面が最新版へ切り替わります。\n・過去のテスト送信データが本番に混ざることはありません。`)) {
-            mergeFormToProduction(idx);
-          }
+          openMergeProductionModal();
+        });
+      }
+
+      // 🔒 ドロップダウン内の「フォームを非公開にする / 公開する」メニュー項目
+      const menuTogglePublish = document.getElementById('menu-item-toggle-publish');
+      if (menuTogglePublish && !menuTogglePublish._hooked) {
+        menuTogglePublish._hooked = true;
+        menuTogglePublish.addEventListener('click', (e) => {
+          e.preventDefault();
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          toggleFormPublishStatus();
         });
       }
 
@@ -20357,125 +20750,15 @@
         createBtn.innerHTML = '<span>⏳</span> <span>専用テーブル作成中...</span>';
 
         try {
-          const newTableId = `ctbl_${Date.now()}`;
-          const columns = [
-            { id: 'master_id', label: 'マスターID / コード', type: 'text', required: false },
-            { id: 'form_title', label: 'フォーム名', type: 'text', required: false }
-          ];
-
-          sections.forEach((sec) => {
-            (sec.questions || []).forEach(q => {
-              const colName = q.title || q.dataKey || q.id;
-              let colType = 'text';
-              if (q.type === 'date') colType = 'date';
-              else if (q.type === 'select' || q.type === 'radio') colType = 'select';
-              else if (q.type === 'number') colType = 'number';
-
-              columns.push({
-                id: q.dataKey || `col_${q.id}`,
-                label: colName,
-                name: colName,
-                type: colType,
-                required: q.required || false,
-                choices: q.options ? q.options.map(opt => ({ value: opt })) : undefined
-              });
-            });
-          });
-
-          // システム共通カラム追加
-          columns.push(
-            { id: 'status', label: 'ステータス', type: 'select', choices: [{ value: '回答完了', color: '#10b981' }, { value: '途中送信', color: '#f59e0b' }], required: false },
-            { id: 'registration_code', label: '確定登録コード', type: 'text', required: false },
-            { id: 'resume_url', label: '再開用URL', type: 'text', required: false },
-            { id: 'created_at', label: '送信日時', type: 'date', required: false }
-          );
-
-          const defaultWidths = {};
-          columns.forEach(col => { defaultWidths[col.id] = 130; });
-
-          const newTable = {
-            id: newTableId,
-            name: formTitle,
-            formTitle: formTitle,
-            isFormDedicatedTable: true,
-            parentMenuId: 'root',
-            columns: columns,
-            visibleColumns: columns.map(c => c.id),
-            columnWidths: defaultWidths,
-            rowHeights: {},
-            fixedCol: 'none',
-            fixedRow: 'none',
-            cellStyles: {},
-            rows: []
-          };
-
-          // 1. localStorage更新（synapse_custom_tables に追加）
-          let curTables = [];
-          try { curTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
-          const existingIdx = curTables.findIndex(t => t.id === newTableId || t.name === formTitle);
-          if (existingIdx !== -1) {
-            curTables[existingIdx] = newTable;
-          } else {
-            curTables.push(newTable);
-          }
-          localStorage.setItem('synapse_custom_tables', JSON.stringify(curTables));
-          localStorage.setItem(`synapse_table_${newTableId}`, JSON.stringify(newTable));
-
-          // 2. Supabase REST API へ即時保存
-          const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
-          const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
-
-          try {
-            await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
-              method: 'POST',
-              headers: {
-                apikey: sbKey,
-                Authorization: `Bearer ${sbKey}`,
-                'Content-Type': 'application/json',
-                Prefer: 'resolution=merge-duplicates'
-              },
-              body: JSON.stringify({
-                key: `synapse_table_${newTableId}`,
-                value: newTable,
-                updated_at: new Date().toISOString()
-              })
-            });
-
-            await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
-              method: 'POST',
-              headers: {
-                apikey: sbKey,
-                Authorization: `Bearer ${sbKey}`,
-                'Content-Type': 'application/json',
-                Prefer: 'resolution=merge-duplicates'
-              },
-              body: JSON.stringify({
-                key: 'synapse_custom_tables',
-                value: curTables,
-                updated_at: new Date().toISOString()
-              })
-            });
-          } catch (netErr) {
-            console.warn('[Supabase Sync] Network error during table registration (saved locally):', netErr);
-          }
-
-          // 3. フォーム定義の保存先テーブルを専用テーブルにバインド
-          formDef.createDedicatedTable = true;
-          formDef.targetTableId = newTableId;
-          formDef.targetTableType = 'dedicated';
+          const newTable = await createDedicatedTableForForm(formDef);
           if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
           if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
 
-          // 4. 親ウィンドウへの通知（Synapse側のカスタムテーブル一覧を即時更新）
-          if (window.parent && window.parent !== window) {
-            window.parent.postMessage({ type: 'SYNAPSE_TABLE_CREATED', table: newTable }, '*');
-          }
-
           // モーダル表示を完了状態に再描画
           openFormColumnMappingModal(formDef);
-          syncGlobalTargetTableSelect(newTableId);
+          syncGlobalTargetTableSelect(newTable ? newTable.id : true);
 
-          alert(`✅ テーブル「${formTitle}」を作成し、一覧に登録しました！\n\n・テーブルID: ${newTableId}\n・全${columns.length}カラムを定義済み\n・回答保存先をこの専用テーブルに設定しました。\n・Synapseの「カスタムテーブル」一覧からいつでも確認・選択できます。`);
+          alert(`✅ テーブル「${formTitle}」を作成し、一覧に登録しました！\n\n・テーブルID: ${newTable ? newTable.id : ''}\n・全${newTable && newTable.columns ? newTable.columns.length : 0}カラムを定義済み\n・回答保存先をこの専用テーブルに設定しました。\n・Synapseの「カスタムテーブル」一覧からいつでも確認・選択できます。`);
         } catch(err) {
           console.error('Failed to create table:', err);
           alert(`テーブル作成に失敗しました: ${err.message}`);
