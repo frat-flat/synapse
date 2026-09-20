@@ -761,24 +761,29 @@
                   </div>
                 </div>
 
-                <!-- 📊 回答データの保存先テーブル設定（DB連携） -->
-                <div class="form-group-card" id="editor-target-table-card" style="margin-top: 14px; padding: 14px 16px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px;">
-                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
-                    <label style="font-size: 0.82rem; font-weight: 700; color: #0369a1; display: flex; align-items: center; gap: 6px; margin: 0;">
-                      <span>📊 回答データの保存先テーブル（DB連携）</span>
-                    </label>
-                    <button type="button" id="btn-open-col-modal-from-settings" class="btn btn-sm" style="font-size: 0.72rem; padding: 3px 10px; background: #e0f2fe; color: #0284c7; border: 1px solid #7dd3fc; border-radius: 4px; cursor: pointer; font-weight: 600; transition: all 0.2s;">
-                      カラムマッピング確認・作成
+                <!-- 📊 専用テーブル作成設定（DB連携） -->
+                <div class="form-group-card" id="editor-target-table-card" style="margin-top: 14px; padding: 14px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; transition: all 0.2s;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <label class="editor-toggle-switch" for="editor-create-dedicated-table" style="margin: 0; cursor: pointer;">
+                        <input type="checkbox" id="editor-create-dedicated-table" />
+                        <span class="editor-toggle-slider"></span>
+                      </label>
+                      <label for="editor-create-dedicated-table" style="font-size: 0.83rem; font-weight: 700; color: #1e293b; margin: 0; cursor: pointer;">
+                        専用テーブルを作成する
+                      </label>
+                    </div>
+                    <button type="button" id="btn-open-col-modal-from-settings" class="btn btn-sm" style="font-size: 0.72rem; padding: 3px 10px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; font-weight: 600; transition: all 0.2s;">
+                      カラム・テーブル詳細
                     </button>
                   </div>
-                  <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                    <select id="editor-target-table-select" class="form-control form-control-sm" style="flex: 1; min-width: 240px; height: 34px; font-size: 0.8rem; font-weight: 600; border: 1px solid #7dd3fc; border-radius: 6px; background: #fff; color: #0f172a; cursor: pointer;">
-                      <option value="table_all_form_responses" selected>【推奨・標準】全フォーム回答データ（全回答を統合テーブルに1行追記）</option>
-                      <option value="dedicated">このフォーム専用の独立テーブル（新規作成）</option>
-                    </select>
-                  </div>
-                  <div id="target-table-status-desc" style="font-size: 0.73rem; color: #0284c7; margin-top: 6px; line-height: 1.4;">
-                    💡 すべてのフォームの回答が統合テーブル「全フォーム回答データ」に1レコードとして自動蓄積されます（「フォーム名」で自動識別）。
+                  <!-- 旧互換用の非表示セレクト -->
+                  <select id="editor-target-table-select" style="display: none;">
+                    <option value="table_all_form_responses" selected>全フォーム回答データ</option>
+                    <option value="dedicated">専用テーブル</option>
+                  </select>
+                  <div id="target-table-status-desc" style="font-size: 0.73rem; color: #64748b; margin-top: 8px; line-height: 1.4;">
+                    💡 選択しない場合：回答はすべて「<strong>全フォーム回答データ</strong>」に保存されて完了します（専用テーブルは作成されません）。
                   </div>
                 </div>
 

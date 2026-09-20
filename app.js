@@ -20935,16 +20935,21 @@ function handleFormSubmitMessage(event) {
   const reqTableId = targetTableId || 'table_all_form_responses';
   const reqType = targetTableType || (reqTableId === 'dedicated' ? 'dedicated' : (reqTableId === 'table_all_form_responses' ? 'consolidated' : 'existing'));
 
+  // ユーザーが専用テーブルの作成を選択しているか判定
+  const isDedicatedSelected = !!(
+    event.data.createDedicatedTable === true ||
+    reqType === 'dedicated' ||
+    reqTableId === 'dedicated' ||
+    (reqTableId && reqTableId.startsWith('dedicated'))
+  );
+
   // 該当フォームの専用独立テーブルが既に存在するか確認
   let existingDedicated = state.customTables.find(t => 
     t.id !== 'table_all_form_responses' && 
-    (t.name === effectiveFormTitle || t.formTitle === effectiveFormTitle || (reqTableId !== 'table_all_form_responses' && t.id === reqTableId))
+    (t.name === effectiveFormTitle || t.formTitle === effectiveFormTitle || (isDedicatedSelected && t.id === reqTableId))
   );
 
-  // ユーザーが専用独立テーブルを選択しているか判定（選択しない限り独立テーブルは新規作成・追加しない）
-  const isDedicatedSelected = reqType === 'dedicated' || reqTableId === 'dedicated' || (existingDedicated && reqTableId === existingDedicated.id);
-
-  // 独立テーブルの有無ステータス（専用テーブルが選択されている、または既に存在する場合は「あり」、それ以外は「なし」）
+  // 独立テーブルの有無ステータス（専用テーブル作成を選択している、または既に存在する場合は「あり」、それ以外は「なし」）
   const hasDedicated = isDedicatedSelected || !!existingDedicated;
   data["独立テーブル有無"] = hasDedicated ? "あり" : "なし";
 
@@ -21084,15 +21089,8 @@ function handleFormSubmitMessage(event) {
     if (dedCol && allResponsesRow) {
       allResponsesRow[dedCol.id] = 'あり';
     }
-  } else if (reqTableId && reqTableId !== 'table_all_form_responses') {
-    // 既存の別テーブル（例: table_form_basic など）が明示選択されている場合
-    const otherTable = state.customTables.find(t => t.id === reqTableId || t.name === reqTableId);
-    if (otherTable) {
-      const otherRow = saveSubmissionRowToTable(otherTable);
-      targetRow = otherRow;
-      targetTable = otherTable;
-    }
   }
+  // ※専用テーブルの作成を選択しない場合は、全フォーム回答データ（table_all_form_responses）にのみ保存されて完了します。
 
   const effectiveTableName = targetTable ? targetTable.name : (effectiveFormTitle || '無題のフォーム');
 

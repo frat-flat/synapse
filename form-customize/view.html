@@ -6964,11 +6964,13 @@
 
           // 1. 親ウィンドウ (iframe) への postMessage 送信
           if (window.parent && window.parent !== window) {
+            const isDedicatedMode = !!(formDefinition.createDedicatedTable === true || formDefinition.targetTableType === 'dedicated' || (formDefinition.targetTableId && formDefinition.targetTableId !== 'table_all_form_responses'));
             window.parent.postMessage({
               type: 'FORM_SUBMIT',
               formTitle: formDefinition.title || '無題のフォーム',
-              targetTableId: formDefinition.targetTableId || 'table_all_form_responses',
-              targetTableType: formDefinition.targetTableType || 'consolidated',
+              createDedicatedTable: isDedicatedMode,
+              targetTableId: isDedicatedMode ? (formDefinition.targetTableId || 'dedicated') : 'table_all_form_responses',
+              targetTableType: isDedicatedMode ? 'dedicated' : 'consolidated',
               data: submitData,
               isTemporary: false,
               isPartialSubmit: isPartial,
