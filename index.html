@@ -68,11 +68,20 @@
 <!-- 左サイドメニューバー（ログイン後に表示） -->
 <aside id="app-sidebar" class="sidebar-menu" style="display: none;">
 <div class="sidebar-header">
-  <div class="logo-section" id="sidebar-logo-btn" style="cursor: pointer;" title="ホーム画面へ">
-    <div class="logo-icon" style="background: #ffffff; box-shadow: none; overflow: hidden; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+  <div class="logo-section" id="sidebar-logo-btn">
+    <div class="logo-icon" style="background: #ffffff; box-shadow: none; overflow: hidden; padding: 0; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 8px; flex-shrink: 0; cursor: pointer;" title="ホーム画面へ">
       <img src="logo.png?v=20260904_3" alt="Synapse" style="width: 100%; height: 100%; object-fit: contain;">
     </div>
-    <span class="logo-text">Synapse</span>
+    <div class="sidebar-brand-text-container">
+      <span class="logo-text" style="cursor: pointer;" title="ホーム画面へ">Synapse</span>
+      <div class="sidebar-service-subtitle-wrapper" id="sidebar-service-switcher-btn" role="button" tabindex="0" title="利用サービスを切り替える">
+        <span class="sidebar-service-pill">
+          <span class="sidebar-service-icon" id="sidebar-service-current-icon">📊</span>
+          <span class="sidebar-service-name" id="sidebar-service-current-name">ヨサンダス</span>
+          <span class="sidebar-service-arrow">▾</span>
+        </span>
+      </div>
+    </div>
   </div>
   <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" style="display: none;" title="サイドバーを折りたたむ">‹</button>
 </div>
@@ -245,40 +254,6 @@
               <span id="sync-status-text">同期済み</span>
             </div>
 
-            <!-- 🚀 サービススイッチャー (常設切り替えセレクター) -->
-            <div class="header-service-switcher-container" id="header-service-switcher-container">
-              <button id="header-service-switcher-btn" class="header-service-switcher-btn" title="サービスを切り替える">
-                <span id="header-service-current-icon">🌐</span>
-                <span id="header-service-current-name">全サービス共通 (ホーム)</span>
-                <span class="switcher-arrow">▾</span>
-              </button>
-              <div id="header-service-dropdown" class="header-service-dropdown" style="display: none;">
-                <div class="header-service-dropdown-header">利用サービス切り替え</div>
-                <div class="header-service-dropdown-item active" data-service-id="home" id="service-opt-home">
-                  <span class="service-item-icon">🌐</span>
-                  <div class="service-item-info">
-                    <div class="service-item-title">全サービス共通 (ホーム)</div>
-                    <div class="service-item-desc">横断検索・全社スケジュール・ポータル</div>
-                  </div>
-                  <span class="service-item-badge">ポータル</span>
-                </div>
-                <div class="header-service-dropdown-item" data-service-id="yosandas" id="service-opt-yosandas">
-                  <span class="service-item-icon">📊</span>
-                  <div class="service-item-info">
-                    <div class="service-item-title">ヨサンダス</div>
-                    <div class="service-item-desc">JO・代理店・申込者マスタ & アポイント管理</div>
-                  </div>
-                  <span class="service-item-badge active-badge">利用可能</span>
-                </div>
-                <div class="header-service-dropdown-item disabled" data-service-id="yosandas_plus" id="service-opt-yosandas-plus" title="準備中">
-                  <span class="service-item-icon">✨</span>
-                  <div class="service-item-info">
-                    <div class="service-item-title">ヨサンダス＋</div>
-                    <div class="service-item-desc">次世代拡張サービス（近日公開）</div>
-                  </div>
-                  <span class="service-item-badge disabled-badge">準備中</span>
-                </div>
-              </div>
             </div>
           </div>
 

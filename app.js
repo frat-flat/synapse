@@ -1712,15 +1712,15 @@ function setupSupabaseAuthListener() {
         updateUIForCurrentMode();
         removeRestrictedTabsForRole(role);
         
-        // 💡 ログイン成功時はまずサービス選択ポップアップを表示する
+        // 💡 ログイン成功時の画面遷移（管理者は直接ホームへ、一般ユーザーのみサービス選択ポップアップを表示）
         if (canAccessHomeScreen()) {
           switchView('home-screen');
         } else {
           switchView('mypage-screen');
           if (typeof openMyPage === 'function') openMyPage();
-        }
-        if (typeof showServiceSelectionModal === 'function') {
-          showServiceSelectionModal(false);
+          if (typeof showServiceSelectionModal === 'function') {
+            showServiceSelectionModal(false);
+          }
         }
         
         // ログイン成功時にバックグラウンドで管理者の共有メモをロードする
@@ -12709,9 +12709,9 @@ function checkLoginStatus() {
       if (typeof openMyPage === 'function') {
         openMyPage();
       }
-    }
-    if (typeof showServiceSelectionModal === 'function') {
-      showServiceSelectionModal(false);
+      if (typeof showServiceSelectionModal === 'function') {
+        showServiceSelectionModal(false);
+      }
     }
 
     // ズーム比率の復元・マイグレーション処理（画面全体のCSSズームは100%に戻し、レイアウト占有面積を60%にする設計に対応）
@@ -14274,10 +14274,11 @@ function setupEventListeners() {
     state.isSelectingCols = false;
   });
 
-  // 💡 ロゴクリックで全社共通ホームポータルへ
+  // 💡 ロゴクリックで全社共通ホームポータルへ（サービススイッチャーサブタイトルクリック時は除外）
   const logoBtn = document.getElementById('sidebar-logo-btn');
   if (logoBtn) {
     logoBtn.addEventListener('click', (e) => {
+      if (e.target.closest('#sidebar-service-switcher-btn')) return;
       if (typeof switchService === 'function') {
         switchService('home');
       } else {
@@ -16013,9 +16014,6 @@ async function handleLogin(e) {
         if (typeof openMyPage === 'function') openMyPage();
       }
       showToast('管理者としてログインしました。', 'success');
-      if (typeof showServiceSelectionModal === 'function') {
-        showServiceSelectionModal(false);
-      }
       return;
     }
 
@@ -16118,7 +16116,7 @@ async function handleLogin(e) {
         updateUIForCurrentMode();
         removeRestrictedTabsForRole(state.currentUser.role);
         
-        // 💡 ログイン成功時はまずサービス選択ポップアップを表示する
+        // 💡 ログイン成功時の画面遷移（管理者は直接ホームへ、一般ユーザーのみサービス選択ポップアップを表示）
         if (canAccessHomeScreen()) {
           switchView('home-screen');
         } else {
@@ -16126,9 +16124,9 @@ async function handleLogin(e) {
           if (typeof openMyPage === 'function') {
             openMyPage();
           }
-        }
-        if (typeof showServiceSelectionModal === 'function') {
-          showServiceSelectionModal(false);
+          if (typeof showServiceSelectionModal === 'function') {
+            showServiceSelectionModal(false);
+          }
         }
       }
     }
@@ -52150,22 +52148,32 @@ function switchService(serviceId, targetViewId = null) {
 }
 
 function updateServiceUIState() {
-  const currentIconEl = document.getElementById('header-service-current-icon');
-  const currentNameEl = document.getElementById('header-service-current-name');
+  const headerIconEl = document.getElementById('header-service-current-icon');
+  const headerNameEl = document.getElementById('header-service-current-name');
+  const sidebarIconEl = document.getElementById('sidebar-service-current-icon');
+  const sidebarNameEl = document.getElementById('sidebar-service-current-name');
   const serviceItems = document.querySelectorAll('#header-service-dropdown .header-service-dropdown-item');
   const yosandasHeader = document.getElementById('sidebar-yosandas-header');
 
   const currentService = state.activeService || 'yosandas';
 
+  let icon = '📊';
+  let name = 'ヨサンダス';
+
   if (currentService === 'yosandas') {
-    if (currentIconEl) currentIconEl.textContent = '📊';
-    if (currentNameEl) currentNameEl.textContent = 'ヨサンダス';
+    icon = '📊';
+    name = 'ヨサンダス';
     if (yosandasHeader) yosandasHeader.style.opacity = '1';
   } else if (currentService === 'home') {
-    if (currentIconEl) currentIconEl.textContent = '🌐';
-    if (currentNameEl) currentNameEl.textContent = '全社ポータル';
+    icon = '🌐';
+    name = '全社ポータル';
     if (yosandasHeader) yosandasHeader.style.opacity = '0.7';
   }
+
+  if (headerIconEl) headerIconEl.textContent = icon;
+  if (headerNameEl) headerNameEl.textContent = name;
+  if (sidebarIconEl) sidebarIconEl.textContent = icon;
+  if (sidebarNameEl) sidebarNameEl.textContent = name;
 
   serviceItems.forEach(item => {
     if (item.dataset.serviceId === currentService) {
@@ -52356,7 +52364,23 @@ function initMultiServiceEvents() {
     });
   }
 
-  // 4. ヘッダーのサービススイッチャー（クリックでモーダルを開く）
+  // 4. 左サイドバーのサービスサブタイトル・スイッチャー（クリックでモーダルを開く）
+  const sidebarSwitcherBtn = document.getElementById('sidebar-service-switcher-btn');
+  if (sidebarSwitcherBtn) {
+    sidebarSwitcherBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showServiceSelectionModal(true);
+    });
+    sidebarSwitcherBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        showServiceSelectionModal(true);
+      }
+    });
+  }
+
+  // 旧ヘッダーサービススイッチャー（互換用）
   const switcherBtn = document.getElementById('header-service-switcher-btn');
   const switcherDropdown = document.getElementById('header-service-dropdown');
   if (switcherBtn) {
@@ -52365,17 +52389,6 @@ function initMultiServiceEvents() {
       showServiceSelectionModal(true);
     });
   }
-
-  // ドロップダウンアイテムクリック（もし利用する場合）
-  const dropdownItems = document.querySelectorAll('#header-service-dropdown .header-service-dropdown-item');
-  dropdownItems.forEach(item => {
-    item.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (switcherDropdown) switcherDropdown.style.display = 'none';
-      const serviceId = item.dataset.serviceId;
-      selectService(serviceId);
-    });
-  });
 
   // 5. スケジュールウィジェットのカレンダー詳細ボタン
   const openCalBtn = document.getElementById('home-schedule-open-calendar-btn');

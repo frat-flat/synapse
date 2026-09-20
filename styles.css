@@ -1516,7 +1516,8 @@ body:not(.logged-in) .login-layout {
   margin: 0 !important;
 }
 
-.sidebar-menu.collapsed .logo-text {
+.sidebar-menu.collapsed .logo-text,
+.sidebar-menu.collapsed .sidebar-brand-text-container {
   display: none !important;
 }
 
@@ -1813,9 +1814,85 @@ body:not(.logged-in) .login-layout {
   width: 100%;
   box-sizing: border-box;
   padding: 0 0.2rem;
-  margin-bottom: 0.35rem;
-  height: 36px;
+  margin-bottom: 0.4rem;
+  min-height: 42px;
   position: relative;
+}
+
+.sidebar-brand-text-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.sidebar-brand-text-container .logo-text {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  user-select: none;
+}
+
+.sidebar-service-subtitle-wrapper {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  outline: none;
+  width: fit-content;
+}
+
+.sidebar-service-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.12rem 0.48rem 0.12rem 0.35rem;
+  border-radius: 6px;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  color: var(--primary, #2563eb);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.15;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.sidebar-service-subtitle-wrapper:hover .sidebar-service-pill,
+.sidebar-service-subtitle-wrapper:focus-visible .sidebar-service-pill {
+  background: rgba(37, 99, 235, 0.16);
+  border-color: rgba(37, 99, 235, 0.45);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.18);
+}
+
+.sidebar-service-subtitle-wrapper:active .sidebar-service-pill {
+  transform: translateY(0);
+}
+
+.sidebar-service-icon {
+  font-size: 0.76rem;
+  line-height: 1;
+}
+
+.sidebar-service-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.sidebar-service-arrow {
+  font-size: 0.65rem;
+  opacity: 0.75;
+  transition: transform 0.2s ease;
+  line-height: 1;
+  margin-left: 1px;
+}
+
+.sidebar-service-subtitle-wrapper:hover .sidebar-service-arrow {
+  opacity: 1;
+  transform: translateY(1px);
 }
 
 .sidebar-toggle-btn {
