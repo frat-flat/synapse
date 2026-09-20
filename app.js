@@ -52374,7 +52374,6 @@ function updateServiceUIState() {
 
   const sidebarIconEl = document.getElementById('sidebar-service-current-icon');
   const sidebarNameEl = document.getElementById('sidebar-service-current-name');
-  const yosandasHeader = document.getElementById('sidebar-yosandas-header');
 
   const iconHtml = renderServiceIconHtml(currentService.icon);
 
@@ -52389,20 +52388,9 @@ function updateServiceUIState() {
   }
   if (sidebarNameEl) sidebarNameEl.textContent = currentService.name;
 
+  const yosandasHeader = document.getElementById('sidebar-yosandas-header');
   if (yosandasHeader) {
-    const iconSpan = yosandasHeader.querySelector('div span:first-child');
-    const nameSpan = yosandasHeader.querySelector('div span:nth-child(2)');
-    if (iconSpan) {
-      if (iconHtml) {
-        iconSpan.innerHTML = iconHtml;
-        iconSpan.style.display = 'inline-flex';
-      } else {
-        iconSpan.innerHTML = '';
-        iconSpan.style.display = 'none';
-      }
-    }
-    if (nameSpan) nameSpan.textContent = currentService.name;
-    yosandasHeader.style.opacity = currentServiceId === 'yosandas' ? '1' : '0.8';
+    yosandasHeader.style.display = 'none';
   }
 
   // 含まれる機能に基づいてサイドバーの項目を表示/非表示フィルタリング
