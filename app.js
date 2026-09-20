@@ -29441,7 +29441,7 @@ document.addEventListener('DOMContentLoaded', () => {
       { id: 'admin-panel-folder-btn', name: '📁 フォルダ管理', desc: 'サイドバーおよびテーブルのフォルダ格納管理' },
       { id: 'admin-panel-user-register-btn', name: '👥 ユーザー登録', desc: '新規ユーザー登録・オンボーディング承認' },
       { id: 'admin-panel-party-id-btn', name: '🔑 ID管理', desc: '発行済みパーティーIDのステータス監視・手動再利用' },
-      { id: 'admin-panel-service-config-btn', name: '⚙️ サービス構成', desc: '利用サービスの名称・アイコンおよび含む機能のカスタマイズ' }
+      { id: 'admin-panel-service-config-btn', name: '🧩 サービス構成', desc: '利用サービスの名称・アイコンおよび含む機能のカスタマイズ' }
     ];
 
     let adminIconsToggleHtml = `
