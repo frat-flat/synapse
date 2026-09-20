@@ -1712,6 +1712,17 @@ function setupSupabaseAuthListener() {
         updateUIForCurrentMode();
         removeRestrictedTabsForRole(role);
         
+        // 💡 ログイン成功時はまずサービス選択ポップアップを表示する
+        if (canAccessHomeScreen()) {
+          switchView('home-screen');
+        } else {
+          switchView('mypage-screen');
+          if (typeof openMyPage === 'function') openMyPage();
+        }
+        if (typeof showServiceSelectionModal === 'function') {
+          showServiceSelectionModal(false);
+        }
+        
         // ログイン成功時にバックグラウンドで管理者の共有メモをロードする
         loadAdminSharedMemos().catch(err => console.error('[Supabase API] Shared load error on login:', err));
       }
@@ -1723,6 +1734,9 @@ function setupSupabaseAuthListener() {
       
       if (isLocal && hasMockUser) {
         console.log("[Supabase Auth] Session is null, but keeping mock local user session active.");
+        if (typeof checkLoginStatus === 'function') {
+          checkLoginStatus();
+        }
       } else {
         state.decryptedVaultContent = null;
         state.memoUnlockedSecure = false;
@@ -4272,11 +4286,37 @@ function isUserAdmin() {
   return r === 'admin' || r === 'owner' || id === 'admin' || id === 'owner' || id === 'owner@synapse.management' || loginId === 'admin' || loginId === 'owner';
 }
 
-// ホーム画面（全サービス共通ポータル）にアクセス可能かを判定するヘルパー
+// ホーム画面（コントロールパネル）にアクセス可能かを判定するヘルパー
 function canAccessHomeScreen() {
   if (!state.currentUser) return false;
-  // ホーム画面は全社共通ポータルのため、ログイン中の全ユーザーが利用可能
-  return true;
+
+  // 1. オーナーであれば常にアクセス可能（プレビューシミュレーション中を除く）
+  if (isOwnerUser() && !state.previewUserId) return true;
+
+  // 通常判定用のユーザーIDを決定
+  const userId = getCurrentUserId();
+  if (userId === 'owner' || userId === 'owner@synapse.management') return true;
+
+  const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+  const user = users.find(u => u.id === userId);
+  const isOwner = (user && (user.role === 'owner' || user.id === 'owner@synapse.management'));
+  if (isOwner) return true;
+
+  // 2. 一般ユーザー（adminロールを含む）であっても、いずれかのコントロールパネルアイコンの権限を持っていればアクセス可能
+  const adminIcons = [
+    'admin-panel-form-btn',
+    'admin-panel-table-btn',
+    'admin-panel-presence-btn',
+    'admin-panel-audit-btn',
+    'admin-panel-partner-btn',
+    'admin-panel-folder-btn',
+    'admin-panel-user-register-btn',
+    'admin-panel-party-id-btn'
+  ];
+  const hasAnyIconAccess = adminIcons.some(iconId => {
+    return checkAdminIconAccess(iconId);
+  });
+  return hasAnyIconAccess;
 }
 
 // コントロールパネルアイコンへの権限を1つでも所持しているかを判定するヘルパー
@@ -5628,6 +5668,7 @@ let cachedAppointSubMenus = null;
 function renderCustomTableList() {
   const sidebarNav = document.querySelector('.sidebar-nav');
   if (!sidebarNav) return;
+  const targetRootContainer = document.getElementById('sidebar-yosandas-group') || sidebarNav;
 
   // 標準アコーディオンおよび標準テーブル（アポイント配下の5機能含む）を状態として保証
   ensureStandardAccordionsInState();
@@ -5744,20 +5785,25 @@ function renderCustomTableList() {
 
       folderDiv.draggable = false;
 
-      // グレーアウト制御＆権限アイコン（🔒/🔓/✏️・文字折り返し防止）
-      const headerEl = folderDiv.querySelector('.accordion-header');
-      if (access.grayout) {
+      // アクセス権限に応じたグレーアウト
+      if (!access.canRead) {
         folderDiv.classList.add('grayed-out-access');
       } else {
         folderDiv.classList.remove('grayed-out-access');
       }
+      const headerEl = folderDiv.querySelector('.accordion-header');
       if (headerEl) {
         renderSidebarPermissionIconBtn(headerEl, 'folder', acc.id);
       }
 
       // DOMツリーに挿入
       if (parentId === 'root') {
-        sidebarNav.insertBefore(folderDiv, document.getElementById('menu-form-customize') || null);
+        const refNode = document.getElementById('menu-form-customize');
+        if (refNode && refNode.parentNode === targetRootContainer) {
+          targetRootContainer.insertBefore(folderDiv, refNode);
+        } else {
+          targetRootContainer.appendChild(folderDiv);
+        }
       } else {
         containerEl.appendChild(folderDiv);
       }
@@ -5896,7 +5942,12 @@ function renderCustomTableList() {
       // DOMツリーに挿入
       if (parentId === 'root') {
         btn.style.marginTop = '0.5rem';
-        sidebarNav.insertBefore(btn, document.getElementById('menu-form-customize') || null);
+        const refNode = document.getElementById('menu-form-customize');
+        if (refNode && refNode.parentNode === targetRootContainer) {
+          targetRootContainer.insertBefore(btn, refNode);
+        } else {
+          targetRootContainer.appendChild(btn);
+        }
       } else {
         containerEl.appendChild(btn);
       }
@@ -5904,7 +5955,7 @@ function renderCustomTableList() {
   };
 
   // ルート直下から再帰構築
-  renderMenuNode('root', sidebarNav);
+  renderMenuNode('root', targetRootContainer);
 
   // 全アコーディオンの空フォルダ判定を一括更新（標準・カスタムを問わず、最終的な子要素数で正しく同期する）
   sidebarNav.querySelectorAll('.sidebar-accordion').forEach(folder => {
@@ -12433,52 +12484,27 @@ function updateUIForCurrentMode() {
 
   const isMobile = window.innerWidth <= 768;
 
-  if (isSystemAdmin || isMobile) {
-    if (menuMypage) menuMypage.style.display = 'flex';
-    if (userMypageContainer) userMypageContainer.style.display = isMobile ? 'none' : 'none';
+  // 全ユーザー共通でサイドバー最上部のマイページメニューを表示
+  if (menuMypage) menuMypage.style.display = 'flex';
+  if (userMypageContainer) userMypageContainer.style.display = 'none';
 
-    // システム管理者またはモバイル表示の場合はマイページ画面内にメニューを配置
-    if (menuView && origMenuParent && menuView.parentNode !== origMenuParent) {
+  // マイページ画面内にメニュービュー・お気に入り・メモ帳を配置
+  if (menuView && origMenuParent && menuView.parentNode !== origMenuParent) {
+    if (origMenuParent.firstChild) {
       origMenuParent.insertBefore(menuView, origMenuParent.firstChild);
-    }
-    if (mypageFavWrapper && origFavParent && mypageFavWrapper.parentNode !== origFavParent) {
-      origFavParent.appendChild(mypageFavWrapper);
-    }
-    if (mypageMemoWrapper && origMemoParent && mypageMemoWrapper.parentNode !== origMemoParent) {
-      origMemoParent.appendChild(mypageMemoWrapper);
-    }
-    if (menuView) menuView.style.display = (pendingUser && !isSystemAdmin) ? 'none' : 'flex';
-  } else {
-    if (menuMypage) menuMypage.style.display = 'none';
-    if (userMypageContainer) userMypageContainer.style.display = 'flex';
-
-    // 一般ユーザー（PC表示時）の場合はホーム画面のメニューコンテナへ移動
-    if (menuView && userMypageContainer && menuView.parentNode !== userMypageContainer) {
-      userMypageContainer.appendChild(menuView);
-    }
-    // メニュービューは常にホーム上で表示されるようにする (承認待ちの場合はマイページ機能自体以外は非表示なのでメニュー一覧自体隠す)
-    if (menuView) menuView.style.display = pendingUser ? 'none' : 'flex';
-
-    // お気に入り一覧とメモ帳本体は本来の親に戻しておく
-    // ただし承認待ちユーザーの場合、お気に入り・メモのみが見えるよう、ホーム画面（user-mypage-container）へ移設する
-    if (pendingUser) {
-      if (mypageFavWrapper && userMypageContainer && mypageFavWrapper.parentNode !== userMypageContainer) {
-        userMypageContainer.appendChild(mypageFavWrapper);
-      }
-      if (mypageMemoWrapper && userMypageContainer && mypageMemoWrapper.parentNode !== userMypageContainer) {
-        userMypageContainer.appendChild(mypageMemoWrapper);
-      }
-      if (mypageFavWrapper) mypageFavWrapper.style.display = 'block';
-      if (mypageMemoWrapper) mypageMemoWrapper.style.display = 'block';
     } else {
-      if (mypageFavWrapper && origFavParent && mypageFavWrapper.parentNode !== origFavParent) {
-        origFavParent.appendChild(mypageFavWrapper);
-      }
-      if (mypageMemoWrapper && origMemoParent && mypageMemoWrapper.parentNode !== origMemoParent) {
-        origMemoParent.appendChild(mypageMemoWrapper);
-      }
+      origMenuParent.appendChild(menuView);
     }
   }
+  if (mypageFavWrapper && origFavParent && mypageFavWrapper.parentNode !== origFavParent) {
+    origFavParent.appendChild(mypageFavWrapper);
+  }
+  if (mypageMemoWrapper && origMemoParent && mypageMemoWrapper.parentNode !== origMemoParent) {
+    origMemoParent.appendChild(mypageMemoWrapper);
+  }
+  if (menuView) menuView.style.display = (pendingUser && !isSystemAdmin) ? 'none' : 'flex';
+  if (mypageFavWrapper) mypageFavWrapper.style.display = 'block';
+  if (mypageMemoWrapper) mypageMemoWrapper.style.display = 'block';
 
   // ユーザープロフィールの更新
   const mypageFullnameEl = document.getElementById('mypage-user-fullname');
@@ -12675,11 +12701,17 @@ function checkLoginStatus() {
 
     showLoginScreen(false);
     
-    // 💡 ログイン後は全サービス共通ホーム（ポータル）を着地先とし、サービスを選択可能にする
-    if (typeof switchService === 'function') {
-      switchService('home');
-    } else {
+    // 💡 ログイン成功時はまずサービス選択ポップアップを表示する
+    if (canAccessHomeScreen()) {
       switchView('home-screen');
+    } else {
+      switchView('mypage-screen');
+      if (typeof openMyPage === 'function') {
+        openMyPage();
+      }
+    }
+    if (typeof showServiceSelectionModal === 'function') {
+      showServiceSelectionModal(false);
     }
 
     // ズーム比率の復元・マイグレーション処理（画面全体のCSSズームは100%に戻し、レイアウト占有面積を60%にする設計に対応）
@@ -12834,6 +12866,8 @@ function showLoginScreen(show) {
     if (notifPopover) notifPopover.style.display = 'none';
     const loginNotifModal = document.getElementById('login-notification-modal');
     if (loginNotifModal) loginNotifModal.style.display = 'none';
+    const serviceSelectModal = document.getElementById('service-selection-modal');
+    if (serviceSelectModal) serviceSelectModal.style.display = 'none';
     const notifBadge = document.getElementById('notification-badge');
     if (notifBadge) notifBadge.style.display = 'none';
 
@@ -15972,8 +16006,16 @@ async function handleLogin(e) {
       showLoginScreen(false);
       updateUIForCurrentMode();
       removeRestrictedTabsForRole(state.currentUser.role);
-      switchView('home-screen');
+      if (canAccessHomeScreen()) {
+        switchView('home-screen');
+      } else {
+        switchView('mypage-screen');
+        if (typeof openMyPage === 'function') openMyPage();
+      }
       showToast('管理者としてログインしました。', 'success');
+      if (typeof showServiceSelectionModal === 'function') {
+        showServiceSelectionModal(false);
+      }
       return;
     }
 
@@ -16076,10 +16118,17 @@ async function handleLogin(e) {
         updateUIForCurrentMode();
         removeRestrictedTabsForRole(state.currentUser.role);
         
-        if (typeof switchService === 'function') {
-          switchService('home');
-        } else {
+        // 💡 ログイン成功時はまずサービス選択ポップアップを表示する
+        if (canAccessHomeScreen()) {
           switchView('home-screen');
+        } else {
+          switchView('mypage-screen');
+          if (typeof openMyPage === 'function') {
+            openMyPage();
+          }
+        }
+        if (typeof showServiceSelectionModal === 'function') {
+          showServiceSelectionModal(false);
         }
       }
     }
@@ -28470,9 +28519,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!state || !state.currentUser) return;
     ensureInitialNotifications(state.currentUser);
     updateNotificationBadgeUI();
-    setTimeout(() => {
-      checkAndShowLoginNotificationPopup();
-    }, 350);
+    // 💡 サービス選択モーダルが表示中なら、サービス選択完了後に通知を表示する
+    const serviceModal = document.getElementById('service-selection-modal');
+    const isServiceModalVisible = serviceModal && serviceModal.style.display !== 'none' && serviceModal.classList.contains('active');
+    if (!isServiceModalVisible) {
+      setTimeout(() => {
+        checkAndShowLoginNotificationPopup();
+      }, 350);
+    }
   }
 
   // グローバル（window）にも公開して他画面やテストからアクセス可能にする
@@ -51986,6 +52040,74 @@ const SYNAPSE_SERVICES = [
   }
 ];
 
+// ==========================================
+// 🚀 サービス選択モーダル管理
+// ==========================================
+function showServiceSelectionModal(allowClose = false) {
+  const modal = document.getElementById('service-selection-modal');
+  if (!modal) return;
+
+  const closeBtn = document.getElementById('service-select-close-btn');
+  if (closeBtn) {
+    // 業務画面から手動で開いた場合は閉じるボタンを表示、ログイン直後は選択必須にするため非表示
+    closeBtn.style.display = allowClose ? 'block' : 'none';
+  }
+
+  modal.classList.add('active');
+  modal.style.display = 'flex';
+}
+
+function closeServiceSelectionModal() {
+  const modal = document.getElementById('service-selection-modal');
+  if (modal) {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  }
+}
+
+function selectService(serviceId) {
+  if (serviceId === 'yosandas_plus') {
+    if (typeof showToast === 'function') {
+      showToast('「ヨサンダス＋」は現在準備中です。正式リリースまで今しばらくお待ちください。', 'info');
+    } else {
+      alert('「ヨサンダス＋」は現在準備中です。');
+    }
+    return;
+  }
+
+  if (serviceId === 'yosandas') {
+    state.activeService = 'yosandas';
+    const userId = state.currentUser ? state.currentUser.id : 'guest';
+    try {
+      localStorage.setItem(`SYNAPSE_ACTIVE_SERVICE_${userId}`, 'yosandas');
+    } catch (e) {}
+
+    updateServiceUIState();
+    closeServiceSelectionModal();
+
+    // ユーザー権限に応じた遷移
+    if (canAccessHomeScreen()) {
+      switchView('home-screen');
+    } else {
+      switchView('mypage-screen');
+      if (typeof openMyPage === 'function') {
+        openMyPage();
+      }
+    }
+
+    if (typeof showToast === 'function') {
+      showToast('「ヨサンダス」を開始しました。', 'info');
+    }
+
+    // 未読通知ポップアップがあればサービス選択後に開く
+    setTimeout(() => {
+      if (window.SynapseNotifications && typeof window.SynapseNotifications.checkAndShowLoginNotificationPopup === 'function') {
+        window.SynapseNotifications.checkAndShowLoginNotificationPopup();
+      }
+    }, 400);
+  }
+}
+
 function switchService(serviceId, targetViewId = null) {
   if (serviceId === 'yosandas_plus') {
     if (typeof showToast === 'function') {
@@ -51996,7 +52118,7 @@ function switchService(serviceId, targetViewId = null) {
     return;
   }
 
-  state.activeService = serviceId || 'home';
+  state.activeService = serviceId || 'yosandas';
   const userId = state.currentUser ? state.currentUser.id : 'guest';
   try {
     localStorage.setItem(`SYNAPSE_ACTIVE_SERVICE_${userId}`, state.activeService);
@@ -52005,11 +52127,22 @@ function switchService(serviceId, targetViewId = null) {
   updateServiceUIState();
 
   if (state.activeService === 'home') {
-    switchView('home-screen');
-    renderHomeScheduleOverview();
+    if (canAccessHomeScreen()) {
+      switchView('home-screen');
+      renderHomeScheduleOverview();
+    } else {
+      switchView('mypage-screen');
+      if (typeof openMyPage === 'function') openMyPage();
+    }
   } else if (state.activeService === 'yosandas') {
-    const dest = targetViewId || 'dashboard-screen';
-    switchView(dest);
+    if (targetViewId) {
+      switchView(targetViewId);
+    } else if (canAccessHomeScreen()) {
+      switchView('home-screen');
+    } else {
+      switchView('mypage-screen');
+      if (typeof openMyPage === 'function') openMyPage();
+    }
     if (typeof showToast === 'function') {
       showToast('「ヨサンダス」を開始しました。', 'info');
     }
@@ -52021,20 +52154,17 @@ function updateServiceUIState() {
   const currentNameEl = document.getElementById('header-service-current-name');
   const serviceItems = document.querySelectorAll('#header-service-dropdown .header-service-dropdown-item');
   const yosandasHeader = document.getElementById('sidebar-yosandas-header');
-  const homeBtn = document.getElementById('menu-home');
 
-  const currentService = state.activeService || 'home';
+  const currentService = state.activeService || 'yosandas';
 
-  if (currentService === 'home') {
-    if (currentIconEl) currentIconEl.textContent = '🌐';
-    if (currentNameEl) currentNameEl.textContent = '全サービス共通 (ホーム)';
-    if (homeBtn) homeBtn.classList.add('active');
-    if (yosandasHeader) yosandasHeader.style.opacity = '0.7';
-  } else if (currentService === 'yosandas') {
+  if (currentService === 'yosandas') {
     if (currentIconEl) currentIconEl.textContent = '📊';
     if (currentNameEl) currentNameEl.textContent = 'ヨサンダス';
-    if (homeBtn) homeBtn.classList.remove('active');
     if (yosandasHeader) yosandasHeader.style.opacity = '1';
+  } else if (currentService === 'home') {
+    if (currentIconEl) currentIconEl.textContent = '🌐';
+    if (currentNameEl) currentNameEl.textContent = '全社ポータル';
+    if (yosandasHeader) yosandasHeader.style.opacity = '0.7';
   }
 
   serviceItems.forEach(item => {
@@ -52151,7 +52281,7 @@ function renderHomeScheduleOverview() {
 
     el.addEventListener('click', () => {
       if (item.type === 'appointment') {
-        switchService('yosandas', 'dashboard-screen');
+        selectService('yosandas');
       } else {
         switchView('mypage-calendar-screen');
       }
@@ -52162,16 +52292,16 @@ function renderHomeScheduleOverview() {
 }
 
 function initMultiServiceEvents() {
-  // 1. ホーム画面の正方形カード
+  // 1. ホーム画面の正方形カード (オーナー画面用)
   const cardYosandas = document.getElementById('home-card-yosandas');
   if (cardYosandas) {
     cardYosandas.addEventListener('click', () => {
-      switchService('yosandas');
+      selectService('yosandas');
     });
     cardYosandas.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        switchService('yosandas');
+        selectService('yosandas');
       }
     });
   }
@@ -52179,39 +52309,75 @@ function initMultiServiceEvents() {
   const cardYosandasPlus = document.getElementById('home-card-yosandas-plus');
   if (cardYosandasPlus) {
     cardYosandasPlus.addEventListener('click', () => {
-      switchService('yosandas_plus');
+      selectService('yosandas_plus');
     });
   }
 
-  // 2. ヘッダーのサービススイッチャー
-  const switcherBtn = document.getElementById('header-service-switcher-btn');
-  const switcherDropdown = document.getElementById('header-service-dropdown');
-  if (switcherBtn && switcherDropdown) {
-    switcherBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isVisible = switcherDropdown.style.display === 'flex';
-      switcherDropdown.style.display = isVisible ? 'none' : 'flex';
+  // 2. サービス選択モーダル内の正方形カード
+  const modalYosandas = document.getElementById('modal-service-yosandas');
+  if (modalYosandas) {
+    modalYosandas.addEventListener('click', () => {
+      selectService('yosandas');
     });
-
-    document.addEventListener('click', (e) => {
-      if (switcherDropdown && !switcherDropdown.contains(e.target) && e.target !== switcherBtn) {
-        switcherDropdown.style.display = 'none';
+    modalYosandas.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectService('yosandas');
       }
     });
   }
 
-  // ドロップダウンアイテムクリック
+  const modalYosandasPlus = document.getElementById('modal-service-yosandas-plus');
+  if (modalYosandasPlus) {
+    modalYosandasPlus.addEventListener('click', () => {
+      selectService('yosandas_plus');
+    });
+    modalYosandasPlus.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectService('yosandas_plus');
+      }
+    });
+  }
+
+  // 3. サービス選択モーダルの閉じるボタン & 背景クリック
+  const modalCloseBtn = document.getElementById('service-select-close-btn');
+  if (modalCloseBtn) {
+    modalCloseBtn.addEventListener('click', () => {
+      closeServiceSelectionModal();
+    });
+  }
+  const serviceModalEl = document.getElementById('service-selection-modal');
+  if (serviceModalEl) {
+    serviceModalEl.addEventListener('click', (e) => {
+      if (e.target === serviceModalEl && modalCloseBtn && modalCloseBtn.style.display !== 'none') {
+        closeServiceSelectionModal();
+      }
+    });
+  }
+
+  // 4. ヘッダーのサービススイッチャー（クリックでモーダルを開く）
+  const switcherBtn = document.getElementById('header-service-switcher-btn');
+  const switcherDropdown = document.getElementById('header-service-dropdown');
+  if (switcherBtn) {
+    switcherBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showServiceSelectionModal(true);
+    });
+  }
+
+  // ドロップダウンアイテムクリック（もし利用する場合）
   const dropdownItems = document.querySelectorAll('#header-service-dropdown .header-service-dropdown-item');
   dropdownItems.forEach(item => {
     item.addEventListener('click', (e) => {
       e.stopPropagation();
       if (switcherDropdown) switcherDropdown.style.display = 'none';
       const serviceId = item.dataset.serviceId;
-      switchService(serviceId);
+      selectService(serviceId);
     });
   });
 
-  // 3. スケジュールウィジェットのカレンダー詳細ボタン
+  // 5. スケジュールウィジェットのカレンダー詳細ボタン
   const openCalBtn = document.getElementById('home-schedule-open-calendar-btn');
   if (openCalBtn) {
     openCalBtn.addEventListener('click', () => {
@@ -52219,7 +52385,7 @@ function initMultiServiceEvents() {
     });
   }
 
-  // 4. 初期UI状態の反映
+  // 6. 初期UI状態の反映
   updateServiceUIState();
 }
 
@@ -52236,6 +52402,9 @@ if (document.readyState === 'loading') {
 if (typeof window !== 'undefined') {
   window.SYNAPSE_SERVICES = SYNAPSE_SERVICES;
   window.switchService = switchService;
+  window.selectService = selectService;
+  window.showServiceSelectionModal = showServiceSelectionModal;
+  window.closeServiceSelectionModal = closeServiceSelectionModal;
   window.updateServiceUIState = updateServiceUIState;
   window.openHomePage = openHomePage;
   window.renderHomeScheduleOverview = renderHomeScheduleOverview;

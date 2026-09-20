@@ -8965,11 +8965,177 @@ body.login-active #login-notification-modal {
     width: min(290px, calc(100vw - 24px));
     left: 0;
   }
+}
 
-  #header-add-sticky-btn {
-    display: none !important;
+/* =======================================================
+   🚀 ログイン後 サービス選択ポップアップモーダル
+   ======================================================= */
+.service-select-modal-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 100050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  box-sizing: border-box;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.service-select-modal-card {
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 20px;
+  box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2);
+  width: 100%;
+  max-width: 580px;
+  padding: 2rem 2.25rem;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: modalPopIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+@keyframes modalPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
   }
 }
+
+.service-select-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border-color, #f1f5f9);
+  padding-bottom: 1.1rem;
+}
+
+.service-select-modal-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.service-select-modal-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.service-select-modal-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.service-select-modal-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.service-select-modal-subtitle {
+  font-size: 0.82rem;
+  color: var(--text-secondary, #64748b);
+  margin: 0.25rem 0 0 0;
+}
+
+.service-select-close-x {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 6px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.service-select-close-x:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary, #0f172a);
+}
+
+.service-select-modal-body {
+  width: 100%;
+}
+
+.service-select-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.service-select-square-card {
+  width: 100%;
+  min-height: 200px;
+  padding: 1.4rem 1.1rem;
+  box-sizing: border-box;
+}
+
+.service-select-modal-footer {
+  text-align: center;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border-color, #f1f5f9);
+}
+
+@media (max-width: 640px) {
+  .service-select-modal-card {
+    padding: 1.35rem 1rem;
+    border-radius: 16px;
+    gap: 1rem;
+  }
+
+  .service-select-modal-logo {
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+  }
+
+  .service-select-modal-title {
+    font-size: 1.05rem;
+  }
+
+  .service-select-modal-subtitle {
+    font-size: 0.74rem;
+  }
+
+  .service-select-grid {
+    gap: 0.65rem;
+  }
+
+  .service-select-square-card {
+    min-height: 165px;
+    padding: 0.9rem 0.55rem;
+  }
+}
+
 
 
 
