@@ -1883,6 +1883,193 @@ body:not(.logged-in) .login-layout {
   transform: translateY(1px);
 }
 
+.sidebar-service-container {
+  position: relative;
+  width: 100%;
+}
+
+.sidebar-menu.collapsed .sidebar-service-container {
+  display: none !important;
+}
+
+.sidebar-service-dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: calc(32px + 0.7rem);
+  min-width: 190px;
+  background: var(--bg-surface-elevated, #ffffff);
+  border: 1px solid var(--border-color, rgba(0,0,0,0.12));
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 0.35rem 0;
+  z-index: 1050;
+  animation: dropdownFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sidebar-service-dropdown-header {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted, #64748b);
+  padding: 0.25rem 0.65rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.sidebar-service-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.78rem;
+  color: var(--text-primary, #1e293b);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  user-select: none;
+}
+
+.sidebar-service-dropdown-item:hover {
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--primary, #2563eb);
+}
+
+.sidebar-service-dropdown-item.active {
+  font-weight: 700;
+  color: var(--primary, #2563eb);
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.sidebar-service-dropdown-item.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sidebar-service-dropdown-item.disabled:hover {
+  background: transparent;
+  color: var(--text-primary, #1e293b);
+}
+
+.sidebar-service-item-check {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--primary, #2563eb);
+  font-weight: 700;
+}
+
+.sidebar-service-item-badge {
+  margin-left: auto;
+  font-size: 0.65rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: var(--bg-surface, #f1f5f9);
+  color: var(--text-muted, #64748b);
+  border: 1px solid var(--border-color, #cbd5e1);
+}
+
+.sidebar-service-dropdown-admin-actions {
+  border-top: 1px solid var(--border-color, rgba(0,0,0,0.08));
+  padding-top: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.sidebar-service-admin-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.4rem 0.65rem;
+  background: none;
+  border: none;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.sidebar-service-admin-btn:hover {
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--primary, #2563eb);
+}
+
+.icon-preset-chip {
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.icon-preset-chip:hover {
+  background: rgba(37, 99, 235, 0.15);
+  border-radius: 4px;
+  transform: scale(1.15);
+}
+
+.service-config-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-surface-elevated, #ffffff);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.service-config-tab.active {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: var(--primary, #2563eb);
+  color: var(--primary, #2563eb);
+  font-weight: 700;
+}
+
+.service-feature-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.12s;
+  user-select: none;
+}
+
+.service-feature-checkbox-item:hover {
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.service-feature-checkbox-item input[type="checkbox"] {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary, #2563eb);
+}
+
+.service-config-modal-overlay {
+  z-index: 20050 !important;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.service-config-modal-overlay.active {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
 .sidebar-toggle-btn {
   display: flex;
   align-items: center;
