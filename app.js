@@ -3769,8 +3769,23 @@ function ensureStandardTablesInState() {
     }
   });
 
-  // 🌟 フォーム別専用テーブル（Synapse公開以前の過去データ一括インポート・同一テーブル完全共有）
+  // 🌟 フォーム回答統合テーブル（全フォーム回答を一元格納・既存テーブル選択の基本先）
   const formDedicatedTables = [
+    {
+      id: 'table_all_form_responses',
+      name: '全フォーム回答データ',
+      formTitle: '全フォーム共通',
+      isConsolidatedTable: true,
+      parentMenuId: 'root',
+      columns: [
+        { id: 'master_id', name: 'マスターID / コード', label: 'マスターID / コード', type: 'text' },
+        { id: 'form_title', name: 'フォーム名', label: 'フォーム名', type: 'text' },
+        { id: 'status', name: 'ステータス', label: 'ステータス', type: 'text' },
+        { id: 'registration_code', name: '確定登録コード', label: '確定登録コード', type: 'text' },
+        { id: 'submitted_at', name: '回答日時 / 登録日時', label: '回答日時 / 登録日時', type: 'text' },
+        { id: 'resume_url', name: '再開用URL', label: '再開用URL', type: 'text' }
+      ]
+    },
     {
       id: 'table_form_basic',
       name: 'フォーム① 基本情報受付テーブル',
@@ -20751,15 +20766,43 @@ function handleFormSubmitMessage(event) {
     return;
   }
 
+  // 0. 新規カスタムテーブル事前作成通知の受信（Form Studioから独立テーブル作成時）
+  if (event.data.type === 'SYNAPSE_TABLE_CREATED') {
+    const { table } = event.data;
+    if (table && table.id) {
+      const existsIdx = state.customTables.findIndex(t => t.id === table.id);
+      if (existsIdx !== -1) {
+        state.customTables[existsIdx] = table;
+      } else {
+        state.customTables.push(table);
+      }
+      localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+      if (typeof renderCustomTableList === 'function') {
+        renderCustomTableList();
+      }
+      console.log(`[Synapse] Registered dedicated table from Form Studio: "${table.name}" (ID: ${table.id})`);
+    }
+    return;
+  }
+
   // 1. 一時保存・途中再開データ取得の要求をハンドリング
   if (event.data.type === 'FORM_GET_TEMPORARY_DATA') {
-    const { rowId, formTitle } = event.data;
+    const { rowId, formTitle, targetTableId } = event.data;
     if (!rowId) return;
 
-    console.log('[Synapse Database] Request received to get temporary data for row:', rowId, 'in table:', formTitle);
+    console.log('[Synapse Database] Request received to get temporary data for row:', rowId, 'in table:', targetTableId || formTitle);
     
-    let targetTable = formTitle ? state.customTables.find(t => t.name === formTitle) : null;
+    let targetTable = null;
+    if (targetTableId) {
+      targetTable = state.customTables.find(t => t.id === targetTableId || t.name === targetTableId);
+    }
+    if (!targetTable && formTitle) {
+      targetTable = state.customTables.find(t => t.name === formTitle);
+    }
     if (!targetTable) {
+      targetTable = state.customTables.find(t => t.id === 'table_all_form_responses');
+    }
+    if (!targetTable || !(targetTable.rows || targetTable.data || []).some(r => r.id === rowId)) {
       targetTable = state.customTables.find(t => (t.rows || t.data || []).some(r => r.id === rowId));
     }
     if (targetTable) {
@@ -20806,18 +20849,22 @@ function handleFormSubmitMessage(event) {
   // 送信イベント以外はスルー
   if (event.data.type !== 'FORM_SUBMIT') return;
 
-  const { formTitle, data, isTemporary, isPartialSubmit, rowId: clientRowId, nextSectionId, currentSectionId, env, branch } = event.data;
+  const { formTitle, data, isTemporary, isPartialSubmit, rowId: clientRowId, nextSectionId, currentSectionId, env, branch, targetTableId } = event.data;
   if (!data) return;
 
   // 🧪 テスト送信フラグの判定（Gitブランチ型環境分離: test vs production）
   const isTestSubmission = env === 'test' || branch === 'test';
-  const effectiveTableName = formTitle || '無題のフォーム';
+  const effectiveFormTitle = formTitle || '無題のフォーム';
 
   // 事前に行IDを決定（新規なら採番、既存なら引き継ぐ）
   const targetRowId = clientRowId || 'row_' + Date.now();
 
   // 一時保存・途中送信・回答完了ステータスおよび再開用URLをデータに自動マージ
   data["ステータス"] = isTemporary ? "一時保存" : (isPartialSubmit ? "途中送信（コード確定済）" : "回答完了");
+  data["フォーム名"] = effectiveFormTitle;
+  if (!data["回答日時 / 登録日時"]) {
+    data["回答日時 / 登録日時"] = new Date().toLocaleString('ja-JP');
+  }
   if (isTestSubmission) {
     data["送信種別"] = "🧪 テスト送信 (test branch)";
   }
@@ -20831,7 +20878,7 @@ function handleFormSubmitMessage(event) {
   
   data["再開用URL"] = resumeUrl;
 
-  console.log(`%c[Form Submit]%c Received submission for form "${effectiveTableName}" (isTest: ${isTestSubmission}, isTemporary: ${!!isTemporary}, isPartial: ${!!isPartialSubmit}, rowId: ${targetRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
+  console.log(`%c[Form Submit]%c Received submission for form "${effectiveFormTitle}" (targetTableId: ${targetTableId || 'default: table_all_form_responses'}, isTest: ${isTestSubmission}, isTemporary: ${!!isTemporary}, isPartial: ${!!isPartialSubmit}, rowId: ${targetRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
 
   // ⚠️ テスト送信時はDBテーブルを作成・汚染しない（ユーザー指定仕様: テストデータ用テーブルは不要）
   if (isTestSubmission) {
@@ -20857,12 +20904,27 @@ function handleFormSubmitMessage(event) {
   // ----------------------------------------------------
   // 1. COS内カスタムマスターテーブルへのデータ蓄積・更新（本番送信のみ）
   // ----------------------------------------------------
-  let targetTable = state.customTables.find(t => t.name === effectiveTableName);
+  // 保存先テーブルの解決（指定がある場合はそのテーブル、無ければデフォルト「全フォーム回答データ」）
+  let targetTable = null;
   let isNewTable = false;
+  const reqTableId = targetTableId || 'table_all_form_responses';
+
+  if (reqTableId === 'table_all_form_responses') {
+    targetTable = state.customTables.find(t => t.id === 'table_all_form_responses');
+  } else if (reqTableId && reqTableId !== 'dedicated') {
+    targetTable = state.customTables.find(t => t.id === reqTableId || t.name === reqTableId);
+  }
+
+  // 独立専用テーブル（dedicated）または見つからない場合はフォーム名で検索
+  if (!targetTable) {
+    targetTable = state.customTables.find(t => t.name === effectiveFormTitle);
+  }
+
+  const effectiveTableName = targetTable ? targetTable.name : (effectiveFormTitle || '無題のフォーム');
 
   if (!targetTable) {
     isNewTable = true;
-    const tableId = 'table_' + Date.now();
+    const tableId = (reqTableId && reqTableId !== 'dedicated' && reqTableId !== 'table_all_form_responses') ? reqTableId : ('table_' + Date.now());
     // 送信データにあるすべてのキーをカラム定義として生成する
     const columns = Object.keys(data).map((key, idx) => ({
       id: 'col_' + Math.random().toString(36).substr(2, 9),
@@ -20880,6 +20942,8 @@ function handleFormSubmitMessage(event) {
     targetTable = {
       id: tableId,
       name: effectiveTableName,
+      formTitle: effectiveFormTitle,
+      isFormDedicatedTable: true,
       parentMenuId: 'root', // メニューのルート直下に配置
       columns: columns,
       visibleColumns: columns.map(c => c.id),
@@ -20946,10 +21010,11 @@ function handleFormSubmitMessage(event) {
     targetTable.rows.push(targetRow);
   }
 
-  // 各カラムの値として回答データを設定
+  // 各カラムの値として回答データを設定（カラムID、カラム名、ラベルいずれにも対応）
   targetTable.columns.forEach(col => {
-    if (data[col.name] !== undefined) {
-      targetRow[col.id] = String(data[col.name]);
+    const val = data[col.name] !== undefined ? data[col.name] : (data[col.label] !== undefined ? data[col.label] : (data[col.id] !== undefined ? data[col.id] : undefined));
+    if (val !== undefined) {
+      targetRow[col.id] = String(val);
     } else if (targetRow[col.id] === undefined) {
       targetRow[col.id] = '';
     }

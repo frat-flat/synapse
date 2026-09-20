@@ -6967,6 +6967,8 @@
             window.parent.postMessage({
               type: 'FORM_SUBMIT',
               formTitle: formDefinition.title || '無題のフォーム',
+              targetTableId: formDefinition.targetTableId || 'table_all_form_responses',
+              targetTableType: formDefinition.targetTableType || 'consolidated',
               data: submitData,
               isTemporary: false,
               isPartialSubmit: isPartial,
