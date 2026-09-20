@@ -4285,38 +4285,12 @@ function isUserAdmin() {
   return r === 'admin' || r === 'owner' || id === 'admin' || id === 'owner' || id === 'owner@synapse.management' || loginId === 'admin' || loginId === 'owner';
 }
 
-// ホーム画面（コントロールパネル）にアクセス可能かを判定するヘルパー
+// ホーム画面（全サービス共通ポータル）にアクセス可能かを判定するヘルパー
 function canAccessHomeScreen() {
   if (!state.currentUser) return false;
-
-  // 1. オーナーであれば常にアクセス可能（プレビューシミュレーション中を除く）
-  if (isOwnerUser() && !state.previewUserId) return true;
-
-  // 通常判定用のユーザーIDを決定
-  const userId = getCurrentUserId();
-  if (userId === 'owner' || userId === 'owner@synapse.management') return true;
-
-  const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
-  const user = users.find(u => u.id === userId);
-  const isOwner = (user && (user.role === 'owner' || user.id === 'owner@synapse.management'));
-  if (isOwner) return true;
-
-  // 2. 一般ユーザー（adminロールを含む）であっても、いずれかのコントロールパネルアイコンの権限を持っていればアクセス可能
-  const adminIcons = [
-    'admin-panel-form-btn',
-    'admin-panel-table-btn',
-    'admin-panel-presence-btn',
-    'admin-panel-audit-btn',
-    'admin-panel-partner-btn',
-    'admin-panel-folder-btn',
-    'admin-panel-user-register-btn',
-    'admin-panel-party-id-btn',
-    'admin-panel-service-config-btn'
-  ];
-  const hasAnyIconAccess = adminIcons.some(iconId => {
-    return checkAdminIconAccess(iconId);
-  });
-  return hasAnyIconAccess;
+  // 承認待ちユーザーはマイページに限定
+  if (state.currentUser.status === 'pending' && !isOwnerUser()) return false;
+  return true;
 }
 
 // コントロールパネルアイコンへの権限を1つでも所持しているかを判定するヘルパー
@@ -12575,6 +12549,21 @@ function updateUIForCurrentMode() {
     // 管理者権限または表示権限を持つアイコンがある場合にのみコントロールパネルを表示
     const shouldShowPanel = (isOwnerUser() && !state.previewUserId) || (hasAnyAdminIconAccess() && hasAnyVisibleIcon && (!pendingUser || isOwnerUser()));
     adminHomePanel.style.display = shouldShowPanel ? 'flex' : 'none';
+  }
+
+  // ホーム画面のスケジュールおよびタスク概要の表示制御（管理者は不要・非表示、一般ユーザーのみ表示）
+  const isAdmUser = isUserAdmin() || isOwnerUser();
+  const homeScheduleSection = document.getElementById('home-schedule-section');
+  const homeTaskSection = document.getElementById('home-task-section');
+  if (homeScheduleSection) {
+    homeScheduleSection.style.display = isAdmUser ? 'none' : 'block';
+  }
+  if (homeTaskSection) {
+    homeTaskSection.style.display = isAdmUser ? 'none' : 'block';
+  }
+  if (!isAdmUser) {
+    if (typeof renderHomeScheduleOverview === 'function') renderHomeScheduleOverview();
+    if (typeof renderHomeTaskOverview === 'function') renderHomeTaskOverview();
   }
 
   // 管理者メニューボタンの表示制御
@@ -22216,7 +22205,12 @@ async function handleDeleteDraft() {
 // 12. ユーティリティ機能（トースト通知）
 // ==========================================
 function showToast(message, type = 'primary') {
-  const container = document.getElementById('toast-container');
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   
@@ -52451,11 +52445,29 @@ function closeServiceSelectionModal() {
 }
 
 function openHomePage() {
-  renderHomeScheduleOverview();
+  const isAdm = isUserAdmin() || isOwnerUser();
+  const scheduleSection = document.getElementById('home-schedule-section');
+  const taskSection = document.getElementById('home-task-section');
+
+  if (scheduleSection) scheduleSection.style.display = isAdm ? 'none' : 'block';
+  if (taskSection) taskSection.style.display = isAdm ? 'none' : 'block';
+
+  if (!isAdm) {
+    renderHomeScheduleOverview();
+    renderHomeTaskOverview();
+  }
   updateServiceUIState();
 }
 
 function renderHomeScheduleOverview() {
+  const isAdm = isUserAdmin() || isOwnerUser();
+  const section = document.getElementById('home-schedule-section');
+  if (isAdm) {
+    if (section) section.style.display = 'none';
+    return;
+  }
+  if (section) section.style.display = 'block';
+
   const container = document.getElementById('home-schedule-list-container');
   const dateLabel = document.getElementById('home-schedule-today-date');
   if (!container) return;
@@ -52549,7 +52561,7 @@ function renderHomeScheduleOverview() {
         <span style="font-size: 0.85rem; font-weight: 800; color: var(--text-primary); line-height: 1.1;">${escapeHtml(item.timeVal)}</span>
         <span style="font-size: 0.65rem; color: var(--text-muted); margin-top: 2px;">${escapeHtml(item.dateVal)}</span>
       </div>
-      <div style="flex: 1; min-width: 0;">
+      <div style="flex: 1; min-width: 0; text-align: left;">
         <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
           <span style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary);">${escapeHtml(item.title)}</span>
           <span style="font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(37,99,235,0.1); color: var(--primary); font-weight: 700;">${escapeHtml(item.serviceBadge)}</span>
@@ -52558,7 +52570,7 @@ function renderHomeScheduleOverview() {
           ${escapeHtml(item.sub)}
         </div>
       </div>
-      <button class="btn btn-sm btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; font-weight: 600; flex-shrink: 0;">
+      <button class="btn btn-sm btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; font-weight: 600; flex-shrink: 0; cursor: pointer;">
         詳細 ➔
       </button>
     `;
@@ -52567,9 +52579,167 @@ function renderHomeScheduleOverview() {
       if (item.type === 'appointment') {
         selectService('yosandas');
       } else {
-        switchView('mypage-calendar-screen');
+        if (typeof openTab === 'function') {
+          openTab('mypage-calendar-screen', 'mypage-calendar-screen', '📅 カレンダー');
+        } else {
+          switchView('mypage-calendar-screen');
+        }
       }
     });
+
+    container.appendChild(el);
+  });
+}
+
+function renderHomeTaskOverview() {
+  const isAdm = isUserAdmin() || isOwnerUser();
+  const section = document.getElementById('home-task-section');
+  if (isAdm) {
+    if (section) section.style.display = 'none';
+    return;
+  }
+  if (section) section.style.display = 'block';
+
+  const container = document.getElementById('home-task-list-container');
+  const countBadge = document.getElementById('home-task-count-badge');
+  if (!container) return;
+
+  const rawUserId = state.currentUser ? state.currentUser.id : 'guest';
+  const me = rawUserId.toLowerCase();
+
+  // 1. タスクデータの取得 (localStorage および メモリ)
+  let allTasks = [];
+  try {
+    const saved = localStorage.getItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`);
+    if (saved) allTasks = JSON.parse(saved);
+  } catch (e) {}
+
+  if ((!Array.isArray(allTasks) || allTasks.length === 0) && typeof todoTasks !== 'undefined' && Array.isArray(todoTasks)) {
+    allTasks = [...todoTasks];
+  }
+
+  // 2. 未完了タスクの抽出
+  const activeTasks = (Array.isArray(allTasks) ? allTasks : []).filter(t => t && t.status !== 'completed');
+
+  // 3. 期日順にソート
+  const todayStr = new Date().toISOString().slice(0, 10);
+  activeTasks.sort((a, b) => {
+    const dueA = a.due || '';
+    const dueB = b.due || '';
+    if (dueA && dueB) return dueA.localeCompare(dueB);
+    if (dueA) return -1;
+    if (dueB) return 1;
+    return (b.created_at || '').localeCompare(a.created_at || '');
+  });
+
+  if (countBadge) {
+    countBadge.textContent = `未完了: ${activeTasks.length}件`;
+  }
+
+  if (activeTasks.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 2rem 1rem; color: var(--text-muted); font-size: 0.85rem;">
+        <span>現在、未完了のタスクはありません。🎉</span>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = '';
+  activeTasks.slice(0, 5).forEach(task => {
+    const el = document.createElement('div');
+    el.className = 'home-task-item';
+    el.style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.8rem 1rem;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface);
+      margin-bottom: 0.65rem;
+      transition: all 0.2s ease;
+    `;
+
+    // サービス・出所の特定
+    let serviceBadge = 'Synapse';
+    const tid = task.id || '';
+    if (tid.startsWith('asana-')) {
+      serviceBadge = 'Asana';
+    } else if (tid.startsWith('google-')) {
+      serviceBadge = 'Google To-Do';
+    }
+
+    // 期日バッジの判定
+    let dueTagHtml = '';
+    if (task.due) {
+      const dueDateStr = task.due.slice(0, 10);
+      if (dueDateStr < todayStr) {
+        dueTagHtml = `<span class="home-task-item-due-tag overdue" style="font-size: 0.68rem; font-weight: 700; padding: 0.12rem 0.45rem; border-radius: 4px; background: rgba(239,68,68,0.12); color: #dc2626;">⚠️ 期限切 (${dueDateStr.slice(5)})</span>`;
+      } else if (dueDateStr === todayStr) {
+        dueTagHtml = `<span class="home-task-item-due-tag today" style="font-size: 0.68rem; font-weight: 700; padding: 0.12rem 0.45rem; border-radius: 4px; background: rgba(245,158,11,0.15); color: #d97706;">🔥 本日締切</span>`;
+      } else {
+        dueTagHtml = `<span class="home-task-item-due-tag normal" style="font-size: 0.68rem; font-weight: 700; padding: 0.12rem 0.45rem; border-radius: 4px; background: rgba(16,185,129,0.12); color: #059669;">期日: ${dueDateStr.slice(5)}</span>`;
+      }
+    } else {
+      dueTagHtml = `<span class="home-task-item-due-tag none" style="font-size: 0.68rem; font-weight: 600; padding: 0.12rem 0.45rem; border-radius: 4px; background: rgba(100,116,139,0.1); color: #64748b;">期日なし</span>`;
+    }
+
+    el.innerHTML = `
+      <label class="home-task-item-check" title="完了にする" style="cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <input type="checkbox" style="width: 18px; height: 18px; cursor: pointer; accent-color: #10b981;" />
+      </label>
+      <div class="home-task-item-content" style="flex: 1; min-width: 0; text-align: left;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+          <span style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary); cursor: pointer;" class="task-title-link">${escapeHtml(task.title || '無題のタスク')}</span>
+          ${dueTagHtml}
+          <span class="home-task-item-service-tag" style="font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(100,116,139,0.1); color: #475569;">${escapeHtml(serviceBadge)}</span>
+        </div>
+        ${task.notes ? `<div style="font-size: 0.74rem; color: var(--text-secondary); margin-top: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(task.notes)}</div>` : ''}
+      </div>
+      <button class="btn btn-sm btn-secondary task-detail-btn" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; font-weight: 600; flex-shrink: 0; cursor: pointer;">
+        詳細 ➔
+      </button>
+    `;
+
+    // チェックボックスで完了操作
+    const checkbox = el.querySelector('input[type="checkbox"]');
+    if (checkbox) {
+      checkbox.addEventListener('change', (e) => {
+        e.stopPropagation();
+        task.status = 'completed';
+        task.completed_at = new Date().toISOString();
+        try {
+          const idx = allTasks.findIndex(t => t.id === task.id);
+          if (idx !== -1) allTasks[idx] = task;
+          localStorage.setItem(`SYNAPSE_LOCAL_TODO_TASKS_${me}`, JSON.stringify(allTasks));
+          if (typeof todoTasks !== 'undefined') {
+            const tIdx = todoTasks.findIndex(t => t.id === task.id);
+            if (tIdx !== -1) todoTasks[tIdx] = task;
+          }
+        } catch (err) {}
+        try {
+          if (typeof showToast === 'function') {
+            showToast(`タスク「${task.title}」を完了にしました。`, 'success');
+          }
+        } catch (e) {}
+        renderHomeTaskOverview();
+      });
+    }
+
+    const openTaskDetail = () => {
+      if (typeof openTab === 'function') {
+        openTab('mypage-task-screen', 'mypage-task-screen', '📋 タスク');
+      } else {
+        switchView('mypage-task-screen');
+      }
+    };
+
+    const titleLink = el.querySelector('.task-title-link');
+    if (titleLink) titleLink.addEventListener('click', openTaskDetail);
+
+    const detailBtn = el.querySelector('.task-detail-btn');
+    if (detailBtn) detailBtn.addEventListener('click', openTaskDetail);
 
     container.appendChild(el);
   });
@@ -52710,7 +52880,23 @@ function initMultiServiceEvents() {
   const openCalBtn = document.getElementById('home-schedule-open-calendar-btn');
   if (openCalBtn) {
     openCalBtn.addEventListener('click', () => {
-      switchView('mypage-calendar-screen');
+      if (typeof openTab === 'function') {
+        openTab('mypage-calendar-screen', 'mypage-calendar-screen', '📅 カレンダー');
+      } else {
+        switchView('mypage-calendar-screen');
+      }
+    });
+  }
+
+  // 6b. タスクウィジェットのタスク一覧ボタン
+  const openTaskBtn = document.getElementById('home-task-open-task-btn');
+  if (openTaskBtn) {
+    openTaskBtn.addEventListener('click', () => {
+      if (typeof openTab === 'function') {
+        openTab('mypage-task-screen', 'mypage-task-screen', '📋 タスク');
+      } else {
+        switchView('mypage-task-screen');
+      }
     });
   }
 
@@ -52741,5 +52927,6 @@ if (typeof window !== 'undefined') {
   window.updateServiceUIState = updateServiceUIState;
   window.openHomePage = openHomePage;
   window.renderHomeScheduleOverview = renderHomeScheduleOverview;
+  window.renderHomeTaskOverview = renderHomeTaskOverview;
 }
 

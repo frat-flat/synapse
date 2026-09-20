@@ -2339,14 +2339,14 @@
   </div>
 </div>
 
-<!-- 📅 サービス横断 スケジュール概要ウィジェット -->
-<div class="list-section home-schedule-section" style="padding: 1.5rem; background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); margin-bottom: 1.5rem;">
+<!-- 📅 スケジュール概要ウィジェット（一般ユーザー向け） -->
+<div id="home-schedule-section" class="list-section home-schedule-section home-user-only-section" style="padding: 1.5rem; background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); margin-bottom: 1.5rem;">
   <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
     <div style="display: flex; align-items: center; gap: 0.5rem;">
       <span style="font-size: 1.25rem;">📅</span>
       <div>
-        <h3 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--text-primary);">全社横断 スケジュール ＆ 直近タスク</h3>
-        <p style="margin: 0; font-size: 0.73rem; color: var(--text-muted);">全サービスの予定・アポイント・締切をまとめて確認</p>
+        <h3 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--text-primary);">スケジュール</h3>
+        <p style="margin: 0; font-size: 0.73rem; color: var(--text-muted);">本日の予定および直近のアポイント・カレンダー予定</p>
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -2356,6 +2356,27 @@
   </div>
   <!-- スケジュールリストコンテナ -->
   <div id="home-schedule-list-container" class="home-schedule-list">
+    <!-- JSで動的描画 -->
+  </div>
+</div>
+
+<!-- ✅ 直近タスク概要ウィジェット（一般ユーザー向け） -->
+<div id="home-task-section" class="list-section home-task-section home-user-only-section" style="padding: 1.5rem; background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); margin-bottom: 1.5rem;">
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <span style="font-size: 1.25rem;">✅</span>
+      <div>
+        <h3 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--text-primary);">タスク</h3>
+        <p style="margin: 0; font-size: 0.73rem; color: var(--text-muted);">未完了の作業タスクおよび期日・締切</p>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <span id="home-task-count-badge" style="font-size: 0.78rem; font-weight: 700; color: #059669; background: rgba(16,185,129,0.1); padding: 0.2rem 0.55rem; border-radius: 4px;">未完了: 0件</span>
+      <button id="home-task-open-task-btn" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; font-weight: 600; cursor: pointer;">タスク一覧 ➔</button>
+    </div>
+  </div>
+  <!-- タスクリストコンテナ -->
+  <div id="home-task-list-container" class="home-task-list">
     <!-- JSで動的描画 -->
   </div>
 </div>
