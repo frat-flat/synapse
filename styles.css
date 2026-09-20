@@ -1976,41 +1976,31 @@ body:not(.logged-in) .login-layout {
   border: 1px solid var(--border-color, #cbd5e1);
 }
 
-.sidebar-service-dropdown-admin-actions {
-  border-top: 1px solid var(--border-color, rgba(0,0,0,0.08));
-  padding-top: 0.25rem;
-  margin-top: 0.25rem;
-}
-
-.sidebar-service-admin-btn {
-  display: flex;
+.sidebar-service-item-icon {
+  display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  width: 100%;
-  padding: 0.4rem 0.65rem;
-  background: none;
-  border: none;
-  font-size: 0.74rem;
-  font-weight: 600;
-  color: var(--text-secondary, #475569);
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.15s ease;
+  justify-content: center;
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
-.sidebar-service-admin-btn:hover {
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--primary, #2563eb);
+.sidebar-service-item-icon img,
+.sidebar-service-icon img,
+.sidebar-service-group-header img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  border-radius: 2px;
+  display: block;
 }
 
-.icon-preset-chip {
-  transition: transform 0.15s ease, background 0.15s ease;
-}
-
-.icon-preset-chip:hover {
-  background: rgba(37, 99, 235, 0.15);
-  border-radius: 4px;
-  transform: scale(1.15);
+.service-config-tab img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  border-radius: 2px;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .service-config-tab {

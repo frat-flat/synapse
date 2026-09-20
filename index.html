@@ -85,16 +85,11 @@
       <span class="sidebar-service-arrow">▾</span>
     </span>
   </div>
-  <!-- コンパクト ドロップダウンメニュー -->
+  <!-- コンパクト ドロップダウンメニュー（サービス切替専用） -->
   <div id="sidebar-service-dropdown" class="sidebar-service-dropdown" style="display: none;">
     <div class="sidebar-service-dropdown-header">利用サービス切替</div>
     <div id="sidebar-service-dropdown-list" class="sidebar-service-dropdown-list">
       <!-- JSで動的レンダリング -->
-    </div>
-    <div id="sidebar-service-dropdown-admin-actions" class="sidebar-service-dropdown-admin-actions" style="display: none;">
-      <button type="button" id="sidebar-service-edit-config-btn" class="sidebar-service-admin-btn">
-        <span style="font-size: 0.88rem;">⚙️</span> サービス構成を編集
-      </button>
     </div>
   </div>
 </div>
@@ -2416,10 +2411,10 @@
 <span style="font-size: 1.8rem; line-height: 1;">🪪</span>
 <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">ID管理</div>
 </div>
-<!-- サービス設定 -->
-<div class="admin-app-icon" id="admin-panel-service-config-btn" title="サービス設定&#13;利用サービスの名称・アイコンおよび含む機能（アポイント・JO・代理店等）をカスタマイズします。" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.6rem 0.4rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; aspect-ratio: 1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
-<span style="font-size: 1.8rem; line-height: 1;">🚀</span>
-<div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">サービス設定</div>
+<!-- サービス構成設定 -->
+<div class="admin-app-icon" id="admin-panel-service-config-btn" title="サービス構成設定&#13;利用サービスの名称・アイコンおよび含む機能（アポイント・JO・代理店等）をカスタマイズします。" style="cursor: pointer; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.6rem 0.4rem; background: var(--bg-surface); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; aspect-ratio: 1 / 1; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; box-shadow: var(--shadow-sm);">
+<span style="font-size: 1.8rem; line-height: 1;">⚙️</span>
+<div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">サービス構成</div>
 </div>
 </div>
 </div>
@@ -5473,27 +5468,43 @@
       </div>
 
       <!-- 基本情報設定 -->
-      <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
-        <!-- アイコン設定 -->
-        <div style="width: 85px;">
-          <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.3rem;">アイコン</label>
-          <input type="text" id="service-config-icon-input" maxlength="4" style="width: 100%; box-sizing: border-box; font-size: 1.4rem; text-align: center; padding: 0.4rem 0.2rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-primary);" />
-          <!-- プリセットクイック選択 -->
-          <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 0.35rem; justify-content: center;" id="service-config-preset-icons">
-            <span class="icon-preset-chip" style="cursor: pointer; font-size: 0.95rem; padding: 2px;">📊</span>
-            <span class="icon-preset-chip" style="cursor: pointer; font-size: 0.95rem; padding: 2px;">💼</span>
-            <span class="icon-preset-chip" style="cursor: pointer; font-size: 0.95rem; padding: 2px;">📑</span>
-            <span class="icon-preset-chip" style="cursor: pointer; font-size: 0.95rem; padding: 2px;">📋</span>
-            <span class="icon-preset-chip" style="cursor: pointer; font-size: 0.95rem; padding: 2px;">🚀</span>
-            <span class="icon-preset-chip" style="cursor: pointer; font-size: 0.95rem; padding: 2px;">✨</span>
-          </div>
+      <div style="display: flex; flex-direction: column; gap: 0.85rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.9rem;">
+        <!-- サービス名設定 -->
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.35rem;">サービス名称</label>
+          <input type="text" id="service-config-name-input" placeholder="例: ヨサンダス" style="width: 100%; box-sizing: border-box; font-size: 0.88rem; padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); font-weight: 600;" />
+          <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;">サイドバーや切り替えメニューに表示される名称です</div>
         </div>
 
-        <!-- サービス名設定 -->
-        <div style="flex: 1;">
-          <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.3rem;">サービス名称</label>
-          <input type="text" id="service-config-name-input" placeholder="サービス名を入力..." style="width: 100%; box-sizing: border-box; font-size: 0.88rem; padding: 0.55rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-primary); font-weight: 600;" />
-          <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.3rem;">サイドバーや切り替えメニューに表示される名称です</div>
+        <!-- アイコン設定（画像・データ挿入 または 不要） -->
+        <div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
+            <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); margin: 0;">アイコン（画像・データ・不要）</label>
+            <button type="button" id="service-config-no-icon-btn" class="btn btn-sm btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.55rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;">
+              🚫 アイコン不要（なし）
+            </button>
+          </div>
+          <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <!-- プレビュー枠 -->
+            <div id="service-config-icon-preview" style="width: 52px; height: 52px; border-radius: var(--radius-md); border: 1.5px dashed var(--border-color); background: var(--bg-surface); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; font-size: 1.4rem;">
+              <!-- プレビュー表示 -->
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 0.4rem;">
+              <!-- 画像ファイル選択ボタン & 隠しinput -->
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="file" id="service-config-file-input" accept="image/*" style="display: none;" />
+                <button type="button" id="service-config-upload-btn" class="btn btn-sm btn-primary" style="font-size: 0.76rem; padding: 0.3rem 0.65rem; display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer;">
+                  📁 画像・データを選択
+                </button>
+                <span id="service-config-file-status" style="font-size: 0.72rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">PNG, SVG, JPG, WebP等</span>
+              </div>
+              <!-- URL / Base64 / テキスト直接入力 -->
+              <input type="text" id="service-config-icon-input" placeholder="画像URLまたはデータ (https://... または data:image/...)" style="width: 100%; box-sizing: border-box; font-size: 0.76rem; padding: 0.35rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary);" />
+            </div>
+          </div>
+          <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 0.3rem;">
+            ※ 画像ファイルを選択するとアイコンとして登録されます。「アイコン不要（なし）」を押すとアイコンが非表示になります。
+          </div>
         </div>
       </div>
 

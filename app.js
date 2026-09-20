@@ -3607,7 +3607,8 @@ function initDatabase() {
     'admin-panel-partner-btn',
     'admin-panel-folder-btn',
     'admin-panel-user-register-btn',
-    'admin-panel-party-id-btn'
+    'admin-panel-party-id-btn',
+    'admin-panel-service-config-btn'
   ];
   if (!state.permissions.writeTables) state.permissions.writeTables = {};
   defaultAdminIcons.forEach(iconId => {
@@ -4309,7 +4310,8 @@ function canAccessHomeScreen() {
     'admin-panel-partner-btn',
     'admin-panel-folder-btn',
     'admin-panel-user-register-btn',
-    'admin-panel-party-id-btn'
+    'admin-panel-party-id-btn',
+    'admin-panel-service-config-btn'
   ];
   const hasAnyIconAccess = adminIcons.some(iconId => {
     return checkAdminIconAccess(iconId);
@@ -4329,7 +4331,8 @@ function hasAnyAdminIconAccess() {
     'admin-panel-partner-btn',
     'admin-panel-folder-btn',
     'admin-panel-user-register-btn',
-    'admin-panel-party-id-btn'
+    'admin-panel-party-id-btn',
+    'admin-panel-service-config-btn'
   ];
   return adminIcons.some(iconId => checkAdminIconAccess(iconId));
 }
@@ -12553,7 +12556,8 @@ function updateUIForCurrentMode() {
     'admin-panel-partner-btn',
     'admin-panel-folder-btn',
     'admin-panel-user-register-btn',
-    'admin-panel-party-id-btn'
+    'admin-panel-party-id-btn',
+    'admin-panel-service-config-btn'
   ];
 
   let hasAnyVisibleIcon = false;
@@ -29442,7 +29446,8 @@ document.addEventListener('DOMContentLoaded', () => {
       { id: 'admin-panel-partner-btn', name: '🛢️ パートナーDB', desc: 'パートナー企業等の統合データベース' },
       { id: 'admin-panel-folder-btn', name: '📁 フォルダ管理', desc: 'サイドバーおよびテーブルのフォルダ格納管理' },
       { id: 'admin-panel-user-register-btn', name: '👥 ユーザー登録', desc: '新規ユーザー登録・オンボーディング承認' },
-      { id: 'admin-panel-party-id-btn', name: '🔑 ID管理', desc: '発行済みパーティーIDのステータス監視・手動再利用' }
+      { id: 'admin-panel-party-id-btn', name: '🔑 ID管理', desc: '発行済みパーティーIDのステータス監視・手動再利用' },
+      { id: 'admin-panel-service-config-btn', name: '⚙️ サービス構成', desc: '利用サービスの名称・アイコンおよび含む機能のカスタマイズ' }
     ];
 
     let adminIconsToggleHtml = `
@@ -33684,6 +33689,19 @@ function setupPermissionFeatures() {
         return;
       }
       openTab('party-id-mgmt-screen', 'party-id-mgmt-screen', '🔑 Party ID管理');
+    });
+  }
+
+  const panelServiceConfigBtn = document.getElementById('admin-panel-service-config-btn');
+  if (panelServiceConfigBtn) {
+    panelServiceConfigBtn.addEventListener('click', () => {
+      if (!checkAdminIconAccess('admin-panel-service-config-btn')) {
+        showToast('この機能を利用する権限がありません。', 'error');
+        return;
+      }
+      if (typeof openServiceConfigModal === 'function') {
+        openServiceConfigModal();
+      }
     });
   }
 
@@ -52070,11 +52088,40 @@ function saveServicesConfig() {
 }
 
 // ==========================================
+// 🚀 サービスアイコン描画 & プレビュー補助関数
+// ==========================================
+function renderServiceIconHtml(icon, defaultIcon = '', extraStyle = '') {
+  const targetIcon = (icon !== undefined && icon !== null && String(icon).trim() !== '') ? String(icon).trim() : defaultIcon;
+  if (!targetIcon) return '';
+  if (targetIcon.startsWith('data:image/') || targetIcon.startsWith('http://') || targetIcon.startsWith('https://') || targetIcon.startsWith('blob:')) {
+    return `<img src="${escapeHtml(targetIcon)}" alt="" style="width: 1.1em; height: 1.1em; object-fit: contain; vertical-align: middle; border-radius: 2px; display: inline-block; ${extraStyle}" />`;
+  }
+  if (targetIcon.startsWith('<svg') || targetIcon.startsWith('<img')) {
+    return targetIcon;
+  }
+  return `<span style="${extraStyle}">${escapeHtml(targetIcon)}</span>`;
+}
+
+function updateServiceConfigIconPreview(val) {
+  const previewEl = document.getElementById('service-config-icon-preview');
+  if (!previewEl) return;
+  const cleanVal = (val || '').trim();
+  if (!cleanVal) {
+    previewEl.innerHTML = '<span style="font-size: 0.7rem; color: var(--text-muted); text-align: center; line-height: 1.2;">なし</span>';
+  } else if (cleanVal.startsWith('data:image/') || cleanVal.startsWith('http://') || cleanVal.startsWith('https://') || cleanVal.startsWith('blob:')) {
+    previewEl.innerHTML = `<img src="${escapeHtml(cleanVal)}" alt="preview" style="width: 100%; height: 100%; object-fit: contain; border-radius: var(--radius-sm);" />`;
+  } else if (cleanVal.startsWith('<svg') || cleanVal.startsWith('<img')) {
+    previewEl.innerHTML = cleanVal;
+  } else {
+    previewEl.innerHTML = `<span style="font-size: 1.5rem; line-height: 1;">${escapeHtml(cleanVal)}</span>`;
+  }
+}
+
+// ==========================================
 // 🚀 サイドバー インライン・サービスドロップダウン管理
 // ==========================================
 function renderSidebarServiceDropdown() {
   const listEl = document.getElementById('sidebar-service-dropdown-list');
-  const adminActionsEl = document.getElementById('sidebar-service-dropdown-admin-actions');
   if (!listEl) return;
 
   const currentServiceId = state.activeService || 'yosandas';
@@ -52082,9 +52129,10 @@ function renderSidebarServiceDropdown() {
   listEl.innerHTML = SYNAPSE_SERVICES.map(service => {
     const isActive = service.id === currentServiceId;
     const isDisabled = !service.enabled;
+    const itemIconHtml = renderServiceIconHtml(service.icon);
     return `
       <div class="sidebar-service-dropdown-item ${isActive ? 'active' : ''} ${isDisabled ? 'disabled' : ''}" data-service-id="${escapeHtml(service.id)}">
-        <span style="font-size: 0.95rem; line-height: 1;">${escapeHtml(service.icon)}</span>
+        ${itemIconHtml ? `<span class="sidebar-service-item-icon">${itemIconHtml}</span>` : ''}
         <span style="flex: 1; font-weight: ${isActive ? '700' : '500'};">${escapeHtml(service.name)}</span>
         ${isActive ? '<span class="sidebar-service-item-check">✓</span>' : ''}
         ${isDisabled ? `<span class="sidebar-service-item-badge">${escapeHtml(service.badge || '準備中')}</span>` : ''}
@@ -52100,14 +52148,6 @@ function renderSidebarServiceDropdown() {
       closeSidebarServiceDropdown();
     });
   });
-
-  if (adminActionsEl) {
-    if (canAccessHomeScreen() || isOwnerUser()) {
-      adminActionsEl.style.display = 'block';
-    } else {
-      adminActionsEl.style.display = 'none';
-    }
-  }
 }
 
 function toggleSidebarServiceDropdown(force) {
@@ -52163,9 +52203,10 @@ function renderServiceConfigTabs() {
 
   tabContainer.innerHTML = SYNAPSE_SERVICES.map(s => {
     const isActive = s.id === currentEditingServiceId;
+    const tabIconHtml = renderServiceIconHtml(s.icon);
     return `
       <div class="service-config-tab ${isActive ? 'active' : ''}" data-service-id="${escapeHtml(s.id)}" role="button" tabindex="0">
-        <span>${escapeHtml(s.icon)}</span>
+        ${tabIconHtml ? `<span>${tabIconHtml}</span>` : ''}
         <span>${escapeHtml(s.name)}</span>
       </div>
     `;
@@ -52188,8 +52229,25 @@ function loadServiceConfigForm(serviceId) {
   const iconInput = document.getElementById('service-config-icon-input');
   const nameInput = document.getElementById('service-config-name-input');
   const featuresList = document.getElementById('service-config-features-list');
+  const fileInput = document.getElementById('service-config-file-input');
+  const fileStatus = document.getElementById('service-config-file-status');
 
-  if (iconInput) iconInput.value = s.icon || '📊';
+  if (fileInput) fileInput.value = '';
+  if (fileStatus) {
+    if (s.icon && s.icon.startsWith('data:image/')) {
+      fileStatus.textContent = '画像データ設定中';
+    } else if (s.icon && (s.icon.startsWith('http://') || s.icon.startsWith('https://'))) {
+      fileStatus.textContent = '画像URL設定中';
+    } else if (!s.icon) {
+      fileStatus.textContent = 'アイコンなし（不要）';
+    } else {
+      fileStatus.textContent = 'PNG, SVG, JPG, WebP等';
+    }
+  }
+
+  if (iconInput) iconInput.value = s.icon || '';
+  updateServiceConfigIconPreview(s.icon || '');
+
   if (nameInput) nameInput.value = s.name || '';
 
   const included = s.includedFeatures || ['appoint', 'agency', 'jo', 'applicant', 'form_customize', 'table_creator'];
@@ -52236,7 +52294,8 @@ function saveCurrentServiceConfig() {
   const nameInput = document.getElementById('service-config-name-input');
   const featuresList = document.getElementById('service-config-features-list');
 
-  if (iconInput && iconInput.value.trim()) {
+  // アイコンは空文字（不要・なし）も許容する
+  if (iconInput) {
     s.icon = iconInput.value.trim();
   }
   if (nameInput && nameInput.value.trim()) {
@@ -52323,13 +52382,31 @@ function updateServiceUIState() {
   const sidebarNameEl = document.getElementById('sidebar-service-current-name');
   const yosandasHeader = document.getElementById('sidebar-yosandas-header');
 
-  if (sidebarIconEl) sidebarIconEl.textContent = currentService.icon;
+  const iconHtml = renderServiceIconHtml(currentService.icon);
+
+  if (sidebarIconEl) {
+    if (iconHtml) {
+      sidebarIconEl.innerHTML = iconHtml;
+      sidebarIconEl.style.display = 'inline-flex';
+    } else {
+      sidebarIconEl.innerHTML = '';
+      sidebarIconEl.style.display = 'none';
+    }
+  }
   if (sidebarNameEl) sidebarNameEl.textContent = currentService.name;
 
   if (yosandasHeader) {
     const iconSpan = yosandasHeader.querySelector('div span:first-child');
     const nameSpan = yosandasHeader.querySelector('div span:nth-child(2)');
-    if (iconSpan) iconSpan.textContent = currentService.icon;
+    if (iconSpan) {
+      if (iconHtml) {
+        iconSpan.innerHTML = iconHtml;
+        iconSpan.style.display = 'inline-flex';
+      } else {
+        iconSpan.innerHTML = '';
+        iconSpan.style.display = 'none';
+      }
+    }
     if (nameSpan) nameSpan.textContent = currentService.name;
     yosandasHeader.style.opacity = currentServiceId === 'yosandas' ? '1' : '0.8';
   }
@@ -52524,24 +52601,19 @@ function initMultiServiceEvents() {
     }
   });
 
-  // 3. ドロップダウン内の管理者設定ボタン
-  const editConfigBtn = document.getElementById('sidebar-service-edit-config-btn');
-  if (editConfigBtn) {
-    editConfigBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openServiceConfigModal();
-    });
-  }
-
-  // 4. 管理者コントロールパネルの「サービス設定」アイコン
+  // 3. 管理者コントロールパネルの「サービス設定」アイコン
   const adminPanelConfigBtn = document.getElementById('admin-panel-service-config-btn');
   if (adminPanelConfigBtn) {
     adminPanelConfigBtn.addEventListener('click', () => {
+      if (!checkAdminIconAccess('admin-panel-service-config-btn')) {
+        showToast('この機能を利用する権限がありません。', 'error');
+        return;
+      }
       openServiceConfigModal();
     });
   }
 
-  // 5. サービス設定モーダルのボタン群
+  // 4. サービス設定モーダルのボタン群
   const closeConfigBtn = document.getElementById('service-config-close-btn');
   if (closeConfigBtn) {
     closeConfigBtn.addEventListener('click', closeServiceConfigModal);
@@ -52563,13 +52635,68 @@ function initMultiServiceEvents() {
       toggleAllBtn.textContent = allChecked ? 'すべて選択' : 'すべて解除';
     });
   }
-  const presetChips = document.querySelectorAll('#service-config-preset-icons .icon-preset-chip');
-  presetChips.forEach(chip => {
-    chip.addEventListener('click', () => {
+
+  // アイコン不要（なし）ボタン
+  const noIconBtn = document.getElementById('service-config-no-icon-btn');
+  if (noIconBtn) {
+    noIconBtn.addEventListener('click', () => {
       const iconInput = document.getElementById('service-config-icon-input');
-      if (iconInput) iconInput.value = chip.textContent.trim();
+      const fileStatus = document.getElementById('service-config-file-status');
+      const fileInput = document.getElementById('service-config-file-input');
+      if (iconInput) iconInput.value = '';
+      if (fileInput) fileInput.value = '';
+      if (fileStatus) fileStatus.textContent = 'アイコンなし（不要）';
+      updateServiceConfigIconPreview('');
     });
-  });
+  }
+
+  // 画像・データファイルアップロードボタン & input
+  const uploadBtn = document.getElementById('service-config-upload-btn');
+  const fileInput = document.getElementById('service-config-file-input');
+  const iconInput = document.getElementById('service-config-icon-input');
+  const fileStatus = document.getElementById('service-config-file-status');
+
+  if (uploadBtn && fileInput) {
+    uploadBtn.addEventListener('click', () => {
+      fileInput.click();
+    });
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        if (typeof showToast === 'function') {
+          showToast('画像ファイル（PNG, SVG, JPG, WebP等）を選択してください。', 'warning');
+        }
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        if (typeof showToast === 'function') {
+          showToast('画像ファイルサイズは2MB以下にしてください。', 'warning');
+        }
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64Data = event.target.result;
+        if (iconInput) iconInput.value = base64Data;
+        if (fileStatus) fileStatus.textContent = `${file.name} (${Math.round(file.size / 1024)}KB)`;
+        updateServiceConfigIconPreview(base64Data);
+      };
+      reader.onerror = () => {
+        if (typeof showToast === 'function') {
+          showToast('画像ファイルの読み込みに失敗しました。', 'error');
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // アイコン入力欄のリアルタイムプレビュー
+  if (iconInput) {
+    iconInput.addEventListener('input', () => {
+      updateServiceConfigIconPreview(iconInput.value);
+    });
+  }
 
   // モーダル背景クリックで閉じる
   const configModalEl = document.getElementById('service-config-modal');
