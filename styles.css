@@ -5979,7 +5979,7 @@ h3 {
   }
 
   /* 3-B. フォーム作成画面 (iframe埋め込み) は全画面・全高展開 */
-  #form-customize-screen {
+  #form-customize-screen.active {
     margin-left: 0 !important;
     padding: 0 !important;
     width: 100% !important;
@@ -8557,6 +8557,420 @@ body.login-active #login-notification-modal {
     justify-content: center;
   }
 }
+
+/* ==========================================================================
+   🚀 SYNAPSE マルチサービス（ヨサンダス ＆ ヨサンダス＋）アーキテクチャ スタイル
+   ========================================================================== */
+
+/* ヘッダー: サービススイッチャー */
+.header-service-switcher-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.header-service-switcher-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  background: var(--bg-surface-elevated, #ffffff);
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
+}
+
+.header-service-switcher-btn:hover {
+  background: var(--bg-surface-hover, #f1f5f9);
+  border-color: var(--primary, #2563eb);
+}
+
+.header-service-switcher-btn .switcher-arrow {
+  font-size: 0.65rem;
+  color: var(--text-secondary, #64748b);
+  transition: transform 0.2s ease;
+}
+
+.header-service-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 290px;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.15));
+  z-index: 10000;
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  backdrop-filter: blur(12px);
+  animation: dropdownFadeIn 0.18s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header-service-dropdown-header {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted, #94a3b8);
+  padding: 0.35rem 0.6rem 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.header-service-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  border: 1px solid transparent;
+}
+
+.header-service-dropdown-item:hover:not(.disabled) {
+  background: var(--bg-surface-elevated, #f8fafc);
+  border-color: var(--border-color, #e2e8f0);
+}
+
+.header-service-dropdown-item.active {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.header-service-dropdown-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(70%);
+}
+
+.service-item-icon {
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-surface-elevated, #f1f5f9);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.service-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  text-align: left;
+}
+
+.service-item-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+}
+
+.service-item-desc {
+  font-size: 0.68rem;
+  color: var(--text-secondary, #64748b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 170px;
+}
+
+.service-item-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 0.12rem 0.4rem;
+  border-radius: 9999px;
+  background: var(--bg-surface-elevated, #e2e8f0);
+  color: var(--text-secondary, #475569);
+  white-space: nowrap;
+}
+
+.service-item-badge.active-badge {
+  background: rgba(37, 99, 235, 0.15);
+  color: var(--primary, #2563eb);
+}
+
+.service-item-badge.disabled-badge {
+  background: rgba(100, 116, 139, 0.15);
+  color: var(--text-muted, #64748b);
+}
+
+/* 🚀 ホーム画面: 正方形アプリアイコンによるサービス選択 */
+.service-selector-section {
+  margin-bottom: 2rem;
+  text-align: left;
+}
+
+.service-icon-grid {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.service-square-card {
+  position: relative;
+  width: 180px;
+  aspect-ratio: 1 / 1;
+  background: var(--bg-surface, #ffffff);
+  border: 1.5px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-lg, 16px);
+  padding: 1.1rem 1rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm, 0 2px 4px rgba(0,0,0,0.05));
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.service-square-card:hover:not(.disabled-service-card) {
+  transform: translateY(-5px);
+  border-color: var(--primary, #2563eb);
+  box-shadow: 0 12px 28px -6px rgba(37, 99, 235, 0.25), 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.service-square-card.disabled-service-card {
+  opacity: 0.52;
+  filter: grayscale(85%);
+  cursor: not-allowed;
+  border-style: dashed;
+  background: var(--bg-surface-elevated, #f8fafc);
+}
+
+.service-square-card.disabled-service-card:hover {
+  transform: none;
+  box-shadow: var(--shadow-sm, 0 2px 4px rgba(0,0,0,0.05));
+}
+
+.service-square-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 9999px;
+  letter-spacing: 0.3px;
+}
+
+.service-badge-live {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.service-badge-disabled {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+.service-square-icon-box {
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.35rem;
+  box-shadow: 0 6px 14px -3px rgba(37, 99, 235, 0.35);
+  transition: transform 0.2s ease;
+}
+
+.service-square-card:hover:not(.disabled-service-card) .service-square-icon-box {
+  transform: scale(1.08);
+}
+
+.service-square-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  margin-top: 0.3rem;
+  letter-spacing: -0.2px;
+}
+
+.service-square-desc {
+  font-size: 0.68rem;
+  color: var(--text-secondary, #64748b);
+  line-height: 1.25;
+  margin-top: 0.1rem;
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.service-square-action {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--primary, #2563eb);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.2rem;
+}
+
+/* 📅 ホーム画面: サービス横断スケジュール概要ウィジェット */
+.home-schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.home-schedule-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--bg-surface-elevated, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md, 8px);
+  transition: all 0.2s ease;
+  gap: 0.75rem;
+}
+
+.home-schedule-item:hover {
+  background: var(--bg-surface-hover, #f1f5f9);
+  border-color: var(--border-hover, #cbd5e1);
+}
+
+.home-schedule-item-time {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 65px;
+  padding: 0.3rem 0.5rem;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+.home-schedule-item-time .time-val {
+  font-size: 0.85rem;
+  color: var(--text-primary, #0f172a);
+}
+
+.home-schedule-item-time .date-val {
+  font-size: 0.65rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+.home-schedule-item-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-align: left;
+}
+
+.home-schedule-item-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.home-schedule-item-service-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--primary, #2563eb);
+}
+
+.home-schedule-item-meta {
+  font-size: 0.72rem;
+  color: var(--text-secondary, #64748b);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.home-schedule-empty-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* 📱 モバイル表示調整 */
+@media (max-width: 768px) {
+  .service-icon-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .service-square-card {
+    width: 100%;
+    padding: 0.85rem 0.6rem 0.7rem;
+  }
+
+  .service-square-icon-box {
+    width: 44px;
+    height: 44px;
+  }
+
+  .service-square-name {
+    font-size: 0.88rem;
+  }
+
+  .header-service-switcher-btn {
+    max-width: 135px;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.72rem;
+  }
+
+  #header-service-current-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80px;
+  }
+
+  .header-service-dropdown {
+    width: min(290px, calc(100vw - 24px));
+    left: 0;
+  }
+
+  #header-add-sticky-btn {
+    display: none !important;
+  }
+}
+
 
 
 

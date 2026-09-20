@@ -4272,23 +4272,17 @@ function isUserAdmin() {
   return r === 'admin' || r === 'owner' || id === 'admin' || id === 'owner' || id === 'owner@synapse.management' || loginId === 'admin' || loginId === 'owner';
 }
 
-// ホーム画面（コントロールパネル）にアクセス可能かを判定するヘルパー
+// ホーム画面（全サービス共通ポータル）にアクセス可能かを判定するヘルパー
 function canAccessHomeScreen() {
   if (!state.currentUser) return false;
+  // ホーム画面は全社共通ポータルのため、ログイン中の全ユーザーが利用可能
+  return true;
+}
 
-  // 1. オーナーであれば常にアクセス可能（プレビューシミュレーション中を除く）
+// コントロールパネルアイコンへの権限を1つでも所持しているかを判定するヘルパー
+function hasAnyAdminIconAccess() {
+  if (!state.currentUser) return false;
   if (isOwnerUser() && !state.previewUserId) return true;
-
-  // 通常判定用のユーザーIDを決定
-  const userId = getCurrentUserId();
-  if (userId === 'owner' || userId === 'owner@synapse.management') return true;
-
-  const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
-  const user = users.find(u => u.id === userId);
-  const isOwner = (user && (user.role === 'owner' || user.id === 'owner@synapse.management'));
-  if (isOwner) return true;
-
-  // 2. 一般ユーザー（adminロールを含む）であっても、いずれかのコントロールパネルアイコンの権限を持っていればアクセス可能
   const adminIcons = [
     'admin-panel-form-btn',
     'admin-panel-table-btn',
@@ -4299,11 +4293,7 @@ function canAccessHomeScreen() {
     'admin-panel-user-register-btn',
     'admin-panel-party-id-btn'
   ];
-  const hasAnyIconAccess = adminIcons.some(iconId => {
-    return checkAdminIconAccess(iconId);
-  });
-
-  return hasAnyIconAccess;
+  return adminIcons.some(iconId => checkAdminIconAccess(iconId));
 }
 
 // アクティブなプレビュー対象、または現在のユーザーIDを解決するヘルパー
@@ -12554,8 +12544,8 @@ function updateUIForCurrentMode() {
 
   const adminHomePanel = document.getElementById('admin-home-panel');
   if (adminHomePanel) {
-    // canAccessHomeScreen() を参照して、オーナーまたはプレビュー中のオーナー・管理者にのみ表示する (ただし表示可能アイコンが1つもない場合は非表示)
-    const shouldShowPanel = (isOwnerUser() && !state.previewUserId) || (canAccessHomeScreen() && hasAnyVisibleIcon && (!pendingUser || isOwnerUser()));
+    // 管理者権限または表示権限を持つアイコンがある場合にのみコントロールパネルを表示
+    const shouldShowPanel = (isOwnerUser() && !state.previewUserId) || (hasAnyAdminIconAccess() && hasAnyVisibleIcon && (!pendingUser || isOwnerUser()));
     adminHomePanel.style.display = shouldShowPanel ? 'flex' : 'none';
   }
 
@@ -12685,11 +12675,11 @@ function checkLoginStatus() {
 
     showLoginScreen(false);
     
-    // 💡 オーナーならホーム画面、それ以外ならマイページを初期表示する
-    if (isOwnerUser()) {
-      switchView('home-screen');
+    // 💡 ログイン後は全サービス共通ホーム（ポータル）を着地先とし、サービスを選択可能にする
+    if (typeof switchService === 'function') {
+      switchService('home');
     } else {
-      switchView('mypage-screen');
+      switchView('home-screen');
     }
 
     // ズーム比率の復元・マイグレーション処理（画面全体のCSSズームは100%に戻し、レイアウト占有面積を60%にする設計に対応）
@@ -14250,14 +14240,26 @@ function setupEventListeners() {
     state.isSelectingCols = false;
   });
 
-  // 💡 ロゴクリックでホーム画面（オーナーのみ）またはマイページ（非オーナー）へ
+  // 💡 ロゴクリックで全社共通ホームポータルへ
   const logoBtn = document.getElementById('sidebar-logo-btn');
   if (logoBtn) {
     logoBtn.addEventListener('click', (e) => {
-      if (canAccessHomeScreen()) {
-        switchView('home-screen');
+      if (typeof switchService === 'function') {
+        switchService('home');
       } else {
-        switchView('mypage-screen');
+        switchView('home-screen');
+      }
+    });
+  }
+
+  // 🏠 サイドバー ホームボタンクリック
+  const menuHomeBtn = document.getElementById('menu-home');
+  if (menuHomeBtn) {
+    menuHomeBtn.addEventListener('click', (e) => {
+      if (typeof switchService === 'function') {
+        switchService('home');
+      } else {
+        switchView('home-screen');
       }
     });
   }
@@ -16074,13 +16076,10 @@ async function handleLogin(e) {
         updateUIForCurrentMode();
         removeRestrictedTabsForRole(state.currentUser.role);
         
-        if (resolvedUser.role === 'owner') {
-          switchView('home-screen');
+        if (typeof switchService === 'function') {
+          switchService('home');
         } else {
-          switchView('mypage-screen');
-          if (typeof openMyPage === 'function') {
-            openMyPage();
-          }
+          switchView('home-screen');
         }
       }
     }
@@ -33391,7 +33390,8 @@ function renderGlobalSearchResults(results) {
       <div>
         <div class="item-title">${res.name}</div>
         <div class="item-subtitle">${res.corp !== '（法人名未設定）' ? res.corp : ''}</div>
-        <div style="margin-top: 0.2rem; display: flex; gap: 0.4rem; align-items: center;">
+        <div style="margin-top: 0.2rem; display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+          <span class="service-tag-badge" style="font-size: 0.62rem; font-weight: 700; background: rgba(37,99,235,0.12); color: var(--primary); padding: 0.1rem 0.4rem; border-radius: 4px;">📊 ヨサンダス</span>
           <span class="item-id">${res.id}</span>
           <span class="item-badge" style="font-size: 0.6rem;">${badgeText}</span>
         </div>
@@ -33402,6 +33402,10 @@ function renderGlobalSearchResults(results) {
     item.addEventListener('click', () => {
       container.style.display = 'none';
       document.getElementById('global-search-input').value = '';
+      if (typeof switchService === 'function') {
+        state.activeService = 'yosandas';
+        updateServiceUIState();
+      }
       openCustomerDetailTab(res.id);
     });
 
@@ -51953,6 +51957,290 @@ if (typeof window !== 'undefined') {
   window.triggerSubtreeBounding = triggerSubtreeBounding;
   window.refreshAgencyNetworkChart = refreshAgencyNetworkChart;
 }
+
+// ============================================================================
+// 🚀 SYNAPSE マルチサービス（ヨサンダス ＆ ヨサンダス＋）アーキテクチャ モジュール
+// ============================================================================
+
+const SYNAPSE_SERVICES = [
+  {
+    id: 'yosandas',
+    name: 'ヨサンダス',
+    shortName: 'ヨサンダス',
+    icon: '📊',
+    badge: '利用可能',
+    color: '#2563eb',
+    enabled: true,
+    description: 'JO・代理店・申込者マスタの統合管理およびアポイント記録',
+    defaultView: 'dashboard-screen'
+  },
+  {
+    id: 'yosandas_plus',
+    name: 'ヨサンダス＋',
+    shortName: 'ヨサンダス＋',
+    icon: '✨',
+    badge: '準備中',
+    color: '#64748b',
+    enabled: false,
+    description: '次世代拡張サービス（近日公開予定）'
+  }
+];
+
+function switchService(serviceId, targetViewId = null) {
+  if (serviceId === 'yosandas_plus') {
+    if (typeof showToast === 'function') {
+      showToast('「ヨサンダス＋」は現在準備中です。正式リリースまで今しばらくお待ちください。', 'info');
+    } else {
+      alert('「ヨサンダス＋」は現在準備中です。');
+    }
+    return;
+  }
+
+  state.activeService = serviceId || 'home';
+  const userId = state.currentUser ? state.currentUser.id : 'guest';
+  try {
+    localStorage.setItem(`SYNAPSE_ACTIVE_SERVICE_${userId}`, state.activeService);
+  } catch (e) {}
+
+  updateServiceUIState();
+
+  if (state.activeService === 'home') {
+    switchView('home-screen');
+    renderHomeScheduleOverview();
+  } else if (state.activeService === 'yosandas') {
+    const dest = targetViewId || 'dashboard-screen';
+    switchView(dest);
+    if (typeof showToast === 'function') {
+      showToast('「ヨサンダス」を開始しました。', 'info');
+    }
+  }
+}
+
+function updateServiceUIState() {
+  const currentIconEl = document.getElementById('header-service-current-icon');
+  const currentNameEl = document.getElementById('header-service-current-name');
+  const serviceItems = document.querySelectorAll('#header-service-dropdown .header-service-dropdown-item');
+  const yosandasHeader = document.getElementById('sidebar-yosandas-header');
+  const homeBtn = document.getElementById('menu-home');
+
+  const currentService = state.activeService || 'home';
+
+  if (currentService === 'home') {
+    if (currentIconEl) currentIconEl.textContent = '🌐';
+    if (currentNameEl) currentNameEl.textContent = '全サービス共通 (ホーム)';
+    if (homeBtn) homeBtn.classList.add('active');
+    if (yosandasHeader) yosandasHeader.style.opacity = '0.7';
+  } else if (currentService === 'yosandas') {
+    if (currentIconEl) currentIconEl.textContent = '📊';
+    if (currentNameEl) currentNameEl.textContent = 'ヨサンダス';
+    if (homeBtn) homeBtn.classList.remove('active');
+    if (yosandasHeader) yosandasHeader.style.opacity = '1';
+  }
+
+  serviceItems.forEach(item => {
+    if (item.dataset.serviceId === currentService) {
+      item.classList.add('active');
+    } else {
+      item.classList.remove('active');
+    }
+  });
+}
+
+function openHomePage() {
+  renderHomeScheduleOverview();
+  updateServiceUIState();
+}
+
+function renderHomeScheduleOverview() {
+  const container = document.getElementById('home-schedule-list-container');
+  const dateLabel = document.getElementById('home-schedule-today-date');
+  if (!container) return;
+
+  const now = new Date();
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  const todayFormatted = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日(${days[now.getDay()]})`;
+  if (dateLabel) dateLabel.textContent = `本日: ${todayFormatted}`;
+
+  // 予定・アポイントの収集
+  const items = [];
+
+  // 1. アポイント (state.appointments)
+  if (Array.isArray(state.appointments)) {
+    state.appointments.forEach(ap => {
+      let timeVal = '終日';
+      let dateVal = '直近';
+      if (ap.date) {
+        const parts = ap.date.split('T');
+        if (parts[0]) dateVal = parts[0].slice(5); // MM-DD
+        if (parts[1]) timeVal = parts[1].slice(0, 5); // HH:MM
+      }
+      items.push({
+        id: ap.id,
+        service: 'ヨサンダス',
+        serviceBadge: 'ヨサンダス (アポ)',
+        title: ap.customerName ? `アポイント: ${ap.customerName} 様` : 'アポイント面談',
+        sub: ap.memo || (ap.customFields ? ap.customFields.location : '') || '顧客面談記録',
+        dateVal,
+        timeVal,
+        rawDate: ap.date ? new Date(ap.date).getTime() : 0,
+        type: 'appointment'
+      });
+    });
+  }
+
+  // 2. カレンダーイベント (state.calendarEvents)
+  if (Array.isArray(state.calendarEvents)) {
+    state.calendarEvents.forEach(ev => {
+      const st = ev.start_time || ev.startTime || '';
+      let timeVal = '終日';
+      let dateVal = '直近';
+      if (st) {
+        const parts = st.split('T');
+        if (parts[0]) dateVal = parts[0].slice(5);
+        if (parts[1]) timeVal = parts[1].slice(0, 5);
+      }
+      items.push({
+        id: ev.id,
+        service: '全社共通',
+        serviceBadge: '全社予定',
+        title: ev.title || '社内予定',
+        sub: ev.notes || ev.location || 'カレンダー予定',
+        dateVal,
+        timeVal,
+        rawDate: st ? new Date(st).getTime() : 0,
+        type: 'calendar'
+      });
+    });
+  }
+
+  // ソート (直近順)
+  items.sort((a, b) => b.rawDate - a.rawDate);
+
+  if (items.length === 0) {
+    container.innerHTML = `
+      <div class="home-schedule-empty-state">
+        <span style="font-size: 1.5rem;">📅</span>
+        <span>本日および直近の予定・アポイントは登録されていません。</span>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">カレンダーまたはアポイント画面から新しい予定を登録できます。</span>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = '';
+  // 最大5件表示
+  items.slice(0, 5).forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'home-schedule-item';
+    el.innerHTML = `
+      <div class="home-schedule-item-time">
+        <span class="time-val">${item.timeVal}</span>
+        <span class="date-val">${item.dateVal}</span>
+      </div>
+      <div class="home-schedule-item-content">
+        <div class="home-schedule-item-title">
+          <span>${item.title}</span>
+          <span class="home-schedule-item-service-tag">${item.serviceBadge}</span>
+        </div>
+        <div class="home-schedule-item-meta">
+          <span>${item.sub}</span>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; font-weight: 600; cursor: pointer;">詳細 ➔</button>
+    `;
+
+    el.addEventListener('click', () => {
+      if (item.type === 'appointment') {
+        switchService('yosandas', 'dashboard-screen');
+      } else {
+        switchView('mypage-calendar-screen');
+      }
+    });
+
+    container.appendChild(el);
+  });
+}
+
+function initMultiServiceEvents() {
+  // 1. ホーム画面の正方形カード
+  const cardYosandas = document.getElementById('home-card-yosandas');
+  if (cardYosandas) {
+    cardYosandas.addEventListener('click', () => {
+      switchService('yosandas');
+    });
+    cardYosandas.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        switchService('yosandas');
+      }
+    });
+  }
+
+  const cardYosandasPlus = document.getElementById('home-card-yosandas-plus');
+  if (cardYosandasPlus) {
+    cardYosandasPlus.addEventListener('click', () => {
+      switchService('yosandas_plus');
+    });
+  }
+
+  // 2. ヘッダーのサービススイッチャー
+  const switcherBtn = document.getElementById('header-service-switcher-btn');
+  const switcherDropdown = document.getElementById('header-service-dropdown');
+  if (switcherBtn && switcherDropdown) {
+    switcherBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isVisible = switcherDropdown.style.display === 'flex';
+      switcherDropdown.style.display = isVisible ? 'none' : 'flex';
+    });
+
+    document.addEventListener('click', (e) => {
+      if (switcherDropdown && !switcherDropdown.contains(e.target) && e.target !== switcherBtn) {
+        switcherDropdown.style.display = 'none';
+      }
+    });
+  }
+
+  // ドロップダウンアイテムクリック
+  const dropdownItems = document.querySelectorAll('#header-service-dropdown .header-service-dropdown-item');
+  dropdownItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (switcherDropdown) switcherDropdown.style.display = 'none';
+      const serviceId = item.dataset.serviceId;
+      switchService(serviceId);
+    });
+  });
+
+  // 3. スケジュールウィジェットのカレンダー詳細ボタン
+  const openCalBtn = document.getElementById('home-schedule-open-calendar-btn');
+  if (openCalBtn) {
+    openCalBtn.addEventListener('click', () => {
+      switchView('mypage-calendar-screen');
+    });
+  }
+
+  // 4. 初期UI状態の反映
+  updateServiceUIState();
+}
+
+// 実行時イベント初期化
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    initMultiServiceEvents();
+  });
+} else {
+  initMultiServiceEvents();
+}
+
+// グローバル公開
+if (typeof window !== 'undefined') {
+  window.SYNAPSE_SERVICES = SYNAPSE_SERVICES;
+  window.switchService = switchService;
+  window.updateServiceUIState = updateServiceUIState;
+  window.openHomePage = openHomePage;
+  window.renderHomeScheduleOverview = renderHomeScheduleOverview;
+}
+
 
 
 

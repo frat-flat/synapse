@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-title" content="Synapse">
 <meta name="theme-color" content="#ffffff">
 
-<link rel="stylesheet" href="styles.css?v=2.9">
+<link rel="stylesheet" href="styles.css?v=3.0">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -77,64 +77,77 @@
   <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" style="display: none;" title="サイドバーを折りたたむ">‹</button>
 </div>
 <nav class="sidebar-nav">
-        <button class="nav-item" id="menu-mypage" data-tab="mypage-screen" style="margin-top: 0.5rem; margin-bottom: 0.5rem; font-weight: bold; width: calc(100% - 1rem); box-sizing: border-box; text-align: left; display: flex; align-items: center; gap: 0.5rem;">👤 <span class="nav-item-text">マイページ</span></button>
-        <div class="sidebar-accordion" id="appoint-accordion" style="margin-top: 0.5rem;">
-          <button class="accordion-header collapsed" id="menu-appoint-parent">
-            <span class="accordion-icon">▼</span>
-            <span class="user-custom-icon">📅</span>
-            <span class="accordion-header-text">アポイント</span>
-          </button>
-          <div class="accordion-content" id="menu-appoint-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
-            <div class="accordion-content-header">📅 アポイント</div>
-            <button class="nav-item" id="menu-new-appoint" data-tab="appointment-new">新規アポイント</button>
-            <button class="nav-item" id="menu-existing-appoint" data-tab="appointment-existing">既存顧客アポイント</button>
-            <button class="nav-item" id="menu-drafts-list" data-tab="drafts-view-screen">一時保存一覧</button>
-            <button class="nav-item" id="menu-history-list" data-tab="history-view-screen">アポイント履歴</button>
-            <button class="nav-item" id="menu-link-official" data-tab="link-official-screen">本登録ID紐付け</button>
+        <!-- 🏠 全社共通ポータル（ホーム） -->
+        <button class="nav-item" id="menu-home" data-tab="home-screen" style="margin-top: 0.5rem; margin-bottom: 0.25rem; font-weight: bold; width: calc(100% - 1rem); box-sizing: border-box; text-align: left; display: flex; align-items: center; gap: 0.5rem;">🏠 <span class="nav-item-text">ホーム（全社共通）</span></button>
+        <button class="nav-item" id="menu-mypage" data-tab="mypage-screen" style="margin-bottom: 0.5rem; font-weight: bold; width: calc(100% - 1rem); box-sizing: border-box; text-align: left; display: flex; align-items: center; gap: 0.5rem;">👤 <span class="nav-item-text">マイページ</span></button>
+
+        <!-- 📊 ヨサンダス サービスグループヘッダー -->
+        <div id="sidebar-yosandas-header" class="sidebar-service-group-header" style="display: flex; align-items: center; justify-content: space-between; padding: 0.35rem 0.6rem; margin: 0.5rem 0.5rem 0.25rem 0.5rem; background: rgba(37,99,235,0.08); border: 1px solid rgba(37,99,235,0.2); border-radius: var(--radius-sm); user-select: none;">
+          <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.76rem; font-weight: 700; color: var(--primary);">
+            <span>📊</span>
+            <span>ヨサンダス</span>
           </div>
-        </div>
-        <!-- 代理店情報アコーディオン -->
-        <div class="sidebar-accordion" id="agency-accordion" style="margin-top: 0.5rem;">
-          <button class="accordion-header collapsed" id="menu-agency-parent">
-            <span class="accordion-icon">▼</span>
-            <span class="user-custom-icon">💼</span>
-            <span class="accordion-header-text">代理店情報</span>
-          </button>
-          <div class="accordion-content" id="menu-agency-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
-            <div class="accordion-content-header">💼 代理店情報</div>
-            <button class="nav-item" id="menu-agency-info" data-tab="agency-info-screen">📊 代理店 基本マスタ</button>
-            <button class="nav-item" id="menu-agency-network" data-tab="agency-network-screen">🌐 代理店 流入相関図</button>
-          </div>
-        </div>
-        <!-- JO情報アコーディオン -->
-        <div class="sidebar-accordion" id="jo-accordion" style="margin-top: 0.5rem;">
-          <button class="accordion-header collapsed" id="menu-jo-parent">
-            <span class="accordion-icon">▼</span>
-            <span class="user-custom-icon">📑</span>
-            <span class="accordion-header-text">JO情報</span>
-          </button>
-          <div class="accordion-content" id="menu-jo-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
-            <div class="accordion-content-header">📑 JO情報</div>
-            <button class="nav-item" id="menu-jo-info" data-tab="jo-info-screen">📊 JO 基本マスタ</button>
-          </div>
-        </div>
-        <!-- 申込者情報アコーディオン -->
-        <div class="sidebar-accordion" id="applicant-accordion" style="margin-top: 0.5rem;">
-          <button class="accordion-header collapsed" id="menu-applicant-parent">
-            <span class="accordion-icon">▼</span>
-            <span class="user-custom-icon">📋</span>
-            <span class="accordion-header-text">申込者情報</span>
-          </button>
-          <div class="accordion-content" id="menu-applicant-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
-            <div class="accordion-content-header">📋 申込者情報</div>
-            <button class="nav-item" id="menu-applicant-info" data-tab="applicant-info-screen">📊 申込者 基本マスタ</button>
-          </div>
+          <span style="font-size: 0.62rem; background: var(--primary); color: #fff; padding: 0.05rem 0.3rem; border-radius: 3px; font-weight: 700;">SERVICE</span>
         </div>
 
-        <button class="nav-item" id="menu-form-customize" data-tab="form-customize-screen" style="margin-top: 0.5rem;">📋 フォーム作成</button>
-        <button class="nav-item" id="menu-table-creator" data-tab="table-creator-screen" style="margin-top: 0.5rem;">📊 テーブル作成</button>
+        <!-- 📊 ヨサンダス サービス専用メニュー群 -->
+        <div id="sidebar-yosandas-group" class="sidebar-service-group" style="display: flex; flex-direction: column; width: 100%;">
+          <div class="sidebar-accordion" id="appoint-accordion" style="margin-top: 0.25rem;">
+            <button class="accordion-header collapsed" id="menu-appoint-parent">
+              <span class="accordion-icon">▼</span>
+              <span class="user-custom-icon">📅</span>
+              <span class="accordion-header-text">アポイント</span>
+            </button>
+            <div class="accordion-content" id="menu-appoint-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
+              <div class="accordion-content-header">📅 アポイント</div>
+              <button class="nav-item" id="menu-new-appoint" data-tab="appointment-new">新規アポイント</button>
+              <button class="nav-item" id="menu-existing-appoint" data-tab="appointment-existing">既存顧客アポイント</button>
+              <button class="nav-item" id="menu-drafts-list" data-tab="drafts-view-screen">一時保存一覧</button>
+              <button class="nav-item" id="menu-history-list" data-tab="history-view-screen">アポイント履歴</button>
+              <button class="nav-item" id="menu-link-official" data-tab="link-official-screen">本登録ID紐付け</button>
+            </div>
+          </div>
+          <!-- 代理店情報アコーディオン -->
+          <div class="sidebar-accordion" id="agency-accordion" style="margin-top: 0.5rem;">
+            <button class="accordion-header collapsed" id="menu-agency-parent">
+              <span class="accordion-icon">▼</span>
+              <span class="user-custom-icon">💼</span>
+              <span class="accordion-header-text">代理店情報</span>
+            </button>
+            <div class="accordion-content" id="menu-agency-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
+              <div class="accordion-content-header">💼 代理店情報</div>
+              <button class="nav-item" id="menu-agency-info" data-tab="agency-info-screen">📊 代理店 基本マスタ</button>
+              <button class="nav-item" id="menu-agency-network" data-tab="agency-network-screen">🌐 代理店 流入相関図</button>
+            </div>
+          </div>
+          <!-- JO情報アコーディオン -->
+          <div class="sidebar-accordion" id="jo-accordion" style="margin-top: 0.5rem;">
+            <button class="accordion-header collapsed" id="menu-jo-parent">
+              <span class="accordion-icon">▼</span>
+              <span class="user-custom-icon">📑</span>
+              <span class="accordion-header-text">JO情報</span>
+            </button>
+            <div class="accordion-content" id="menu-jo-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
+              <div class="accordion-content-header">📑 JO情報</div>
+              <button class="nav-item" id="menu-jo-info" data-tab="jo-info-screen">📊 JO 基本マスタ</button>
+            </div>
+          </div>
+          <!-- 申込者情報アコーディオン -->
+          <div class="sidebar-accordion" id="applicant-accordion" style="margin-top: 0.5rem;">
+            <button class="accordion-header collapsed" id="menu-applicant-parent">
+              <span class="accordion-icon">▼</span>
+              <span class="user-custom-icon">📋</span>
+              <span class="accordion-header-text">申込者情報</span>
+            </button>
+            <div class="accordion-content" id="menu-applicant-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
+              <div class="accordion-content-header">📋 申込者情報</div>
+              <button class="nav-item" id="menu-applicant-info" data-tab="applicant-info-screen">📊 申込者 基本マスタ</button>
+            </div>
+          </div>
 
-
+          <button class="nav-item" id="menu-form-customize" data-tab="form-customize-screen" style="margin-top: 0.5rem;">📋 フォーム作成</button>
+          <button class="nav-item" id="menu-table-creator" data-tab="table-creator-screen" style="margin-top: 0.5rem;">📊 テーブル作成</button>
+        </div>
 </nav>
 <div class="user-profile-section" style="position: relative;">
 <!-- 設定ポップアップ (非表示) -->
@@ -231,6 +244,42 @@
             <div id="sync-status-indicator" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; font-weight: 600; padding: 0.1rem 0.4rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-secondary); transition: all 0.2s; user-select: none;">
               <span id="sync-status-icon">🟢</span>
               <span id="sync-status-text">同期済み</span>
+            </div>
+
+            <!-- 🚀 サービススイッチャー (常設切り替えセレクター) -->
+            <div class="header-service-switcher-container" id="header-service-switcher-container">
+              <button id="header-service-switcher-btn" class="header-service-switcher-btn" title="サービスを切り替える">
+                <span id="header-service-current-icon">🌐</span>
+                <span id="header-service-current-name">全サービス共通 (ホーム)</span>
+                <span class="switcher-arrow">▾</span>
+              </button>
+              <div id="header-service-dropdown" class="header-service-dropdown" style="display: none;">
+                <div class="header-service-dropdown-header">利用サービス切り替え</div>
+                <div class="header-service-dropdown-item active" data-service-id="home" id="service-opt-home">
+                  <span class="service-item-icon">🌐</span>
+                  <div class="service-item-info">
+                    <div class="service-item-title">全サービス共通 (ホーム)</div>
+                    <div class="service-item-desc">横断検索・全社スケジュール・ポータル</div>
+                  </div>
+                  <span class="service-item-badge">ポータル</span>
+                </div>
+                <div class="header-service-dropdown-item" data-service-id="yosandas" id="service-opt-yosandas">
+                  <span class="service-item-icon">📊</span>
+                  <div class="service-item-info">
+                    <div class="service-item-title">ヨサンダス</div>
+                    <div class="service-item-desc">JO・代理店・申込者マスタ & アポイント管理</div>
+                  </div>
+                  <span class="service-item-badge active-badge">利用可能</span>
+                </div>
+                <div class="header-service-dropdown-item disabled" data-service-id="yosandas_plus" id="service-opt-yosandas-plus" title="準備中">
+                  <span class="service-item-icon">✨</span>
+                  <div class="service-item-info">
+                    <div class="service-item-title">ヨサンダス＋</div>
+                    <div class="service-item-desc">次世代拡張サービス（近日公開）</div>
+                  </div>
+                  <span class="service-item-badge disabled-badge">準備中</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -916,7 +965,7 @@
 </section>
 
 <!-- ================= フォーム作成画面 ================= -->
-<section id="form-customize-screen" class="screen-view" style="padding: 0; height: calc(100vh - 120px); min-height: 0; display: flex; flex-direction: column;">
+<section id="form-customize-screen" class="screen-view" style="display: none; padding: 0; height: calc(100vh - 120px); min-height: 0; flex-direction: column;">
 <iframe src="form-customize/index.html?v=8.6.0" style="width: 100%; height: 100%; flex: 1 1 auto; border: none; display: block;"></iframe>
 </section>
 
@@ -2271,14 +2320,67 @@
   </div>
 </section>
 
-<!-- ================= ホーム画面 ================= -->
+<!-- ================= ホーム画面（全サービス共通ポータル） ================= -->
 <section id="home-screen" class="screen-view">
-<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
-<h1 style="margin-bottom: 0; font-size: 1.4rem;">ホーム</h1>
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
+  <div>
+    <div style="display: flex; align-items: center; gap: 0.6rem;">
+      <h1 style="margin-bottom: 0; font-size: 1.45rem; font-weight: 800;">ホーム</h1>
+      <span style="font-size: 0.72rem; background: rgba(37,99,235,0.1); color: var(--primary); font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 9999px; border: 1px solid rgba(37,99,235,0.25);">全サービス共通ポータル</span>
+    </div>
+    <p style="margin: 0.25rem 0 0 0; font-size: 0.82rem; color: var(--text-secondary);">利用するサービスを選択するか、全社横断の顧客検索およびスケジュールをご確認ください。</p>
+  </div>
 </div>
+
+<!-- 🚀 サービス選択セクション (正方形アプリアイコン) -->
+<div class="service-selector-section" style="margin-bottom: 1.75rem;">
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+    <h2 style="font-size: 0.98rem; font-weight: 700; margin: 0; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+      <span>🚀</span> 利用サービスを選択
+    </h2>
+    <span style="font-size: 0.75rem; color: var(--text-muted);">正方形アイコンをクリックしてサービスを開始</span>
+  </div>
+  <div class="service-icon-grid" id="home-service-icon-grid">
+    <!-- 1. ヨサンダス (正方形) -->
+    <div class="service-square-card" id="home-card-yosandas" data-service-id="yosandas" role="button" tabindex="0" title="ヨサンダスを開始&#13;JO・代理店・申込者マスタの統合管理およびアポイント記録">
+      <div class="service-square-badge service-badge-live">利用可能</div>
+      <div class="service-square-icon-box" style="background: linear-gradient(135deg, #2563eb, #1d4ed8);">
+        <span style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));">📊</span>
+      </div>
+      <div class="service-square-name">ヨサンダス</div>
+      <div class="service-square-desc">JO・代理店・申込者マスタ & アポイント管理</div>
+      <div class="service-square-action">
+        <span>サービスを開く</span>
+        <span style="font-size: 0.85rem;">➔</span>
+      </div>
+    </div>
+
+    <!-- 2. ヨサンダス＋ (正方形・グレーアウト準備中) -->
+    <div class="service-square-card disabled-service-card" id="home-card-yosandas-plus" data-service-id="yosandas_plus" role="button" tabindex="-1" title="ヨサンダス＋（準備中）&#13;次世代拡張機能。現在はご利用いただけません。">
+      <div class="service-square-badge service-badge-disabled">準備中</div>
+      <div class="service-square-icon-box" style="background: linear-gradient(135deg, #64748b, #475569); opacity: 0.6;">
+        <span style="font-size: 2.2rem; filter: grayscale(80%);">✨</span>
+      </div>
+      <div class="service-square-name" style="color: var(--text-muted);">ヨサンダス＋</div>
+      <div class="service-square-desc" style="color: var(--text-muted);">次期拡張サービス（近日公開予定）</div>
+      <div class="service-square-action" style="color: var(--text-muted); opacity: 0.7;">
+        <span>🔒 準備中</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 🔍 全サービス横断 顧客検索 -->
 <div class="list-section" style="padding: 1.5rem; background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); position: relative; margin-bottom: 1.5rem;">
   <div style="margin-bottom: 0.5rem; display: flex; flex-direction: column; gap: 0.75rem;">
-    <p style="font-size: 0.9rem; color: var(--text-secondary); text-align: left; margin: 0; font-weight: 600;">🔍 顧客ID・名前・電話番号でマスタ横断検索</p>
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+      <p style="font-size: 0.92rem; color: var(--text-primary); text-align: left; margin: 0; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+        <span>🔍</span> 全サービス横断 顧客マスタ検索
+      </p>
+      <span style="font-size: 0.72rem; color: var(--text-muted); background: var(--bg-surface-elevated); padding: 0.15rem 0.45rem; border-radius: 4px; border: 1px solid var(--border-color);">
+        ヨサンダス ＆ 全登録マスタ横断
+      </span>
+    </div>
     <div style="display: flex; gap: 0.5rem; width: 100%;">
       <input type="text" id="global-search-input" placeholder="顧客ID、名前、または電話番号を入力..." style="flex: 1; padding: 0.6rem 1rem; font-size: 0.9rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
       <button class="btn btn-primary" id="global-search-btn" style="padding: 0.6rem 1.5rem; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; cursor: pointer;">
@@ -2292,6 +2394,27 @@
     <div id="global-search-empty-msg" style="display: none; margin-top: 0.75rem; font-size: 0.85rem; color: var(--danger); font-weight: 500; text-align: left;">
       ⚠️ 該当するマスタ情報が見つかりませんでした。入力内容をお確かめください。
     </div>
+  </div>
+</div>
+
+<!-- 📅 サービス横断 スケジュール概要ウィジェット -->
+<div class="list-section home-schedule-section" style="padding: 1.5rem; background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); margin-bottom: 1.5rem;">
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <span style="font-size: 1.25rem;">📅</span>
+      <div>
+        <h3 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--text-primary);">全社横断 スケジュール ＆ 直近タスク</h3>
+        <p style="margin: 0; font-size: 0.73rem; color: var(--text-muted);">全サービスの予定・アポイント・締切をまとめて確認</p>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <span id="home-schedule-today-date" style="font-size: 0.78rem; font-weight: 700; color: var(--primary); background: rgba(37,99,235,0.08); padding: 0.2rem 0.5rem; border-radius: 4px;"></span>
+      <button id="home-schedule-open-calendar-btn" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; font-weight: 600; cursor: pointer;">カレンダー詳細 ➔</button>
+    </div>
+  </div>
+  <!-- スケジュールリストコンテナ -->
+  <div id="home-schedule-list-container" class="home-schedule-list">
+    <!-- JSで動的描画 -->
   </div>
 </div>
 
