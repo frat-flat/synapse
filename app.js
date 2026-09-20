@@ -583,6 +583,18 @@ function setupInactivityMonitors() {
     if (globalLogoutTimer) clearTimeout(globalLogoutTimer);
     globalLogoutTimer = setTimeout(() => {
       if (state.currentUser) {
+        // 未統合フォームがあれば次回ログイン時新着通知用に記録
+        try {
+          const unmergedForms = (typeof getUnmergedForms === 'function') ? getUnmergedForms() : [];
+          if (unmergedForms.length > 0) {
+            localStorage.setItem('synapse_unmerged_forms_notice', JSON.stringify({
+              forms: unmergedForms.map(f => ({ id: f.id, title: f.title || '無題のフォーム', updatedAt: f.publishedAt || new Date().toISOString() })),
+              timestamp: Date.now(),
+              reason: 'auto_logout'
+            }));
+          }
+        } catch(err) {}
+
         handleLogout();
         showToast('1時間無操作だったため、自動的にログアウトしました。', 'warning');
       }
@@ -1160,6 +1172,23 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('beforeunload', (e) => {
     const hasUnsavedForm = state.isFormDirty;
     const hasPendingSync = state.syncQueue.length > 0;
+    const unmergedForms = (typeof getUnmergedForms === 'function') ? getUnmergedForms() : [];
+
+    // 未統合フォームがある場合、次回ログイン時の新着通知用にローカルストレージへ保存
+    if (unmergedForms.length > 0) {
+      try {
+        localStorage.setItem('synapse_unmerged_forms_notice', JSON.stringify({
+          forms: unmergedForms.map(f => ({ id: f.id, title: f.title || '無題のフォーム', updatedAt: f.publishedAt || new Date().toISOString() })),
+          timestamp: Date.now(),
+          reason: 'tab_close'
+        }));
+      } catch(err) {}
+
+      e.preventDefault();
+      e.returnValue = '本番に統合されていないフォームの編集内容があります。このページを離れますか？';
+      return e.returnValue;
+    }
+
     if (hasUnsavedForm || hasPendingSync) {
       e.preventDefault();
       e.returnValue = '作業内容が保存されていない可能性があります。このページを離れますか？';
@@ -1720,6 +1749,9 @@ function setupSupabaseAuthListener() {
           if (typeof openMyPage === 'function') openMyPage();
         }
         if (typeof updateServiceUIState === 'function') updateServiceUIState();
+        if (typeof checkAndShowUnmergedFormsLoginNotice === 'function') {
+          checkAndShowUnmergedFormsLoginNotice();
+        }
         
         // ログイン成功時にバックグラウンドで管理者の共有メモをロードする
         loadAdminSharedMemos().catch(err => console.error('[Supabase API] Shared load error on login:', err));
@@ -12707,6 +12739,9 @@ function checkLoginStatus() {
       if (savedService) state.activeService = savedService;
     } catch (e) {}
     if (typeof updateServiceUIState === 'function') updateServiceUIState();
+    if (typeof checkAndShowUnmergedFormsLoginNotice === 'function') {
+      checkAndShowUnmergedFormsLoginNotice();
+    }
 
     // ズーム比率の復元・マイグレーション処理（画面全体のCSSズームは100%に戻し、レイアウト占有面積を60%にする設計に対応）
     const migrationKey = `SYNAPSE_ZOOM_MIGRATION_V100_RESTORE_LAYOUT_${userId}`;
@@ -13972,6 +14007,293 @@ function activateTab(id) {
   }
 }
 
+// ============================================================================
+// 🚀 フォーム本番未統合検知 & 統合ヘルパー (タブ削除・離脱・ログアウト・新着通知)
+// ============================================================================
+
+// 1. 本番へ未統合のフォーム一覧を取得
+function getUnmergedForms() {
+  try {
+    const raw = localStorage.getItem('form_customize_all_forms');
+    if (!raw) return [];
+    const forms = JSON.parse(raw);
+    if (!Array.isArray(forms)) return [];
+
+    return forms.filter(f => {
+      if (!f || !f.sections || f.sections.length === 0) return false;
+      // スナップショットがまだ一度も作成されていない場合は未統合
+      if (!f.publishedSnapshot) return true;
+
+      // コア設定の比較
+      const extractCore = (obj) => ({
+        title: (obj.title || '').trim(),
+        subtitle: (obj.subtitle || '').trim(),
+        description: (obj.description || '').trim(),
+        sections: (obj.sections || []).map(sec => ({
+          id: sec.id,
+          title: (sec.title || '').trim(),
+          questions: (sec.questions || []).map(q => ({
+            id: q.id,
+            title: (q.title || '').trim(),
+            type: q.type,
+            required: !!q.required,
+            options: q.options || [],
+            dataKey: q.dataKey || null
+          }))
+        }))
+      });
+
+      return JSON.stringify(extractCore(f)) !== JSON.stringify(extractCore(f.publishedSnapshot));
+    });
+  } catch(e) {
+    console.warn('[Unmerged Forms] Check error:', e);
+    return [];
+  }
+}
+window.getUnmergedForms = getUnmergedForms;
+
+// 2. 親ウィンドウからフォームを本番統合する処理
+async function mergeFormToProductionFromParent(formIdentifier) {
+  try {
+    const raw = localStorage.getItem('form_customize_all_forms');
+    if (!raw) return false;
+    let forms = JSON.parse(raw);
+    if (!Array.isArray(forms)) return false;
+
+    // formIdentifierが 'all' の場合は未統合フォームをすべて統合
+    const targetForms = (formIdentifier === 'all' || !formIdentifier)
+      ? getUnmergedForms()
+      : forms.filter(f => f && (f.id === formIdentifier || f.title === formIdentifier));
+
+    if (targetForms.length === 0) return false;
+
+    for (const f of targetForms) {
+      const idx = forms.findIndex(x => x && (x.id === f.id || x.title === f.title));
+      if (idx === -1) continue;
+
+      const nextVer = (f.publishedVersion || 1) + 1;
+      const snapshot = {
+        id: f.id || `form_${idx}`,
+        title: f.title || '無題のフォーム',
+        subtitle: f.subtitle || '',
+        description: f.description || '',
+        headerStyle: f.headerStyle || 'card-accent-top',
+        headerAlign: f.headerAlign || 'left',
+        subtitlePosition: f.subtitlePosition || 'below',
+        titleBadgeShape: f.titleBadgeShape || 'none',
+        titleBadgeStyle: f.titleBadgeStyle || 'fill',
+        titleBadgeBgType: f.titleBadgeBgType || 'primary',
+        titleBadgeBgCustom: f.titleBadgeBgCustom || '#1a73e8',
+        titleBadgeColorType: f.titleBadgeColorType || 'white',
+        titleBadgeColorCustom: f.titleBadgeColorCustom || '#ffffff',
+        titleWarpShape: f.titleWarpShape || 'none',
+        titleWarpStrength: f.titleWarpStrength !== undefined ? f.titleWarpStrength : 50,
+        titleWarpEffect: f.titleWarpEffect || 'none',
+        titleLightAngle: f.titleLightAngle !== undefined ? f.titleLightAngle : 315,
+        titleLightIntensity: f.titleLightIntensity !== undefined ? f.titleLightIntensity : 60,
+        titleColorType: f.titleColorType || 'default',
+        titleColorCustom: f.titleColorCustom || '#1a73e8',
+        titleFontFamily: f.titleFontFamily || 'default',
+        titleFontTarget: f.titleFontTarget || 'both',
+        sections: JSON.parse(JSON.stringify(f.sections || [])),
+        theme: f.theme ? JSON.parse(JSON.stringify(f.theme)) : null,
+        settings: f.settings ? JSON.parse(JSON.stringify(f.settings)) : null,
+        appearance: f.appearance ? JSON.parse(JSON.stringify(f.appearance)) : null,
+        estimatedTime: f.estimatedTime || null,
+        targetTableMode: f.targetTableType === 'dedicated' ? 'dedicated' : 'unified',
+        targetTableId: f.targetTableId || (f.createDedicatedTable ? 'dedicated' : 'table_all_form_responses'),
+        createDedicatedTable: !!f.createDedicatedTable,
+        isUnpublished: !!f.isUnpublished,
+        publishedVersion: nextVer,
+        publishedAt: new Date().toISOString()
+      };
+
+      f.publishedSnapshot = snapshot;
+      f.publishedVersion = nextVer;
+      f.publishedAt = snapshot.publishedAt;
+      forms[idx] = f;
+    }
+
+    localStorage.setItem('form_customize_all_forms', JSON.stringify(forms));
+
+    // Supabaseへの自動同期
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try {
+        await supabaseClient.from('synapse_storage').upsert({
+          key: 'synapse_form_customize_all_forms',
+          value: forms,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+      } catch(sbErr) {
+        console.warn('[Unmerged Merge] Supabase sync warning:', sbErr);
+      }
+    }
+
+    // iframe が存在すれば内部にメッセージを送ってUI同期
+    const formIframe = document.querySelector('#form-customize-screen iframe');
+    if (formIframe && formIframe.contentWindow) {
+      formIframe.contentWindow.postMessage({ type: 'SYNAPSE_FORCE_MERGE_COMPLETED' }, '*');
+    }
+
+    return true;
+  } catch(e) {
+    console.error('[Unmerged Merge] Error:', e);
+    return false;
+  }
+}
+window.mergeFormToProductionFromParent = mergeFormToProductionFromParent;
+
+// 3. タブ削除やログアウト時の「本番環境へ統合しますか？」モーダル表示
+function promptUnmergedFormConfirm(unmergedForms, onProceed, onCancel) {
+  const modal = document.getElementById('modal-unmerged-form-confirm');
+  if (!modal) {
+    const titles = unmergedForms.map(f => f.title || '無題のフォーム').join('、');
+    if (confirm(`フォーム「${titles}」に本番へ未統合の編集内容があります。\n\n本番公開リンク（main）へ統合してから閉じますか？\n・[OK]: 本番へ統合して閉じる\n・[キャンセル]: 統合せずに閉じる`)) {
+      mergeFormToProductionFromParent('all').then(() => {
+        showToast('本番環境へ統合しました。', 'success');
+        if (onProceed) onProceed();
+      });
+    } else {
+      if (onProceed) onProceed();
+    }
+    return;
+  }
+
+  const nameEl = document.getElementById('unmerged-modal-form-names');
+  if (nameEl) {
+    nameEl.textContent = unmergedForms.map(f => f.title || '無題のフォーム').join('、');
+  }
+
+  const btnMerge = document.getElementById('btn-unmerged-confirm-merge');
+  const btnDiscard = document.getElementById('btn-unmerged-confirm-discard');
+  const btnCancel = document.getElementById('btn-unmerged-confirm-cancel');
+
+  const closeModal = () => {
+    modal.style.display = 'none';
+  };
+
+  if (btnMerge) {
+    btnMerge.onclick = async () => {
+      btnMerge.disabled = true;
+      btnMerge.textContent = '⏳ 統合中...';
+      try {
+        await mergeFormToProductionFromParent('all');
+        showToast('本番公開リンクへ最新の編集内容を統合しました！', 'success');
+        closeModal();
+        if (onProceed) onProceed();
+      } catch(err) {
+        alert('統合処理に失敗しました: ' + err.message);
+      } finally {
+        btnMerge.disabled = false;
+        btnMerge.textContent = '🚀 本番へ統合して閉じる';
+      }
+    };
+  }
+
+  if (btnDiscard) {
+    btnDiscard.onclick = () => {
+      closeModal();
+      if (onProceed) onProceed();
+    };
+  }
+
+  if (btnCancel) {
+    btnCancel.onclick = () => {
+      closeModal();
+      if (onCancel) onCancel();
+    };
+  }
+
+  modal.style.display = 'flex';
+}
+window.promptUnmergedFormConfirm = promptUnmergedFormConfirm;
+
+// 4. 🔔 次回ログイン時・未統合フォーム新着通知の表示
+function checkAndShowUnmergedFormsLoginNotice() {
+  try {
+    const noticeRaw = localStorage.getItem('synapse_unmerged_forms_notice');
+    const unmergedForms = (typeof getUnmergedForms === 'function') ? getUnmergedForms() : [];
+
+    // 通知キュー、または現在未統合のフォームが存在する場合に表示
+    if (unmergedForms.length === 0 && !noticeRaw) return;
+
+    const modal = document.getElementById('modal-unmerged-login-notice');
+    if (!modal) return;
+
+    let noticeObj = null;
+    try { noticeObj = noticeRaw ? JSON.parse(noticeRaw) : null; } catch(err) {}
+
+    const activeForms = unmergedForms.length > 0
+      ? unmergedForms
+      : (noticeObj && noticeObj.forms ? noticeObj.forms : []);
+    if (activeForms.length === 0) return;
+
+    const listContainer = document.getElementById('login-notice-unmerged-list');
+    if (listContainer) {
+      listContainer.innerHTML = activeForms.map(f => `
+        <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.15rem;">📋</span>
+            <div>
+              <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a;">${f.title || '無題のフォーム'}</div>
+              <div style="font-size: 0.72rem; color: #64748b;">本番公開リンク: 旧バージョン保護中</div>
+            </div>
+          </div>
+          <span style="background: #fee2e2; color: #b91c1c; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; border: 1px solid #fca5a5;">未統合</span>
+        </div>
+      `).join('');
+    }
+
+    const closeModal = () => {
+      modal.style.display = 'none';
+      localStorage.removeItem('synapse_unmerged_forms_notice');
+    };
+
+    const btnCloseX = document.getElementById('btn-close-login-notice-x');
+    const btnDismiss = document.getElementById('btn-login-notice-dismiss');
+    const btnOpenForm = document.getElementById('btn-login-notice-open-form');
+    const btnMergeAll = document.getElementById('btn-login-notice-merge-all');
+
+    if (btnCloseX) btnCloseX.onclick = closeModal;
+    if (btnDismiss) btnDismiss.onclick = closeModal;
+
+    if (btnOpenForm) {
+      btnOpenForm.onclick = () => {
+        closeModal();
+        if (typeof openTab === 'function') {
+          openTab('form-customize-screen', 'form-customize-screen', '📋 フォーム作成');
+        }
+      };
+    }
+
+    if (btnMergeAll) {
+      btnMergeAll.onclick = async () => {
+        btnMergeAll.disabled = true;
+        btnMergeAll.textContent = '⏳ 本番へ統合中...';
+        try {
+          await mergeFormToProductionFromParent('all');
+          closeModal();
+          showToast('すべてのフォーム編集を本番公開リンクへ統合しました！', 'success');
+        } catch(err) {
+          alert('本番統合に失敗しました: ' + err.message);
+        } finally {
+          btnMergeAll.disabled = false;
+          btnMergeAll.textContent = '🚀 今すぐ本番へ統合する';
+        }
+      };
+    }
+
+    // ログイン完了後に少し余白をおいてスムーズに表示
+    setTimeout(() => {
+      modal.style.display = 'flex';
+    }, 500);
+
+  } catch(e) {
+    console.warn('[Login Notice] Display error:', e);
+  }
+}
+window.checkAndShowUnmergedFormsLoginNotice = checkAndShowUnmergedFormsLoginNotice;
+
 // タブを閉じる
 function closeTab(id, event) {
   if (event) event.stopPropagation();
@@ -13981,12 +14303,34 @@ function closeTab(id, event) {
 
   const tab = state.tabs[tabIndex];
 
+  // 🚀 フォーム作成タブを閉じる際、本番未統合の編集があればポップアップを表示
+  if (tab.type === 'form-customize-screen' || tab.id === 'form-customize-tab' || tab.type === 'form-customize-tab' || tab.id === 'form-customize-screen') {
+    const unmergedForms = getUnmergedForms();
+    if (unmergedForms.length > 0) {
+      promptUnmergedFormConfirm(
+        unmergedForms,
+        () => {
+          proceedActualCloseTab(id, tabIndex);
+        },
+        () => {
+          // キャンセル時はタブを閉じない
+        }
+      );
+      return;
+    }
+  }
+
   // 未保存の下書き編集中の場合は確認ダイアログを表示
   if (tab.type === 'appointment-screen' && tab.appointData && tab.appointData.isFormDirty && tab.appointData.status === 'draft') {
     if (!confirm(`「${tab.title}」は保存されていません。このタブを閉じてもよろしいですか？`)) {
       return;
     }
   }
+
+  proceedActualCloseTab(id, tabIndex);
+}
+
+function proceedActualCloseTab(id, tabIndex) {
 
   let nextActiveTabId = null;
   if (state.activeTabId === id) {
@@ -14508,7 +14852,18 @@ function setupEventListeners() {
 
   // ログイン・ログアウト
   document.getElementById('login-form').addEventListener('submit', handleLogin);
-  document.getElementById('logout-btn').addEventListener('click', handleLogout);
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    const unmergedForms = (typeof getUnmergedForms === 'function') ? getUnmergedForms() : [];
+    if (unmergedForms.length > 0) {
+      promptUnmergedFormConfirm(
+        unmergedForms,
+        () => { handleLogout(); },
+        () => { /* キャンセル */ }
+      );
+    } else {
+      handleLogout();
+    }
+  });
 
   // テーマ切り替え
   const themeSelector = document.getElementById('theme-selector');
@@ -16007,6 +16362,9 @@ async function handleLogin(e) {
         if (typeof openMyPage === 'function') openMyPage();
       }
       showToast('管理者としてログインしました。', 'success');
+      if (typeof checkAndShowUnmergedFormsLoginNotice === 'function') {
+        checkAndShowUnmergedFormsLoginNotice();
+      }
       return;
     }
 
@@ -16119,6 +16477,9 @@ async function handleLogin(e) {
           }
         }
         if (typeof updateServiceUIState === 'function') updateServiceUIState();
+        if (typeof checkAndShowUnmergedFormsLoginNotice === 'function') {
+          checkAndShowUnmergedFormsLoginNotice();
+        }
       }
     }
   } catch (err) {

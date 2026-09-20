@@ -7203,6 +7203,25 @@
           evaluateLiveSkipLogic();
           injectDraftSavePanelToPreview();
         }
+      } else if (event.data.type === 'SYNAPSE_FORCE_MERGE_COMPLETED') {
+        try {
+          const raw = localStorage.getItem('form_customize_all_forms');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              window.U = parsed;
+              const idx = (window.W !== undefined ? window.W : (parseInt(localStorage.getItem('form_customize_active_index'), 10) || 0));
+              if (window.U[idx]) {
+                window.G = window.U[idx];
+              }
+            }
+          }
+          if (typeof updatePublishSyncUI === 'function') {
+            updatePublishSyncUI();
+          }
+        } catch (e) {
+          console.warn('[Message: SYNAPSE_FORCE_MERGE_COMPLETED] Error updating UI:', e);
+        }
       }
     });
   }
