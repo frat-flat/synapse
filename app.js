@@ -5761,7 +5761,7 @@ function renderCustomTableList() {
       folderDiv.draggable = false;
 
       // アクセス権限に応じたグレーアウト
-      if (!access.canRead) {
+      if (access.grayout) {
         folderDiv.classList.add('grayed-out-access');
       } else {
         folderDiv.classList.remove('grayed-out-access');
