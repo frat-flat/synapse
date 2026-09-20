@@ -12840,6 +12840,12 @@ function showLoginScreen(show) {
     if (userPopover) userPopover.style.display = 'none';
     const settingsPopup = document.getElementById('sidebar-settings-popup');
     if (settingsPopup) settingsPopup.style.display = 'none';
+    const notifPopover = document.getElementById('notification-popover');
+    if (notifPopover) notifPopover.style.display = 'none';
+    const loginNotifModal = document.getElementById('login-notification-modal');
+    if (loginNotifModal) loginNotifModal.style.display = 'none';
+    const notifBadge = document.getElementById('notification-badge');
+    if (notifBadge) notifBadge.style.display = 'none';
 
     // ログイン画面表示時（ログアウト時）は閲覧状況をクリアしてオフラインにする
     if (state.currentUser) {
@@ -12879,6 +12885,13 @@ function showLoginScreen(show) {
     // 📱 ログイン後にスマホボトムバーを描画
     if (typeof renderMobileBottomNav === 'function') {
       renderMobileBottomNav();
+    }
+
+    // 🔔 ログイン後に通知システムの初期化と未読通知ポップアップ
+    if (window.SynapseNotifications && typeof window.SynapseNotifications.initNotificationsForCurrentUser === 'function') {
+      window.SynapseNotifications.initNotificationsForCurrentUser();
+    } else if (typeof initNotificationsForCurrentUser === 'function') {
+      initNotificationsForCurrentUser();
     }
 
     // ログイン成功時はURLを / に更新
@@ -28074,6 +28087,523 @@ document.addEventListener('DOMContentLoaded', () => {
     closeUserPopoverBtn.addEventListener('click', () => {
       userProfilePopover.style.display = 'none';
     });
+  }
+
+  // ==========================================
+  // 🔔 ユーザー別通知ボックス & ログイン後新着通知ポップアップの制御
+  // ==========================================
+  const NOTIFICATION_STORAGE_PREFIX = 'synapse_notifications_';
+
+  function getNotificationStorageKey(userId) {
+    const uid = userId || (state && state.currentUser ? state.currentUser.id : 'guest');
+    return NOTIFICATION_STORAGE_PREFIX + uid;
+  }
+
+  function getNotifications(userId) {
+    try {
+      const key = getNotificationStorageKey(userId);
+      const raw = localStorage.getItem(key);
+      if (!raw) return [];
+      const list = JSON.parse(raw);
+      return Array.isArray(list) ? list : [];
+    } catch (e) {
+      console.error('Failed to load notifications:', e);
+      return [];
+    }
+  }
+
+  function saveNotifications(userId, list) {
+    try {
+      const key = getNotificationStorageKey(userId);
+      localStorage.setItem(key, JSON.stringify(list));
+    } catch (e) {
+      console.error('Failed to save notifications:', e);
+    }
+  }
+
+  function getUnreadNotifications(userId) {
+    return getNotifications(userId).filter(n => !n.read);
+  }
+
+  function addNotification(userId, notification) {
+    const currentList = getNotifications(userId);
+    const now = new Date();
+    const timeStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    const newNotif = {
+      id: notification.id || ('notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)),
+      type: notification.type || 'info',
+      icon: notification.icon || '🔔',
+      title: notification.title || '新しいお知らせ',
+      message: notification.message || '',
+      timestamp: notification.timestamp || timeStr,
+      read: false,
+      link: notification.link || null,
+      actionText: notification.actionText || null
+    };
+    
+    currentList.unshift(newNotif);
+    saveNotifications(userId, currentList);
+    updateNotificationBadgeUI();
+    return newNotif;
+  }
+
+  function markNotificationAsRead(userId, notifId) {
+    const list = getNotifications(userId);
+    let changed = false;
+    list.forEach(n => {
+      if (n.id === notifId && !n.read) {
+        n.read = true;
+        changed = true;
+      }
+    });
+    if (changed) {
+      saveNotifications(userId, list);
+      updateNotificationBadgeUI();
+    }
+  }
+
+  function markAllNotificationsAsRead(userId) {
+    const list = getNotifications(userId);
+    let changed = false;
+    list.forEach(n => {
+      if (!n.read) {
+        n.read = true;
+        changed = true;
+      }
+    });
+    if (changed) {
+      saveNotifications(userId, list);
+      updateNotificationBadgeUI();
+    }
+  }
+
+  function deleteNotification(userId, notifId) {
+    let list = getNotifications(userId);
+    list = list.filter(n => n.id !== notifId);
+    saveNotifications(userId, list);
+    updateNotificationBadgeUI();
+  }
+
+  function ensureInitialNotifications(user) {
+    if (!user || !user.id) return;
+    const initializedKey = 'synapse_notif_init_' + user.id;
+    if (localStorage.getItem(initializedKey)) return;
+
+    const currentList = getNotifications(user.id);
+    if (currentList.length === 0) {
+      const role = user.role || 'general';
+      const now = new Date();
+      const timeStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      
+      const initialList = [];
+      if (role === 'owner') {
+        initialList.push({
+          id: 'notif_init_1_' + user.id,
+          type: 'system',
+          icon: '📢',
+          title: 'Synapseへようこそ（管理者）',
+          message: 'システム設定、ユーザー管理、テーブル作成・連携などすべての管理機能をご利用いただけます。',
+          timestamp: timeStr,
+          read: false
+        });
+        initialList.push({
+          id: 'notif_init_2_' + user.id,
+          type: 'info',
+          icon: '🔔',
+          title: '新機能: 通知ボックスと新着ポップアップ',
+          message: 'ヘッダー右上の🔔アイコンからいつでも通知履歴を確認・管理できるようになりました。',
+          timestamp: timeStr,
+          read: false
+        });
+        initialList.push({
+          id: 'notif_init_3_' + user.id,
+          type: 'warning',
+          icon: '⚠️',
+          title: 'セキュリティ推奨',
+          message: '2段階認証の設定やパスワードの定期的な変更をお勧めします。アカウント情報よりご確認いただけます。',
+          timestamp: timeStr,
+          read: false
+        });
+      } else if (role === 'sales' || role.includes('sales')) {
+        initialList.push({
+          id: 'notif_init_1_' + user.id,
+          type: 'system',
+          icon: '📢',
+          title: 'Synapseへようこそ（営業担当）',
+          message: '担当案件・アポイントの登録・進捗管理・紹介者マスタの連携がご利用いただけます。',
+          timestamp: timeStr,
+          read: false
+        });
+        initialList.push({
+          id: 'notif_init_2_' + user.id,
+          type: 'info',
+          icon: '📅',
+          title: '新着案件・スケジュールの確認',
+          message: '割り当てられた案件や予定はカレンダーおよびタスク一覧から確認できます。',
+          timestamp: timeStr,
+          read: false
+        });
+      } else {
+        initialList.push({
+          id: 'notif_init_1_' + user.id,
+          type: 'system',
+          icon: '📢',
+          title: 'Synapseへようこそ',
+          message: '業務システムの各機能をご利用いただけます。上部ヘッダーの通知ボックスよりお知らせをご確認ください。',
+          timestamp: timeStr,
+          read: false
+        });
+        initialList.push({
+          id: 'notif_init_2_' + user.id,
+          type: 'info',
+          icon: '🔔',
+          title: '通知機能が追加されました',
+          message: '重要なお知らせやアップデート通知は、ログイン時のポップアップおよび通知ボックスでご確認いただけます。',
+          timestamp: timeStr,
+          read: false
+        });
+      }
+      
+      saveNotifications(user.id, initialList);
+    }
+    localStorage.setItem(initializedKey, 'true');
+  }
+
+  function updateNotificationBadgeUI() {
+    const userId = state && state.currentUser ? state.currentUser.id : null;
+    const badgeEl = document.getElementById('notification-badge');
+    const popoverPill = document.getElementById('notif-popover-unread-count');
+    
+    if (!userId || !state || !state.currentUser) {
+      if (badgeEl) badgeEl.style.display = 'none';
+      if (popoverPill) popoverPill.style.display = 'none';
+      return;
+    }
+    
+    const unreads = getUnreadNotifications(userId);
+    const count = unreads.length;
+    
+    if (badgeEl) {
+      if (count > 0) {
+        badgeEl.textContent = count > 99 ? '99+' : String(count);
+        badgeEl.style.display = 'flex';
+      } else {
+        badgeEl.style.display = 'none';
+      }
+    }
+    
+    if (popoverPill) {
+      if (count > 0) {
+        popoverPill.textContent = `${count}件未読`;
+        popoverPill.style.display = 'inline-flex';
+      } else {
+        popoverPill.style.display = 'none';
+      }
+    }
+  }
+
+  let currentNotifFilter = 'all';
+
+  function renderNotificationBox(filter) {
+    if (filter) currentNotifFilter = filter;
+    const container = document.getElementById('notification-items-container');
+    if (!container) return;
+    
+    const userId = state && state.currentUser ? state.currentUser.id : null;
+    if (!userId) {
+      container.innerHTML = '<div class="notif-empty-state"><div class="notif-empty-icon">📭</div><div>ログイン後に通知が表示されます</div></div>';
+      return;
+    }
+    
+    const allNotifs = getNotifications(userId);
+    const displayList = currentNotifFilter === 'unread' ? allNotifs.filter(n => !n.read) : allNotifs;
+    
+    if (displayList.length === 0) {
+      const emptyText = currentNotifFilter === 'unread' ? '未読の通知はありません' : '通知はありません';
+      container.innerHTML = `<div class="notif-empty-state"><div class="notif-empty-icon">📭</div><div>${emptyText}</div></div>`;
+      return;
+    }
+    
+    container.innerHTML = displayList.map(n => {
+      const unreadClass = n.read ? '' : 'unread';
+      const unreadDot = n.read ? '' : '<div class="notif-unread-dot" title="未読"></div>';
+      const readToggleTitle = n.read ? '未読にする' : '既読にする';
+      const readToggleText = n.read ? '未読' : '既読';
+      
+      return `
+        <div class="notif-item ${unreadClass}" data-notif-id="${n.id}">
+          <div class="notif-item-icon">${escapeHtml(n.icon || '🔔')}</div>
+          <div class="notif-item-body">
+            <div class="notif-item-title">${escapeHtml(n.title)}</div>
+            <div class="notif-item-message">${escapeHtml(n.message)}</div>
+            <div class="notif-item-meta">
+              <span class="notif-item-time">${escapeHtml(n.timestamp)}</span>
+              <div class="notif-item-actions">
+                <button type="button" class="notif-item-btn notif-toggle-read-btn" data-notif-id="${n.id}" title="${readToggleTitle}">${readToggleText}</button>
+                <button type="button" class="notif-item-btn delete notif-delete-btn" data-notif-id="${n.id}" title="削除">✕</button>
+              </div>
+            </div>
+          </div>
+          ${unreadDot}
+        </div>
+      `;
+    }).join('');
+    
+    container.querySelectorAll('.notif-toggle-read-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const notifId = btn.getAttribute('data-notif-id');
+        const list = getNotifications(userId);
+        const target = list.find(item => item.id === notifId);
+        if (target) {
+          target.read = !target.read;
+          saveNotifications(userId, list);
+          updateNotificationBadgeUI();
+          renderNotificationBox();
+        }
+      });
+    });
+    
+    container.querySelectorAll('.notif-delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const notifId = btn.getAttribute('data-notif-id');
+        deleteNotification(userId, notifId);
+        renderNotificationBox();
+      });
+    });
+    
+    container.querySelectorAll('.notif-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const notifId = item.getAttribute('data-notif-id');
+        markNotificationAsRead(userId, notifId);
+        renderNotificationBox();
+      });
+    });
+  }
+
+  function openNotificationBox() {
+    const popover = document.getElementById('notification-popover');
+    const userProfilePopover = document.getElementById('user-profile-popover');
+    if (userProfilePopover) userProfilePopover.style.display = 'none';
+    
+    if (popover) {
+      const isMobile = window.innerWidth <= 768;
+      if (isMobile) {
+        popover.style.position = 'fixed';
+        popover.style.top = '36px';
+        popover.style.left = '8px';
+        popover.style.right = '8px';
+        popover.style.width = 'auto';
+      } else {
+        const notifBtn = document.getElementById('header-notification-btn');
+        if (notifBtn) {
+          const rect = notifBtn.getBoundingClientRect();
+          popover.style.position = 'fixed';
+          popover.style.top = `${rect.bottom + 8}px`;
+          const rightPos = Math.max(10, window.innerWidth - rect.right);
+          popover.style.right = `${rightPos}px`;
+          popover.style.left = 'auto';
+          popover.style.width = '380px';
+        }
+      }
+      renderNotificationBox();
+      popover.style.display = 'flex';
+    }
+  }
+
+  function closeNotificationBox() {
+    const popover = document.getElementById('notification-popover');
+    if (popover) popover.style.display = 'none';
+  }
+
+  function toggleNotificationBox() {
+    const popover = document.getElementById('notification-popover');
+    if (!popover) return;
+    const isHidden = popover.style.display === 'none' || !popover.style.display;
+    if (isHidden) {
+      openNotificationBox();
+    } else {
+      closeNotificationBox();
+    }
+  }
+
+  function checkAndShowLoginNotificationPopup() {
+    if (!state || !state.currentUser) return;
+    const userId = state.currentUser.id;
+    const unreads = getUnreadNotifications(userId);
+    
+    if (unreads.length === 0) return; // 未読がない場合は表示しない
+    
+    const modal = document.getElementById('login-notification-modal');
+    const countText = document.getElementById('login-notif-count-text');
+    const listContainer = document.getElementById('login-notif-list-container');
+    
+    if (!modal || !listContainer) return;
+    
+    if (countText) countText.textContent = `${unreads.length}件`;
+    
+    listContainer.innerHTML = unreads.map(n => `
+      <div class="login-notif-card-item">
+        <div class="login-notif-card-icon">${escapeHtml(n.icon || '📢')}</div>
+        <div class="login-notif-card-content">
+          <div class="login-notif-card-title">${escapeHtml(n.title)}</div>
+          <div class="login-notif-card-msg">${escapeHtml(n.message)}</div>
+          <div class="login-notif-card-time">${escapeHtml(n.timestamp)}</div>
+        </div>
+      </div>
+    `).join('');
+    
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+  }
+
+  function closeLoginNotificationPopup() {
+    const modal = document.getElementById('login-notification-modal');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.style.display = 'none';
+    }
+  }
+
+  function initNotificationsForCurrentUser() {
+    if (!state || !state.currentUser) return;
+    ensureInitialNotifications(state.currentUser);
+    updateNotificationBadgeUI();
+    setTimeout(() => {
+      checkAndShowLoginNotificationPopup();
+    }, 350);
+  }
+
+  // グローバル（window）にも公開して他画面やテストからアクセス可能にする
+  window.SynapseNotifications = {
+    getNotifications,
+    getUnreadNotifications,
+    addNotification,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    deleteNotification,
+    updateNotificationBadgeUI,
+    renderNotificationBox,
+    openNotificationBox,
+    closeNotificationBox,
+    toggleNotificationBox,
+    checkAndShowLoginNotificationPopup,
+    closeLoginNotificationPopup,
+    initNotificationsForCurrentUser
+  };
+
+  // イベントリスナーの登録
+  const notifBtn = document.getElementById('header-notification-btn');
+  const closePopoverBtn = document.getElementById('close-notification-popover-btn');
+  const markAllReadBtn = document.getElementById('notif-mark-all-read-btn');
+  const addTestNotifBtn = document.getElementById('notif-add-test-btn');
+
+  if (notifBtn) {
+    notifBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleNotificationBox();
+    });
+  }
+
+  if (closePopoverBtn) {
+    closePopoverBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeNotificationBox();
+    });
+  }
+
+  if (markAllReadBtn) {
+    markAllReadBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!state || !state.currentUser) return;
+      markAllNotificationsAsRead(state.currentUser.id);
+      renderNotificationBox();
+      if (typeof showToast === 'function') showToast('すべての通知を既読にしました', 'info');
+    });
+  }
+
+  const filterTabs = document.querySelectorAll('.notif-filter-tab');
+  filterTabs.forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      e.stopPropagation();
+      filterTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const filter = tab.getAttribute('data-filter') || 'all';
+      renderNotificationBox(filter);
+    });
+  });
+
+  if (addTestNotifBtn) {
+    addTestNotifBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!state || !state.currentUser) return;
+      const testTitles = [
+        '新規商談アポイントメント',
+        '顧客情報の更新通知',
+        'システムメンテナンスのお知らせ',
+        '週次業務レポートの提出リマインド'
+      ];
+      const testIcons = ['🔔', '📅', '📝', 'ℹ️'];
+      const randIdx = Math.floor(Math.random() * testTitles.length);
+      addNotification(state.currentUser.id, {
+        icon: testIcons[randIdx],
+        title: testTitles[randIdx],
+        message: 'これはシステムから送信された通知テストです。'
+      });
+      renderNotificationBox();
+      if (typeof showToast === 'function') showToast('テスト通知を追加しました', 'success');
+    });
+  }
+
+  const modalCloseX = document.getElementById('login-notif-close-x-btn');
+  const modalLaterBtn = document.getElementById('login-notif-later-btn');
+  const modalMarkAllBtn = document.getElementById('login-notif-mark-all-read-btn');
+  const modalOpenBoxBtn = document.getElementById('login-notif-open-box-btn');
+
+  if (modalCloseX) {
+    modalCloseX.addEventListener('click', () => {
+      closeLoginNotificationPopup();
+    });
+  }
+  if (modalLaterBtn) {
+    modalLaterBtn.addEventListener('click', () => {
+      closeLoginNotificationPopup();
+    });
+  }
+  if (modalMarkAllBtn) {
+    modalMarkAllBtn.addEventListener('click', () => {
+      if (state && state.currentUser) {
+        markAllNotificationsAsRead(state.currentUser.id);
+      }
+      closeLoginNotificationPopup();
+      if (typeof showToast === 'function') showToast('すべての通知を既読にしました', 'info');
+    });
+  }
+  if (modalOpenBoxBtn) {
+    modalOpenBoxBtn.addEventListener('click', () => {
+      closeLoginNotificationPopup();
+      setTimeout(() => {
+        openNotificationBox();
+      }, 100);
+    });
+  }
+
+  // ポップオーバー外側クリックで閉じる
+  document.addEventListener('click', (e) => {
+    const popover = document.getElementById('notification-popover');
+    const notifBtnEl = document.getElementById('header-notification-btn');
+    if (popover && popover.style.display !== 'none' && notifBtnEl) {
+      if (!popover.contains(e.target) && !notifBtnEl.contains(e.target)) {
+        closeNotificationBox();
+      }
+    }
+  });
+
+  // 初期ロード時、すでにログイン状態であれば通知システムを初期化
+  if (state && state.currentUser) {
+    initNotificationsForCurrentUser();
   }
 
   // プロファイル編集モーダルの制御
