@@ -1517,7 +1517,7 @@ body:not(.logged-in) .login-layout {
 }
 
 .sidebar-menu.collapsed .logo-text,
-.sidebar-menu.collapsed .sidebar-brand-text-container {
+.sidebar-menu.collapsed .sidebar-service-subtitle-wrapper {
   display: none !important;
 }
 
@@ -1814,29 +1814,17 @@ body:not(.logged-in) .login-layout {
   width: 100%;
   box-sizing: border-box;
   padding: 0 0.2rem;
-  margin-bottom: 0.4rem;
-  min-height: 42px;
+  margin-bottom: 0.25rem;
+  height: 36px;
   position: relative;
 }
 
-.sidebar-brand-text-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-}
-
-.sidebar-brand-text-container .logo-text {
-  font-size: 1.15rem;
-  font-weight: 800;
-  letter-spacing: -0.025em;
-  line-height: 1.1;
-  user-select: none;
-}
-
 .sidebar-service-subtitle-wrapper {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  padding-left: calc(32px + 0.7rem);
+  margin-top: -0.15rem;
+  margin-bottom: 0.45rem;
   cursor: pointer;
   outline: none;
   width: fit-content;
