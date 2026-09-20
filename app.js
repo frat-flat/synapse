@@ -3780,6 +3780,7 @@ function ensureStandardTablesInState() {
       columns: [
         { id: 'master_id', name: 'マスターID / コード', label: 'マスターID / コード', type: 'text' },
         { id: 'form_title', name: 'フォーム名', label: 'フォーム名', type: 'text' },
+        { id: 'has_dedicated_table', name: '独立テーブル有無', label: '独立テーブル有無', type: 'text' },
         { id: 'status', name: 'ステータス', label: 'ステータス', type: 'text' },
         { id: 'registration_code', name: '確定登録コード', label: '確定登録コード', type: 'text' },
         { id: 'submitted_at', name: '回答日時 / 登録日時', label: '回答日時 / 登録日時', type: 'text' },
@@ -3842,7 +3843,8 @@ function ensureStandardTablesInState() {
         id: fTable.id,
         name: fTable.name,
         formTitle: fTable.formTitle,
-        isFormDedicatedTable: true,
+        isFormDedicatedTable: fTable.isFormDedicatedTable || false,
+        isConsolidatedTable: fTable.isConsolidatedTable || false,
         parentMenuId: fTable.parentMenuId,
         columns: fTable.columns,
         visibleColumns: fTable.columns.map(c => c.id),
@@ -3857,10 +3859,21 @@ function ensureStandardTablesInState() {
     } else {
       existing.name = fTable.name;
       existing.formTitle = fTable.formTitle;
-      existing.isFormDedicatedTable = true;
+      if (fTable.isConsolidatedTable) existing.isConsolidatedTable = true;
+      if (fTable.isFormDedicatedTable) existing.isFormDedicatedTable = true;
       if (!existing.columns || existing.columns.length === 0) {
         existing.columns = fTable.columns;
         existing.visibleColumns = fTable.columns.map(c => c.id);
+      } else {
+        // 新規必須定義カラムの自動補完（例: 独立テーブル有無など）
+        fTable.columns.forEach(col => {
+          const hasCol = existing.columns.some(c => c.id === col.id || c.name === col.name || c.label === col.label);
+          if (!hasCol) {
+            existing.columns.push(col);
+            if (existing.visibleColumns) existing.visibleColumns.push(col.id);
+            if (existing.columnWidths) existing.columnWidths[col.id] = 130;
+          }
+        });
       }
       if (!existing.rows) existing.rows = [];
     }
@@ -20776,11 +20789,26 @@ function handleFormSubmitMessage(event) {
       } else {
         state.customTables.push(table);
       }
+
+      // 🌟 全フォーム回答データ内の該当フォームの過去回答行があれば、独立テーブル有無を「あり」に更新！
+      const allTable = state.customTables.find(t => t.id === 'table_all_form_responses');
+      if (allTable && allTable.rows && allTable.columns) {
+        const hasDedCol = allTable.columns.find(c => c.name === '独立テーブル有無' || c.label === '独立テーブル有無');
+        const formTitleCol = allTable.columns.find(c => c.name === 'フォーム名' || c.label === 'フォーム名');
+        if (hasDedCol && formTitleCol) {
+          allTable.rows.forEach(r => {
+            if (r[formTitleCol.id] === table.name || r[formTitleCol.id] === table.formTitle) {
+              r[hasDedCol.id] = 'あり';
+            }
+          });
+        }
+      }
+
       localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
       if (typeof renderCustomTableList === 'function') {
         renderCustomTableList();
       }
-      console.log(`[Synapse] Registered dedicated table from Form Studio: "${table.name}" (ID: ${table.id})`);
+      console.log(`[Synapse] Registered dedicated table from Form Studio: "${table.name}" (ID: ${table.id}) and updated dedicated status in consolidated table.`);
     }
     return;
   }
@@ -20849,7 +20877,7 @@ function handleFormSubmitMessage(event) {
   // 送信イベント以外はスルー
   if (event.data.type !== 'FORM_SUBMIT') return;
 
-  const { formTitle, data, isTemporary, isPartialSubmit, rowId: clientRowId, nextSectionId, currentSectionId, env, branch, targetTableId } = event.data;
+  const { formTitle, data, isTemporary, isPartialSubmit, rowId: clientRowId, nextSectionId, currentSectionId, env, branch, targetTableId, targetTableType } = event.data;
   if (!data) return;
 
   // 🧪 テスト送信フラグの判定（Gitブランチ型環境分離: test vs production）
@@ -20878,7 +20906,7 @@ function handleFormSubmitMessage(event) {
   
   data["再開用URL"] = resumeUrl;
 
-  console.log(`%c[Form Submit]%c Received submission for form "${effectiveFormTitle}" (targetTableId: ${targetTableId || 'default: table_all_form_responses'}, isTest: ${isTestSubmission}, isTemporary: ${!!isTemporary}, isPartial: ${!!isPartialSubmit}, rowId: ${targetRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
+  console.log(`%c[Form Submit]%c Received submission for form "${effectiveFormTitle}" (targetTableId: ${targetTableId || 'default: table_all_form_responses'}, targetTableType: ${targetTableType || 'consolidated'}, isTest: ${isTestSubmission}, isTemporary: ${!!isTemporary}, isPartial: ${!!isPartialSubmit}, rowId: ${targetRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
 
   // ⚠️ テスト送信時はDBテーブルを作成・汚染しない（ユーザー指定仕様: テストデータ用テーブルは不要）
   if (isTestSubmission) {
@@ -20902,140 +20930,189 @@ function handleFormSubmitMessage(event) {
   }
 
   // ----------------------------------------------------
-  // 1. COS内カスタムマスターテーブルへのデータ蓄積・更新（本番送信のみ）
+  // 1. 保存先テーブルの特定と独立テーブル有無の判定
   // ----------------------------------------------------
-  // 保存先テーブルの解決（指定がある場合はそのテーブル、無ければデフォルト「全フォーム回答データ」）
-  let targetTable = null;
-  let isNewTable = false;
   const reqTableId = targetTableId || 'table_all_form_responses';
+  const reqType = targetTableType || (reqTableId === 'dedicated' ? 'dedicated' : (reqTableId === 'table_all_form_responses' ? 'consolidated' : 'existing'));
 
-  if (reqTableId === 'table_all_form_responses') {
-    targetTable = state.customTables.find(t => t.id === 'table_all_form_responses');
-  } else if (reqTableId && reqTableId !== 'dedicated') {
-    targetTable = state.customTables.find(t => t.id === reqTableId || t.name === reqTableId);
-  }
+  // 該当フォームの専用独立テーブルが既に存在するか確認
+  let existingDedicated = state.customTables.find(t => 
+    t.id !== 'table_all_form_responses' && 
+    (t.name === effectiveFormTitle || t.formTitle === effectiveFormTitle || (reqTableId !== 'table_all_form_responses' && t.id === reqTableId))
+  );
 
-  // 独立専用テーブル（dedicated）または見つからない場合はフォーム名で検索
-  if (!targetTable) {
-    targetTable = state.customTables.find(t => t.name === effectiveFormTitle);
-  }
+  // ユーザーが専用独立テーブルを選択しているか判定（選択しない限り独立テーブルは新規作成・追加しない）
+  const isDedicatedSelected = reqType === 'dedicated' || reqTableId === 'dedicated' || (existingDedicated && reqTableId === existingDedicated.id);
 
-  const effectiveTableName = targetTable ? targetTable.name : (effectiveFormTitle || '無題のフォーム');
+  // 独立テーブルの有無ステータス（専用テーブルが選択されている、または既に存在する場合は「あり」、それ以外は「なし」）
+  const hasDedicated = isDedicatedSelected || !!existingDedicated;
+  data["独立テーブル有無"] = hasDedicated ? "あり" : "なし";
 
-  if (!targetTable) {
-    isNewTable = true;
-    const tableId = (reqTableId && reqTableId !== 'dedicated' && reqTableId !== 'table_all_form_responses') ? reqTableId : ('table_' + Date.now());
-    // 送信データにあるすべてのキーをカラム定義として生成する
-    const columns = Object.keys(data).map((key, idx) => ({
-      id: 'col_' + Math.random().toString(36).substr(2, 9),
-      label: key,
-      name: key,
-      type: 'text',
-      required: idx === 0
-    }));
+  let isNewTableCreated = false;
 
-    const defaultWidths = {};
-    columns.forEach(col => {
-      defaultWidths[col.id] = 120;
-    });
-
-    targetTable = {
-      id: tableId,
-      name: effectiveTableName,
-      formTitle: effectiveFormTitle,
-      isFormDedicatedTable: true,
-      parentMenuId: 'root', // メニューのルート直下に配置
-      columns: columns,
-      visibleColumns: columns.map(c => c.id),
-      columnWidths: defaultWidths,
-      rowHeights: {},
-      fixedCol: 'none',
-      fixedRow: 'none',
-      cellStyles: {},
-      rows: []
-    };
-    state.customTables.push(targetTable);
-  } else {
-    // 既存テーブルの場合、送信データに新しいキーがあればカラム定義を自動追加
-    // 既存のカラム定義が label を持っていなければ補完する
-    targetTable.columns.forEach(col => {
+  // 汎用テーブル保存ヘルパー関数（カラム自動拡張・行追加/更新）
+  function saveSubmissionRowToTable(tbl) {
+    if (!tbl) return null;
+    tbl.columns.forEach(col => {
       if (!col.label && col.name) col.label = col.name;
     });
 
     Object.keys(data).forEach(key => {
-      const exists = targetTable.columns.some(col => col.name === key || col.label === key);
+      const exists = tbl.columns.some(col => col.name === key || col.label === key);
       if (!exists) {
         const colId = 'col_' + Math.random().toString(36).substr(2, 9);
-        targetTable.columns.push({
+        tbl.columns.push({
           id: colId,
           label: key,
           name: key,
           type: 'text'
         });
-        if (targetTable.visibleColumns) {
-          targetTable.visibleColumns.push(colId);
-        }
-        if (targetTable.columnWidths) {
-          targetTable.columnWidths[colId] = 120;
-        }
+        if (tbl.visibleColumns) tbl.visibleColumns.push(colId);
+        if (tbl.columnWidths) tbl.columnWidths[colId] = 120;
       }
     });
 
-    // 既存テーブルに必要な他のプロパティが欠落していれば補完する
-    if (!targetTable.rows && targetTable.data) {
-      targetTable.rows = targetTable.data;
-      delete targetTable.data;
+    if (!tbl.rows && tbl.data) {
+      tbl.rows = tbl.data;
+      delete tbl.data;
     }
-    if (!targetTable.rows) targetTable.rows = [];
-    if (!targetTable.visibleColumns) targetTable.visibleColumns = targetTable.columns.map(c => c.id);
-    if (!targetTable.columnWidths) {
-      targetTable.columnWidths = {};
-      targetTable.columns.forEach(c => { targetTable.columnWidths[c.id] = 120; });
+    if (!tbl.rows) tbl.rows = [];
+    if (!tbl.visibleColumns) tbl.visibleColumns = tbl.columns.map(c => c.id);
+    if (!tbl.columnWidths) {
+      tbl.columnWidths = {};
+      tbl.columns.forEach(c => { tbl.columnWidths[c.id] = 120; });
     }
-    if (!targetTable.rowHeights) targetTable.rowHeights = {};
-    if (!targetTable.fixedCol) targetTable.fixedCol = 'none';
-    if (!targetTable.fixedRow) targetTable.fixedRow = 'none';
-    if (!targetTable.cellStyles) targetTable.cellStyles = {};
+    if (!tbl.rowHeights) tbl.rowHeights = {};
+    if (!tbl.fixedCol) tbl.fixedCol = 'none';
+    if (!tbl.fixedRow) tbl.fixedRow = 'none';
+    if (!tbl.cellStyles) tbl.cellStyles = {};
+
+    let row = tbl.rows.find(r => r.id === targetRowId);
+    if (!row) {
+      row = { id: targetRowId };
+      tbl.rows.push(row);
+    }
+
+    tbl.columns.forEach(col => {
+      const val = data[col.name] !== undefined ? data[col.name] : (data[col.label] !== undefined ? data[col.label] : (data[col.id] !== undefined ? data[col.id] : undefined));
+      if (val !== undefined) {
+        row[col.id] = String(val);
+      } else if (row[col.id] === undefined) {
+        row[col.id] = '';
+      }
+    });
+
+    return row;
   }
 
-  // 既存のレコードを上書き更新するか、新規に作成するか
-  let targetRow = targetTable.rows.find(r => r.id === targetRowId);
-
-  if (targetRow) {
-    console.log('[Synapse Database] Updating existing row:', targetRowId);
-  } else {
-    targetRow = {
-      id: targetRowId
+  // ----------------------------------------------------
+  // 2. 【必須】全フォーム回答データ（table_all_form_responses）へ必ず格納
+  // ----------------------------------------------------
+  let allResponsesTable = state.customTables.find(t => t.id === 'table_all_form_responses');
+  if (!allResponsesTable) {
+    allResponsesTable = {
+      id: 'table_all_form_responses',
+      name: '全フォーム回答データ',
+      formTitle: '全フォーム共通',
+      isConsolidatedTable: true,
+      parentMenuId: 'root',
+      columns: [
+        { id: 'master_id', name: 'マスターID / コード', label: 'マスターID / コード', type: 'text' },
+        { id: 'form_title', name: 'フォーム名', label: 'フォーム名', type: 'text' },
+        { id: 'has_dedicated_table', name: '独立テーブル有無', label: '独立テーブル有無', type: 'text' },
+        { id: 'status', name: 'ステータス', label: 'ステータス', type: 'text' },
+        { id: 'registration_code', name: '確定登録コード', label: '確定登録コード', type: 'text' },
+        { id: 'submitted_at', name: '回答日時 / 登録日時', label: '回答日時 / 登録日時', type: 'text' },
+        { id: 'resume_url', name: '再開用URL', label: '再開用URL', type: 'text' }
+      ],
+      visibleColumns: ['master_id', 'form_title', 'has_dedicated_table', 'status', 'registration_code', 'submitted_at', 'resume_url'],
+      columnWidths: {},
+      rows: []
     };
-    targetTable.rows.push(targetRow);
+    state.customTables.unshift(allResponsesTable);
+    isNewTableCreated = true;
   }
 
-  // 各カラムの値として回答データを設定（カラムID、カラム名、ラベルいずれにも対応）
-  targetTable.columns.forEach(col => {
-    const val = data[col.name] !== undefined ? data[col.name] : (data[col.label] !== undefined ? data[col.label] : (data[col.id] !== undefined ? data[col.id] : undefined));
-    if (val !== undefined) {
-      targetRow[col.id] = String(val);
-    } else if (targetRow[col.id] === undefined) {
-      targetRow[col.id] = '';
+  const allResponsesRow = saveSubmissionRowToTable(allResponsesTable);
+  let targetRow = allResponsesRow;
+  let targetTable = allResponsesTable;
+
+  // ----------------------------------------------------
+  // 3. 【選択時のみ】フォーム専用の独立テーブル、または指定既存テーブルへの格納
+  // ----------------------------------------------------
+  if (isDedicatedSelected) {
+    let dedicatedTable = existingDedicated;
+    if (!dedicatedTable) {
+      // ユーザーが独立テーブルを選択したため新規作成
+      isNewTableCreated = true;
+      const tableId = (reqTableId && reqTableId !== 'dedicated' && reqTableId !== 'table_all_form_responses') ? reqTableId : ('table_' + Date.now());
+      const columns = Object.keys(data).map((key, idx) => ({
+        id: 'col_' + Math.random().toString(36).substr(2, 9),
+        label: key,
+        name: key,
+        type: 'text',
+        required: idx === 0
+      }));
+
+      const defaultWidths = {};
+      columns.forEach(col => { defaultWidths[col.id] = 120; });
+
+      dedicatedTable = {
+        id: tableId,
+        name: effectiveFormTitle,
+        formTitle: effectiveFormTitle,
+        isFormDedicatedTable: true,
+        parentMenuId: 'root',
+        columns: columns,
+        visibleColumns: columns.map(c => c.id),
+        columnWidths: defaultWidths,
+        rowHeights: {},
+        fixedCol: 'none',
+        fixedRow: 'none',
+        cellStyles: {},
+        rows: []
+      };
+      state.customTables.push(dedicatedTable);
     }
-  });
+
+    const dedicatedRow = saveSubmissionRowToTable(dedicatedTable);
+    targetRow = dedicatedRow;
+    targetTable = dedicatedTable;
+
+    // 全フォーム回答データ側の独立テーブル有無も確実に「あり」を記録
+    const dedCol = allResponsesTable.columns.find(c => c.name === '独立テーブル有無' || c.label === '独立テーブル有無');
+    if (dedCol && allResponsesRow) {
+      allResponsesRow[dedCol.id] = 'あり';
+    }
+  } else if (reqTableId && reqTableId !== 'table_all_form_responses') {
+    // 既存の別テーブル（例: table_form_basic など）が明示選択されている場合
+    const otherTable = state.customTables.find(t => t.id === reqTableId || t.name === reqTableId);
+    if (otherTable) {
+      const otherRow = saveSubmissionRowToTable(otherTable);
+      targetRow = otherRow;
+      targetTable = otherTable;
+    }
+  }
+
+  const effectiveTableName = targetTable ? targetTable.name : (effectiveFormTitle || '無題のフォーム');
 
   // レコードを追加/更新し、LocalStorageへ永続化
   localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
   
   // 編集監査ログへ記録
   logCellEdit(targetTable.id, targetRowId, 'all_columns', 'none', JSON.stringify(data));
-  console.log(`%c[Synapse Database]%c Saved row (ID: ${targetRowId}) to Custom Master Table "${effectiveTableName}":`, "color: #3b82f6; font-weight: bold;", "color: inherit;", targetRow);
+  console.log(`%c[Synapse Database]%c Saved row (ID: ${targetRowId}) to Master Table "${effectiveTableName}" and Consolidated Table "全フォーム回答データ":`, "color: #3b82f6; font-weight: bold;", "color: inherit;", targetRow);
 
   // もしカスタムテーブルが新設された場合は、サイドメニューを再描画する
-  if (isNewTable) {
+  if (isNewTableCreated) {
     renderCustomTableList();
   }
 
   // 現在表示中のカスタムテーブルがこのテーブルであれば、表示をリアルタイム更新する
-  if (state.currentView === 'custom-table-screen' && state.activeCustomTableId === targetTable.id) {
-    renderCustomTable(targetTable.id);
+  if (state.currentView === 'custom-table-screen' && (state.activeCustomTableId === targetTable.id || state.activeCustomTableId === 'table_all_form_responses')) {
+    renderCustomTable(state.activeCustomTableId);
   }
+
 
   // ----------------------------------------------------
   // 2. パートナーDBへの自動抽出・承認・多段更新処理（全56カラム完全対応）
