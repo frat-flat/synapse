@@ -816,7 +816,8 @@ const STORAGE_KEYS = {
   AP_ROW_HEIGHTS: 'synapse_ap_row_heights',
   AG_ROW_HEIGHTS: 'synapse_ag_row_heights',
   USERS: 'synapse_users_list',
-  FAVORITES: 'synapse_favorites'
+  FAVORITES: 'synapse_favorites',
+  DELETED_TABLE_IDS: 'synapse_deleted_table_ids'
 };
 
 const INITIAL_JO_COLUMNS = [
@@ -3008,14 +3009,17 @@ function loadStateFromLocalStorage(keys) {
     } else if (key === 'synapse_dbmake_partners') {
       dbmakePartners = JSON.parse(localStorage.getItem('synapse_dbmake_partners')) || [];
     } else if (key === STORAGE_KEYS.CUSTOM_TABLES) {
-      state.customTables = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_TABLES)) || [];
+      const rawTables = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_TABLES)) || [];
+      const deletedIds = (typeof getDeletedTableIds === 'function') ? getDeletedTableIds() : [];
+      state.customTables = rawTables.filter(t => !deletedIds.includes(t.id));
       if (Array.isArray(state.customTables)) {
         state.customTables.forEach(t => sanitizeAndUnifyTableColumns(t));
       }
     } else if (typeof key === 'string' && key.startsWith('synapse_table_')) {
       try {
         const singleTbl = JSON.parse(localStorage.getItem(key));
-        if (singleTbl && singleTbl.id) {
+        const deletedIds = (typeof getDeletedTableIds === 'function') ? getDeletedTableIds() : [];
+        if (singleTbl && singleTbl.id && !deletedIds.includes(singleTbl.id)) {
           sanitizeAndUnifyTableColumns(singleTbl);
           state.customTables = state.customTables || [];
           const exIdx = state.customTables.findIndex(t => t.id === singleTbl.id);
@@ -3569,6 +3573,10 @@ function initDatabase() {
     if (!Array.isArray(state.customTables)) {
       state.customTables = [];
     }
+    const deletedIds = (typeof getDeletedTableIds === 'function') ? getDeletedTableIds() : [];
+    if (deletedIds.length > 0) {
+      state.customTables = state.customTables.filter(t => !deletedIds.includes(t.id));
+    }
 
     // 💡 全テーブルの重複キーを自動マージしてクリーンアップ（古いキャッシュの即時自動修復）
     let ctSanitized = false;
@@ -3846,8 +3854,32 @@ function initDatabase() {
   }
 }
 
+function getDeletedTableIds() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DELETED_TABLE_IDS || 'synapse_deleted_table_ids');
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function addDeletedTableId(id) {
+  if (!id) return;
+  const list = getDeletedTableIds();
+  if (!list.includes(id)) {
+    list.push(id);
+    localStorage.setItem(STORAGE_KEYS.DELETED_TABLE_IDS || 'synapse_deleted_table_ids', JSON.stringify(list));
+    if (typeof syncToSupabase === 'function') {
+      syncToSupabase(STORAGE_KEYS.DELETED_TABLE_IDS || 'synapse_deleted_table_ids', list);
+    }
+  }
+}
+
 function saveCustomTables() {
   localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+  if (typeof syncToSupabase === 'function') {
+    syncToSupabase(STORAGE_KEYS.CUSTOM_TABLES, state.customTables);
+  }
 }
 
 function saveCustomAccordions() {
@@ -3901,6 +3933,11 @@ function ensureStandardAccordionsInState() {
 
 function ensureStandardTablesInState() {
   if (!state.customTables) state.customTables = [];
+
+  const deletedIds = getDeletedTableIds();
+  if (deletedIds && deletedIds.length > 0) {
+    state.customTables = state.customTables.filter(t => !deletedIds.includes(t.id));
+  }
 
   // 過去に残ってしまったアポイント関連のテーブルIDを取り除く
   const appointTableIds = ['appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link', 'link-official-screen'];
@@ -3995,6 +4032,7 @@ function ensureStandardTablesInState() {
   ];
 
   formDedicatedTables.forEach(fTable => {
+    if (deletedIds && deletedIds.includes(fTable.id)) return;
     let existing = state.customTables.find(t => t.id === fTable.id);
     if (!existing) {
       const defaultWidths = {};
@@ -7348,6 +7386,140 @@ function adjustOverflowCells(tableElement) {
   });
 }
 
+// 🗑️ テーブル安全削除モーダル制御（誤操作防止・テーブル名完全一致確認）
+function openDeleteTableSafetyModal(tbl) {
+  if (!tbl) return;
+  if (tbl.isConsolidatedTable || tbl.id === 'table_all_form_responses') {
+    showToast('「全フォーム回答データ」はシステムの基盤テーブルのため削除できません。', 'warning');
+    return;
+  }
+
+  const modal = document.getElementById('modal-delete-table-safety');
+  const nameEl = document.getElementById('safety-delete-table-name');
+  const inputEl = document.getElementById('safety-delete-input');
+  const confirmBtn = document.getElementById('safety-delete-confirm-btn');
+  const cancelBtn = document.getElementById('safety-delete-cancel-btn');
+
+  if (!modal || !nameEl || !inputEl || !confirmBtn) return;
+
+  nameEl.textContent = tbl.name;
+  inputEl.value = '';
+  confirmBtn.disabled = true;
+  confirmBtn.style.background = '#94a3b8';
+  confirmBtn.style.borderColor = '#94a3b8';
+  confirmBtn.style.color = '#ffffff';
+  confirmBtn.style.cursor = 'not-allowed';
+  confirmBtn.style.opacity = '0.6';
+
+  modal.style.display = 'flex';
+  modal.classList.add('active');
+  setTimeout(() => { inputEl.focus(); }, 80);
+
+  const checkMatch = () => {
+    const isMatch = inputEl.value.trim() === tbl.name.trim();
+    if (isMatch) {
+      confirmBtn.disabled = false;
+      confirmBtn.style.background = '#dc2626';
+      confirmBtn.style.borderColor = '#dc2626';
+      confirmBtn.style.color = '#ffffff';
+      confirmBtn.style.cursor = 'pointer';
+      confirmBtn.style.opacity = '1';
+    } else {
+      confirmBtn.disabled = true;
+      confirmBtn.style.background = '#94a3b8';
+      confirmBtn.style.borderColor = '#94a3b8';
+      confirmBtn.style.color = '#ffffff';
+      confirmBtn.style.cursor = 'not-allowed';
+      confirmBtn.style.opacity = '0.6';
+    }
+  };
+
+  inputEl.oninput = checkMatch;
+  inputEl.onkeydown = (e) => {
+    if (e.key === 'Enter' && !confirmBtn.disabled) {
+      confirmBtn.click();
+    } else if (e.key === 'Escape') {
+      closeModal();
+    }
+  };
+
+  const closeModal = () => {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+    inputEl.value = '';
+    inputEl.oninput = null;
+    inputEl.onkeydown = null;
+    confirmBtn.onclick = null;
+    if (cancelBtn) cancelBtn.onclick = null;
+    modal.onclick = null;
+  };
+
+  if (cancelBtn) cancelBtn.onclick = closeModal;
+  modal.onclick = (e) => {
+    if (e.target === modal) closeModal();
+  };
+
+  confirmBtn.onclick = () => {
+    if (confirmBtn.disabled) return;
+    closeModal();
+    executeDeleteCustomTable(tbl.id, tbl.name);
+  };
+}
+
+// 🗑️ テーブル削除の完全実行処理（状態除外、永続化、自動復活防止、タブ・サイドバー反映）
+function executeDeleteCustomTable(tableId, tableName) {
+  if (!tableId) return;
+
+  // 1. 削除済みIDリストに登録（自動復活を完全に防止）
+  addDeletedTableId(tableId);
+
+  // 2. state.customTables から除外
+  state.customTables = (state.customTables || []).filter(t => t.id !== tableId);
+  saveCustomTables();
+
+  // 3. 個別テーブルの localStorage / Supabase キャッシュもクリーンアップ
+  localStorage.removeItem(`synapse_table_${tableId}`);
+  if (typeof syncToSupabase === 'function') {
+    syncToSupabase(`synapse_table_${tableId}`, null);
+  }
+
+  // 4. 開いているタブがあれば閉じる
+  const tabId = `custom-table-${tableId}`;
+  const existingTabIndex = (state.tabs || []).findIndex(t => t.id === tabId);
+  if (existingTabIndex >= 0) {
+    if (typeof closeTab === 'function') {
+      closeTab(tabId);
+    } else {
+      state.tabs.splice(existingTabIndex, 1);
+      renderTabBar();
+    }
+  }
+
+  // 5. サイドバーの該当ボタンをDOMから直接削除し、サイドバー全体を再描画
+  const sideBtn = document.getElementById(`menu-custom-table-${tableId}`);
+  if (sideBtn) sideBtn.remove();
+  if (typeof renderCustomTableList === 'function') {
+    renderCustomTableList();
+  }
+
+  // 6. メイン画面の表示切り替え（該当テーブルを開いていた場合）
+  if (state.activeCustomTableId === tableId || state.currentView === 'custom-table-screen') {
+    state.activeCustomTableId = null;
+    if (state.activeTabId && typeof openTab === 'function') {
+      const activeTabObj = (state.tabs || []).find(t => t.id === state.activeTabId);
+      if (activeTabObj) {
+        openTab(activeTabObj.id, activeTabObj.type, activeTabObj.title);
+      } else {
+        openTab('home-screen', 'home-screen', '🏠 ホーム');
+      }
+    } else if (typeof openTab === 'function') {
+      openTab('home-screen', 'home-screen', '🏠 ホーム');
+    }
+  }
+
+  showToast(`テーブル「${tableName || tableId}」をSynapseから完全に削除しました。`, 'info');
+}
+
 // 汎用カスタムテーブル画面の動的描画
 function renderCustomTable(tableId) {
   let tbl = state.customTables.find(t => t.id === tableId);
@@ -7376,6 +7548,19 @@ function renderCustomTable(tableId) {
   const listSection = document.querySelector('#custom-table-screen .list-section');
   if (listSection) {
     renderTableControlBar(tableId, listSection);
+  }
+
+  // 🗑️ テーブル削除ボタンの制御
+  const deleteTableBtn = document.getElementById('ct-delete-table-btn');
+  if (deleteTableBtn) {
+    if (tbl.isConsolidatedTable || tbl.id === 'table_all_form_responses') {
+      deleteTableBtn.style.display = 'none'; // システム基盤テーブルは削除不可
+    } else {
+      deleteTableBtn.style.display = 'inline-flex';
+      deleteTableBtn.onclick = () => {
+        openDeleteTableSafetyModal(tbl);
+      };
+    }
   }
 
   const nameInput = document.getElementById('ct-table-name-input');
@@ -9293,9 +9478,6 @@ function setupCtButtonsEvents() {
       openMyPage();
     }
   };
-
-  document.getElementById('ct-delete-table-btn')?.addEventListener('click', () => executeDeleteCustomTable());
-  document.getElementById('ct-delete-table-btn-header')?.addEventListener('click', () => executeDeleteCustomTable());
 
   // 🔗 列の統合表示（アクションバーのボタン）
   document.getElementById('ct-merge-cols-btn')?.addEventListener('click', () => {
@@ -14861,7 +15043,9 @@ function clearAllSpreadsheetSelections() {
       } else if (activeTab.type === 'custom-table-screen') {
         if (state.activeCustomTableId) {
           renderCustomTable(state.activeCustomTableId);
-          syncCustomTableFormatToolbar();
+          if (typeof syncCustomTableFormatToolbar === 'function') {
+            syncCustomTableFormatToolbar();
+          }
         }
       }
     }

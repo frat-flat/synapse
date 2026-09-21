@@ -990,8 +990,14 @@
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 0.5rem;">
-      <button type="button" class="btn btn-sm btn-outline-danger" id="ct-delete-table-btn-header" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.3rem; color: #ef4444; border: 1px solid #ef4444; background: transparent; border-radius: var(--radius-sm); cursor: pointer;" title="このテーブルをSynapse上から削除します">
-        🗑️ テーブル削除
+      <button type="button" class="btn btn-sm btn-subtle-danger" id="ct-delete-table-btn" style="padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.35rem; color: #64748b; border: 1px solid #cbd5e1; background: transparent; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.2s;" title="テーブルの削除（安全確認モーダルが開きます）">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          <line x1="10" y1="11" x2="10" y2="17"></line>
+          <line x1="14" y1="11" x2="14" y2="17"></line>
+        </svg>
+        <span>テーブル削除...</span>
       </button>
     </div>
   </div>
@@ -1103,11 +1109,6 @@
     <button type="button" class="btn btn-secondary" id="ct-merge-cols-btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem;" title="選択した列の統合表示（結合ビュー）や非表示を設定します">
       🔗 列の統合表示
     </button>
-    <div style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
-      <button type="button" class="btn btn-outline-danger" id="ct-delete-table-btn" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem; color: #ef4444; border: 1px solid #ef4444; background: transparent; border-radius: var(--radius-sm); cursor: pointer;" title="このテーブルをSynapse上から削除します">
-        🗑️ テーブル削除
-      </button>
-    </div>
   </div>
 
   <div class="list-section">
@@ -4804,6 +4805,39 @@
     <!-- 各行はデータ値のみの最小構成 -->
   </div>
   <div id="synapse-chip-copy-feedback" class="synapse-chip-copy-feedback" style="display: none;">✓ コピーしました</div>
+</div>
+
+<!-- 🗑️ テーブル安全削除確認モーダル（誤操作防止） -->
+<div class="modal-overlay" id="modal-delete-table-safety" style="z-index: 100020; display: none;">
+  <div class="modal-box" style="max-width: 460px; width: 92%; padding: 1.5rem; background: var(--bg-surface-elevated, #ffffff); border-radius: var(--radius-md, 10px); box-shadow: 0 20px 30px -10px rgba(0,0,0,0.3); border: 1px solid var(--border-color, #e2e8f0); color: var(--text-primary, #0f172a);">
+    <div style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.75rem;">
+      <span style="color: #ef4444; display: flex; align-items: center;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </span>
+      <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary, #0f172a);">テーブルの削除確認</h3>
+    </div>
+    <div style="background: #fef2f2; border: 1px solid #fee2e2; border-radius: 6px; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.82rem; color: #991b1b; line-height: 1.5;">
+      ⚠️ テーブル「<strong id="safety-delete-table-name" style="color: #b91c1c;">-</strong>」をSynapseから完全に削除します。<br>
+      この操作は元に戻せません。Synapse上のテーブルデータはすべて消去されます。<br>
+      <span style="font-size: 0.75rem; color: #6b7280;">（※Supabase上の回答生ログや物理テーブルには影響しません）</span>
+    </div>
+    <div style="margin-bottom: 1rem;">
+      <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-secondary, #475569);">
+        誤操作を防ぐため、確認として上記の<strong>テーブル名</strong>を入力してください：
+      </label>
+      <input type="text" id="safety-delete-input" placeholder="テーブル名を入力" autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; font-size: 0.85rem; border: 1px solid var(--border-color, #cbd5e1); border-radius: 6px; background: var(--bg-surface, #ffffff); color: var(--text-primary, #0f172a); outline: none;">
+    </div>
+    <div style="display: flex; gap: 0.65rem; justify-content: flex-end;">
+      <button type="button" class="btn btn-secondary" id="safety-delete-cancel-btn" style="padding: 0.45rem 1rem; font-size: 0.82rem; cursor: pointer;">キャンセル</button>
+      <button type="button" class="btn btn-danger" id="safety-delete-confirm-btn" disabled style="padding: 0.45rem 1.25rem; font-size: 0.82rem; font-weight: 700; background: #94a3b8; border-color: #94a3b8; color: #ffffff; cursor: not-allowed; opacity: 0.6; transition: all 0.2s;">
+        削除を実行する
+      </button>
+    </div>
+  </div>
 </div>
 
 <!-- ================= 👁️ 列の表示設定モーダル (非表示 & 統合) ================= -->
