@@ -6778,7 +6778,11 @@ window.createIndependentTableFromRow = createIndependentTableFromRow;
 // 表示列選択チェックボックスの描画
 function renderCtColumnSelector(tbl) {
   const container = document.getElementById('ct-column-selector-dropdown');
-  if (!container) return;
+  if (!container || !tbl) return;
+  if (!tbl.columns || !Array.isArray(tbl.columns)) tbl.columns = [];
+  if (!tbl.visibleColumns || !Array.isArray(tbl.visibleColumns)) {
+    tbl.visibleColumns = tbl.columns.map(c => c.id);
+  }
   container.innerHTML = '';
 
   tbl.columns.forEach(col => {
@@ -7354,6 +7358,12 @@ function renderCustomTable(tableId) {
     } catch(e) {}
   }
   if (!tbl) return;
+  if (!tbl.columns || !Array.isArray(tbl.columns)) tbl.columns = [];
+  if (!tbl.rows || !Array.isArray(tbl.rows)) tbl.rows = [];
+  if (!tbl.visibleColumns || !Array.isArray(tbl.visibleColumns)) {
+    tbl.visibleColumns = tbl.columns.map(c => c.id);
+  }
+  if (!tbl.columnWidths) tbl.columnWidths = {};
 
   // 🧹 同一キー（dataKey/id）の自動マージ・統一
   sanitizeAndUnifyTableColumns(tbl);
@@ -7495,6 +7505,67 @@ function renderCustomTable(tableId) {
     syncCtFormatToolbar();
   };
 
+  // 列ヘッダークリック共通ハンドラ
+  const handleCtColumnSelect = (colId, e) => {
+    if (e.button !== 0) return; // 左クリックのみ
+    e.stopPropagation();
+
+    const visibleCols = tbl.columns.filter(c => (tbl.visibleColumns || []).includes(c.id));
+    const clickIdx = visibleCols.findIndex(c => c.id === colId);
+    if (clickIdx === -1) return;
+
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl / Meta: 非連続複数列選択トグル
+      if (state.ctSelectedCols.has(colId)) {
+        state.ctSelectedCols.delete(colId);
+      } else {
+        state.ctSelectedCols.add(colId);
+      }
+      state.ctColumnSelectAnchor = colId;
+      state.ctColumnSelectLast = colId;
+    } else if (e.shiftKey && state.ctColumnSelectAnchor) {
+      // Shift: 範囲選択
+      const anchorIdx = visibleCols.findIndex(c => c.id === state.ctColumnSelectAnchor);
+      if (anchorIdx !== -1) {
+        state.ctSelectedCell = null;
+        state.ctSelectedRange = null;
+        state.ctSelectedRows.clear();
+        state.ctSelectedCells.clear();
+        state.ctSelectedCols.clear();
+
+        const startIdx = Math.min(anchorIdx, clickIdx);
+        const endIdx = Math.max(anchorIdx, clickIdx);
+        for (let i = startIdx; i <= endIdx; i++) {
+          state.ctSelectedCols.add(visibleCols[i].id);
+        }
+        state.ctColumnSelectLast = colId;
+      } else {
+        state.ctSelectedCell = null;
+        state.ctSelectedRange = null;
+        state.ctSelectedRows.clear();
+        state.ctSelectedCells.clear();
+        state.ctSelectedCols.clear();
+        state.ctSelectedCols.add(colId);
+        state.ctColumnSelectAnchor = colId;
+        state.ctColumnSelectLast = colId;
+      }
+    } else {
+      // 通常クリック: 単一列選択
+      state.ctSelectedCell = null;
+      state.ctSelectedRange = null;
+      state.ctSelectedRows.clear();
+      state.ctSelectedCells.clear();
+      state.ctSelectedCols.clear();
+
+      state.ctSelectedCols.add(colId);
+      state.ctColumnSelectAnchor = colId;
+      state.ctColumnSelectLast = colId;
+    }
+
+    updateCtSelectionHighlight();
+    syncCtFormatToolbar();
+  };
+
   // 行1: 列記号行
   const lettersRow = document.createElement('tr');
   lettersRow.className = 'col-letters-row';
@@ -7529,6 +7600,8 @@ function renderCustomTable(tableId) {
     th.textContent = getColumnLetter(visibleColIndex);
     th.style.width = `${tbl.columnWidths[col.id] || 120}px`;
     th.style.minWidth = `${tbl.columnWidths[col.id] || 120}px`;
+    th.dataset.colId = col.id;
+    th.style.cursor = 'pointer';
 
     if (fixedColIds.includes(col.id)) {
       th.classList.add('fixed-col-header');
@@ -7537,10 +7610,23 @@ function renderCustomTable(tableId) {
       th.style.zIndex = '32';
     }
 
+    // 列選択イベント
+    th.addEventListener('click', (e) => {
+      handleCtColumnSelect(col.id, e);
+    });
+
     // アルファベット行の右クリックでもコンテキストメニューを表示する
     th.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (!state.ctSelectedCols.has(col.id)) {
+        state.ctSelectedCols.clear();
+        state.ctSelectedCols.add(col.id);
+        state.ctColumnSelectAnchor = col.id;
+        state.ctColumnSelectLast = col.id;
+        updateCtSelectionHighlight();
+        syncCtFormatToolbar();
+      }
       if (window.logToDebugPanel) {
         window.logToDebugPanel(`contextmenu (lettersRow th): col.id=${col.id}`, '#ffd700');
       }
@@ -7658,6 +7744,14 @@ function renderCustomTable(tableId) {
     th.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (!state.ctSelectedCols.has(col.id)) {
+        state.ctSelectedCols.clear();
+        state.ctSelectedCols.add(col.id);
+        state.ctColumnSelectAnchor = col.id;
+        state.ctColumnSelectLast = col.id;
+        updateCtSelectionHighlight();
+        syncCtFormatToolbar();
+      }
       if (window.logToDebugPanel) {
         window.logToDebugPanel(`contextmenu (namesRow th): col.id=${col.id}`, '#ffd700');
       }
@@ -7672,44 +7766,8 @@ function renderCustomTable(tableId) {
         e.target.closest('.grant-access-inline-btn') ||
         e.target.closest('.revoke-access-inline-btn')
       ) return;
-      
-      const visibleCols = tbl.columns.filter(c => tbl.visibleColumns.includes(c.id));
-      
-      if (e.shiftKey && state.ctColumnSelectAnchor) {
-        const anchorIdx = visibleCols.findIndex(c => c.id === state.ctColumnSelectAnchor);
-        const clickIdx = visibleCols.findIndex(c => c.id === col.id);
-        
-        if (anchorIdx !== -1 && clickIdx !== -1) {
-          state.ctSelectedCell = null;
-          state.ctSelectedRange = null;
-          state.ctSelectedRows.clear();
-          state.ctSelectedCols.clear();
-          
-          const startIdx = Math.min(anchorIdx, clickIdx);
-          const endIdx = Math.max(anchorIdx, clickIdx);
-          
-          for (let i = startIdx; i <= endIdx; i++) {
-            state.ctSelectedCols.add(visibleCols[i].id);
-          }
-          state.ctColumnSelectLast = col.id;
-          
-          updateCtSelectionHighlight();
-          syncCtFormatToolbar();
-          return;
-        }
-      }
-      
-      state.ctSelectedCell = null;
-      state.ctSelectedRange = null;
-      state.ctSelectedRows.clear();
-      state.ctSelectedCols.clear();
-      
-      state.ctSelectedCols.add(col.id);
-      state.ctColumnSelectAnchor = col.id;
-      state.ctColumnSelectLast = col.id;
-      
-      updateCtSelectionHighlight();
-      syncCtFormatToolbar();
+
+      handleCtColumnSelect(col.id, e);
     });
 
     th.appendChild(headerWrapper);
@@ -8453,7 +8511,7 @@ function syncCtFormatToolbar() {
   if (cellKeys.length === 0) return;
 
   const firstKey = cellKeys[0];
-  const style = tbl.cellStyles[firstKey] || {};
+  const style = (tbl.cellStyles && tbl.cellStyles[firstKey]) || {};
 
   const sizeInput = document.getElementById('ct-font-size-input');
   if (sizeInput) {
@@ -9197,12 +9255,14 @@ function setupCtButtonsEvents() {
     showToast('選択された行を削除しました。', 'success');
   });
 
-  document.getElementById('ct-delete-table-btn')?.addEventListener('click', () => {
-    if (!state.activeCustomTableId) return;
-    const tbl = state.customTables.find(t => t.id === state.activeCustomTableId);
+  // 🗑️ カスタムテーブルの安全削除共通処理
+  const executeDeleteCustomTable = (tblId) => {
+    const targetId = tblId || state.activeCustomTableId;
+    if (!targetId) return;
+    const tbl = state.customTables.find(t => t.id === targetId);
     if (!tbl) return;
 
-    if (!confirm(`本当にテーブル「${tbl.name}」を削除しますか？\nこの操作は元に戻せません。`)) {
+    if (!confirm(`本当にテーブル「${tbl.name}」をSynapseから削除しますか？\n\n※この操作を実行しても、Supabase上の回答ログや元データには影響しません。\n※この操作は元に戻せません。`)) {
       return;
     }
 
@@ -9214,7 +9274,7 @@ function setupCtButtonsEvents() {
     }
 
     renderCustomTableList();
-    showToast(`テーブル「${tbl.name}」を削除しました。`, 'success');
+    showToast(`テーブル「${tbl.name}」をSynapseから削除しました。`, 'success');
 
     const tabId = `custom-table-${tbl.id}`;
     const tabIndex = state.tabs.findIndex(t => t.id === tabId);
@@ -9231,6 +9291,23 @@ function setupCtButtonsEvents() {
       }
     } else {
       openMyPage();
+    }
+  };
+
+  document.getElementById('ct-delete-table-btn')?.addEventListener('click', () => executeDeleteCustomTable());
+  document.getElementById('ct-delete-table-btn-header')?.addEventListener('click', () => executeDeleteCustomTable());
+
+  // 🔗 列の統合表示（アクションバーのボタン）
+  document.getElementById('ct-merge-cols-btn')?.addEventListener('click', () => {
+    if (!state.activeCustomTableId) return;
+    const normId = normalizeTableId(state.activeCustomTableId);
+    const selectedCols = getSelectedColumnsForTable(normId);
+    if (typeof openMergedColumnsModal === 'function') {
+      if (selectedCols.length >= 2) {
+        openMergedColumnsModal(normId, selectedCols);
+      } else {
+        openMergedColumnsModal(normId);
+      }
     }
   });
 
@@ -10002,13 +10079,35 @@ function setupCtButtonsEvents() {
     openValidationSidebar(tbl, ctResizeState.targetId);
   });
 
+  // 選択中カラム一覧の安全取得関数
+  function getSelectedColumnsForTable(tableId) {
+    const normId = typeof normalizeTableId === 'function' ? normalizeTableId(tableId) : tableId;
+    if (normId === 'ag') {
+      return state.agSelectedCols ? Array.from(state.agSelectedCols) : (state.agSelectedCol ? [state.agSelectedCol] : []);
+    } else if (normId === 'jo') {
+      return state.joSelectedCols ? Array.from(state.joSelectedCols) : (state.joSelectedCol ? [state.joSelectedCol] : []);
+    } else if (normId === 'ap') {
+      return state.apSelectedCols ? Array.from(state.apSelectedCols) : (state.apSelectedCol ? [state.apSelectedCol] : []);
+    } else if (normId === 'dbmake') {
+      return state.dbmakeSelectedCols ? Array.from(state.dbmakeSelectedCols) : [];
+    } else {
+      // カスタムテーブル
+      if (state.ctSelectedCols && state.ctSelectedCols.size > 0) {
+        return Array.from(state.ctSelectedCols);
+      }
+      return [];
+    }
+  }
+  window.getSelectedColumnsForTable = getSelectedColumnsForTable;
+
   // 🔗 列の統合表示を設定
   document.getElementById('ct-menu-merge-columns')?.addEventListener('mousedown', (e) => {
     e.stopPropagation();
     const menu = document.getElementById('ct-context-menu');
     if (menu) menu.style.display = 'none';
-    if (!ctResizeState.tblId) return;
-    const normId = normalizeTableId(ctResizeState.tblId);
+    const targetTableId = ctResizeState.tblId || state.activeCustomTableId;
+    if (!targetTableId) return;
+    const normId = normalizeTableId(targetTableId);
     const selectedCols = getSelectedColumnsForTable(normId);
     if (selectedCols.length >= 2) {
       openMergedColumnsModal(normId, selectedCols);
