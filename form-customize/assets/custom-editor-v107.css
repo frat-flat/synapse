@@ -6943,3 +6943,25 @@ html, body {
   flex: 1 !important;
   opacity: 0.85 !important;
 }
+
+/* ==========================================================================
+   メイン編集エリア（中央エディタ）の完全固定化スタイル
+   セクションや質問の並び替えは左側セクション一覧からのみ行うため、
+   メイン編集エリアのカードドラッグ・ハンドル・▲▼ボタンを無効化・非表示にする
+   ========================================================================== */
+
+#questions-container .question-card,
+#questions-container .editor-question-group,
+#overview-sections-list .overview-section-card,
+#active-section-editor {
+  user-drag: none !important;
+  -webkit-user-drag: none !important;
+}
+
+#questions-container .question-card-drag-handle,
+#questions-container .group-drag-handle,
+#overview-sections-list .sidebar-drag-handle,
+.btn-move-q-up,
+.btn-move-q-down {
+  display: none !important;
+}

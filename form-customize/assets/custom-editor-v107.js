@@ -11635,61 +11635,19 @@
       optObserver.observe(qContainer, { childList: true, subtree: true });
     }
 
-    // --- 質問の並び替え（▲ / ▼）ボタンの注入（全モード共通） ---
+    // --- 質問の並び替えボタン（メイン編集画面では動かさないため固定・非表示） ---
     const allQCards = document.querySelectorAll('#questions-container .question-card');
-    allQCards.forEach((qCard, idx) => {
+    allQCards.forEach((qCard) => {
       const qId = qCard.dataset.questionId;
       const curSec = sec || (window.n && window.n.sections ? window.n.sections.find(s => s.id === window.r) : null);
       const qDef = (curSec && curSec.questions) ? curSec.questions.find(q => q.id === qId) : null;
       if (!qDef) return;
 
-      const actionsRow = qCard.querySelector('.question-card-actions');
-      if (actionsRow && !actionsRow.querySelector('.btn-move-q-up')) {
-        let btnGroup = actionsRow.querySelector('.question-action-buttons');
-        if (!btnGroup) {
-          btnGroup = document.createElement('div');
-          btnGroup.className = 'question-action-buttons';
-          btnGroup.style.display = 'flex';
-          btnGroup.style.gap = '6px';
-          btnGroup.style.alignItems = 'center';
-
-          const delBtn = actionsRow.querySelector('.btn-danger');
-          if (delBtn) {
-            actionsRow.appendChild(btnGroup);
-            btnGroup.appendChild(delBtn);
-          } else {
-            actionsRow.appendChild(btnGroup);
-          }
-        }
-
-        const upBtn = document.createElement('button');
-        upBtn.type = 'button';
-        upBtn.className = 'btn btn-sm btn-secondary btn-move-q-up';
-        upBtn.innerHTML = '▲';
-        upBtn.title = '上へ移動';
-        upBtn.disabled = (idx === 0);
-        upBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          moveQuestionInEditor(sec, idx, idx - 1);
-        });
-
-        const downBtn = document.createElement('button');
-        downBtn.type = 'button';
-        downBtn.className = 'btn btn-sm btn-secondary btn-move-q-down';
-        downBtn.innerHTML = '▼';
-        downBtn.title = '下へ移動';
-        downBtn.disabled = (idx === sec.questions.length - 1);
-        downBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          moveQuestionInEditor(sec, idx, idx + 1);
-        });
-
-        const firstChild = btnGroup.firstChild;
-        btnGroup.insertBefore(downBtn, firstChild);
-        btnGroup.insertBefore(upBtn, downBtn);
-      }
+      // 既存の並び替えボタンがあれば削除して完全固定
+      const existingUp = qCard.querySelector('.btn-move-q-up');
+      if (existingUp) existingUp.remove();
+      const existingDown = qCard.querySelector('.btn-move-q-down');
+      if (existingDown) existingDown.remove();
 
       // 📋 「前述と同じ（同上）」自動入力設定UIの注入
       injectSameAsAboveEditorUI(qCard, qDef, sec);
@@ -12102,12 +12060,11 @@
           const grpEl = document.createElement('div');
           grpEl.className = 'editor-question-group' + (isCollapsed ? ' is-collapsed' : '');
           grpEl.dataset.groupId = gId;
-          grpEl.setAttribute('draggable', 'true');
+          grpEl.setAttribute('draggable', 'false');
 
           grpEl.innerHTML = `
             <div class="group-card-header">
               <div class="group-header-left">
-                <span class="group-drag-handle" title="ドラッグしてグループ全体を並び替え">⠿</span>
                 <span class="group-title-display" title="クリックしてグループ名を変更">${escapeHtml(gTitle)}</span>
                 <span class="group-count-badge" title="クリックで開閉">${cluster.questions.length}問</span>
               </div>
@@ -12468,122 +12425,8 @@
             }
           });
 
-          // 6. DnD on editor group container
-          grpEl.addEventListener('dragstart', (e) => {
-            if (e.target.closest('input, textarea, select, button, .rich-text-content-editable, a, label')) {
-              e.preventDefault();
-              return;
-            }
-            window._currentDnD = { type: 'question-group', sectionId: curSec.id, groupId: gId, groupTitle: gTitle };
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', JSON.stringify(window._currentDnD));
-            grpEl.classList.add('is-dragging');
-          });
-
-          grpEl.addEventListener('dragend', () => {
-            grpEl.classList.remove('is-dragging');
-            document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
-              el.classList.remove('drag-over-top', 'drag-over-bottom');
-            });
-            window._currentDnD = null;
-          });
-
-          grpEl.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            if (!window._currentDnD) return;
-            if (window._currentDnD.type === 'question-group' && window._currentDnD.groupId === gId) return;
-            e.dataTransfer.dropEffect = 'move';
-            const rect = grpEl.getBoundingClientRect();
-            const h = rect.height || 100;
-            const isOverTop = (e.clientY - rect.top) <= h / 2;
-            if (isOverTop) {
-              grpEl.classList.add('drag-over-top');
-              grpEl.classList.remove('drag-over-bottom');
-            } else {
-              grpEl.classList.add('drag-over-bottom');
-              grpEl.classList.remove('drag-over-top');
-            }
-          });
-
-          grpEl.addEventListener('dragleave', (e) => {
-            if (!grpEl.contains(e.relatedTarget)) {
-              grpEl.classList.remove('drag-over-top', 'drag-over-bottom');
-            }
-          });
-
-          grpEl.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const isTop = grpEl.classList.contains('drag-over-top');
-            grpEl.classList.remove('drag-over-top', 'drag-over-bottom');
-
-            if (!window._currentDnD) return;
-
-            if (window._currentDnD.type === 'question-group') {
-              const srcSec = window.n.sections.find(s => s.id === window._currentDnD.sectionId);
-              const srcGroupId = window._currentDnD.groupId;
-              if (!srcSec || srcGroupId === gId) return;
-
-              const movedQList = [];
-              srcSec.questions = srcSec.questions.filter(q => {
-                if (q.groupId === srcGroupId) {
-                  movedQList.push(q);
-                  return false;
-                }
-                return true;
-              });
-
-              const tgtFirstIdx = curSec.questions.findIndex(q => q.groupId === gId);
-              if (tgtFirstIdx !== -1) {
-                let insertIdx = tgtFirstIdx;
-                if (!isTop) {
-                  for (let i = curSec.questions.length - 1; i >= 0; i--) {
-                    if (curSec.questions[i].groupId === gId) {
-                      insertIdx = i + 1;
-                      break;
-                    }
-                  }
-                }
-                curSec.questions.splice(insertIdx, 0, ...movedQList);
-              } else {
-                curSec.questions.push(...movedQList);
-              }
-
-              if (window.S) window.S(true);
-              if (window.le) window.le(curSec);
-              if (window.x) window.x();
-              if (window.renderLivePreview) window.renderLivePreview();
-              if (window.showSectionToast) window.showSectionToast(`グループ「${window._currentDnD.groupTitle || 'グループ'}」を並び替えました`);
-            } else if (window._currentDnD.type === 'question') {
-              const srcSec = window.n.sections.find(s => s.id === window._currentDnD.sectionId);
-              const srcQId = window._currentDnD.questionId;
-              if (!srcSec) return;
-              const qIdx = srcSec.questions.findIndex(x => x.id === srcQId);
-              if (qIdx === -1) return;
-
-              const [movedQ] = srcSec.questions.splice(qIdx, 1);
-              movedQ.groupId = gId;
-              movedQ.groupTitle = gTitle;
-
-              const tgtFirstIdx = curSec.questions.findIndex(q => q.groupId === gId);
-              let insertIdx = tgtFirstIdx;
-              if (!isTop) {
-                for (let i = curSec.questions.length - 1; i >= 0; i--) {
-                  if (curSec.questions[i].groupId === gId) {
-                    insertIdx = i + 1;
-                    break;
-                  }
-                }
-              }
-              curSec.questions.splice(insertIdx, 0, movedQ);
-
-              if (window.S) window.S(true);
-              if (window.le) window.le(curSec);
-              if (window.x) window.x();
-              if (window.renderLivePreview) window.renderLivePreview();
-              if (window.showSectionToast) window.showSectionToast(`質問「${movedQ.title || '無題'}」を「${gTitle}」に追加しました`);
-            }
-          });
+          // 6. メイン編集エリアでのグループDnDは無効化（左側セクション一覧からのみ並び替え可能にするため固定）
+          // DnDイベントリスナーは登録せず、誤作動を防止
 
           container.appendChild(grpEl);
         }
@@ -13196,257 +13039,37 @@
     });
   }
 
-  // 2. メイン編集画面の質問カード（.question-card）のドラッグハンドル注入 ＆ DnD
+  // 2. メイン編集画面の質問カード（.question-card）の固定化（ドラッグ無効化・固定表示）
   function injectQuestionCardDnD() {
     const qCards = document.querySelectorAll('#questions-container .question-card');
-    if (!qCards.length || !window.n || !window.n.sections) return;
+    if (!qCards.length) return;
 
-    const curSec = (window.n.sections.find(s => s.id === window.r)) || window.n.sections[0];
-    if (!curSec || !curSec.questions) return;
+    qCards.forEach((card) => {
+      // 既存のドラッグハンドルがあれば削除
+      const handleBar = card.querySelector('.question-card-drag-handle');
+      if (handleBar) handleBar.remove();
 
-    qCards.forEach((card, idx) => {
-      const qId = card.dataset.questionId;
-      if (!qId) return;
-
-      if (!card.querySelector('.question-card-drag-handle')) {
-        const handleBar = document.createElement('div');
-        handleBar.className = 'question-card-drag-handle';
-        handleBar.innerHTML = '⠿ ⠿ ⠿';
-        handleBar.title = 'ドラッグして質問カードを並び替え';
-        card.insertBefore(handleBar, card.firstChild);
-      }
-
-      if (!card._hasCardDnD) {
-        card._hasCardDnD = true;
-        card.setAttribute('draggable', 'true');
-
-        card.addEventListener('dragstart', (e) => {
-          const target = e.target;
-          if (target.closest('input, textarea, select, button, .rich-text-content-editable, a, label')) {
-            e.preventDefault();
-            return;
-          }
-
-          window._currentDnD = { type: 'question', sectionId: curSec.id, questionId: qId, index: idx };
-          e.dataTransfer.effectAllowed = 'move';
-          e.dataTransfer.setData('text/plain', JSON.stringify(window._currentDnD));
-          card.classList.add('is-dragging');
-        });
-
-        card.addEventListener('dragend', () => {
-          card.classList.remove('is-dragging');
-          document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
-            el.classList.remove('drag-over-top', 'drag-over-bottom');
-          });
-          window._currentDnD = null;
-        });
-
-        card.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          if (!window._currentDnD || (window._currentDnD.type !== 'question' && window._currentDnD.type !== 'question-group')) return;
-          if (window._currentDnD.type === 'question' && window._currentDnD.questionId === qId) return;
-          e.dataTransfer.dropEffect = 'move';
-
-          const rect = card.getBoundingClientRect();
-          const h = rect.height || 100;
-          let isOverTop = true;
-          if (e.clientY !== undefined && !isNaN(e.clientY)) {
-            isOverTop = (e.clientY - rect.top) <= h / 2;
-          } else if (card.classList.contains('drag-over-bottom')) {
-            isOverTop = false;
-          }
-          if (isOverTop) {
-            card.classList.add('drag-over-top');
-            card.classList.remove('drag-over-bottom');
-          } else {
-            card.classList.add('drag-over-bottom');
-            card.classList.remove('drag-over-top');
-          }
-        });
-
-        card.addEventListener('dragleave', (e) => {
-          if (!card.contains(e.relatedTarget)) {
-            card.classList.remove('drag-over-top', 'drag-over-bottom');
-          }
-        });
-
-        card.addEventListener('drop', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          let isTop = card.classList.contains('drag-over-top');
-          if (!isTop && !card.classList.contains('drag-over-bottom')) {
-            const rect = card.getBoundingClientRect();
-            const cY = (e.clientY !== undefined && !isNaN(e.clientY)) ? e.clientY : rect.top;
-            isTop = (cY - rect.top) <= rect.height / 2;
-          }
-          card.classList.remove('drag-over-top', 'drag-over-bottom');
-
-          if (!window._currentDnD) return;
-
-          if (window._currentDnD.type === 'question-group') {
-            const srcSec = window.n.sections.find(s => s.id === window._currentDnD.sectionId);
-            const tgtSec = curSec;
-            if (!srcSec || !tgtSec) return;
-            const srcGroupId = window._currentDnD.groupId;
-            const movedQList = [];
-            srcSec.questions = srcSec.questions.filter(x => {
-              if (x.groupId === srcGroupId) {
-                movedQList.push(x);
-                return false;
-              }
-              return true;
-            });
-            let targetIdx = tgtSec.questions.findIndex(x => x.id === qId);
-            const insertIdx = isTop ? targetIdx : targetIdx + 1;
-            tgtSec.questions.splice(insertIdx, 0, ...movedQList);
-            if (window.S) window.S(true);
-            if (window.le) window.le(tgtSec);
-            if (window.x) window.x();
-            if (window.renderLivePreview) window.renderLivePreview();
-            if (window.showSectionToast) window.showSectionToast(`グループを並び替えました`);
-            return;
-          }
-
-          if (window._currentDnD.type !== 'question') return;
-          const srcSecId = window._currentDnD.sectionId;
-          const srcQId = window._currentDnD.questionId;
-          if (srcQId === qId) return;
-
-          const srcSec = window.n.sections.find(s => s.id === srcSecId);
-          const tgtSec = curSec;
-          if (!srcSec || !tgtSec) return;
-
-          const fromIdx = srcSec.questions.findIndex(x => x.id === srcQId);
-          if (fromIdx === -1) return;
-
-          const [movedQ] = srcSec.questions.splice(fromIdx, 1);
-          let targetIdx = tgtSec.questions.findIndex(x => x.id === qId);
-          const insertIdx = isTop ? targetIdx : targetIdx + 1;
-          const targetQ = tgtSec.questions.find(x => x.id === qId);
-          if (targetQ) {
-            movedQ.groupId = targetQ.groupId || null;
-            movedQ.groupTitle = targetQ.groupTitle || null;
-          }
-          tgtSec.questions.splice(insertIdx, 0, movedQ);
-
-          if (window.S) window.S(true);
-          if (window.le) window.le(tgtSec);
-          if (window.x) window.x();
-          if (window.renderLivePreview) window.renderLivePreview();
-          if (window.showSectionToast) {
-            if (srcSecId === tgtSec.id) {
-              window.showSectionToast(`質問「${movedQ.title || '無題'}」を並び替えました`);
-            } else {
-              window.showSectionToast(`質問「${movedQ.title || '無題'}」を「${tgtSec.title || 'セクション'}」へ移動しました`);
-            }
-          }
-        });
-      }
+      // カードを固定化（ドラッグ不可）
+      card.setAttribute('draggable', 'false');
+      card.style.cursor = 'default';
+      card.classList.remove('is-dragging', 'drag-over-top', 'drag-over-bottom');
     });
   }
 
-  // 3. 概要画面のセクションカード（.overview-section-card）のDnD
+  // 3. 概要画面のセクションカード（.overview-section-card）の固定化（ドラッグ無効化・固定表示）
   function injectOverviewSectionDnD() {
     const ovCards = document.querySelectorAll('#overview-sections-list .overview-section-card');
-    if (!ovCards.length || !window.n || !window.n.sections) return;
+    if (!ovCards.length) return;
 
-    ovCards.forEach((card, idx) => {
-      const secDef = window.n.sections[idx];
-      if (!secDef) return;
+    ovCards.forEach((card) => {
+      // 既存のドラッグハンドルがあれば削除
+      const handle = card.querySelector('.sidebar-drag-handle');
+      if (handle) handle.remove();
 
-      if (!card.querySelector('.sidebar-drag-handle')) {
-        const badge = card.querySelector('.overview-section-badge');
-        if (badge) {
-          const handle = document.createElement('span');
-          handle.className = 'sidebar-drag-handle';
-          handle.innerHTML = '⠿';
-          handle.style.marginRight = '6px';
-          handle.title = 'ドラッグしてセクションを並び替え';
-          badge.insertBefore(handle, badge.firstChild);
-        }
-      }
-
-      if (!card._hasOvDnD) {
-        card._hasOvDnD = true;
-        card.setAttribute('draggable', 'true');
-
-        card.addEventListener('dragstart', (e) => {
-          if (e.target.closest('button, input, textarea, a')) {
-            e.preventDefault();
-            return;
-          }
-          window._currentDnD = { type: 'section', sectionId: secDef.id, index: idx };
-          e.dataTransfer.effectAllowed = 'move';
-          e.dataTransfer.setData('text/plain', JSON.stringify(window._currentDnD));
-          card.classList.add('is-dragging');
-        });
-
-        card.addEventListener('dragend', () => {
-          card.classList.remove('is-dragging');
-          document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
-            el.classList.remove('drag-over-top', 'drag-over-bottom');
-          });
-          window._currentDnD = null;
-        });
-
-        card.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          if (!window._currentDnD || window._currentDnD.type !== 'section') return;
-          if (window._currentDnD.sectionId === secDef.id) return;
-          e.dataTransfer.dropEffect = 'move';
-
-          const rect = card.getBoundingClientRect();
-          const h = rect.height || 60;
-          let isOverTop = true;
-          if (e.clientY !== undefined && !isNaN(e.clientY)) {
-            isOverTop = (e.clientY - rect.top) <= h / 2;
-          } else if (card.classList.contains('drag-over-bottom')) {
-            isOverTop = false;
-          }
-          if (isOverTop) {
-            card.classList.add('drag-over-top');
-            card.classList.remove('drag-over-bottom');
-          } else {
-            card.classList.add('drag-over-bottom');
-            card.classList.remove('drag-over-top');
-          }
-        });
-
-        card.addEventListener('dragleave', (e) => {
-          if (!card.contains(e.relatedTarget)) {
-            card.classList.remove('drag-over-top', 'drag-over-bottom');
-          }
-        });
-
-        card.addEventListener('drop', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          let isTop = card.classList.contains('drag-over-top');
-          if (!isTop && !card.classList.contains('drag-over-bottom')) {
-            const rect = card.getBoundingClientRect();
-            const cY = (e.clientY !== undefined && !isNaN(e.clientY)) ? e.clientY : rect.top;
-            isTop = (cY - rect.top) <= rect.height / 2;
-          }
-          card.classList.remove('drag-over-top', 'drag-over-bottom');
-
-          if (!window._currentDnD || window._currentDnD.type !== 'section') return;
-          const srcId = window._currentDnD.sectionId;
-          if (srcId === secDef.id) return;
-
-          const fromIdx = window.n.sections.findIndex(s => s.id === srcId);
-          let toIdx = window.n.sections.findIndex(s => s.id === secDef.id);
-          if (fromIdx !== -1 && toIdx !== -1) {
-            const [movedSec] = window.n.sections.splice(fromIdx, 1);
-            let targetIdx = window.n.sections.findIndex(s => s.id === secDef.id);
-            const insertIdx = isTop ? targetIdx : targetIdx + 1;
-            window.n.sections.splice(insertIdx, 0, movedSec);
-            if (window.S) window.S(true);
-            if (window.x) window.x();
-            if (window.renderLivePreview) window.renderLivePreview();
-            if (window.showSectionToast) window.showSectionToast(`セクション「${movedSec.title || '無題'}」を移動しました`);
-          }
-        });
-      }
+      // カードを固定化（ドラッグ不可）
+      card.setAttribute('draggable', 'false');
+      card.style.cursor = 'default';
+      card.classList.remove('is-dragging', 'drag-over-top', 'drag-over-bottom');
     });
   }
 
