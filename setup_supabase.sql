@@ -251,3 +251,126 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- ============================================================================
+-- 10. 動的テーブル作成・カラム更新用 RPC 関数 (synapse_create_or_alter_table)
+-- 本番で1回専用テーブルを作成し、本番へ統合時は追加カラムのみ動的追加 (ALTER TABLE ADD COLUMN)
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.synapse_create_or_alter_table(
+  p_table_name text,
+  p_columns jsonb
+)
+RETURNS jsonb AS $$
+DECLARE
+  v_safe_name text;
+  v_col record;
+  v_col_name text;
+  v_col_type text;
+  v_sql text;
+  v_exists boolean;
+BEGIN
+  -- テーブル名のサニタイズ（英小文字・数字・アンダースコア）
+  v_safe_name := lower(regexp_replace(p_table_name, '[^a-zA-Z0-9_]', '_', 'g'));
+  IF v_safe_name !~ '^[a-z]' THEN
+    v_safe_name := 'tbl_' || v_safe_name;
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' AND table_name = v_safe_name
+  ) INTO v_exists;
+
+  -- テーブルが未作成の場合は新規作成（本番1回作成）
+  IF NOT v_exists THEN
+    v_sql := format('CREATE TABLE public.%I (
+      id text PRIMARY KEY,
+      master_id text,
+      form_title text,
+      status text,
+      registration_code text,
+      resume_url text,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    )', v_safe_name);
+    EXECUTE v_sql;
+
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', v_safe_name);
+    EXECUTE format('CREATE POLICY "Allow select for all" ON public.%I FOR SELECT USING (true)', v_safe_name);
+    EXECUTE format('CREATE POLICY "Allow insert for all" ON public.%I FOR INSERT WITH CHECK (true)', v_safe_name);
+    EXECUTE format('CREATE POLICY "Allow update for all" ON public.%I FOR UPDATE USING (true) WITH CHECK (true)', v_safe_name);
+  END IF;
+
+  -- 追加カラムのみ動的追加 (ALTER TABLE ADD COLUMN)
+  FOR v_col IN SELECT * FROM jsonb_to_recordset(p_columns) AS (id text, label text, type text) LOOP
+    v_col_name := lower(regexp_replace(COALESCE(v_col.id, v_col.label), '[^a-zA-Z0-9_]', '_', 'g'));
+    IF v_col_name !~ '^[a-z]' THEN
+      v_col_name := 'col_' || v_col_name;
+    END IF;
+
+    IF v_col.type = 'number' THEN
+      v_col_type := 'numeric';
+    ELSIF v_col.type = 'date' THEN
+      v_col_type := 'timestamptz';
+    ELSE
+      v_col_type := 'text';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' AND table_name = v_safe_name AND column_name = v_col_name
+    ) THEN
+      EXECUTE format('ALTER TABLE public.%I ADD COLUMN %I %s', v_safe_name, v_col_name, v_col_type);
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('success', true, 'table_name', v_safe_name);
+EXCEPTION WHEN OTHERS THEN
+  RETURN jsonb_build_object('success', false, 'error', SQLERRM);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 11. フォーム「ヨサンダス 紹介代理店申込フォーム」専用物理テーブル
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.form_yosandas (
+  id TEXT PRIMARY KEY,
+  master_id TEXT,
+  form_title TEXT DEFAULT 'ヨサンダス 紹介代理店申込フォーム',
+  company_name TEXT,                    -- 会社名
+  representative_name TEXT,             -- 代表者名
+  contact_name TEXT,                    -- 担当者名
+  email TEXT,                           -- メールアドレス
+  postal_code TEXT,                     -- 郵便番号
+  prefecture TEXT,                      -- 都道府県
+  city TEXT,                            -- 市区町村
+  street TEXT,                          -- 町名・番地
+  building TEXT,                        -- 建物名・部屋番号
+  tel TEXT,                             -- 電話番号
+  tax_invoice_status TEXT,              -- 税務区分・インボイス登録状況
+  invoice_number TEXT,                  -- インボイス登録番号
+  activity_confirmation TEXT,           -- 紹介代理店としての活動に関する確認事項
+  contract_agreement TEXT,              -- 紹介代理店契約への同意
+  anti_social_declaration TEXT,         -- 反社会的勢力等に関する表明・確約
+  privacy_agreement TEXT,               -- 個人情報の取扱いへの同意
+  bank_name TEXT,                       -- 銀行名
+  bank_code TEXT,                       -- 金融機関コード
+  branch_code TEXT,                     -- 支店番号
+  branch_name TEXT,                     -- 支店名
+  account_type TEXT,                    -- 口座種別
+  account_number TEXT,                  -- 口座番号
+  account_holder TEXT,                  -- 口座名義（カナ）
+  status TEXT DEFAULT '回答完了',        -- ステータス (回答完了 / 途中送信)
+  registration_code TEXT,               -- 確定登録コード
+  resume_url TEXT,                      -- 再開用URL
+  created_at TIMESTAMPTZ DEFAULT NOW(), -- 送信日時
+  updated_at TIMESTAMPTZ DEFAULT NOW()  -- 更新日時
+);
+
+ALTER TABLE public.form_yosandas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow select for all" ON public.form_yosandas;
+CREATE POLICY "Allow select for all" ON public.form_yosandas FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert for all" ON public.form_yosandas;
+CREATE POLICY "Allow insert for all" ON public.form_yosandas FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow update for all" ON public.form_yosandas;
+CREATE POLICY "Allow update for all" ON public.form_yosandas FOR UPDATE USING (true) WITH CHECK (true);
+
+

@@ -16646,10 +16646,23 @@
     }
   }
 
+  // 🏷️ フォーム名（必ずサブタイトルまで結合）生成共通ヘルパー
+  function getEffectiveFormTitle(formDef) {
+    if (!formDef) return '無題のフォーム';
+    const rawTitle = (typeof formDef === 'string' ? formDef : (formDef.title || formDef.name || '無題のフォーム')).trim();
+    if (typeof formDef === 'string') return rawTitle;
+    const rawSubtitle = (formDef.subtitle || (formDef.header && formDef.header.subtitle) || '').trim();
+    if (rawSubtitle && !rawTitle.includes(rawSubtitle)) {
+      return `${rawTitle} ${rawSubtitle}`;
+    }
+    return rawTitle || '無題のフォーム';
+  }
+  window.getEffectiveFormTitle = getEffectiveFormTitle;
+
   // 📊 フォーム専用独立テーブル作成共通ヘルパー
   async function createDedicatedTableForForm(formDef) {
     if (!formDef) return null;
-    const formTitle = formDef.title || '無題のフォーム';
+    const formTitle = getEffectiveFormTitle(formDef);
     const sections = formDef.sections || [];
     const newTableId = `ctbl_${Date.now()}`;
     const columns = [
@@ -16746,6 +16759,28 @@
           updated_at: new Date().toISOString()
         })
       });
+
+      // 🌐 Supabaseクラウド上に物理テーブル（CREATE TABLE）を自動作成 (RPC)
+      try {
+        const rawSlug = (formDef.id || formDef.title || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        const pTableName = rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
+        const rpcCols = columns.map(c => ({ id: c.id, label: c.label || c.name, type: c.type || 'text' }));
+        await fetch(`${sbUrl}/rest/v1/rpc/synapse_create_or_alter_table`, {
+          method: 'POST',
+          headers: {
+            apikey: sbKey,
+            Authorization: `Bearer ${sbKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            p_table_name: pTableName,
+            p_columns: rpcCols
+          })
+        });
+        console.log(`[Supabase Physical Table] RPC triggered for table "${pTableName}".`);
+      } catch (rpcErr) {
+        console.warn('[Supabase Physical Table RPC] Failed to create physical table via RPC (RPC might not be installed yet):', rpcErr);
+      }
     } catch (netErr) {
       console.warn('[Supabase Sync] Network error during table registration:', netErr);
     }
@@ -16900,6 +16935,30 @@
       console.warn('[Supabase Sync] Network error during table columns update:', netErr);
     }
 
+    // 🌐 Supabaseクラウド上の物理テーブルへ追加カラムを動的反映 (RPC)
+    if (newColumnsToAdd && newColumnsToAdd.length > 0) {
+      try {
+        const rawSlug = (formDef.id || formDef.title || dedicatedTable.name || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        const pTableName = rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
+        const rpcCols = newColumnsToAdd.map(c => ({ id: c.id, label: c.label || c.name, type: c.type || 'text' }));
+        await fetch(`${sbUrl}/rest/v1/rpc/synapse_create_or_alter_table`, {
+          method: 'POST',
+          headers: {
+            apikey: sbKey,
+            Authorization: `Bearer ${sbKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            p_table_name: pTableName,
+            p_columns: rpcCols
+          })
+        });
+        console.log(`[Supabase Physical Table] Added ${newColumnsToAdd.length} columns to table "${pTableName}" via RPC.`);
+      } catch (rpcErr) {
+        console.warn('[Supabase Physical Table Alter RPC]', rpcErr);
+      }
+    }
+
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({ type: 'SYNAPSE_TABLE_UPDATED', table: fullTable, addedColumns: newColumnsToAdd }, '*');
     }
@@ -16919,7 +16978,7 @@
     const modal = document.getElementById('modal-merge-production');
     if (!modal) {
       // モーダル要素がない場合は従来の確認ダイアログ
-      const title = formObj.title || 'フォーム';
+      const title = getEffectiveFormTitle(formObj);
       const nextVer = ((formObj && formObj.publishedVersion) || 1) + 1;
       if (confirm(`「${title}」の最新編集内容を本番公開リンクへ統合（公開更新）しますか？\n\n・新バージョン: v${nextVer}\n・配布済みの本番URLは変更されず、回答画面が最新版へ切り替わります。\n・過去のテスト送信データが本番に混ざることはありません。`)) {
         mergeFormToProduction(idx);
@@ -16935,7 +16994,7 @@
     const labelEl = document.getElementById('merge-create-dedicated-table-label');
     const badgeEl = document.getElementById('merge-table-badge');
 
-    const formTitle = formObj.title || '無題のフォーム';
+    const formTitle = getEffectiveFormTitle(formObj);
     const curVer = formObj.publishedVersion || 1;
     const nextVer = curVer + 1;
 
@@ -17070,11 +17129,6 @@
       cancelBtn._hooked = true;
       cancelBtn.onclick = closeMergeProductionModal;
     }
-    if (executeBtn && !executeBtn._hooked) {
-      executeBtn._hooked = true;
-      executeBtn.onclick = executeMergeProductionFromModal;
-    }
-
     modal.classList.add('active');
     modal.style.display = 'flex';
   }
@@ -17086,6 +17140,7 @@
       modal.classList.remove('active');
       modal.style.display = 'none';
     }
+    _mergeModalTargetIndex = null;
   }
   window.closeMergeProductionModal = closeMergeProductionModal;
 
@@ -17106,7 +17161,7 @@
       if (wantDedicated) {
         let existingTables = [];
         try { existingTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
-        const formTitle = formObj.title || '無題のフォーム';
+        const formTitle = getEffectiveFormTitle(formObj);
         let dedicatedTable = existingTables.find(t => t && (
           t.id === formObj.targetTableId ||
           t.name === formTitle ||
@@ -17143,16 +17198,20 @@
 
       mergeFormToProduction(idx);
       closeMergeProductionModal();
+      const currentTitle = getEffectiveFormTitle(formObj);
+      const nextVersion = (formObj.publishedVersion || 1);
+      showToast(`「${currentTitle}」を本番環境へ統合しました。配布済み本番リンクが最新版（v${nextVersion}）に切り替わりました。`, 'success');
     } catch(err) {
-      console.error('Error during production merge:', err);
-      alert('本番統合中にエラーが発生しました: ' + err.message);
+      console.error('[MergeProductionModal] Error during merge execution:', err);
+      showToast('本番環境への統合中にエラーが発生しました。', 'error');
     } finally {
       if (executeBtn) {
         executeBtn.disabled = false;
-        executeBtn.textContent = '🚀 本番環境へ統合して公開';
+        executeBtn.textContent = '🚀 本番環境へ統合する';
       }
     }
   }
+  window.executeMergeProductionFromModal = executeMergeProductionFromModal;
 
   // 🔒 フォームの非公開・公開（受付停止・再開）切り替え
   async function toggleFormPublishStatus(formIndex) {
@@ -17301,7 +17360,7 @@
       }
       let customTables = [];
       try { customTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
-      const curFormTitle = formObj.title || '無題のフォーム';
+      const curFormTitle = getEffectiveFormTitle(formObj);
       const dedicatedTable = customTables.find(t => t && (
         t.id === formObj.targetTableId ||
         t.name === curFormTitle ||
@@ -20905,7 +20964,7 @@
   // ==========================================
   function openFormColumnMappingModal(targetFormDef = null) {
     const formDef = targetFormDef || window.G || window.L || {};
-    const formTitle = formDef.title || '無題のフォーム';
+    const formTitle = getEffectiveFormTitle(formDef);
     const sections = formDef.sections || [];
 
     let modal = document.getElementById('form-column-mapping-modal');
@@ -21200,7 +21259,7 @@
     const card = document.getElementById('editor-target-table-card');
 
     const formDef = window.G || window.L || {};
-    const formTitle = formDef.title || '無題のフォーム';
+    const formTitle = getEffectiveFormTitle(formDef);
 
     let isDedicated = false;
     if (typeof forcedVal === 'boolean') {

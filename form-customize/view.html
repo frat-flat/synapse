@@ -6999,6 +6999,19 @@
           if (nextSecId) currentUrl.searchParams.set('resumeSec', nextSecId);
           const resumeUrl = currentUrl.toString();
 
+          // 🏷️ フォーム名（必ずサブタイトルまで結合）
+          function getEffectiveFormTitle(formDef) {
+            if (!formDef) return '無題のフォーム';
+            const rawTitle = (typeof formDef === 'string' ? formDef : (formDef.title || formDef.name || '無題のフォーム')).trim();
+            if (typeof formDef === 'string') return rawTitle;
+            const rawSubtitle = (formDef.subtitle || (formDef.header && formDef.header.subtitle) || '').trim();
+            if (rawSubtitle && !rawTitle.includes(rawSubtitle)) {
+              return `${rawTitle} ${rawSubtitle}`;
+            }
+            return rawTitle || '無題のフォーム';
+          }
+          const effectiveFormTitle = getEffectiveFormTitle(formDefinition);
+
           // ドラフト保存
           try {
             localStorage.setItem('form_draft_' + rowId, JSON.stringify({
@@ -7015,7 +7028,7 @@
             const isDedicatedMode = !!(formDefinition.createDedicatedTable === true || formDefinition.targetTableType === 'dedicated' || (formDefinition.targetTableId && formDefinition.targetTableId !== 'table_all_form_responses'));
             window.parent.postMessage({
               type: 'FORM_SUBMIT',
-              formTitle: formDefinition.title || '無題のフォーム',
+              formTitle: effectiveFormTitle,
               createDedicatedTable: isDedicatedMode,
               targetTableId: isDedicatedMode ? (formDefinition.targetTableId || 'dedicated') : 'table_all_form_responses',
               targetTableType: isDedicatedMode ? 'dedicated' : 'consolidated',
@@ -7029,6 +7042,50 @@
               env: window.IS_TEST_ENV ? 'test' : 'production',
               branch: window.IS_TEST_ENV ? 'test' : 'main'
             }, '*');
+          }
+
+          // 🌐 Supabaseクラウド上の物理テーブル（例: form_yosandas）への自動直接書き込み
+          if (!window.IS_TEST_ENV && !isPartial) {
+            (async () => {
+              try {
+                const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+                const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+                const rawSlug = (formDefinition.id || formDefinition.title || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+                const pTableName = rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
+                
+                const physRow = {
+                  id: rowId,
+                  master_id: window.FORM_MASTER_ID || submitData['master_id'] || null,
+                  form_title: effectiveFormTitle,
+                  status: '回答完了',
+                  registration_code: confirmedCode,
+                  resume_url: resumeUrl,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                };
+
+                Object.keys(submitData).forEach(k => {
+                  const safeKey = k.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+                  if (safeKey && safeKey !== 'id') {
+                    physRow[safeKey] = String(submitData[k]);
+                  }
+                });
+
+                await fetch(`${sbUrl}/rest/v1/${pTableName}`, {
+                  method: 'POST',
+                  headers: {
+                    apikey: sbKey,
+                    Authorization: `Bearer ${sbKey}`,
+                    'Content-Type': 'application/json',
+                    Prefer: 'resolution=merge-duplicates'
+                  },
+                  body: JSON.stringify(physRow)
+                });
+                console.log(`[Supabase Physical Table] Successfully persisted row to "${pTableName}".`);
+              } catch (physErr) {
+                console.warn('[Supabase Physical Table Direct Insert]', physErr);
+              }
+            })();
           }
 
           // 2. ローカルストレージへの回答データ蓄積（スタンドアローン回答ログ）

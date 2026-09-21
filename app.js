@@ -5605,7 +5605,7 @@ function renderMypageFavorites() {
         if (origBtn) {
           origBtn.click();
         } else {
-          openTab(`custom-table-${fav.id}-tab`, `custom-table-${fav.id}-screen`, `📊 ${fav.name}`);
+          openTab(`custom-table-${fav.id}`, 'custom-table-screen', `📊 ${fav.name}`);
           renderCustomTable(fav.id);
         }
       }
@@ -5930,7 +5930,7 @@ function renderCustomTableList() {
           if (tbl.id === 'agency-network-screen') {
             openTab('agency-network-screen', 'agency-network-screen', '🌐 代理店 流入相関図');
           } else {
-            openTab(`custom-table-${tbl.id}-tab`, `custom-table-${tbl.id}-screen`, `📊 ${tbl.name}`);
+            openTab(`custom-table-${tbl.id}`, 'custom-table-screen', `📊 ${tbl.name}`);
             renderCustomTable(tbl.id);
           }
         });
@@ -13989,9 +13989,10 @@ function activateTab(id) {
     renderApplicantInfo();
   } else if (tab.type === 'customer-detail-template-view') {
     renderCustomerDetailView(tab.customerDetailId);
-  } else if (tab.type === 'custom-table-screen') {
-    const tableId = tab.id.replace('custom-table-', '');
+  } else if (tab.type === 'custom-table-screen' || (typeof tab.type === 'string' && tab.type.startsWith('custom-table-'))) {
+    const tableId = (tab.customTableId || tab.id).replace('custom-table-', '').replace(/-tab$/, '').replace(/-screen$/, '');
     state.activeCustomTableId = tableId;
+    tab.type = 'custom-table-screen';
     renderCustomTable(tableId);
   } else if (tab.type === 'table-creator-screen') {
     state.activeCustomTableId = null;
@@ -14024,9 +14025,11 @@ function activateTab(id) {
   // 画面表示切り替え
   const views = document.querySelectorAll('.screen-view');
   views.forEach(v => {
-    if (v.id === tab.type) {
+    const isCustomTable = (tab.type === 'custom-table-screen' || (typeof tab.type === 'string' && tab.type.startsWith('custom-table-')));
+    const match = isCustomTable ? (v.id === 'custom-table-screen') : (v.id === tab.type);
+    if (match) {
       v.classList.add('active');
-      v.style.display = (tab.type === 'chart-sheet-screen' || tab.type === 'form-customize-screen' || tab.type === 'agency-network-screen') ? 'flex' : 'block';
+      v.style.display = (tab.type === 'chart-sheet-screen' || tab.type === 'form-customize-screen' || tab.type === 'agency-network-screen' || tab.type === 'custom-table-screen') ? 'flex' : 'block';
       applyZoom(tab.zoomLevel || 100);
     } else {
       v.classList.remove('active');
@@ -21411,8 +21414,10 @@ function handleFormSubmitMessage(event) {
 
   // 該当フォームの専用独立テーブルが既に存在するか確認
   let existingDedicated = state.customTables.find(t => 
-    t.id !== 'table_all_form_responses' && 
-    (t.name === effectiveFormTitle || t.formTitle === effectiveFormTitle || (isDedicatedSelected && t.id === reqTableId))
+    t && t.id !== 'table_all_form_responses' && 
+    (t.name === effectiveFormTitle || t.formTitle === effectiveFormTitle || 
+     (effectiveFormTitle && t.name && (t.name.includes(effectiveFormTitle) || effectiveFormTitle.includes(t.name))) ||
+     (isDedicatedSelected && t.id === reqTableId))
   );
 
   // 独立テーブルの有無ステータス（専用テーブル作成を選択している、または既に存在する場合は「あり」、それ以外は「なし」）
@@ -21566,6 +21571,58 @@ function handleFormSubmitMessage(event) {
   // 編集監査ログへ記録
   logCellEdit(targetTable.id, targetRowId, 'all_columns', 'none', JSON.stringify(data));
   console.log(`%c[Synapse Database]%c Saved row (ID: ${targetRowId}) to Master Table "${effectiveTableName}" and Consolidated Table "全フォーム回答データ":`, "color: #3b82f6; font-weight: bold;", "color: inherit;", targetRow);
+
+  // 🌐 Supabaseクラウドへの自動永続化同期（synapse_storage & 物理テーブル）
+  try {
+    const sbUrl = localStorage.getItem(STORAGE_KEYS.SUPABASE_URL) || 'https://uefiuhywfsnrepiouofq.supabase.co';
+    const sbKey = localStorage.getItem(STORAGE_KEYS.SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+    
+    // 1. synapse_custom_tables の保存
+    fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+      method: 'POST',
+      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify({ key: 'synapse_custom_tables', value: state.customTables, updated_at: new Date().toISOString() })
+    }).catch(e => console.warn('[Supabase Sync Tables]', e));
+
+    // 2. targetTable の詳細データの保存
+    if (targetTable && targetTable.id) {
+      fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+        body: JSON.stringify({ key: `synapse_table_${targetTable.id}`, value: targetTable, updated_at: new Date().toISOString() })
+      }).catch(e => console.warn('[Supabase Sync Table Detail]', e));
+    }
+
+    // 3. Supabase物理テーブル（例: form_yosandas）への直接INSERT
+    const rawSlug = (targetTable.id || effectiveTableName || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    const pTableName = rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
+    const physRow = {
+      id: targetRowId,
+      master_id: targetRow.master_id || targetRow.mid || null,
+      form_title: effectiveTableName,
+      status: targetRow['ステータス'] || '回答完了',
+      registration_code: confirmedCode,
+      resume_url: targetRow['再開用URL'] || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    Object.keys(data).forEach(k => {
+      const safeK = k.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      if (safeK && safeK !== 'id') {
+        physRow[safeK] = String(data[k]);
+      }
+    });
+
+    fetch(`${sbUrl}/rest/v1/${pTableName}`, {
+      method: 'POST',
+      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify(physRow)
+    }).then(res => {
+      if (res.ok) console.log(`[Supabase Physical Table] Persisted row to "${pTableName}".`);
+    }).catch(e => console.warn('[Supabase Physical Table Insert]', e));
+  } catch (syncErr) {
+    console.warn('[Supabase Auto Sync Error]', syncErr);
+  }
 
   // もしカスタムテーブルが新設された場合は、サイドメニューを再描画する
   if (isNewTableCreated) {
