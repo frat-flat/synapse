@@ -16759,6 +16759,152 @@
   }
   window.createDedicatedTableForForm = createDedicatedTableForForm;
 
+  // 🔍 フォームの最新定義と既存専用テーブルを比較し、新設された質問（追加カラム）を特定する
+  function getNewColumnsForFormTable(dedicatedTable, formDef) {
+    if (!dedicatedTable || !formDef) return { newColumnsToAdd: [], existingColCount: 0 };
+
+    const formQuestions = [];
+    (formDef.sections || []).forEach(sec => {
+      (sec.questions || []).forEach(q => {
+        if (q) formQuestions.push(q);
+      });
+    });
+
+    const cols = Array.isArray(dedicatedTable.columns) ? dedicatedTable.columns : [];
+    const existingColIds = new Set(cols.map(c => c && c.id).filter(Boolean));
+    const existingColLabels = new Set(cols.map(c => c && (c.label || c.name || '').trim()).filter(Boolean));
+
+    const newColumnsToAdd = [];
+    formQuestions.forEach(q => {
+      const colId = q.dataKey || `col_${q.id}`;
+      const colName = (q.title || q.dataKey || q.id || '').trim();
+
+      const hasId = existingColIds.has(colId) || existingColIds.has(q.id) || existingColIds.has(q.dataKey);
+      const hasLabel = colName && existingColLabels.has(colName);
+
+      if (!hasId && !hasLabel) {
+        let colType = 'text';
+        if (q.type === 'date') colType = 'date';
+        else if (q.type === 'select' || q.type === 'radio') colType = 'select';
+        else if (q.type === 'number') colType = 'number';
+
+        let choices = undefined;
+        if (Array.isArray(q.options) && q.options.length > 0) {
+          choices = q.options.map(opt => {
+            if (typeof opt === 'object' && opt !== null) {
+              return { value: opt.label || opt.value || '' };
+            }
+            return { value: String(opt) };
+          });
+        }
+
+        const newCol = {
+          id: colId,
+          label: colName,
+          name: colName,
+          type: colType,
+          required: !!q.required,
+          choices: choices
+        };
+        newColumnsToAdd.push(newCol);
+        existingColIds.add(colId);
+        if (colName) existingColLabels.add(colName);
+      }
+    });
+
+    return { newColumnsToAdd, existingColCount: cols.length };
+  }
+  window.getNewColumnsForFormTable = getNewColumnsForFormTable;
+
+  // 🔄 テストから本番へ統合する際、追加カラムがあった場合のみ既存専用テーブルを更新する
+  async function updateDedicatedTableColumns(dedicatedTable, formDef) {
+    if (!dedicatedTable || !formDef) return { updated: false, addedColumns: [] };
+
+    const { newColumnsToAdd } = getNewColumnsForFormTable(dedicatedTable, formDef);
+    if (!newColumnsToAdd || newColumnsToAdd.length === 0) {
+      console.log(`[DedicatedTable] No new columns detected for "${dedicatedTable.name}". Table preserved as-is.`);
+      return { updated: false, addedColumns: [] };
+    }
+
+    console.log(`[DedicatedTable] Adding ${newColumnsToAdd.length} new columns to existing table "${dedicatedTable.name}"...`, newColumnsToAdd);
+
+    if (!Array.isArray(dedicatedTable.columns)) dedicatedTable.columns = [];
+    
+    // システムカラム（status, registration_code, resume_url, created_at）の直前に新カラムを挿入
+    const sysColKeys = ['status', 'registration_code', 'resume_url', 'created_at'];
+    let insertIdx = dedicatedTable.columns.findIndex(c => c && sysColKeys.includes(c.id));
+    if (insertIdx === -1) insertIdx = dedicatedTable.columns.length;
+
+    dedicatedTable.columns.splice(insertIdx, 0, ...newColumnsToAdd);
+
+    // visibleColumnsの更新
+    if (Array.isArray(dedicatedTable.visibleColumns)) {
+      newColumnsToAdd.forEach(c => {
+        if (!dedicatedTable.visibleColumns.includes(c.id)) {
+          dedicatedTable.visibleColumns.push(c.id);
+        }
+      });
+    }
+
+    // columnWidthsの更新
+    if (!dedicatedTable.columnWidths) dedicatedTable.columnWidths = {};
+    newColumnsToAdd.forEach(c => {
+      if (!dedicatedTable.columnWidths[c.id]) {
+        dedicatedTable.columnWidths[c.id] = 130;
+      }
+    });
+
+    // 1. synapse_custom_tables の保存・更新
+    let curTables = [];
+    try { curTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
+    const existingIdx = curTables.findIndex(t => t && t.id === dedicatedTable.id);
+    if (existingIdx !== -1) {
+      curTables[existingIdx] = dedicatedTable;
+    } else {
+      curTables.push(dedicatedTable);
+    }
+    localStorage.setItem('synapse_custom_tables', JSON.stringify(curTables));
+
+    // 2. synapse_table_${id} の更新（既存行データを保持したままカラム定義のみマージ）
+    let fullTable = dedicatedTable;
+    try {
+      const raw = localStorage.getItem(`synapse_table_${dedicatedTable.id}`);
+      if (raw) {
+        fullTable = JSON.parse(raw);
+        fullTable.columns = dedicatedTable.columns;
+        fullTable.visibleColumns = dedicatedTable.visibleColumns;
+        fullTable.columnWidths = dedicatedTable.columnWidths;
+      }
+    } catch(e) {}
+    localStorage.setItem(`synapse_table_${dedicatedTable.id}`, JSON.stringify(fullTable));
+
+    // 3. Supabaseへの非同期同期
+    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+
+    try {
+      await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+        body: JSON.stringify({ key: `synapse_table_${dedicatedTable.id}`, value: fullTable, updated_at: new Date().toISOString() })
+      });
+      await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+        body: JSON.stringify({ key: 'synapse_custom_tables', value: curTables, updated_at: new Date().toISOString() })
+      });
+    } catch(netErr) {
+      console.warn('[Supabase Sync] Network error during table columns update:', netErr);
+    }
+
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'SYNAPSE_TABLE_UPDATED', table: fullTable, addedColumns: newColumnsToAdd }, '*');
+    }
+
+    return { updated: true, addedColumns: newColumnsToAdd };
+  }
+  window.updateDedicatedTableColumns = updateDedicatedTableColumns;
+
   // 🚀 本番公開・統合モーダル（公開時に専用テーブル作成を選択可能）
   let _mergeModalTargetIndex = null;
 
@@ -16783,6 +16929,8 @@
     const dedicatedToggle = document.getElementById('merge-create-dedicated-table');
     const tableCard = document.getElementById('merge-target-table-card');
     const tableDesc = document.getElementById('merge-target-table-desc');
+    const labelEl = document.getElementById('merge-create-dedicated-table-label');
+    const badgeEl = document.getElementById('merge-table-badge');
 
     const formTitle = formObj.title || '無題のフォーム';
     const curVer = formObj.publishedVersion || 1;
@@ -16791,10 +16939,15 @@
     if (titleEl) titleEl.textContent = formTitle;
     if (verEl) verEl.textContent = `v${curVer} → v${nextVer}`;
 
-    // 専用テーブルの有無判定
+    // 専用テーブルの有無判定（本番で1回作成されたテーブルがあるか）
     let existingTables = [];
     try { existingTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
-    const dedicatedTable = existingTables.find(t => t && (t.id === formObj.targetTableId || t.name === formTitle || (t.formTitle && t.formTitle === formTitle)));
+    const dedicatedTable = existingTables.find(t => t && (
+      t.id === formObj.targetTableId ||
+      t.name === formTitle ||
+      (t.formTitle && t.formTitle === formTitle) ||
+      (t.formId && t.formId === formObj.id)
+    ));
 
     const isDedicated = !!(formObj.createDedicatedTable === true || formObj.targetTableType === 'dedicated' || dedicatedTable);
 
@@ -16805,19 +16958,52 @@
     const updateMergeModalTableUI = (checked) => {
       if (!tableCard || !tableDesc) return;
       if (checked) {
-        tableCard.style.borderColor = '#86efac';
-        tableCard.style.background = '#f0fdf4';
-        if (dedicatedTable) {
-          tableDesc.innerHTML = `✅ フォーム専用テーブル「<strong>${formTitle}</strong>」と連携中（回答は専用テーブルと「全フォーム回答データ」の両方に記録されます）。`;
-        } else {
-          tableDesc.innerHTML = `⚡ 本番公開と同時にフォーム専用テーブル「<strong>${formTitle}</strong>」が自動作成され、全問のカラムがマッピングされます（回答は専用テーブルと「全フォーム回答データ」の両方に記録されます）。`;
-        }
-        tableDesc.style.color = '#15803d';
-      } else {
         tableCard.style.borderColor = '#cbd5e1';
         tableCard.style.background = '#f8fafc';
-        tableDesc.innerHTML = `💡 選択しない場合：回答はすべて統合テーブル「<strong>全フォーム回答データ</strong>」に保存されます（専用テーブルは作成されません）。`;
-        tableDesc.style.color = '#64748b';
+
+        if (dedicatedTable) {
+          const { newColumnsToAdd } = getNewColumnsForFormTable(dedicatedTable, formObj);
+          if (labelEl) labelEl.textContent = '専用テーブルと連携中';
+
+          if (badgeEl) {
+            badgeEl.style.display = 'inline-block';
+            if (newColumnsToAdd.length > 0) {
+              badgeEl.textContent = `+${newColumnsToAdd.length} カラム追加`;
+              badgeEl.style.background = '#e0f2fe';
+              badgeEl.style.color = '#0369a1';
+            } else {
+              badgeEl.textContent = 'カラム変更なし';
+              badgeEl.style.background = '#f1f5f9';
+              badgeEl.style.color = '#64748b';
+            }
+          }
+
+          if (newColumnsToAdd.length > 0) {
+            const previewNames = newColumnsToAdd.map(c => c.label).slice(0, 2).join('、') + (newColumnsToAdd.length > 2 ? ` 他${newColumnsToAdd.length - 2}件` : '');
+            tableDesc.innerHTML = `🔄 既存テーブル「${dedicatedTable.name || formTitle}」に新設された<strong>${newColumnsToAdd.length}件</strong>のカラム（${previewNames}）を自動追加します。`;
+            tableDesc.style.color = '#0369a1';
+          } else {
+            tableDesc.innerHTML = `✅ 既存テーブル「${dedicatedTable.name || formTitle}」と連携中（追加カラムはありません）。`;
+            tableDesc.style.color = '#475569';
+          }
+        } else {
+          if (labelEl) labelEl.textContent = 'このフォーム専用のテーブルを作成する';
+          if (badgeEl) {
+            badgeEl.style.display = 'inline-block';
+            badgeEl.textContent = '初回作成';
+            badgeEl.style.background = '#fef3c7';
+            badgeEl.style.color = '#92400e';
+          }
+          tableDesc.innerHTML = `💡 初回本番公開時に専用テーブル「<strong>${formTitle}</strong>」を自動作成します。`;
+          tableDesc.style.color = '#475569';
+        }
+      } else {
+        tableCard.style.borderColor = '#e2e8f0';
+        tableCard.style.background = '#ffffff';
+        if (labelEl) labelEl.textContent = '専用テーブルと連携しない';
+        if (badgeEl) badgeEl.style.display = 'none';
+        tableDesc.innerHTML = `💡 未選択時：回答はすべて統合テーブル「<strong>全フォーム回答データ</strong>」に保存されます。`;
+        tableDesc.style.color = '#94a3b8';
       }
     };
 
@@ -16880,14 +17066,29 @@
         let existingTables = [];
         try { existingTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
         const formTitle = formObj.title || '無題のフォーム';
-        const dedicatedTable = existingTables.find(t => t && (t.id === formObj.targetTableId || t.name === formTitle || (t.formTitle && t.formTitle === formTitle)));
+        let dedicatedTable = existingTables.find(t => t && (
+          t.id === formObj.targetTableId ||
+          t.name === formTitle ||
+          (t.formTitle && t.formTitle === formTitle) ||
+          (t.formId && t.formId === formObj.id)
+        ));
 
         if (!dedicatedTable) {
-          await createDedicatedTableForForm(formObj);
+          // 専用テーブルの新規作成は本番で最初の1回のみ
+          dedicatedTable = await createDedicatedTableForForm(formObj);
+          console.log(`[DedicatedTable] First-time production table created:`, dedicatedTable?.id);
         } else {
+          // すでに存在する場合：テーブルIDを確実に紐付け、追加カラムがあった場合のみテーブルを更新
           formObj.createDedicatedTable = true;
           formObj.targetTableId = dedicatedTable.id;
           formObj.targetTableType = 'dedicated';
+
+          const res = await updateDedicatedTableColumns(dedicatedTable, formObj);
+          if (res && res.updated) {
+            console.log(`[DedicatedTable] Successfully updated table "${dedicatedTable.name}" with ${res.addedColumns.length} new columns.`);
+          } else {
+            console.log(`[DedicatedTable] Table "${dedicatedTable.name}" requires no column updates.`);
+          }
         }
       } else {
         formObj.createDedicatedTable = false;
