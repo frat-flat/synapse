@@ -14716,16 +14716,8 @@
       
       if (currentSecId) {
         allSelects.forEach(select => {
-          // もしセレクトボックスの現在の選択値が空値（""）または "next" である場合は、
-          // 整合性向上のため、自動的に「隣のセクションのID」を選択値に割り当てて、UI表示を同期させる
-          if (select.value === "" || select.value === "next") {
-            const nextSec = window.n.sections[currentIdx + 1];
-            if (nextSec) {
-              select.value = nextSec.id;
-              // React 側に値の更新を通知する
-              select.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-          }
+          // 空値（""）は「デフォルトの進行（同一セクション内の次の質問へ進む）」を表す正常な値のため、
+          // 勝手に別セクションへ上書きしない。
 
           const options = select.querySelectorAll('option');
           let needChangeTrigger = false;
@@ -17952,6 +17944,26 @@
                 }
               }
             });
+          }
+
+          // 4. 同一セクション内に後続の質問が存在する通常の選択項目（口座種別など）において、
+          // 全選択肢が誤って "submit"（送信完了）を指してしまい後続質問がスキップされてしまう誤爆の防止
+          const qIdxInSec = questions.indexOf(q);
+          const isLastQInSection = (qIdxInSec === questions.length - 1);
+          if (!isLastQInSection && Array.isArray(q.options) && q.options.length > 0) {
+            const hasSubsequentQuestions = (questions.length - 1 > qIdxInSec);
+            const isAccountType = (q.dataKey === 'account_type' || (q.title && q.title.includes('口座種別')));
+            const allOptionsAreSubmit = q.options.every(opt => opt && opt.nextSectionId === 'submit');
+
+            if ((isAccountType && allOptionsAreSubmit) || (hasSubsequentQuestions && allOptionsAreSubmit && !dependentSubQs.length)) {
+              console.warn(`[Sanitize] Question "${q.title}" had subsequent questions in same section, but all options were set to "submit". Resetting option branches to default.`);
+              q.options.forEach(opt => {
+                if (opt && opt.nextSectionId === 'submit') {
+                  delete opt.nextSectionId;
+                  hasModified = true;
+                }
+              });
+            }
           }
         });
       });
