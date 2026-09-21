@@ -97,14 +97,6 @@
         <!-- 👤 マイページ（最上部） -->
         <button class="nav-item" id="menu-mypage" data-tab="mypage-screen" style="margin-top: 0.5rem; margin-bottom: 0.5rem; font-weight: bold; width: calc(100% - 1rem); box-sizing: border-box; text-align: left; display: flex; align-items: center; gap: 0.5rem;">👤 <span class="nav-item-text">マイページ</span></button>
 
-        <!-- 🔒 並び替えロック切替ツールバー -->
-        <div class="sidebar-reorder-toolbar" id="sidebar-reorder-toolbar">
-          <button id="sidebar-reorder-lock-btn" class="sidebar-reorder-lock-btn" type="button" title="メニューの並び替えロック（クリックでロック解除）">
-            <span class="lock-icon" id="sidebar-reorder-lock-icon">🔒</span>
-            <span class="lock-text" id="sidebar-reorder-lock-text">並び替えロック中</span>
-          </button>
-        </div>
-
         <!-- 📊 ヨサンダス サービス専用メニュー群 -->
         <div id="sidebar-yosandas-group" class="sidebar-service-group" style="display: flex; flex-direction: column; width: 100%;">
           <div class="sidebar-accordion" id="appoint-accordion" style="margin-top: 0.25rem;">
@@ -248,9 +240,23 @@
 <input type="checkbox" id="preview-grayout-chk" style="transform: scale(0.9);" /> グレー表示
 </label>
 <button id="preview-apply-btn" class="btn btn-sm btn-primary" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;">適用</button>
+    </div>
+  </div>
 </div>
 </div>
-</div>
+
+<!-- 🔒 サイドバー最下部：並び替えロック切替ボタン（線画アイコンのみ） -->
+<div class="sidebar-footer" id="sidebar-footer">
+  <button id="sidebar-reorder-lock-btn" class="sidebar-lock-btn" type="button" title="メニューの並び替え（ロック中・クリックで解除）" aria-label="メニューの並び替えロック切替">
+    <svg class="lock-icon-svg icon-locked" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+    </svg>
+    <svg class="lock-icon-svg icon-unlocked" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+      <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+    </svg>
+  </button>
 </div>
 </aside>
 

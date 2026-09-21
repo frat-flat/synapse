@@ -1457,8 +1457,6 @@ body:not(.logged-in) .login-layout {
 }
 
 .user-profile-section {
-  border-top: 1px solid var(--border-color);
-  padding-top: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -4928,82 +4926,88 @@ h3 {
   display: none !important;
 }
 
-/* 🔒 並び替えロック切替ツールバー */
-.sidebar-reorder-toolbar {
+/* 🔒 サイドバー最下部：並び替えロックボタン（線画アイコンのみ） */
+.sidebar-footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 0.15rem 0.6rem 0.35rem;
-  margin-bottom: 0.15rem;
-  user-select: none;
+  padding: 0.45rem 0.5rem 0.25rem;
+  margin-top: auto;
+  border-top: 1px solid var(--border-color, #e2e8f0);
 }
 
-.sidebar-reorder-lock-btn {
+.sidebar-lock-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  background: var(--bg-surface-elevated, #f8fafc);
-  border: 1px solid var(--border-color, #e2e8f0);
-  color: var(--text-muted, #64748b);
-  border-radius: 20px;
-  padding: 0.2rem 0.6rem;
-  font-size: 0.72rem;
-  font-weight: 500;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted, #94a3b8);
   cursor: pointer;
   transition: all 0.2s ease;
-  line-height: 1.2;
+  padding: 0;
+  outline: none;
 }
 
-.sidebar-reorder-lock-btn:hover {
-  border-color: var(--primary, #2563eb);
+.sidebar-lock-btn:hover {
+  background: var(--bg-surface-elevated, #f1f5f9);
   color: var(--text-primary, #0f172a);
-  background: rgba(37, 99, 235, 0.05);
+  border-color: var(--border-color, #e2e8f0);
 }
 
-.sidebar-reorder-lock-btn:focus-visible {
+.sidebar-lock-btn:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 1px;
 }
 
-.sidebar-reorder-lock-btn:focus:not(:focus-visible) {
+.sidebar-lock-btn:focus:not(:focus-visible) {
   outline: none;
 }
 
-/* ロック解除中（並び替えモード有効）のアクティブスタイル */
-.sidebar-reorder-lock-btn.is-unlocked {
-  background: rgba(37, 99, 235, 0.12);
-  border-color: var(--primary, #2563eb);
-  color: var(--primary, #2563eb);
-  font-weight: 600;
-  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
+.sidebar-lock-btn .lock-icon-svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+  stroke: currentColor;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
 }
 
-.sidebar-reorder-lock-btn.is-unlocked:hover {
-  background: rgba(37, 99, 235, 0.2);
+/* ロック中（デフォルト） */
+.sidebar-lock-btn .icon-locked {
+  display: block;
 }
-
-.sidebar-reorder-lock-btn .lock-icon {
-  font-size: 0.8rem;
-  line-height: 1;
-}
-
-.sidebar-reorder-lock-btn .lock-text {
-  font-size: 0.72rem;
-}
-
-/* サイドバー折りたたみ時 */
-.sidebar-menu.collapsed .sidebar-reorder-toolbar {
-  justify-content: center;
-  padding: 0.2rem 0.2rem;
-}
-
-.sidebar-menu.collapsed .sidebar-reorder-lock-btn .lock-text {
+.sidebar-lock-btn .icon-unlocked {
   display: none;
 }
 
-.sidebar-menu.collapsed .sidebar-reorder-lock-btn {
-  padding: 0.25rem 0.4rem;
-  border-radius: var(--radius-sm, 6px);
+/* 🔓 ロック解除時（並び替えモード有効） */
+.sidebar-lock-btn.is-unlocked {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--primary, #2563eb);
+  border-color: rgba(37, 99, 235, 0.3);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
+}
+
+.sidebar-lock-btn.is-unlocked:hover {
+  background: rgba(37, 99, 235, 0.2);
+  border-color: var(--primary, #2563eb);
+}
+
+.sidebar-lock-btn.is-unlocked .icon-locked {
+  display: none;
+}
+.sidebar-lock-btn.is-unlocked .icon-unlocked {
+  display: block;
+}
+
+/* サイドバー折りたたみ時 */
+.sidebar-menu.collapsed .sidebar-footer {
+  justify-content: center;
+  padding: 0.45rem 0.2rem 0.25rem;
 }
 
 /* 🔓 ロック解除時（.sidebar-reorder-unlocked）の挙動 */

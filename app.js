@@ -5896,8 +5896,6 @@ function updateSidebarReorderLockUI() {
   const isUnlocked = !!state.isSidebarReorderUnlocked;
   const sidebarEl = document.getElementById('app-sidebar');
   const lockBtn = document.getElementById('sidebar-reorder-lock-btn');
-  const lockIcon = document.getElementById('sidebar-reorder-lock-icon');
-  const lockText = document.getElementById('sidebar-reorder-lock-text');
 
   if (sidebarEl) {
     sidebarEl.classList.toggle('sidebar-reorder-unlocked', isUnlocked);
@@ -5905,9 +5903,9 @@ function updateSidebarReorderLockUI() {
 
   if (lockBtn) {
     lockBtn.classList.toggle('is-unlocked', isUnlocked);
-    lockBtn.title = isUnlocked ? '並び替えを完了してロックする' : 'メニューの並び替えロック（クリックで解除）';
-    if (lockIcon) lockIcon.textContent = isUnlocked ? '🔓' : '🔒';
-    if (lockText) lockText.textContent = isUnlocked ? '並び替え中 (完了)' : '並び替えロック中';
+    const titleText = isUnlocked ? 'メニューの並び替え中（クリックで完了・ロック）' : 'メニューの並び替え（ロック中・クリックで解除）';
+    lockBtn.title = titleText;
+    lockBtn.setAttribute('aria-label', titleText);
   }
 
   // 各メニュー項目の draggable 属性をロック状態に同期
@@ -5924,9 +5922,9 @@ function toggleSidebarReorderLock() {
 
   if (typeof showToast === 'function') {
     if (state.isSidebarReorderUnlocked) {
-      showToast('並び替えロックを解除しました。ドラッグまたは▲▼で順序を変更できます。', 'info');
+      showToast('メニューの並び替えロックを解除しました（ドラッグまたは▲▼で移動）', 'info');
     } else {
-      showToast('並び替えを完了し、ロックしました。', 'success');
+      showToast('メニューの並び替えを完了し、ロックしました', 'success');
     }
   }
 }
