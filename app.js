@@ -11209,26 +11209,65 @@ function setupCtButtonsEvents() {
     colId: null
   };
 
-  function openColumnFormulaModal(tbl, colId) {
+  function openColumnFormulaModal(tbl, initialColId = null) {
     const modal = document.getElementById('ct-column-formula-modal');
     if (!modal) return;
+    if (!tbl) {
+      tbl = findCustomOrMasterTable(state.activeCustomTableId);
+    }
+    if (!tbl) {
+      showToast('テーブルが選択されていません。', 'warning');
+      return;
+    }
 
-    const col = tbl.columns?.find(c => c.id === colId);
-    if (!col) return;
+    if (!canEditTableSchema(tbl.id)) {
+      showToast('⚠️ 列の関数・他シート参照を設定するには「関数・構造編集権限」が必要です。', 'warning');
+      return;
+    }
+
+    const cols = tbl.columns || [];
+    if (cols.length === 0) {
+      showToast('設定可能なカラムがありません。', 'warning');
+      return;
+    }
 
     activeFormulaModalTarget.tbl = tbl;
-    activeFormulaModalTarget.colId = colId;
 
-    const targetColNameEl = document.getElementById('cf-target-col-name');
-    if (targetColNameEl) targetColNameEl.textContent = `${col.label || col.id} (${col.id})`;
+    // カラム選択ドロップダウンの構築
+    const targetColSelect = document.getElementById('cf-target-col-select');
+    if (targetColSelect) {
+      targetColSelect.innerHTML = '';
+      cols.forEach((c, idx) => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        const letter = getColumnLetter(idx);
+        opt.textContent = `${letter}列: ${c.label || c.id} ${c.formula ? `[🔗 ${c.formula}]` : ''}`;
+        targetColSelect.appendChild(opt);
+      });
+    }
+
+    // 初期選択カラムの決定
+    let selectedColId = initialColId;
+    if (!selectedColId) {
+      if (state.ctSelectedCols && state.ctSelectedCols.size > 0) {
+        selectedColId = Array.from(state.ctSelectedCols)[0];
+      } else if (state.ctSelectedCell && state.ctSelectedCell.colId) {
+        selectedColId = state.ctSelectedCell.colId;
+      } else {
+        selectedColId = cols[0].id;
+      }
+    }
+    if (targetColSelect && selectedColId) {
+      targetColSelect.value = selectedColId;
+    }
 
     const tableSelect = document.getElementById('cf-source-table-select');
     const colSelectGroup = document.getElementById('cf-col-select-group');
     const colSelect = document.getElementById('cf-source-col-select');
-    const previewEl = document.getElementById('cf-formula-preview');
+    const formulaInput = document.getElementById('cf-formula-input');
 
     const allTables = getAllAvailableTables();
-    tableSelect.innerHTML = '<option value="">参照なし（独立入力カラム）</option>';
+    tableSelect.innerHTML = '<option value="">参照なし（独立手入力カラム）</option>';
     allTables.forEach(t => {
       // 循環参照防止のため自テーブルは除外
       if (t.id === tbl.id || t.id === `custom-table-${tbl.id}`) return;
@@ -11238,26 +11277,48 @@ function setupCtButtonsEvents() {
       tableSelect.appendChild(opt);
     });
 
-    let initialSheet = '';
-    let initialColSpec = '';
-    if (col.formula) {
-      const m = col.formula.trim().match(/^=?(?:'([^']+)'|([^'!]+))!(.+)$/);
-      if (m) {
-        initialSheet = m[1] || m[2];
-        initialColSpec = m[3];
+    // カラム切り替え時のUI同期関数
+    const syncModalForCol = (colId) => {
+      activeFormulaModalTarget.colId = colId;
+      const curCol = tbl.columns?.find(c => c.id === colId);
+      if (!curCol) return;
+
+      let initialSheet = '';
+      let initialColSpec = '';
+      if (curCol.formula) {
+        formulaInput.value = curCol.formula;
+        const m = curCol.formula.trim().match(/^=?(?:'([^']+)'|([^'!]+))!(.+)$/);
+        if (m) {
+          initialSheet = m[1] || m[2];
+          initialColSpec = m[3];
+        }
+      } else {
+        formulaInput.value = '';
       }
-    }
+
+      if (initialSheet) {
+        const resolvedTable = resolveTableBySheetName(initialSheet);
+        if (resolvedTable) {
+          tableSelect.value = resolvedTable.id;
+          updateColDropdown(resolvedTable.id, initialColSpec);
+        } else {
+          tableSelect.value = '';
+          updateColDropdown('');
+        }
+      } else {
+        tableSelect.value = '';
+        updateColDropdown('');
+      }
+    };
 
     const updateColDropdown = (selectedTableId, targetColSpec = '') => {
       if (!selectedTableId) {
         if (colSelectGroup) colSelectGroup.style.display = 'none';
-        if (previewEl) previewEl.textContent = '(参照なし)';
         return;
       }
       const targetTable = allTables.find(t => t.id === selectedTableId || t.name === selectedTableId);
       if (!targetTable) {
         if (colSelectGroup) colSelectGroup.style.display = 'none';
-        if (previewEl) previewEl.textContent = '(参照なし)';
         return;
       }
 
@@ -11276,48 +11337,63 @@ function setupCtButtonsEvents() {
           colSelect.appendChild(opt);
         });
       }
-
-      updatePreview();
     };
 
-    const updatePreview = () => {
+    const applyDropdownToInput = () => {
       const selectedTblId = tableSelect.value;
       if (!selectedTblId) {
-        if (previewEl) previewEl.textContent = '(参照なし)';
+        formulaInput.value = '';
         return;
       }
       const targetTable = allTables.find(t => t.id === selectedTblId);
       const tblName = targetTable ? targetTable.name : selectedTblId;
       const selectedColLetter = colSelect ? colSelect.value || 'A' : 'A';
-      if (previewEl) previewEl.textContent = `='${tblName}'!${selectedColLetter}`;
+      formulaInput.value = `='${tblName}'!${selectedColLetter}`;
     };
 
-    if (initialSheet) {
-      const resolvedTable = resolveTableBySheetName(initialSheet);
-      if (resolvedTable) {
-        tableSelect.value = resolvedTable.id;
-        updateColDropdown(resolvedTable.id, initialColSpec);
-      } else {
-        tableSelect.value = '';
-        updateColDropdown('');
-      }
-    } else {
-      tableSelect.value = '';
-      updateColDropdown('');
+    if (targetColSelect) {
+      targetColSelect.onchange = () => {
+        syncModalForCol(targetColSelect.value);
+      };
     }
 
     tableSelect.onchange = () => {
       updateColDropdown(tableSelect.value);
+      applyDropdownToInput();
     };
     if (colSelect) {
       colSelect.onchange = () => {
-        updatePreview();
+        applyDropdownToInput();
       };
     }
+
+    // クリアボタン
+    const clearBtn = document.getElementById('btn-clear-formula-input');
+    if (clearBtn) {
+      clearBtn.onclick = () => {
+        formulaInput.value = '';
+        tableSelect.value = '';
+        if (colSelectGroup) colSelectGroup.style.display = 'none';
+      };
+    }
+
+    // 初回同期
+    syncModalForCol(targetColSelect ? targetColSelect.value : selectedColId);
 
     modal.style.display = 'flex';
   }
   window.openColumnFormulaModal = openColumnFormulaModal;
+
+  // 上部ツールバー「fx 関数・他シート参照」ボタンのクリックイベント
+  document.getElementById('ct-open-formula-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const tbl = findCustomOrMasterTable(state.activeCustomTableId);
+    if (!tbl) {
+      showToast('テーブルが開かれていません。', 'warning');
+      return;
+    }
+    openColumnFormulaModal(tbl);
+  });
 
   // コンテキストメニュー「fx 関数・他シート参照設定...」のクリックイベント
   document.getElementById('ct-menu-col-formula')?.addEventListener('mousedown', (e) => {
@@ -11327,11 +11403,6 @@ function setupCtButtonsEvents() {
     if (!ctResizeState.tblId || !ctResizeState.targetId) return;
     const tbl = findCustomOrMasterTable(ctResizeState.tblId);
     if (!tbl) return;
-
-    if (!canEditTableSchema(tbl.id)) {
-      showToast('⚠️ 列の関数・他シート参照を設定するには「関数・構造編集権限」が必要です。', 'warning');
-      return;
-    }
 
     openColumnFormulaModal(tbl, ctResizeState.targetId);
   });
@@ -11343,19 +11414,17 @@ function setupCtButtonsEvents() {
     const col = tbl.columns?.find(c => c.id === colId);
     if (!col) return;
 
-    const tableSelect = document.getElementById('cf-source-table-select');
-    const colSelect = document.getElementById('cf-source-col-select');
+    const formulaInput = document.getElementById('cf-formula-input');
     const modal = document.getElementById('ct-column-formula-modal');
+    const enteredFormula = formulaInput ? formulaInput.value.trim() : '';
 
-    if (tableSelect && tableSelect.value && colSelect && colSelect.value) {
-      const allTables = getAllAvailableTables();
-      const targetTable = allTables.find(t => t.id === tableSelect.value);
-      const tblName = targetTable ? targetTable.name : tableSelect.value;
-      col.formula = `='${tblName}'!${colSelect.value}`;
-      showToast(`カラム「${col.label || col.id}」に参照数式 ${col.formula} を設定しました。`, 'success');
+    if (enteredFormula) {
+      // '='で始まっていなければ自動付与
+      col.formula = enteredFormula.startsWith('=') ? enteredFormula : `=${enteredFormula}`;
+      showToast(`カラム「${col.label || col.id}」に数式 ${col.formula} を保存しました。`, 'success');
     } else {
       delete col.formula;
-      showToast(`カラム「${col.label || col.id}」の他シート参照設定を解除しました。`, 'info');
+      showToast(`カラム「${col.label || col.id}」の数式を解除しました。`, 'info');
     }
 
     saveCustomTables();
@@ -35881,25 +35950,59 @@ function getFolderMenuPath(accId) {
 function updateParentSelectDropdowns() {
   const tcSelect = document.getElementById('tc-table-parent');
   const ctSelect = document.getElementById('ct-table-parent-select');
-  
-  const options = [
-    { value: 'forms-accordion', text: '📝 回答フォーム一覧' },
-    { value: 'agency-info', text: '代理店情報' },
-    { value: 'jo-info', text: 'JO情報' },
-    { value: 'applicant-info', text: '申込者情報' },
-    { value: 'appoint', text: 'アポイント情報' },
-    { value: 'root', text: 'ルート直下' }
-  ];
+  if (!tcSelect && !ctSelect) return;
 
-  state.customAccordions.forEach(acc => {
-    if (!options.some(o => o.value === acc.id)) {
-      options.push({ value: acc.id, text: getFolderMenuPath(acc.id) });
-    }
+  // 標準フォルダーの定義（正規化IDとスマートなアイコン・表示名）
+  const standardFolderMap = {
+    'root': { value: 'root', text: '🏠 メインメニュー直下（最上位）', icon: '🏠' },
+    'agency-accordion': { value: 'agency-accordion', text: '💼 代理店情報', icon: '💼' },
+    'jo-accordion': { value: 'jo-accordion', text: '📑 JO情報', icon: '📑' },
+    'applicant-accordion': { value: 'applicant-accordion', text: '📋 申込者情報', icon: '📋' },
+    'appoint-accordion': { value: 'appoint-accordion', text: '📅 アポイント情報', icon: '📅' },
+    'forms-accordion': { value: 'forms-accordion', text: '📝 回答フォーム一覧', icon: '📝' }
+  };
+
+  const options = [];
+  const addedValues = new Set();
+
+  // 1. ルート（最上位）
+  options.push(standardFolderMap['root']);
+  addedValues.add('root');
+
+  // 2. 標準フォルダー群（順序良く並べる）
+  const stdOrder = ['agency-accordion', 'jo-accordion', 'applicant-accordion', 'appoint-accordion', 'forms-accordion'];
+  stdOrder.forEach(id => {
+    options.push(standardFolderMap[id]);
+    addedValues.add(id);
+    // 旧エイリアス（agency-info 等）も重複ガードに追加
+    if (id === 'agency-accordion') addedValues.add('agency-info');
+    if (id === 'jo-accordion') addedValues.add('jo-info');
+    if (id === 'applicant-accordion') addedValues.add('applicant-info');
+    if (id === 'appoint-accordion') addedValues.add('appoint');
+    if (id === 'forms-accordion') addedValues.add('forms');
   });
+
+  // 3. ユーザー作成カスタムフォルダー（state.customAccordions から重複なく追加）
+  if (Array.isArray(state.customAccordions)) {
+    state.customAccordions.forEach(acc => {
+      const normId = normalizeFolderId(acc.id);
+      if (addedValues.has(normId) || addedValues.has(acc.id)) return;
+      addedValues.add(acc.id);
+      addedValues.add(normId);
+
+      const icon = acc.icon || '📁';
+      const pathText = typeof getFolderMenuPath === 'function' ? getFolderMenuPath(acc.id) : (acc.name || acc.id);
+      options.push({
+        value: normId,
+        text: `${icon} ${pathText}`
+      });
+    });
+  }
 
   const renderOpts = (selectEl) => {
     if (!selectEl) return;
-    const currentVal = selectEl.value;
+    const rawVal = selectEl.value || selectEl.dataset.selectedVal;
+    const currentVal = normalizeFolderId(rawVal);
     selectEl.innerHTML = '';
     options.forEach(opt => {
       const el = document.createElement('option');
@@ -35907,7 +36010,11 @@ function updateParentSelectDropdowns() {
       el.textContent = opt.text;
       selectEl.appendChild(el);
     });
-    selectEl.value = currentVal || 'root';
+    if (currentVal && options.some(o => o.value === currentVal)) {
+      selectEl.value = currentVal;
+    } else {
+      selectEl.value = 'root';
+    }
   };
 
   renderOpts(tcSelect);
@@ -35917,15 +36024,38 @@ function updateParentSelectDropdowns() {
 function updateAdminFolderAddDropdown() {
   const selectEl = document.getElementById('modal-folder-parent-select');
   if (!selectEl) return;
-  const currentVal = selectEl.value;
-  selectEl.innerHTML = '<option value="root">ルート直下</option>';
-  
-  state.customAccordions.forEach(acc => {
+  const currentVal = normalizeFolderId(selectEl.value);
+  selectEl.innerHTML = '<option value="root">🏠 メインメニュー直下（最上位）</option>';
+
+  const standardFolderIds = new Set(['root', 'forms-accordion', 'applicant-accordion', 'jo-accordion', 'agency-accordion', 'appoint-accordion']);
+
+  const stdFolders = [
+    { id: 'agency-accordion', name: '💼 代理店情報' },
+    { id: 'jo-accordion', name: '📑 JO情報' },
+    { id: 'applicant-accordion', name: '📋 申込者情報' },
+    { id: 'appoint-accordion', name: '📅 アポイント情報' },
+    { id: 'forms-accordion', name: '📝 回答フォーム一覧' }
+  ];
+  stdFolders.forEach(sf => {
     const el = document.createElement('option');
-    el.value = acc.id;
-    el.textContent = getFolderMenuPath(acc.id);
+    el.value = sf.id;
+    el.textContent = sf.name;
     selectEl.appendChild(el);
   });
+
+  if (Array.isArray(state.customAccordions)) {
+    state.customAccordions.forEach(acc => {
+      const normId = normalizeFolderId(acc.id);
+      if (standardFolderIds.has(normId) || standardFolderIds.has(acc.id)) return;
+      standardFolderIds.add(acc.id);
+      standardFolderIds.add(normId);
+
+      const el = document.createElement('option');
+      el.value = acc.id;
+      el.textContent = (acc.icon ? acc.icon + ' ' : '📁 ') + (typeof getFolderMenuPath === 'function' ? getFolderMenuPath(acc.id) : (acc.name || acc.id));
+      selectEl.appendChild(el);
+    });
+  }
   selectEl.value = currentVal || 'root';
 }
 
@@ -50529,6 +50659,14 @@ function handleSpreadsheetMenuAction(action, label) {
         showToast('データの入力規則（ドロップダウン/チップ）設定を開きました。', 'info');
       } else {
         showToast('データの入力規則設定を開きます。', 'info');
+      }
+      break;
+    }
+
+    case 'insert-formula': {
+      const tbl = findCustomOrMasterTable(tableId);
+      if (typeof openColumnFormulaModal === 'function') {
+        openColumnFormulaModal(tbl);
       }
       break;
     }
