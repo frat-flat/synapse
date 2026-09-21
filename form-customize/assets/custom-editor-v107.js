@@ -7622,8 +7622,19 @@
 
   function renderRichTextWithLinks(text) {
     if (!text) return '';
+
+    // 0. 未許可のHTMLタグ（span, div, p, font 等）のクリーンアップ＆意味のある装飾の抽出
+    let cleaned = String(text);
+    // スタイル付きspanの装飾（下線・太字・斜体）を正規タグへ変換
+    cleaned = cleaned
+      .replace(/<span\b[^>]*?style="[^"]*?text-decoration:\s*[^;]*underline[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<u>$1</u>')
+      .replace(/<span\b[^>]*?style="[^"]*?font-weight:\s*[^;]*(?:bold|[6-9]00)[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<strong>$1</strong>')
+      .replace(/<span\b[^>]*?style="[^"]*?font-style:\s*italic[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<em>$1</em>')
+      // 装飾を持たないすべての span, font, div, p, header, section, span 等のタグ自体を剥ぎ取りテキストのみ抽出
+      .replace(/<\/?(?:span|font|div|p|header|section|article|bdo|bdi|label)\b[^>]*>/gi, '');
+
     // 1. HTMLエスケープ（XSS対策）
-    let escaped = escapeHtml(text);
+    let escaped = escapeHtml(cleaned);
 
     // 2. 下線: <u>...</u> (エスケープされた &lt;u&gt;...&lt;/u&gt;)
     escaped = escaped.replace(/&lt;u\b.*?&gt;(.*?)&lt;\/u&gt;/gi, '<u style="text-decoration: underline;">$1</u>');
@@ -7644,6 +7655,9 @@
       }
       return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="rich-embedded-link" style="color:var(--color-primary, #0056b3); text-decoration:underline; font-weight:500; cursor:pointer;" onclick="event.stopPropagation();">${label}</a>`;
     });
+
+    // 万が一残ったエスケープ済み span/font 等のゴミタグを除去
+    escaped = escaped.replace(/&lt;\/?(?:span|font|div|p)\b.*?&gt;/gi, '');
 
     // 3. 太字: **...**
     escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
@@ -8182,7 +8196,14 @@
 
   function markdownOrHtmlToWysiwyg(text) {
     if (!text) return '';
-    let str = text;
+    let str = String(text);
+
+    // 不要な未許可タグのクリーンアップ＆意味のある装飾の抽出
+    str = str
+      .replace(/<span\b[^>]*?style="[^"]*?text-decoration:\s*[^;]*underline[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<u>$1</u>')
+      .replace(/<span\b[^>]*?style="[^"]*?font-weight:\s*[^;]*(?:bold|[6-9]00)[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<strong>$1</strong>')
+      .replace(/<span\b[^>]*?style="[^"]*?font-style:\s*italic[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<em>$1</em>')
+      .replace(/<\/?(?:span|font|header|section|article)\b[^>]*>/gi, '');
 
     // 下線: <u>...</u> -> <u style="text-decoration: underline;">...</u>
     str = str.replace(/<u\b[^>]*>(.*?)<\/u>/gi, '<u style="text-decoration: underline;">$1</u>');
@@ -8206,39 +8227,18 @@
     if (!editorEl) return '';
     const clone = editorEl.cloneNode(true);
 
-    // <br> を改行プレースホルダーに置換
+    // 1. <br> を改行プレースホルダーに置換
     const brs = clone.querySelectorAll('br');
     brs.forEach(br => br.replaceWith('___LINE_BREAK___'));
 
-    // <div> や <p>（Enterキーで生成されるブロック）の先頭に改行プレースホルダーを挿入
+    // 2. <div> や <p>（Enterキーで生成されるブロック）の先頭に改行プレースホルダーを挿入
     const blocks = clone.querySelectorAll('div, p');
     blocks.forEach(b => {
       const brPlaceholder = document.createTextNode('___LINE_BREAK___');
       b.parentNode.insertBefore(brPlaceholder, b);
     });
 
-    // <u> タグの標準化
-    const uTags = clone.querySelectorAll('u');
-    uTags.forEach(u => {
-      u.removeAttribute('style');
-      u.removeAttribute('class');
-    });
-
-    // <strong>, <b> タグの標準化
-    const bTags = clone.querySelectorAll('b, strong');
-    bTags.forEach(b => {
-      b.removeAttribute('style');
-      b.removeAttribute('class');
-    });
-
-    // <em>, <i> タグの標準化
-    const iTags = clone.querySelectorAll('i, em');
-    iTags.forEach(i => {
-      i.removeAttribute('style');
-      i.removeAttribute('class');
-    });
-
-    // <a> タグの標準化（Markdownリンク形式に変換）
+    // 3. <a> タグの標準化（Markdownリンク形式に変換）
     const aTags = clone.querySelectorAll('a');
     aTags.forEach(a => {
       const href = a.getAttribute('href') || '';
@@ -8250,13 +8250,57 @@
       }
     });
 
+    // 4. span や font などのインライン装飾要素の解析とunwrap
+    const spans = clone.querySelectorAll('span, font');
+    spans.forEach(el => {
+      const style = el.getAttribute('style') || '';
+      const isUnderline = /text-decoration\s*:\s*[^;]*underline/i.test(style);
+      const isBold = /font-weight\s*:\s*[^;]*(bold|[6-9]00)/i.test(style);
+      const isItalic = /font-style\s*:\s*italic/i.test(style);
+
+      const frag = document.createDocumentFragment();
+      while (el.firstChild) {
+        frag.appendChild(el.firstChild);
+      }
+
+      let wrapper = frag;
+      if (isUnderline) {
+        const u = document.createElement('u');
+        u.appendChild(wrapper);
+        wrapper = u;
+      }
+      if (isBold) {
+        const s = document.createElement('strong');
+        s.appendChild(wrapper);
+        wrapper = s;
+      }
+      if (isItalic) {
+        const em = document.createElement('em');
+        em.appendChild(wrapper);
+        wrapper = em;
+      }
+
+      el.parentNode.replaceChild(wrapper, el);
+    });
+
+    // 5. 許可タグ（u, strong, b, em, i）以外のあらゆる未許可HTML要素をunwrap
+    const allEls = Array.from(clone.querySelectorAll('*'));
+    allEls.forEach(el => {
+      const tag = el.tagName.toLowerCase();
+      if (!['u', 'strong', 'b', 'em', 'i'].includes(tag)) {
+        while (el.firstChild) {
+          el.parentNode.insertBefore(el.firstChild, el);
+        }
+        el.remove();
+      } else {
+        el.removeAttribute('style');
+        el.removeAttribute('class');
+      }
+    });
+
     let html = clone.innerHTML;
 
-    // span装飾の吸収
     html = html
-      .replace(/<span style="[^"]*text-decoration:\s*underline[^"]*">(.*?)<\/span>/gi, '<u>$1</u>')
-      .replace(/<span style="[^"]*font-weight:\s*bold[^"]*">(.*?)<\/span>/gi, '<strong>$1</strong>')
-      .replace(/<span style="[^"]*font-style:\s*italic[^"]*">(.*?)<\/span>/gi, '<em>$1</em>')
       .replace(/&nbsp;/g, ' ')
       .replace(/___LINE_BREAK___/g, '\n')
       .trim();
