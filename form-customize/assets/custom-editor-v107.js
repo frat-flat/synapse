@@ -16665,8 +16665,8 @@
     if (formDef.physicalTableName) return formDef.physicalTableName;
 
     const effectiveTitle = getEffectiveFormTitle(formDef);
-    if (effectiveTitle.includes('ヨサンダス') && (effectiveTitle.includes('紹介代理店') || effectiveTitle.includes('代理店'))) {
-      return 'form_yosandas_agency_application';
+    if (effectiveTitle.includes('紹介代理店') || effectiveTitle.includes('代理店')) {
+      return 'form_referral_agency_application';
     }
 
     const rawId = (formDef.id || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
