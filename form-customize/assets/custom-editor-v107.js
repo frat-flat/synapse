@@ -16535,6 +16535,9 @@
       titleColorCustom: f.titleColorCustom || '#1a73e8',
       titleFontFamily: f.titleFontFamily || 'default',
       titleFontTarget: f.titleFontTarget || 'both',
+      targetTableMode: f.targetTableType === 'dedicated' ? 'dedicated' : (f.targetTableMode || 'unified'),
+      targetTableId: f.targetTableId || (f.createDedicatedTable ? 'dedicated' : 'table_all_form_responses'),
+      createDedicatedTable: !!f.createDedicatedTable,
       sections: (f.sections || []).map(sec => ({
         id: sec.id,
         title: (sec.title || '').trim(),
@@ -17258,10 +17261,27 @@
           ? `現在の編集内容は本番公開リンクに反映されています（最終統合: ${pubTime}）。`
           : '現在の編集内容は本番公開リンクに反映されています。';
       }
-      if (mergeBtn) mergeBtn.style.display = 'none';
+      if (mergeBtn) {
+        mergeBtn.style.display = 'inline-flex';
+        mergeBtn.innerHTML = '⚙️ 本番公開設定・再統合';
+        mergeBtn.style.background = '#f1f5f9';
+        mergeBtn.style.color = '#334155';
+        mergeBtn.style.border = '1px solid #cbd5e1';
+      }
       if (headerMergeBtn) headerMergeBtn.style.setProperty('display', 'none', 'important');
       const menuItemMerge = document.getElementById('menu-item-merge-prod');
-      if (menuItemMerge) menuItemMerge.style.display = 'none';
+      if (menuItemMerge) {
+        menuItemMerge.style.display = 'flex';
+        const titleEl = menuItemMerge.querySelector('.menu-title');
+        const descEl = menuItemMerge.querySelector('.menu-desc');
+        if (titleEl) {
+          titleEl.textContent = '本番へ統合（公開更新）';
+          titleEl.style.color = '#0284c7';
+        }
+        if (descEl) {
+          descEl.textContent = '専用テーブル連携設定・公開バージョンの更新';
+        }
+      }
       const mainBtnLabel = document.getElementById('share-btn-main-label');
       if (mainBtnLabel) {
         mainBtnLabel.innerHTML = isUnpublished
@@ -17284,9 +17304,23 @@
       if (mergeBtn) {
         mergeBtn.style.display = 'inline-flex';
         mergeBtn.innerHTML = '🚀 本番環境へ統合';
+        mergeBtn.style.background = '#673ab7';
+        mergeBtn.style.color = '#ffffff';
+        mergeBtn.style.border = 'none';
       }
       const menuItemMerge = document.getElementById('menu-item-merge-prod');
-      if (menuItemMerge) menuItemMerge.style.display = 'flex';
+      if (menuItemMerge) {
+        menuItemMerge.style.display = 'flex';
+        const titleEl = menuItemMerge.querySelector('.menu-title');
+        const descEl = menuItemMerge.querySelector('.menu-desc');
+        if (titleEl) {
+          titleEl.textContent = '本番へ統合（公開更新）';
+          titleEl.style.color = '#16a34a';
+        }
+        if (descEl) {
+          descEl.textContent = '最新の編集内容・テーブル設定を本番公開リンクへ反映';
+        }
+      }
       const mainBtnLabel = document.getElementById('share-btn-main-label');
       if (mainBtnLabel) {
         if (isUnpublished) {
@@ -20884,12 +20918,15 @@
     if (!isDedicated) {
       statusBadgeHtml = `
         <span style="background: #e0f2fe; color: #0284c7; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #bae6fd; display: inline-flex; align-items: center; gap: 5px;">
-          <span>🌐</span> <span>専用テーブルなし：回答は「全フォーム回答データ」に統合保存されます</span>
+          <span>🌐</span> <span>専用テーブル未連携：回答は「全フォーム回答データ」に統合保存されます</span>
         </span>
       `;
       actionBtnHtml = `
         <div style="display: flex; align-items: center; gap: 10px;">
-          <button type="button" id="btn-col-modal-ok" style="background: #0284c7; color: #fff; border: none; font-weight: 700; font-size: 0.85rem; padding: 7px 20px; border-radius: 6px; cursor: pointer;">閉じる</button>
+          <button type="button" id="btn-create-supabase-table" style="background: #0284c7; color: #fff; border: 1px solid #0369a1; font-weight: 700; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(2,132,199,0.3); transition: all 0.2s;">
+            <span>⚡</span> <span>このフォーム専用のテーブルを作成して連携</span>
+          </button>
+          <button type="button" id="btn-col-modal-ok" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 600; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer;">閉じる</button>
         </div>
       `;
     } else {
@@ -21041,13 +21078,36 @@
         createBtn.innerHTML = '<span>⏳</span> <span>専用テーブル作成中...</span>';
 
         try {
+          formDef.createDedicatedTable = true;
+          formDef.targetTableType = 'dedicated';
           const newTable = await createDedicatedTableForForm(formDef);
+          if (newTable && newTable.id) {
+            formDef.targetTableId = newTable.id;
+          }
+
+          // 🌟 本番公開スナップショットが存在する場合、スナップショット側も即座に専用テーブル連携へ同期！
+          if (formDef.publishedSnapshot) {
+            formDef.publishedSnapshot.createDedicatedTable = true;
+            formDef.publishedSnapshot.targetTableId = newTable ? newTable.id : 'dedicated';
+            formDef.publishedSnapshot.targetTableMode = 'dedicated';
+            try {
+              const allFormsRaw = localStorage.getItem('form_customize_all_forms');
+              let allForms = allFormsRaw ? JSON.parse(allFormsRaw) : [];
+              const fIdx = allForms.findIndex(f => f && (f.id === formDef.id || f.title === formDef.title));
+              if (fIdx !== -1) {
+                allForms[fIdx] = formDef;
+                localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+              }
+            } catch(e) {}
+          }
+
           if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
           if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
 
           // モーダル表示を完了状態に再描画
           openFormColumnMappingModal(formDef);
           syncGlobalTargetTableSelect(newTable ? newTable.id : true);
+          if (typeof updatePublishSyncUI === 'function') updatePublishSyncUI();
 
           alert(`✅ テーブル「${formTitle}」を作成し、一覧に登録しました！\n\n・テーブルID: ${newTable ? newTable.id : ''}\n・全${newTable && newTable.columns ? newTable.columns.length : 0}カラムを定義済み\n・回答保存先をこの専用テーブルに設定しました。\n・Synapseの「カスタムテーブル」一覧からいつでも確認・選択できます。`);
         } catch(err) {

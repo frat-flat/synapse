@@ -14081,6 +14081,9 @@ function getUnmergedForms() {
         title: (obj.title || '').trim(),
         subtitle: (obj.subtitle || '').trim(),
         description: (obj.description || '').trim(),
+        targetTableMode: obj.targetTableType === 'dedicated' ? 'dedicated' : (obj.targetTableMode || 'unified'),
+        targetTableId: obj.targetTableId || (obj.createDedicatedTable ? 'dedicated' : 'table_all_form_responses'),
+        createDedicatedTable: !!obj.createDedicatedTable,
         sections: (obj.sections || []).map(sec => ({
           id: sec.id,
           title: (sec.title || '').trim(),
