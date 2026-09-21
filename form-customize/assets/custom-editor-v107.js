@@ -16942,6 +16942,9 @@
     if (titleEl) titleEl.textContent = formTitle;
     if (verEl) verEl.textContent = `v${curVer} → v${nextVer}`;
 
+    const publishStatus = checkFormPublishStatus(formObj);
+    const isSynced = publishStatus.isSynced;
+
     // 専用テーブルの有無判定（本番で1回作成されたテーブルがあるか）
     let existingTables = [];
     try { existingTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
@@ -16950,12 +16953,48 @@
       t.name === formTitle ||
       (t.formTitle && t.formTitle === formTitle) ||
       (t.formId && t.formId === formObj.id)
-    ));
+    ) && t.id !== 'table_all_form_responses');
 
-    const isDedicated = !!(formObj.createDedicatedTable === true || formObj.targetTableType === 'dedicated' || dedicatedTable);
+    const hasDedicated = !!(dedicatedTable || (formObj.targetTableId && formObj.targetTableId !== 'table_all_form_responses' && formObj.targetTableType === 'dedicated'));
+
+    // 再統合内容がない（同期中）かつ専用テーブル未作成の状態で開かれた場合は、自動でトグルをONにして作成を即時支援
+    let isDedicated = hasDedicated;
+    if (isSynced && !hasDedicated) {
+      isDedicated = true;
+    } else if (formObj.createDedicatedTable === true || formObj.targetTableType === 'dedicated') {
+      isDedicated = true;
+    }
 
     if (dedicatedToggle) {
       dedicatedToggle.checked = isDedicated;
+    }
+
+    // ヘッダーアイコン・タイトルの動的更新
+    const headerIconEl = document.getElementById('merge-modal-header-icon');
+    const headerTextEl = document.getElementById('merge-modal-header-text');
+    if (headerIconEl && headerTextEl) {
+      if (isSynced && !hasDedicated) {
+        headerIconEl.textContent = '📊';
+        headerTextEl.textContent = '専用テーブル作成・本番連携';
+      } else if (isSynced && hasDedicated) {
+        headerIconEl.textContent = '📊';
+        headerTextEl.textContent = '専用テーブル設定・本番公開';
+      } else {
+        headerIconEl.textContent = '🚀';
+        headerTextEl.textContent = '本番環境へ統合（公開更新）';
+      }
+    }
+
+    // 実行ボタンのラベル
+    const executeBtn = document.getElementById('btn-execute-merge-prod');
+    if (executeBtn) {
+      if (isSynced && !hasDedicated) {
+        executeBtn.textContent = '📊 専用テーブルを作成して反映';
+      } else if (isSynced && hasDedicated) {
+        executeBtn.textContent = '🚀 設定を本番へ反映';
+      } else {
+        executeBtn.textContent = '🚀 本番環境へ統合して公開';
+      }
     }
 
     const updateMergeModalTableUI = (checked) => {
@@ -17022,7 +17061,6 @@
     // モーダル内ボタンのイベント紐付け
     const closeBtn = document.getElementById('btn-close-merge-modal');
     const cancelBtn = document.getElementById('btn-cancel-merge-modal');
-    const executeBtn = document.getElementById('btn-execute-merge-prod');
 
     if (closeBtn && !closeBtn._hooked) {
       closeBtn._hooked = true;
@@ -17261,12 +17299,31 @@
           ? `現在の編集内容は本番公開リンクに反映されています（最終統合: ${pubTime}）。`
           : '現在の編集内容は本番公開リンクに反映されています。';
       }
+      let customTables = [];
+      try { customTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
+      const curFormTitle = formObj.title || '無題のフォーム';
+      const dedicatedTable = customTables.find(t => t && (
+        t.id === formObj.targetTableId ||
+        t.name === curFormTitle ||
+        (t.formTitle && t.formTitle === curFormTitle) ||
+        (t.formId && t.formId === formObj.id)
+      ) && t.id !== 'table_all_form_responses');
+
+      const isDedicatedActive = !!(dedicatedTable || (formObj.targetTableId && formObj.targetTableId !== 'table_all_form_responses' && formObj.targetTableType === 'dedicated'));
+
       if (mergeBtn) {
         mergeBtn.style.display = 'inline-flex';
-        mergeBtn.innerHTML = '⚙️ 本番公開設定・再統合';
-        mergeBtn.style.background = '#f1f5f9';
-        mergeBtn.style.color = '#334155';
-        mergeBtn.style.border = '1px solid #cbd5e1';
+        if (!isDedicatedActive) {
+          mergeBtn.innerHTML = '📊 テーブル作成';
+          mergeBtn.style.background = '#0284c7';
+          mergeBtn.style.color = '#ffffff';
+          mergeBtn.style.border = 'none';
+        } else {
+          mergeBtn.innerHTML = '📊 テーブル設定';
+          mergeBtn.style.background = '#f1f5f9';
+          mergeBtn.style.color = '#334155';
+          mergeBtn.style.border = '1px solid #cbd5e1';
+        }
       }
       if (headerMergeBtn) headerMergeBtn.style.setProperty('display', 'none', 'important');
       const menuItemMerge = document.getElementById('menu-item-merge-prod');
@@ -17274,12 +17331,25 @@
         menuItemMerge.style.display = 'flex';
         const titleEl = menuItemMerge.querySelector('.menu-title');
         const descEl = menuItemMerge.querySelector('.menu-desc');
-        if (titleEl) {
-          titleEl.textContent = '本番へ統合（公開更新）';
-          titleEl.style.color = '#0284c7';
-        }
-        if (descEl) {
-          descEl.textContent = '専用テーブル連携設定・公開バージョンの更新';
+        const iconEl = menuItemMerge.querySelector('.menu-icon');
+        if (!isDedicatedActive) {
+          if (iconEl) iconEl.textContent = '📊';
+          if (titleEl) {
+            titleEl.textContent = '専用テーブル作成';
+            titleEl.style.color = '#0284c7';
+          }
+          if (descEl) {
+            descEl.textContent = 'フォーム専用の独立テーブルを作成して回答を保存';
+          }
+        } else {
+          if (iconEl) iconEl.textContent = '📊';
+          if (titleEl) {
+            titleEl.textContent = '専用テーブル設定';
+            titleEl.style.color = '#475569';
+          }
+          if (descEl) {
+            descEl.textContent = '専用テーブルのカラム構成確認・追加カラム更新';
+          }
         }
       }
       const mainBtnLabel = document.getElementById('share-btn-main-label');
