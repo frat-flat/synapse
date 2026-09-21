@@ -4502,6 +4502,39 @@ function isUserAdmin() {
   return r === 'admin' || r === 'owner' || id === 'admin' || id === 'owner' || id === 'owner@synapse.management' || loginId === 'admin' || loginId === 'owner';
 }
 
+// -------------------------------------------------------------
+// 🔐 二段階編集権限: 「データ入力権限」 & 「関数・構造編集権限」
+// -------------------------------------------------------------
+const PERMISSION_LEVEL_DATA_EDIT = 'data_edit';     // レベル1: 「データ入力権限」（セル内通常データの入力・編集）
+const PERMISSION_LEVEL_SCHEMA_EDIT = 'schema_edit'; // レベル2: 「関数・構造編集権限」（テーブル列構造・他シート参照数式の設定）
+window.PERMISSION_LEVEL_DATA_EDIT = PERMISSION_LEVEL_DATA_EDIT;
+window.PERMISSION_LEVEL_SCHEMA_EDIT = PERMISSION_LEVEL_SCHEMA_EDIT;
+
+// ユーザーが「データ入力権限」を持つか判定（セル内データ編集）
+function canEditCellData(tableId, rowIdx, colId) {
+  if (isUserAdmin()) return true;
+  if (typeof isTableLocked === 'function' && isTableLocked(tableId)) return false;
+  if (typeof checkCellEditAccess === 'function') {
+    return checkCellEditAccess(tableId, rowIdx, colId);
+  }
+  return true;
+}
+window.canEditCellData = canEditCellData;
+
+// ユーザーが「関数・構造編集権限」を持つか判定（列の追加・削除、fx 他シート参照・関数設定）
+function canEditTableSchema(tableId) {
+  if (isUserAdmin()) return true;
+  const userId = getCurrentUserId();
+  if (!userId) return false;
+  if (state.permissions?.schemaEditUsers && state.permissions.schemaEditUsers.includes(userId)) return true;
+  const user = (state.users || []).find(u => u.id === userId);
+  if (user && (user.permissionLevel === PERMISSION_LEVEL_SCHEMA_EDIT || user.canEditSchema || user.role === 'schema_editor')) {
+    return true;
+  }
+  return false;
+}
+window.canEditTableSchema = canEditTableSchema;
+
 // ホーム画面（全サービス共通ポータル）にアクセス可能かを判定するヘルパー
 function canAccessHomeScreen() {
   if (!state.currentUser) return false;
@@ -4766,7 +4799,7 @@ function checkColumnEditAccess(tableId, colId) {
     const tbl = state.customTables.find(t => t.id === tblId);
     if (tbl && tbl.columns) {
       const col = tbl.columns.find(c => c.id === colId);
-      if (col && col.readOnly) return false;
+      if (col && (col.readOnly || col.formula)) return false;
     }
   }
 
@@ -6665,6 +6698,181 @@ function formatCustomDate(dateStr, formatType, customPattern) {
     .replace(/D/g, day);
 }
 
+// =================================================================
+// 🔗 スプレッドシート形式クロスシート数式エンジン & 他テーブル解決
+// =================================================================
+
+// 利用可能なすべてのテーブル（マスタ・カスタム）を取得する統一関数
+function getAllAvailableTables() {
+  const list = [];
+  // 1. 基本マスタ（システム標準テーブル）
+  list.push({
+    id: 'applicant-info-screen',
+    name: '申込者 基本マスタ',
+    getColumns: () => state.apColumns || [],
+    getRows: () => state.apContracts || []
+  });
+  list.push({
+    id: 'jo-info-screen',
+    name: 'JO 基本マスタ',
+    getColumns: () => state.joColumns || [],
+    getRows: () => state.joContracts || []
+  });
+  list.push({
+    id: 'agency-info-screen',
+    name: '代理店 基本マスタ',
+    getColumns: () => state.agColumns || [],
+    getRows: () => state.agContracts || []
+  });
+  list.push({
+    id: 'dbmake-screen',
+    name: 'パートナーDB',
+    getColumns: () => state.dbmakeColumns || [],
+    getRows: () => (typeof dbmakePartners !== 'undefined' ? dbmakePartners : (window.dbmakePartners || []))
+  });
+
+  // 2. 汎用カスタムテーブル（フォーム専用テーブル含む）
+  if (state.customTables && Array.isArray(state.customTables)) {
+    state.customTables.forEach(t => {
+      list.push({
+        id: t.id,
+        name: t.name || t.formTitle || t.id,
+        getColumns: () => t.columns || [],
+        getRows: () => t.rows || []
+      });
+    });
+  }
+  return list;
+}
+window.getAllAvailableTables = getAllAvailableTables;
+
+// シート名（'シート名' または シート名）からテーブルオブジェクトを解決する
+function resolveTableBySheetName(sheetName) {
+  if (!sheetName) return null;
+  const clean = String(sheetName).trim().replace(/^['"]|['"]$/g, '');
+  const allTables = getAllAvailableTables();
+
+  // 1. 完全一致 (name または id)
+  let found = allTables.find(t => t.name === clean || t.id === clean);
+  if (found) return found;
+
+  // 2. 大文字小文字・prefix無視の一致
+  const cleanLower = clean.toLowerCase();
+  found = allTables.find(t => {
+    const n = (t.name || '').toLowerCase();
+    const id = (t.id || '').toLowerCase();
+    return n === cleanLower || id === cleanLower ||
+           id === `custom-table-${cleanLower}` ||
+           cleanLower === id.replace(/^custom-table-/, '');
+  });
+  if (found) return found;
+
+  // 3. 部分一致（日本語の名称揺れ対応: 例「申込者」「JO」「代理店」「パートナー」）
+  found = allTables.find(t => t.name.includes(clean) || clean.includes(t.name));
+  return found || null;
+}
+window.resolveTableBySheetName = resolveTableBySheetName;
+
+// 列記号（A, B, ..., AA, etc.）をインデックス（0, 1, ...）に変換するヘルパー
+function columnLetterToIndex(letters) {
+  if (!letters || typeof letters !== 'string') return 0;
+  let index = 0;
+  const clean = letters.trim().toUpperCase();
+  for (let i = 0; i < clean.length; i++) {
+    index = index * 26 + (clean.charCodeAt(i) - 64);
+  }
+  return index - 1;
+}
+window.columnLetterToIndex = columnLetterToIndex;
+
+// 対象テーブル内から列指定（列記号 A, B / 列ID / 列名）に合致するカラムを解決する
+function resolveColumnInTable(tableObj, colSpec) {
+  if (!tableObj || !colSpec) return null;
+  const cols = tableObj.getColumns ? tableObj.getColumns() : (tableObj.columns || []);
+  const clean = String(colSpec).trim();
+
+  // 1. 英字のみ（A-Z）の場合は列記号としてインデックス解決
+  if (/^[A-Za-z]+$/.test(clean)) {
+    const colIdx = columnLetterToIndex(clean);
+    if (colIdx >= 0 && colIdx < cols.length) {
+      return cols[colIdx];
+    }
+  }
+
+  // 2. id での一致
+  let found = cols.find(c => c.id === clean);
+  if (found) return found;
+
+  // 3. label / name での一致
+  found = cols.find(c => c.label === clean || c.name === clean);
+  if (found) return found;
+
+  // 4. 部分一致
+  found = cols.find(c => (c.label && c.label.includes(clean)) || (clean && c.label && clean.includes(c.label)));
+  return found || null;
+}
+window.resolveColumnInTable = resolveColumnInTable;
+
+// スプレッドシート数式（='シート名'!A, ='シート名'!A1, ='シート名'!列名 など）を評価する
+function evaluateSpreadsheetFormula(formulaStr, currentRow, rowIndex, currentTable) {
+  if (!formulaStr || typeof formulaStr !== 'string') return '';
+  let str = formulaStr.trim();
+  if (str.startsWith('=')) {
+    str = str.substring(1).trim();
+  }
+
+  // 'シート名'!A または シート名!A 形式の正規表現
+  const match = str.match(/^(?:'([^']+)'|([^'!]+))!(.+)$/);
+  if (!match) {
+    return '';
+  }
+
+  const sheetName = (match[1] || match[2] || '').trim();
+  const targetSpec = (match[3] || '').trim();
+
+  const sourceTable = resolveTableBySheetName(sheetName);
+  if (!sourceTable) return '#REF!';
+
+  // targetSpec の解析（列記号＋行番号 または 列名）
+  let colPart = targetSpec;
+  let explicitRowIdx = null;
+
+  // 例: "A1", "B2" のような列記号 + 1始まりの行番号
+  const cellMatch = targetSpec.match(/^([A-Za-z]+)(\d+)$/);
+  if (cellMatch) {
+    colPart = cellMatch[1];
+    explicitRowIdx = parseInt(cellMatch[2], 10) - 1; // 1-indexed -> 0-indexed
+  } else {
+    // 例: "会社名1" や "会社名[1]" 形式
+    const nameWithNumMatch = targetSpec.match(/^(.+?)[\[\(]?(\d+)[\]\)]?$/);
+    if (nameWithNumMatch && !isNaN(parseInt(nameWithNumMatch[2], 10))) {
+      colPart = nameWithNumMatch[1];
+      explicitRowIdx = parseInt(nameWithNumMatch[2], 10) - 1;
+    }
+  }
+
+  const sourceCol = resolveColumnInTable(sourceTable, colPart);
+  if (!sourceCol) return '#REF!';
+
+  const sourceRows = sourceTable.getRows ? sourceTable.getRows() : (sourceTable.rows || []);
+  if (!sourceRows || sourceRows.length === 0) return '';
+
+  const targetRowIdx = explicitRowIdx !== null ? explicitRowIdx : (rowIndex !== undefined ? rowIndex : 0);
+  if (targetRowIdx < 0 || targetRowIdx >= sourceRows.length) {
+    return '';
+  }
+
+  const targetRow = sourceRows[targetRowIdx];
+  if (!targetRow) return '';
+
+  const val = targetRow[sourceCol.id] !== undefined ? targetRow[sourceCol.id] : (targetRow[sourceCol.key] !== undefined ? targetRow[sourceCol.key] : '');
+  return val !== undefined && val !== null ? String(val) : '';
+}
+window.evaluateSpreadsheetFormula = evaluateSpreadsheetFormula;
+
+// =================================================================
+// 📊 テーブル作成画面のセットアップ（既存テーブルからのカラム取り込み対応）
+// =================================================================
 function setupTableCreator() {
   const addColBtn = document.getElementById('tc-add-col-btn');
   const columnsList = document.getElementById('tc-columns-list');
@@ -6672,23 +6880,31 @@ function setupTableCreator() {
 
   if (!addColBtn || !columnsList || !submitBtn) return;
 
-  const createColumnRowHtml = (colCount) => {
+  const createColumnRowHtml = (colCount, initialData = {}) => {
+    const isFormula = !!initialData.formula;
+    const formulaStr = initialData.formula || '';
+    const colName = initialData.label || `列${colCount}`;
+    const colType = initialData.type || 'text';
+    const choicesStr = initialData.choices ? (Array.isArray(initialData.choices) ? initialData.choices.map(c => typeof c === 'object' ? (c.value || '') : c).join(',') : String(initialData.choices)) : '';
+
     return `
-      <div class="tc-column-row" style="display: flex; flex-direction: column; gap: 0.35rem; padding: 0.5rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); margin-bottom: 0.25rem;">
+      <div class="tc-column-row" style="display: flex; flex-direction: column; gap: 0.35rem; padding: 0.5rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); margin-bottom: 0.25rem;" data-formula="${escapeHtml(formulaStr)}">
         <div style="display: flex; gap: 0.5rem; align-items: center; width: 100%;">
-          <input type="text" class="tc-col-input" value="列${colCount}" placeholder="列名" style="flex: 2; padding: 0.4rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); outline: none; font-size: 0.85rem;" />
+          <input type="text" class="tc-col-input" value="${escapeHtml(colName)}" placeholder="列名" style="flex: 2; padding: 0.4rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); outline: none; font-size: 0.85rem;" ${isFormula ? `title="他シート参照カラム (数式: ${escapeHtml(formulaStr)})"` : ''} />
           <select class="tc-col-type" style="flex: 1; padding: 0.4rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); outline: none; font-size: 0.85rem; cursor: pointer;">
-            <option value="text">テキスト</option>
-            <option value="number">数値</option>
-            <option value="select">プルダウン</option>
-            <option value="date">日付</option>
+            <option value="text" ${colType === 'text' ? 'selected' : ''}>テキスト</option>
+            <option value="number" ${colType === 'number' ? 'selected' : ''}>数値</option>
+            <option value="select" ${colType === 'select' ? 'selected' : ''}>プルダウン</option>
+            <option value="date" ${colType === 'date' ? 'selected' : ''}>日付</option>
           </select>
+          ${isFormula ? `<span class="badge" style="background: rgba(99, 102, 241, 0.15); color: #4338ca; border: 1px solid rgba(99, 102, 241, 0.3); font-size: 0.72rem; padding: 2px 6px; font-weight: 700; white-space: nowrap;" title="${escapeHtml(formulaStr)}">🔗 参照連動</span>` : ''}
           <button type="button" class="btn-icon tc-remove-col-btn" style="background: none; border: none; color: var(--danger); font-size: 1.2rem; cursor: pointer; padding: 0.25rem;">&times;</button>
         </div>
-        <div class="tc-choices-container" style="display: none; width: 100%;">
-          <input type="text" class="tc-col-choices" placeholder="選択肢をカンマ区切りで入力 (例: 東京,大阪,名古屋)" style="width: 100%; padding: 0.4rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); outline: none; font-size: 0.8rem;" />
+        ${isFormula ? `<div style="font-size: 0.72rem; color: #4338ca; font-family: monospace; padding: 0 4px;">数式: ${escapeHtml(formulaStr)}</div>` : ''}
+        <div class="tc-choices-container" style="display: ${colType === 'select' ? 'block' : 'none'}; width: 100%;">
+          <input type="text" class="tc-col-choices" value="${escapeHtml(choicesStr)}" placeholder="選択肢をカンマ区切りで入力 (例: 東京,大阪,名古屋)" style="width: 100%; padding: 0.4rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); outline: none; font-size: 0.8rem;" />
         </div>
-        <div class="tc-date-format-container" style="display: none; width: 100%;">
+        <div class="tc-date-format-container" style="display: ${colType === 'date' ? 'block' : 'none'}; width: 100%;">
           <div style="display: flex; gap: 0.5rem; align-items: center;">
             <select class="tc-col-date-format" style="flex: 1; padding: 0.4rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); outline: none; font-size: 0.8rem; cursor: pointer;">
               <option value="YYYY/MM/DD">西暦 (2008/09/26)</option>
@@ -6747,6 +6963,126 @@ function setupTableCreator() {
     }
   };
 
+  // 既存テーブルからのカラム取り込みUIのセットアップ
+  const populateTableCreatorSourceTables = () => {
+    const srcSelect = document.getElementById('tc-source-table-select');
+    if (!srcSelect) return;
+    const currentVal = srcSelect.value;
+    srcSelect.innerHTML = '<option value="">参照元テーブルを選択してください...</option>';
+    const allTables = getAllAvailableTables();
+    allTables.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = `${t.name} (${t.id})`;
+      srcSelect.appendChild(opt);
+    });
+    if (currentVal) srcSelect.value = currentVal;
+  };
+  window.refreshTableCreatorSourceTables = populateTableCreatorSourceTables;
+
+  const srcSelect = document.getElementById('tc-source-table-select');
+  const srcContainer = document.getElementById('tc-source-cols-container');
+  const srcColsList = document.getElementById('tc-source-cols-list');
+  const selectAllSrcBtn = document.getElementById('tc-select-all-source-cols-btn');
+  const deselectAllSrcBtn = document.getElementById('tc-deselect-all-source-cols-btn');
+  const importColsBtn = document.getElementById('tc-import-cols-btn');
+
+  if (srcSelect && srcContainer && srcColsList) {
+    srcSelect.addEventListener('change', () => {
+      const selectedId = srcSelect.value;
+      if (!selectedId) {
+        srcContainer.style.display = 'none';
+        srcColsList.innerHTML = '';
+        return;
+      }
+      const allTables = getAllAvailableTables();
+      const targetTable = allTables.find(t => t.id === selectedId);
+      if (!targetTable) {
+        srcContainer.style.display = 'none';
+        srcColsList.innerHTML = '';
+        return;
+      }
+      const cols = targetTable.getColumns ? targetTable.getColumns() : (targetTable.columns || []);
+      srcColsList.innerHTML = '';
+      cols.forEach((col, idx) => {
+        const letter = getColumnLetter(idx);
+        const choicesStr = (col.choices || []).map(c => typeof c === 'object' ? (c.value || '') : c).join(',');
+        const label = document.createElement('label');
+        label.style.cssText = 'display: flex; align-items: center; gap: 8px; font-size: 0.8rem; cursor: pointer; padding: 4px 6px; border-radius: 4px; background: var(--bg-surface-elevated); transition: background 0.15s;';
+        label.innerHTML = `
+          <input type="checkbox" class="tc-source-col-cb" value="${escapeHtml(col.id)}" data-letter="${letter}" data-label="${escapeHtml(col.label || col.id)}" data-type="${col.type || 'text'}" data-choices="${escapeHtml(choicesStr)}" checked />
+          <span style="font-weight: 700; color: #4338ca; font-family: monospace; min-width: 22px;">${letter}</span>
+          <span style="font-weight: 600; color: var(--text-primary); flex: 1;">${escapeHtml(col.label || col.id)}</span>
+          <span style="color: var(--text-muted); font-size: 0.72rem;">(${col.type || 'text'})</span>
+        `;
+        srcColsList.appendChild(label);
+      });
+      srcContainer.style.display = 'flex';
+    });
+
+    if (selectAllSrcBtn) {
+      selectAllSrcBtn.addEventListener('click', () => {
+        srcColsList.querySelectorAll('.tc-source-col-cb').forEach(cb => { cb.checked = true; });
+      });
+    }
+
+    if (deselectAllSrcBtn) {
+      deselectAllSrcBtn.addEventListener('click', () => {
+        srcColsList.querySelectorAll('.tc-source-col-cb').forEach(cb => { cb.checked = false; });
+      });
+    }
+
+    if (importColsBtn) {
+      importColsBtn.addEventListener('click', () => {
+        const checkedCbs = Array.from(srcColsList.querySelectorAll('.tc-source-col-cb:checked'));
+        if (checkedCbs.length === 0) {
+          showToast('取り込むカラムを1つ以上選択してください。', 'warning');
+          return;
+        }
+
+        const selectedTableId = srcSelect.value;
+        const allTables = getAllAvailableTables();
+        const targetTable = allTables.find(t => t.id === selectedTableId);
+        const sheetName = targetTable ? targetTable.name : (srcSelect.options[srcSelect.selectedIndex]?.text || selectedTableId);
+
+        const importMode = document.querySelector('input[name="tc-import-mode"]:checked')?.value || 'reference';
+
+        // もしカラム定義リストが初期状態（空行1つだけ）ならそれを置き換える
+        const currentRows = columnsList.querySelectorAll('.tc-column-row');
+        if (currentRows.length === 1) {
+          const firstInput = currentRows[0].querySelector('.tc-col-input');
+          const firstFormula = currentRows[0].dataset.formula;
+          if (firstInput && (!firstInput.value || firstInput.value === '列1') && !firstFormula) {
+            columnsList.innerHTML = '';
+          }
+        }
+
+        checkedCbs.forEach(cb => {
+          const colCount = columnsList.querySelectorAll('.tc-column-row').length + 1;
+          const letter = cb.dataset.letter || 'A';
+          const label = cb.dataset.label || `列${colCount}`;
+          const type = cb.dataset.type || 'text';
+          const choices = cb.dataset.choices || '';
+          const formula = importMode === 'reference' ? `='${sheetName}'!${letter}` : '';
+
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = createColumnRowHtml(colCount, {
+            label: label,
+            type: type,
+            choices: choices,
+            formula: formula
+          }).trim();
+          const newRow = tempDiv.firstChild;
+          setupRowEvents(newRow);
+          columnsList.appendChild(newRow);
+        });
+
+        const modeText = importMode === 'reference' ? '「🔗 スプシ参照」' : '「📋 通常」';
+        showToast(`${checkedCbs.length} 個のカラムを${modeText}カラムとして定義に追加しました。`, 'success');
+      });
+    }
+  }
+
   // 初期ロード時に1列目がなければ挿入する
   if (columnsList.querySelectorAll('.tc-column-row').length === 0) {
     columnsList.innerHTML = createColumnRowHtml(1);
@@ -6779,6 +7115,7 @@ function setupTableCreator() {
     let colIndex = 1;
     let hasEmptyCol = false;
     let hasEmptyChoices = false;
+    let maxSourceRows = 1;
 
     colRows.forEach(row => {
       const nameInput = row.querySelector('.tc-col-input');
@@ -6786,6 +7123,21 @@ function setupTableCreator() {
       const choicesInput = row.querySelector('.tc-col-choices');
       const dateFormatSelect = row.querySelector('.tc-col-date-format');
       const customDateFormatInput = row.querySelector('.tc-col-custom-date-format');
+      const formula = row.dataset.formula || '';
+
+      if (formula) {
+        const m = formula.trim().match(/^=?(?:'([^']+)'|([^'!]+))!(.+)$/);
+        if (m) {
+          const sName = m[1] || m[2];
+          const st = resolveTableBySheetName(sName);
+          if (st) {
+            const sRows = st.getRows ? st.getRows() : (st.rows || []);
+            if (sRows && sRows.length > maxSourceRows) {
+              maxSourceRows = sRows.length;
+            }
+          }
+        }
+      }
 
       const colName = nameInput ? nameInput.value.trim() : '';
       const colType = typeSelect ? typeSelect.value : 'text';
@@ -6800,17 +7152,19 @@ function setupTableCreator() {
 
       if (colType === 'select') {
         const rawChoices = choicesInput ? choicesInput.value.trim() : '';
-        if (!rawChoices) {
+        if (!rawChoices && !formula) {
           hasEmptyChoices = true;
           return;
         }
-        choices = rawChoices.split(',').map(c => c.trim()).filter(c => c).map((c, idx) => ({
-          value: c,
-          color: VALIDATION_PALETTE_COLORS[idx % VALIDATION_PALETTE_COLORS.length]
-        }));
-        if (choices.length === 0) {
-          hasEmptyChoices = true;
-          return;
+        if (rawChoices) {
+          choices = rawChoices.split(',').map(c => c.trim()).filter(c => c).map((c, idx) => ({
+            value: c,
+            color: VALIDATION_PALETTE_COLORS[idx % VALIDATION_PALETTE_COLORS.length]
+          }));
+          if (choices.length === 0 && !formula) {
+            hasEmptyChoices = true;
+            return;
+          }
         }
       }
 
@@ -6828,6 +7182,7 @@ function setupTableCreator() {
         id: `col_${colIndex}`,
         label: colName,
         type: colType,
+        formula: formula || undefined,
         choices: choices,
         dropdownStyle: colType === 'select' ? 'chip-outline' : undefined,
         dateFormat: dateFormat,
@@ -6872,14 +7227,16 @@ function setupTableCreator() {
       fixedCol: 'none',
       fixedRow: 'none',
       cellStyles: {},
-      rows: [
-        { id: `row_${Date.now()}_1` }
-      ]
+      rows: []
     };
 
-    columns.forEach(col => {
-      newTable.rows[0][col.id] = '';
-    });
+    for (let r = 0; r < maxSourceRows; r++) {
+      const rowObj = { id: `row_${Date.now()}_${r + 1}` };
+      columns.forEach(col => {
+        rowObj[col.id] = '';
+      });
+      newTable.rows.push(rowObj);
+    }
 
     state.customTables.push(newTable);
     saveCustomTables();
@@ -6893,6 +7250,8 @@ function setupTableCreator() {
     renderCustomTableList();
     openTab(`custom-table-${tableId}`, 'custom-table-screen', `📋 ${tableName}`);
   });
+
+  populateTableCreatorSourceTables();
 }
 
 // =================================================================
@@ -7572,6 +7931,17 @@ function showCtContextMenu(x, y, tbl, type, targetId) {
     if (dropdownSettingsItem) dropdownSettingsItem.style.display = 'block';
     if (createTableItem) createTableItem.style.display = 'none';
 
+    const colFormulaItem = document.getElementById('ct-menu-col-formula');
+    if (colFormulaItem) {
+      colFormulaItem.style.display = 'block';
+      const targetCol = tbl.columns?.find(c => c.id === targetId);
+      if (targetCol && targetCol.formula) {
+        colFormulaItem.textContent = `fx 他シート参照設定の変更... (${targetCol.formula})`;
+      } else {
+        colFormulaItem.textContent = 'fx 関数・他シート参照設定...';
+      }
+    }
+
     const normId = normalizeTableId(tbl.id);
     const existingGroup = getMergedGroupForCol(normId, targetId);
     if (existingGroup) {
@@ -7603,6 +7973,8 @@ function showCtContextMenu(x, y, tbl, type, targetId) {
     if (switchPrimaryItem) switchPrimaryItem.style.display = 'none';
     if (unmergeItem) unmergeItem.style.display = 'none';
     if (createTableItem) createTableItem.style.display = isMasterAdmin ? 'block' : 'none';
+    const colFormulaItem = document.getElementById('ct-menu-col-formula');
+    if (colFormulaItem) colFormulaItem.style.display = 'none';
   }
 
   menu.style.left = `${x}px`;
@@ -7979,6 +8351,7 @@ function renderCustomTable(tableId) {
     } catch(e) {}
   }
   if (!tbl) return;
+  state.activeCustomTableId = tableId;
   if (!tbl.columns || !Array.isArray(tbl.columns)) tbl.columns = [];
   if (!tbl.rows || !Array.isArray(tbl.rows)) tbl.rows = [];
   if (!tbl.visibleColumns || !Array.isArray(tbl.visibleColumns)) {
@@ -8246,6 +8619,10 @@ function renderCustomTable(tableId) {
 
     const th = document.createElement('th');
     th.textContent = getColumnLetter(visibleColIndex);
+    if (col.formula) {
+      th.title = `列記号 ${getColumnLetter(visibleColIndex)} (他シート参照数式: ${col.formula})`;
+      th.style.color = '#4338ca';
+    }
     th.style.width = `${tbl.columnWidths[col.id] || 120}px`;
     th.style.minWidth = `${tbl.columnWidths[col.id] || 120}px`;
     th.dataset.colId = col.id;
@@ -8339,6 +8716,10 @@ function renderCustomTable(tableId) {
     const isCtMergedHeader = ctMg && ctMg.primaryColumnId === col.id;
     let ctHeaderText = col.label;
     let ctTooltipText = col.label;
+    if (col.formula) {
+      ctHeaderText = `🔗 ${col.label}`;
+      ctTooltipText = `${col.label} (他シート参照数式: ${col.formula})\n※他シート参照データのためセル内直接編集は保護されています`;
+    }
     if (isCtMergedHeader) {
       const mgInfo = getMergedColumnHeaderInfo(tbl.id, ctMg, tbl.columns);
       ctHeaderText = mgInfo.headerText;
@@ -8610,7 +8991,19 @@ function renderCustomTable(tableId) {
         td.style.zIndex = isRowFixed ? '31' : '10';
       }
 
-      const textVal = row[col.id] !== undefined ? row[col.id] : '';
+      const rawTextVal = row[col.id] !== undefined ? row[col.id] : '';
+      let textVal = rawTextVal;
+      if (col.formula) {
+        const evalVal = evaluateSpreadsheetFormula(col.formula, row, rowIndex, tbl);
+        if (evalVal !== undefined && evalVal !== null && evalVal !== '') {
+          textVal = evalVal;
+        } else if (evalVal === '#REF!') {
+          textVal = '#REF!';
+        }
+        td.style.backgroundColor = 'rgba(99, 102, 241, 0.04)';
+        td.title = `他シート参照データ (${col.formula}): セル内直接編集は保護されています`;
+        td.classList.add('ct-cell-referenced');
+      }
       let displayVal = textVal;
       if (col.type === 'date' && textVal) {
         displayVal = formatCustomDate(textVal, col.dateFormat, col.customDateFormat);
@@ -8712,10 +9105,18 @@ function renderCustomTable(tableId) {
 
       // シングルクリックでドロップダウン編集を開く（ドロップダウンのみ）
       td.addEventListener('click', (e) => {
+        if (col.formula && col.type === 'select') {
+          e.stopPropagation();
+          showToast('💡 この項目は他シート参照データのため直接編集できません（参照元テーブルで編集してください）。', 'info');
+          return;
+        }
         if (col.type === 'select') {
           e.stopPropagation();
           if (isTableLocked(tableId)) return;
-          if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess(`custom-table-${tbl.id}`, rowIndex, col.id)) {
+          if (typeof canEditCellData === 'function' && !canEditCellData(`custom-table-${tbl.id}`, rowIndex, col.id)) {
+            showToast('このセルの編集権限がありません（読取専用）。', 'warning');
+            return;
+          } else if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess(`custom-table-${tbl.id}`, rowIndex, col.id)) {
             showToast('このセルの編集権限がありません（読取専用）。', 'warning');
             return;
           }
@@ -8724,9 +9125,17 @@ function renderCustomTable(tableId) {
         }
       });
 
-      td.addEventListener('dblclick', () => {
+      td.addEventListener('dblclick', (e) => {
+        if (col.formula) {
+          if (e && e.stopPropagation) e.stopPropagation();
+          showToast('💡 この項目は他シート参照データのため直接編集できません（参照元テーブルで編集してください）。', 'info');
+          return;
+        }
         if (isTableLocked(tableId)) return;
-        if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess(`custom-table-${tbl.id}`, rowIndex, col.id)) {
+        if (typeof canEditCellData === 'function' && !canEditCellData(`custom-table-${tbl.id}`, rowIndex, col.id)) {
+          showToast('このセルの編集権限がありません（読取専用）。', 'warning');
+          return;
+        } else if (typeof checkCellEditAccess === 'function' && !checkCellEditAccess(`custom-table-${tbl.id}`, rowIndex, col.id)) {
           showToast('このセルの編集権限がありません（読取専用）。', 'warning');
           return;
         }
@@ -10790,6 +11199,181 @@ function setupCtButtonsEvents() {
     if (menu) menu.style.display = 'none';
     if (!ctResizeState.tblId) return;
     openRecordToTableModal(ctResizeState.tblId, ctResizeState.targetId);
+  });
+
+  // =================================================================
+  // 🔗 列の参照・関数設定モーダル (関数・構造編集権限者専用)
+  // =================================================================
+  let activeFormulaModalTarget = {
+    tbl: null,
+    colId: null
+  };
+
+  function openColumnFormulaModal(tbl, colId) {
+    const modal = document.getElementById('ct-column-formula-modal');
+    if (!modal) return;
+
+    const col = tbl.columns?.find(c => c.id === colId);
+    if (!col) return;
+
+    activeFormulaModalTarget.tbl = tbl;
+    activeFormulaModalTarget.colId = colId;
+
+    const targetColNameEl = document.getElementById('cf-target-col-name');
+    if (targetColNameEl) targetColNameEl.textContent = `${col.label || col.id} (${col.id})`;
+
+    const tableSelect = document.getElementById('cf-source-table-select');
+    const colSelectGroup = document.getElementById('cf-col-select-group');
+    const colSelect = document.getElementById('cf-source-col-select');
+    const previewEl = document.getElementById('cf-formula-preview');
+
+    const allTables = getAllAvailableTables();
+    tableSelect.innerHTML = '<option value="">参照なし（独立入力カラム）</option>';
+    allTables.forEach(t => {
+      // 循環参照防止のため自テーブルは除外
+      if (t.id === tbl.id || t.id === `custom-table-${tbl.id}`) return;
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = `${t.name} (${t.id})`;
+      tableSelect.appendChild(opt);
+    });
+
+    let initialSheet = '';
+    let initialColSpec = '';
+    if (col.formula) {
+      const m = col.formula.trim().match(/^=?(?:'([^']+)'|([^'!]+))!(.+)$/);
+      if (m) {
+        initialSheet = m[1] || m[2];
+        initialColSpec = m[3];
+      }
+    }
+
+    const updateColDropdown = (selectedTableId, targetColSpec = '') => {
+      if (!selectedTableId) {
+        if (colSelectGroup) colSelectGroup.style.display = 'none';
+        if (previewEl) previewEl.textContent = '(参照なし)';
+        return;
+      }
+      const targetTable = allTables.find(t => t.id === selectedTableId || t.name === selectedTableId);
+      if (!targetTable) {
+        if (colSelectGroup) colSelectGroup.style.display = 'none';
+        if (previewEl) previewEl.textContent = '(参照なし)';
+        return;
+      }
+
+      if (colSelectGroup) colSelectGroup.style.display = 'block';
+      if (colSelect) {
+        colSelect.innerHTML = '';
+        const srcCols = targetTable.getColumns ? targetTable.getColumns() : (targetTable.columns || []);
+        srcCols.forEach((sc, idx) => {
+          const letter = getColumnLetter(idx);
+          const opt = document.createElement('option');
+          opt.value = letter;
+          opt.textContent = `${letter}: ${sc.label || sc.id} (${sc.type || 'text'})`;
+          if (targetColSpec && (targetColSpec === letter || targetColSpec === sc.id || targetColSpec === sc.label)) {
+            opt.selected = true;
+          }
+          colSelect.appendChild(opt);
+        });
+      }
+
+      updatePreview();
+    };
+
+    const updatePreview = () => {
+      const selectedTblId = tableSelect.value;
+      if (!selectedTblId) {
+        if (previewEl) previewEl.textContent = '(参照なし)';
+        return;
+      }
+      const targetTable = allTables.find(t => t.id === selectedTblId);
+      const tblName = targetTable ? targetTable.name : selectedTblId;
+      const selectedColLetter = colSelect ? colSelect.value || 'A' : 'A';
+      if (previewEl) previewEl.textContent = `='${tblName}'!${selectedColLetter}`;
+    };
+
+    if (initialSheet) {
+      const resolvedTable = resolveTableBySheetName(initialSheet);
+      if (resolvedTable) {
+        tableSelect.value = resolvedTable.id;
+        updateColDropdown(resolvedTable.id, initialColSpec);
+      } else {
+        tableSelect.value = '';
+        updateColDropdown('');
+      }
+    } else {
+      tableSelect.value = '';
+      updateColDropdown('');
+    }
+
+    tableSelect.onchange = () => {
+      updateColDropdown(tableSelect.value);
+    };
+    if (colSelect) {
+      colSelect.onchange = () => {
+        updatePreview();
+      };
+    }
+
+    modal.style.display = 'flex';
+  }
+  window.openColumnFormulaModal = openColumnFormulaModal;
+
+  // コンテキストメニュー「fx 関数・他シート参照設定...」のクリックイベント
+  document.getElementById('ct-menu-col-formula')?.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('ct-context-menu');
+    if (menu) menu.style.display = 'none';
+    if (!ctResizeState.tblId || !ctResizeState.targetId) return;
+    const tbl = findCustomOrMasterTable(ctResizeState.tblId);
+    if (!tbl) return;
+
+    if (!canEditTableSchema(tbl.id)) {
+      showToast('⚠️ 列の関数・他シート参照を設定するには「関数・構造編集権限」が必要です。', 'warning');
+      return;
+    }
+
+    openColumnFormulaModal(tbl, ctResizeState.targetId);
+  });
+
+  // モーダル：設定を保存
+  document.getElementById('btn-save-col-formula')?.addEventListener('click', () => {
+    const { tbl, colId } = activeFormulaModalTarget;
+    if (!tbl || !colId) return;
+    const col = tbl.columns?.find(c => c.id === colId);
+    if (!col) return;
+
+    const tableSelect = document.getElementById('cf-source-table-select');
+    const colSelect = document.getElementById('cf-source-col-select');
+    const modal = document.getElementById('ct-column-formula-modal');
+
+    if (tableSelect && tableSelect.value && colSelect && colSelect.value) {
+      const allTables = getAllAvailableTables();
+      const targetTable = allTables.find(t => t.id === tableSelect.value);
+      const tblName = targetTable ? targetTable.name : tableSelect.value;
+      col.formula = `='${tblName}'!${colSelect.value}`;
+      showToast(`カラム「${col.label || col.id}」に参照数式 ${col.formula} を設定しました。`, 'success');
+    } else {
+      delete col.formula;
+      showToast(`カラム「${col.label || col.id}」の他シート参照設定を解除しました。`, 'info');
+    }
+
+    saveCustomTables();
+    if (modal) modal.style.display = 'none';
+    renderCustomTable(tbl.id);
+  });
+
+  // モーダル：キャンセル・閉じる
+  const closeColumnFormulaModal = () => {
+    const modal = document.getElementById('ct-column-formula-modal');
+    if (modal) modal.style.display = 'none';
+  };
+  document.getElementById('btn-close-col-formula-modal')?.addEventListener('click', closeColumnFormulaModal);
+  document.getElementById('btn-cancel-col-formula')?.addEventListener('click', closeColumnFormulaModal);
+  document.getElementById('ct-column-formula-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'ct-column-formula-modal') {
+      closeColumnFormulaModal();
+    }
   });
 
   // リサイズダイアログ：キャンセル
@@ -14893,6 +15477,9 @@ function activateTab(id) {
     }
   } else if (tab.type === 'table-creator-screen') {
     state.activeCustomTableId = null;
+    if (typeof window.refreshTableCreatorSourceTables === 'function') {
+      window.refreshTableCreatorSourceTables();
+    }
   } else if (tab.type === 'mypage-memo-screen') {
     if (typeof window.updateMypageMemoUI === 'function') window.updateMypageMemoUI();
   } else if (tab.type === 'mypage-calendar-screen') {
