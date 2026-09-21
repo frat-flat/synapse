@@ -868,6 +868,73 @@ let supabaseClient = null;
 let partnerSupabaseClient = null;
 let isSyncing = false;
 
+// 🧹 カスタムテーブルのカラムキー統一・重複マージヘルパー
+function sanitizeAndUnifyTableColumns(tbl) {
+  if (!tbl || !Array.isArray(tbl.columns) || tbl.columns.length === 0) return tbl;
+  
+  const cleanedCols = [];
+  const seenKeys = new Map();
+  let hasDuplicates = false;
+
+  tbl.columns.forEach(c => {
+    if (!c) return;
+    const effectiveKey = (c.id || c.dataKey || '').trim();
+    if (!effectiveKey) {
+      cleanedCols.push(c);
+      return;
+    }
+
+    if (seenKeys.has(effectiveKey)) {
+      hasDuplicates = true;
+      const exist = seenKeys.get(effectiveKey);
+      const curLabel = (c.label || c.name || '').trim();
+      // ラベルが異なる場合（例: 法人名 と 屋号）はマージして「法人名 / 屋号」に
+      if (curLabel && !exist.label.includes(curLabel)) {
+        exist.label = `${exist.label} / ${curLabel}`;
+        exist.name = exist.label;
+      }
+      if (c.required) exist.required = true;
+      if (Array.isArray(c.choices) && c.choices.length > 0) {
+        if (!exist.choices) exist.choices = [];
+        const exVals = new Set(exist.choices.map(ch => typeof ch === 'object' ? (ch.label || ch.value) : ch));
+        c.choices.forEach(ch => {
+          const val = typeof ch === 'object' ? (ch.label || ch.value) : ch;
+          if (val && !exVals.has(val)) {
+            exist.choices.push(typeof ch === 'object' ? ch : { value: ch });
+            exVals.add(val);
+          }
+        });
+      }
+    } else {
+      const copy = { ...c };
+      seenKeys.set(effectiveKey, copy);
+      if (c.id) seenKeys.set(c.id, copy);
+      if (c.dataKey) seenKeys.set(c.dataKey, copy);
+      cleanedCols.push(copy);
+    }
+  });
+
+  if (hasDuplicates || (tbl.columns && tbl.columns.length !== cleanedCols.length)) {
+    tbl.columns = cleanedCols;
+    const cleanedIds = cleanedCols.map(c => c.id);
+    if (Array.isArray(tbl.visibleColumns)) {
+      tbl.visibleColumns = tbl.visibleColumns.filter(id => cleanedIds.includes(id));
+      cleanedIds.forEach(id => {
+        if (!tbl.visibleColumns.includes(id)) tbl.visibleColumns.push(id);
+      });
+    } else {
+      tbl.visibleColumns = cleanedIds;
+    }
+    const newWidths = {};
+    cleanedCols.forEach(c => { newWidths[c.id] = (tbl.columnWidths && tbl.columnWidths[c.id]) || 130; });
+    tbl.columnWidths = newWidths;
+    console.log(`[Database] Auto-unified duplicate column keys for table "${tbl.name}": reduced to ${cleanedCols.length} columns.`);
+  }
+
+  return tbl;
+}
+window.sanitizeAndUnifyTableColumns = sanitizeAndUnifyTableColumns;
+
 // LocalStorageの更新をフックしてSupabaseと自動同期するラッパー
 const originalSetItem = localStorage.setItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
@@ -2867,6 +2934,33 @@ async function syncFromSupabase(showNotification = false) {
           localStorage.setItem(STORAGE_KEYS.USERS, remoteValStr);
           updatedKeys.push(STORAGE_KEYS.USERS);
         }
+
+        // 3. synapse_custom_tables（カスタムテーブル定義一覧）をプル＆自動キー統一
+        try {
+          const { data: ctData, error: ctError } = await supabaseClient
+            .from('synapse_storage')
+            .select('value')
+            .eq('key', STORAGE_KEYS.CUSTOM_TABLES)
+            .maybeSingle();
+
+          if (!ctError && ctData && Array.isArray(ctData.value)) {
+            const cleanedTables = ctData.value.map(t => sanitizeAndUnifyTableColumns(t));
+            localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(cleanedTables));
+            state.customTables = cleanedTables;
+            cleanedTables.forEach(t => {
+              if (t && t.id) {
+                localStorage.setItem(`synapse_table_${t.id}`, JSON.stringify(t));
+              }
+            });
+            updatedKeys.push(STORAGE_KEYS.CUSTOM_TABLES);
+            if (typeof renderCustomTableList === 'function') renderCustomTableList();
+            if (state.currentView === 'custom-table-screen' && state.activeCustomTableId) {
+              renderCustomTable(state.activeCustomTableId);
+            }
+          }
+        } catch (ctErr) {
+          console.warn('[Supabase Sync] Pull custom tables failed:', ctErr);
+        }
       }
     } finally {
       isSyncing = false;
@@ -2915,10 +3009,14 @@ function loadStateFromLocalStorage(keys) {
       dbmakePartners = JSON.parse(localStorage.getItem('synapse_dbmake_partners')) || [];
     } else if (key === STORAGE_KEYS.CUSTOM_TABLES) {
       state.customTables = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_TABLES)) || [];
+      if (Array.isArray(state.customTables)) {
+        state.customTables.forEach(t => sanitizeAndUnifyTableColumns(t));
+      }
     } else if (typeof key === 'string' && key.startsWith('synapse_table_')) {
       try {
         const singleTbl = JSON.parse(localStorage.getItem(key));
         if (singleTbl && singleTbl.id) {
+          sanitizeAndUnifyTableColumns(singleTbl);
           state.customTables = state.customTables || [];
           const exIdx = state.customTables.findIndex(t => t.id === singleTbl.id);
           if (exIdx >= 0) {
@@ -3470,6 +3568,23 @@ function initDatabase() {
     state.customTables = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_TABLES)) || [];
     if (!Array.isArray(state.customTables)) {
       state.customTables = [];
+    }
+
+    // 💡 全テーブルの重複キーを自動マージしてクリーンアップ（古いキャッシュの即時自動修復）
+    let ctSanitized = false;
+    state.customTables.forEach(tbl => {
+      if (tbl && Array.isArray(tbl.columns)) {
+        const origLen = tbl.columns.length;
+        sanitizeAndUnifyTableColumns(tbl);
+        if (tbl.columns.length !== origLen) {
+          ctSanitized = true;
+          localStorage.setItem(`synapse_table_${tbl.id}`, JSON.stringify(tbl));
+        }
+      }
+    });
+    if (ctSanitized) {
+      localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+      console.log('[Database] Auto-sanitized duplicate column keys in custom tables on initDatabase.');
     }
   } catch (e) {
     console.error("[Database] Failed to load custom tables, resetting to empty array:", e);
@@ -7231,8 +7346,17 @@ function adjustOverflowCells(tableElement) {
 
 // 汎用カスタムテーブル画面の動的描画
 function renderCustomTable(tableId) {
-  const tbl = state.customTables.find(t => t.id === tableId);
+  let tbl = state.customTables.find(t => t.id === tableId);
+  if (!tbl) {
+    try {
+      const raw = localStorage.getItem(`synapse_table_${tableId}`);
+      if (raw) tbl = JSON.parse(raw);
+    } catch(e) {}
+  }
   if (!tbl) return;
+
+  // 🧹 同一キー（dataKey/id）の自動マージ・統一
+  sanitizeAndUnifyTableColumns(tbl);
 
   const tableAccess = checkTableAccess(tableId);
   const screenEl = document.getElementById('custom-table-screen');
@@ -13994,6 +14118,32 @@ function activateTab(id) {
     state.activeCustomTableId = tableId;
     tab.type = 'custom-table-screen';
     renderCustomTable(tableId);
+
+    // 🌐 クラウド（Supabase）から該当テーブルの最新定義・行データを取得して同期
+    if (supabaseClient) {
+      supabaseClient
+        .from('synapse_storage')
+        .select('value')
+        .eq('key', `synapse_table_${tableId}`)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (!error && data && data.value) {
+            const freshTable = sanitizeAndUnifyTableColumns(data.value);
+            localStorage.setItem(`synapse_table_${tableId}`, JSON.stringify(freshTable));
+            const idx = state.customTables.findIndex(t => t.id === tableId);
+            if (idx !== -1) {
+              state.customTables[idx] = freshTable;
+            } else {
+              state.customTables.push(freshTable);
+            }
+            localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+            if (state.currentView === 'custom-table-screen' && state.activeCustomTableId === tableId) {
+              renderCustomTable(tableId);
+            }
+          }
+        })
+        .catch(err => console.warn('[Supabase Pull Table]', err));
+    }
   } else if (tab.type === 'table-creator-screen') {
     state.activeCustomTableId = null;
   } else if (tab.type === 'mypage-memo-screen') {
