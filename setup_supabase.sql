@@ -6,7 +6,7 @@
 -- の左メニュー「SQL Editor」を開き、「+ New Query」をクリックして本ファイルの内容（または末尾のセクション10・11）
 -- を貼り付けて「Run」を押してください。
 -- これにより、以下が一括で即時反映されます：
---  1. フォーム「ヨサンダス 紹介代理店申込フォーム」の物理テーブル（public.form_yosandas）の作成
+--  1. フォーム「ヨサンダス 紹介代理店申込フォーム」の物理テーブル（public.form_yosandas_agency_application および日本語ビュー「ヨサンダス_紹介代理店申込フォーム」）の作成
 --  2. 動的テーブル自動作成RPC（synapse_create_or_alter_table）の登録
 --  3. 全ユーザー（回答者含む）の読み取り・回答INSERTを許可するRLSポリシー設定
 -- ============================================================================
@@ -334,10 +334,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
+-- -- ============================================================================
 -- 11. フォーム「ヨサンダス 紹介代理店申込フォーム」専用物理テーブル
--- （同一キー統一済み: 法人名/屋号、カナ、代表者名、住所、電話、インボイス等）
+-- （サブタイトル「紹介代理店申込フォーム」をテーブル名に完全反映）
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.form_yosandas (
+CREATE TABLE IF NOT EXISTS public.form_yosandas_agency_application (
   id TEXT PRIMARY KEY,
   master_id TEXT,
   form_title TEXT DEFAULT 'ヨサンダス 紹介代理店申込フォーム',
@@ -373,12 +374,18 @@ CREATE TABLE IF NOT EXISTS public.form_yosandas (
   updated_at TIMESTAMPTZ DEFAULT NOW()  -- 更新日時
 );
 
-ALTER TABLE public.form_yosandas ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow select for all" ON public.form_yosandas;
-CREATE POLICY "Allow select for all" ON public.form_yosandas FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Allow insert for all" ON public.form_yosandas;
-CREATE POLICY "Allow insert for all" ON public.form_yosandas FOR INSERT WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow update for all" ON public.form_yosandas;
-CREATE POLICY "Allow update for all" ON public.form_yosandas FOR UPDATE USING (true) WITH CHECK (true);
+ALTER TABLE public.form_yosandas_agency_application ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow select for all" ON public.form_yosandas_agency_application;
+CREATE POLICY "Allow select for all" ON public.form_yosandas_agency_application FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert for all" ON public.form_yosandas_agency_application;
+CREATE POLICY "Allow insert for all" ON public.form_yosandas_agency_application FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow update for all" ON public.form_yosandas_agency_application;
+CREATE POLICY "Allow update for all" ON public.form_yosandas_agency_application FOR UPDATE USING (true) WITH CHECK (true);
 
+-- 💡 日本語名ビュー（Supabaseの Table Editor 上でひと目で確認できる「ヨサンダス_紹介代理店申込フォーム」）
+CREATE OR REPLACE VIEW public."ヨサンダス_紹介代理店申込フォーム" AS
+  SELECT * FROM public.form_yosandas_agency_application;
 
+-- 💡 互換用ビュー（form_yosandas でも透過的にアクセス可能）
+CREATE OR REPLACE VIEW public.form_yosandas AS
+  SELECT * FROM public.form_yosandas_agency_application;

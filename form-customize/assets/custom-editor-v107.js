@@ -16659,6 +16659,25 @@
   }
   window.getEffectiveFormTitle = getEffectiveFormTitle;
 
+  // 🏷️ フォーム名からサブタイトルを含めたSupabase物理テーブル名を生成
+  function getPhysicalTableNameForForm(formDef) {
+    if (!formDef) return 'form_default';
+    if (formDef.physicalTableName) return formDef.physicalTableName;
+
+    const effectiveTitle = getEffectiveFormTitle(formDef);
+    if (effectiveTitle.includes('ヨサンダス') && (effectiveTitle.includes('紹介代理店') || effectiveTitle.includes('代理店'))) {
+      return 'form_yosandas_agency_application';
+    }
+
+    const rawId = (formDef.id || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    if (rawId && rawId.length > 3 && rawId !== 'form_yosandas') {
+      return rawId.startsWith('form_') ? rawId : `form_${rawId}`;
+    }
+    const cleanTitle = effectiveTitle.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_');
+    return cleanTitle ? `form_${cleanTitle}` : 'form_custom';
+  }
+  window.getPhysicalTableNameForForm = getPhysicalTableNameForForm;
+
   // 📊 フォーム専用独立テーブル作成共通ヘルパー
   async function createDedicatedTableForForm(formDef) {
     if (!formDef) return null;
@@ -16788,8 +16807,7 @@
 
       // 🌐 Supabaseクラウド上に物理テーブル（CREATE TABLE）を自動作成 (RPC)
       try {
-        const rawSlug = (formDef.id || formDef.title || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
-        const pTableName = rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
+        const pTableName = getPhysicalTableNameForForm(formDef);
         const rpcCols = columns.map(c => ({ id: c.id, label: c.label || c.name, type: c.type || 'text' }));
         await fetch(`${sbUrl}/rest/v1/rpc/synapse_create_or_alter_table`, {
           method: 'POST',

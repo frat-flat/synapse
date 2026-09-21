@@ -21743,9 +21743,14 @@ function handleFormSubmitMessage(event) {
       }).catch(e => console.warn('[Supabase Sync Table Detail]', e));
     }
 
-    // 3. Supabase物理テーブル（例: form_yosandas）への直接INSERT
-    const rawSlug = (targetTable.id || effectiveTableName || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
-    const pTableName = rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
+    // 3. Supabase物理テーブル（例: form_yosandas_agency_application）への直接INSERT
+    let pTableName = (effectiveTableName.includes('ヨサンダス') && (effectiveTableName.includes('紹介代理店') || effectiveTableName.includes('代理店')))
+      ? 'form_yosandas_agency_application'
+      : (() => {
+          const rawSlug = (targetTable.id || effectiveTableName || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+          return rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
+        })();
+
     const physRow = {
       id: targetRowId,
       master_id: targetRow.master_id || targetRow.mid || null,
@@ -21767,8 +21772,17 @@ function handleFormSubmitMessage(event) {
       method: 'POST',
       headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
       body: JSON.stringify(physRow)
-    }).then(res => {
-      if (res.ok) console.log(`[Supabase Physical Table] Persisted row to "${pTableName}".`);
+    }).then(async res => {
+      if (res.ok) {
+        console.log(`[Supabase Physical Table] Persisted row to "${pTableName}".`);
+      } else if (pTableName === 'form_yosandas_agency_application') {
+        // 旧テーブル名へのフォールバック
+        await fetch(`${sbUrl}/rest/v1/form_yosandas`, {
+          method: 'POST',
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+          body: JSON.stringify(physRow)
+        }).catch(e => console.warn('[Supabase Fallback Insert]', e));
+      }
     }).catch(e => console.warn('[Supabase Physical Table Insert]', e));
   } catch (syncErr) {
     console.warn('[Supabase Auto Sync Error]', syncErr);
