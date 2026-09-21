@@ -4910,9 +4910,109 @@ h3 {
 }
 
 /* ============================================================================
-/* ============================================================================
-   📌 浮遊付箋（Sticky Notes）スタイル
+   📂 サイドバー項目の並び替え（ドラッグ＆ドロップ ＆ ▲▼操作）
    ============================================================================ */
+.sidebar-accordion,
+.sidebar-nav .nav-item {
+  position: relative;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+}
+
+.accordion-header {
+  cursor: grab;
+}
+
+.accordion-header:active {
+  cursor: grabbing;
+}
+
+/* ドラッグ中の要素 */
+.sidebar-item-dragging {
+  opacity: 0.35 !important;
+  background: rgba(37, 99, 235, 0.08) !important;
+}
+
+/* ドロップ先の挿入インジケーター線（上・下） */
+.sidebar-accordion.drag-over-top > .accordion-header,
+.sidebar-nav .nav-item.drag-over-top {
+  border-top: 2px solid var(--primary) !important;
+  border-top-left-radius: var(--radius-sm);
+  border-top-right-radius: var(--radius-sm);
+  background: rgba(37, 99, 235, 0.06) !important;
+}
+
+.sidebar-accordion.drag-over-bottom > .accordion-header,
+.sidebar-nav .nav-item.drag-over-bottom {
+  border-bottom: 2px solid var(--primary) !important;
+  border-bottom-left-radius: var(--radius-sm);
+  border-bottom-right-radius: var(--radius-sm);
+  background: rgba(37, 99, 235, 0.06) !important;
+}
+
+/* 並び替えアクションボタンコンテナ */
+.sidebar-reorder-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.custom-icon-fav-btn + .sidebar-reorder-actions,
+.custom-icon-edit-btn + .sidebar-reorder-actions,
+.sidebar-perm-icon-btn + .sidebar-reorder-actions {
+  margin-left: 4px;
+}
+
+.accordion-header:hover .sidebar-reorder-actions,
+.sidebar-nav .nav-item:hover .sidebar-reorder-actions {
+  opacity: 1;
+}
+
+/* 上下移動ボタン */
+.sidebar-reorder-btn {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  padding: 0.15rem 0.25rem;
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease;
+}
+
+.sidebar-reorder-btn:hover {
+  background: var(--bg-surface-elevated);
+  color: var(--primary);
+  transform: scale(1.15);
+}
+
+/* ドラッググリップハンドル */
+.sidebar-drag-handle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: grab;
+  padding: 0 0.15rem;
+  line-height: 1;
+  letter-spacing: -1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s ease;
+}
+
+.sidebar-drag-handle:hover {
+  color: var(--primary);
+}
+
+.sidebar-drag-handle:active {
+  cursor: grabbing;
+}
 .floating-sticky-note {
   position: fixed !important;
   width: 250px;

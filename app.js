@@ -5800,13 +5800,15 @@ function renderMypageFavorites() {
   });
 }
 
-// ⭐ サイドバー項目にお気に入り＆編集アクションを追加する共通関数
-function attachSidebarItemActions(el, itemId, itemName, itemType, depth = 1) {
+// ⭐ サイドバー項目にお気に入り＆編集＆並び替えアクションを追加する共通関数
+function attachSidebarItemActions(el, itemId, itemName, itemType, depth = 1, parentId = 'root', domId = null) {
   // すでに存在している場合は削除して再作成（再描画時のクリーンアップ）
   const oldFav = el.querySelector('.custom-icon-fav-btn');
   if (oldFav) oldFav.remove();
   const oldEdit = el.querySelector('.custom-icon-edit-btn');
   if (oldEdit) oldEdit.remove();
+  const oldReorder = el.querySelector('.sidebar-reorder-actions');
+  if (oldReorder) oldReorder.remove();
 
   // 親フォルダ（第一階層：depth === 0 かつフォルダタイプ）の場合はお気に入りボタンを表示しない
   const isParentFolder = (itemType === 'folder' && depth === 0);
@@ -5849,7 +5851,321 @@ function attachSidebarItemActions(el, itemId, itemName, itemType, depth = 1) {
     });
     el.appendChild(editBtn);
   }
-  // マウスイベントは styles.css のホバー指定でクリーンに制御するため、JSリスナーはバインドしません。
+
+  // 並び替えアクションボタン（▲ / ▼ / ドラッグハンドル）
+  const reorderContainer = document.createElement('span');
+  reorderContainer.className = 'sidebar-reorder-actions';
+
+  const upBtn = document.createElement('span');
+  upBtn.className = 'sidebar-reorder-btn reorder-up';
+  upBtn.innerHTML = '▲';
+  upBtn.title = '上に移動';
+  upBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    moveSidebarItem(itemId, itemType, 'up', parentId, domId);
+  });
+
+  const downBtn = document.createElement('span');
+  downBtn.className = 'sidebar-reorder-btn reorder-down';
+  downBtn.innerHTML = '▼';
+  downBtn.title = '下に移動';
+  downBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    moveSidebarItem(itemId, itemType, 'down', parentId, domId);
+  });
+
+  const handle = document.createElement('span');
+  handle.className = 'sidebar-drag-handle';
+  handle.innerHTML = '⋮⋮';
+  handle.title = 'ドラッグして並び替え';
+
+  reorderContainer.appendChild(upBtn);
+  reorderContainer.appendChild(downBtn);
+  reorderContainer.appendChild(handle);
+  el.appendChild(reorderContainer);
+}
+
+// 📂 サイドバー並び替え管理
+let isDraggingSidebarItem = false;
+let draggedSidebarData = null;
+
+function moveSidebarItem(itemId, itemType, direction, parentId = 'root', domId = null) {
+  if (itemType === 'folder') {
+    const normParentId = normalizeFolderId(parentId || 'root');
+    const siblings = state.customAccordions.filter(acc => normalizeFolderId(acc.parentMenuId || 'root') === normParentId);
+    const currIdx = siblings.findIndex(acc => acc.id === itemId);
+    if (currIdx === -1) return;
+
+    const targetIdx = direction === 'up' ? currIdx - 1 : currIdx + 1;
+    if (targetIdx < 0 || targetIdx >= siblings.length) return;
+
+    const targetSibling = siblings[targetIdx];
+    const actualCurrIdx = state.customAccordions.findIndex(acc => acc.id === itemId);
+    const actualTargetIdx = state.customAccordions.findIndex(acc => acc.id === targetSibling.id);
+
+    if (actualCurrIdx !== -1 && actualTargetIdx !== -1) {
+      const temp = state.customAccordions[actualCurrIdx];
+      state.customAccordions[actualCurrIdx] = state.customAccordions[actualTargetIdx];
+      state.customAccordions[actualTargetIdx] = temp;
+      localStorage.setItem(STORAGE_KEYS.CUSTOM_ACCORDIONS, JSON.stringify(state.customAccordions));
+      if (typeof syncToSupabase === 'function') syncToSupabase(STORAGE_KEYS.CUSTOM_ACCORDIONS, state.customAccordions);
+      renderCustomTableList();
+    }
+  } else if (itemType === 'appoint-submenu') {
+    const defaultAppointIds = ['menu-new-appoint', 'menu-existing-appoint', 'menu-drafts-list', 'menu-history-list', 'menu-link-official'];
+    let order = [];
+    try {
+      order = JSON.parse(localStorage.getItem('synapse_appoint_submenus_order')) || [];
+    } catch (e) {}
+    if (!Array.isArray(order) || order.length === 0) {
+      order = [...defaultAppointIds];
+    }
+    defaultAppointIds.forEach(id => {
+      if (!order.includes(id)) order.push(id);
+    });
+
+    const targetKey = domId || itemId;
+    const currIdx = order.indexOf(targetKey);
+    if (currIdx === -1) return;
+
+    const targetIdx = direction === 'up' ? currIdx - 1 : currIdx + 1;
+    if (targetIdx < 0 || targetIdx >= order.length) return;
+
+    const temp = order[currIdx];
+    order[currIdx] = order[targetIdx];
+    order[targetIdx] = temp;
+
+    localStorage.setItem('synapse_appoint_submenus_order', JSON.stringify(order));
+    renderCustomTableList();
+  } else if (itemType === 'table') {
+    const normParentId = normalizeFolderId(parentId || 'root');
+    const siblings = state.customTables.filter(t => normalizeFolderId(t.parentMenuId || 'root') === normParentId);
+    const currIdx = siblings.findIndex(t => t.id === itemId);
+    if (currIdx === -1) return;
+
+    const targetIdx = direction === 'up' ? currIdx - 1 : currIdx + 1;
+    if (targetIdx < 0 || targetIdx >= siblings.length) return;
+
+    const targetSibling = siblings[targetIdx];
+    const actualCurrIdx = state.customTables.findIndex(t => t.id === itemId);
+    const actualTargetIdx = state.customTables.findIndex(t => t.id === targetSibling.id);
+
+    if (actualCurrIdx !== -1 && actualTargetIdx !== -1) {
+      const temp = state.customTables[actualCurrIdx];
+      state.customTables[actualCurrIdx] = state.customTables[actualTargetIdx];
+      state.customTables[actualTargetIdx] = temp;
+      localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+      if (typeof syncToSupabase === 'function') syncToSupabase(STORAGE_KEYS.CUSTOM_TABLES, state.customTables);
+      renderCustomTableList();
+    }
+  }
+}
+
+function reorderSidebarFolder(sourceId, targetId, position, parentId = 'root') {
+  if (sourceId === targetId) return;
+  const srcIdx = state.customAccordions.findIndex(a => a.id === sourceId);
+  if (srcIdx === -1) return;
+
+  const [moved] = state.customAccordions.splice(srcIdx, 1);
+  let tgtIdx = state.customAccordions.findIndex(a => a.id === targetId);
+
+  if (tgtIdx === -1) {
+    state.customAccordions.push(moved);
+  } else {
+    if (position === 'after') {
+      tgtIdx++;
+    }
+    state.customAccordions.splice(tgtIdx, 0, moved);
+  }
+
+  localStorage.setItem(STORAGE_KEYS.CUSTOM_ACCORDIONS, JSON.stringify(state.customAccordions));
+  if (typeof syncToSupabase === 'function') syncToSupabase(STORAGE_KEYS.CUSTOM_ACCORDIONS, state.customAccordions);
+  renderCustomTableList();
+}
+
+function reorderAppointSubmenu(sourceDomId, targetDomId, position) {
+  if (sourceDomId === targetDomId) return;
+  const defaultAppointIds = ['menu-new-appoint', 'menu-existing-appoint', 'menu-drafts-list', 'menu-history-list', 'menu-link-official'];
+  let order = [];
+  try {
+    order = JSON.parse(localStorage.getItem('synapse_appoint_submenus_order')) || [];
+  } catch (e) {}
+  if (!Array.isArray(order) || order.length === 0) {
+    order = [...defaultAppointIds];
+  }
+  defaultAppointIds.forEach(id => {
+    if (!order.includes(id)) order.push(id);
+  });
+
+  const srcIdx = order.indexOf(sourceDomId);
+  if (srcIdx === -1) return;
+  const [moved] = order.splice(srcIdx, 1);
+
+  let tgtIdx = order.indexOf(targetDomId);
+  if (tgtIdx === -1) {
+    order.push(moved);
+  } else {
+    if (position === 'after') tgtIdx++;
+    order.splice(tgtIdx, 0, moved);
+  }
+
+  localStorage.setItem('synapse_appoint_submenus_order', JSON.stringify(order));
+  renderCustomTableList();
+}
+
+function reorderSidebarTable(sourceId, targetId, position, parentId = 'root') {
+  if (sourceId === targetId) return;
+  const srcIdx = state.customTables.findIndex(t => t.id === sourceId);
+  if (srcIdx === -1) return;
+
+  const [moved] = state.customTables.splice(srcIdx, 1);
+  let tgtIdx = state.customTables.findIndex(t => t.id === targetId);
+
+  if (tgtIdx === -1) {
+    state.customTables.push(moved);
+  } else {
+    if (position === 'after') tgtIdx++;
+    state.customTables.splice(tgtIdx, 0, moved);
+  }
+
+  localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+  if (typeof syncToSupabase === 'function') syncToSupabase(STORAGE_KEYS.CUSTOM_TABLES, state.customTables);
+  renderCustomTableList();
+}
+
+function setupSidebarFolderDragAndDrop(folderDiv, folderId, parentId = 'root') {
+  if (!folderDiv) return;
+  const headerEl = folderDiv.querySelector('.accordion-header');
+  if (!headerEl) return;
+
+  headerEl.setAttribute('draggable', 'true');
+
+  headerEl.addEventListener('dragstart', (e) => {
+    isDraggingSidebarItem = true;
+    draggedSidebarData = { type: 'folder', id: folderId, parentId: parentId || 'root', domId: folderDiv.id };
+    folderDiv.classList.add('sidebar-item-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try {
+      e.dataTransfer.setData('text/plain', JSON.stringify(draggedSidebarData));
+    } catch(err) {}
+  });
+
+  headerEl.addEventListener('dragend', () => {
+    folderDiv.classList.remove('sidebar-item-dragging');
+    document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+      el.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+    setTimeout(() => {
+      isDraggingSidebarItem = false;
+      draggedSidebarData = null;
+    }, 150);
+  });
+
+  folderDiv.addEventListener('dragover', (e) => {
+    if (!draggedSidebarData || draggedSidebarData.type !== 'folder') return;
+    if (normalizeFolderId(draggedSidebarData.parentId) !== normalizeFolderId(parentId || 'root')) return;
+    if (draggedSidebarData.id === folderId) return;
+
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    const rect = headerEl.getBoundingClientRect();
+    const isTop = e.clientY < (rect.top + rect.height / 2);
+    folderDiv.classList.toggle('drag-over-top', isTop);
+    folderDiv.classList.toggle('drag-over-bottom', !isTop);
+  });
+
+  folderDiv.addEventListener('dragleave', (e) => {
+    if (!folderDiv.contains(e.relatedTarget)) {
+      folderDiv.classList.remove('drag-over-top', 'drag-over-bottom');
+    }
+  });
+
+  folderDiv.addEventListener('drop', (e) => {
+    if (!draggedSidebarData || draggedSidebarData.type !== 'folder') return;
+    if (normalizeFolderId(draggedSidebarData.parentId) !== normalizeFolderId(parentId || 'root')) return;
+    if (draggedSidebarData.id === folderId) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = headerEl.getBoundingClientRect();
+    const position = e.clientY < (rect.top + rect.height / 2) ? 'before' : 'after';
+
+    folderDiv.classList.remove('drag-over-top', 'drag-over-bottom');
+    reorderSidebarFolder(draggedSidebarData.id, folderId, position, parentId || 'root');
+  });
+}
+
+function setupSidebarTableDragAndDrop(btn, itemId, itemType = 'table', parentId = 'root', domId = null) {
+  if (!btn) return;
+
+  btn.setAttribute('draggable', 'true');
+
+  btn.addEventListener('dragstart', (e) => {
+    isDraggingSidebarItem = true;
+    draggedSidebarData = { type: itemType, id: itemId, parentId: parentId || 'root', domId: domId || btn.id };
+    btn.classList.add('sidebar-item-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try {
+      e.dataTransfer.setData('text/plain', JSON.stringify(draggedSidebarData));
+    } catch(err) {}
+  });
+
+  btn.addEventListener('dragend', () => {
+    btn.classList.remove('sidebar-item-dragging');
+    document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+      el.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+    setTimeout(() => {
+      isDraggingSidebarItem = false;
+      draggedSidebarData = null;
+    }, 150);
+  });
+
+  btn.addEventListener('dragover', (e) => {
+    if (!draggedSidebarData || draggedSidebarData.type !== itemType) return;
+    if (normalizeFolderId(draggedSidebarData.parentId) !== normalizeFolderId(parentId || 'root')) return;
+    if ((draggedSidebarData.domId || draggedSidebarData.id) === (domId || itemId || btn.id)) return;
+
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    const rect = btn.getBoundingClientRect();
+    const isTop = e.clientY < (rect.top + rect.height / 2);
+    btn.classList.toggle('drag-over-top', isTop);
+    btn.classList.toggle('drag-over-bottom', !isTop);
+  });
+
+  btn.addEventListener('dragleave', (e) => {
+    if (!btn.contains(e.relatedTarget)) {
+      btn.classList.remove('drag-over-top', 'drag-over-bottom');
+    }
+  });
+
+  btn.addEventListener('drop', (e) => {
+    if (!draggedSidebarData || draggedSidebarData.type !== itemType) return;
+    if (normalizeFolderId(draggedSidebarData.parentId) !== normalizeFolderId(parentId || 'root')) return;
+    const targetKey = domId || itemId || btn.id;
+    const sourceKey = draggedSidebarData.domId || draggedSidebarData.id;
+    if (sourceKey === targetKey) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = btn.getBoundingClientRect();
+    const position = e.clientY < (rect.top + rect.height / 2) ? 'before' : 'after';
+
+    btn.classList.remove('drag-over-top', 'drag-over-bottom');
+
+    if (itemType === 'appoint-submenu') {
+      reorderAppointSubmenu(sourceKey, targetKey, position);
+    } else {
+      reorderSidebarTable(draggedSidebarData.id, itemId, position, parentId);
+    }
+  });
 }
 
 // 標準メニュー要素 of cache
@@ -5899,10 +6215,33 @@ function renderCustomTableList() {
     ];
   }
 
+  // 現在開いているアコーディオンの開閉状態を記憶（再描画後も保持するため）
+  const openFolderIds = new Set();
+  sidebarNav.querySelectorAll('.sidebar-accordion').forEach(folder => {
+    const content = folder.querySelector('.accordion-content');
+    const header = folder.querySelector('.accordion-header');
+    if (content && content.style.display !== 'none' && header && !header.classList.contains('collapsed')) {
+      openFolderIds.add(folder.id);
+    }
+  });
+
   // キャッシュからクローン（参照渡しを防ぐためシャローコピー）
   const sysAccs = { ...cachedSysAccs };
   const sysTables = { ...cachedSysTables };
-  const appointSubMenus = [...cachedAppointSubMenus];
+  let appointSubMenus = [...cachedAppointSubMenus].filter(Boolean);
+
+  // アポイント配下のサブメニューの保存された並び順を反映
+  let appointOrder = [];
+  try {
+    appointOrder = JSON.parse(localStorage.getItem('synapse_appoint_submenus_order')) || [];
+  } catch (e) {}
+  if (Array.isArray(appointOrder) && appointOrder.length > 0) {
+    appointSubMenus.sort((a, b) => {
+      const idxA = appointOrder.indexOf(a.id);
+      const idxB = appointOrder.indexOf(b.id);
+      return (idxA !== -1 ? idxA : 999) - (idxB !== -1 ? idxB : 999);
+    });
+  }
 
   // 既存の動的カスタムアコーディオンおよびテーブルボタンをクリア
   sidebarNav.querySelectorAll('.sidebar-accordion').forEach(acc => {
@@ -5936,7 +6275,7 @@ function renderCustomTableList() {
       if (folderDiv) {
         const headerEl = folderDiv.querySelector('.accordion-header');
         if (headerEl) {
-          attachSidebarItemActions(headerEl, acc.id, acc.name, 'folder', depth);
+          attachSidebarItemActions(headerEl, acc.id, acc.name, 'folder', depth, parentId, folderDiv.id);
         }
       } else {
         // 新規カスタムアコーディオンを動的生成
@@ -5953,9 +6292,7 @@ function renderCustomTableList() {
         const iconHtml = getUserItemIconHtml(acc.id, '📁');
         header.innerHTML = `<span class="accordion-arrow">▼</span>${iconHtml}<span class="accordion-header-text">${acc.name}</span>`;
 
-        attachSidebarItemActions(header, acc.id, acc.name, 'folder', depth);
-
-        // サイドバーからのフォルダ削除は禁止（「フォルダ管理」からのみパスワード認証で削除可能）
+        attachSidebarItemActions(header, acc.id, acc.name, 'folder', depth, parentId, folderDiv.id);
 
         const content = document.createElement('div');
         content.className = 'accordion-content';
@@ -5967,6 +6304,8 @@ function renderCustomTableList() {
         content.innerHTML = `<div class="accordion-content-header">${acc.name}</div>`;
 
         header.addEventListener('click', (e) => {
+          if (isDraggingSidebarItem) return;
+          if (e.target.closest('.sidebar-reorder-actions') || e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn') || e.target.closest('.sidebar-item-perm-btn')) return;
           e.stopPropagation();
           const isCollapsed = header.classList.toggle('collapsed');
           content.style.display = isCollapsed ? 'none' : 'flex';
@@ -5976,7 +6315,8 @@ function renderCustomTableList() {
         folderDiv.appendChild(content);
       }
 
-      folderDiv.draggable = false;
+      // ドラッグ＆ドロップ並び替えの設定
+      setupSidebarFolderDragAndDrop(folderDiv, acc.id, parentId);
 
       // アクセス権限に応じたグレーアウト
       if (access.grayout) {
@@ -5989,14 +6329,17 @@ function renderCustomTableList() {
         renderSidebarPermissionIconBtn(headerEl, 'folder', acc.id);
       }
 
-      // DOMツリーに挿入
+      // 以前開いていた状態を復元
+      const curContentEl = folderDiv.querySelector('.accordion-content');
+      const curHeaderEl = folderDiv.querySelector('.accordion-header');
+      if (openFolderIds.has(acc.id)) {
+        if (curHeaderEl) curHeaderEl.classList.remove('collapsed');
+        if (curContentEl) curContentEl.style.display = 'flex';
+      }
+
+      // DOMツリーに挿入（サイドバーからフォーム作成・テーブル作成ボタンを削除したため直接append）
       if (parentId === 'root') {
-        const refNode = document.getElementById('menu-form-customize');
-        if (refNode && refNode.parentNode === targetRootContainer) {
-          targetRootContainer.insertBefore(folderDiv, refNode);
-        } else {
-          targetRootContainer.appendChild(folderDiv);
-        }
+        targetRootContainer.appendChild(folderDiv);
       } else {
         containerEl.appendChild(folderDiv);
       }
@@ -6035,11 +6378,10 @@ function renderCustomTableList() {
                 el.style.alignItems = 'center';
                 el.style.width = '100%';
                 
-                // アイコンの左右の謎のスペース解消のため、元々のテキストだけを表示する
-                // （前回のデグレーションで追加された customIcon 等をクリアし、元の文字だけの innerHTML を保証）
                 el.innerHTML = `<span class="nav-item-text">${itemName}</span>`;
                 
-                attachSidebarItemActions(el, itemId, itemName, 'table');
+                attachSidebarItemActions(el, itemId, itemName, 'appoint-submenu', depth, 'appoint-accordion', el.id);
+                setupSidebarTableDragAndDrop(el, itemId, 'appoint-submenu', 'appoint-accordion', el.id);
               }
             }
           });
@@ -6068,17 +6410,18 @@ function renderCustomTableList() {
 
       const tableIcon = getUserItemIconHtml(tbl.id, null);
       if (btn) {
-        console.log('[DEBUG] Rendering table:', tbl.id, 'with name:', tbl.name);
         btn.setAttribute('data-tooltip', tbl.name);
         btn.style.display = 'flex';
         btn.style.alignItems = 'center';
         btn.innerHTML = `${tableIcon}<span class="nav-item-text">${tbl.name}</span>`;
 
-        attachSidebarItemActions(btn, tbl.id, tbl.name, 'table');
+        attachSidebarItemActions(btn, tbl.id, tbl.name, 'table', depth, tbl.parentMenuId || parentId, btn.id);
+        setupSidebarTableDragAndDrop(btn, tbl.id, 'table', tbl.parentMenuId || parentId, btn.id);
 
         // ★ 標準テーブルおよび流入相関図へのクリックを確実に発火
         btn.onclick = (e) => {
-          if (e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn')) return;
+          if (isDraggingSidebarItem) return;
+          if (e.target.closest('.sidebar-reorder-actions') || e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn') || e.target.closest('.sidebar-item-perm-btn')) return;
           if (tbl.id === 'agency-network-screen') {
             openTab('agency-network-screen', 'agency-network-screen', '🌐 代理店 流入相関図');
           } else if (tbl.id === 'agency-info-screen') {
@@ -6109,10 +6452,12 @@ function renderCustomTableList() {
         btn.setAttribute('data-tooltip', tbl.name);
         btn.innerHTML = `${tableIcon}<span class="nav-item-text">${tbl.name}</span>`;
 
-        attachSidebarItemActions(btn, tbl.id, tbl.name, 'table');
+        attachSidebarItemActions(btn, tbl.id, tbl.name, 'table', depth, tbl.parentMenuId || parentId, btn.id);
+        setupSidebarTableDragAndDrop(btn, tbl.id, 'table', tbl.parentMenuId || parentId, btn.id);
 
         btn.addEventListener('click', (e) => {
-          if (e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn')) return;
+          if (isDraggingSidebarItem) return;
+          if (e.target.closest('.sidebar-reorder-actions') || e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn') || e.target.closest('.sidebar-item-perm-btn')) return;
           if (tbl.id === 'agency-network-screen') {
             openTab('agency-network-screen', 'agency-network-screen', '🌐 代理店 流入相関図');
           } else {
@@ -6121,8 +6466,6 @@ function renderCustomTableList() {
           }
         });
       }
-
-      btn.draggable = false;
 
       // テーブルのグレーアウト制御＆権限アイコン（🔒/🔓/✏️・文字折り返し防止）
       if (access.grayout) {
@@ -6135,12 +6478,7 @@ function renderCustomTableList() {
       // DOMツリーに挿入
       if (parentId === 'root') {
         btn.style.marginTop = '0.5rem';
-        const refNode = document.getElementById('menu-form-customize');
-        if (refNode && refNode.parentNode === targetRootContainer) {
-          targetRootContainer.insertBefore(btn, refNode);
-        } else {
-          targetRootContainer.appendChild(btn);
-        }
+        targetRootContainer.appendChild(btn);
       } else {
         containerEl.appendChild(btn);
       }
@@ -15237,7 +15575,9 @@ function setupEventListeners() {
   sidebarButtons.forEach(btn => {
     const el = document.getElementById(btn.id);
     if (el) {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (e) => {
+        if (isDraggingSidebarItem) return;
+        if (e && e.target && e.target.closest && (e.target.closest('.sidebar-reorder-actions') || e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn') || e.target.closest('.sidebar-item-perm-btn'))) return;
         if (btn.tab === 'mypage-screen') {
           openMyPage();
           return;
@@ -15292,7 +15632,9 @@ function setupEventListeners() {
   const accordionHeader = document.getElementById('menu-appoint-parent');
   const accordionContent = document.getElementById('menu-appoint-content');
   if (accordionHeader && accordionContent) {
-    accordionHeader.addEventListener('click', () => {
+    accordionHeader.addEventListener('click', (e) => {
+      if (isDraggingSidebarItem) return;
+      if (e && e.target && e.target.closest && (e.target.closest('.sidebar-reorder-actions') || e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn') || e.target.closest('.sidebar-item-perm-btn'))) return;
       accordionHeader.classList.toggle('collapsed');
       const isHidden = accordionContent.style.display === 'none' || !accordionContent.style.display;
       accordionContent.style.display = isHidden ? 'flex' : 'none';
@@ -15302,7 +15644,9 @@ function setupEventListeners() {
   const customAccordionHeader = document.getElementById('menu-custom-tables-parent');
   const customAccordionContent = document.getElementById('menu-custom-tables-content');
   if (customAccordionHeader && customAccordionContent) {
-    customAccordionHeader.addEventListener('click', () => {
+    customAccordionHeader.addEventListener('click', (e) => {
+      if (isDraggingSidebarItem) return;
+      if (e && e.target && e.target.closest && (e.target.closest('.sidebar-reorder-actions') || e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn') || e.target.closest('.sidebar-item-perm-btn'))) return;
       customAccordionHeader.classList.toggle('collapsed');
       const isHidden = customAccordionContent.style.display === 'none' || !customAccordionContent.style.display;
       customAccordionContent.style.display = isHidden ? 'flex' : 'none';
@@ -15313,7 +15657,9 @@ function setupEventListeners() {
   const agAccordionHeader = document.getElementById('menu-agency-parent');
   const agAccordionContent = document.getElementById('menu-agency-content');
   if (agAccordionHeader && agAccordionContent) {
-    agAccordionHeader.addEventListener('click', () => {
+    agAccordionHeader.addEventListener('click', (e) => {
+      if (isDraggingSidebarItem) return;
+      if (e && e.target && e.target.closest && (e.target.closest('.sidebar-reorder-actions') || e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn') || e.target.closest('.sidebar-item-perm-btn'))) return;
       agAccordionHeader.classList.toggle('collapsed');
       const isHidden = agAccordionContent.style.display === 'none' || !agAccordionContent.style.display;
       agAccordionContent.style.display = isHidden ? 'flex' : 'none';
@@ -15324,7 +15670,9 @@ function setupEventListeners() {
   const joAccordionHeader = document.getElementById('menu-jo-parent');
   const joAccordionContent = document.getElementById('menu-jo-content');
   if (joAccordionHeader && joAccordionContent) {
-    joAccordionHeader.addEventListener('click', () => {
+    joAccordionHeader.addEventListener('click', (e) => {
+      if (isDraggingSidebarItem) return;
+      if (e && e.target && e.target.closest && (e.target.closest('.sidebar-reorder-actions') || e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn') || e.target.closest('.sidebar-item-perm-btn'))) return;
       joAccordionHeader.classList.toggle('collapsed');
       const isHidden = joAccordionContent.style.display === 'none' || !joAccordionContent.style.display;
       joAccordionContent.style.display = isHidden ? 'flex' : 'none';
@@ -15335,7 +15683,9 @@ function setupEventListeners() {
   const apAccordionHeader = document.getElementById('menu-applicant-parent');
   const apAccordionContent = document.getElementById('menu-applicant-content');
   if (apAccordionHeader && apAccordionContent) {
-    apAccordionHeader.addEventListener('click', () => {
+    apAccordionHeader.addEventListener('click', (e) => {
+      if (isDraggingSidebarItem) return;
+      if (e && e.target && e.target.closest && (e.target.closest('.sidebar-reorder-actions') || e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn') || e.target.closest('.sidebar-item-perm-btn'))) return;
       apAccordionHeader.classList.toggle('collapsed');
       const isHidden = apAccordionContent.style.display === 'none' || !apAccordionContent.style.display;
       apAccordionContent.style.display = isHidden ? 'flex' : 'none';
@@ -15346,7 +15696,9 @@ function setupEventListeners() {
   const formsAccordionHeader = document.getElementById('menu-forms-parent');
   const formsAccordionContent = document.getElementById('menu-forms-content');
   if (formsAccordionHeader && formsAccordionContent) {
-    formsAccordionHeader.addEventListener('click', () => {
+    formsAccordionHeader.addEventListener('click', (e) => {
+      if (isDraggingSidebarItem) return;
+      if (e && e.target && e.target.closest && (e.target.closest('.sidebar-reorder-actions') || e.target.closest('.custom-icon-fav-btn') || e.target.closest('.custom-icon-edit-btn') || e.target.closest('.sidebar-item-perm-btn'))) return;
       formsAccordionHeader.classList.toggle('collapsed');
       const isHidden = formsAccordionContent.style.display === 'none' || !formsAccordionContent.style.display;
       formsAccordionContent.style.display = isHidden ? 'flex' : 'none';
@@ -53368,10 +53720,10 @@ function updateServiceUIState() {
   if (formsAcc) formsAcc.style.display = (included.includes('forms') || included.includes('forms-accordion') || included.includes('form_customize')) ? '' : 'none';
 
   const formCust = document.getElementById('menu-form-customize');
-  if (formCust) formCust.style.display = included.includes('form_customize') ? '' : 'none';
+  if (formCust) formCust.style.display = 'none';
 
   const tableCust = document.getElementById('menu-table-creator');
-  if (tableCust) tableCust.style.display = included.includes('table_creator') ? '' : 'none';
+  if (tableCust) tableCust.style.display = 'none';
 
   // カスタムテーブルのフィルタリング
   if (Array.isArray(state.customTables)) {
