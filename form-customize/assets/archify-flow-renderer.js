@@ -142,6 +142,78 @@
 
       const btnReset = document.getElementById('btn-flow-reset-route');
       if (btnReset) btnReset.addEventListener('click', () => this.clearHighlight());
+
+      // 📖 ガイドモーダルの開閉ハンドリング
+      const guideModal = document.getElementById('modal-flowmap-guide');
+      const openGuide = (e) => {
+        if (e) e.stopPropagation();
+        if (guideModal) {
+          guideModal.style.display = 'flex';
+          guideModal.classList.add('active');
+        }
+      };
+      const closeGuide = (e) => {
+        if (e) e.stopPropagation();
+        if (guideModal) {
+          guideModal.style.display = 'none';
+          guideModal.classList.remove('active');
+        }
+      };
+
+      const btnGuide = document.getElementById('btn-flow-guide');
+      if (btnGuide) btnGuide.addEventListener('click', openGuide);
+
+      const btnLegendGuide = document.getElementById('btn-legend-open-guide');
+      if (btnLegendGuide) btnLegendGuide.addEventListener('click', openGuide);
+
+      const btnCloseGuide = document.getElementById('btn-close-flow-guide');
+      if (btnCloseGuide) btnCloseGuide.addEventListener('click', closeGuide);
+
+      const btnCloseGuideFooter = document.getElementById('btn-close-flow-guide-footer');
+      if (btnCloseGuideFooter) btnCloseGuideFooter.addEventListener('click', closeGuide);
+
+      if (guideModal) {
+        guideModal.addEventListener('click', (e) => {
+          if (e.target === guideModal) closeGuide(e);
+        });
+      }
+
+      // 📌 常設凡例フローティングミニパネルの折りたたみ / 展開
+      const legendPanel = document.getElementById('flowmap-floating-legend');
+      const btnLegendToggle = document.getElementById('btn-legend-toggle');
+      if (legendPanel && btnLegendToggle) {
+        btnLegendToggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isCollapsed = legendPanel.classList.toggle('is-collapsed');
+          btnLegendToggle.textContent = isCollapsed ? '＋' : '─';
+          btnLegendToggle.title = isCollapsed ? '凡例を展開' : '凡例を最小化';
+          try {
+            localStorage.setItem('archify_legend_collapsed', isCollapsed ? '1' : '0');
+          } catch(err){}
+        });
+
+        // クリックで折りたたみ状態から展開
+        legendPanel.addEventListener('click', (e) => {
+          if (legendPanel.classList.contains('is-collapsed')) {
+            if (e.target.closest('#btn-legend-open-guide')) return;
+            legendPanel.classList.remove('is-collapsed');
+            btnLegendToggle.textContent = '─';
+            btnLegendToggle.title = '凡例を最小化';
+            try {
+              localStorage.setItem('archify_legend_collapsed', '0');
+            } catch(err){}
+          }
+        });
+
+        // 保存された状態の復元
+        try {
+          if (localStorage.getItem('archify_legend_collapsed') === '1') {
+            legendPanel.classList.add('is-collapsed');
+            btnLegendToggle.textContent = '＋';
+            btnLegendToggle.title = '凡例を展開';
+          }
+        } catch(err){}
+      }
     }
 
     applyTransform() {
