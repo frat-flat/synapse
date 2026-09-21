@@ -11250,7 +11250,17 @@
       groups: [],
       questions: []
     };
-    const formObj = window.n || window.G;
+    const formSources = [window.n, window.G, window.F, window.L];
+    if (window.U && Array.isArray(window.U)) {
+      formSources.push(...window.U);
+    }
+    let formObj = null;
+    for (const fs of formSources) {
+      if (fs && fs.sections && Array.isArray(fs.sections) && fs.sections.length > 0) {
+        formObj = fs;
+        break;
+      }
+    }
     if (!formObj || !formObj.sections) return result;
 
     const sections = formObj.sections;
@@ -11303,11 +11313,13 @@
     }
     return result;
   }
+  window.getAvailableSourcesFor = getAvailableSourcesFor;
 
   // 後方互換用ラッパー
   function getAvailableSourceQuestionsFor(targetSecId, targetQId) {
     return getAvailableSourcesFor(targetSecId, targetQId).questions;
   }
+  window.getAvailableSourceQuestionsFor = getAvailableSourceQuestionsFor;
 
   function injectSameAsAboveEditorUI(qCard, qDef, sec) {
     if (!qCard || !qDef || !sec) return;
@@ -11649,144 +11661,17 @@
       const existingDown = qCard.querySelector('.btn-move-q-down');
       if (existingDown) existingDown.remove();
 
-      // 📋 「前述と同じ（同上）」自動入力設定UIの注入
-      injectSameAsAboveEditorUI(qCard, qDef, sec);
+      // 📋 「前述と同じ（同上）」および「プロ版限定スキップ」は詳細設定ドロワーに集約
+      // 質問カード本体からはインラインUIを排除してスッキリ固定化
+      const existingSame = qCard.querySelector('.same-as-above-editor-container');
+      if (existingSame) existingSame.remove();
+      const existingSkip = qCard.querySelector('.pro-skip-logic-container');
+      if (existingSkip) existingSkip.remove();
     });
 
-    if (editorMode !== 'pro' || !sec || !sec.questions) return;
+    // 質問カード本体のインラインUIクリーンアップ（念のため残存要素も全消去）
+    document.querySelectorAll('#questions-container .same-as-above-editor-container, #questions-container .pro-skip-logic-container').forEach(el => el.remove());
 
-    const qCards = document.querySelectorAll('#questions-container .question-card');
-    qCards.forEach(qCard => {
-      const qId = qCard.dataset.questionId;
-      const qDef = sec.questions.find(q => q.id === qId);
-      if (!qDef) return;
-
-      if (qCard.querySelector('.pro-skip-logic-container')) return;
-
-      const skipContainer = document.createElement('div');
-      skipContainer.className = 'pro-skip-logic-container';
-      skipContainer.style.cssText = 'margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--color-border); display:flex; flex-direction:column; gap:8px;';
-
-      const otherQuestions = sec.questions.filter(q => q.id !== qId);
-      let optionsHtml = '<option value="">-- スキップ分岐を設定しない --</option>';
-      otherQuestions.forEach(oq => {
-        optionsHtml += `<option value="${oq.id}">${oq.title || '無題の質問'}</option>`;
-      });
-
-      qDef.skipLogic = qDef.skipLogic || { dependsOn: "", condition: "equals", value: "", value2: "", action: "disable" };
-
-      skipContainer.innerHTML = `
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-          <span style="font-size:0.8rem; font-weight:600; color:var(--color-primary);">⚡ プロ版限定: セクション内スキップ（条件分岐）</span>
-          <span style="font-size: 0.68rem; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 600;">書式ルール対応</span>
-        </div>
-        <div class="skip-logic-row" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <select class="form-control skip-depends-select" style="flex:2; min-width:150px; font-size:0.82rem; height:34px; padding:4px 8px; box-sizing:border-box;">
-            ${optionsHtml}
-          </select>
-          <select class="form-control skip-condition-select" style="flex:2; min-width:140px; font-size:0.82rem; height:34px; padding:4px 8px; box-sizing:border-box;">
-            <optgroup label="空白">
-              <option value="is_empty">空白</option>
-              <option value="is_not_empty">空白ではない</option>
-            </optgroup>
-            <optgroup label="テキスト">
-              <option value="text_contains">次を含むテキスト</option>
-              <option value="text_not_contains">次を含まないテキスト</option>
-              <option value="text_starts_with">次で始まるテキスト</option>
-              <option value="text_ends_with">次で終わるテキスト</option>
-              <option value="text_equals">完全一致するテキスト</option>
-            </optgroup>
-            <optgroup label="日付">
-              <option value="date_is">日付</option>
-              <option value="date_before">次より前の日付</option>
-              <option value="date_after">次より後の日付</option>
-            </optgroup>
-            <optgroup label="数値 / 比較">
-              <option value="greater_than">次より大きい</option>
-              <option value="greater_than_or_equal">以上</option>
-              <option value="less_than">次より小さい</option>
-              <option value="less_than_or_equal">以下</option>
-              <option value="equals" selected>次と等しい</option>
-              <option value="not_equals">次と等しくない</option>
-              <option value="between">次の間にある</option>
-              <option value="not_between">次の間にない</option>
-            </optgroup>
-          </select>
-          <div class="skip-value-wrapper" style="flex:2; min-width:140px; display:flex; gap:6px; align-items:center;">
-            <input type="text" class="form-control skip-value-input" style="flex:1; font-size:0.82rem; height:34px; padding:4px 8px; box-sizing:border-box;" placeholder="トリガー値" />
-            <span class="skip-between-sep" style="display:none; font-size:0.8rem; color:#64748b; font-weight:600;">〜</span>
-            <input type="text" class="form-control skip-value2-input" style="display:none; flex:1; font-size:0.82rem; height:34px; padding:4px 8px; box-sizing:border-box;" placeholder="終了値" />
-          </div>
-          <select class="form-control skip-action-select" style="flex:1; min-width:110px; font-size:0.82rem; height:34px; padding:4px 8px; box-sizing:border-box;">
-            <option value="disable">非活性にする</option>
-            <option value="hide">非表示にする</option>
-          </select>
-        </div>
-      `;
-
-      const actionsRow = qCard.querySelector('.question-card-actions');
-      if (actionsRow) {
-        qCard.insertBefore(skipContainer, actionsRow);
-      }
-
-      const depSelect = skipContainer.querySelector('.skip-depends-select');
-      const condSelect = skipContainer.querySelector('.skip-condition-select');
-      const valWrapper = skipContainer.querySelector('.skip-value-wrapper');
-      const valInput = skipContainer.querySelector('.skip-value-input');
-      const sepSpan = skipContainer.querySelector('.skip-between-sep');
-      const val2Input = skipContainer.querySelector('.skip-value2-input');
-      const actSelect = skipContainer.querySelector('.skip-action-select');
-
-      depSelect.value = qDef.skipLogic.dependsOn || "";
-      condSelect.value = qDef.skipLogic.condition || "equals";
-      actSelect.value = qDef.skipLogic.action || "disable";
-      valInput.value = qDef.skipLogic.value || "";
-      val2Input.value = qDef.skipLogic.value2 || "";
-
-      const updateValueInputVisibility = () => {
-        const cond = condSelect.value;
-        if (cond === 'is_empty' || cond === 'is_not_empty') {
-          valWrapper.style.display = 'none';
-        } else {
-          valWrapper.style.display = 'flex';
-          if (cond === 'between' || cond === 'not_between') {
-            valInput.placeholder = '開始値';
-            sepSpan.style.display = 'inline';
-            val2Input.style.display = 'block';
-          } else {
-            sepSpan.style.display = 'none';
-            val2Input.style.display = 'none';
-            if (cond.startsWith('date_')) {
-              valInput.placeholder = 'YYYY-MM-DD';
-            } else if (cond === 'greater_than' || cond === 'greater_than_or_equal' || cond === 'less_than' || cond === 'less_than_or_equal') {
-              valInput.placeholder = '比較数値';
-            } else {
-              valInput.placeholder = 'トリガー値';
-            }
-          }
-        }
-      };
-      updateValueInputVisibility();
-
-      const saveLogic = () => {
-        qDef.skipLogic.dependsOn = depSelect.value;
-        qDef.skipLogic.condition = condSelect.value;
-        qDef.skipLogic.action = actSelect.value;
-        qDef.skipLogic.value = valInput.value;
-        qDef.skipLogic.value2 = val2Input.value;
-        if (window.S) window.S();
-        renderLivePreview();
-      };
-
-      depSelect.addEventListener('change', saveLogic);
-      condSelect.addEventListener('change', () => {
-        updateValueInputVisibility();
-        saveLogic();
-      });
-      actSelect.addEventListener('change', saveLogic);
-      valInput.addEventListener('input', saveLogic);
-      val2Input.addEventListener('input', saveLogic);
-    });
     injectRichTextToolbars();
   }
 
@@ -12069,6 +11954,7 @@
                 <span class="group-count-badge" title="クリックで開閉">${cluster.questions.length}問</span>
               </div>
               <div class="group-header-right">
+                <button type="button" class="group-btn btn-group-settings" title="グループの一括自動入力などの詳細設定を開く">⚙️ 詳細設定</button>
                 <button type="button" class="group-btn btn-add-q-to-group" title="このグループ内に新しい質問を追加">＋ 質問追加</button>
                 <button type="button" class="group-btn btn-ungroup" title="グループを解除して個別の質問に戻す">グループ解除</button>
                 <button type="button" class="group-btn group-btn-danger btn-delete-group" title="グループと配下の質問を削除">削除</button>
@@ -12081,7 +11967,7 @@
                 <span class="group-desc-text">${gDesc ? (typeof renderRichTextWithLinks === 'function' ? renderRichTextWithLinks(gDesc) : escapeHtml(gDesc)) : '＋ グループの説明文を追加（任意）'}</span>
               </div>
             </div>
-            <div class="group-same-as-above-bar" style="display: none;">
+            <div class="group-same-as-above-bar" style="display: none !important;">
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                 <label class="group-same-as-above-toggle-label">
                   <input type="checkbox" class="group-same-as-above-toggle" />
@@ -12258,7 +12144,7 @@
           }
 
           if (priorGroups.length > 0) {
-            sameBar.style.display = 'block';
+            sameBar.style.display = 'none'; // 詳細設定に組み込むため常時表示はせず非表示固定
             const sameToggle = sameBar.querySelector('.group-same-as-above-toggle');
             const sameDetails = sameBar.querySelector('.group-same-as-above-details');
             const sameSelect = sameBar.querySelector('.group-same-as-above-source-select');
@@ -12340,6 +12226,25 @@
               });
               if (window.S) window.S(true);
               if (window.renderLivePreview) window.renderLivePreview();
+            });
+          }
+
+          // 2-0. グループ詳細設定ボタン
+          const grpSettingsBtn = grpEl.querySelector('.btn-group-settings');
+          if (grpSettingsBtn) {
+            grpSettingsBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const firstQ = cluster.questions[0]?.q;
+              if (firstQ) {
+                openQuestionSettingsDrawer(firstQ.id);
+                setTimeout(() => {
+                  const grpSec = document.getElementById('drawer-groupsame-section');
+                  if (grpSec) grpSec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 150);
+              } else {
+                if (window.showSectionToast) window.showSectionToast('グループ内に質問がありません');
+              }
             });
           }
 
@@ -18858,6 +18763,27 @@
   let _activeDrawerQuestionId = null;
   let _currentAiAdvice = null;
 
+  function getDrawerFormSections() {
+    const formSources = [window.n, window.G, window.F, window.L];
+    if (window.U && Array.isArray(window.U)) formSources.push(...window.U);
+    for (const fs of formSources) {
+      if (fs && fs.sections && Array.isArray(fs.sections) && fs.sections.length > 0) {
+        return fs.sections;
+      }
+    }
+    return [];
+  }
+
+  function getDrawerAvailableSources(secId, qId, grpId) {
+    if (typeof getAvailableSourcesFor === 'function') {
+      return getAvailableSourcesFor(secId, qId, grpId);
+    }
+    if (typeof window.getAvailableSourcesFor === 'function') {
+      return window.getAvailableSourcesFor(secId, qId, grpId);
+    }
+    return { groups: [], questions: [] };
+  }
+
   // バリデーションの短縮ラベル取得
   function getValidationShortLabel(v) {
     if (!v) return '';
@@ -18934,7 +18860,9 @@
         q.validation ? `${q.validation.category}:${q.validation.condition}:${q.validation.presetKey || ''}` : '',
         q.autoReply ? 'autoreply' : '',
         (q.media && q.media.url) ? 'media' : '',
-        q.scrollRequired ? 'scroll' : ''
+        q.scrollRequired ? 'scroll' : '',
+        (q.sameAsAbove && q.sameAsAbove.enabled) ? `same:${q.sameAsAbove.sourceQuestionId || ''}` : '',
+        (q.skipLogic && q.skipLogic.dependsOn) ? `skip:${q.skipLogic.dependsOn}:${q.skipLogic.condition || ''}` : ''
       ].join('|');
 
       if (badgesWrap.dataset.lastSignature !== badgeSignature) {
@@ -18997,16 +18925,29 @@
           badgesWrap.appendChild(b);
           badgeCount++;
         }
-
-        // 未設定時
-        if (badgeCount === 0) {
+        // ⑥ 📋 「前述と同じ（同上）」自動入力バッジ
+        if (q.sameAsAbove && q.sameAsAbove.enabled) {
           const b = document.createElement('span');
-          b.className = 'q-setting-badge badge-unset';
-          b.innerHTML = `⚙️ 詳細設定を開く`;
-          b.title = '入力規則やカラム統一などを設定します';
+          b.className = 'q-setting-badge badge-sameasabove';
+          b.innerHTML = q.sameAsAbove.sourceType === 'group' ? `📁 グループ同上連動` : `📋 同上入力`;
+          b.title = '前述の入力値から自動補完されます（クリックで詳細設定）';
           b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
           badgesWrap.appendChild(b);
+          badgeCount++;
         }
+
+        // ⑦ ⚡ セクション内スキップ（条件分岐）バッジ
+        if (q.skipLogic && q.skipLogic.dependsOn) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-skiplogic';
+          b.innerHTML = `⚡ スキップ分岐`;
+          b.title = '条件分岐ルールが設定されています（クリックで詳細設定）';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+          badgeCount++;
+        }
+
+        // 未設定時はボタンの重複を避けるため何も表示しない（詳細設定はアクション行の「⚙️ 詳細設定」ボタンに一本化）
       }
 
       // 4. アクション行に「⚙️ 詳細設定」ボタンを注入
@@ -19457,6 +19398,128 @@
             <textarea id="drawer-scroll-text" class="form-control form-control-sm" rows="3" placeholder="【利用規約】ここに規約本文を入力してください..."></textarea>
           </div>
         </div>
+
+        <!-- 7. 📋 「前述と同じ（同上）」自動入力設定 -->
+        <div class="drawer-section" id="drawer-sameasabove-section">
+          <div class="drawer-section-title">📋 「前述と同じ（同上）」自動入力設定</div>
+          <div class="drawer-section-desc">
+            回答者がチェックを入れると、前述の入力内容（またはグループ内の全項目）が自動で入力欄に流し込まれます。
+          </div>
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-sameasabove-toggle" />
+            <span>「前述と同じ（同上）」自動入力を有効にする</span>
+          </label>
+          <div id="drawer-sameasabove-fields" style="display: none; margin-top: 10px;">
+            <div style="display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 180px;">
+                <label class="drawer-field-label">コピー元の質問またはグループ</label>
+                <select id="drawer-sameasabove-source-select" class="form-control form-control-sm"></select>
+              </div>
+              <div style="flex: 1; min-width: 180px;">
+                <label class="drawer-field-label">表示チェックボックスの文言</label>
+                <input type="text" id="drawer-sameasabove-label-input" class="form-control form-control-sm" placeholder="例: 本社住所と同じ" />
+              </div>
+            </div>
+            <div class="drawer-help-text" style="margin-top: 6px;">
+              💡 回答者がチェックを入れると、前述の回答値が自動で入力欄に流し込まれます。
+            </div>
+          </div>
+        </div>
+
+        <!-- 8. ⚡ プロ版限定: セクション内スキップ（条件分岐） -->
+        <div class="drawer-section" id="drawer-skiplogic-section">
+          <div class="drawer-section-title">⚡ プロ版限定: セクション内スキップ（条件分岐）</div>
+          <div class="drawer-section-desc">
+            同一セクション内の他の質問の回答条件に応じて、この質問を非活性（入力不可）または非表示にするルールを設定できます。
+          </div>
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-skiplogic-toggle" />
+            <span>セクション内スキップ（条件分岐）を有効にする</span>
+          </label>
+          <div id="drawer-skiplogic-fields" style="display: none; margin-top: 10px;">
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div>
+                <label class="drawer-field-label">対象となるトリガー質問</label>
+                <select id="drawer-skiplogic-depends-select" class="form-control form-control-sm"></select>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <div style="flex: 2; min-width: 140px;">
+                  <label class="drawer-field-label">分岐判定条件</label>
+                  <select id="drawer-skiplogic-condition-select" class="form-control form-control-sm">
+                    <optgroup label="空白">
+                      <option value="is_empty">空白</option>
+                      <option value="is_not_empty">空白ではない</option>
+                    </optgroup>
+                    <optgroup label="テキスト">
+                      <option value="text_contains">次を含むテキスト</option>
+                      <option value="text_not_contains">次を含まないテキスト</option>
+                      <option value="text_starts_with">次で始まるテキスト</option>
+                      <option value="text_ends_with">次で終わるテキスト</option>
+                      <option value="text_equals">完全一致するテキスト</option>
+                    </optgroup>
+                    <optgroup label="日付">
+                      <option value="date_is">日付</option>
+                      <option value="date_before">次より前の日付</option>
+                      <option value="date_after">次より後の日付</option>
+                    </optgroup>
+                    <optgroup label="数値 / 比較">
+                      <option value="greater_than">次より大きい</option>
+                      <option value="greater_than_or_equal">以上</option>
+                      <option value="less_than">次より小さい</option>
+                      <option value="less_than_or_equal">以下</option>
+                      <option value="equals" selected>次と等しい</option>
+                      <option value="not_equals">次と等しくない</option>
+                      <option value="between">次の間にある</option>
+                      <option value="not_between">次の間にない</option>
+                    </optgroup>
+                  </select>
+                </div>
+                <div style="flex: 2; min-width: 140px;" id="drawer-skiplogic-val-wrapper">
+                  <label class="drawer-field-label">トリガー値</label>
+                  <div style="display: flex; gap: 4px; align-items: center;">
+                    <input type="text" id="drawer-skiplogic-value-input" class="form-control form-control-sm" placeholder="トリガー値" />
+                    <span id="drawer-skiplogic-between-sep" style="display: none; font-size: 0.8rem; color: #64748b;">〜</span>
+                    <input type="text" id="drawer-skiplogic-value2-input" class="form-control form-control-sm" style="display: none;" placeholder="終了値" />
+                  </div>
+                </div>
+                <div style="flex: 1; min-width: 110px;">
+                  <label class="drawer-field-label">動作</label>
+                  <select id="drawer-skiplogic-action-select" class="form-control form-control-sm">
+                    <option value="disable">非活性にする</option>
+                    <option value="hide">非表示にする</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 9. 📁 所属グループの一括自動入力設定 -->
+        <div class="drawer-section" id="drawer-groupsame-section" style="display: none;">
+          <div class="drawer-section-title">📁 所属グループの一括自動入力設定</div>
+          <div class="drawer-section-desc">
+            この質問が所属するグループ全体について、前述の別グループの内容を一括自動入力させることができます。
+          </div>
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-groupsame-toggle" />
+            <span>前述のグループと同じ内容を一括自動入力する</span>
+          </label>
+          <div id="drawer-groupsame-fields" style="display: none; margin-top: 10px;">
+            <div style="display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 180px;">
+                <label class="drawer-field-label">コピー元のグループ</label>
+                <select id="drawer-groupsame-source-select" class="form-control form-control-sm"></select>
+              </div>
+              <div style="flex: 1; min-width: 180px;">
+                <label class="drawer-field-label">表示チェックボックスの文言</label>
+                <input type="text" id="drawer-groupsame-label-input" class="form-control form-control-sm" placeholder="例: 本社情報と同じ" />
+              </div>
+            </div>
+            <div class="drawer-help-text" style="margin-top: 6px;">
+              💡 このグループ内のすべての該当質問に一括自動入力が適用されます。
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="drawer-footer">
@@ -19813,6 +19876,195 @@
     chatInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') handleSendChat();
     });
+
+    // 📋 同上入力イベント
+    const sameToggle = drawer.querySelector('#drawer-sameasabove-toggle');
+    const sameFields = drawer.querySelector('#drawer-sameasabove-fields');
+    const sameSourceSelect = drawer.querySelector('#drawer-sameasabove-source-select');
+    const sameLabelInput = drawer.querySelector('#drawer-sameasabove-label-input');
+
+    sameToggle.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      if (!q.sameAsAbove) q.sameAsAbove = {};
+      q.sameAsAbove.enabled = sameToggle.checked;
+      sameFields.style.display = sameToggle.checked ? 'block' : 'none';
+
+      if (sameToggle.checked) {
+        const curSec = findSectionByQuestionId(q.id);
+        const sources = curSec ? getDrawerAvailableSources(curSec.id, q.id, q.groupId) : { groups: [], questions: [] };
+        const allOpts = [...sources.groups.map(g => ({ id: g.id, title: g.title, isGroup: true })), ...sources.questions.map(x => ({ id: x.id, title: x.title, isGroup: false }))];
+        if (!q.sameAsAbove.sourceQuestionId || !allOpts.some(s => s.id === q.sameAsAbove.sourceQuestionId)) {
+          q.sameAsAbove.sourceQuestionId = sameSourceSelect.value || (allOpts[0] ? allOpts[0].id : '');
+        }
+        sameSourceSelect.value = q.sameAsAbove.sourceQuestionId;
+
+        const isGrp = q.sameAsAbove.sourceQuestionId && q.sameAsAbove.sourceQuestionId.startsWith('group:');
+        q.sameAsAbove.sourceType = isGrp ? 'group' : 'question';
+        if (isGrp) q.sameAsAbove.sourceGroupId = q.sameAsAbove.sourceQuestionId.replace('group:', '');
+        else delete q.sameAsAbove.sourceGroupId;
+
+        if (!q.sameAsAbove.label || !q.sameAsAbove.label.trim()) {
+          const chosen = allOpts.find(s => s.id === q.sameAsAbove.sourceQuestionId);
+          const defLbl = chosen ? `${chosen.title}と同じ` : '前述の入力と同じ';
+          q.sameAsAbove.label = defLbl;
+          sameLabelInput.value = defLbl;
+        }
+      }
+      persistDrawerChanges();
+    });
+
+    sameSourceSelect.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.sameAsAbove) return;
+      const sId = sameSourceSelect.value;
+      q.sameAsAbove.sourceQuestionId = sId;
+      const isGrp = sId && sId.startsWith('group:');
+      q.sameAsAbove.sourceType = isGrp ? 'group' : 'question';
+      if (isGrp) q.sameAsAbove.sourceGroupId = sId.replace('group:', '');
+      else delete q.sameAsAbove.sourceGroupId;
+
+      const curSec = findSectionByQuestionId(q.id);
+      const sources = curSec ? getDrawerAvailableSources(curSec.id, q.id, q.groupId) : { groups: [], questions: [] };
+      const allOpts = [...sources.groups.map(g => ({ id: g.id, title: g.title })), ...sources.questions.map(x => ({ id: x.id, title: x.title }))];
+      const chosen = allOpts.find(s => s.id === sId);
+      const newLbl = chosen ? `${chosen.title}と同じ` : '前述の入力と同じ';
+      q.sameAsAbove.label = newLbl;
+      sameLabelInput.value = newLbl;
+      persistDrawerChanges();
+    });
+
+    sameLabelInput.addEventListener('input', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.sameAsAbove) return;
+      q.sameAsAbove.label = sameLabelInput.value;
+      persistDrawerChanges();
+    });
+
+    // ⚡ スキップ分岐イベント
+    const skipToggle = drawer.querySelector('#drawer-skiplogic-toggle');
+    const skipFields = drawer.querySelector('#drawer-skiplogic-fields');
+    const skipDependsSelect = drawer.querySelector('#drawer-skiplogic-depends-select');
+    const skipConditionSelect = drawer.querySelector('#drawer-skiplogic-condition-select');
+    const skipValInput = drawer.querySelector('#drawer-skiplogic-value-input');
+    const skipVal2Input = drawer.querySelector('#drawer-skiplogic-value2-input');
+    const skipActionSelect = drawer.querySelector('#drawer-skiplogic-action-select');
+
+    const saveDrawerSkipLogic = () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      if (!q.skipLogic) q.skipLogic = {};
+      if (skipToggle.checked) {
+        q.skipLogic.dependsOn = skipDependsSelect.value;
+        q.skipLogic.condition = skipConditionSelect.value;
+        q.skipLogic.action = skipActionSelect.value;
+        q.skipLogic.value = skipValInput.value;
+        q.skipLogic.value2 = skipVal2Input.value;
+      } else {
+        delete q.skipLogic.dependsOn;
+      }
+      persistDrawerChanges();
+    };
+
+    skipToggle.addEventListener('change', () => {
+      skipFields.style.display = skipToggle.checked ? 'block' : 'none';
+      saveDrawerSkipLogic();
+    });
+    skipDependsSelect.addEventListener('change', saveDrawerSkipLogic);
+    skipConditionSelect.addEventListener('change', () => {
+      syncDrawerSkipVisibility();
+      saveDrawerSkipLogic();
+    });
+    skipActionSelect.addEventListener('change', saveDrawerSkipLogic);
+    skipValInput.addEventListener('input', saveDrawerSkipLogic);
+    skipVal2Input.addEventListener('input', saveDrawerSkipLogic);
+
+    // 📁 所属グループ同上イベント
+    const grpSameToggle = drawer.querySelector('#drawer-groupsame-toggle');
+    const grpSameFields = drawer.querySelector('#drawer-groupsame-fields');
+    const grpSameSelect = drawer.querySelector('#drawer-groupsame-source-select');
+    const grpSameInput = drawer.querySelector('#drawer-groupsame-label-input');
+
+    const saveGroupSame = () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.groupId) return;
+      const curSec = findSectionByQuestionId(q.id);
+      if (!curSec || !curSec.questions) return;
+
+      const checked = grpSameToggle.checked;
+      grpSameFields.style.display = checked ? 'block' : 'none';
+      const targetGId = grpSameSelect.value;
+      const lbl = grpSameInput.value.trim() || '前述のグループと同じ';
+
+      curSec.questions.forEach(item => {
+        if (item.groupId === q.groupId) {
+          if (!item.sameAsAbove) item.sameAsAbove = {};
+          item.sameAsAbove.enabled = checked;
+          if (checked) {
+            item.sameAsAbove.sourceType = 'group';
+            item.sameAsAbove.sourceGroupId = targetGId;
+            item.sameAsAbove.sourceQuestionId = 'group:' + targetGId;
+            item.sameAsAbove.label = lbl;
+          }
+        }
+      });
+      persistDrawerChanges();
+    };
+
+    grpSameToggle.addEventListener('change', saveGroupSame);
+    grpSameSelect.addEventListener('change', saveGroupSame);
+    grpSameInput.addEventListener('input', saveGroupSame);
+  }
+
+  function findSectionByQuestionId(questionId) {
+    if (!questionId) return null;
+    const formSources = [window.n, window.G, window.F, window.L];
+    if (window.U && Array.isArray(window.U)) {
+      formSources.push(...window.U);
+    }
+    for (const formSrc of formSources) {
+      if (formSrc && formSrc.sections && Array.isArray(formSrc.sections)) {
+        for (const sec of formSrc.sections) {
+          if (!sec || !sec.questions) continue;
+          if (sec.questions.some(q => q && q.id === questionId)) {
+            return sec;
+          }
+        }
+      }
+    }
+    return null;
+  }
+  window.findSectionByQuestionId = findSectionByQuestionId;
+
+  function syncDrawerSkipVisibility() {
+    const condSelect = document.getElementById('drawer-skiplogic-condition-select');
+    const valWrapper = document.getElementById('drawer-skiplogic-val-wrapper');
+    const valInput = document.getElementById('drawer-skiplogic-value-input');
+    const sepSpan = document.getElementById('drawer-skiplogic-between-sep');
+    const val2Input = document.getElementById('drawer-skiplogic-value2-input');
+    if (!condSelect || !valWrapper || !valInput) return;
+
+    const cond = condSelect.value;
+    if (cond === 'is_empty' || cond === 'is_not_empty') {
+      valWrapper.style.display = 'none';
+    } else {
+      valWrapper.style.display = 'block';
+      if (cond === 'between' || cond === 'not_between') {
+        valInput.placeholder = '開始値';
+        if (sepSpan) sepSpan.style.display = 'inline';
+        if (val2Input) val2Input.style.display = 'block';
+      } else {
+        if (sepSpan) sepSpan.style.display = 'none';
+        if (val2Input) val2Input.style.display = 'none';
+        if (cond.startsWith('date_')) {
+          valInput.placeholder = 'YYYY-MM-DD';
+        } else if (cond === 'greater_than' || cond === 'greater_than_or_equal' || cond === 'less_than' || cond === 'less_than_or_equal') {
+          valInput.placeholder = '比較数値';
+        } else {
+          valInput.placeholder = 'トリガー値';
+        }
+      }
+    }
   }
 
   function syncColumnSelectWithKey(key) {
@@ -20072,6 +20324,146 @@
     scrollToggle.checked = !!q.scrollRequired;
     scrollFields.style.display = q.scrollRequired ? 'block' : 'none';
     scrollText.value = q.scrollText || '';
+
+    // 7. 📋 「前述と同じ（同上）」自動入力の同期
+    const sameSection = document.getElementById('drawer-sameasabove-section');
+    const sameToggle = document.getElementById('drawer-sameasabove-toggle');
+    const sameFields = document.getElementById('drawer-sameasabove-fields');
+    const sameSourceSelect = document.getElementById('drawer-sameasabove-source-select');
+    const sameLabelInput = document.getElementById('drawer-sameasabove-label-input');
+
+    const curSec = findSectionByQuestionId(q.id);
+    const sources = curSec ? getDrawerAvailableSources(curSec.id, q.id, q.groupId) : { groups: [], questions: [] };
+    const allAvailableCount = sources.groups.length + sources.questions.length;
+
+    if (sameSection) {
+      if (allAvailableCount > 0) {
+        sameSection.style.display = 'block';
+        let optHtml = '';
+        if (sources.groups.length > 0) {
+          optHtml += '<optgroup label="先行グループ">';
+          sources.groups.forEach(g => {
+            optHtml += `<option value="group:${escapeHtml(g.id)}">${escapeHtml(g.title)}（グループ内全項目）</option>`;
+          });
+          optHtml += '</optgroup>';
+        }
+        if (sources.questions.length > 0) {
+          optHtml += '<optgroup label="先行質問">';
+          sources.questions.forEach(oq => {
+            optHtml += `<option value="${escapeHtml(oq.id)}">${escapeHtml(oq.title || '無題')}</option>`;
+          });
+          optHtml += '</optgroup>';
+        }
+        sameSourceSelect.innerHTML = optHtml;
+
+        const isSameActive = !!(q.sameAsAbove && q.sameAsAbove.enabled);
+        sameToggle.checked = isSameActive;
+        sameFields.style.display = isSameActive ? 'block' : 'none';
+        if (q.sameAsAbove && q.sameAsAbove.sourceQuestionId) {
+          sameSourceSelect.value = q.sameAsAbove.sourceQuestionId;
+        }
+        sameLabelInput.value = (q.sameAsAbove && q.sameAsAbove.label) || '';
+      } else {
+        sameSection.style.display = 'none';
+      }
+    }
+
+    // 8. ⚡ プロ版限定: セクション内スキップ（条件分岐）の同期
+    const skipSection = document.getElementById('drawer-skiplogic-section');
+    const skipToggle = document.getElementById('drawer-skiplogic-toggle');
+    const skipFields = document.getElementById('drawer-skiplogic-fields');
+    const skipDependsSelect = document.getElementById('drawer-skiplogic-depends-select');
+    const skipConditionSelect = document.getElementById('drawer-skiplogic-condition-select');
+    const skipValInput = document.getElementById('drawer-skiplogic-value-input');
+    const skipVal2Input = document.getElementById('drawer-skiplogic-value2-input');
+    const skipActionSelect = document.getElementById('drawer-skiplogic-action-select');
+
+    const otherQuestions = curSec ? curSec.questions.filter(x => x.id !== q.id) : [];
+    if (skipSection) {
+      if (otherQuestions.length > 0) {
+        skipSection.style.display = 'block';
+        let optHtml = '<option value="">-- スキップ分岐を設定しない --</option>';
+        otherQuestions.forEach(oq => {
+          optHtml += `<option value="${escapeHtml(oq.id)}">${escapeHtml(oq.title || '無題の質問')}</option>`;
+        });
+        skipDependsSelect.innerHTML = optHtml;
+
+        const hasSkip = !!(q.skipLogic && q.skipLogic.dependsOn);
+        skipToggle.checked = hasSkip;
+        skipFields.style.display = hasSkip ? 'block' : 'none';
+        if (hasSkip) {
+          skipDependsSelect.value = q.skipLogic.dependsOn || '';
+          skipConditionSelect.value = q.skipLogic.condition || 'equals';
+          skipActionSelect.value = q.skipLogic.action || 'disable';
+          skipValInput.value = q.skipLogic.value || '';
+          skipVal2Input.value = q.skipLogic.value2 || '';
+        } else {
+          skipDependsSelect.value = '';
+          skipConditionSelect.value = 'equals';
+          skipActionSelect.value = 'disable';
+          skipValInput.value = '';
+          skipVal2Input.value = '';
+        }
+        syncDrawerSkipVisibility();
+      } else {
+        skipSection.style.display = 'none';
+      }
+    }
+
+    // 9. 📁 所属グループの一括自動入力設定の同期
+    const grpSameSection = document.getElementById('drawer-groupsame-section');
+    const grpSameToggle = document.getElementById('drawer-groupsame-toggle');
+    const grpSameFields = document.getElementById('drawer-groupsame-fields');
+    const grpSameSelect = document.getElementById('drawer-groupsame-source-select');
+    const grpSameInput = document.getElementById('drawer-groupsame-label-input');
+
+    if (grpSameSection) {
+      if (q.groupId && curSec) {
+        const sections = getDrawerFormSections();
+        const curSecIdx = sections.findIndex(s => s.id === curSec.id);
+        const priorGroups = [];
+        const seenPriorGIds = new Set([q.groupId]);
+
+        for (let sIdx = 0; sIdx <= curSecIdx; sIdx++) {
+          const sItem = sections[sIdx];
+          if (!sItem || !sItem.questions) continue;
+          for (let qIdx = 0; qIdx < sItem.questions.length; qIdx++) {
+            const qItem = sItem.questions[qIdx];
+            if (sIdx === curSecIdx && qItem.groupId === q.groupId) break;
+            if (qItem.groupId && qItem.groupTitle && !seenPriorGIds.has(qItem.groupId)) {
+              seenPriorGIds.add(qItem.groupId);
+              priorGroups.push({
+                groupId: qItem.groupId,
+                title: qItem.groupTitle,
+                sectionTitle: sItem.title || `セクション ${sIdx + 1}`
+              });
+            }
+          }
+          if (sIdx === curSecIdx) break;
+        }
+
+        if (priorGroups.length > 0) {
+          grpSameSection.style.display = 'block';
+          let optHtml = '';
+          priorGroups.forEach(pg => {
+            optHtml += `<option value="${escapeHtml(pg.groupId)}">[${escapeHtml(pg.sectionTitle)}] ${escapeHtml(pg.title)}</option>`;
+          });
+          grpSameSelect.innerHTML = optHtml;
+
+          const isGroupSameActive = !!(q.sameAsAbove && q.sameAsAbove.enabled && q.sameAsAbove.sourceType === 'group');
+          grpSameToggle.checked = isGroupSameActive;
+          grpSameFields.style.display = isGroupSameActive ? 'block' : 'none';
+          if (isGroupSameActive && q.sameAsAbove.sourceGroupId) {
+            grpSameSelect.value = q.sameAsAbove.sourceGroupId;
+          }
+          grpSameInput.value = (q.sameAsAbove && q.sameAsAbove.label) || '';
+        } else {
+          grpSameSection.style.display = 'none';
+        }
+      } else {
+        grpSameSection.style.display = 'none';
+      }
+    }
 
     // 表示アニメーション
     drawer.classList.add('is-open');

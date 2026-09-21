@@ -6965,3 +6965,54 @@ html, body {
 .btn-move-q-down {
   display: none !important;
 }
+
+/* ==========================================================================
+   詳細設定への集約＆カード本体の超軽量固定スタイル
+   - 未設定バッジ（⚙️ 詳細設定を開く）の非表示（フッターの「⚙️ 詳細設定」に一本化）
+   - カード本体内の同上入力、スキップ分岐、グループ同上バーの非表示（ドロワーで設定）
+   - バッジ（同上入力、スキップ分岐）のスタイル定義
+   ========================================================================== */
+
+#questions-container .q-setting-badge.badge-unset {
+  display: none !important;
+}
+
+#questions-container .same-as-above-editor-container,
+#questions-container .pro-skip-logic-container,
+#questions-container .group-same-as-above-bar {
+  display: none !important;
+}
+
+.q-setting-badge.badge-sameasabove {
+  background: rgba(14, 165, 233, 0.1) !important;
+  color: #0284c7 !important;
+  border: 1px solid rgba(14, 165, 233, 0.3) !important;
+}
+
+.q-setting-badge.badge-skiplogic {
+  background: rgba(168, 85, 247, 0.1) !important;
+  color: #9333ea !important;
+  border: 1px solid rgba(168, 85, 247, 0.3) !important;
+}
+
+.group-btn.btn-group-settings {
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  background: #f8fafc;
+  color: #0284c7;
+  border: 1px solid #bae6fd;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.group-btn.btn-group-settings:hover {
+  background: #e0f2fe;
+  color: #0369a1;
+  border-color: #7dd3fc;
+}
+
