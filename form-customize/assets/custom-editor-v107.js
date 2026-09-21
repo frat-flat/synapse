@@ -16672,19 +16672,45 @@
 
     sections.forEach((sec) => {
       (sec.questions || []).forEach(q => {
-        const colName = q.title || q.dataKey || q.id;
+        const colId = q.dataKey || `col_${q.id}`;
+        const colName = (q.title || q.dataKey || q.id || '').trim();
         let colType = 'text';
         if (q.type === 'date') colType = 'date';
         else if (q.type === 'select' || q.type === 'radio') colType = 'select';
         else if (q.type === 'number') colType = 'number';
 
+        // 🔍 同一のキー（dataKey/id）を持つカラムが既に存在するかチェック
+        const existingCol = columns.find(c => c.id === colId);
+        if (existingCol) {
+          // 同一キーの設問が存在する場合：別カラムを作らず1つのカラムに統合
+          // ラベルが異なる場合（例: 法人名 と 屋号）はスラッシュで繋いで「法人名 / 屋号」にする
+          if (colName && !existingCol.label.includes(colName)) {
+            existingCol.label = `${existingCol.label} / ${colName}`;
+            existingCol.name = existingCol.label;
+          }
+          if (q.required) existingCol.required = true;
+          // choices のマージ
+          if (Array.isArray(q.options) && q.options.length > 0) {
+            if (!existingCol.choices) existingCol.choices = [];
+            const existingVals = new Set(existingCol.choices.map(c => typeof c === 'object' ? (c.label || c.value) : c));
+            q.options.forEach(opt => {
+              const val = typeof opt === 'object' ? (opt.label || opt.value) : opt;
+              if (val && !existingVals.has(val)) {
+                existingCol.choices.push({ value: val });
+                existingVals.add(val);
+              }
+            });
+          }
+          return; // 重複追加を防止
+        }
+
         columns.push({
-          id: q.dataKey || `col_${q.id}`,
+          id: colId,
           label: colName,
           name: colName,
           type: colType,
           required: q.required || false,
-          choices: q.options ? q.options.map(opt => ({ value: opt })) : undefined
+          choices: q.options ? q.options.map(opt => ({ value: (typeof opt === 'object' ? (opt.label || opt.value) : opt) })) : undefined
         });
       });
     });
@@ -16817,8 +16843,18 @@
       const colId = q.dataKey || `col_${q.id}`;
       const colName = (q.title || q.dataKey || q.id || '').trim();
 
-      const hasId = existingColIds.has(colId) || existingColIds.has(q.id) || existingColIds.has(q.dataKey);
+      const hasId = existingColIds.has(colId) || (q.id && existingColIds.has(q.id)) || (q.dataKey && existingColIds.has(q.dataKey));
       const hasLabel = colName && existingColLabels.has(colName);
+
+      if (hasId) {
+        // 既存カラムが存在する場合はラベル統合（例: 法人名 と 屋号 を統一）
+        const targetCol = cols.find(c => c && (c.id === colId || c.id === q.id || c.id === q.dataKey));
+        if (targetCol && colName && !targetCol.label.includes(colName)) {
+          targetCol.label = `${targetCol.label} / ${colName}`;
+          targetCol.name = targetCol.label;
+        }
+        return;
+      }
 
       if (!hasId && !hasLabel) {
         let colType = 'text';
@@ -16846,6 +16882,8 @@
         };
         newColumnsToAdd.push(newCol);
         existingColIds.add(colId);
+        if (q.id) existingColIds.add(q.id);
+        if (q.dataKey) existingColIds.add(q.dataKey);
         if (colName) existingColLabels.add(colName);
       }
     });

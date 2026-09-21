@@ -330,17 +330,20 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
 -- 11. フォーム「ヨサンダス 紹介代理店申込フォーム」専用物理テーブル
+-- （同一キー統一済み: 法人名/屋号、カナ、代表者名、住所、電話、インボイス等）
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.form_yosandas (
   id TEXT PRIMARY KEY,
   master_id TEXT,
   form_title TEXT DEFAULT 'ヨサンダス 紹介代理店申込フォーム',
-  company_name TEXT,                    -- 会社名
-  representative_name TEXT,             -- 代表者名
-  contact_name TEXT,                    -- 担当者名
   email TEXT,                           -- メールアドレス
-  postal_code TEXT,                     -- 郵便番号
-  prefecture TEXT,                      -- 都道府県
+  business_type TEXT,                   -- 事業者区分
+  company_name TEXT,                    -- 法人名 / 屋号
+  company_kana TEXT,                    -- 法人名（カナ） / 屋号（カナ）
+  representative_name TEXT,             -- 代表者名
+  representative_kana TEXT,             -- 代表者名（カナ）
+  zip_code TEXT,                        -- 郵便番号
+  pref TEXT,                            -- 都道府県
   city TEXT,                            -- 市区町村
   street TEXT,                          -- 町名・番地
   building TEXT,                        -- 建物名・部屋番号
