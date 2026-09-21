@@ -7050,12 +7050,13 @@
               try {
                 const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
                 const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
-                let pTableName = (effectiveFormTitle.includes('ヨサンダス') && (effectiveFormTitle.includes('紹介代理店') || effectiveFormTitle.includes('代理店')))
-                  ? 'form_yosandas_agency_application'
-                  : (() => {
-                      const rawSlug = (formDefinition.id || formDefinition.title || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
-                      return rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
-                    })();
+                let pTableName = formDefinition.physicalTableName
+                  || ((effectiveFormTitle.includes('ヨサンダス') && (effectiveFormTitle.includes('紹介代理店') || effectiveFormTitle.includes('代理店')))
+                    ? 'form_yosandas_agency_application'
+                    : (() => {
+                        const rawSlug = (formDefinition.id || formDefinition.title || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+                        return rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
+                      })());
                 
                 const physRow = {
                   id: rowId,

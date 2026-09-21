@@ -16748,6 +16748,7 @@
       id: newTableId,
       name: formTitle,
       formTitle: formTitle,
+      physicalTableName: pTableName,
       isFormDedicatedTable: true,
       parentMenuId: 'root',
       columns: columns,
@@ -16832,6 +16833,7 @@
     formDef.createDedicatedTable = true;
     formDef.targetTableId = newTableId;
     formDef.targetTableType = 'dedicated';
+    formDef.physicalTableName = pTableName;
 
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({ type: 'SYNAPSE_TABLE_CREATED', table: newTable }, '*');
@@ -17234,6 +17236,13 @@
           formObj.createDedicatedTable = true;
           formObj.targetTableId = dedicatedTable.id;
           formObj.targetTableType = 'dedicated';
+          formObj.physicalTableName = dedicatedTable.physicalTableName || getPhysicalTableNameForForm(formObj);
+
+          // フォームタイトル（サブタイトル含む）が変更されていた場合はテーブル表示名も同期更新
+          if (dedicatedTable.name !== formTitle) {
+            dedicatedTable.name = formTitle;
+            dedicatedTable.formTitle = formTitle;
+          }
 
           const res = await updateDedicatedTableColumns(dedicatedTable, formObj);
           if (res && res.updated) {
