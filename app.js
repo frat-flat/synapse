@@ -5887,11 +5887,78 @@ function attachSidebarItemActions(el, itemId, itemName, itemType, depth = 1, par
   el.appendChild(reorderContainer);
 }
 
+// 🔒 サイドバー並び替えロック管理
+if (typeof state.isSidebarReorderUnlocked === 'undefined') {
+  state.isSidebarReorderUnlocked = false; // デフォルトはロック状態（誤操作防止）
+}
+
+function updateSidebarReorderLockUI() {
+  const isUnlocked = !!state.isSidebarReorderUnlocked;
+  const sidebarEl = document.getElementById('app-sidebar');
+  const lockBtn = document.getElementById('sidebar-reorder-lock-btn');
+  const lockIcon = document.getElementById('sidebar-reorder-lock-icon');
+  const lockText = document.getElementById('sidebar-reorder-lock-text');
+
+  if (sidebarEl) {
+    sidebarEl.classList.toggle('sidebar-reorder-unlocked', isUnlocked);
+  }
+
+  if (lockBtn) {
+    lockBtn.classList.toggle('is-unlocked', isUnlocked);
+    lockBtn.title = isUnlocked ? '並び替えを完了してロックする' : 'メニューの並び替えロック（クリックで解除）';
+    if (lockIcon) lockIcon.textContent = isUnlocked ? '🔓' : '🔒';
+    if (lockText) lockText.textContent = isUnlocked ? '並び替え中 (完了)' : '並び替えロック中';
+  }
+
+  // 各メニュー項目の draggable 属性をロック状態に同期
+  if (sidebarEl) {
+    sidebarEl.querySelectorAll('.accordion-header, .nav-item').forEach(el => {
+      el.setAttribute('draggable', isUnlocked ? 'true' : 'false');
+    });
+  }
+}
+
+function toggleSidebarReorderLock() {
+  state.isSidebarReorderUnlocked = !state.isSidebarReorderUnlocked;
+  updateSidebarReorderLockUI();
+
+  if (typeof showToast === 'function') {
+    if (state.isSidebarReorderUnlocked) {
+      showToast('並び替えロックを解除しました。ドラッグまたは▲▼で順序を変更できます。', 'info');
+    } else {
+      showToast('並び替えを完了し、ロックしました。', 'success');
+    }
+  }
+}
+
+function initSidebarReorderLock() {
+  const lockBtn = document.getElementById('sidebar-reorder-lock-btn');
+  if (lockBtn && !lockBtn._lockBound) {
+    lockBtn._lockBound = true;
+    lockBtn.onclick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      toggleSidebarReorderLock();
+    };
+  }
+  updateSidebarReorderLockUI();
+}
+
+window.toggleSidebarReorderLock = toggleSidebarReorderLock;
+window.updateSidebarReorderLockUI = updateSidebarReorderLockUI;
+window.initSidebarReorderLock = initSidebarReorderLock;
+
 // 📂 サイドバー並び替え管理
 let isDraggingSidebarItem = false;
 let draggedSidebarData = null;
 
 function moveSidebarItem(itemId, itemType, direction, parentId = 'root', domId = null) {
+  if (!state.isSidebarReorderUnlocked) {
+    if (typeof showToast === 'function') {
+      showToast('メニューは現在ロックされています。上部の「🔒 並び替えロック中」をクリックして解除してください。', 'warning');
+    }
+    return;
+  }
   if (itemType === 'folder') {
     const normParentId = normalizeFolderId(parentId || 'root');
     const siblings = state.customAccordions.filter(acc => normalizeFolderId(acc.parentMenuId || 'root') === normParentId);
@@ -6040,9 +6107,14 @@ function setupSidebarFolderDragAndDrop(folderDiv, folderId, parentId = 'root') {
   const headerEl = folderDiv.querySelector('.accordion-header');
   if (!headerEl) return;
 
-  headerEl.setAttribute('draggable', 'true');
+  const isUnlocked = !!state.isSidebarReorderUnlocked;
+  headerEl.setAttribute('draggable', isUnlocked ? 'true' : 'false');
 
   headerEl.addEventListener('dragstart', (e) => {
+    if (!state.isSidebarReorderUnlocked) {
+      e.preventDefault();
+      return false;
+    }
     isDraggingSidebarItem = true;
     draggedSidebarData = { type: 'folder', id: folderId, parentId: parentId || 'root', domId: folderDiv.id };
     folderDiv.classList.add('sidebar-item-dragging');
@@ -6064,6 +6136,7 @@ function setupSidebarFolderDragAndDrop(folderDiv, folderId, parentId = 'root') {
   });
 
   folderDiv.addEventListener('dragover', (e) => {
+    if (!state.isSidebarReorderUnlocked) return;
     if (!draggedSidebarData || draggedSidebarData.type !== 'folder') return;
     if (normalizeFolderId(draggedSidebarData.parentId) !== normalizeFolderId(parentId || 'root')) return;
     if (draggedSidebarData.id === folderId) return;
@@ -6084,6 +6157,7 @@ function setupSidebarFolderDragAndDrop(folderDiv, folderId, parentId = 'root') {
   });
 
   folderDiv.addEventListener('drop', (e) => {
+    if (!state.isSidebarReorderUnlocked) return;
     if (!draggedSidebarData || draggedSidebarData.type !== 'folder') return;
     if (normalizeFolderId(draggedSidebarData.parentId) !== normalizeFolderId(parentId || 'root')) return;
     if (draggedSidebarData.id === folderId) return;
@@ -6102,9 +6176,14 @@ function setupSidebarFolderDragAndDrop(folderDiv, folderId, parentId = 'root') {
 function setupSidebarTableDragAndDrop(btn, itemId, itemType = 'table', parentId = 'root', domId = null) {
   if (!btn) return;
 
-  btn.setAttribute('draggable', 'true');
+  const isUnlocked = !!state.isSidebarReorderUnlocked;
+  btn.setAttribute('draggable', isUnlocked ? 'true' : 'false');
 
   btn.addEventListener('dragstart', (e) => {
+    if (!state.isSidebarReorderUnlocked) {
+      e.preventDefault();
+      return false;
+    }
     isDraggingSidebarItem = true;
     draggedSidebarData = { type: itemType, id: itemId, parentId: parentId || 'root', domId: domId || btn.id };
     btn.classList.add('sidebar-item-dragging');
@@ -6126,6 +6205,7 @@ function setupSidebarTableDragAndDrop(btn, itemId, itemType = 'table', parentId 
   });
 
   btn.addEventListener('dragover', (e) => {
+    if (!state.isSidebarReorderUnlocked) return;
     if (!draggedSidebarData || draggedSidebarData.type !== itemType) return;
     if (normalizeFolderId(draggedSidebarData.parentId) !== normalizeFolderId(parentId || 'root')) return;
     if ((draggedSidebarData.domId || draggedSidebarData.id) === (domId || itemId || btn.id)) return;
@@ -6146,6 +6226,7 @@ function setupSidebarTableDragAndDrop(btn, itemId, itemType = 'table', parentId 
   });
 
   btn.addEventListener('drop', (e) => {
+    if (!state.isSidebarReorderUnlocked) return;
     if (!draggedSidebarData || draggedSidebarData.type !== itemType) return;
     if (normalizeFolderId(draggedSidebarData.parentId) !== normalizeFolderId(parentId || 'root')) return;
     const targetKey = domId || itemId || btn.id;
@@ -6506,6 +6587,9 @@ function renderCustomTableList() {
   if (favAccordion) {
     favAccordion.remove();
   }
+
+  // 並び替えロック状態のUI同期（ロック中・解除中の外観とdraggable状態を確実に同期）
+  initSidebarReorderLock();
 }
 
 // テーブル作成画面の初期セットアップとイベントリスナーの登録
@@ -15554,6 +15638,9 @@ function setupEventListeners() {
       switchView(tab.dataset.tab);
     });
   });
+
+  // サイドバー並び替えロック機能の初期化
+  if (typeof initSidebarReorderLock === 'function') initSidebarReorderLock();
 
   // 左サイドメニューの各ボタンのクリックイベント登録
   const sidebarButtons = [

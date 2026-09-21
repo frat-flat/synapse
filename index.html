@@ -97,6 +97,14 @@
         <!-- 👤 マイページ（最上部） -->
         <button class="nav-item" id="menu-mypage" data-tab="mypage-screen" style="margin-top: 0.5rem; margin-bottom: 0.5rem; font-weight: bold; width: calc(100% - 1rem); box-sizing: border-box; text-align: left; display: flex; align-items: center; gap: 0.5rem;">👤 <span class="nav-item-text">マイページ</span></button>
 
+        <!-- 🔒 並び替えロック切替ツールバー -->
+        <div class="sidebar-reorder-toolbar" id="sidebar-reorder-toolbar">
+          <button id="sidebar-reorder-lock-btn" class="sidebar-reorder-lock-btn" type="button" title="メニューの並び替えロック（クリックでロック解除）">
+            <span class="lock-icon" id="sidebar-reorder-lock-icon">🔒</span>
+            <span class="lock-text" id="sidebar-reorder-lock-text">並び替えロック中</span>
+          </button>
+        </div>
+
         <!-- 📊 ヨサンダス サービス専用メニュー群 -->
         <div id="sidebar-yosandas-group" class="sidebar-service-group" style="display: flex; flex-direction: column; width: 100%;">
           <div class="sidebar-accordion" id="appoint-accordion" style="margin-top: 0.25rem;">

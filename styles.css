@@ -4910,7 +4910,7 @@ h3 {
 }
 
 /* ============================================================================
-   📂 サイドバー項目の並び替え（ドラッグ＆ドロップ ＆ ▲▼操作）
+   📂 サイドバー項目の並び替え（ドラッグ＆ドロップ ＆ ▲▼操作 ＆ ロック制御）
    ============================================================================ */
 .sidebar-accordion,
 .sidebar-nav .nav-item {
@@ -4918,12 +4918,124 @@ h3 {
   transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
 }
 
+/* ロック中（デフォルト）：カーソルは通常の pointer */
 .accordion-header {
+  cursor: pointer;
+}
+
+/* ロック中：並び替えアクション（▲▼・ドラッグハンドル）は完全に非表示 */
+.sidebar-reorder-actions {
+  display: none !important;
+}
+
+/* 🔒 並び替えロック切替ツールバー */
+.sidebar-reorder-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0.15rem 0.6rem 0.35rem;
+  margin-bottom: 0.15rem;
+  user-select: none;
+}
+
+.sidebar-reorder-lock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--bg-surface-elevated, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  color: var(--text-muted, #64748b);
+  border-radius: 20px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1.2;
+}
+
+.sidebar-reorder-lock-btn:hover {
+  border-color: var(--primary, #2563eb);
+  color: var(--text-primary, #0f172a);
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.sidebar-reorder-lock-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.sidebar-reorder-lock-btn:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ロック解除中（並び替えモード有効）のアクティブスタイル */
+.sidebar-reorder-lock-btn.is-unlocked {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: var(--primary, #2563eb);
+  color: var(--primary, #2563eb);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
+}
+
+.sidebar-reorder-lock-btn.is-unlocked:hover {
+  background: rgba(37, 99, 235, 0.2);
+}
+
+.sidebar-reorder-lock-btn .lock-icon {
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.sidebar-reorder-lock-btn .lock-text {
+  font-size: 0.72rem;
+}
+
+/* サイドバー折りたたみ時 */
+.sidebar-menu.collapsed .sidebar-reorder-toolbar {
+  justify-content: center;
+  padding: 0.2rem 0.2rem;
+}
+
+.sidebar-menu.collapsed .sidebar-reorder-lock-btn .lock-text {
+  display: none;
+}
+
+.sidebar-menu.collapsed .sidebar-reorder-lock-btn {
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--radius-sm, 6px);
+}
+
+/* 🔓 ロック解除時（.sidebar-reorder-unlocked）の挙動 */
+.sidebar-reorder-unlocked .accordion-header {
   cursor: grab;
 }
 
-.accordion-header:active {
+.sidebar-reorder-unlocked .accordion-header:active {
   cursor: grabbing;
+}
+
+/* ロック解除時はアクションコンテナを表示 */
+.sidebar-reorder-unlocked .sidebar-reorder-actions {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.sidebar-reorder-unlocked .custom-icon-fav-btn + .sidebar-reorder-actions,
+.sidebar-reorder-unlocked .custom-icon-edit-btn + .sidebar-reorder-actions,
+.sidebar-reorder-unlocked .sidebar-perm-icon-btn + .sidebar-reorder-actions {
+  margin-left: 4px;
+}
+
+.sidebar-reorder-unlocked .accordion-header:hover .sidebar-reorder-actions,
+.sidebar-reorder-unlocked .sidebar-nav .nav-item:hover .sidebar-reorder-actions {
+  opacity: 1 !important;
 }
 
 /* ドラッグ中の要素 */
@@ -4933,43 +5045,20 @@ h3 {
 }
 
 /* ドロップ先の挿入インジケーター線（上・下） */
-.sidebar-accordion.drag-over-top > .accordion-header,
-.sidebar-nav .nav-item.drag-over-top {
+.sidebar-reorder-unlocked .sidebar-accordion.drag-over-top > .accordion-header,
+.sidebar-reorder-unlocked .sidebar-nav .nav-item.drag-over-top {
   border-top: 2px solid var(--primary) !important;
   border-top-left-radius: var(--radius-sm);
   border-top-right-radius: var(--radius-sm);
   background: rgba(37, 99, 235, 0.06) !important;
 }
 
-.sidebar-accordion.drag-over-bottom > .accordion-header,
-.sidebar-nav .nav-item.drag-over-bottom {
+.sidebar-reorder-unlocked .sidebar-accordion.drag-over-bottom > .accordion-header,
+.sidebar-reorder-unlocked .sidebar-nav .nav-item.drag-over-bottom {
   border-bottom: 2px solid var(--primary) !important;
   border-bottom-left-radius: var(--radius-sm);
   border-bottom-right-radius: var(--radius-sm);
   background: rgba(37, 99, 235, 0.06) !important;
-}
-
-/* 並び替えアクションボタンコンテナ */
-.sidebar-reorder-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  user-select: none;
-  flex-shrink: 0;
-}
-
-.custom-icon-fav-btn + .sidebar-reorder-actions,
-.custom-icon-edit-btn + .sidebar-reorder-actions,
-.sidebar-perm-icon-btn + .sidebar-reorder-actions {
-  margin-left: 4px;
-}
-
-.accordion-header:hover .sidebar-reorder-actions,
-.sidebar-nav .nav-item:hover .sidebar-reorder-actions {
-  opacity: 1;
 }
 
 /* 上下移動ボタン */
