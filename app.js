@@ -13383,6 +13383,34 @@ function loadTabState(tab) {
 // 顧客詳細タブを新規タブとして起動する関数
 function openCustomerDetailTab(customerId) {
   if (!customerId) return;
+
+  const isTableAccessible = (tableId) => {
+    if (typeof checkTableAccess !== 'function') return true;
+    const a = checkTableAccess(tableId);
+    return a && a.visible && !a.grayout;
+  };
+  const isFolderAccessible = (folderId) => {
+    if (typeof checkFolderAccess !== 'function') return true;
+    const a = checkFolderAccess(folderId);
+    return a && a.visible && !a.grayout;
+  };
+
+  const hasAnyMasterAccess = (
+    (isTableAccessible('appoint-screen') && isFolderAccessible('appoint-accordion')) ||
+    (isTableAccessible('jo-info-screen') && isFolderAccessible('jo-accordion')) ||
+    (isTableAccessible('applicant-info-screen') && isFolderAccessible('applicant-accordion')) ||
+    (isTableAccessible('agency-info-screen') && isFolderAccessible('agency-accordion')) ||
+    (isTableAccessible('dbmake-screen') && (
+      isUserAdmin() ||
+      (typeof checkAdminIconAccess === 'function' && checkAdminIconAccess('admin-panel-partner-btn')) ||
+      (state.permissions && state.permissions.tables && state.permissions.tables['dbmake-screen'] && state.permissions.tables['dbmake-screen'].includes(getCurrentUserId()))
+    ))
+  );
+
+  if (!hasAnyMasterAccess) {
+    showToast('マスタ情報の閲覧権限がありません。', 'warning');
+    return;
+  }
   
   const tabId = `customer-detail-${customerId}`;
   const tabTitle = `顧客詳細: ${customerId}`;
@@ -13434,11 +13462,33 @@ function renderCustomerDetailView(customerId) {
 
   container.innerHTML = '';
 
-  // 1. 各データベーステーブルから該当IDに紐づく情報を網羅的に収集
-  const apRecords = state.apContracts ? state.apContracts.filter(r => (r.customerPersonalityId || r.customerId) === customerId) : [];
-  const joRecords = state.joContracts ? state.joContracts.filter(r => (r.customerPersonalityId || r.customerId) === customerId) : [];
-  const agentRecords = state.agentContracts ? state.agentContracts.filter(r => r.customerPersonalityId === customerId) : [];
-  const partnerRecords = (typeof dbmakePartners !== 'undefined' && dbmakePartners) ? dbmakePartners.filter(r => (r.customerPersonalityId || r.id) === customerId) : [];
+  // 1. 各マスタテーブルへのアクセス権限判定
+  const isTableAccessible = (tableId) => {
+    if (typeof checkTableAccess !== 'function') return true;
+    const a = checkTableAccess(tableId);
+    return a && a.visible && !a.grayout;
+  };
+  const isFolderAccessible = (folderId) => {
+    if (typeof checkFolderAccess !== 'function') return true;
+    const a = checkFolderAccess(folderId);
+    return a && a.visible && !a.grayout;
+  };
+
+  const canAccessCustomer = isTableAccessible('appoint-screen') && isFolderAccessible('appoint-accordion');
+  const canAccessJo = isTableAccessible('jo-info-screen') && isFolderAccessible('jo-accordion');
+  const canAccessApplicant = isTableAccessible('applicant-info-screen') && isFolderAccessible('applicant-accordion');
+  const canAccessAgency = isTableAccessible('agency-info-screen') && isFolderAccessible('agency-accordion');
+  const canAccessPartner = isTableAccessible('dbmake-screen') && (
+    isUserAdmin() ||
+    (typeof checkAdminIconAccess === 'function' && checkAdminIconAccess('admin-panel-partner-btn')) ||
+    (state.permissions && state.permissions.tables && state.permissions.tables['dbmake-screen'] && state.permissions.tables['dbmake-screen'].includes(getCurrentUserId()))
+  );
+
+  // 該当IDに紐づく情報を権限所持テーブルからのみ収集
+  const apRecords = (canAccessApplicant && state.apContracts) ? state.apContracts.filter(r => (r.customerPersonalityId || r.customerId) === customerId) : [];
+  const joRecords = (canAccessJo && state.joContracts) ? state.joContracts.filter(r => (r.customerPersonalityId || r.customerId) === customerId) : [];
+  const agentRecords = (canAccessAgency && state.agentContracts) ? state.agentContracts.filter(r => r.customerPersonalityId === customerId) : [];
+  const partnerRecords = (canAccessPartner && typeof dbmakePartners !== 'undefined' && dbmakePartners) ? dbmakePartners.filter(r => (r.customerPersonalityId || r.id) === customerId) : [];
 
   let name = '（氏名未設定）';
   let furigana = '';
@@ -13446,7 +13496,7 @@ function renderCustomerDetailView(customerId) {
   let email = '未設定';
   let address = '未設定';
 
-  const customerMaster = state.customers.find(c => c.id === customerId);
+  const customerMaster = (canAccessCustomer && state.customers) ? state.customers.find(c => c.id === customerId) : null;
   if (customerMaster && customerMaster.address) {
     address = customerMaster.address;
   }
@@ -13532,8 +13582,10 @@ function renderCustomerDetailView(customerId) {
     emptyCard.style.borderRadius = 'var(--radius-md)';
     emptyCard.style.textAlign = 'center';
     emptyCard.innerHTML = `
-      <span class="empty-state-icon" style="font-size: 2.5rem;">🔍</span>
-      <p style="margin-top: 1rem; color: var(--text-secondary);">該当IDに紐づく申込者・JO・代理店・パートナーマスタレコードが見つかりませんでした。</p>
+      <span class="empty-state-icon" style="font-size: 2.5rem; display: flex; justify-content: center; margin-bottom: 0.5rem;">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </span>
+      <p style="margin-top: 0.5rem; color: var(--text-secondary);">該当IDに紐づく申込者・JO・代理店・パートナーマスタレコードが見つかりませんでした。</p>
     `;
     rightCol.appendChild(emptyCard);
   } else {
@@ -13621,8 +13673,8 @@ function renderCustomerDetailView(customerId) {
     });
   }
 
-  // 6. 紐付けられたアポイント履歴の収集と表示
-  const matchedAppoints = state.appointments ? state.appointments.filter(
+  // 6. 紐付けられたアポイント履歴の収集と表示（顧客マスタ/アポイント閲覧権限所持時のみ）
+  const matchedAppoints = (canAccessCustomer && state.appointments) ? state.appointments.filter(
     a => (a.customerId === customerId || (customerMaster && customerMaster.relatedCustomerId && customerMaster.relatedCustomerId.split(',').map(x => x.trim()).includes(a.customerId))) && a.status !== 'cancelled'
   ) : [];
 
@@ -33675,6 +33727,33 @@ function getSelectedTableText(type, activeScreen, selectedCell, selectedRange, c
 function executeGlobalMasterSearch(query) {
   if (!query) return [];
 
+  // 各マスタテーブルへのアクセス権限判定
+  const isTableAccessible = (tableId) => {
+    if (typeof checkTableAccess !== 'function') return true;
+    const a = checkTableAccess(tableId);
+    return a && a.visible && !a.grayout;
+  };
+  const isFolderAccessible = (folderId) => {
+    if (typeof checkFolderAccess !== 'function') return true;
+    const a = checkFolderAccess(folderId);
+    return a && a.visible && !a.grayout;
+  };
+
+  const canAccessCustomer = isTableAccessible('appoint-screen') && isFolderAccessible('appoint-accordion');
+  const canAccessJo = isTableAccessible('jo-info-screen') && isFolderAccessible('jo-accordion');
+  const canAccessApplicant = isTableAccessible('applicant-info-screen') && isFolderAccessible('applicant-accordion');
+  const canAccessAgency = isTableAccessible('agency-info-screen') && isFolderAccessible('agency-accordion');
+  const canAccessPartner = isTableAccessible('dbmake-screen') && (
+    isUserAdmin() || 
+    (typeof checkAdminIconAccess === 'function' && checkAdminIconAccess('admin-panel-partner-btn')) || 
+    (state.permissions && state.permissions.tables && state.permissions.tables['dbmake-screen'] && state.permissions.tables['dbmake-screen'].includes(getCurrentUserId()))
+  );
+
+  // いずれのマスタ閲覧権限もない場合は検索結果なし
+  if (!canAccessCustomer && !canAccessJo && !canAccessApplicant && !canAccessAgency && !canAccessPartner) {
+    return [];
+  }
+
   const cleanQuery = query.toLowerCase().trim();
   const matchedCustomersMap = new Map();
 
@@ -33695,20 +33774,22 @@ function executeGlobalMasterSearch(query) {
     }
   };
 
-  // 1. 顧客マスタ (state.customers) からの検索
-  state.customers.forEach(c => {
-    const idMatch = c.id && c.id.toLowerCase() === cleanQuery;
-    const nameMatch = c.name && c.name.toLowerCase().includes(cleanQuery);
-    const furiganaMatch = c.furigana && c.furigana.toLowerCase().includes(cleanQuery);
-    const corpMatch = c.corp && c.corp.toLowerCase().includes(cleanQuery);
+  // 1. 顧客マスタ (state.customers) からの検索（顧客/アポイント権限所持時のみ）
+  if (canAccessCustomer && state.customers) {
+    state.customers.forEach(c => {
+      const idMatch = c.id && c.id.toLowerCase() === cleanQuery;
+      const nameMatch = c.name && c.name.toLowerCase().includes(cleanQuery);
+      const furiganaMatch = c.furigana && c.furigana.toLowerCase().includes(cleanQuery);
+      const corpMatch = c.corp && c.corp.toLowerCase().includes(cleanQuery);
 
-    if (idMatch || nameMatch || furiganaMatch || corpMatch) {
-      addMatch(c.id, c.name, c.corp, '顧客基本マスタ');
-    }
-  });
+      if (idMatch || nameMatch || furiganaMatch || corpMatch) {
+        addMatch(c.id, c.name, c.corp, '顧客基本マスタ');
+      }
+    });
+  }
 
-  // 2. JO契約 (state.joContracts) からの検索
-  if (state.joContracts) {
+  // 2. JO契約 (state.joContracts) からの検索（JO権限所持時のみ）
+  if (canAccessJo && state.joContracts) {
     state.joContracts.forEach(jo => {
       const pid = jo.customerPersonalityId || jo.customerId;
       const cidMatch = jo.customerId && jo.customerId.toLowerCase() === cleanQuery;
@@ -33724,8 +33805,8 @@ function executeGlobalMasterSearch(query) {
     });
   }
 
-  // 3. 申込者情報 (state.apContracts) からの検索
-  if (state.apContracts) {
+  // 3. 申込者情報 (state.apContracts) からの検索（申込者情報権限所持時のみ）
+  if (canAccessApplicant && state.apContracts) {
     state.apContracts.forEach(ap => {
       const pid = ap.customerPersonalityId || ap.customerId;
       const cidMatch = ap.customerId && ap.customerId.toLowerCase() === cleanQuery;
@@ -33740,8 +33821,8 @@ function executeGlobalMasterSearch(query) {
     });
   }
 
-  // 4. 代理店情報 (state.agentContracts) からの検索
-  if (state.agentContracts) {
+  // 4. 代理店情報 (state.agentContracts) からの検索（代理店情報権限所持時のみ）
+  if (canAccessAgency && state.agentContracts) {
     state.agentContracts.forEach(ag => {
       const pid = ag.customerPersonalityId;
       const pidMatch = pid && pid.toLowerCase() === cleanQuery;
@@ -33755,8 +33836,8 @@ function executeGlobalMasterSearch(query) {
     });
   }
 
-  // 5. パートナー情報 (dbmakePartners) からの検索
-  if (typeof dbmakePartners !== 'undefined' && dbmakePartners) {
+  // 5. パートナー情報 (dbmakePartners) からの検索（パートナーDB権限所持時のみ）
+  if (canAccessPartner && typeof dbmakePartners !== 'undefined' && dbmakePartners) {
     dbmakePartners.forEach(pt => {
       const pid = pt.id;
       const pidMatch = pid && pid.toLowerCase() === cleanQuery;

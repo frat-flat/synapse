@@ -2307,17 +2307,15 @@
 <div class="list-section" style="padding: 1.5rem; background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); position: relative; margin-bottom: 1.5rem;">
   <div style="margin-bottom: 0.5rem; display: flex; flex-direction: column; gap: 0.75rem;">
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-      <p style="font-size: 0.92rem; color: var(--text-primary); text-align: left; margin: 0; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
-        <span>🔍</span> 全サービス横断 顧客マスタ検索
+      <p style="font-size: 0.92rem; color: var(--text-primary); text-align: left; margin: 0; font-weight: 700; display: flex; align-items: center; gap: 0.45rem;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; color: var(--text-secondary); flex-shrink: 0;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg> 全サービス横断 顧客マスタ検索
       </p>
-      <span style="font-size: 0.72rem; color: var(--text-muted); background: var(--bg-surface-elevated); padding: 0.15rem 0.45rem; border-radius: 4px; border: 1px solid var(--border-color);">
-        ヨサンダス ＆ 全登録マスタ横断
-      </span>
     </div>
     <div style="display: flex; gap: 0.5rem; width: 100%;">
       <input type="text" id="global-search-input" placeholder="顧客ID、名前、または電話番号を入力..." style="flex: 1; padding: 0.6rem 1rem; font-size: 0.9rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-surface-elevated); color: var(--text-primary); outline: none;">
-      <button class="btn btn-primary" id="global-search-btn" style="padding: 0.6rem 1.5rem; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; cursor: pointer;">
-        🔍 検索
+      <button class="btn-global-search" id="global-search-btn" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <span>検索</span>
       </button>
     </div>
     <!-- 検索結果表示エリア -->
