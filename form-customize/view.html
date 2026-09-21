@@ -7023,15 +7023,14 @@
             }));
           } catch(e) {}
 
-          // 1. 親ウィンドウ (iframe) への postMessage 送信
+          // 1. 親ウィンドウ (iframe) への postMessage 送信（常に各フォーム専用の独立テーブルへ送信）
           if (window.parent && window.parent !== window) {
-            const isDedicatedMode = !!(formDefinition.createDedicatedTable === true || formDefinition.targetTableType === 'dedicated' || (formDefinition.targetTableId && formDefinition.targetTableId !== 'table_all_form_responses'));
             window.parent.postMessage({
               type: 'FORM_SUBMIT',
               formTitle: effectiveFormTitle,
-              createDedicatedTable: isDedicatedMode,
-              targetTableId: isDedicatedMode ? (formDefinition.targetTableId || 'dedicated') : 'table_all_form_responses',
-              targetTableType: isDedicatedMode ? 'dedicated' : 'consolidated',
+              createDedicatedTable: true,
+              targetTableId: formDefinition.targetTableId || 'dedicated',
+              targetTableType: 'dedicated',
               data: submitData,
               isTemporary: false,
               isPartialSubmit: isPartial,

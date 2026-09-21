@@ -780,11 +780,10 @@
                   </div>
                   <!-- 旧互換用の非表示セレクト -->
                   <select id="editor-target-table-select" style="display: none;">
-                    <option value="table_all_form_responses" selected>全フォーム回答データ</option>
-                    <option value="dedicated">専用テーブル</option>
+                    <option value="dedicated" selected>専用テーブル</option>
                   </select>
                   <div id="target-table-status-desc" style="font-size: 0.73rem; color: #64748b; margin-top: 8px; line-height: 1.4;">
-                    💡 選択しない場合：回答はすべて「<strong>全フォーム回答データ</strong>」に保存されて完了します（専用テーブルは作成されません）。
+                    💡 回答はすべてこのフォーム専用の「<strong>独立テーブル</strong>」に自動保存されます。
                   </div>
                 </div>
 
@@ -1570,7 +1569,7 @@
               <span id="merge-table-badge" style="font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; background: #e2e8f0; color: #475569; font-weight: 600; display: none; white-space: nowrap;"></span>
             </div>
             <div id="merge-target-table-desc" style="font-size: 0.72rem; color: #64748b; margin-top: 3px; line-height: 1.35;">
-              未選択時：回答は統合テーブル「全フォーム回答データ」に記録されます
+              回答データはこのフォーム専用の独立テーブルに保存されます
             </div>
           </div>
 

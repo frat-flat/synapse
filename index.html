@@ -142,13 +142,25 @@
           <!-- 申込者情報アコーディオン -->
           <div class="sidebar-accordion" id="applicant-accordion" style="margin-top: 0.5rem;">
             <button class="accordion-header collapsed" id="menu-applicant-parent">
-              <span class="accordion-icon">▼</span>
+              <span class="accordion-arrow">▼</span>
               <span class="user-custom-icon">📋</span>
               <span class="accordion-header-text">申込者情報</span>
             </button>
             <div class="accordion-content" id="menu-applicant-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
               <div class="accordion-content-header">📋 申込者情報</div>
               <button class="nav-item" id="menu-applicant-info" data-tab="applicant-info-screen">📊 申込者 基本マスタ</button>
+            </div>
+          </div>
+
+          <!-- 回答フォーム一覧アコーディオン -->
+          <div class="sidebar-accordion" id="forms-accordion" style="margin-top: 0.5rem;">
+            <button class="accordion-header collapsed" id="menu-forms-parent">
+              <span class="accordion-arrow">▼</span>
+              <span class="user-custom-icon">📝</span>
+              <span class="accordion-header-text">回答フォーム一覧</span>
+            </button>
+            <div class="accordion-content" id="menu-forms-content" style="display: none; padding-left: 1rem; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
+              <div class="accordion-content-header">📝 回答フォーム一覧</div>
             </div>
           </div>
 
@@ -4741,6 +4753,7 @@
             <select id="r2t-parent-menu-select" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-surface-elevated); color: var(--text-primary); font-size: 0.82rem; outline: none; cursor: pointer; box-sizing: border-box;">
               <option value="custom-tables">📋 カスタムテーブル</option>
               <option value="root">📁 ルート直下</option>
+              <option value="forms-accordion">📝 回答フォーム一覧</option>
               <option value="agency-accordion">🏢 代理店情報</option>
               <option value="jo-accordion">📄 JO情報</option>
               <option value="applicant-accordion">👤 申込者情報</option>

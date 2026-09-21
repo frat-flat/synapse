@@ -3573,6 +3573,13 @@ function initDatabase() {
     if (!Array.isArray(state.customTables)) {
       state.customTables = [];
     }
+    // 🌟 全フォーム回答データ（table_all_form_responses）の徹底消去
+    state.customTables = state.customTables.filter(t => t && t.id !== 'table_all_form_responses' && t.name !== '全フォーム回答データ' && !t.isConsolidatedTable);
+    localStorage.removeItem('synapse_table_table_all_form_responses');
+    if (typeof addDeletedTableId === 'function') {
+      addDeletedTableId('table_all_form_responses');
+    }
+
     const deletedIds = (typeof getDeletedTableIds === 'function') ? getDeletedTableIds() : [];
     if (deletedIds.length > 0) {
       state.customTables = state.customTables.filter(t => !deletedIds.includes(t.id));
@@ -3638,6 +3645,7 @@ function initDatabase() {
 
   // --- 標準フォルダ・テーブルの自動マイグレーション ---
   const defaultAccs = [
+    { id: 'forms-accordion', name: '回答フォーム一覧', parentMenuId: 'root', icon: '📝', isSystem: true },
     { id: 'appoint-accordion', name: 'アポイント情報', parentMenuId: 'root', isSystem: true },
     { id: 'agency-accordion', name: '代理店情報', parentMenuId: 'root', isSystem: true },
     { id: 'jo-accordion', name: 'JO情報', parentMenuId: 'root', isSystem: true },
@@ -3645,9 +3653,20 @@ function initDatabase() {
   ];
   let customAccUpdated = false;
   defaultAccs.forEach(def => {
-    if (!state.customAccordions.find(a => a.id === def.id)) {
+    const existing = state.customAccordions.find(a => a.id === def.id || a.name === def.name);
+    if (!existing) {
       state.customAccordions.unshift(def); // 先頭に追加
       customAccUpdated = true;
+    } else {
+      if (existing.id !== def.id) {
+        existing.id = def.id;
+        customAccUpdated = true;
+      }
+      if (def.icon && !existing.icon) {
+        existing.icon = def.icon;
+        customAccUpdated = true;
+      }
+      existing.isSystem = true;
     }
   });
   if (customAccUpdated) {
@@ -3735,7 +3754,7 @@ function initDatabase() {
   if (!state.permissions.rowFilters) state.permissions.rowFilters = {};
 
   // 標準フォルダの初期権限（未設定の場合、全ユーザーに許可）
-  const defaultFolders = ['appoint-accordion', 'agency-accordion', 'jo-accordion', 'applicant-accordion'];
+  const defaultFolders = ['appoint-accordion', 'agency-accordion', 'jo-accordion', 'applicant-accordion', 'forms-accordion'];
   defaultFolders.forEach(fid => {
     if (!state.permissions.folders[fid]) {
       state.permissions.folders[fid] = ['admin', 'sales_01', 'sales_02', 'support_01'];
@@ -3908,6 +3927,7 @@ function normalizeFolderId(id) {
   if (id === 'agency' || id === 'agency-info' || id === 'agency-accordion') return 'agency-accordion';
   if (id === 'jo' || id === 'jo-info' || id === 'jo-accordion') return 'jo-accordion';
   if (id === 'applicant' || id === 'applicant-info' || id === 'applicant-accordion') return 'applicant-accordion';
+  if (id === 'forms' || id === 'forms-accordion' || id === 'form-responses' || id === 'cacc_forms' || id === '回答フォーム一覧') return 'forms-accordion';
   return id;
 }
 
@@ -3915,24 +3935,35 @@ function ensureStandardAccordionsInState() {
   if (!state.customAccordions) state.customAccordions = [];
   
   const stdAccs = [
-    { id: 'applicant-accordion', name: '申込者情報', parentMenuId: 'root' },
-    { id: 'jo-accordion', name: 'JO情報', parentMenuId: 'root' },
-    { id: 'agency-accordion', name: '代理店情報', parentMenuId: 'root' },
-    { id: 'appoint-accordion', name: 'アポイント情報', parentMenuId: 'root' }
+    { id: 'forms-accordion', name: '回答フォーム一覧', parentMenuId: 'root', icon: '📝', isSystem: true },
+    { id: 'applicant-accordion', name: '申込者情報', parentMenuId: 'root', isSystem: true },
+    { id: 'jo-accordion', name: 'JO情報', parentMenuId: 'root', isSystem: true },
+    { id: 'agency-accordion', name: '代理店情報', parentMenuId: 'root', isSystem: true },
+    { id: 'appoint-accordion', name: 'アポイント情報', parentMenuId: 'root', isSystem: true }
   ];
 
   stdAccs.forEach(std => {
-    const existing = state.customAccordions.find(a => a.id === std.id);
+    let existing = state.customAccordions.find(a => a.id === std.id || a.name === std.name);
     if (!existing) {
-      state.customAccordions.unshift(std);
+      state.customAccordions.push(std);
     } else {
+      existing.id = std.id;
       existing.name = std.name;
+      if (std.icon && !existing.icon) existing.icon = std.icon;
+      existing.isSystem = std.isSystem;
     }
   });
 }
 
 function ensureStandardTablesInState() {
   if (!state.customTables) state.customTables = [];
+
+  // 🌟 全フォーム回答データ（table_all_form_responses）をSynapseから完全に排除
+  state.customTables = state.customTables.filter(t => t && t.id !== 'table_all_form_responses' && t.name !== '全フォーム回答データ' && !t.isConsolidatedTable);
+  localStorage.removeItem('synapse_table_table_all_form_responses');
+  if (typeof addDeletedTableId === 'function') {
+    addDeletedTableId('table_all_form_responses');
+  }
 
   const deletedIds = getDeletedTableIds();
   if (deletedIds && deletedIds.length > 0) {
@@ -3966,30 +3997,14 @@ function ensureStandardTablesInState() {
     }
   });
 
-  // 🌟 フォーム回答統合テーブル（全フォーム回答を一元格納・既存テーブル選択の基本先）
+  // 🌟 各フォーム専用の独立テーブル群
   const formDedicatedTables = [
-    {
-      id: 'table_all_form_responses',
-      name: '全フォーム回答データ',
-      formTitle: '全フォーム共通',
-      isConsolidatedTable: true,
-      parentMenuId: 'root',
-      columns: [
-        { id: 'master_id', name: 'マスターID / コード', label: 'マスターID / コード', type: 'text' },
-        { id: 'form_title', name: 'フォーム名', label: 'フォーム名', type: 'text' },
-        { id: 'has_dedicated_table', name: '独立テーブル有無', label: '独立テーブル有無', type: 'text' },
-        { id: 'status', name: 'ステータス', label: 'ステータス', type: 'text' },
-        { id: 'registration_code', name: '確定登録コード', label: '確定登録コード', type: 'text' },
-        { id: 'submitted_at', name: '回答日時 / 登録日時', label: '回答日時 / 登録日時', type: 'text' },
-        { id: 'resume_url', name: '再開用URL', label: '再開用URL', type: 'text' }
-      ]
-    },
     {
       id: 'table_form_basic',
       name: 'フォーム① 基本情報受付テーブル',
       formTitle: '基本情報受付フォーム',
       isFormDedicatedTable: true,
-      parentMenuId: 'root',
+      parentMenuId: 'forms-accordion',
       columns: [
         { id: 'id', name: 'マスターID / コード', label: 'マスターID / コード', type: 'text' },
         { id: 'registeredName', name: '会社名・屋号 / 氏名', label: '会社名・屋号 / 氏名', type: 'text' },
@@ -4011,7 +4026,7 @@ function ensureStandardTablesInState() {
       name: 'フォーム② 口座・担当者受付テーブル',
       formTitle: '口座・担当者受付フォーム',
       isFormDedicatedTable: true,
-      parentMenuId: 'root',
+      parentMenuId: 'forms-accordion',
       columns: [
         { id: 'id', name: 'マスターID / コード', label: 'マスターID / コード', type: 'text' },
         { id: 'registeredName', name: '会社名・屋号', label: '会社名・屋号', type: 'text' },
@@ -4042,8 +4057,7 @@ function ensureStandardTablesInState() {
         name: fTable.name,
         formTitle: fTable.formTitle,
         isFormDedicatedTable: fTable.isFormDedicatedTable || false,
-        isConsolidatedTable: fTable.isConsolidatedTable || false,
-        parentMenuId: fTable.parentMenuId,
+        parentMenuId: fTable.parentMenuId || 'forms-accordion',
         columns: fTable.columns,
         visibleColumns: fTable.columns.map(c => c.id),
         columnWidths: defaultWidths,
@@ -4057,7 +4071,6 @@ function ensureStandardTablesInState() {
     } else {
       existing.name = fTable.name;
       existing.formTitle = fTable.formTitle;
-      if (fTable.isConsolidatedTable) existing.isConsolidatedTable = true;
       if (fTable.isFormDedicatedTable) existing.isFormDedicatedTable = true;
       if (!existing.columns || existing.columns.length === 0) {
         existing.columns = fTable.columns;
@@ -4074,6 +4087,25 @@ function ensureStandardTablesInState() {
         });
       }
       if (!existing.rows) existing.rows = [];
+    }
+  });
+
+  // 🌟 全てのフォーム回答テーブル（isFormDedicatedTable または フォーム由来テーブル）を「回答フォーム一覧（forms-accordion）」に格納
+  state.customTables.forEach(t => {
+    if (!t) return;
+    if (t.isSystem || t.id === 'applicant-info-screen' || t.id === 'agency-info-screen' || t.id === 'jo-info-screen' || t.id === 'agency-network-screen') return;
+
+    const isFormTable = t.isFormDedicatedTable || 
+                        (t.id && (t.id.startsWith('table_form_') || t.id.startsWith('ctbl_'))) || 
+                        (t.formTitle && t.formTitle.trim() !== '') ||
+                        (t.name && (t.name.includes('フォーム') || t.name.includes('受付テーブル'))) ||
+                        (t.targetTableType === 'dedicated');
+    if (isFormTable) {
+      t.isFormDedicatedTable = true;
+      const norm = normalizeFolderId(t.parentMenuId);
+      if (!norm || norm === 'root' || norm === 'none' || norm === 'custom-tables') {
+        t.parentMenuId = 'forms-accordion';
+      }
     }
   });
 }
@@ -4552,7 +4584,7 @@ function checkFolderAccess(folderId) {
   }
 
   // 標準アコーディオンフォルダ群は常に表示する（権限がセットアップされていない、または許可されている場合のみ）
-  const stdFolders = ['appoint-accordion', 'agency-accordion', 'jo-accordion', 'applicant-accordion'];
+  const stdFolders = ['appoint-accordion', 'agency-accordion', 'jo-accordion', 'applicant-accordion', 'forms-accordion'];
   if (stdFolders.includes(folderId)) {
     return { visible: true, grayout: false };
   }
@@ -5798,7 +5830,7 @@ function attachSidebarItemActions(el, itemId, itemName, itemType, depth = 1) {
   // 編集ボタン（🎨）は、システム項目以外の項目にのみ表示する
   const normId = normalizeFolderId(itemId);
   const stdSystemItems = [
-    'appoint-accordion', 'agency-accordion', 'jo-accordion', 'applicant-accordion',
+    'appoint-accordion', 'agency-accordion', 'jo-accordion', 'applicant-accordion', 'forms-accordion',
     'agency-info-screen', 'jo-info-screen', 'applicant-info-screen',
     'appointment-new', 'appointment-existing', 'drafts-view-screen', 'history-view-screen', 'official-id-link'
   ];
@@ -5844,7 +5876,8 @@ function renderCustomTableList() {
       'appoint-accordion': document.getElementById('appoint-accordion'),
       'agency-accordion': document.getElementById('agency-accordion'),
       'jo-accordion': document.getElementById('jo-accordion'),
-      'applicant-accordion': document.getElementById('applicant-accordion')
+      'applicant-accordion': document.getElementById('applicant-accordion'),
+      'forms-accordion': document.getElementById('forms-accordion')
     };
     console.log('[Synapse Debug] cachedSysAccs initialized:', cachedSysAccs);
   }
@@ -7389,10 +7422,6 @@ function adjustOverflowCells(tableElement) {
 // 🗑️ テーブル安全削除モーダル制御（誤操作防止・テーブル名完全一致確認）
 function openDeleteTableSafetyModal(tbl) {
   if (!tbl) return;
-  if (tbl.isConsolidatedTable || tbl.id === 'table_all_form_responses') {
-    showToast('「全フォーム回答データ」はシステムの基盤テーブルのため削除できません。', 'warning');
-    return;
-  }
 
   const modal = document.getElementById('modal-delete-table-safety');
   const nameEl = document.getElementById('safety-delete-table-name');
@@ -7553,14 +7582,10 @@ function renderCustomTable(tableId) {
   // 🗑️ テーブル削除ボタンの制御
   const deleteTableBtn = document.getElementById('ct-delete-table-btn');
   if (deleteTableBtn) {
-    if (tbl.isConsolidatedTable || tbl.id === 'table_all_form_responses') {
-      deleteTableBtn.style.display = 'none'; // システム基盤テーブルは削除不可
-    } else {
-      deleteTableBtn.style.display = 'inline-flex';
-      deleteTableBtn.onclick = () => {
-        openDeleteTableSafetyModal(tbl);
-      };
-    }
+    deleteTableBtn.style.display = 'inline-flex';
+    deleteTableBtn.onclick = () => {
+      openDeleteTableSafetyModal(tbl);
+    };
   }
 
   const nameInput = document.getElementById('ct-table-name-input');
@@ -7591,7 +7616,11 @@ function renderCustomTable(tableId) {
   // 配置先の同期と変更イベント
   const parentSelect = document.getElementById('ct-table-parent-select');
   if (parentSelect) {
-    parentSelect.value = tbl.parentMenuId || 'custom-tables';
+    if (typeof updateParentSelectDropdowns === 'function') {
+      updateParentSelectDropdowns();
+    }
+    const currentParentNorm = normalizeFolderId(tbl.parentMenuId);
+    parentSelect.value = currentParentNorm || 'forms-accordion';
     parentSelect.dataset.activeTableId = tableId;
     if (!parentSelect.dataset.listenerAttached) {
       parentSelect.dataset.listenerAttached = 'true';
@@ -7605,6 +7634,20 @@ function renderCustomTable(tableId) {
           showToast('配置先メニューを変更しました。', 'success');
         }
       });
+    }
+  }
+
+  // 親アコーディオンを自動展開
+  const pNorm = normalizeFolderId(tbl.parentMenuId);
+  if (pNorm && pNorm !== 'root') {
+    const pAcc = document.getElementById(pNorm);
+    if (pAcc) {
+      const pHeader = pAcc.querySelector('.accordion-header');
+      const pContent = pAcc.querySelector('.accordion-content');
+      if (pHeader && pContent) {
+        pHeader.classList.remove('collapsed');
+        pContent.style.display = 'flex';
+      }
     }
   }
 
@@ -12931,6 +12974,7 @@ function updateUIForCurrentMode() {
   const agencyAccordion = document.getElementById('agency-accordion');
   const joAccordion = document.getElementById('jo-accordion');
   const applicantAccordion = document.getElementById('applicant-accordion');
+  const formsAccordion = document.getElementById('forms-accordion');
   const customTablesAccordion = document.getElementById('custom-tables-accordion');
   
   if (pendingUser) {
@@ -12938,12 +12982,14 @@ function updateUIForCurrentMode() {
     if (agencyAccordion) agencyAccordion.style.display = 'none';
     if (joAccordion) joAccordion.style.display = 'none';
     if (applicantAccordion) applicantAccordion.style.display = 'none';
+    if (formsAccordion) formsAccordion.style.display = 'none';
     if (customTablesAccordion) customTablesAccordion.style.display = 'none';
   } else {
     if (appointAccordion) appointAccordion.style.display = shouldShowFolder('appoint-accordion') ? 'block' : 'none';
     if (agencyAccordion) agencyAccordion.style.display = shouldShowFolder('agency-accordion') ? 'block' : 'none';
     if (joAccordion) joAccordion.style.display = shouldShowFolder('jo-accordion') ? 'block' : 'none';
     if (applicantAccordion) applicantAccordion.style.display = shouldShowFolder('applicant-accordion') ? 'block' : 'none';
+    if (formsAccordion) formsAccordion.style.display = shouldShowFolder('forms-accordion') ? 'block' : 'none';
     if (customTablesAccordion) customTablesAccordion.style.display = 'block';
   }
   
@@ -14515,9 +14561,9 @@ function getUnmergedForms() {
         title: (obj.title || '').trim(),
         subtitle: (obj.subtitle || '').trim(),
         description: (obj.description || '').trim(),
-        targetTableMode: obj.targetTableType === 'dedicated' ? 'dedicated' : (obj.targetTableMode || 'unified'),
-        targetTableId: obj.targetTableId || (obj.createDedicatedTable ? 'dedicated' : 'table_all_form_responses'),
-        createDedicatedTable: !!obj.createDedicatedTable,
+        targetTableMode: 'dedicated',
+        targetTableId: obj.targetTableId || 'dedicated',
+        createDedicatedTable: true,
         sections: (obj.sections || []).map(sec => ({
           id: sec.id,
           title: (sec.title || '').trim(),
@@ -14589,9 +14635,9 @@ async function mergeFormToProductionFromParent(formIdentifier) {
         settings: f.settings ? JSON.parse(JSON.stringify(f.settings)) : null,
         appearance: f.appearance ? JSON.parse(JSON.stringify(f.appearance)) : null,
         estimatedTime: f.estimatedTime || null,
-        targetTableMode: f.targetTableType === 'dedicated' ? 'dedicated' : 'unified',
-        targetTableId: f.targetTableId || (f.createDedicatedTable ? 'dedicated' : 'table_all_form_responses'),
-        createDedicatedTable: !!f.createDedicatedTable,
+        targetTableMode: 'dedicated',
+        targetTableId: f.targetTableId || 'dedicated',
+        createDedicatedTable: true,
         isUnpublished: !!f.isUnpublished,
         publishedVersion: nextVer,
         publishedAt: new Date().toISOString()
@@ -15293,6 +15339,17 @@ function setupEventListeners() {
       apAccordionHeader.classList.toggle('collapsed');
       const isHidden = apAccordionContent.style.display === 'none' || !apAccordionContent.style.display;
       apAccordionContent.style.display = isHidden ? 'flex' : 'none';
+    });
+  }
+
+  // 回答フォーム一覧アコーディオン
+  const formsAccordionHeader = document.getElementById('menu-forms-parent');
+  const formsAccordionContent = document.getElementById('menu-forms-content');
+  if (formsAccordionHeader && formsAccordionContent) {
+    formsAccordionHeader.addEventListener('click', () => {
+      formsAccordionHeader.classList.toggle('collapsed');
+      const isHidden = formsAccordionContent.style.display === 'none' || !formsAccordionContent.style.display;
+      formsAccordionContent.style.display = isHidden ? 'flex' : 'none';
     });
   }
 
@@ -21685,6 +21742,9 @@ function handleFormSubmitMessage(event) {
   if (event.data.type === 'SYNAPSE_TABLE_CREATED') {
     const { table } = event.data;
     if (table && table.id) {
+      if (!table.parentMenuId || table.parentMenuId === 'root') {
+        table.parentMenuId = 'forms-accordion';
+      }
       const existsIdx = state.customTables.findIndex(t => t.id === table.id);
       if (existsIdx !== -1) {
         state.customTables[existsIdx] = table;
@@ -21692,25 +21752,11 @@ function handleFormSubmitMessage(event) {
         state.customTables.push(table);
       }
 
-      // 🌟 全フォーム回答データ内の該当フォームの過去回答行があれば、独立テーブル有無を「あり」に更新！
-      const allTable = state.customTables.find(t => t.id === 'table_all_form_responses');
-      if (allTable && allTable.rows && allTable.columns) {
-        const hasDedCol = allTable.columns.find(c => c.name === '独立テーブル有無' || c.label === '独立テーブル有無');
-        const formTitleCol = allTable.columns.find(c => c.name === 'フォーム名' || c.label === 'フォーム名');
-        if (hasDedCol && formTitleCol) {
-          allTable.rows.forEach(r => {
-            if (r[formTitleCol.id] === table.name || r[formTitleCol.id] === table.formTitle) {
-              r[hasDedCol.id] = 'あり';
-            }
-          });
-        }
-      }
-
       localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
       if (typeof renderCustomTableList === 'function') {
         renderCustomTableList();
       }
-      console.log(`[Synapse] Registered dedicated table from Form Studio: "${table.name}" (ID: ${table.id}) and updated dedicated status in consolidated table.`);
+      console.log(`[Synapse] Registered dedicated table from Form Studio: "${table.name}" (ID: ${table.id}).`);
     }
     return;
   }
@@ -21727,10 +21773,7 @@ function handleFormSubmitMessage(event) {
       targetTable = state.customTables.find(t => t.id === targetTableId || t.name === targetTableId);
     }
     if (!targetTable && formTitle) {
-      targetTable = state.customTables.find(t => t.name === formTitle);
-    }
-    if (!targetTable) {
-      targetTable = state.customTables.find(t => t.id === 'table_all_form_responses');
+      targetTable = state.customTables.find(t => t.name === formTitle || (t.formTitle && t.formTitle === formTitle));
     }
     if (!targetTable || !(targetTable.rows || targetTable.data || []).some(r => r.id === rowId)) {
       targetTable = state.customTables.find(t => (t.rows || t.data || []).some(r => r.id === rowId));
@@ -21779,7 +21822,11 @@ function handleFormSubmitMessage(event) {
   // 送信イベント以外はスルー
   if (event.data.type !== 'FORM_SUBMIT') return;
 
-  const { formTitle, data, isTemporary, isPartialSubmit, rowId: clientRowId, nextSectionId, currentSectionId, env, branch, targetTableId, targetTableType } = event.data;
+  const formDef = event.data.formDefinition || {};
+  const formTitle = event.data.formTitle || formDef.title || formDef.name;
+  const targetTableId = event.data.targetTableId || formDef.targetTableId;
+  const targetTableType = event.data.targetTableType || formDef.targetTableType || 'dedicated';
+  const { data, isTemporary, isPartialSubmit, rowId: clientRowId, nextSectionId, currentSectionId, env, branch } = event.data;
   if (!data) return;
 
   // 🧪 テスト送信フラグの判定（Gitブランチ型環境分離: test vs production）
@@ -21808,7 +21855,7 @@ function handleFormSubmitMessage(event) {
   
   data["再開用URL"] = resumeUrl;
 
-  console.log(`%c[Form Submit]%c Received submission for form "${effectiveFormTitle}" (targetTableId: ${targetTableId || 'default: table_all_form_responses'}, targetTableType: ${targetTableType || 'consolidated'}, isTest: ${isTestSubmission}, isTemporary: ${!!isTemporary}, isPartial: ${!!isPartialSubmit}, rowId: ${targetRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
+  console.log(`%c[Form Submit]%c Received submission for form "${effectiveFormTitle}" (targetTableId: ${targetTableId || 'dedicated'}, targetTableType: ${targetTableType || 'dedicated'}, isTest: ${isTestSubmission}, isTemporary: ${!!isTemporary}, isPartial: ${!!isPartialSubmit}, rowId: ${targetRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
 
   // ⚠️ テスト送信時はDBテーブルを作成・汚染しない（ユーザー指定仕様: テストデータ用テーブルは不要）
   if (isTestSubmission) {
@@ -21834,30 +21881,63 @@ function handleFormSubmitMessage(event) {
   // ----------------------------------------------------
   // 1. 保存先テーブルの特定と独立テーブル有無の判定
   // ----------------------------------------------------
-  const reqTableId = targetTableId || 'table_all_form_responses';
-  const reqType = targetTableType || (reqTableId === 'dedicated' ? 'dedicated' : (reqTableId === 'table_all_form_responses' ? 'consolidated' : 'existing'));
-
-  // ユーザーが専用テーブルの作成を選択しているか判定
-  const isDedicatedSelected = !!(
-    event.data.createDedicatedTable === true ||
-    reqType === 'dedicated' ||
-    reqTableId === 'dedicated' ||
-    (reqTableId && reqTableId.startsWith('dedicated'))
-  );
-
-  // 該当フォームの専用独立テーブルが既に存在するか確認
-  let existingDedicated = state.customTables.find(t => 
-    t && t.id !== 'table_all_form_responses' && 
-    (t.name === effectiveFormTitle || t.formTitle === effectiveFormTitle || 
-     (effectiveFormTitle && t.name && (t.name.includes(effectiveFormTitle) || effectiveFormTitle.includes(t.name))) ||
-     (isDedicatedSelected && t.id === reqTableId))
-  );
-
-  // 独立テーブルの有無ステータス（専用テーブル作成を選択している、または既に存在する場合は「あり」、それ以外は「なし」）
-  const hasDedicated = isDedicatedSelected || !!existingDedicated;
-  data["独立テーブル有無"] = hasDedicated ? "あり" : "なし";
-
+  // ----------------------------------------------------
+  // 1. 保存先となる各フォーム専用の独立テーブルを特定・自動生成
+  // ----------------------------------------------------
+  let targetTable = null;
   let isNewTableCreated = false;
+
+  // 1-1. 指定テーブルIDでの検索
+  if (targetTableId && targetTableId !== 'dedicated' && targetTableId !== 'table_all_form_responses') {
+    targetTable = state.customTables.find(t => t.id === targetTableId);
+  }
+
+  // 1-2. フォーム名・タイトルでの完全一致・部分一致検索
+  if (!targetTable && effectiveFormTitle) {
+    targetTable = state.customTables.find(t => 
+      t && t.id !== 'table_all_form_responses' && 
+      (t.name === effectiveFormTitle || t.formTitle === effectiveFormTitle || 
+       t.name.includes(effectiveFormTitle) || effectiveFormTitle.includes(t.name))
+    );
+  }
+
+  // 1-3. まだ独立テーブルが存在しない場合は、このフォーム専用の独立テーブルを自動生成
+  if (!targetTable) {
+    isNewTableCreated = true;
+    const tableId = (targetTableId && targetTableId !== 'dedicated' && targetTableId !== 'table_all_form_responses') 
+      ? targetTableId 
+      : ('table_' + Date.now());
+
+    const columns = Object.keys(data).map((key, idx) => ({
+      id: 'col_' + Math.random().toString(36).substr(2, 9),
+      label: key,
+      name: key,
+      type: 'text',
+      required: idx === 0
+    }));
+
+    const defaultWidths = {};
+    columns.forEach(col => { defaultWidths[col.id] = 120; });
+
+    targetTable = {
+      id: tableId,
+      name: effectiveFormTitle || 'フォーム回答テーブル',
+      formTitle: effectiveFormTitle || 'フォーム回答テーブル',
+      isFormDedicatedTable: true,
+      parentMenuId: 'forms-accordion',
+      columns: columns,
+      visibleColumns: columns.map(c => c.id),
+      columnWidths: defaultWidths,
+      rowHeights: {},
+      fixedCol: 'none',
+      fixedRow: 'none',
+      cellStyles: {},
+      rows: []
+    };
+    state.customTables.push(targetTable);
+  } else if (!targetTable.parentMenuId || targetTable.parentMenuId === 'root') {
+    targetTable.parentMenuId = 'forms-accordion';
+  }
 
   // 汎用テーブル保存ヘルパー関数（カラム自動拡張・行追加/更新）
   function saveSubmissionRowToTable(tbl) {
@@ -21914,88 +21994,8 @@ function handleFormSubmitMessage(event) {
     return row;
   }
 
-  // ----------------------------------------------------
-  // 2. 【必須】全フォーム回答データ（table_all_form_responses）へ必ず格納
-  // ----------------------------------------------------
-  let allResponsesTable = state.customTables.find(t => t.id === 'table_all_form_responses');
-  if (!allResponsesTable) {
-    allResponsesTable = {
-      id: 'table_all_form_responses',
-      name: '全フォーム回答データ',
-      formTitle: '全フォーム共通',
-      isConsolidatedTable: true,
-      parentMenuId: 'root',
-      columns: [
-        { id: 'master_id', name: 'マスターID / コード', label: 'マスターID / コード', type: 'text' },
-        { id: 'form_title', name: 'フォーム名', label: 'フォーム名', type: 'text' },
-        { id: 'has_dedicated_table', name: '独立テーブル有無', label: '独立テーブル有無', type: 'text' },
-        { id: 'status', name: 'ステータス', label: 'ステータス', type: 'text' },
-        { id: 'registration_code', name: '確定登録コード', label: '確定登録コード', type: 'text' },
-        { id: 'submitted_at', name: '回答日時 / 登録日時', label: '回答日時 / 登録日時', type: 'text' },
-        { id: 'resume_url', name: '再開用URL', label: '再開用URL', type: 'text' }
-      ],
-      visibleColumns: ['master_id', 'form_title', 'has_dedicated_table', 'status', 'registration_code', 'submitted_at', 'resume_url'],
-      columnWidths: {},
-      rows: []
-    };
-    state.customTables.unshift(allResponsesTable);
-    isNewTableCreated = true;
-  }
-
-  const allResponsesRow = saveSubmissionRowToTable(allResponsesTable);
-  let targetRow = allResponsesRow;
-  let targetTable = allResponsesTable;
-
-  // ----------------------------------------------------
-  // 3. 【選択時のみ】フォーム専用の独立テーブル、または指定既存テーブルへの格納
-  // ----------------------------------------------------
-  if (isDedicatedSelected) {
-    let dedicatedTable = existingDedicated;
-    if (!dedicatedTable) {
-      // ユーザーが独立テーブルを選択したため新規作成
-      isNewTableCreated = true;
-      const tableId = (reqTableId && reqTableId !== 'dedicated' && reqTableId !== 'table_all_form_responses') ? reqTableId : ('table_' + Date.now());
-      const columns = Object.keys(data).map((key, idx) => ({
-        id: 'col_' + Math.random().toString(36).substr(2, 9),
-        label: key,
-        name: key,
-        type: 'text',
-        required: idx === 0
-      }));
-
-      const defaultWidths = {};
-      columns.forEach(col => { defaultWidths[col.id] = 120; });
-
-      dedicatedTable = {
-        id: tableId,
-        name: effectiveFormTitle,
-        formTitle: effectiveFormTitle,
-        isFormDedicatedTable: true,
-        parentMenuId: 'root',
-        columns: columns,
-        visibleColumns: columns.map(c => c.id),
-        columnWidths: defaultWidths,
-        rowHeights: {},
-        fixedCol: 'none',
-        fixedRow: 'none',
-        cellStyles: {},
-        rows: []
-      };
-      state.customTables.push(dedicatedTable);
-    }
-
-    const dedicatedRow = saveSubmissionRowToTable(dedicatedTable);
-    targetRow = dedicatedRow;
-    targetTable = dedicatedTable;
-
-    // 全フォーム回答データ側の独立テーブル有無も確実に「あり」を記録
-    const dedCol = allResponsesTable.columns.find(c => c.name === '独立テーブル有無' || c.label === '独立テーブル有無');
-    if (dedCol && allResponsesRow) {
-      allResponsesRow[dedCol.id] = 'あり';
-    }
-  }
-  // ※専用テーブルの作成を選択しない場合は、全フォーム回答データ（table_all_form_responses）にのみ保存されて完了します。
-
+  // フォーム専用独立テーブルに回答行を格納
+  const targetRow = saveSubmissionRowToTable(targetTable);
   const effectiveTableName = targetTable ? targetTable.name : (effectiveFormTitle || '無題のフォーム');
 
   // レコードを追加/更新し、LocalStorageへ永続化
@@ -22003,7 +22003,7 @@ function handleFormSubmitMessage(event) {
   
   // 編集監査ログへ記録
   logCellEdit(targetTable.id, targetRowId, 'all_columns', 'none', JSON.stringify(data));
-  console.log(`%c[Synapse Database]%c Saved row (ID: ${targetRowId}) to Master Table "${effectiveTableName}" and Consolidated Table "全フォーム回答データ":`, "color: #3b82f6; font-weight: bold;", "color: inherit;", targetRow);
+  console.log(`%c[Synapse Database]%c Saved row (ID: ${targetRowId}) to Dedicated Table "${effectiveTableName}":`, "color: #3b82f6; font-weight: bold;", "color: inherit;", targetRow);
 
   // 🌐 Supabaseクラウドへの自動永続化同期（synapse_storage & 物理テーブル）
   try {
@@ -22081,7 +22081,7 @@ function handleFormSubmitMessage(event) {
   }
 
   // 現在表示中のカスタムテーブルがこのテーブルであれば、表示をリアルタイム更新する
-  if (state.currentView === 'custom-table-screen' && (state.activeCustomTableId === targetTable.id || state.activeCustomTableId === 'table_all_form_responses')) {
+  if (state.currentView === 'custom-table-screen' && state.activeCustomTableId === targetTable.id) {
     renderCustomTable(state.activeCustomTableId);
   }
 
@@ -34859,6 +34859,7 @@ function updateParentSelectDropdowns() {
   const ctSelect = document.getElementById('ct-table-parent-select');
   
   const options = [
+    { value: 'forms-accordion', text: '📝 回答フォーム一覧' },
     { value: 'agency-info', text: '代理店情報' },
     { value: 'jo-info', text: 'JO情報' },
     { value: 'applicant-info', text: '申込者情報' },
@@ -34867,7 +34868,9 @@ function updateParentSelectDropdowns() {
   ];
 
   state.customAccordions.forEach(acc => {
-    options.push({ value: acc.id, text: getFolderMenuPath(acc.id) });
+    if (!options.some(o => o.value === acc.id)) {
+      options.push({ value: acc.id, text: getFolderMenuPath(acc.id) });
+    }
   });
 
   const renderOpts = (selectEl) => {
@@ -53360,6 +53363,9 @@ function updateServiceUIState() {
 
   const applicantAcc = document.getElementById('applicant-accordion');
   if (applicantAcc) applicantAcc.style.display = included.includes('applicant') ? '' : 'none';
+
+  const formsAcc = document.getElementById('forms-accordion');
+  if (formsAcc) formsAcc.style.display = (included.includes('forms') || included.includes('forms-accordion') || included.includes('form_customize')) ? '' : 'none';
 
   const formCust = document.getElementById('menu-form-customize');
   if (formCust) formCust.style.display = included.includes('form_customize') ? '' : 'none';

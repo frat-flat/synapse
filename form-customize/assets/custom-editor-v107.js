@@ -16535,9 +16535,9 @@
       titleColorCustom: f.titleColorCustom || '#1a73e8',
       titleFontFamily: f.titleFontFamily || 'default',
       titleFontTarget: f.titleFontTarget || 'both',
-      targetTableMode: f.targetTableType === 'dedicated' ? 'dedicated' : (f.targetTableMode || 'unified'),
-      targetTableId: f.targetTableId || (f.createDedicatedTable ? 'dedicated' : 'table_all_form_responses'),
-      createDedicatedTable: !!f.createDedicatedTable,
+      targetTableMode: 'dedicated',
+      targetTableId: f.targetTableId || 'dedicated',
+      createDedicatedTable: true,
       sections: (f.sections || []).map(sec => ({
         id: sec.id,
         title: (sec.title || '').trim(),
@@ -16603,9 +16603,9 @@
       settings: formObj.settings ? JSON.parse(JSON.stringify(formObj.settings)) : null,
       appearance: formObj.appearance ? JSON.parse(JSON.stringify(formObj.appearance)) : null,
       estimatedTime: formObj.estimatedTime || null,
-      targetTableMode: formObj.targetTableType === 'dedicated' ? 'dedicated' : 'unified',
-      targetTableId: formObj.targetTableId || (formObj.createDedicatedTable ? 'dedicated' : 'table_all_form_responses'),
-      createDedicatedTable: !!formObj.createDedicatedTable,
+      targetTableMode: 'dedicated',
+      targetTableId: formObj.targetTableId || 'dedicated',
+      createDedicatedTable: true,
       isUnpublished: !!formObj.isUnpublished,
       publishedVersion: nextVersion,
       publishedAt: new Date().toISOString()
@@ -16750,7 +16750,7 @@
       formTitle: formTitle,
       physicalTableName: pTableName,
       isFormDedicatedTable: true,
-      parentMenuId: 'root',
+      parentMenuId: 'forms-accordion',
       columns: columns,
       visibleColumns: columns.map(c => c.id),
       columnWidths: defaultWidths,
@@ -17161,7 +17161,7 @@
         tableCard.style.background = '#ffffff';
         if (labelEl) labelEl.textContent = '専用テーブルと連携しない';
         if (badgeEl) badgeEl.style.display = 'none';
-        tableDesc.innerHTML = `💡 未選択時：回答はすべて統合テーブル「<strong>全フォーム回答データ</strong>」に保存されます。`;
+        tableDesc.innerHTML = `💡 回答はフォーム専用の独立テーブルに保存されます。`;
         tableDesc.style.color = '#94a3b8';
       }
     };
@@ -17178,6 +17178,65 @@
     // モーダル内ボタンのイベント紐付け
     const closeBtn = document.getElementById('btn-close-merge-modal');
     const cancelBtn = document.getElementById('btn-cancel-merge-modal');
+    const executeBtnReal = document.getElementById('btn-execute-merge-prod');
+
+    if (closeBtn) closeBtn.onclick = closeMergeProductionModal;
+    if (cancelBtn) cancelBtn.onclick = closeMergeProductionModal;
+
+    if (executeBtnReal) {
+      executeBtnReal.onclick = async () => {
+        try {
+          const wantDedicated = dedicatedToggle ? dedicatedToggle.checked : true;
+          if (wantDedicated) {
+            formObj.createDedicatedTable = true;
+            formObj.targetTableType = 'dedicated';
+
+            // 専用テーブルが未作成の場合は新規作成して即時連携
+            if (!dedicatedTable) {
+              const newTbl = createFormDedicatedTableInParent(formObj);
+              if (newTbl && newTbl.id) {
+                formObj.targetTableId = newTbl.id;
+              }
+            } else {
+              formObj.targetTableId = dedicatedTable.id;
+              // 既存テーブルの場合、フォーム側の新しい質問項目（未存在カラム）を検出して追記追加
+              if (dedicatedTable.name !== formTitle) {
+                dedicatedTable.name = formTitle;
+              }
+
+              const res = await updateDedicatedTableColumns(dedicatedTable, formObj);
+              if (res && res.updated) {
+                console.log(`[DedicatedTable] Successfully updated table "${dedicatedTable.name}" with ${res.addedColumns.length} new columns.`);
+              } else {
+                console.log(`[DedicatedTable] Table "${dedicatedTable.name}" requires no column updates.`);
+              }
+            }
+          } else {
+            formObj.createDedicatedTable = true;
+            formObj.targetTableType = 'dedicated';
+            formObj.targetTableId = formObj.targetTableId || 'dedicated';
+          }
+
+          if (typeof syncGlobalTargetTableSelect === 'function') {
+            syncGlobalTargetTableSelect(wantDedicated);
+          }
+
+          mergeFormToProduction(idx);
+          closeMergeProductionModal();
+          const currentTitle = getEffectiveFormTitle(formObj);
+          const nextVersion = (formObj.publishedVersion || 1);
+          showToast(`「${currentTitle}」を本番環境へ統合しました。配布済み本番リンクが最新版（v${nextVersion}）に切り替わりました。`, 'success');
+        } catch(err) {
+          console.error('[MergeProductionModal] Error during merge execution:', err);
+          showToast('本番環境への統合中にエラーが発生しました。', 'error');
+        } finally {
+          if (executeBtnReal) {
+            executeBtnReal.disabled = false;
+            executeBtnReal.textContent = '🚀 本番環境へ統合する';
+          }
+        }
+      };
+    }
 
     if (closeBtn && !closeBtn._hooked) {
       closeBtn._hooked = true;
@@ -17252,9 +17311,9 @@
           }
         }
       } else {
-        formObj.createDedicatedTable = false;
-        formObj.targetTableType = 'consolidated';
-        formObj.targetTableId = 'table_all_form_responses';
+        formObj.createDedicatedTable = true;
+        formObj.targetTableType = 'dedicated';
+        formObj.targetTableId = formObj.targetTableId || 'dedicated';
       }
 
       if (typeof syncGlobalTargetTableSelect === 'function') {
@@ -21088,19 +21147,10 @@
     try {
       customTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || [];
     } catch(e) {}
+    customTables = customTables.filter(t => t && t.id !== 'table_all_form_responses' && t.name !== '全フォーム回答データ');
 
-    // 統合テーブル（全フォーム回答データ）が未登録なら配列の先頭に追加
-    if (!customTables.some(t => t.id === 'table_all_form_responses')) {
-      customTables.unshift({
-        id: 'table_all_form_responses',
-        name: '全フォーム回答データ',
-        formTitle: '全フォーム共通',
-        isConsolidatedTable: true
-      });
-    }
-
-    // 専用テーブル作成が選択されているか
-    const isDedicated = !!(formDef.createDedicatedTable === true || formDef.targetTableType === 'dedicated' || (formDef.targetTableId && formDef.targetTableId !== 'table_all_form_responses'));
+    // 専用テーブル作成が選択されているか（常時専用独立テーブル）
+    const isDedicated = true;
 
     // このフォームと同名の専用テーブルが存在するか確認
     const dedicatedTable = customTables.find(t => (t.name === formTitle || t.id === formDef.targetTableId) && t.id !== 'table_all_form_responses');
@@ -21109,10 +21159,10 @@
     let statusBadgeHtml = '';
     let actionBtnHtml = '';
 
-    if (!isDedicated) {
+    if (!dedicatedTable) {
       statusBadgeHtml = `
-        <span style="background: #e0f2fe; color: #0284c7; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #bae6fd; display: inline-flex; align-items: center; gap: 5px;">
-          <span>🌐</span> <span>専用テーブル未連携：回答は「全フォーム回答データ」に統合保存されます</span>
+        <span style="background: #fef3c7; color: #b45309; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #fde68a; display: inline-flex; align-items: center; gap: 5px;">
+          <span>⚡</span> <span>専用テーブル未作成（本番送信時、または下のボタンから事前作成できます）</span>
         </span>
       `;
       actionBtnHtml = `
@@ -21222,8 +21272,8 @@
 
         <!-- フッター -->
         <div style="padding: 14px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-          <div style="font-size: 0.78rem; color: #64748b;">
-            💡 専用テーブルを作成しない場合、回答は「全フォーム回答データ」に集約して保存されます。
+          <div style="font-size: 0.78rem; color: #15803d; font-weight: 600;">
+            🌟 回答データは常にこのフォーム専用の「独立テーブル」に自動保存されます。
           </div>
           ${actionBtnHtml}
         </div>
@@ -21242,15 +21292,9 @@
     const modalToggle = modal.querySelector('#modal-create-dedicated-table');
     if (modalToggle) {
       modalToggle.addEventListener('change', (e) => {
-        const checked = e.target.checked;
-        formDef.createDedicatedTable = checked;
-        if (checked) {
-          formDef.targetTableType = 'dedicated';
-          formDef.targetTableId = dedicatedTable ? dedicatedTable.id : 'dedicated';
-        } else {
-          formDef.targetTableType = 'consolidated';
-          formDef.targetTableId = 'table_all_form_responses';
-        }
+        formDef.createDedicatedTable = true;
+        formDef.targetTableType = 'dedicated';
+        formDef.targetTableId = dedicatedTable ? dedicatedTable.id : 'dedicated';
 
         // フォーム定義の保存
         if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
@@ -21260,7 +21304,7 @@
         openFormColumnMappingModal(formDef);
 
         // 全体設定画面側のトグルも更新
-        syncGlobalTargetTableSelect(checked);
+        syncGlobalTargetTableSelect(true);
       });
     }
 
@@ -21326,40 +21370,21 @@
     const formDef = window.G || window.L || {};
     const formTitle = getEffectiveFormTitle(formDef);
 
-    let isDedicated = false;
-    if (typeof forcedVal === 'boolean') {
-      isDedicated = forcedVal;
-    } else if (typeof forcedVal === 'string') {
-      isDedicated = forcedVal === 'dedicated' || (forcedVal !== 'table_all_form_responses' && forcedVal !== '');
-    } else {
-      isDedicated = !!(formDef.createDedicatedTable === true || formDef.targetTableType === 'dedicated' || (formDef.targetTableId && formDef.targetTableId !== 'table_all_form_responses'));
-    }
-
     if (globalToggle) {
-      globalToggle.checked = isDedicated;
+      globalToggle.checked = true;
     }
     if (globalSelect) {
-      globalSelect.value = isDedicated ? 'dedicated' : 'table_all_form_responses';
+      globalSelect.value = 'dedicated';
     }
 
     if (card) {
-      if (isDedicated) {
-        card.style.background = '#f0fdf4';
-        card.style.borderColor = '#86efac';
-      } else {
-        card.style.background = '#f8fafc';
-        card.style.borderColor = '#e2e8f0';
-      }
+      card.style.background = '#f0fdf4';
+      card.style.borderColor = '#86efac';
     }
 
     if (statusDesc) {
-      if (isDedicated) {
-        statusDesc.innerHTML = `🌟 このフォーム専用テーブル「<strong>${escapeHtml(formTitle)}</strong>」を作成して回答を保存します（「全フォーム回答データ」にも同時に記録されます）。`;
-        statusDesc.style.color = '#15803d';
-      } else {
-        statusDesc.innerHTML = `💡 選択しない場合：回答はすべて「<strong>全フォーム回答データ</strong>」に保存されて完了します（専用テーブルは作成されません）。`;
-        statusDesc.style.color = '#64748b';
-      }
+      statusDesc.innerHTML = `🌟 回答はこのフォーム専用の独立テーブル「<strong>${escapeHtml(formTitle)}</strong>」（回答フォーム一覧フォルダ）に自動保存されます。`;
+      statusDesc.style.color = '#15803d';
     }
   }
 
@@ -21370,48 +21395,48 @@
     const openModalBtn = document.getElementById('btn-open-col-modal-from-settings');
 
     const formDef = window.G || window.L || {};
-    const isDedicated = !!(formDef.createDedicatedTable === true || formDef.targetTableType === 'dedicated' || (formDef.targetTableId && formDef.targetTableId !== 'table_all_form_responses'));
-    const formKey = (formDef.id || '') + '_' + isDedicated;
+    formDef.createDedicatedTable = true;
+    formDef.targetTableType = 'dedicated';
+    if (!formDef.targetTableId || formDef.targetTableId === 'table_all_form_responses') {
+      formDef.targetTableId = 'dedicated';
+    }
+    const formKey = (formDef.id || '') + '_dedicated';
 
     if (globalToggle && globalToggle.dataset.lastFormKey !== formKey) {
       globalToggle.dataset.lastFormKey = formKey;
-      syncGlobalTargetTableSelect(isDedicated);
+      syncGlobalTargetTableSelect(true);
     }
 
     if (globalToggle && !globalToggle.dataset.bound) {
       globalToggle.dataset.bound = 'true';
+      globalToggle.checked = true;
       globalToggle.addEventListener('change', (e) => {
-        const checked = e.target.checked;
         const curDef = window.G || window.L || {};
-        curDef.createDedicatedTable = checked;
-        if (checked) {
-          curDef.targetTableType = 'dedicated';
-          curDef.targetTableId = 'dedicated';
-        } else {
-          curDef.targetTableType = 'consolidated';
-          curDef.targetTableId = 'table_all_form_responses';
-        }
+        curDef.createDedicatedTable = true;
+        curDef.targetTableType = 'dedicated';
+        curDef.targetTableId = 'dedicated';
 
         if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
         if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
-        globalToggle.dataset.lastFormKey = (curDef.id || '') + '_' + checked;
-        syncGlobalTargetTableSelect(checked);
+        globalToggle.checked = true;
+        globalToggle.dataset.lastFormKey = (curDef.id || '') + '_dedicated';
+        syncGlobalTargetTableSelect(true);
       });
     }
 
     // 互換性のための非表示セレクトイベント
     if (globalSelect && !globalSelect.dataset.bound) {
       globalSelect.dataset.bound = 'true';
+      globalSelect.value = 'dedicated';
       globalSelect.addEventListener('change', (e) => {
-        const checked = e.target.value === 'dedicated';
-        if (globalToggle) globalToggle.checked = checked;
+        if (globalToggle) globalToggle.checked = true;
         const curDef = window.G || window.L || {};
-        curDef.createDedicatedTable = checked;
-        curDef.targetTableType = checked ? 'dedicated' : 'consolidated';
-        curDef.targetTableId = checked ? 'dedicated' : 'table_all_form_responses';
+        curDef.createDedicatedTable = true;
+        curDef.targetTableType = 'dedicated';
+        curDef.targetTableId = 'dedicated';
         if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
         if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
-        syncGlobalTargetTableSelect(checked);
+        syncGlobalTargetTableSelect(true);
       });
     }
 
