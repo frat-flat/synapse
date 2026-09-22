@@ -17516,19 +17516,18 @@
 
     const cols = Array.isArray(dedicatedTable.columns) ? dedicatedTable.columns : [];
     const existingColIds = new Set(cols.map(c => c && c.id).filter(Boolean));
-    const existingColLabels = new Set(cols.map(c => c && (c.label || c.name || '').trim()).filter(Boolean));
 
     const newColumnsToAdd = [];
     formQuestions.forEach(q => {
       const colId = q.dataKey || `col_${q.id}`;
       const colName = (q.title || q.dataKey || q.id || '').trim();
 
-      const hasId = existingColIds.has(colId) || (q.id && existingColIds.has(q.id)) || (q.dataKey && existingColIds.has(q.dataKey));
-      const hasLabel = colName && existingColLabels.has(colName);
+      // カラムID（dataKeyまたは固有ID）が既存カラム一覧に既に存在するかチェック
+      const hasId = existingColIds.has(colId);
 
       if (hasId) {
         // 既存カラムが存在する場合はラベル統合（例: 法人名 と 屋号 を統一）
-        const targetCol = cols.find(c => c && (c.id === colId || c.id === q.id || c.id === q.dataKey));
+        const targetCol = cols.find(c => c && c.id === colId);
         if (targetCol && colName && !targetCol.label.includes(colName)) {
           targetCol.label = `${targetCol.label} / ${colName}`;
           targetCol.name = targetCol.label;
@@ -17536,36 +17535,33 @@
         return;
       }
 
-      if (!hasId && !hasLabel) {
-        let colType = 'text';
-        if (q.type === 'date') colType = 'date';
-        else if (q.type === 'select' || q.type === 'radio') colType = 'select';
-        else if (q.type === 'number') colType = 'number';
+      // colIdが存在しない場合：ラベル（タイトル）が既存と同一（例: 複数箇所の「町名・番地」「郵便番号」）であっても
+      // 独立した物理カラム（main_street, mail_street など）として新設するため必ず追加する
+      let colType = 'text';
+      if (q.type === 'date') colType = 'date';
+      else if (q.type === 'select' || q.type === 'radio') colType = 'select';
+      else if (q.type === 'number') colType = 'number';
 
-        let choices = undefined;
-        if (Array.isArray(q.options) && q.options.length > 0) {
-          choices = q.options.map(opt => {
-            if (typeof opt === 'object' && opt !== null) {
-              return { value: opt.label || opt.value || '' };
-            }
-            return { value: String(opt) };
-          });
-        }
-
-        const newCol = {
-          id: colId,
-          label: colName,
-          name: colName,
-          type: colType,
-          required: !!q.required,
-          choices: choices
-        };
-        newColumnsToAdd.push(newCol);
-        existingColIds.add(colId);
-        if (q.id) existingColIds.add(q.id);
-        if (q.dataKey) existingColIds.add(q.dataKey);
-        if (colName) existingColLabels.add(colName);
+      let choices = undefined;
+      if (Array.isArray(q.options) && q.options.length > 0) {
+        choices = q.options.map(opt => {
+          if (typeof opt === 'object' && opt !== null) {
+            return { value: opt.label || opt.value || '' };
+          }
+          return { value: String(opt) };
+        });
       }
+
+      const newCol = {
+        id: colId,
+        label: colName,
+        name: colName,
+        type: colType,
+        required: !!q.required,
+        choices: choices
+      };
+      newColumnsToAdd.push(newCol);
+      existingColIds.add(colId);
     });
 
     return { newColumnsToAdd, existingColCount: cols.length };
@@ -17656,10 +17652,12 @@
     // 🌐 Supabaseクラウド上の物理テーブルへ追加カラムを動的反映 (RPC)
     if (newColumnsToAdd && newColumnsToAdd.length > 0) {
       try {
-        const rawSlug = (formDef.id || formDef.title || dedicatedTable.name || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
-        const pTableName = rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
+        const pTableName = dedicatedTable.physicalTableName || 
+                           formDef.physicalTableName || 
+                           (typeof getPhysicalTableNameForForm === 'function' ? getPhysicalTableNameForForm(formDef) : null) || 
+                           'form_referral_agency_application';
         const rpcCols = newColumnsToAdd.map(c => ({ id: c.id, label: c.label || c.name, type: c.type || 'text' }));
-        await fetch(`${sbUrl}/rest/v1/rpc/synapse_create_or_alter_table`, {
+        const rpcRes = await fetch(`${sbUrl}/rest/v1/rpc/synapse_create_or_alter_table`, {
           method: 'POST',
           headers: {
             apikey: sbKey,
@@ -17671,7 +17669,8 @@
             p_columns: rpcCols
           })
         });
-        console.log(`[Supabase Physical Table] Added ${newColumnsToAdd.length} columns to table "${pTableName}" via RPC.`);
+        const rpcData = await rpcRes.json().catch(() => null);
+        console.log(`[Supabase Physical Table] Added ${newColumnsToAdd.length} columns to table "${pTableName}" via RPC:`, rpcData);
       } catch (rpcErr) {
         console.warn('[Supabase Physical Table Alter RPC]', rpcErr);
       }
