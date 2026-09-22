@@ -15239,7 +15239,7 @@ function loadTabState(tab) {
         sub: `ID: ${data.introducerId}`,
         type: data.introducerType || 'party',
         typeLabel: (data.introducerType === 'temp') ? '見込み客（仮ID）' : '本登録Party ID'
-      });
+      }, data.customerType === 'existing');
     } else {
       selectAppointIntroducer(null);
     }
@@ -21481,10 +21481,43 @@ function selectCustomer(customer) {
       if (switchToggleContainer) switchToggleContainer.style.display = 'none';
     }
 
+    // 👤 紹介者の自動事前表記（プリフィル） & 既存顧客紹介者固定
+    let foundIntro = null;
+    if (customer.introducerId) {
+      foundIntro = {
+        id: customer.introducerId,
+        name: customer.introducerName || customer.introducerId,
+        type: customer.introducerType || 'party',
+        sub: `ID: ${customer.introducerId}`,
+        typeLabel: (customer.introducerType === 'temp') ? '見込み客（仮ID）' : '本登録Party ID'
+      };
+    } else if (relatedAppoints && relatedAppoints.length > 0) {
+      const apWithIntro = relatedAppoints.find(a => a.introducerId);
+      if (apWithIntro) {
+        foundIntro = {
+          id: apWithIntro.introducerId,
+          name: apWithIntro.introducerName || apWithIntro.introducerId,
+          type: apWithIntro.introducerType || 'party',
+          sub: `ID: ${apWithIntro.introducerId}`,
+          typeLabel: (apWithIntro.introducerType === 'temp') ? '見込み客（仮ID）' : '本登録Party ID'
+        };
+      }
+    }
+
+    if (foundIntro && typeof selectAppointIntroducer === 'function') {
+      selectAppointIntroducer(foundIntro, true);
+    } else if (typeof unlockAppointIntroducer === 'function') {
+      unlockAppointIntroducer();
+    }
+
     setFormMode('existing');
   } else {
     banner.style.display = 'none';
     const placeholder = document.getElementById('existing-customer-placeholder');
+    
+    if (typeof unlockAppointIntroducer === 'function') {
+      unlockAppointIntroducer();
+    }
     
     const nameInput = document.getElementById('customer-name');
     if (state.formMode === 'existing') {
@@ -23277,7 +23310,7 @@ function handleFormSubmit(e) {
   e.preventDefault();
   
   const dateVal = document.getElementById('appoint-date').value;
-  const meetingTypeVal = document.querySelector('input[name="appoint-meeting-type"]:checked')?.value;
+  const meetingTypeVal = document.getElementById('appoint-source-type')?.value || document.querySelector('input[name="appoint-meeting-type"]:checked')?.value;
   const nameVal = document.getElementById('customer-name').value.trim();
   const memoVal = document.getElementById('appoint-memo').value.trim();
 
@@ -23295,7 +23328,68 @@ function handleFormSubmit(e) {
     return;
   }
 
+  // 👤 流入経路が「オフライン」「営業」の場合の紹介者未入力チェック
+  const sourceType = document.getElementById('appoint-source-type')?.value;
+  const category = document.getElementById('appoint-source-category')?.value;
+  const isSalesOffline = (meetingTypeVal === 'offline' || sourceType === 'offline') &&
+                         (category === '営業' || (typeof category === 'string' && category.includes('営業')));
+  const introId = document.getElementById('appoint-hidden-introducer-id')?.value;
+
+  if (isSalesOffline && !introId && !state.selectedIntroducer) {
+    openNoIntroducerConfirmModal(() => {
+      saveAppointmentData('official');
+    });
+    return;
+  }
+
   saveAppointmentData('official');
+}
+
+// 👤 営業紹介者未設定時の確認ポップアップ表示
+function openNoIntroducerConfirmModal(onProceed) {
+  const modal = document.getElementById('modal-appoint-no-intro-confirm');
+  if (!modal) {
+    onProceed();
+    return;
+  }
+
+  modal.style.display = 'flex';
+  modal.classList.add('active');
+
+  const closeModal = () => {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  };
+
+  const closeBtn = document.getElementById('btn-close-no-intro-modal');
+  const cancelBtn = document.getElementById('btn-cancel-no-intro');
+  const confirmBtn = document.getElementById('btn-confirm-no-intro-submit');
+
+  if (closeBtn) closeBtn.onclick = closeModal;
+
+  // 「紹介者を設定する」ボタン：モーダルを閉じ、検索入力欄にフォーカス＆スムーズスクロール
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      closeModal();
+      const introGroup = document.getElementById('appoint-sales-introducer-group');
+      const searchInput = document.getElementById('appoint-introducer-search-input');
+      if (introGroup) {
+        introGroup.style.display = 'block';
+        introGroup.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      if (searchInput) {
+        setTimeout(() => searchInput.focus(), 300);
+      }
+    };
+  }
+
+  // 「紹介者なしで登録する」ボタン：モーダルを閉じ、そのまま登録実行
+  if (confirmBtn) {
+    confirmBtn.onclick = () => {
+      closeModal();
+      onProceed();
+    };
+  }
 }
 
 // カスタムフォームの送信イベントハンドラ（パートナーDB転送およびCOS内マスタ自動構築）
@@ -23987,7 +24081,156 @@ function invalidateAppointFormLinks(appointId) {
   }
 }
 
-// 3. アポイント連結時の4パターン判定エンジン
+// 2.5 連結チェーンと紹介者チェーン情報の取得ヘルパー
+function getLinkedAppointmentChain(startId) {
+  if (!startId) return [];
+  const visited = new Set();
+  const queue = [startId];
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (!cur || visited.has(cur)) continue;
+    visited.add(cur);
+    const ap = state.appointments?.find(a => a.id === cur);
+    if (ap && ap.relatedAppointmentIds) {
+      const rels = ap.relatedAppointmentIds.split(',').map(s => s.trim()).filter(Boolean);
+      rels.forEach(r => {
+        if (!visited.has(r)) queue.push(r);
+      });
+    }
+  }
+  return Array.from(visited);
+}
+
+function getChainIntroducerInfo(appointId) {
+  const chain = getLinkedAppointmentChain(appointId);
+  // 現在フォームで編集中ならその値を最優先
+  if (state.editingAppointId && chain.includes(state.editingAppointId)) {
+    const hiddenId = document.getElementById('appoint-hidden-introducer-id')?.value;
+    const hiddenName = document.getElementById('appoint-hidden-introducer-name')?.value;
+    const hiddenType = document.getElementById('appoint-hidden-introducer-type')?.value;
+    if (hiddenId) {
+      return {
+        id: hiddenId,
+        name: hiddenName || hiddenId,
+        type: hiddenType || 'party',
+        chain: chain
+      };
+    }
+  }
+
+  for (const cid of chain) {
+    const ap = state.appointments?.find(a => a.id === cid);
+    if (ap && ap.introducerId) {
+      return {
+        id: ap.introducerId,
+        name: ap.introducerName || ap.introducerId,
+        type: ap.introducerType || 'party',
+        chain: chain
+      };
+    }
+  }
+
+  return { id: '', name: '', type: '', chain: chain };
+}
+
+function unifyChainIntroducers(chainIds, targetIntro) {
+  if (!Array.isArray(chainIds) || !targetIntro || !targetIntro.id) return;
+  let changed = false;
+  chainIds.forEach(id => {
+    const ap = state.appointments?.find(a => a.id === id);
+    if (ap) {
+      ap.introducerId = targetIntro.id;
+      ap.introducerName = targetIntro.name;
+      ap.introducerType = targetIntro.type;
+      changed = true;
+    }
+  });
+  if (changed) {
+    localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(state.appointments));
+  }
+}
+
+// ⚠️ アポイント紹介者不一致・統一モーダルの表示
+function openIntroducerUnifyConflictModal(curIntro, targetIntro, currentAppoint, targetAppoint, onProceed) {
+  const modal = document.getElementById('modal-appoint-intro-unify-conflict');
+  if (!modal) {
+    onProceed();
+    return;
+  }
+
+  const nameA = document.getElementById('conflict-intro-a-name');
+  const idA = document.getElementById('conflict-intro-a-id');
+  const metaA = document.getElementById('conflict-intro-a-meta');
+  const btnLabelA = document.getElementById('btn-unify-intro-to-cur-label');
+
+  const nameB = document.getElementById('conflict-intro-b-name');
+  const idB = document.getElementById('conflict-intro-b-id');
+  const metaB = document.getElementById('conflict-intro-b-meta');
+  const btnLabelB = document.getElementById('btn-unify-intro-to-target-label');
+
+  if (nameA) nameA.textContent = curIntro.name || '（紹介者名未設定）';
+  if (idA) idA.textContent = `ID: ${curIntro.id}`;
+  if (metaA) metaA.textContent = `アポ: ${currentAppoint.customerName || currentAppoint.id} (${curIntro.type === 'temp' ? '見込み客' : '本登録'})`;
+  if (btnLabelA) btnLabelA.textContent = `${curIntro.name || curIntro.id} 様`;
+
+  if (nameB) nameB.textContent = targetIntro.name || '（紹介者名未設定）';
+  if (idB) idB.textContent = `ID: ${targetIntro.id}`;
+  if (metaB) metaB.textContent = `アポ: ${targetAppoint.customerName || targetAppoint.id} (${targetIntro.type === 'temp' ? '見込み客' : '本登録'})`;
+  if (btnLabelB) btnLabelB.textContent = `${targetIntro.name || targetIntro.id} 様`;
+
+  modal.style.display = 'flex';
+  modal.classList.add('active');
+
+  const closeModal = () => {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  };
+
+  const closeBtn = document.getElementById('btn-close-unify-intro-modal');
+  const cancelBtn = document.getElementById('btn-cancel-unify-intro');
+  const btnCur = document.getElementById('btn-unify-intro-to-cur');
+  const btnTarget = document.getElementById('btn-unify-intro-to-target');
+
+  if (closeBtn) closeBtn.onclick = closeModal;
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      closeModal();
+      showToast('アポイントの連結を中止しました。', 'info');
+    };
+  }
+
+  // ① 現在のアポの紹介者（curIntro）に統一
+  if (btnCur) {
+    btnCur.onclick = () => {
+      closeModal();
+      unifyChainIntroducers(targetIntro.chain, curIntro);
+      showToast(`紹介者を「${curIntro.name}」様に統一して連結しました。`, 'success');
+      onProceed();
+    };
+  }
+
+  // ② 連結先のアポの紹介者（targetIntro）に統一
+  if (btnTarget) {
+    btnTarget.onclick = () => {
+      closeModal();
+      unifyChainIntroducers(curIntro.chain, targetIntro);
+      // 現在フォームにも反映 & ロック
+      if (typeof selectAppointIntroducer === 'function') {
+        selectAppointIntroducer({
+          id: targetIntro.id,
+          name: targetIntro.name,
+          type: targetIntro.type,
+          typeLabel: (targetIntro.type === 'temp') ? '見込み客（仮ID）' : '本登録Party ID',
+          sub: `ID: ${targetIntro.id}`
+        }, true);
+      }
+      showToast(`紹介者を「${targetIntro.name}」様に統一して連結しました。`, 'success');
+      onProceed();
+    };
+  }
+}
+
+// 3. アポイント連結時の4パターン判定エンジン（紹介者統一 & Party ID判定）
 function evaluateAppointmentLinking(currentAppoint, targetAppointId, onApproved) {
   if (!currentAppoint || !targetAppointId) return;
 
@@ -24003,49 +24246,87 @@ function evaluateAppointmentLinking(currentAppoint, targetAppointId, onApproved)
     return;
   }
 
-  const curContext = getEffectiveAppointMasterContext(currentAppoint);
-  const targetContext = getEffectiveAppointMasterContext(targetAppoint);
+  // 後続のParty ID 4パターン判定処理
+  const proceedPartyCheck = () => {
+    const curContext = getEffectiveAppointMasterContext(currentAppoint);
+    const targetContext = getEffectiveAppointMasterContext(targetAppoint);
 
-  const curHasParty = curContext.isOfficial && curContext.officialPartyId;
-  const targetHasParty = targetContext.isOfficial && targetContext.officialPartyId;
+    const curHasParty = curContext.isOfficial && curContext.officialPartyId;
+    const targetHasParty = targetContext.isOfficial && targetContext.officialPartyId;
 
-  // ⚠️ パターン4: 双方本登録後、かつ異なるParty ID（重複競合）
-  if (curHasParty && targetHasParty && curContext.officialPartyId !== targetContext.officialPartyId) {
-    openPartyIdConflictModal(targetContext, curContext, currentAppoint, targetAppoint, onApproved);
-    return;
-  }
+    // ⚠️ パターン4: 双方本登録後、かつ異なるParty ID（重複競合）
+    if (curHasParty && targetHasParty && curContext.officialPartyId !== targetContext.officialPartyId) {
+      openPartyIdConflictModal(targetContext, curContext, currentAppoint, targetAppoint, onApproved);
+      return;
+    }
 
-  // 🌟 パターン1: 双方本登録前
-  if (!curHasParty && !targetHasParty) {
-    const curTime = currentAppoint.date ? new Date(currentAppoint.date).getTime() : 0;
-    const targetTime = targetAppoint.date ? new Date(targetAppoint.date).getTime() : 0;
-    const olderAppoint = curTime < targetTime ? currentAppoint : targetAppoint;
-    
-    // 古い方のアポのフォームリンクを無効化
-    invalidateAppointFormLinks(olderAppoint.id);
+    // 🌟 パターン1: 双方本登録前
+    if (!curHasParty && !targetHasParty) {
+      const curTime = currentAppoint.date ? new Date(currentAppoint.date).getTime() : 0;
+      const targetTime = targetAppoint.date ? new Date(targetAppoint.date).getTime() : 0;
+      const olderAppoint = curTime < targetTime ? currentAppoint : targetAppoint;
+      
+      // 古い方のアポのフォームリンクを無効化
+      invalidateAppointFormLinks(olderAppoint.id);
+      onApproved();
+      showToast('アポイントを連結しました（過去アポイントのフォームリンクは無効化されました）。', 'success');
+      return;
+    }
+
+    // 🌟 パターン2: 過去側が本登録済、現在側が本登録前
+    if (targetHasParty && !curHasParty) {
+      invalidateAppointFormLinks(currentAppoint.id);
+      onApproved();
+      showToast(`本登録顧客（ID: ${targetContext.officialPartyId}）にアポイントを連結しました。`, 'success');
+      return;
+    }
+
+    // 🌟 パターン3: 現在側が本登録済、過去側が本登録前
+    if (curHasParty && !targetHasParty) {
+      invalidateAppointFormLinks(targetAppoint.id);
+      onApproved();
+      showToast(`本登録顧客（ID: ${curContext.officialPartyId}）に過去アポイントを連結しました。`, 'success');
+      return;
+    }
+
+    // 同一Party IDの場合はそのまま連結
     onApproved();
-    showToast('アポイントを連結しました（過去アポイントのフォームリンクは無効化されました）。', 'success');
+  };
+
+  // 👤 紹介者の整合性チェック & 一括統一制御
+  const curIntro = getChainIntroducerInfo(currentAppoint.id);
+  const targetIntro = getChainIntroducerInfo(targetAppointId);
+
+  // 双方に紹介者があり、かつ異なる紹介者の場合（不一致競合）
+  if (curIntro.id && targetIntro.id && curIntro.id !== targetIntro.id) {
+    openIntroducerUnifyConflictModal(curIntro, targetIntro, currentAppoint, targetAppoint, () => {
+      proceedPartyCheck();
+    });
     return;
   }
 
-  // 🌟 パターン2: 過去側が本登録済、現在側が本登録前
-  if (targetHasParty && !curHasParty) {
-    invalidateAppointFormLinks(currentAppoint.id);
-    onApproved();
-    showToast(`本登録顧客（ID: ${targetContext.officialPartyId}）にアポイントを連結しました。`, 'success');
+  // 片方のみ紹介者がある場合は、紹介者あり側に自動統一
+  if (curIntro.id && !targetIntro.id) {
+    unifyChainIntroducers(targetIntro.chain, curIntro);
+    proceedPartyCheck();
+    return;
+  } else if (!curIntro.id && targetIntro.id) {
+    unifyChainIntroducers(curIntro.chain, targetIntro);
+    if (state.editingAppointId === currentAppoint.id && typeof selectAppointIntroducer === 'function') {
+      selectAppointIntroducer({
+        id: targetIntro.id,
+        name: targetIntro.name,
+        type: targetIntro.type,
+        typeLabel: (targetIntro.type === 'temp') ? '見込み客（仮ID）' : '本登録Party ID',
+        sub: `ID: ${targetIntro.id}`
+      }, true);
+    }
+    proceedPartyCheck();
     return;
   }
 
-  // 🌟 パターン3: 現在側が本登録済、過去側が本登録前
-  if (curHasParty && !targetHasParty) {
-    invalidateAppointFormLinks(targetAppoint.id);
-    onApproved();
-    showToast(`本登録顧客（ID: ${curContext.officialPartyId}）に過去アポイントを連結しました。`, 'success');
-    return;
-  }
-
-  // 同一Party IDの場合はそのまま連結
-  onApproved();
+  // 双方紹介者なし、または同一紹介者の場合はそのまま続行
+  proceedPartyCheck();
 }
 
 // 4. 重複Party ID解決モーダル（パターン4）の表示
@@ -24267,7 +24548,7 @@ function searchIntroducerCandidates(query) {
   return candidates;
 }
 
-function selectAppointIntroducer(intro) {
+function selectAppointIntroducer(intro, isLocked = false) {
   const hiddenId = document.getElementById('appoint-hidden-introducer-id');
   const hiddenName = document.getElementById('appoint-hidden-introducer-name');
   const hiddenType = document.getElementById('appoint-hidden-introducer-type');
@@ -24277,12 +24558,19 @@ function selectAppointIntroducer(intro) {
   const typeBadge = document.getElementById('appoint-selected-intro-type-badge');
   const resultsContainer = document.getElementById('appoint-introducer-search-results');
   const inputEl = document.getElementById('appoint-introducer-search-input');
+  const removeBtn = document.getElementById('btn-remove-appoint-introducer');
+  const lockedNotice = document.getElementById('appoint-intro-locked-notice');
+  const searchRow = inputEl ? inputEl.closest('div[style*="display: flex"]') : null;
 
   if (!intro) {
     if (hiddenId) hiddenId.value = '';
     if (hiddenName) hiddenName.value = '';
     if (hiddenType) hiddenType.value = '';
     if (box) box.style.display = 'none';
+    if (lockedNotice) lockedNotice.style.display = 'none';
+    if (removeBtn) removeBtn.style.display = 'inline-flex';
+    if (searchRow) searchRow.style.display = 'flex';
+    state.isIntroducerLocked = false;
     return;
   }
 
@@ -24291,7 +24579,7 @@ function selectAppointIntroducer(intro) {
   if (hiddenType) hiddenType.value = intro.type;
 
   if (nameEl) nameEl.textContent = `${intro.name} (${intro.id})`;
-  if (metaEl) metaEl.textContent = intro.sub;
+  if (metaEl) metaEl.textContent = intro.sub || `ID: ${intro.id}`;
   if (typeBadge) {
     typeBadge.textContent = intro.typeLabel || (intro.type === 'party' ? '本登録Party ID' : '見込み客（仮ID）');
     typeBadge.style.background = (intro.type === 'party') ? 'var(--primary)' : 'var(--warning)';
@@ -24300,10 +24588,33 @@ function selectAppointIntroducer(intro) {
   if (resultsContainer) resultsContainer.style.display = 'none';
   if (inputEl) inputEl.value = '';
 
+  // 🔒 ロック制御（既存顧客に登録済み紹介者の場合は変更不可にする）
+  state.isIntroducerLocked = !!isLocked;
+  if (isLocked) {
+    if (removeBtn) removeBtn.style.display = 'none';
+    if (lockedNotice) lockedNotice.style.display = 'flex';
+    if (searchRow) searchRow.style.display = 'none';
+  } else {
+    if (removeBtn) removeBtn.style.display = 'inline-flex';
+    if (lockedNotice) lockedNotice.style.display = 'none';
+    if (searchRow) searchRow.style.display = 'flex';
+  }
+
   state.isFormDirty = true;
   if (typeof showToast === 'function') {
     showToast(`紹介者「${intro.name}」を紐付けました。`, 'success');
   }
+}
+
+function unlockAppointIntroducer() {
+  state.isIntroducerLocked = false;
+  const removeBtn = document.getElementById('btn-remove-appoint-introducer');
+  const lockedNotice = document.getElementById('appoint-intro-locked-notice');
+  const inputEl = document.getElementById('appoint-introducer-search-input');
+  const searchRow = inputEl ? inputEl.closest('div[style*="display: flex"]') : null;
+  if (removeBtn) removeBtn.style.display = 'inline-flex';
+  if (lockedNotice) lockedNotice.style.display = 'none';
+  if (searchRow) searchRow.style.display = 'flex';
 }
 
 function updateSalesIntroducerVisibility() {

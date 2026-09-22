@@ -2857,6 +2857,10 @@
           <input type="hidden" id="appoint-hidden-introducer-id" value="">
           <input type="hidden" id="appoint-hidden-introducer-name" value="">
           <input type="hidden" id="appoint-hidden-introducer-type" value="">
+          <div id="appoint-intro-locked-notice" style="display: none; margin-top: 0.45rem; font-size: 0.74rem; color: #4338ca; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 4px; padding: 0.35rem 0.6rem; align-items: center; gap: 0.35rem;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <span>※ 既存顧客に登録済みの紹介者に統一されています（変更不可）</span>
+          </div>
         </div>
 
         <div class="form-group required" id="customer-name-group">
@@ -5413,6 +5417,82 @@
 
       <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
         <button type="button" class="btn btn-secondary" id="btn-cancel-conflict-resolution" style="font-size: 0.8rem; padding: 0.35rem 0.8rem;">キャンセル（連結しない）</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 👤 営業紹介者未設定確認モーダル ================= -->
+<div class="modal-overlay" id="modal-appoint-no-intro-confirm" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 20065; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+  <div class="modal-box" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 440px; max-width: 95%; box-shadow: var(--shadow-lg); overflow: hidden;">
+    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); background: rgba(99, 102, 241, 0.08);">
+      <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.95rem; color: var(--primary);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        <span>紹介者の未設定確認</span>
+      </div>
+      <button type="button" id="btn-close-no-intro-modal" style="background: none; border: none; font-size: 1.3rem; color: var(--text-muted); cursor: pointer; line-height: 1;">&times;</button>
+    </div>
+    <div class="modal-body" style="padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+      <p style="font-size: 0.9rem; color: var(--text-primary); margin: 0; line-height: 1.6; font-weight: 600;">
+        紹介者を登録せずに、このままアポイントを確定してもよろしいですか？
+      </p>
+      <div style="display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.25rem;">
+        <button type="button" class="btn btn-secondary" id="btn-cancel-no-intro" style="font-size: 0.82rem; padding: 0.45rem 0.9rem;">紹介者を設定する</button>
+        <button type="button" class="btn btn-primary" id="btn-confirm-no-intro-submit" style="font-size: 0.82rem; padding: 0.45rem 1rem; font-weight: 600;">紹介者なしで登録する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ⚠️ アポイント紹介者不一致・統一モーダル ================= -->
+<div class="modal-overlay" id="modal-appoint-intro-unify-conflict" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 20070; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+  <div class="modal-box" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 560px; max-width: 95%; box-shadow: var(--shadow-lg); overflow: hidden;">
+    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); background: rgba(245, 158, 11, 0.08);">
+      <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.95rem; color: #d97706;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        <span>紹介者の不一致（統一確認）</span>
+      </div>
+      <button type="button" id="btn-close-unify-intro-modal" style="background: none; border: none; font-size: 1.3rem; color: var(--text-muted); cursor: pointer; line-height: 1;">&times;</button>
+    </div>
+    <div class="modal-body" style="padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+      <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0; line-height: 1.5;">
+        連結対象のアポイントにそれぞれ<strong>異なる紹介者</strong>が登録されています。<br>
+        同一顧客のアポイントでは紹介者を統一する必要があります。どちらの紹介者に統一して連結しますか？
+      </p>
+
+      <!-- 2つの紹介者候補対比カード -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <!-- 紹介者A -->
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem;">
+          <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.25rem;" id="conflict-intro-a-title">現在のアポ</div>
+          <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary);" id="conflict-intro-a-name">-</div>
+          <div style="font-family: monospace; font-size: 0.76rem; color: var(--primary); margin-top: 0.15rem;" id="conflict-intro-a-id">-</div>
+          <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem;" id="conflict-intro-a-meta">-</div>
+        </div>
+        <!-- 紹介者B -->
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem;">
+          <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.25rem;" id="conflict-intro-b-title">連結先のアポ</div>
+          <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary);" id="conflict-intro-b-name">-</div>
+          <div style="font-family: monospace; font-size: 0.76rem; color: var(--primary); margin-top: 0.15rem;" id="conflict-intro-b-id">-</div>
+          <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem;" id="conflict-intro-b-meta">-</div>
+        </div>
+      </div>
+
+      <!-- 解決方法ボタン -->
+      <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.25rem;">
+        <button type="button" class="btn btn-outline-primary" id="btn-unify-intro-to-cur" style="text-align: left; padding: 0.75rem; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 0.2rem; cursor: pointer;">
+          <div style="font-weight: 700; font-size: 0.85rem;">① 【<span id="btn-unify-intro-to-cur-label">紹介者A</span>】に統一して一括変更し連結</div>
+          <div style="font-size: 0.72rem; color: var(--text-secondary);">連結先の全アポイントの紹介者をこの紹介者に一括更新して連結します。</div>
+        </button>
+
+        <button type="button" class="btn btn-outline-primary" id="btn-unify-intro-to-target" style="text-align: left; padding: 0.75rem; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 0.2rem; cursor: pointer;">
+          <div style="font-weight: 700; font-size: 0.85rem;">② 【<span id="btn-unify-intro-to-target-label">紹介者B</span>】に統一して一括変更し連結</div>
+          <div style="font-size: 0.72rem; color: var(--text-secondary);">現在のアポイント（および関連アポ）の紹介者をこの紹介者に一括更新して連結します。</div>
+        </button>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+        <button type="button" class="btn btn-secondary" id="btn-cancel-unify-intro" style="font-size: 0.8rem; padding: 0.35rem 0.8rem;">連結を中止する</button>
       </div>
     </div>
   </div>
