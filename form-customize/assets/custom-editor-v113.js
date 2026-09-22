@@ -28,6 +28,27 @@
     } catch(e) {}
   })();
 
+  // 🌐 起動時: Supabaseクラウド上の最新テーブル定義（synapse_custom_tables）を非同期取得して同期
+  (async function syncCustomTablesFromSupabase() {
+    try {
+      const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+      const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+      const res = await fetch(`${sbUrl}/rest/v1/synapse_storage?key=eq.synapse_custom_tables&select=value`, {
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data[0] && Array.isArray(data[0].value)) {
+          const cloudTables = data[0].value;
+          localStorage.setItem('synapse_custom_tables', JSON.stringify(cloudTables));
+          console.log('[Startup] Synced synapse_custom_tables from Supabase cloud:', cloudTables.length, 'tables');
+        }
+      }
+    } catch(e) {
+      console.warn('[Startup] Could not fetch synapse_custom_tables from Supabase:', e);
+    }
+  })();
+
   console.log('custom-editor.js loading...');
 
   // 🌐 API連携規則（国税庁・インボイス・郵便番号・全銀協）の拡張保証
