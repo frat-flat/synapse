@@ -4033,9 +4033,10 @@ function ensureStandardTablesInState() {
   state.customTables.forEach(t => {
     if (!t) return;
     if (t.isSystem || t.id === 'applicant-info-screen' || t.id === 'agency-info-screen' || t.id === 'jo-info-screen' || t.id === 'agency-network-screen') return;
+    if (t.isCustomTable) return; // ユーザーが「テーブル作成」で作成したテーブルは除外
 
     const isFormTable = t.isFormDedicatedTable || 
-                        (t.id && (t.id.startsWith('table_form_') || t.id.startsWith('ctbl_'))) || 
+                        (t.id && t.id.startsWith('table_form_')) || 
                         (t.formTitle && t.formTitle.trim() !== '') ||
                         (t.name && (t.name.includes('フォーム') || t.name.includes('受付テーブル'))) ||
                         (t.targetTableType === 'dedicated');
@@ -4052,7 +4053,7 @@ function ensureStandardTablesInState() {
   const seenFormKeys = new Map();
   state.customTables = state.customTables.filter(t => {
     if (!t) return false;
-    if (!t.isFormDedicatedTable && !(t.id && (t.id.startsWith('table_form_') || t.id.startsWith('ctbl_'))) && !t.formTitle) {
+    if (t.isCustomTable || (!t.isFormDedicatedTable && !(t.id && t.id.startsWith('table_form_')) && !t.formTitle)) {
       return true; // フォーム専用テーブル以外はそのまま保持
     }
     const formKey = t.formId || t.sourceFormId || (t.formTitle && t.formTitle.trim()) || t.name;
@@ -7179,6 +7180,8 @@ function setupTableCreator() {
     const newTable = {
       id: tableId,
       name: tableName,
+      isCustomTable: true,
+      isFormDedicatedTable: false,
       parentMenuId: parentMenuId,
       columns: columns,
       visibleColumns: columns.map(c => c.id),
@@ -7542,6 +7545,8 @@ function createIndependentTableFromRow({ sourceTableId, sourceRowId, sourceTitle
   const newTable = {
     id: newTableId,
     name: tableName,
+    isCustomTable: true,
+    isFormDedicatedTable: false,
     parentMenuId: parentMenuId || 'custom-tables',
     sourceRecord: {
       sourceTableId: sourceTableId,
@@ -7585,7 +7590,7 @@ function createIndependentTableFromRow({ sourceTableId, sourceRowId, sourceTitle
 window.openRecordToTableModal = openRecordToTableModal;
 window.createIndependentTableFromRow = createIndependentTableFromRow;
 
-// 表示列選択チェックボックスの描画
+// 表示列選択チェックボックスの描画（テーブルカラムと100%完全連動）
 function renderCtColumnSelector(tbl) {
   const container = document.getElementById('ct-column-selector-dropdown');
   if (!container || !tbl) return;
@@ -7595,41 +7600,128 @@ function renderCtColumnSelector(tbl) {
   }
   container.innerHTML = '';
 
-  tbl.columns.forEach(col => {
-    if (col.required) return; // 1列目は常に表示
+  // ヘッダー部（タイトル＆全選択/全解除クイックボタン）
+  const headerDiv = document.createElement('div');
+  headerDiv.style.display = 'flex';
+  headerDiv.style.justifyContent = 'space-between';
+  headerDiv.style.alignItems = 'center';
+  headerDiv.style.marginBottom = '0.5rem';
+  headerDiv.style.paddingBottom = '0.4rem';
+  headerDiv.style.borderBottom = '1px solid var(--border-color, #e2e8f0)';
+
+  const titleSpan = document.createElement('span');
+  titleSpan.style.fontSize = '0.8rem';
+  titleSpan.style.fontWeight = '700';
+  titleSpan.style.color = 'var(--text-primary, #0f172a)';
+  titleSpan.textContent = `表示列 (${tbl.visibleColumns.length}/${tbl.columns.length})`;
+  headerDiv.appendChild(titleSpan);
+
+  const actionGroup = document.createElement('div');
+  actionGroup.style.display = 'flex';
+  actionGroup.style.gap = '0.4rem';
+
+  const selectAllBtn = document.createElement('button');
+  selectAllBtn.type = 'button';
+  selectAllBtn.textContent = 'すべて表示';
+  selectAllBtn.style.background = 'none';
+  selectAllBtn.style.border = 'none';
+  selectAllBtn.style.color = 'var(--primary, #2563eb)';
+  selectAllBtn.style.fontSize = '0.72rem';
+  selectAllBtn.style.fontWeight = '600';
+  selectAllBtn.style.cursor = 'pointer';
+  selectAllBtn.style.padding = '2px 4px';
+  selectAllBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    tbl.visibleColumns = tbl.columns.map(c => c.id);
+    saveCustomTables();
+    localStorage.setItem(`synapse_table_${tbl.id}`, JSON.stringify(tbl));
+    if (typeof syncToSupabase === 'function') syncToSupabase(`synapse_table_${tbl.id}`, tbl);
+    renderCustomTable(tbl.id);
+    renderCtColumnSelector(tbl);
+  });
+  actionGroup.appendChild(selectAllBtn);
+
+  headerDiv.appendChild(actionGroup);
+  container.appendChild(headerDiv);
+
+  // カラム一覧のスクロールエリア
+  const listArea = document.createElement('div');
+  listArea.style.maxHeight = '320px';
+  listArea.style.overflowY = 'auto';
+
+  // 💡 テーブルの columns 定義に従って全カラムを順序通り展開（必須項目でも絶対にスキップしない！）
+  tbl.columns.forEach((col, idx) => {
+    if (!col || !col.id) return;
 
     const label = document.createElement('label');
-    label.style.display = 'inline-flex';
+    label.style.display = 'flex';
     label.style.alignItems = 'center';
-    label.style.gap = '0.4rem';
+    label.style.gap = '0.45rem';
     label.style.cursor = 'pointer';
-    label.style.color = 'var(--text-primary)';
+    label.style.color = 'var(--text-primary, #0f172a)';
     label.style.userSelect = 'none';
     label.style.fontSize = '0.8rem';
     label.style.width = '100%';
-    label.style.marginBottom = '0.25rem';
+    label.style.padding = '0.2rem 0.25rem';
+    label.style.borderRadius = '4px';
+    label.style.transition = 'background 0.15s';
+    label.onmouseenter = () => { label.style.background = 'var(--bg-surface-elevated, #f1f5f9)'; };
+    label.onmouseleave = () => { label.style.background = 'transparent'; };
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.value = col.id;
     checkbox.checked = tbl.visibleColumns.includes(col.id);
+    checkbox.style.cursor = 'pointer';
+    checkbox.style.accentColor = 'var(--primary, #2563eb)';
 
     checkbox.addEventListener('change', (e) => {
+      e.stopPropagation();
       if (e.target.checked) {
         if (!tbl.visibleColumns.includes(col.id)) {
-          tbl.visibleColumns.push(col.id);
+          // 💡 単に末尾に追加するのではなく、tbl.columns の本来の順序（インデックス順）を維持して挿入！
+          const newVisible = [];
+          tbl.columns.forEach(c => {
+            if (tbl.visibleColumns.includes(c.id) || c.id === col.id) {
+              newVisible.push(c.id);
+            }
+          });
+          tbl.visibleColumns = newVisible;
         }
       } else {
+        // 最低1列は表示を残す安全保護
+        if (tbl.visibleColumns.length <= 1) {
+          showToast('最低1列は表示しておく必要があります。', 'warning');
+          checkbox.checked = true;
+          return;
+        }
         tbl.visibleColumns = tbl.visibleColumns.filter(id => id !== col.id);
       }
+
       saveCustomTables();
+      localStorage.setItem(`synapse_table_${tbl.id}`, JSON.stringify(tbl));
+      if (typeof syncToSupabase === 'function') {
+        syncToSupabase(`synapse_table_${tbl.id}`, tbl);
+      }
+
       renderCustomTable(tbl.id);
+      renderCtColumnSelector(tbl); // タイトル件数等を即座に更新
     });
 
+    const colNameSpan = document.createElement('span');
+    colNameSpan.textContent = col.label || col.name || col.id;
+    colNameSpan.style.whiteSpace = 'nowrap';
+    colNameSpan.style.overflow = 'hidden';
+    colNameSpan.style.textOverflow = 'ellipsis';
+    colNameSpan.style.flex = '1';
+    colNameSpan.title = col.label || col.name || col.id;
+
     label.appendChild(checkbox);
-    label.appendChild(document.createTextNode(col.label));
-    container.appendChild(label);
+    label.appendChild(colNameSpan);
+    listArea.appendChild(label);
   });
+
+  container.appendChild(listArea);
 }
 
 // ウィンドウ枠固定のセレクトボックス更新
@@ -10460,6 +10552,18 @@ function setupCtButtonsEvents() {
     colSelectorBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const isHidden = colSelectorDropdown.style.display === 'none' || !colSelectorDropdown.style.display;
+      if (isHidden && state.activeCustomTableId) {
+        let tbl = (state.customTables || []).find(t => t && t.id === state.activeCustomTableId);
+        if (!tbl) {
+          try {
+            const raw = localStorage.getItem(`synapse_table_${state.activeCustomTableId}`);
+            if (raw) tbl = JSON.parse(raw);
+          } catch(err) {}
+        }
+        if (tbl) {
+          renderCtColumnSelector(tbl);
+        }
+      }
       colSelectorDropdown.style.display = isHidden ? 'block' : 'none';
       
       const frameDropdown = document.getElementById('ct-frame-fix-dropdown');
@@ -10479,6 +10583,18 @@ function setupCtButtonsEvents() {
     frameFixBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const isHidden = frameFixDropdown.style.display === 'none' || !frameFixDropdown.style.display;
+      if (isHidden && state.activeCustomTableId) {
+        let tbl = (state.customTables || []).find(t => t && t.id === state.activeCustomTableId);
+        if (!tbl) {
+          try {
+            const raw = localStorage.getItem(`synapse_table_${state.activeCustomTableId}`);
+            if (raw) tbl = JSON.parse(raw);
+          } catch(err) {}
+        }
+        if (tbl) {
+          setupCtFrameFix(tbl);
+        }
+      }
       frameFixDropdown.style.display = isHidden ? 'block' : 'none';
       
       const colDropdown = document.getElementById('ct-column-selector-dropdown');
@@ -10685,7 +10801,7 @@ function setupCtButtonsEvents() {
       formGroup.style.gap = '0.25rem';
       
       const label = document.createElement('label');
-      label.textContent = col.label || col.id;
+      label.textContent = col.label || col.name || col.id;
       label.style.fontWeight = 'bold';
       label.style.fontSize = '0.85rem';
       
@@ -10714,7 +10830,7 @@ function setupCtButtonsEvents() {
         input = document.createElement('input');
         input.type = col.type === 'number' ? 'number' : 'text';
         input.id = `ct-add-input-${col.id}`;
-        input.placeholder = `${col.label || col.id}を入力してください`;
+        input.placeholder = `${col.label || col.name || col.id}を入力してください`;
       }
 
       input.style.width = '100%';
@@ -10819,6 +10935,13 @@ function setupCtButtonsEvents() {
       if (tbl) {
         tbl.rows.push(newRow);
         saveCustomTables();
+
+        // フォーム専用テーブルの場合はパートナーDBへ自動連携・同期
+        const isFormTable = tbl.isFormDedicatedTable || tbl.formTitle || (tbl.id && tbl.id.startsWith('table_form_'));
+        if (isFormTable && typeof syncFormTableRowToPartnerDb === 'function') {
+          syncFormTableRowToPartnerDb(tbl, newRow);
+        }
+
         renderCustomTable(tbl.id);
       }
     }
@@ -12276,6 +12399,10 @@ function getTableMeta(tableId) {
     const tbl = state.customTables.find(t => t.id === tableId);
     if (tbl) {
       return {
+        id: tbl.id,
+        isFormDedicatedTable: tbl.isFormDedicatedTable,
+        formId: tbl.formId,
+        formTitle: tbl.formTitle,
         columns: tbl.columns,
         rows: tbl.rows,
         name: tbl.name,
@@ -50143,12 +50270,9 @@ function exportTableToFile(tableId, format) {
   // 表示中カラムのフィルタリング（非表示列を除外）
   const hiddenColIds = typeof getUserHiddenColumns === 'function' ? getUserHiddenColumns(normId) : [];
   let cols = meta.columns || [];
-  if (normId.startsWith('custom-table-')) {
-    const tblId = normId.replace('custom-table-', '');
-    const tbl = (state.customTables || []).find(t => t.id === tblId);
-    if (tbl && tbl.visibleColumns && tbl.visibleColumns.length > 0) {
-      cols = cols.filter(c => tbl.visibleColumns.includes(c.id));
-    }
+  const customTbl = (state.customTables || []).find(t => t && (t.id === normId || t.id === tableId || (typeof normId === 'string' && t.id === normId.replace('custom-table-', ''))));
+  if (customTbl && customTbl.visibleColumns && customTbl.visibleColumns.length > 0) {
+    cols = cols.filter(c => customTbl.visibleColumns.includes(c.id));
   } else if (hiddenColIds.length > 0) {
     cols = cols.filter(c => !hiddenColIds.includes(c.id));
   }
