@@ -3979,7 +3979,7 @@
 
                   const isGrpChecked = (formValues['group_' + q.groupId + '_is_same_as_above'] !== undefined)
                     ? !!formValues['group_' + q.groupId + '_is_same_as_above']
-                    : true;
+                    : false;
                   chk.checked = isGrpChecked;
                   formValues['group_' + q.groupId + '_is_same_as_above'] = isGrpChecked;
 
@@ -4687,12 +4687,6 @@
           }
           const chk = document.querySelector(`.view-group-same-as-above-checkbox[data-target-group-id="${groupId}"]`);
           if (chk) return chk.checked;
-          if (formDefinition && formDefinition.sections) {
-            for (const sec of formDefinition.sections) {
-              const grpSameQ = (sec.questions || []).find(item => item.groupId === groupId && item.sameAsAbove && item.sameAsAbove.enabled && (item.sameAsAbove.sourceType === 'group' || (item.sameAsAbove.sourceQuestionId && item.sameAsAbove.sourceQuestionId.startsWith('group:'))));
-              if (grpSameQ) return true;
-            }
-          }
           return false;
         }
 
@@ -4703,7 +4697,7 @@
           }
           const chk = document.querySelector(`.same-as-above-checkbox[data-target-id="${q.id}"]`);
           if (chk) return chk.checked;
-          return true;
+          return false;
         }
 
         // 🛡️ 同上データ保存保証ガード:
