@@ -11873,7 +11873,10 @@ function isTableLocked(tableId) {
     state.tableEditLocks = {};
   }
   if (state.tableEditLocks[tableId] === undefined) {
-    state.tableEditLocks[tableId] = true; // デフォルトはロック
+    // 💡 カスタムテーブル（スプレッドシート）はデフォルトで編集可能 (false) にする！
+    // 重要な基幹標準マスタ（JO、申込者、代理店、DBメイク）のみ誤操作防止のためデフォルトロック (true)
+    const isStandardMaster = ['jo', 'jo-info-screen', 'ap', 'applicant-info-screen', 'ag', 'agency-info-screen', 'dbmake', 'dbmake-screen'].includes(tableId);
+    state.tableEditLocks[tableId] = isStandardMaster ? true : false;
   }
   return state.tableEditLocks[tableId];
 }
