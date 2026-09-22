@@ -22131,7 +22131,7 @@
   // ==========================================
   // 📊 本番テーブル連携カラム確認＆保存先設定モーダル
   // ==========================================
-  function openFormColumnMappingModal(targetFormDef = null) {
+  async function openFormColumnMappingModal(targetFormDef = null) {
     const formDef = targetFormDef || window.G || window.L || {};
     const formTitle = getEffectiveFormTitle(formDef);
     const sections = (window.G && window.G.sections && window.G.sections.length > 0) ? window.G.sections : (formDef.sections || []);
@@ -22154,13 +22154,38 @@
     customTables = customTables.filter(t => t && t.id !== 'table_all_form_responses' && t.name !== '全フォーム回答データ');
 
     // このフォームと同名の専用テーブルが存在するか確認
-    const dedicatedTable = customTables.find(t => t && (
+    let dedicatedTable = customTables.find(t => t && (
       (formDef.targetTableId && t.id === formDef.targetTableId) ||
       (formDef.id && t.formId && t.formId === formDef.id) ||
       t.name === formTitle ||
       t.formTitle === formTitle ||
       (pTableName && t.physicalTableName && t.physicalTableName === pTableName)
     ) && t.id !== 'table_all_form_responses');
+
+    // LocalStorage に存在しない場合は Supabase クラウドから即時フェッチして再確認
+    if (!dedicatedTable) {
+      try {
+        const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+        const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+        const cloudRes = await fetch(`${sbUrl}/rest/v1/synapse_storage?key=eq.synapse_custom_tables&select=value`, {
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+        });
+        if (cloudRes.ok) {
+          const cloudData = await cloudRes.json();
+          if (cloudData && cloudData[0] && Array.isArray(cloudData[0].value)) {
+            customTables = cloudData[0].value.filter(t => t && t.id !== 'table_all_form_responses');
+            localStorage.setItem('synapse_custom_tables', JSON.stringify(cloudData[0].value));
+            dedicatedTable = customTables.find(t => t && (
+              (formDef.targetTableId && t.id === formDef.targetTableId) ||
+              (formDef.id && t.formId && t.formId === formDef.id) ||
+              t.name === formTitle ||
+              t.formTitle === formTitle ||
+              (pTableName && t.physicalTableName && t.physicalTableName === pTableName)
+            ) && t.id !== 'table_all_form_responses');
+          }
+        }
+      } catch(e) {}
+    }
 
     const dedicatedCols = dedicatedTable && Array.isArray(dedicatedTable.columns) ? dedicatedTable.columns : [];
     const dedicatedColMap = new Map();
