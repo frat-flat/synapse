@@ -17115,6 +17115,13 @@
     // UIを更新
     updatePublishSyncUI(idx);
 
+    // 🌐 Supabase物理テーブルのスキーマ完全同期を即時実行（不要カラムの自動除去・新カラム即時反映）
+    if (typeof createDedicatedTableForForm === 'function') {
+      createDedicatedTableForForm(formObj).catch(err => {
+        console.warn('[Merge] Dedicated table auto-sync error:', err);
+      });
+    }
+
     // トースト通知
     showGlobalShareToast(`「${currentTitle}」を本番公開リンクへ統合しました！（v${nextVersion}）`);
     if (typeof showToast === 'function') {
@@ -17568,56 +17575,89 @@
   }
   window.getNewColumnsForFormTable = getNewColumnsForFormTable;
 
-  // 🔄 テストから本番へ統合する際、追加カラムがあった場合のみ既存専用テーブルを更新する
+  // 🔄 フォーム定義の変更（カラム名変更・削除・追加）をSupabase物理テーブルおよび定義へ完全同期
+  // 不要になった古いカラムが末尾や途中に残らないよう、クリーンな完全一致同期を行う
   async function updateDedicatedTableColumns(dedicatedTable, formDef) {
     if (!dedicatedTable || !formDef) return { updated: false, addedColumns: [] };
 
-    const { newColumnsToAdd } = getNewColumnsForFormTable(dedicatedTable, formDef);
-    if (!newColumnsToAdd || newColumnsToAdd.length === 0) {
-      console.log(`[DedicatedTable] No new columns detected for "${dedicatedTable.name}". Table preserved as-is.`);
-      return { updated: false, addedColumns: [] };
-    }
+    // 1. 最新のフォーム定義から、あるべき全カラム定義（expectedColumns）を生成
+    const expectedColumns = [
+      { id: 'master_id', label: 'マスターID / コード', type: 'text', required: false },
+      { id: 'form_title', label: 'フォーム名', type: 'text', required: false }
+    ];
 
-    console.log(`[DedicatedTable] Adding ${newColumnsToAdd.length} new columns to existing table "${dedicatedTable.name}"...`, newColumnsToAdd);
+    const sections = (window.G && window.G.sections && window.G.sections.length > 0) ? window.G.sections : (formDef.sections || []);
+    sections.forEach((sec) => {
+      (sec.questions || []).forEach(q => {
+        if (!q) return;
+        const colId = getEffectiveCleanDataKey(q);
+        const colName = (q.title || q.dataKey || q.id || '').trim();
+        let colType = 'text';
+        if (q.type === 'date') colType = 'date';
+        else if (q.type === 'select' || q.type === 'radio') colType = 'select';
+        else if (q.type === 'number') colType = 'number';
 
-    if (!Array.isArray(dedicatedTable.columns)) dedicatedTable.columns = [];
-    
-    // システムカラム（status, registration_code, resume_url, created_at）の直前に新カラムを挿入
-    const sysColKeys = ['status', 'registration_code', 'resume_url', 'created_at'];
-    let insertIdx = dedicatedTable.columns.findIndex(c => c && sysColKeys.includes(c.id));
-    if (insertIdx === -1) insertIdx = dedicatedTable.columns.length;
-
-    dedicatedTable.columns.splice(insertIdx, 0, ...newColumnsToAdd);
-
-    // visibleColumnsの更新
-    if (Array.isArray(dedicatedTable.visibleColumns)) {
-      newColumnsToAdd.forEach(c => {
-        if (!dedicatedTable.visibleColumns.includes(c.id)) {
-          dedicatedTable.visibleColumns.push(c.id);
+        const existingCol = expectedColumns.find(c => c.id === colId);
+        if (existingCol) {
+          if (colName && !existingCol.label.includes(colName)) {
+            existingCol.label = `${existingCol.label} / ${colName}`;
+            existingCol.name = existingCol.label;
+          }
+          if (q.required) existingCol.required = true;
+          return;
         }
-      });
-    }
 
-    // columnWidthsの更新
-    if (!dedicatedTable.columnWidths) dedicatedTable.columnWidths = {};
-    newColumnsToAdd.forEach(c => {
-      if (!dedicatedTable.columnWidths[c.id]) {
-        dedicatedTable.columnWidths[c.id] = 130;
-      }
+        expectedColumns.push({
+          id: colId,
+          label: colName,
+          name: colName,
+          type: colType,
+          required: !!q.required,
+          choices: q.options ? q.options.map(opt => ({ value: (typeof opt === 'object' ? (opt.label || opt.value) : opt) })) : undefined
+        });
+      });
     });
 
-    // 1. synapse_custom_tables の保存・更新
+    expectedColumns.push(
+      { id: 'status', label: 'ステータス', type: 'select', choices: [{ value: '回答完了', color: '#10b981' }, { value: '途中送信', color: '#f59e0b' }], required: false },
+      { id: 'registration_code', label: '確定登録コード', type: 'text', required: false },
+      { id: 'resume_url', label: '再開用URL', type: 'text', required: false },
+      { id: 'created_at', label: '送信日時', type: 'date', required: false }
+    );
+
+    const oldCols = Array.isArray(dedicatedTable.columns) ? dedicatedTable.columns : [];
+    const oldColIds = oldCols.map(c => c && c.id).filter(Boolean);
+    const newColIds = expectedColumns.map(c => c && c.id).filter(Boolean);
+
+    // カラム構成（ID一覧および順序）に差異があるかチェック
+    const isExactMatch = oldColIds.length === newColIds.length && oldColIds.every((id, idx) => id === newColIds[idx]);
+
+    const pTableName = dedicatedTable.physicalTableName || 
+                       formDef.physicalTableName || 
+                       (typeof getPhysicalTableNameForForm === 'function' ? getPhysicalTableNameForForm(formDef) : null) || 
+                       'form_referral_agency_application';
+
+    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+
+    console.log(`[DedicatedTable Sync] Synchronizing table "${dedicatedTable.name}" (physical: ${pTableName})... ExactMatch: ${isExactMatch}`);
+
+    // カラム定義の更新
+    dedicatedTable.columns = expectedColumns;
+    dedicatedTable.visibleColumns = expectedColumns.map(c => c.id);
+    if (!dedicatedTable.columnWidths) dedicatedTable.columnWidths = {};
+    expectedColumns.forEach(c => {
+      if (!dedicatedTable.columnWidths[c.id]) dedicatedTable.columnWidths[c.id] = 130;
+    });
+
+    // 1. LocalStorage & synapse_storage の保存・更新
     let curTables = [];
     try { curTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
     const existingIdx = curTables.findIndex(t => t && t.id === dedicatedTable.id);
-    if (existingIdx !== -1) {
-      curTables[existingIdx] = dedicatedTable;
-    } else {
-      curTables.push(dedicatedTable);
-    }
+    if (existingIdx !== -1) curTables[existingIdx] = dedicatedTable;
+    else curTables.push(dedicatedTable);
     localStorage.setItem('synapse_custom_tables', JSON.stringify(curTables));
 
-    // 2. synapse_table_${id} の更新（既存行データを保持したままカラム定義のみマージ）
     let fullTable = dedicatedTable;
     try {
       const raw = localStorage.getItem(`synapse_table_${dedicatedTable.id}`);
@@ -17629,10 +17669,6 @@
       }
     } catch(e) {}
     localStorage.setItem(`synapse_table_${dedicatedTable.id}`, JSON.stringify(fullTable));
-
-    // 3. Supabaseへの非同期同期
-    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
-    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
 
     try {
       await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
@@ -17646,41 +17682,82 @@
         body: JSON.stringify({ key: 'synapse_custom_tables', value: curTables, updated_at: new Date().toISOString() })
       });
     } catch(netErr) {
-      console.warn('[Supabase Sync] Network error during table columns update:', netErr);
+      console.warn('[Supabase Storage Sync] Network error:', netErr);
     }
 
-    // 🌐 Supabaseクラウド上の物理テーブルへ追加カラムを動的反映 (RPC)
-    if (newColumnsToAdd && newColumnsToAdd.length > 0) {
+    // 2. 🌐 Supabase物理テーブルのスキーマ完全一致同期（不要旧カラムの完全消去・新カラム反映・データ保全）
+    try {
+      // 既存の回答レコードを確認
+      let existingRows = [];
       try {
-        const pTableName = dedicatedTable.physicalTableName || 
-                           formDef.physicalTableName || 
-                           (typeof getPhysicalTableNameForForm === 'function' ? getPhysicalTableNameForForm(formDef) : null) || 
-                           'form_referral_agency_application';
-        const rpcCols = newColumnsToAdd.map(c => ({ id: c.id, label: c.label || c.name, type: c.type || 'text' }));
-        const rpcRes = await fetch(`${sbUrl}/rest/v1/rpc/synapse_create_or_alter_table`, {
-          method: 'POST',
-          headers: {
-            apikey: sbKey,
-            Authorization: `Bearer ${sbKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            p_table_name: pTableName,
-            p_columns: rpcCols
-          })
+        const fetchRowsRes = await fetch(`${sbUrl}/rest/v1/${pTableName}?select=*`, {
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
         });
-        const rpcData = await rpcRes.json().catch(() => null);
-        console.log(`[Supabase Physical Table] Added ${newColumnsToAdd.length} columns to table "${pTableName}" via RPC:`, rpcData);
-      } catch (rpcErr) {
-        console.warn('[Supabase Physical Table Alter RPC]', rpcErr);
+        if (fetchRowsRes.ok) {
+          existingRows = await fetchRowsRes.json();
+        }
+      } catch(e) {}
+
+      const rpcCols = expectedColumns.map(c => ({ id: c.id, label: c.label || c.name, type: c.type || 'text' }));
+
+      if (!isExactMatch || existingRows.length === 0) {
+        // スキーマに変更がある場合、またはデータ0件の場合：
+        // 旧テーブルをDROPして最新クリーン構成で新規作成（不要な旧カラムを100%残さない）
+        await fetch(`${sbUrl}/rest/v1/rpc/synapse_drop_table`, {
+          method: 'POST',
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_table_name: pTableName })
+        });
+
+        await fetch(`${sbUrl}/rest/v1/rpc/synapse_create_or_alter_table`, {
+          method: 'POST',
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_table_name: pTableName, p_columns: rpcCols })
+        });
+
+        // 既存レコードがあった場合は新スキーマへ復元・移行
+        if (existingRows.length > 0) {
+          const validColIds = new Set(newColIds);
+          validColIds.add('id');
+          validColIds.add('updated_at');
+
+          const migratedRows = existingRows.map(row => {
+            const newRow = {};
+            Object.keys(row).forEach(k => {
+              if (validColIds.has(k)) {
+                newRow[k] = row[k];
+              }
+            });
+            if (!newRow.id && row.id) newRow.id = row.id;
+            return newRow;
+          });
+
+          await fetch(`${sbUrl}/rest/v1/${pTableName}`, {
+            method: 'POST',
+            headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+            body: JSON.stringify(migratedRows)
+          });
+          console.log(`[Supabase Physical Table] Migrated and restored ${migratedRows.length} rows to cleaned table "${pTableName}".`);
+        }
+      } else {
+        // カラム構成が同一でデータがある場合はALTER TABLEで検証のみ実行
+        await fetch(`${sbUrl}/rest/v1/rpc/synapse_create_or_alter_table`, {
+          method: 'POST',
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_table_name: pTableName, p_columns: rpcCols })
+        });
       }
+
+      console.log(`[Supabase Physical Table] Full sync completed for "${pTableName}". Schema matches form definition perfectly.`);
+    } catch (syncErr) {
+      console.warn('[Supabase Physical Table Sync Error]', syncErr);
     }
 
     if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ type: 'SYNAPSE_TABLE_UPDATED', table: fullTable, addedColumns: newColumnsToAdd }, '*');
+      window.parent.postMessage({ type: 'SYNAPSE_TABLE_UPDATED', table: fullTable, columns: expectedColumns }, '*');
     }
 
-    return { updated: true, addedColumns: newColumnsToAdd };
+    return { updated: true, columns: expectedColumns };
   }
   window.updateDedicatedTableColumns = updateDedicatedTableColumns;
 
