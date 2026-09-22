@@ -18467,6 +18467,16 @@
       });
     }
 
+    // 📥 回答一括入力用シート (CSV) のダウンロードボタン
+    const shareModalDlBtn = document.getElementById('btn-share-modal-download-template');
+    if (shareModalDlBtn && !shareModalDlBtn._hooked) {
+      shareModalDlBtn._hooked = true;
+      shareModalDlBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        downloadFormBulkInputTemplate(formObj || window.G || window.L);
+      });
+    }
+
     // 本番統合ステータスの更新
     updatePublishSyncUI(_currentShareModalFormIndex);
 
@@ -18599,6 +18609,19 @@
           _currentShareModalEnv = (pubStatus && !pubStatus.isSynced) ? 'test' : 'production';
           copyFormShareUrl();
           openShareUrlModal();
+        });
+      }
+
+      // 📥 回答一括入力用シート (CSV) のダウンロードメニュー項目
+      const menuDownloadTemplate = document.getElementById('btn-menu-download-template');
+      if (menuDownloadTemplate && !menuDownloadTemplate._hooked) {
+        menuDownloadTemplate._hooked = true;
+        menuDownloadTemplate.addEventListener('click', (e) => {
+          e.preventDefault();
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          const { formObj } = getCurrentFormObject();
+          downloadFormBulkInputTemplate(formObj || window.G || window.L);
         });
       }
 
@@ -22124,10 +22147,139 @@
   }
 
   // ==========================================
-  // 📊 本番テーブル連携カラム確認モーダル
+  // 📥 回答一括入力用シート (CSVテンプレート) ダウンロード機能
   // ==========================================
-  // ==========================================
-  // 📊 本番テーブル連携カラム確認＆保存先設定モーダル
+  function downloadFormBulkInputTemplate(targetFormDef = null) {
+    const formDef = targetFormDef || window.G || window.L || {};
+    const formTitle = (typeof getEffectiveFormTitle === 'function' ? getEffectiveFormTitle(formDef) : (formDef.title || formDef.name)) || 'フォーム';
+    const sections = (window.G && window.G.sections && window.G.sections.length > 0) ? window.G.sections : (formDef.sections || []);
+
+    // 設問一覧を収集
+    const questionCols = [];
+    sections.forEach((sec, sIdx) => {
+      (sec.questions || []).forEach(q => {
+        if (!q) return;
+        const qTitle = (q.title || '').trim() || `設問_${questionCols.length + 1}`;
+        const pKey = typeof getEffectiveCleanDataKey === 'function' ? getEffectiveCleanDataKey(q) : (q.dataKey || `col_${questionCols.length + 1}`);
+
+        // 型や設問名に応じた代表的な入力例（サンプル値）
+        let sampleVal = '';
+        const titleLower = qTitle.toLowerCase();
+        const pKeyLower = pKey.toLowerCase();
+
+        if (q.type === 'radio' || q.type === 'select') {
+          if (Array.isArray(q.options) && q.options.length > 0) {
+            const firstOpt = typeof q.options[0] === 'object' ? (q.options[0].label || q.options[0].text || q.options[0].value) : q.options[0];
+            sampleVal = firstOpt || '選択肢1';
+          } else {
+            sampleVal = '選択肢1';
+          }
+        } else if (q.type === 'checkbox') {
+          if (Array.isArray(q.options) && q.options.length > 0) {
+            const firstOpt = typeof q.options[0] === 'object' ? (q.options[0].label || q.options[0].text || q.options[0].value) : q.options[0];
+            sampleVal = firstOpt || '項目1';
+          } else {
+            sampleVal = '項目1';
+          }
+        } else if (q.type === 'date') {
+          sampleVal = '2026-04-01';
+        } else if (q.type === 'time') {
+          sampleVal = '09:00';
+        } else if (q.type === 'number') {
+          sampleVal = '1000';
+        } else if (titleLower.includes('メール') || pKeyLower.includes('email') || pKeyLower.includes('mail')) {
+          sampleVal = 'sample@example.com';
+        } else if (titleLower.includes('電話') || pKeyLower.includes('tel') || pKeyLower.includes('phone')) {
+          sampleVal = '03-1234-5678';
+        } else if (titleLower.includes('郵便番号') || pKeyLower.includes('zip')) {
+          sampleVal = '100-0001';
+        } else if (titleLower.includes('法人番号') || pKeyLower.includes('corp_num')) {
+          sampleVal = '1234567890123';
+        } else if (titleLower.includes('インボイス') || pKeyLower.includes('invoice')) {
+          sampleVal = 'T1234567890123';
+        } else if (titleLower.includes('支店') || pKeyLower.includes('branch')) {
+          sampleVal = '東京営業部';
+        } else if (titleLower.includes('口座番号') || pKeyLower.includes('account_number') || pKeyLower.includes('account_num') || (titleLower.includes('口座') && titleLower.includes('番号'))) {
+          sampleVal = '1234567';
+        } else if (titleLower.includes('口座種別') || pKeyLower.includes('account_type')) {
+          sampleVal = '普通';
+        } else if (titleLower.includes('口座名義') || pKeyLower.includes('account_holder')) {
+          sampleVal = 'ヤマダ タロウ';
+        } else if (titleLower.includes('銀行') || pKeyLower.includes('bank')) {
+          sampleVal = '三井住友銀行';
+        } else if ((titleLower.includes('法人') || titleLower.includes('会社')) && (titleLower.includes('カナ') || titleLower.includes('フリガナ'))) {
+          sampleVal = 'カブシキガイシャサンプル';
+        } else if (titleLower.includes('法人名') || titleLower.includes('会社名') || pKeyLower.includes('corp_name') || pKeyLower.includes('company')) {
+          sampleVal = '株式会社サンプル';
+        } else if (titleLower.includes('屋号')) {
+          sampleVal = 'サンプル商店';
+        } else if (titleLower.includes('フリガナ') || titleLower.includes('カナ')) {
+          sampleVal = 'ヤマダ タロウ';
+        } else if (titleLower.includes('代表者') || titleLower.includes('氏名') || titleLower.includes('名前') || pKeyLower.includes('rep_name') || pKeyLower.includes('user_name') || pKeyLower === 'name') {
+          sampleVal = '山田 太郎';
+        } else if (titleLower.includes('都道府県') || titleLower.includes('住所') || pKeyLower.includes('addr')) {
+          sampleVal = '東京都千代田区霞が関1-1-1';
+        } else if (q.placeholder && q.placeholder.trim()) {
+          sampleVal = q.placeholder.trim();
+        } else {
+          sampleVal = '例入力データ';
+        }
+
+        questionCols.push({
+          title: qTitle,
+          dataKey: pKey,
+          sample: sampleVal
+        });
+      });
+    });
+
+    if (questionCols.length === 0) {
+      alert('フォームに設問が存在しないため、テンプレートを出力できません。');
+      return;
+    }
+
+    // CSVセルエスケープ処理
+    const escapeCsv = (val) => {
+      const s = val === null || val === undefined ? '' : String(val);
+      if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return `"${s}"`;
+    };
+
+    // 1行目: 設問タイトル（メイン画面のCSVインポートと自動マッチング）
+    const headerRow = questionCols.map(c => escapeCsv(c.title)).join(',');
+    // 2行目: 入力例（サンプルデータ。回答者はここを書き換えるか2行目以降にデータを入力）
+    const sampleRow = questionCols.map(c => escapeCsv(c.sample)).join(',');
+
+    // UTF-8 BOM付きCSV（Excelで文字化けせず開ける仕様）
+    const csvContent = '\uFEFF' + headerRow + '\r\n' + sampleRow + '\r\n';
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const cleanTitle = formTitle.replace(/[\\/:*?"<>|]/g, '_').trim();
+    const filename = `【入力用シート】${cleanTitle}_${dateStr}.csv`;
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    if (typeof showToast === 'function') {
+      showToast(`📥「${cleanTitle}」の回答一括入力用シート (CSV) をダウンロードしました`, 'success');
+    } else if (window.parent && typeof window.parent.showToast === 'function') {
+      window.parent.showToast(`📥「${cleanTitle}」の回答一括入力用シート (CSV) をダウンロードしました`, 'success');
+    } else {
+      alert(`📥「${cleanTitle}」の回答一括入力用シート (CSV) をダウンロードしました。\n\n※1行目は設問名、2行目はサンプル例です。\n回答データを入力後、管理画面のテーブルから【CSVインポート】でまとめて取り込めます。`);
+    }
+  }
+  window.downloadFormBulkInputTemplate = downloadFormBulkInputTemplate;
+
   // ==========================================
   // 📊 本番テーブル連携カラム確認＆保存先設定モーダル
   // ==========================================
@@ -22261,6 +22413,9 @@
       `;
       actionBtnHtml = `
         <div style="display: flex; align-items: center; gap: 10px;">
+          <button type="button" id="btn-download-col-modal-template" style="background: #f0fdf4; color: #166534; border: 1px solid #86efac; font-weight: 700; font-size: 0.82rem; padding: 7px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;" title="このフォームの設問に沿った回答入力用CSVテンプレートを出力します">
+            <span>📥</span> <span>回答一括入力シート (CSV)</span>
+          </button>
           <button type="button" id="btn-create-supabase-table" style="background: #0284c7; color: #fff; border: 1px solid #0369a1; font-weight: 700; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(2,132,199,0.3); transition: all 0.2s;">
             <span>⚡</span> <span>このフォーム専用のテーブルを作成して連携</span>
           </button>
@@ -22275,6 +22430,9 @@
       `;
       actionBtnHtml = `
         <div style="display: flex; align-items: center; gap: 10px;">
+          <button type="button" id="btn-download-col-modal-template" style="background: #f0fdf4; color: #166534; border: 1px solid #86efac; font-weight: 700; font-size: 0.82rem; padding: 7px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;" title="このフォームの設問に沿った回答入力用CSVテンプレートを出力します">
+            <span>📥</span> <span>回答一括入力シート (CSV)</span>
+          </button>
           <button type="button" id="btn-create-supabase-table" style="background: #f8fafc; color: #0284c7; border: 1px solid #0284c7; font-weight: 700; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;">
             <span>🔄</span> <span>Supabase物理テーブルを再作成・同期</span>
           </button>
@@ -22369,6 +22527,14 @@
     };
     modal.querySelector('#btn-close-col-modal').onclick = closeHandler;
     modal.querySelector('#btn-col-modal-ok').onclick = closeHandler;
+
+    // 📥 回答一括入力シート (CSV) ダウンロードイベント
+    const dlTemplateBtn = modal.querySelector('#btn-download-col-modal-template');
+    if (dlTemplateBtn) {
+      dlTemplateBtn.onclick = () => {
+        downloadFormBulkInputTemplate(formDef);
+      };
+    }
 
     // トグル切り替えイベント
     const dedicatedCheckbox = modal.querySelector('#modal-create-dedicated-table');

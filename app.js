@@ -13585,15 +13585,27 @@ function renderTableControlBar(tableId, parentContainerEl) {
         };
 
         const firstLineCells = parseCSVLine(lines[0]);
-        // 1行目のいずれかの値が、列定義のlabelのいずれかと一致すればヘッダーと判定
-        const isHeader = firstLineCells.some(h => meta.columns.some(col => col.label.toLowerCase() === h.toLowerCase()));
+        // 1行目のいずれかの値が、列定義のlabel / name / idのいずれかと一致すればヘッダーと判定
+        const isHeader = firstLineCells.some(h => {
+          const hNorm = (h || '').trim().toLowerCase();
+          return meta.columns.some(col => 
+            (col.label && col.label.trim().toLowerCase() === hNorm) ||
+            (col.name && col.name.trim().toLowerCase() === hNorm) ||
+            (col.id && col.id.trim().toLowerCase() === hNorm)
+          );
+        });
         let startIndex = 0;
         const colMap = {};
 
         if (isHeader) {
           startIndex = 1;
           meta.columns.forEach(col => {
-            const idx = firstLineCells.findIndex(h => h.toLowerCase() === col.label.toLowerCase());
+            const idx = firstLineCells.findIndex(h => {
+              const hNorm = (h || '').trim().toLowerCase();
+              return (col.label && col.label.trim().toLowerCase() === hNorm) ||
+                     (col.name && col.name.trim().toLowerCase() === hNorm) ||
+                     (col.id && col.id.trim().toLowerCase() === hNorm);
+            });
             if (idx !== -1) colMap[col.id] = idx;
           });
         } else {

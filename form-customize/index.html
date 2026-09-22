@@ -167,6 +167,14 @@
               </div>
             </div>
             <div class="share-dropdown-divider"></div>
+            <div class="share-dropdown-item" id="btn-menu-download-template">
+              <span class="menu-icon">📥</span>
+              <div class="menu-text-group">
+                <span class="menu-title" style="color: #166534; font-weight: 700;">回答一括入力用シート (CSV)</span>
+                <span class="menu-desc">この設問に沿った回答データ入力用CSVを出力</span>
+              </div>
+            </div>
+            <div class="share-dropdown-divider"></div>
             <div class="share-dropdown-item" id="btn-export-json">
               <span class="menu-icon">📄</span>
               <div class="menu-text-group">
@@ -1495,6 +1503,21 @@
               <div style="font-weight: 700; color: #15803d;">DB書き込み完全遮断（テストテーブル廃止済み）</div>
               <div style="font-size: 0.72rem; color: #166534; margin-top: 2px;">テスト送信時のデータはデータベース（本番・テスト）へ一切保存されません。そのためテストデータの消去作業も不要です。</div>
             </div>
+          </div>
+
+          <!-- 📥 回答一括入力用シートのダウンロード導線 -->
+          <div style="margin-top: 14px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+            <div>
+              <div style="font-size: 0.82rem; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 6px;">
+                <span>📥</span> 回答データの一括入力・インポート
+              </div>
+              <div style="font-size: 0.72rem; color: #15803d; margin-top: 2px;">
+                設問構成に沿ったCSVを出力。データ入力後、テーブルから一括取込できます。
+              </div>
+            </div>
+            <button type="button" id="btn-share-modal-download-template" class="btn btn-sm" style="background: #16a34a !important; color: #ffffff !important; font-weight: 700; font-size: 0.78rem; padding: 6px 12px; border-radius: 6px; border: 1px solid #15803d; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(22,163,74,0.2);">
+              <span>📥</span> CSV取得
+            </button>
           </div>
 
           <!-- フォーム定義JSON出力エリア（リンク発行モーダルの枠内に統合） -->
