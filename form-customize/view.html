@@ -3974,6 +3974,32 @@
           questionsContainerEl.innerHTML = '';
           const questions = section.questions || [];
 
+          // 🛡️ 初期表示クリーンアップ:
+          // 「前述と同じ」が設定されているグループで、同上チェックがOFF（未選択）の場合、
+          // 先行API等によって誤って自動流入した値があればクリアし、完全な空欄で開く
+          const processedGroupIds = new Set();
+          questions.forEach(q => {
+            if (q.groupId && !processedGroupIds.has(q.groupId)) {
+              processedGroupIds.add(q.groupId);
+              const grpSameQ = questions.find(item => item.groupId === q.groupId && item.sameAsAbove && item.sameAsAbove.enabled && (item.sameAsAbove.sourceType === 'group' || (item.sameAsAbove.sourceQuestionId && item.sameAsAbove.sourceQuestionId.startsWith('group:'))));
+              if (grpSameQ) {
+                const isGrpActive = (formValues['group_' + q.groupId + '_is_same_as_above'] !== undefined)
+                  ? !!formValues['group_' + q.groupId + '_is_same_as_above']
+                  : false;
+                formValues['group_' + q.groupId + '_is_same_as_above'] = isGrpActive;
+                if (!isGrpActive) {
+                  const grpQuestions = getGroupQuestions(q.groupId);
+                  grpQuestions.forEach(tq => {
+                    if (formValues[tq.id + '_is_same_as_above'] !== true) {
+                      formValues[tq.id + '_is_same_as_above'] = false;
+                      delete formValues[tq.id];
+                    }
+                  });
+                }
+              }
+            }
+          });
+
           let currentViewGrpEl = null;
           let currentViewGrpId = null;
 
