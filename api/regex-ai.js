@@ -336,18 +336,25 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
       });
     }
 
-    // 5. JSONパース
+    // 5. JSONパース（マークダウンコードブロックの剥離処理）
     let parsedResult = null;
+    let cleanJsonStr = (rawText || '').trim();
+    if (cleanJsonStr.startsWith('```json')) {
+      cleanJsonStr = cleanJsonStr.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (cleanJsonStr.startsWith('```')) {
+      cleanJsonStr = cleanJsonStr.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+
     try {
-      parsedResult = JSON.parse(rawText);
+      parsedResult = JSON.parse(cleanJsonStr);
     } catch (parseErr) {
       if (mode === 'diagnose_question') {
         parsedResult = null;
       } else {
         // JSON形式から外れていた場合の正規表現フォールバック抽出
-        const patternMatch = rawText.match(/`(\^[^`]+\$)`/);
+        const patternMatch = cleanJsonStr.match(/`(\^[^`]+\$)`/);
         parsedResult = {
-          reply: rawText,
+          reply: cleanJsonStr,
           pattern: patternMatch ? patternMatch[1] : ''
         };
       }
@@ -364,7 +371,7 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
 
     const replyText = (parsedResult && typeof parsedResult.reply === 'string' && parsedResult.reply)
       ? parsedResult.reply
-      : (typeof rawText === 'string' ? rawText : '');
+      : cleanJsonStr;
 
     return res.status(200).json({
       success: true,

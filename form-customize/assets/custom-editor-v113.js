@@ -21261,14 +21261,29 @@
         });
 
         const data = await res.json();
-        const replyText = data.text || data.reply || data.message;
+        let replyText = data.text || data.reply || data.message;
+
+        // もしJSON文字列として渡された場合の安全なアンラップ
+        if (typeof replyText === 'string') {
+          const trimmed = replyText.trim();
+          if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+            try {
+              const parsed = JSON.parse(trimmed);
+              if (parsed && typeof parsed.reply === 'string') {
+                replyText = parsed.reply;
+              }
+            } catch(e) {}
+          }
+        }
 
         if (data && data.success && replyText) {
           window._aiDrawerChatHistory.push({ role: 'assistant', text: replyText });
           
-          // マークダウンや改行・インラインコードを美しく整形
+          // マークダウン（見出し、太字、インラインコード、改行）を美しく整形
           let formattedHtml = escapeHtml(replyText)
             .replace(/\n/g, '<br>')
+            .replace(/###\s+(.*?)<br>/g, '<div style="font-weight: 700; font-size: 0.95em; color: #0f172a; margin-top: 8px; margin-bottom: 4px;">$1</div>')
+            .replace(/##\s+(.*?)<br>/g, '<div style="font-weight: 700; font-size: 1.05em; color: #0f172a; margin-top: 10px; margin-bottom: 6px;">$1</div>')
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/`([^`]+)`/g, '<code style="background: rgba(2,132,199,0.08); color: #0284c7; padding: 2px 5px; border-radius: 4px; font-size: 0.85em; font-family: monospace;">$1</code>');
           botMsg.innerHTML = formattedHtml;
