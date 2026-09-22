@@ -3162,8 +3162,17 @@
         }
 
         // 法人名選択時にカナ欄・インボイス登録番号欄・郵便番号・4分割住所欄・税務区分へ自動連動
-        function autoFillCorpRelatedFields(item) {
+        function autoFillCorpRelatedFields(item, sourceCorpQId) {
           if (!item || !formDefinition || !formDefinition.sections) return;
+
+          let srcQ = null;
+          if (sourceCorpQId) {
+            for (const sec of formDefinition.sections) {
+              srcQ = (sec.questions || []).find(q => q.id === sourceCorpQId);
+              if (srcQ) break;
+            }
+          }
+          const srcGroupId = srcQ ? srcQ.groupId : null;
 
           // 住所の4分割パース
           const parsedAddr = parseJapaneseAddress(item.address || '', item.pref, item.cityName, item.street);
@@ -3179,6 +3188,27 @@
               const qTitle = q.title || '';
               // 屋号項目は自動反映の対象外
               if (qTitle.includes('屋号')) return;
+
+              // 🛡️ スコープガード:
+              // 住所関連項目（郵便番号、都道府県、市区町村、町名番地、建物名）は、
+              // 法人名と同じグループの項目にのみ自動補完する（別グループの郵送先住所や代表者住所には絶対に直接流し込まない）
+              const isAddressRelatedField = (q.type === 'text' && (q.dataKey === 'zip_code' || qTitle.includes('郵便番号') || qTitle.toLowerCase().includes('zip'))) ||
+                                            (q.dataKey === 'pref' || qTitle.includes('都道府県')) ||
+                                            (q.dataKey === 'city' || qTitle.includes('市区町村') || (qTitle.includes('市') && qTitle.includes('区') && !qTitle.includes('番地'))) ||
+                                            ((q.dataKey === 'street') || ((qTitle.includes('町名') || qTitle.includes('番地') || qTitle.includes('丁目')) && !qTitle.includes('建物'))) ||
+                                            ((q.dataKey === 'building') || qTitle.includes('建物') || qTitle.includes('マンション') || qTitle.includes('ビル') || qTitle.includes('部屋番号')) ||
+                                            ((qTitle.includes('町名') || qTitle.includes('番地')) && qTitle.includes('建物'));
+
+              if (isAddressRelatedField) {
+                // 1. 法人名がグループに属している場合、別グループの住所項目には補完しない！
+                if (srcGroupId && q.groupId !== srcGroupId) return;
+                // 2. 法人名がグループ外の場合、グループ内の住所項目には補完しない！
+                if (!srcGroupId && q.groupId) return;
+                // 3. 「前述と同じ」が設定されている項目で、同上チェックがOFFの場合は絶対に補完しない！
+                if (q.sameAsAbove && q.sameAsAbove.enabled && !isGroupSameAsAboveActive(q.groupId) && !isQuestionSameAsAboveActive(q)) {
+                  return;
+                }
+              }
 
               // 0. 法人名欄
               const isCorpNameField = (q.dataKey === 'company_name') || ((qTitle.includes('法人名') || qTitle.includes('会社名') || qTitle.includes('貴社名') || qTitle.includes('御社名') || qTitle.includes('企業名') || qTitle.includes('商号')) && !qTitle.includes('カナ') && !qTitle.includes('フリガナ') && !qTitle.includes('ふりがな') && qTitle.trim() !== '屋号');
@@ -3383,10 +3413,34 @@
         window.autoFillCorpRelatedFields = autoFillCorpRelatedFields;
 
         // 📮 郵便番号からの住所自動補完ハンドラ（公開回答画面 view.html 用）
-        function autoFillAddressFromZipInView(addr) {
+        function autoFillAddressFromZipInView(addr, sourceZipQId) {
           if (!addr || !formDefinition || !formDefinition.sections) return;
+
+          let srcQ = null;
+          if (sourceZipQId) {
+            for (const sec of formDefinition.sections) {
+              srcQ = (sec.questions || []).find(q => q.id === sourceZipQId);
+              if (srcQ) break;
+            }
+          }
+          const srcGroupId = srcQ ? srcQ.groupId : null;
+
           formDefinition.sections.forEach(sec => {
             (sec.questions || []).forEach(q => {
+              // 🛡️ スコープガード:
+              // 1. 郵便番号がグループに所属している場合、同じグループ以外の質問には絶対に住所を補完しない！
+              if (srcGroupId && q.groupId !== srcGroupId) {
+                return;
+              }
+              // 2. 郵便番号がグループ外の場合、グループに所属する質問には補完しない
+              if (!srcGroupId && q.groupId) {
+                return;
+              }
+              // 3. 「前述と同じ」が設定されている項目で、同上チェックがOFFの場合は絶対に補完しない
+              if (q.sameAsAbove && q.sameAsAbove.enabled && !isGroupSameAsAboveActive(q.groupId) && !isQuestionSameAsAboveActive(q)) {
+                return;
+              }
+
               const qTitle = q.title || '';
               // 都道府県
               if (qTitle.includes('都道府県') && addr.pref) {
@@ -3994,6 +4048,11 @@
                     badge.style.display = 'inline-flex';
                     setTimeout(() => {
                       applyGroupSameAsAbove(q.groupId, srcGId, true);
+                    }, 20);
+                  } else {
+                    badge.style.display = 'none';
+                    setTimeout(() => {
+                      updateGroupSameAsAboveSummary(q.groupId, srcGId, false);
                     }, 20);
                   }
                 }
@@ -4793,7 +4852,8 @@
                 }
                 // 2. グループ連動でソースグループ内の質問が変更された場合
                 else if (srcGroupId && (tq.sameAsAbove.sourceGroupId === srcGroupId || tq.sameAsAbove.sourceQuestionId === 'group:' + srcGroupId)) {
-                  if (isQuestionSameAsAboveActive(tq) || isGroupSameAsAboveActive(tq.groupId)) {
+                  const isTargetActive = tq.groupId ? isGroupSameAsAboveActive(tq.groupId) : isQuestionSameAsAboveActive(tq);
+                  if (isTargetActive) {
                     const srcVal = resolveValueFromGroupForQuestion(srcGroupId, tq);
                     applyValueToQuestion(tq, srcVal);
                     setQuestionInputsLocked(tq.id, true, srcVal);
@@ -5390,7 +5450,7 @@
                   badgeContainer.style.display = 'block';
 
                   // カナ欄・インボイス登録番号欄への自動反映
-                  autoFillCorpRelatedFields(item);
+                  autoFillCorpRelatedFields(item, q.id);
                 });
 
                 searchPanel.appendChild(row);
@@ -5581,7 +5641,7 @@
                 badgeContainer.style.display = 'block';
 
                 // 関連法人名・カナが空欄なら自動補完
-                autoFillCorpRelatedFields(item);
+                autoFillCorpRelatedFields(item, q.id);
               });
 
               searchPanel.appendChild(row);
@@ -6262,7 +6322,7 @@
                     zipLookupTimer = setTimeout(async () => {
                       const addr = await lookupAddressFromZip(cleanZip);
                       if (addr) {
-                        autoFillAddressFromZipInView(addr);
+                        autoFillAddressFromZipInView(addr, q.id);
                       }
                     }, 100);
                   }
