@@ -4028,7 +4028,8 @@
                 // グループ一括同上自動入力チェックボックス
                 const grpSameQ = (section.questions || []).find(item => item.groupId === q.groupId && item.sameAsAbove && item.sameAsAbove.enabled && (item.sameAsAbove.sourceType === 'group' || (item.sameAsAbove.sourceQuestionId && item.sameAsAbove.sourceQuestionId.startsWith('group:'))));
                 if (grpSameQ) {
-                  const srcGId = grpSameQ.sameAsAbove.sourceGroupId || grpSameQ.sameAsAbove.sourceQuestionId.replace('group:', '');
+                  const rawSrcGId = grpSameQ.sameAsAbove.sourceGroupId || grpSameQ.sameAsAbove.sourceQuestionId.replace('group:', '');
+                  const srcGId = getEffectiveSourceGroupId(q.groupId, rawSrcGId);
                   const sameWrap = document.createElement('div');
                   sameWrap.className = 'view-group-same-as-above-wrapper';
 
@@ -4437,9 +4438,53 @@
           return list;
         }
 
+        // 🎯 コピー元グループIDのスマート解決ヘルパー:
+        // 設定された sourceGroupId が別セクション（非表示の法人セクションなど）を指している場合でも、
+        // 現在のセクション内の直前にある先行情報グループ（個人事業主情報など）を自動解決する
+        function getEffectiveSourceGroupId(targetGroupId, explicitSourceGroupId) {
+          if (!formDefinition || !formDefinition.sections || !targetGroupId) return explicitSourceGroupId;
+
+          let targetSec = null;
+          let targetSecQuestions = [];
+          for (const sec of formDefinition.sections) {
+            const qs = sec.questions || [];
+            if (qs.some(q => q.groupId === targetGroupId)) {
+              targetSec = sec;
+              targetSecQuestions = qs;
+              break;
+            }
+          }
+          if (!targetSec) return explicitSourceGroupId;
+
+          // 同じセクション内に explicitSourceGroupId が実在すればそれを使用
+          if (explicitSourceGroupId && targetSecQuestions.some(q => q.groupId === explicitSourceGroupId)) {
+            return explicitSourceGroupId;
+          }
+
+          // 同じセクション内で、targetGroupId より前にある直前の先行グループを探索
+          const priorGroupIds = [];
+          for (const q of targetSecQuestions) {
+            if (q.groupId === targetGroupId) break;
+            if (q.groupId && !priorGroupIds.includes(q.groupId)) {
+              priorGroupIds.push(q.groupId);
+            }
+          }
+
+          if (priorGroupIds.length > 0) {
+            // 直前の先行情報グループ（住所・基本情報）を最優先で返す
+            return priorGroupIds[priorGroupIds.length - 1];
+          }
+
+          return explicitSourceGroupId;
+        }
+
         // コピー元グループから、対象質問に適合する値を探索・解決する
         function resolveValueFromGroupForQuestion(sourceGroupId, targetQ) {
-          const srcQuestions = getGroupQuestions(sourceGroupId);
+          const effectiveSrcGId = targetQ.groupId ? getEffectiveSourceGroupId(targetQ.groupId, sourceGroupId) : sourceGroupId;
+          let srcQuestions = getGroupQuestions(effectiveSrcGId);
+          if (srcQuestions.length === 0 && sourceGroupId && sourceGroupId !== effectiveSrcGId) {
+            srcQuestions = getGroupQuestions(sourceGroupId);
+          }
           if (srcQuestions.length === 0) return '';
 
           // 1. 完全一致（タイトル）
@@ -4698,7 +4743,8 @@
             }
           }
 
-          const sourceQuestions = getGroupQuestions(sourceGroupId);
+          const effectiveSrcGId = getEffectiveSourceGroupId(targetGroupId, sourceGroupId);
+          const sourceQuestions = getGroupQuestions(effectiveSrcGId);
           const targetQuestions = getGroupQuestions(targetGroupId);
           let srcTitle = (sourceQuestions[0] && sourceQuestions[0].groupTitle) ? sourceQuestions[0].groupTitle : '';
           const chkLabel = grpEl.querySelector('.view-group-same-as-above-label');
@@ -4713,17 +4759,20 @@
           let zipVal = '', prefVal = '', cityVal = '', streetVal = '', bldgVal = '';
           const summaryItems = [];
 
-          targetQuestions.forEach(tq => {
+          // ターゲット質問およびコピー元質問の両方から入力値を取得（リアルタイム同期を完全保証）
+          const questionsToInspect = targetQuestions.concat(sourceQuestions);
+          questionsToInspect.forEach(tq => {
             const val = formValues[tq.id];
+            if (!val) return;
             const title = (tq.title || '').trim();
             const key = (tq.dataKey || '').toLowerCase();
 
-            if (key.includes('zip') || title.includes('郵便番号')) zipVal = val || '';
-            else if (key.includes('pref') || title.includes('都道府県')) prefVal = val || '';
-            else if (key.includes('city') || title.includes('市区町村')) cityVal = val || '';
-            else if (key.includes('street') || title.includes('町名') || title.includes('番地')) streetVal = val || '';
-            else if (key.includes('bldg') || title.includes('建物') || title.includes('部屋')) bldgVal = val || '';
-            else if (val) summaryItems.push(`${title}: ${val}`);
+            if ((key.includes('zip') || title.includes('郵便番号')) && !zipVal) zipVal = val;
+            else if ((key.includes('pref') || title.includes('都道府県')) && !prefVal) prefVal = val;
+            else if ((key.includes('city') || title.includes('市区町村')) && !cityVal) cityVal = val;
+            else if ((key.includes('street') || title.includes('町名') || title.includes('番地')) && !streetVal) streetVal = val;
+            else if ((key.includes('bldg') || title.includes('建物') || title.includes('部屋')) && !bldgVal) bldgVal = val;
+            else if (val && !summaryItems.some(item => item.startsWith(title + ':'))) summaryItems.push(`${title}: ${val}`);
           });
 
           let displayPreview = '';
@@ -4800,7 +4849,8 @@
                   if (grpSameQ) break;
                 }
                 if (grpSameQ && grpSameQ.sameAsAbove) {
-                  const srcGId = grpSameQ.sameAsAbove.sourceGroupId || grpSameQ.sameAsAbove.sourceQuestionId.replace('group:', '');
+                  const rawSrcGId = grpSameQ.sameAsAbove.sourceGroupId || grpSameQ.sameAsAbove.sourceQuestionId.replace('group:', '');
+                  const srcGId = getEffectiveSourceGroupId(q.groupId, rawSrcGId);
                   const resolvedVal = resolveValueFromGroupForQuestion(srcGId, q);
                   if (resolvedVal !== undefined && resolvedVal !== null && resolvedVal !== '') {
                     formValues[q.id] = resolvedVal;
@@ -4824,12 +4874,13 @@
         window.ensureAllSameAsAboveValuesSynced = ensureAllSameAsAboveValuesSynced;
 
         function applyGroupSameAsAbove(targetGroupId, sourceGroupId, isLocked) {
+          const effectiveSrcGId = getEffectiveSourceGroupId(targetGroupId, sourceGroupId);
           const targetQuestions = getGroupQuestions(targetGroupId);
           targetQuestions.forEach(tq => {
             formValues[tq.id + '_is_same_as_above'] = isLocked;
             const card = document.querySelector(`.question-card[data-question-id="${tq.id}"]`);
             if (isLocked) {
-              const val = resolveValueFromGroupForQuestion(sourceGroupId, tq);
+              const val = resolveValueFromGroupForQuestion(effectiveSrcGId, tq);
               applyValueToQuestion(tq, val);
               setQuestionInputsLocked(tq.id, true, val);
               // ✨ グループ一括同上のときは、個別質問カード（外枠・タイトル含む）を閉じる！
@@ -4849,7 +4900,7 @@
               }
             }
           });
-          updateGroupSameAsAboveSummary(targetGroupId, sourceGroupId, isLocked);
+          updateGroupSameAsAboveSummary(targetGroupId, effectiveSrcGId, isLocked);
         }
 
         function syncAllSameAsAboveForSource(sourceId) {
@@ -4877,12 +4928,16 @@
                   }
                 }
                 // 2. グループ連動でソースグループ内の質問が変更された場合
-                else if (srcGroupId && (tq.sameAsAbove.sourceGroupId === srcGroupId || tq.sameAsAbove.sourceQuestionId === 'group:' + srcGroupId)) {
-                  const isTargetActive = tq.groupId ? isGroupSameAsAboveActive(tq.groupId) : isQuestionSameAsAboveActive(tq);
-                  if (isTargetActive) {
-                    const srcVal = resolveValueFromGroupForQuestion(srcGroupId, tq);
-                    applyValueToQuestion(tq, srcVal);
-                    setQuestionInputsLocked(tq.id, true, srcVal);
+                else if (srcGroupId) {
+                  const rawSrc = tq.sameAsAbove.sourceGroupId || (tq.sameAsAbove.sourceQuestionId && tq.sameAsAbove.sourceQuestionId.replace('group:', ''));
+                  const effectiveSrcGId = tq.groupId ? getEffectiveSourceGroupId(tq.groupId, rawSrc) : rawSrc;
+                  if (effectiveSrcGId === srcGroupId || tq.sameAsAbove.sourceGroupId === srcGroupId || tq.sameAsAbove.sourceQuestionId === 'group:' + srcGroupId) {
+                    const isTargetActive = tq.groupId ? isGroupSameAsAboveActive(tq.groupId) : isQuestionSameAsAboveActive(tq);
+                    if (isTargetActive) {
+                      const srcVal = resolveValueFromGroupForQuestion(srcGroupId, tq);
+                      applyValueToQuestion(tq, srcVal);
+                      setQuestionInputsLocked(tq.id, true, srcVal);
+                    }
                   }
                 }
               });
@@ -4891,8 +4946,12 @@
             if (srcGroupId) {
               formDefinition.sections.forEach(sec => {
                 (sec.questions || []).forEach(tq => {
-                  if (tq.groupId && formValues['group_' + tq.groupId + '_is_same_as_above']) {
-                    updateGroupSameAsAboveSummary(tq.groupId, srcGroupId, true);
+                  if (tq.groupId && isGroupSameAsAboveActive(tq.groupId)) {
+                    const rawSrc = tq.sameAsAbove.sourceGroupId || (tq.sameAsAbove.sourceQuestionId && tq.sameAsAbove.sourceQuestionId.replace('group:', ''));
+                    const effectiveSrcGId = getEffectiveSourceGroupId(tq.groupId, rawSrc || srcGroupId);
+                    if (effectiveSrcGId === srcGroupId) {
+                      updateGroupSameAsAboveSummary(tq.groupId, srcGroupId, true);
+                    }
                   }
                 });
               });
