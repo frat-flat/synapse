@@ -21210,6 +21210,8 @@
       if (!isShowing) chatInput.focus();
     });
 
+    window._aiDrawerChatHistory = window._aiDrawerChatHistory || [];
+
     const handleSendChat = async () => {
       const text = chatInput.value.trim();
       if (!text) return;
@@ -21224,6 +21226,8 @@
       chatInput.value = '';
       chatMessages.scrollTop = chatMessages.scrollHeight;
 
+      window._aiDrawerChatHistory.push({ role: 'user', text: text });
+
       // ボット返答プレースホルダー
       const botMsg = document.createElement('div');
       botMsg.className = 'ai-chat-msg bot';
@@ -21233,23 +21237,48 @@
 
       try {
         const clientApiKey = localStorage.getItem('synapse_gemini_api_key') || '';
-        const systemPrompt = `あなたはSynapse組織統制型フォームビルダーの専属AIコンシェルジュです。質問「${q ? q.title : ''}」の設計や入力規則、カラム統一（dataKey）について、初心者にもわかりやすく親切に日本語でアドバイスしてください。`;
-        const res = await fetch('/api/regex-ai', {
+        let endpoint = '/api/regex-ai';
+        if (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          endpoint = 'https://synapse-wayway.vercel.app/api/regex-ai';
+        }
+
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt: `${systemPrompt}\nユーザーの相談: ${text}`,
-            userKey: clientApiKey
+            mode: 'consult_question',
+            question: q ? {
+              id: q.id,
+              title: q.title || '',
+              type: q.type || 'text',
+              dataKey: q.dataKey || '',
+              description: q.description || ''
+            } : null,
+            message: text,
+            history: window._aiDrawerChatHistory.slice(-6),
+            clientApiKey: clientApiKey
           })
         });
+
         const data = await res.json();
-        if (data && data.text) {
-          botMsg.innerHTML = data.text.replace(/\n/g, '<br>');
+        const replyText = data.text || data.reply || data.message;
+
+        if (data && data.success && replyText) {
+          window._aiDrawerChatHistory.push({ role: 'assistant', text: replyText });
+          
+          // マークダウンや改行・インラインコードを美しく整形
+          let formattedHtml = escapeHtml(replyText)
+            .replace(/\n/g, '<br>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/`([^`]+)`/g, '<code style="background: rgba(2,132,199,0.08); color: #0284c7; padding: 2px 5px; border-radius: 4px; font-size: 0.85em; font-family: monospace;">$1</code>');
+          botMsg.innerHTML = formattedHtml;
         } else {
           // フォールバック
-          botMsg.textContent = `質問「${q ? q.title : ''}」について：業務用途に合わせて「カラム統一」で列名を統一するか、入力規則で正しい形式を担保するのがおすすめです。`;
+          const fallbackText = (data && data.message && !data.success) ? data.message : `質問「${q ? q.title : ''}」について：業務用途に合わせて「カラム統一」で列名を統一するか、入力規則で正しい形式を担保するのがおすすめです。`;
+          botMsg.textContent = fallbackText;
         }
       } catch (err) {
+        console.warn('[AI Drawer Chat] fetch error:', err);
         botMsg.textContent = `質問「${q ? q.title : ''}」について：業務用途に合わせて「カラム統一」で列名を統一するか、入力規則で正しい形式を担保するのがおすすめです。`;
       }
       chatMessages.scrollTop = chatMessages.scrollHeight;

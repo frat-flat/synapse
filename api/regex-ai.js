@@ -24,13 +24,31 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { mode, question, otherQuestions, message, history = [], clientApiKey } = req.body || {};
+    const body = req.body || {};
+    const mode = body.mode;
+    const question = body.question;
+    const otherQuestions = body.otherQuestions;
+    const history = Array.isArray(body.history) ? body.history : [];
+
+    // message または prompt からユーザーの相談文を取得
+    const message = (typeof body.message === 'string' && body.message.trim())
+      ? body.message.trim()
+      : (typeof body.prompt === 'string' && body.prompt.trim())
+        ? body.prompt.trim()
+        : '';
+
+    // clientApiKey または userKey からクライアントキーを取得
+    const clientApiKey = (typeof body.clientApiKey === 'string' && body.clientApiKey.trim())
+      ? body.clientApiKey.trim()
+      : (typeof body.userKey === 'string' && body.userKey.trim())
+        ? body.userKey.trim()
+        : '';
 
     if (mode !== 'diagnose_question') {
-      if (!message || typeof message !== 'string' || message.trim().length === 0) {
+      if (!message || message.length === 0) {
         return res.status(400).json({
           success: false,
-          error: 'Message is required.'
+          error: 'Message or prompt is required.'
         });
       }
     }
@@ -51,9 +69,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    const apiKey =
-      envKey ||
-      (typeof clientApiKey === 'string' && clientApiKey.trim() ? clientApiKey.trim() : null);
+    const apiKey = envKey || (clientApiKey ? clientApiKey : null);
 
     if (!apiKey) {
       return res.status(200).json({
@@ -67,6 +83,12 @@ module.exports = async (req, res) => {
     // 2. システムプロンプトおよびプロンプトの構築
     let systemInstructionText = '';
     const contents = [];
+
+    // モード判定:
+    // A. mode === 'diagnose_question' -> 質問のリアルタイム診断（おすすめ設定JSON返却）
+    // B. mode === 'consult_question' || mode === 'chat' || questionがある || prompt形式の相談 -> Synapse専属AIコンシェルジュ
+    // C. それ以外（mode === 'regex' など） -> GoogleスプレッドシートRE2正規表現アシスタント
+    const isConsultMode = mode === 'consult_question' || mode === 'chat' || (mode !== 'diagnose_question' && (question || typeof body.prompt === 'string' || !/正規表現/.test(message)));
 
     if (mode === 'diagnose_question') {
       systemInstructionText = `
@@ -133,6 +155,59 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
         parts: [{ text: questionText }]
       });
 
+    } else if (isConsultMode) {
+      // 💬 Synapse専属AIコンシェルジュ（設計・カラム統一・バリデーション・物理キー相談）
+      systemInstructionText = `
+あなたはWebフォーム構築基盤「Synapse（シナプス）」の専属AIコンシェルジュ・アーキテクトです。
+フォーム作成者からの質問設計、出力カラムの統一（物理キー・dataKey）、入力規則（バリデーション）、API連携、同上（前述と同じ）設定、テーブル設計・運用設計に関する相談に対して、初心者にもわかりやすく親切・的確・専門的に日本語でアドバイスしてください。
+
+【Synapseの設計・推奨方針】
+1. カラム名・物理キー（dataKey）の命名規則:
+   - 法人情報: company_name（会社名/屋号）、company_kana（カナ）、corp_number（法人番号）、establishment_date（設立日）
+   - 代表者情報: representative_name または rep_name（代表者氏名）、representative_kana または rep_kana（代表者カナ）、rep_tel（代表電話）、rep_email（代表メール）
+   - 担当者情報: contact_name または pic_name（担当者氏名）、contact_kana（担当者カナ）、contact_tel（担当電話）、contact_email（担当メール）
+   - 本店住所: corp_zip または zip_code（郵便番号）、pref（都道府県）、city（市区町村）、street（番地）、building（建物名）
+   - 郵送先・送付先住所: shipping_zip または mail_zip（送付先郵便番号）、shipping_pref（送付先都道府県）、shipping_city（送付先市区町村）、shipping_street または shipping_address（送付先住所・番地）、shipping_building（建物名）
+   - 口座情報: bank_name（銀行名）、bank_code（金融機関コード）、branch_name（支店名）、branch_code（支店番号）、account_type（口座種別）、account_number（口座番号）、account_holder_kana（口座名義カナ）
+   - 命名規則は半角英小文字のスネークケース（例: billing_address, emergency_contact, referral_code）を推奨。
+
+2. 「前述と同じ（同上）」機能とカラム分離について:
+   - 代表者と担当者、本店住所と郵送先住所などでカラムを別に分けたい場合は、dataKeyや設問タイトルを分けるだけで、同上チェック時でも送信時にそれぞれの個別カラムへ値が100%独立して記録されます。
+   - 逆に同じカラムにまとめたい場合（法人セクションと個人事業主セクションの会社名/屋号など）に「カラム統一」で同じdataKeyを指定します。
+
+3. 回答スタイル:
+   - ユーザーの相談に対して直接的かつ具体的に回答してください。
+   - おすすめの物理キー名や設定手順をコードハイライト（\`shipping_address\` 等）や箇条書きを用いてわかりやすく提示してください。
+   - 出力は必ず以下のJSON形式で行ってください。マークダウンのコードブロックなしで生のJSONのみを出力してください:
+{
+  "reply": "ユーザーへの親切・具体的・丁寧なアドバイス本文（マークダウン形式。太字やコードハイライト \`...\`、箇条書きを活用）"
+}
+`.trim();
+
+      // 会話履歴の反映
+      if (Array.isArray(history)) {
+        const recentHistory = history.slice(-6);
+        recentHistory.forEach(item => {
+          if (item && item.role && item.text) {
+            contents.push({
+              role: item.role === 'assistant' || item.role === 'model' ? 'model' : 'user',
+              parts: [{ text: item.text }]
+            });
+          }
+        });
+      }
+
+      // 質問文脈の付与
+      let userQueryText = message;
+      if (question && question.title) {
+        userQueryText = `【現在設定中の質問項目】\n- タイトル: ${question.title}\n- 型: ${question.type || 'text'}\n- 現在のカラムキー(dataKey): ${question.dataKey || '（未設定）'}\n- 説明文: ${question.description || '（なし）'}\n\n【相談内容】\n${message}`;
+      }
+
+      contents.push({
+        role: 'user',
+        parts: [{ text: userQueryText }]
+      });
+
     } else {
       // 2. Googleスプレッドシート（RE2正規表現）に特化したシステムプロンプト
       systemInstructionText = `
@@ -149,9 +224,8 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
 }
 `.trim();
 
-      // 3. 会話履歴の構築
+      // 会話履歴の構築
       if (Array.isArray(history)) {
-        // 直近の会話（最大6ターン程度）を反映
         const recentHistory = history.slice(-6);
         recentHistory.forEach(item => {
           if (item && item.role && item.text) {
@@ -166,7 +240,7 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
       // 現在のメッセージを追加
       contents.push({
         role: 'user',
-        parts: [{ text: (message || '').trim() }]
+        parts: [{ text: message }]
       });
     }
 
@@ -288,12 +362,18 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
       });
     }
 
+    const replyText = (parsedResult && typeof parsedResult.reply === 'string' && parsedResult.reply)
+      ? parsedResult.reply
+      : (typeof rawText === 'string' ? rawText : '');
+
     return res.status(200).json({
       success: true,
       isConfigured: true,
       model: successfulModel,
-      reply: parsedResult.reply || '',
-      pattern: parsedResult.pattern || ''
+      text: replyText,
+      reply: replyText,
+      message: replyText,
+      pattern: (parsedResult && parsedResult.pattern) || ''
     });
 
   } catch (error) {
