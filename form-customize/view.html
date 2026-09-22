@@ -1899,12 +1899,14 @@
           if (formDefinition) {
             try {
               const currentCached = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]');
-              const existingIdx = currentCached.findIndex(f => f && f.id === formDefinition.id);
+              const existingIdx = currentCached.findIndex((f, idx) => f && (f.id === formDefinition.id || (formId === '0' && idx === 0) || (!f.id && !formDefinition.id)));
               if (existingIdx !== -1) {
-                // 安全ガード: テスト環境でローカルに既に最新の編集データが存在する場合、古いクラウドデータで上書きしない
+                // 安全ガード: テスト環境でローカルに既に最新の編集データが存在する場合、ローカルの最新ドラフトを優先採用
                 const localQuestionsCount = (currentCached[existingIdx].sections || []).reduce((sum, s) => sum + (s.questions ? s.questions.length : 0), 0);
                 const cloudQuestionsCount = (formDefinition.sections || []).reduce((sum, s) => sum + (s.questions ? s.questions.length : 0), 0);
-                if (!window.IS_TEST_ENV || localQuestionsCount <= cloudQuestionsCount) {
+                if (window.IS_TEST_ENV && localQuestionsCount > cloudQuestionsCount) {
+                  formDefinition = currentCached[existingIdx];
+                } else {
                   currentCached[existingIdx] = formDefinition;
                 }
               } else {
