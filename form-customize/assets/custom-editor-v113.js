@@ -11803,6 +11803,12 @@
         });
       }
     }
+    // 同一セクション内のグループを最優先（先頭）にソート
+    result.groups.sort((a, b) => {
+      if (a.isSameSection && !b.isSameSection) return -1;
+      if (!a.isSameSection && b.isSameSection) return 1;
+      return 0;
+    });
     return result;
   }
   window.getAvailableSourcesFor = getAvailableSourcesFor;
@@ -12628,7 +12634,8 @@
                 priorGroups.push({
                   groupId: qItem.groupId,
                   title: qItem.groupTitle,
-                  sectionTitle: sItem.title || `セクション ${sIdx + 1}`
+                  sectionTitle: sItem.title || `セクション ${sIdx + 1}`,
+                  isSameSection: (sIdx === curSecIdx)
                 });
               }
             }
@@ -12636,6 +12643,13 @@
           }
 
           if (priorGroups.length > 0) {
+            // 同一セクション内のグループを最優先（先頭）に配置
+            priorGroups.sort((a, b) => {
+              if (a.isSameSection && !b.isSameSection) return -1;
+              if (!a.isSameSection && b.isSameSection) return 1;
+              return 0;
+            });
+
             sameBar.style.display = 'none'; // 詳細設定に組み込むため常時表示はせず非表示固定
             const sameToggle = sameBar.querySelector('.group-same-as-above-toggle');
             const sameDetails = sameBar.querySelector('.group-same-as-above-details');
@@ -12644,7 +12658,8 @@
 
             let optHtml = '';
             priorGroups.forEach(pg => {
-              optHtml += `<option value="${escapeHtml(pg.groupId)}">[${escapeHtml(pg.sectionTitle)}] ${escapeHtml(pg.title)}</option>`;
+              const secTag = pg.isSameSection ? '同セクション (推奨)' : pg.sectionTitle;
+              optHtml += `<option value="${escapeHtml(pg.groupId)}">[${escapeHtml(secTag)}] ${escapeHtml(pg.title)}</option>`;
             });
             sameSelect.innerHTML = optHtml;
 

@@ -4438,9 +4438,145 @@
           return list;
         }
 
-        // 🎯 コピー元グループIDのスマート解決ヘルパー:
+        // ==========================================
+        // 4.5.1 汎用セマンティック・フィールド分類エンジン
+        // 住所以外（代表者・担当者・請求先・口座等）のあらゆるビジネス項目を正確に判別
+        // ==========================================
+        const FIELD_SEMANTICS = {
+          // 口座名義人（カナ・漢字）
+          ACCOUNT_HOLDER: {
+            priority: 5,
+            matches: (title, key) => /(口座名義|名義人|受取人名)/i.test(title) || /(account_holder|holder_name)/i.test(key)
+          },
+          // 金融機関・銀行名
+          BANK_NAME: {
+            priority: 6,
+            matches: (title, key) => /(銀行名|金融機関名|信金|信組)/i.test(title) || /(bank_name|^bank$)/i.test(key)
+          },
+          // 支店名
+          BRANCH_NAME: {
+            priority: 7,
+            matches: (title, key) => /(支店名|支店|出張所)/i.test(title) || /(branch_name|^branch$)/i.test(key)
+          },
+          // 口座種別
+          ACCOUNT_TYPE: {
+            priority: 8,
+            matches: (title, key) => /(口座種別|預金種目)/i.test(title) || /(account_type|deposit_type)/i.test(key)
+          },
+          // 口座番号
+          ACCOUNT_NUM: {
+            priority: 9,
+            matches: (title, key) => /(口座番号|口座No)/i.test(title) || /(account_number|account_no)/i.test(key)
+          },
+          // 氏名（カナ）
+          NAME_KANA: {
+            priority: 10,
+            matches: (title, key) => /(カナ|フリガナ|ふりがな|かな|メイキ)/i.test(title) || /(kana|furigana|rubi)/i.test(key)
+          },
+          // 氏名（漢字・一般）
+          NAME_KANJI: {
+            priority: 20,
+            matches: (title, key) => {
+              if (/(カナ|フリガナ|ふりがな|かな)/i.test(title) || /(kana|furigana)/i.test(key)) return false;
+              if (/(会社名|法人名|屋号|銀行名|金融機関|支店)/i.test(title) || /(company|corp|bank|branch)/i.test(key)) return false;
+              return /(氏名|お名前|名前|担当者名|代表者名|代表者|役員名|姓名|フルネーム)/i.test(title) ||
+                     /(rep_name|repname|contact_name|pic_name|user_name|full_name|^name$|_name$)/i.test(key);
+            }
+          },
+          // 役職・部署・所属
+          POSITION: {
+            priority: 30,
+            matches: (title, key) => /(役職|部署|所属|肩書|肩書き|職位|役員)/i.test(title) ||
+                                     /(position|title|dept|department|role)/i.test(key)
+          },
+          // 電話番号
+          TEL: {
+            priority: 40,
+            matches: (title, key) => {
+              if (/(メール|mail|アドレス)/i.test(title) || /(mail|email)/i.test(key)) return false;
+              return /(電話|TEL|tel|携帯|連絡先|FAX|fax)/i.test(title) ||
+                     /(tel|phone|mobile|fax)/i.test(key);
+            }
+          },
+          // メールアドレス
+          EMAIL: {
+            priority: 50,
+            matches: (title, key) => /(メール|Mail|mail|アドレス|E-mail|email)/i.test(title) ||
+                                     /(mail|email)/i.test(key)
+          },
+          // 生年月日・設立日
+          BIRTHDATE: {
+            priority: 60,
+            matches: (title, key) => /(生年月日|誕生日|設立日|設立年月日)/i.test(title) ||
+                                     /(birth|birthday|birthdate|founded|found_date)/i.test(key)
+          },
+          // 郵便番号
+          ZIP: {
+            priority: 70,
+            matches: (title, key) => /(郵便番号|〒)/i.test(title) || /(zip|post_code|postal)/i.test(key)
+          },
+          // 都道府県
+          PREF: {
+            priority: 80,
+            matches: (title, key) => /(都道府県|都道府|県名)/i.test(title) || /(pref|prefecture)/i.test(key)
+          },
+          // 市区町村
+          CITY: {
+            priority: 90,
+            matches: (title, key) => /(市区町村|市町村|市区郡|郡)/i.test(title) || /(city|ward)/i.test(key)
+          },
+          // 町名・番地（※口座番号・電話番号の「号」は絶対に除外）
+          STREET: {
+            priority: 100,
+            matches: (title, key) => {
+              if (/(番号|口座|電話)/.test(title)) return false;
+              return /(町名|番地|丁目|番地等)/i.test(title) || (title.includes('号') && !title.includes('番号')) ||
+                     /(street|address1|address_line|line1)/i.test(key);
+            }
+          },
+          // 建物名・部屋番号
+          BUILDING: {
+            priority: 110,
+            matches: (title, key) => /(建物|マンション|アパート|ビル|部屋|号室|住所2)/i.test(title) || /(building|room|bldg|address2|line2)/i.test(key)
+          },
+          // 会社名・法人名・屋号
+          COMPANY: {
+            priority: 120,
+            matches: (title, key) => /(会社名|法人名|屋号|商号|企業名|組織名)/i.test(title) || /(company|corp|trade_name|org)/i.test(key)
+          },
+          // インボイス登録番号
+          INVOICE: {
+            priority: 180,
+            matches: (title, key) => /(インボイス|登録番号|適格請求書)/i.test(title) || /(invoice)/i.test(key)
+          }
+        };
+
+        function detectFieldSemanticType(q) {
+          if (!q) return null;
+          const title = (q.title || '').trim();
+          const key = (q.dataKey || '').trim().toLowerCase();
+
+          for (const [typeKey, def] of Object.entries(FIELD_SEMANTICS)) {
+            if (def.matches(title, key)) {
+              return typeKey;
+            }
+          }
+          return null;
+        }
+
+        // 役割・対象プレフィックスを除去したコアキーを抽出
+        function extractCoreSemanticKey(str) {
+          if (!str) return '';
+          return str.toString()
+            .trim()
+            .toLowerCase()
+            .replace(/^(rep|representative|contact|pic|charge|billing|shipping|mail|corp|company|client|user|personal|home|office|target|source|owner|manager|emergency|delivery|main)_?/, '')
+            .replace(/^(代表者|代表|担当者|ご担当者|ご担当|担当|申込者|お申込者|請求先|ご請求先|送付先|郵送先|配送先|お届け先|法人|会社|個人|自宅|勤務先|緊急連絡先|連絡先)_?/, '');
+        }
+
+        // 🎯 コピー元グループIDのスマート自動解決ヘルパー:
         // 設定された sourceGroupId が別セクション（非表示の法人セクションなど）を指している場合でも、
-        // 現在のセクション内の直前にある先行情報グループ（個人事業主情報など）を自動解決する
+        // 現在のセクション内の直前にある最も適合する先行グループ（代表者なら担当者、住所なら住所等）を自動解決する
         function getEffectiveSourceGroupId(targetGroupId, explicitSourceGroupId) {
           if (!formDefinition || !formDefinition.sections || !targetGroupId) return explicitSourceGroupId;
 
@@ -4461,7 +4597,7 @@
             return explicitSourceGroupId;
           }
 
-          // 同じセクション内で、targetGroupId より前にある直前の先行グループを探索
+          // 同じセクション内で、targetGroupId より前にある直前の先行グループ群を探索
           const priorGroupIds = [];
           for (const q of targetSecQuestions) {
             if (q.groupId === targetGroupId) break;
@@ -4469,16 +4605,36 @@
               priorGroupIds.push(q.groupId);
             }
           }
+          if (priorGroupIds.length === 0) return explicitSourceGroupId;
 
-          if (priorGroupIds.length > 0) {
-            // 直前の先行情報グループ（住所・基本情報）を最優先で返す
-            return priorGroupIds[priorGroupIds.length - 1];
-          }
+          // 先行グループが1つだけならそれを返す
+          if (priorGroupIds.length === 1) return priorGroupIds[0];
 
-          return explicitSourceGroupId;
+          // 複数ある場合: ターゲットグループの設問セマンティクスとの親和性スコアで最良の先行グループを選定
+          const targetQuestions = targetSecQuestions.filter(q => q.groupId === targetGroupId);
+          const targetTypes = targetQuestions.map(q => detectFieldSemanticType(q)).filter(Boolean);
+
+          let bestGId = priorGroupIds[priorGroupIds.length - 1]; // デフォルトは直前グループ
+          let maxScore = -1;
+
+          priorGroupIds.forEach(pGId => {
+            const pQuestions = targetSecQuestions.filter(q => q.groupId === pGId);
+            const pTypes = pQuestions.map(q => detectFieldSemanticType(q)).filter(Boolean);
+            // 共通するセマンティクスカテゴリ数をカウント
+            let score = 0;
+            targetTypes.forEach(tt => {
+              if (pTypes.includes(tt)) score++;
+            });
+            if (score > maxScore) {
+              maxScore = score;
+              bestGId = pGId;
+            }
+          });
+
+          return bestGId;
         }
 
-        // コピー元グループから、対象質問に適合する値を探索・解決する
+        // コピー元グループから、対象質問に適合する値を探索・解決する（汎用多段階パイプライン）
         function resolveValueFromGroupForQuestion(sourceGroupId, targetQ) {
           const effectiveSrcGId = targetQ.groupId ? getEffectiveSourceGroupId(targetQ.groupId, sourceGroupId) : sourceGroupId;
           let srcQuestions = getGroupQuestions(effectiveSrcGId);
@@ -4488,55 +4644,43 @@
           if (srcQuestions.length === 0) return '';
 
           // 1. 完全一致（タイトル）
-          const exactTitle = srcQuestions.find(sq => sq.title && targetQ.title && sq.title.trim() === targetQ.title.trim());
+          const targetTitle = (targetQ.title || '').trim();
+          const exactTitle = srcQuestions.find(sq => sq.title && (sq.title || '').trim() === targetTitle);
           if (exactTitle) return getResolvedQuestionValue(exactTitle.id, exactTitle);
 
-          // 1.5 dataKey サフィックス一致によるマッチング（例: corp_zip と rep_zip, corp_pref と rep_pref など）
+          // 2. dataKey 完全一致
           if (targetQ.dataKey) {
-            const tKey = targetQ.dataKey.toLowerCase();
-            const matchedByKey = srcQuestions.find(sq => {
-              if (!sq.dataKey) return false;
-              const sKey = sq.dataKey.toLowerCase();
-              if (tKey === sKey) return true;
-              const tSuffix = tKey.replace(/^(corp|rep|company|client|user|personal|home|office|target|source)_?/, '');
-              const sSuffix = sKey.replace(/^(corp|rep|company|client|user|personal|home|office|target|source)_?/, '');
-              return tSuffix && sSuffix && tSuffix === sSuffix;
+            const exactKey = srcQuestions.find(sq => sq.dataKey && sq.dataKey.toLowerCase() === targetQ.dataKey.toLowerCase());
+            if (exactKey) return getResolvedQuestionValue(exactKey.id, exactKey);
+          }
+
+          // 3. 役割プレフィックス除去後のコアキー一致
+          const targetCoreKey = extractCoreSemanticKey(targetQ.dataKey || targetTitle);
+          if (targetCoreKey) {
+            const matchedByCore = srcQuestions.find(sq => {
+              const srcCoreKey = extractCoreSemanticKey(sq.dataKey || sq.title);
+              return srcCoreKey && srcCoreKey === targetCoreKey;
             });
-            if (matchedByKey) return getResolvedQuestionValue(matchedByKey.id, matchedByKey);
+            if (matchedByCore) return getResolvedQuestionValue(matchedByCore.id, matchedByCore);
           }
 
-          // 2. 代表的な住所・連絡先キーワードによるマッチング
-          const keywords = [
-            ['郵便番号', '〒'],
-            ['都道府県'],
-            ['市区町村', '市区郡', '市町村'],
-            ['番地', '丁目', '号'],
-            ['建物', 'マンション', 'アパート', '部屋'],
-            ['カナ', 'フリガナ', 'ふりがな'],
-            ['電話', 'TEL', 'tel'],
-            ['メール', 'Mail', 'mail', 'アドレス'],
-            ['会社名', '法人名', '名称', '組織名'],
-            ['代表者', '役職', '担当者']
-          ];
-
-          for (const kwList of keywords) {
-            const isTargetMatch = kwList.some(kw => (targetQ.title || '').includes(kw));
-            if (isTargetMatch) {
-              const matchedSrc = srcQuestions.find(sq => kwList.some(kw => (sq.title || '').includes(kw)));
-              if (matchedSrc) return getResolvedQuestionValue(matchedSrc.id, matchedSrc);
-            }
+          // 4. 汎用セマンティクス分類カテゴリ一致（氏名、カナ、役職、TEL、メール、住所各部等）
+          const targetSemType = detectFieldSemanticType(targetQ);
+          if (targetSemType) {
+            const matchedBySem = srcQuestions.find(sq => detectFieldSemanticType(sq) === targetSemType);
+            if (matchedBySem) return getResolvedQuestionValue(matchedBySem.id, matchedBySem);
           }
 
-          // 3. 同じ質問タイプ ＆ 同じ相対順序（インデックス）
+          // 5. 同じ質問タイプ ＆ 同じ相対順序（インデックス）
           if (targetQ.groupId) {
             const targetGroupQuestions = getGroupQuestions(targetQ.groupId);
             const targetIdx = targetGroupQuestions.findIndex(q => q.id === targetQ.id);
-            if (targetIdx !== -1 && srcQuestions[targetIdx]) {
+            if (targetIdx !== -1 && srcQuestions[targetIdx] && srcQuestions[targetIdx].type === targetQ.type) {
               return getResolvedQuestionValue(srcQuestions[targetIdx].id, srcQuestions[targetIdx]);
             }
           }
 
-          // 4. 単独テキスト項目（textareaなど）の場合: グループ全設問の値を結合して返す
+          // 6. 単独テキスト項目（textareaなど）の場合: グループ全設問の値を結合して返す
           if (!targetQ.groupId || targetQ.type === 'textarea') {
             const combined = srcQuestions.map(sq => {
               const val = getResolvedQuestionValue(sq.id, sq);
@@ -4755,34 +4899,54 @@
           if (!srcTitle) srcTitle = '前述の入力内容';
           const targetGrpTitle = (targetQuestions[0] && targetQuestions[0].groupTitle) ? targetQuestions[0].groupTitle : '入力項目';
 
-          // 住所項目の自動連結プレビュー判定
-          let zipVal = '', prefVal = '', cityVal = '', streetVal = '', bldgVal = '';
-          const summaryItems = [];
-
-          // ターゲット質問およびコピー元質問の両方から入力値を取得（リアルタイム同期を完全保証）
+          // 多種項目対応スマートプレビュー生成
+          const valBySem = {};
+          const rawItems = [];
           const questionsToInspect = targetQuestions.concat(sourceQuestions);
+
           questionsToInspect.forEach(tq => {
             const val = formValues[tq.id];
             if (!val) return;
+            const sType = detectFieldSemanticType(tq);
+            if (sType && !valBySem[sType]) {
+              valBySem[sType] = val;
+            }
             const title = (tq.title || '').trim();
-            const key = (tq.dataKey || '').toLowerCase();
-
-            if ((key.includes('zip') || title.includes('郵便番号')) && !zipVal) zipVal = val;
-            else if ((key.includes('pref') || title.includes('都道府県')) && !prefVal) prefVal = val;
-            else if ((key.includes('city') || title.includes('市区町村')) && !cityVal) cityVal = val;
-            else if ((key.includes('street') || title.includes('町名') || title.includes('番地')) && !streetVal) streetVal = val;
-            else if ((key.includes('bldg') || title.includes('建物') || title.includes('部屋')) && !bldgVal) bldgVal = val;
-            else if (val && !summaryItems.some(item => item.startsWith(title + ':'))) summaryItems.push(`${title}: ${val}`);
+            if (!rawItems.some(item => item.startsWith(title + ':'))) {
+              rawItems.push(`${title}: ${val}`);
+            }
           });
 
           let displayPreview = '';
           let shortPreview = '';
-          if (zipVal || prefVal || cityVal || streetVal) {
-            displayPreview = `${zipVal ? '〒' + zipVal + ' ' : ''}${prefVal}${cityVal}${streetVal}${bldgVal ? ' ' + bldgVal : ''}`.trim();
-            shortPreview = `${zipVal ? '〒' + zipVal + ' ' : ''}${prefVal}${cityVal}...`;
-          } else if (summaryItems.length > 0) {
-            displayPreview = summaryItems.join(' / ');
-            shortPreview = summaryItems[0] || '適用中';
+
+          // パターン1: 住所系グループ（郵便番号、都道府県、市区町村、町名など）
+          if (valBySem.ZIP || valBySem.PREF || valBySem.CITY || valBySem.STREET) {
+            displayPreview = `${valBySem.ZIP ? '〒' + valBySem.ZIP + ' ' : ''}${valBySem.PREF || ''}${valBySem.CITY || ''}${valBySem.STREET || ''}${valBySem.BUILDING ? ' ' + valBySem.BUILDING : ''}`.trim();
+            shortPreview = `${valBySem.ZIP ? '〒' + valBySem.ZIP + ' ' : ''}${valBySem.PREF || ''}${valBySem.CITY || ''}...`;
+          }
+          // パターン2: 人物・代表者・担当者系グループ（氏名漢字、氏名カナ、役職、TEL、メールなど）
+          else if (valBySem.NAME_KANJI || valBySem.NAME_KANA) {
+            const namePart = valBySem.NAME_KANJI
+              ? (valBySem.NAME_KANA ? `${valBySem.NAME_KANJI}（${valBySem.NAME_KANA}）` : valBySem.NAME_KANJI)
+              : valBySem.NAME_KANA;
+            const posPart = valBySem.POSITION ? ` [${valBySem.POSITION}]` : '';
+            const contactParts = [valBySem.TEL, valBySem.EMAIL].filter(Boolean);
+            displayPreview = `${namePart}${posPart}${contactParts.length ? ' / ' + contactParts.join(' / ') : ''}`.trim();
+            shortPreview = namePart || '適用中';
+          }
+          // パターン3: 口座情報系グループ（銀行名、支店名、口座種別、口座番号など）
+          else if (valBySem.BANK_NAME || valBySem.ACCOUNT_NUM) {
+            const bankPart = `${valBySem.BANK_NAME || ''} ${valBySem.BRANCH_NAME || ''}`.trim();
+            const typePart = valBySem.ACCOUNT_TYPE ? `[${valBySem.ACCOUNT_TYPE}] ` : '';
+            const holderPart = valBySem.ACCOUNT_HOLDER ? ` (${valBySem.ACCOUNT_HOLDER})` : '';
+            displayPreview = `${bankPart} ${typePart}${valBySem.ACCOUNT_NUM || ''}${holderPart}`.trim();
+            shortPreview = bankPart || '口座情報';
+          }
+          // パターン4: その他汎用グループ
+          else if (rawItems.length > 0) {
+            displayPreview = rawItems.join(' / ');
+            shortPreview = rawItems[0] || '適用中';
           } else {
             displayPreview = '前述の入力内容が反映されます（コピー元の入力待ち）';
             shortPreview = '適用中';
@@ -6266,7 +6430,7 @@
             formValues[q.id] = '';
           }
 
-          if (q.type === 'text') {
+          if (['text', 'email', 'tel', 'number', 'date', 'url'].includes(q.type) || !q.type) {
             const apiConfig = getQuestionApiConfig(q);
 
             if (apiConfig && apiConfig.isCorp) {
@@ -6286,7 +6450,7 @@
               setupBranchCodeApiSearchField(q, container, val);
             } else {
               const input = document.createElement('input');
-              input.type = 'text';
+              input.type = (q.type && ['text', 'email', 'tel', 'number', 'date', 'url'].includes(q.type)) ? q.type : 'text';
               input.className = 'form-control';
               input.placeholder = '回答を入力...';
               input.value = val || '';
@@ -6296,7 +6460,7 @@
               const isBranchCode = q.title && (q.title.includes('支店番号') || q.title.includes('支店コード') || (q.title.includes('店舗コード') || (q.title.includes('支店') && q.title.includes('番号'))));
               const isZipCode = (apiConfig && apiConfig.isZip) || (q.title && (q.title.includes('郵便番号') || q.title.toLowerCase().includes('zip')));
               const isAccountHolderKana = isAccountHolderKanaField(q);
-              const isAcctNum = (q.dataKey === 'account_number') || (q.title && (q.title.includes('口座番号') || (!q.title.includes('名義') && q.title.includes('口座'))));
+              const isAcctNum = (q.dataKey === 'account_number') || (q.title && (q.title.includes('口座番号') || (!q.title.includes('名義') && !q.title.includes('種別') && !q.title.includes('区分') && q.title.includes('口座'))));
 
               if (isBankCode) {
                 input.placeholder = '4桁の金融機関コード (例: 0005)';
