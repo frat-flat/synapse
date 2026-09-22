@@ -579,6 +579,31 @@
         gap: 4px;
         font-weight: 500;
       }
+      .question-same-as-above-summary {
+        background: #f8f9fa;
+        border: 1px dashed #dadce0;
+        border-radius: 6px;
+        padding: 8px 12px;
+        margin-top: 6px;
+        font-size: 0.82rem;
+        color: #3c4043;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        transition: all 0.2s ease;
+      }
+      .view-group-same-summary-card {
+        background: #e6f4ea;
+        border: 1px solid #ceead6;
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin: 8px 0 12px 0;
+        font-size: 0.85rem;
+        color: #137333;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        transition: all 0.2s ease;
+      }
       .input-locked-same-as-above {
         background-color: #f1f5f9 !important;
         border-color: #cbd5e1 !important;
@@ -1406,6 +1431,8 @@
         let sectionHistory = [];
         let formValues = {};
         let visitedSections = new Set();
+        window.formValues = formValues;
+        window.formDefinition = formDefinition;
 
         // DOM参照
         const loadingBox = document.getElementById('loading-box');
@@ -3344,6 +3371,9 @@
 
           // スキップ・表示条件（インボイス番号の表示トグル等）を即時再計算
           applySectionSkipLogic();
+
+          // 🛡️ 同上データ同期: 自動補完された法人情報を同上項目へ即時反映
+          ensureAllSameAsAboveValuesSynced();
         }
         window.autoFillCorpRelatedFields = autoFillCorpRelatedFields;
 
@@ -3388,6 +3418,9 @@
               }
             });
           });
+
+          // 🛡️ 同上データ同期: 自動補完された住所情報を同上項目へ即時反映
+          ensureAllSameAsAboveValuesSynced();
         }
 
         // 🔤 タイトル・サブタイトル用フォントファミリーマップ
@@ -3634,6 +3667,8 @@
 
         function initFormView() {
           formValues = {};
+          window.formValues = formValues;
+          window.formDefinition = formDefinition;
           sectionHistory = [];
           visitedSections = new Set();
           currentSectionId = formDefinition.sections[0].id;
@@ -4305,6 +4340,20 @@
           const exactTitle = srcQuestions.find(sq => sq.title && targetQ.title && sq.title.trim() === targetQ.title.trim());
           if (exactTitle) return getResolvedQuestionValue(exactTitle.id, exactTitle);
 
+          // 1.5 dataKey サフィックス一致によるマッチング（例: corp_zip と rep_zip, corp_pref と rep_pref など）
+          if (targetQ.dataKey) {
+            const tKey = targetQ.dataKey.toLowerCase();
+            const matchedByKey = srcQuestions.find(sq => {
+              if (!sq.dataKey) return false;
+              const sKey = sq.dataKey.toLowerCase();
+              if (tKey === sKey) return true;
+              const tSuffix = tKey.replace(/^(corp|rep|company|client|user|personal|home|office|target|source)_?/, '');
+              const sSuffix = sKey.replace(/^(corp|rep|company|client|user|personal|home|office|target|source)_?/, '');
+              return tSuffix && sSuffix && tSuffix === sSuffix;
+            });
+            if (matchedByKey) return getResolvedQuestionValue(matchedByKey.id, matchedByKey);
+          }
+
           // 2. 代表的な住所・連絡先キーワードによるマッチング
           const keywords = [
             ['郵便番号', '〒'],
@@ -4373,15 +4422,44 @@
             }
           }
 
+          // DOMからの取得と formValues への逆同期
           const card = document.querySelector(`.question-card[data-question-id="${sourceId}"]`);
           if (card) {
             const textInput = card.querySelector('input:not([type="checkbox"]):not([type="radio"]), textarea, select');
-            if (textInput && textInput.value) return textInput.value;
+            if (textInput && textInput.value) {
+              formValues[sourceId] = textInput.value;
+              return textInput.value;
+            }
             const checkedRadio = card.querySelector('input[type="radio"]:checked');
-            if (checkedRadio) return checkedRadio.value;
+            if (checkedRadio) {
+              formValues[sourceId] = checkedRadio.value;
+              return checkedRadio.value;
+            }
             const checkedBoxes = Array.from(card.querySelectorAll('input[type="checkbox"]:not(.same-as-above-checkbox):checked')).map(cb => cb.value);
-            if (checkedBoxes.length > 0) return checkedBoxes;
+            if (checkedBoxes.length > 0) {
+              formValues[sourceId] = checkedBoxes;
+              return checkedBoxes;
+            }
           }
+
+          // dataKey によるDOM検索フォールバック
+          if (formDefinition && formDefinition.sections) {
+            for (const s of formDefinition.sections) {
+              for (const sq of (s.questions || [])) {
+                if (sq.dataKey === sourceId || sq.title === sourceId) {
+                  const subCard = document.querySelector(`.question-card[data-question-id="${sq.id}"]`);
+                  if (subCard) {
+                    const textInput = subCard.querySelector('input:not([type="checkbox"]):not([type="radio"]), textarea, select');
+                    if (textInput && textInput.value) {
+                      formValues[sq.id] = textInput.value;
+                      return textInput.value;
+                    }
+                  }
+                }
+              }
+            }
+          }
+
           return formValues[sourceId] || '';
         }
 
@@ -4436,41 +4514,179 @@
           }
         }
 
-        function setQuestionInputsLocked(questionId, isLocked) {
+        function setQuestionInputsLocked(questionId, isLocked, summaryText = '') {
           const card = document.querySelector(`.question-card[data-question-id="${questionId}"]`);
           if (!card) return;
 
           const wrapper = card.querySelector('.question-input-wrapper');
-          if (!wrapper) return;
-
-          const inputs = wrapper.querySelectorAll('input:not(.same-as-above-checkbox):not([type="file"]), textarea');
-          inputs.forEach(input => {
-            input.readOnly = isLocked;
+          if (wrapper) {
             if (isLocked) {
-              input.classList.add('input-locked-same-as-above');
+              // ✨ 入力欄を閉じる（非表示）
+              wrapper.style.display = 'none';
+              wrapper.setAttribute('aria-hidden', 'true');
             } else {
-              input.classList.remove('input-locked-same-as-above');
+              // ✨ 入力欄を開く（再表示）
+              wrapper.style.display = '';
+              wrapper.removeAttribute('aria-hidden');
             }
-          });
+          }
 
-          const controls = wrapper.querySelectorAll('select:not(.corp-pref-filter), .options-list input[type="radio"], .options-list input[type="checkbox"], button');
-          controls.forEach(el => {
-            if (isLocked) {
-              el.style.pointerEvents = 'none';
-              el.style.opacity = '0.65';
-              el.tabIndex = -1;
-            } else {
-              el.style.pointerEvents = '';
-              el.style.opacity = '';
-              el.removeAttribute('tabindex');
+          // 個別質問用のサマリー表示コンテナ
+          let summaryEl = card.querySelector('.question-same-as-above-summary');
+          if (isLocked) {
+            if (!summaryEl) {
+              summaryEl = document.createElement('div');
+              summaryEl.className = 'question-same-as-above-summary';
+              summaryEl.style.cssText = 'background: #f8f9fa; border: 1px dashed #dadce0; border-radius: 6px; padding: 8px 12px; margin-top: 6px; font-size: 0.82rem; color: #3c4043; display: flex; align-items: center; justify-content: space-between; gap: 8px;';
+              const sameWrap = card.querySelector('.same-as-above-wrapper');
+              if (sameWrap && sameWrap.nextSibling) {
+                card.insertBefore(summaryEl, sameWrap.nextSibling);
+              } else {
+                card.appendChild(summaryEl);
+              }
             }
-          });
+            const displayVal = (summaryText !== undefined && summaryText !== null && summaryText !== '') 
+              ? summaryText 
+              : (formValues[questionId] || '前述の内容を適用中');
+            summaryEl.innerHTML = `
+              <div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                <span style="color:#137333; font-weight:bold;">✓</span>
+                <span style="font-weight:600; color:#1e8e3e; font-size:0.75rem; background:#e6f4ea; padding:2px 6px; border-radius:4px; flex-shrink:0;">適用中</span>
+                <span style="color:#202124; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(String(displayVal))}</span>
+              </div>
+              <span style="color:#70757a; font-size:0.75rem; flex-shrink:0;">(入力欄非表示)</span>
+            `;
+            summaryEl.style.display = 'flex';
+          } else {
+            if (summaryEl) {
+              summaryEl.style.display = 'none';
+            }
+          }
 
           const badge = card.querySelector('.same-as-above-badge');
           if (badge) {
             badge.style.display = isLocked ? 'inline-flex' : 'none';
           }
         }
+
+        // グループ一括同上のサマリープレビュー更新
+        function updateGroupSameAsAboveSummary(targetGroupId, sourceGroupId, isLocked) {
+          const grpEl = document.querySelector(`.view-question-group-card[data-group-id="${targetGroupId}"], .view-question-group[data-group-id="${targetGroupId}"]`);
+          if (!grpEl) return;
+
+          let summaryCard = grpEl.querySelector('.view-group-same-summary-card');
+          if (!isLocked) {
+            if (summaryCard) summaryCard.style.display = 'none';
+            return;
+          }
+
+          if (!summaryCard) {
+            summaryCard = document.createElement('div');
+            summaryCard.className = 'view-group-same-summary-card';
+            summaryCard.style.cssText = 'background: #e6f4ea; border: 1px solid #ceead6; border-radius: 8px; padding: 10px 14px; margin: 8px 0 12px 0; font-size: 0.85rem; color: #137333;';
+            const sameWrap = grpEl.querySelector('.view-group-same-as-above-wrapper');
+            if (sameWrap && sameWrap.nextSibling) {
+              grpEl.insertBefore(summaryCard, sameWrap.nextSibling);
+            } else {
+              grpEl.appendChild(summaryCard);
+            }
+          }
+
+          const sourceQuestions = getGroupQuestions(sourceGroupId);
+          const targetQuestions = getGroupQuestions(targetGroupId);
+          const srcTitle = (sourceQuestions[0] && sourceQuestions[0].groupTitle) ? sourceQuestions[0].groupTitle : '前述のグループ';
+
+          const summaryItems = [];
+          targetQuestions.forEach(tq => {
+            const val = formValues[tq.id];
+            if (val !== undefined && val !== null && val !== '') {
+              summaryItems.push(`${tq.title || ''}: ${val}`);
+            }
+          });
+
+          const summaryText = summaryItems.length > 0 ? summaryItems.join(' / ') : '全項目が自動適用されています';
+
+          summaryCard.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+              <div style="font-weight: bold; display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 1rem;">✓</span>
+                <span>${escapeHtml(srcTitle)}と同じ内容を自動適用中</span>
+              </div>
+              <span style="font-size: 0.75rem; background: #fff; border: 1px solid #ceead6; color: #1e8e3e; padding: 2px 8px; border-radius: 12px; font-weight: 600;">入力欄非表示・データ記録中</span>
+            </div>
+            <div style="font-size: 0.8rem; color: #202124; background: rgba(255,255,255,0.7); padding: 6px 10px; border-radius: 4px; word-break: break-all; margin-top: 4px;">
+              ${escapeHtml(summaryText)}
+            </div>
+            <div style="font-size: 0.72rem; color: #5f6368; margin-top: 4px;">
+              ※ 個別に入力したい場合は、上のチェックを外すと入力欄が開きます。
+            </div>
+          `;
+          summaryCard.style.display = 'block';
+        }
+
+        function isGroupSameAsAboveActive(groupId) {
+          if (!groupId) return false;
+          if (formValues['group_' + groupId + '_is_same_as_above'] !== undefined) {
+            return !!formValues['group_' + groupId + '_is_same_as_above'];
+          }
+          const chk = document.querySelector(`.view-group-same-as-above-checkbox[data-target-group-id="${groupId}"]`);
+          if (chk) return chk.checked;
+          if (formDefinition && formDefinition.sections) {
+            for (const sec of formDefinition.sections) {
+              const grpSameQ = (sec.questions || []).find(item => item.groupId === groupId && item.sameAsAbove && item.sameAsAbove.enabled && (item.sameAsAbove.sourceType === 'group' || (item.sameAsAbove.sourceQuestionId && item.sameAsAbove.sourceQuestionId.startsWith('group:'))));
+              if (grpSameQ) return true;
+            }
+          }
+          return false;
+        }
+
+        function isQuestionSameAsAboveActive(q) {
+          if (!q || !q.sameAsAbove || !q.sameAsAbove.enabled) return false;
+          if (formValues[q.id + '_is_same_as_above'] !== undefined) {
+            return !!formValues[q.id + '_is_same_as_above'];
+          }
+          const chk = document.querySelector(`.same-as-above-checkbox[data-target-id="${q.id}"]`);
+          if (chk) return chk.checked;
+          return true;
+        }
+
+        // 🛡️ 同上データ保存保証ガード:
+        // 「前述と同じ」にチェックが入っているすべての質問について、
+        // コピー元の最新値を確実に解決し、formValues に100%セット・同期する
+        function ensureAllSameAsAboveValuesSynced() {
+          if (!formDefinition || !formDefinition.sections) return;
+          formDefinition.sections.forEach(sec => {
+            (sec.questions || []).forEach(q => {
+              // 1. グループ同上の場合
+              if (q.groupId && isGroupSameAsAboveActive(q.groupId)) {
+                let grpSameQ = null;
+                for (const s of formDefinition.sections) {
+                  grpSameQ = (s.questions || []).find(item => item.groupId === q.groupId && item.sameAsAbove && item.sameAsAbove.enabled && (item.sameAsAbove.sourceType === 'group' || (item.sameAsAbove.sourceQuestionId && item.sameAsAbove.sourceQuestionId.startsWith('group:'))));
+                  if (grpSameQ) break;
+                }
+                if (grpSameQ && grpSameQ.sameAsAbove) {
+                  const srcGId = grpSameQ.sameAsAbove.sourceGroupId || grpSameQ.sameAsAbove.sourceQuestionId.replace('group:', '');
+                  const resolvedVal = resolveValueFromGroupForQuestion(srcGId, q);
+                  if (resolvedVal !== undefined && resolvedVal !== null && resolvedVal !== '') {
+                    formValues[q.id] = resolvedVal;
+                    applyValueToQuestion(q, resolvedVal);
+                    setQuestionInputsLocked(q.id, true, resolvedVal);
+                  }
+                }
+              }
+              // 2. 個別質問同上の場合
+              else if (q.sameAsAbove && q.sameAsAbove.enabled && q.sameAsAbove.sourceQuestionId && isQuestionSameAsAboveActive(q)) {
+                const resolvedVal = getResolvedQuestionValue(q.sameAsAbove.sourceQuestionId, q);
+                if (resolvedVal !== undefined && resolvedVal !== null && resolvedVal !== '') {
+                  formValues[q.id] = resolvedVal;
+                  applyValueToQuestion(q, resolvedVal);
+                  setQuestionInputsLocked(q.id, true, resolvedVal);
+                }
+              }
+            });
+          });
+        }
+        window.ensureAllSameAsAboveValuesSynced = ensureAllSameAsAboveValuesSynced;
 
         function applyGroupSameAsAbove(targetGroupId, sourceGroupId, isLocked) {
           const targetQuestions = getGroupQuestions(targetGroupId);
@@ -4479,14 +4695,15 @@
             if (isLocked) {
               const val = resolveValueFromGroupForQuestion(sourceGroupId, tq);
               applyValueToQuestion(tq, val);
-              setQuestionInputsLocked(tq.id, true);
+              setQuestionInputsLocked(tq.id, true, val);
             } else {
-              // 回答者がチェックを外した場合は入力値をクリアして空欄にする
+              // 回答者がチェックを外した場合は入力値をクリアして空欄にし、入力欄を開く
               applyValueToQuestion(tq, '');
               delete formValues[tq.id];
               setQuestionInputsLocked(tq.id, false);
             }
           });
+          updateGroupSameAsAboveSummary(targetGroupId, sourceGroupId, isLocked);
         }
 
         function syncAllSameAsAboveForSource(sourceId) {
@@ -4507,20 +4724,32 @@
 
                 // 1. 個別質問がソース質問を指定している場合
                 if (tq.sameAsAbove.sourceQuestionId === sourceId) {
-                  if (formValues[tq.id + '_is_same_as_above']) {
+                  if (isQuestionSameAsAboveActive(tq)) {
                     const srcVal = getResolvedQuestionValue(sourceId, tq);
                     applyValueToQuestion(tq, srcVal);
+                    setQuestionInputsLocked(tq.id, true, srcVal);
                   }
                 }
                 // 2. グループ連動でソースグループ内の質問が変更された場合
                 else if (srcGroupId && (tq.sameAsAbove.sourceGroupId === srcGroupId || tq.sameAsAbove.sourceQuestionId === 'group:' + srcGroupId)) {
-                  if (formValues[tq.id + '_is_same_as_above'] || (tq.groupId && formValues['group_' + tq.groupId + '_is_same_as_above'])) {
+                  if (isQuestionSameAsAboveActive(tq) || isGroupSameAsAboveActive(tq.groupId)) {
                     const srcVal = resolveValueFromGroupForQuestion(srcGroupId, tq);
                     applyValueToQuestion(tq, srcVal);
+                    setQuestionInputsLocked(tq.id, true, srcVal);
                   }
                 }
               });
             });
+
+            if (srcGroupId) {
+              formDefinition.sections.forEach(sec => {
+                (sec.questions || []).forEach(tq => {
+                  if (tq.groupId && formValues['group_' + tq.groupId + '_is_same_as_above']) {
+                    updateGroupSameAsAboveSummary(tq.groupId, srcGroupId, true);
+                  }
+                });
+              });
+            }
           } finally {
             isSyncingSameAsAbove = false;
           }
@@ -4825,9 +5054,11 @@
                 formValues[q.id + '_is_same_as_above'] = true;
                 const srcVal = getResolvedQuestionValue(q.sameAsAbove.sourceQuestionId, q);
                 applyValueToQuestion(q, srcVal);
-                setQuestionInputsLocked(q.id, true);
+                setQuestionInputsLocked(q.id, true, srcVal);
               } else {
                 formValues[q.id + '_is_same_as_above'] = false;
+                applyValueToQuestion(q, '');
+                delete formValues[q.id];
                 setQuestionInputsLocked(q.id, false);
               }
             });
@@ -4836,7 +5067,7 @@
               setTimeout(() => {
                 const srcVal = getResolvedQuestionValue(q.sameAsAbove.sourceQuestionId, q);
                 applyValueToQuestion(q, srcVal);
-                setQuestionInputsLocked(q.id, true);
+                setQuestionInputsLocked(q.id, true, srcVal);
               }, 10);
             }
           }
@@ -5937,6 +6168,7 @@
 
                 formValues[q.id] = curVal;
                 clearError(q.id);
+                syncAllSameAsAboveForSource(q.id);
 
                 if (isBankCode && curVal.trim().length === 4) {
                   const b = findBankByCode(curVal.trim());
@@ -5987,6 +6219,7 @@
             textarea.addEventListener('input', (e) => {
               formValues[q.id] = e.target.value;
               clearError(q.id);
+              syncAllSameAsAboveForSource(q.id);
             });
             container.appendChild(textarea);
           } else if (['radio', 'checkbox'].includes(q.type)) {
@@ -6042,6 +6275,7 @@
                   }
                 }
                 clearError(q.id);
+                syncAllSameAsAboveForSource(q.id);
               });
 
               label.appendChild(input);
@@ -6070,6 +6304,7 @@
             select.addEventListener('change', (e) => {
               formValues[q.id] = e.target.value;
               clearError(q.id);
+              syncAllSameAsAboveForSource(q.id);
               const section = formDefinition.sections.find(s => s.id === currentSectionId);
               if (section) updateNavButtons(section);
             });
@@ -6224,6 +6459,9 @@
         function validateCurrentSection() {
           const section = formDefinition.sections.find(s => s.id === currentSectionId);
           if (!section) return true;
+
+          // 🛡️ 同上データ同期保証: 入力欄が非表示であっても回答データが100%確実に格納されるように事前同期
+          ensureAllSameAsAboveValuesSynced();
 
           // 未入力ハイフン自動補填をバリデーション前に実行（必須チェック通過のため）
           autoFillHyphenForEmptyFields(section);
@@ -6895,6 +7133,9 @@
         });
 
         function submitForm(forcePartial = null) {
+          // 🛡️ 同上データ保存絶対保証: 送信直前に同上項目の値を100%確実に解決・セット
+          ensureAllSameAsAboveValuesSynced();
+
           const section = formDefinition.sections.find(s => s.id === currentSectionId);
           const nextAction = section ? getSectionNextAction(section) : 'submit';
           const isPartial = forcePartial !== null ? forcePartial : (nextAction === 'partial_submit');

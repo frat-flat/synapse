@@ -14524,7 +14524,11 @@
         ${scrollHtml}
         <div class="preview-q-input-wrap" style="margin-top:4px;">
           ${sameAsAbovePreviewHtml}
-          ${inputHtml}
+          ${(q.sameAsAbove && q.sameAsAbove.enabled) ? `
+            <div style="font-size:0.75rem; color:#1e8e3e; background:#e6f4ea; border:1px dashed #ceead6; padding:4px 8px; border-radius:4px; margin-top:4px; display:inline-flex; align-items:center; gap:4px;">
+              <span>✓</span> <span>${escapeHtml(q.sameAsAbove.label || '前述と同じ内容')}を適用中 (入力欄非表示)</span>
+            </div>
+          ` : inputHtml}
         </div>
       `;
 
