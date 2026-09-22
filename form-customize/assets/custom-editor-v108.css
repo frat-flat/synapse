@@ -7256,3 +7256,11 @@ html, body {
   100% { transform: scale(1); opacity: 1; }
 }
 
+/* セクション編集バー内の移動ボタン・プレビュー更新ボタンを完全非表示化 */
+.sec-badge-controls,
+.btn-header-sec-up,
+.btn-header-sec-down,
+.btn-editor-sync-preview {
+  display: none !important;
+}
+
