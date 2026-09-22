@@ -438,11 +438,11 @@
       }
 
       .view-group-same-as-above-wrapper {
-        background: #eff6ff;
-        border: 1.5px solid #bfdbfe;
+        background: rgba(236, 253, 245, 0.85);
+        border: 1.5px solid #a7f3d0;
         border-radius: 8px;
         padding: 10px 14px;
-        margin-bottom: 4px;
+        margin-bottom: 8px;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -451,17 +451,17 @@
       }
 
       .view-group-same-as-above-wrapper:hover {
-        background: #dbeafe;
-        border-color: #93c5fd;
+        background: #d1fae5;
+        border-color: #6ee7b7;
       }
 
       .view-group-same-as-above-label {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        font-size: 0.88rem;
-        font-weight: 600;
-        color: #1e40af;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #064e3b;
         cursor: pointer;
         user-select: none;
         margin: 0;
@@ -471,8 +471,13 @@
         width: 18px;
         height: 18px;
         cursor: pointer;
-        accent-color: #2563eb;
+        accent-color: #059669;
         margin: 0;
+      }
+
+      @keyframes pulse-dot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.85); }
       }
 
       .view-question-group-card .question-card {
@@ -3956,8 +3961,9 @@
                   chk.dataset.targetGroupId = q.groupId;
                   chk.dataset.sourceGroupId = srcGId;
 
+                  const rawLabel = grpSameQ.sameAsAbove.label || '前述のグループと同じ';
                   const labelText = document.createElement('span');
-                  labelText.textContent = grpSameQ.sameAsAbove.label || '前述のグループと同じ';
+                  labelText.textContent = rawLabel.startsWith('📋') ? rawLabel : `📋 ${rawLabel}`;
 
                   sameLabel.appendChild(chk);
                   sameLabel.appendChild(labelText);
@@ -3965,8 +3971,8 @@
 
                   const badge = document.createElement('span');
                   badge.className = 'same-as-above-badge';
-                  badge.style.display = 'none';
-                  badge.innerHTML = '🔒 グループ一括自動入力・同期中';
+                  badge.style.cssText = 'display: none; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 600; color: #047857; background: #ffffff; border: 1px solid #a7f3d0; padding: 3px 10px; border-radius: 9999px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);';
+                  badge.innerHTML = '<span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block; animation: pulse-dot 1.5s infinite ease-in-out;"></span> 回答データ同期中';
                   sameWrap.appendChild(badge);
 
                   currentViewGrpEl.appendChild(sameWrap);
@@ -3995,10 +4001,25 @@
                 questionsContainerEl.appendChild(currentViewGrpEl);
               }
               currentViewGrpEl.appendChild(card);
+              // ✨ グループ一括同上が有効な場合は質問カード自体を閉じる！
+              if (isGroupSameAsAboveActive(q.groupId)) {
+                card.style.display = 'none';
+                card.setAttribute('aria-hidden', 'true');
+              }
             } else {
               currentViewGrpEl = null;
               currentViewGrpId = null;
               questionsContainerEl.appendChild(card);
+            }
+          });
+
+          // ✨ 初期状態で同上が有効なグループのサマリー表示と質問カード非表示を確定
+          (section.questions || []).forEach(q => {
+            if (q.groupId && q.sameAsAbove && q.sameAsAbove.enabled && (q.sameAsAbove.sourceType === 'group' || (q.sameAsAbove.sourceQuestionId && q.sameAsAbove.sourceQuestionId.startsWith('group:')))) {
+              const srcGId = q.sameAsAbove.sourceGroupId || q.sameAsAbove.sourceQuestionId.replace('group:', '');
+              if (isGroupSameAsAboveActive(q.groupId)) {
+                applyGroupSameAsAbove(q.groupId, srcGId, true);
+              }
             }
           });
 
@@ -4583,7 +4604,7 @@
           if (!summaryCard) {
             summaryCard = document.createElement('div');
             summaryCard.className = 'view-group-same-summary-card';
-            summaryCard.style.cssText = 'background: #e6f4ea; border: 1px solid #ceead6; border-radius: 8px; padding: 10px 14px; margin: 8px 0 12px 0; font-size: 0.85rem; color: #137333;';
+            summaryCard.style.cssText = 'background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 14px 16px; margin: 4px 0 12px 0;';
             const sameWrap = grpEl.querySelector('.view-group-same-as-above-wrapper');
             if (sameWrap && sameWrap.nextSibling) {
               grpEl.insertBefore(summaryCard, sameWrap.nextSibling);
@@ -4594,31 +4615,66 @@
 
           const sourceQuestions = getGroupQuestions(sourceGroupId);
           const targetQuestions = getGroupQuestions(targetGroupId);
-          const srcTitle = (sourceQuestions[0] && sourceQuestions[0].groupTitle) ? sourceQuestions[0].groupTitle : '前述のグループ';
+          let srcTitle = (sourceQuestions[0] && sourceQuestions[0].groupTitle) ? sourceQuestions[0].groupTitle : '';
+          const chkLabel = grpEl.querySelector('.view-group-same-as-above-label');
+          if (chkLabel) {
+            const parsedLabel = chkLabel.textContent.replace('📋', '').replace(/と同じ.*$/, '').trim();
+            if (parsedLabel) srcTitle = parsedLabel;
+          }
+          if (!srcTitle) srcTitle = '前述の入力内容';
+          const targetGrpTitle = (targetQuestions[0] && targetQuestions[0].groupTitle) ? targetQuestions[0].groupTitle : '入力項目';
 
+          // 住所項目の自動連結プレビュー判定
+          let zipVal = '', prefVal = '', cityVal = '', streetVal = '', bldgVal = '';
           const summaryItems = [];
+
           targetQuestions.forEach(tq => {
             const val = formValues[tq.id];
-            if (val !== undefined && val !== null && val !== '') {
-              summaryItems.push(`${tq.title || ''}: ${val}`);
-            }
+            const title = (tq.title || '').trim();
+            const key = (tq.dataKey || '').toLowerCase();
+
+            if (key.includes('zip') || title.includes('郵便番号')) zipVal = val || '';
+            else if (key.includes('pref') || title.includes('都道府県')) prefVal = val || '';
+            else if (key.includes('city') || title.includes('市区町村')) cityVal = val || '';
+            else if (key.includes('street') || title.includes('町名') || title.includes('番地')) streetVal = val || '';
+            else if (key.includes('bldg') || title.includes('建物') || title.includes('部屋')) bldgVal = val || '';
+            else if (val) summaryItems.push(`${title}: ${val}`);
           });
 
-          const summaryText = summaryItems.length > 0 ? summaryItems.join(' / ') : '全項目が自動適用されています';
+          let displayPreview = '';
+          let shortPreview = '';
+          if (zipVal || prefVal || cityVal || streetVal) {
+            displayPreview = `${zipVal ? '〒' + zipVal + ' ' : ''}${prefVal}${cityVal}${streetVal}${bldgVal ? ' ' + bldgVal : ''}`.trim();
+            shortPreview = `${zipVal ? '〒' + zipVal + ' ' : ''}${prefVal}${cityVal}...`;
+          } else if (summaryItems.length > 0) {
+            displayPreview = summaryItems.join(' / ');
+            shortPreview = summaryItems[0] || '適用中';
+          } else {
+            displayPreview = '前述の入力内容が反映されます（コピー元の入力待ち）';
+            shortPreview = '適用中';
+          }
 
           summaryCard.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-              <div style="font-weight: bold; display: flex; align-items: center; gap: 6px;">
-                <span style="font-size: 1rem;">✓</span>
-                <span>${escapeHtml(srcTitle)}と同じ内容を自動適用中</span>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 700; color: #065f46; margin-bottom: 8px;">
+              <svg style="width: 18px; height: 18px; flex-shrink: 0; color: #059669;" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+              </svg>
+              <span>${escapeHtml(srcTitle)}と同じ内容が回答データとして適用されています</span>
+            </div>
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; font-size: 0.9rem; color: #1e293b; font-weight: 500; word-break: break-all; margin-bottom: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+              ${escapeHtml(displayPreview)}
+            </div>
+            <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px;">
+              ※ 別の${escapeHtml(targetGrpTitle)}を入力する場合は、上のチェックを外すと入力欄が開きます。
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; color: #64748b; padding-top: 8px; border-top: 1px solid #e2e8f0; flex-wrap: wrap; gap: 6px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-weight: 600; color: #475569;">💾 内部記録データ（送信時）:</span>
+                <code style="background: #f1f5f9; color: #334155; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.72rem;">
+                  ${escapeHtml(targetGrpTitle)} = ${escapeHtml(srcTitle)}コピー (${escapeHtml(shortPreview)}) 記録中
+                </code>
               </div>
-              <span style="font-size: 0.75rem; background: #fff; border: 1px solid #ceead6; color: #1e8e3e; padding: 2px 8px; border-radius: 12px; font-weight: 600;">入力欄非表示・データ記録中</span>
-            </div>
-            <div style="font-size: 0.8rem; color: #202124; background: rgba(255,255,255,0.7); padding: 6px 10px; border-radius: 4px; word-break: break-all; margin-top: 4px;">
-              ${escapeHtml(summaryText)}
-            </div>
-            <div style="font-size: 0.72rem; color: #5f6368; margin-top: 4px;">
-              ※ 個別に入力したい場合は、上のチェックを外すと入力欄が開きます。
+              <span style="color: #059669; font-weight: 600;">✓ 回答データは100%保持</span>
             </div>
           `;
           summaryCard.style.display = 'block';
@@ -4692,15 +4748,26 @@
           const targetQuestions = getGroupQuestions(targetGroupId);
           targetQuestions.forEach(tq => {
             formValues[tq.id + '_is_same_as_above'] = isLocked;
+            const card = document.querySelector(`.question-card[data-question-id="${tq.id}"]`);
             if (isLocked) {
               const val = resolveValueFromGroupForQuestion(sourceGroupId, tq);
               applyValueToQuestion(tq, val);
               setQuestionInputsLocked(tq.id, true, val);
+              // ✨ グループ一括同上のときは、個別質問カード（外枠・タイトル含む）を閉じる！
+              if (card) {
+                card.style.display = 'none';
+                card.setAttribute('aria-hidden', 'true');
+              }
             } else {
               // 回答者がチェックを外した場合は入力値をクリアして空欄にし、入力欄を開く
               applyValueToQuestion(tq, '');
               delete formValues[tq.id];
-              setQuestionInputsLocked(tq.id, false);
+              // ✨ チェック解除時は個別質問カードを再表示する！
+              if (card) {
+                card.style.display = '';
+                card.removeAttribute('aria-hidden');
+                setQuestionInputsLocked(tq.id, false);
+              }
             }
           });
           updateGroupSameAsAboveSummary(targetGroupId, sourceGroupId, isLocked);

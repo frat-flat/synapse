@@ -14556,20 +14556,47 @@
           if (q.sameAsAbove && q.sameAsAbove.enabled && (q.sameAsAbove.sourceType === 'group' || (q.sameAsAbove.sourceQuestionId && q.sameAsAbove.sourceQuestionId.startsWith('group:')))) {
             const grpSameWrap = document.createElement('div');
             grpSameWrap.className = 'preview-group-same-as-above';
+            grpSameWrap.style.cssText = 'background: rgba(236, 253, 245, 0.85); border: 1.5px solid #a7f3d0; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 10px;';
+            const rawLabel = q.sameAsAbove.label || '前述のグループと同じ';
             grpSameWrap.innerHTML = `
-              <input type="checkbox" disabled checked style="margin: 0;" />
-              <span>${escapeHtml(q.sameAsAbove.label || '前述のグループと同じ')}</span>
+              <label style="display:inline-flex; align-items:center; gap:8px; font-size:0.85rem; font-weight:700; color:#064e3b; margin:0; cursor:default;">
+                <input type="checkbox" disabled checked style="margin: 0; accent-color:#059669;" />
+                <span>${escapeHtml(rawLabel.startsWith('📋') ? rawLabel : `📋 ${rawLabel}`)}</span>
+              </label>
+              <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.72rem; font-weight: 600; color: #047857; background: #ffffff; border: 1px solid #a7f3d0; padding: 2px 8px; border-radius: 9999px;">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981;"></span> 回答データ同期中
+              </span>
             `;
             currentPreviewGrpEl.appendChild(grpSameWrap);
+
+            const summaryCard = document.createElement('div');
+            summaryCard.className = 'preview-group-same-summary-card';
+            summaryCard.style.cssText = 'background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px 14px; margin: 4px 0 10px 0;';
+            summaryCard.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 700; color: #065f46; margin-bottom: 6px;">
+                <span style="color: #059669;">✓</span>
+                <span>前述と同じ内容が回答データとして適用されています</span>
+              </div>
+              <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; font-size: 0.85rem; color: #1e293b; font-weight: 500; margin-bottom: 6px;">
+                （前述の入力内容が自動反映されます）
+              </div>
+              <div style="font-size: 0.72rem; color: #64748b; margin-bottom: 6px;">
+                ※ 別の内容を入力する場合は、上のチェックを外すと入力欄が開きます。
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.7rem; color: #64748b; padding-top: 6px; border-top: 1px solid #e2e8f0;">
+                <span>💾 内部記録データ（送信時）: 有効</span>
+                <span style="color: #059669; font-weight: 600;">✓ 回答データは100%保持</span>
+              </div>
+            `;
+            currentPreviewGrpEl.appendChild(summaryCard);
           }
 
           liveContainer.appendChild(currentPreviewGrpEl);
         }
 
-        // グループ単位の同上が表示されている場合、個別質問カード内の同上チェックは隠してすっきり見せる
+        // グループ単位の同上が表示されている場合、個別質問カードは非表示にしてすっきり見せる
         if (q.sameAsAbove && q.sameAsAbove.enabled && (q.sameAsAbove.sourceType === 'group' || (q.sameAsAbove.sourceQuestionId && q.sameAsAbove.sourceQuestionId.startsWith('group:')))) {
-          const qSameEl = qCard.querySelector('.preview-same-as-above');
-          if (qSameEl) qSameEl.style.display = 'none';
+          qCard.style.display = 'none';
         }
 
         currentPreviewGrpEl.appendChild(qCard);
