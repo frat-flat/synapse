@@ -21968,10 +21968,13 @@
   // ==========================================
   // 📊 本番テーブル連携カラム確認＆保存先設定モーダル
   // ==========================================
+  // 📊 本番テーブル連携カラム確認＆保存先設定モーダル
+  // ==========================================
   function openFormColumnMappingModal(targetFormDef = null) {
     const formDef = targetFormDef || window.G || window.L || {};
     const formTitle = getEffectiveFormTitle(formDef);
-    const sections = formDef.sections || [];
+    const sections = (window.G && window.G.sections && window.G.sections.length > 0) ? window.G.sections : (formDef.sections || []);
+    const pTableName = getPhysicalTableNameForForm(formDef);
 
     let modal = document.getElementById('form-column-mapping-modal');
     if (!modal) {
@@ -21982,6 +21985,26 @@
       document.body.appendChild(modal);
     }
 
+    // Supabase / LocalStorage 上のテーブル一覧を取得
+    let customTables = [];
+    try {
+      customTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || [];
+    } catch(e) {}
+    customTables = customTables.filter(t => t && t.id !== 'table_all_form_responses' && t.name !== '全フォーム回答データ');
+
+    // このフォームと同名の専用テーブルが存在するか確認
+    const dedicatedTable = customTables.find(t => t && (
+      (formDef.targetTableId && t.id === formDef.targetTableId) ||
+      (formDef.id && t.formId && t.formId === formDef.id) ||
+      t.name === formTitle ||
+      t.formTitle === formTitle ||
+      (pTableName && t.physicalTableName && t.physicalTableName === pTableName)
+    ) && t.id !== 'table_all_form_responses');
+
+    const dedicatedCols = dedicatedTable && Array.isArray(dedicatedTable.columns) ? dedicatedTable.columns : [];
+    const dedicatedColMap = new Map();
+    dedicatedCols.forEach(c => { if (c && c.id) dedicatedColMap.set(c.id, c); });
+
     let rowsHtml = '';
     let colIndex = 1;
 
@@ -21989,8 +22012,8 @@
       const secTitle = sec.title || `セクション ${sIdx + 1}`;
       (sec.questions || []).forEach(q => {
         const qTitle = q.title || '(無題の設問)';
-        const colName = q.title || q.dataKey || q.id;
-        const dataKey = q.dataKey || '-';
+        const physicalKey = q.dataKey || `col_${q.id}`;
+        const hasCustomKey = !!q.dataKey;
         const typeLabel = q.type === 'text' ? 'テキスト' :
                           q.type === 'radio' ? '単一選択 (ラジオ)' :
                           q.type === 'checkbox' ? '複数選択 (チェック)' :
@@ -22002,7 +22025,7 @@
         if (q.validation && q.validation.category === 'api') {
           if (q.validation.condition === 'corp_name') apiBadge = '<span style="background: #e0f2fe; color: #0284c7; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">国税庁法人番号API</span>';
           else if (q.validation.condition === 'invoice_number') apiBadge = '<span style="background: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">国税庁インボイス公表API</span>';
-        } else if (q.dataKey === 'zip_code' || qTitle.includes('郵便番号')) {
+        } else if (q.dataKey === 'zip_code' || q.dataKey === 'main_zip' || q.dataKey === 'mail_zip' || qTitle.includes('郵便番号')) {
           apiBadge = '<span style="background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">郵便番号住所自動補完</span>';
         } else if (qTitle.includes('銀行') || q.dataKey === 'bank_name') {
           apiBadge = '<span style="background: #f3e8ff; color: #7e22ce; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">全銀協 金融機関API</span>';
@@ -22010,32 +22033,35 @@
 
         const requiredBadge = q.required ? '<span style="color: #dc2626; font-weight: bold; margin-left: 2px;">*</span>' : '';
 
+        // 物理カラムの同期状態チェック
+        const isPersistedInTable = dedicatedColMap.has(physicalKey) || (q.dataKey && dedicatedColMap.has(q.dataKey));
+        const syncStatusBadge = isPersistedInTable
+          ? '<span style="background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; display: inline-flex; align-items: center; gap: 3px;">✓ 同期済み</span>'
+          : '<span style="background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; display: inline-flex; align-items: center; gap: 3px;">⏳ 未同期</span>';
+
+        // 物理キー表示バッジ
+        const keyBadge = hasCustomKey
+          ? `<span style="background: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; margin-left: 6px;">個別指定</span>`
+          : `<span style="background: #f1f5f9; color: #64748b; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 6px;">自動割当</span>`;
+
         rowsHtml += `
           <tr style="border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; transition: background 0.15s;">
             <td style="padding: 10px 12px; color: #64748b; font-family: monospace; text-align: center;">${colIndex++}</td>
             <td style="padding: 10px 12px; color: #475569; font-weight: 500;">${escapeHtml(secTitle)}</td>
             <td style="padding: 10px 12px; color: #1e293b; font-weight: 600;">${escapeHtml(qTitle)}${requiredBadge}</td>
-            <td style="padding: 10px 12px; color: #0284c7; font-weight: 700; font-family: monospace;">${escapeHtml(colName)}</td>
-            <td style="padding: 10px 12px; color: #64748b; font-family: monospace;">${escapeHtml(dataKey)}</td>
+            <td style="padding: 10px 12px; color: #0284c7; font-weight: 700; font-family: monospace; font-size: 0.88rem;">
+              <span>${escapeHtml(physicalKey)}</span>${keyBadge}
+            </td>
             <td style="padding: 10px 12px; color: #334155;">${escapeHtml(typeLabel)}</td>
             <td style="padding: 10px 12px;">${apiBadge}</td>
+            <td style="padding: 10px 12px;">${syncStatusBadge}</td>
           </tr>
         `;
       });
     });
 
-    // Supabase / LocalStorage 上のテーブル一覧を取得
-    let customTables = [];
-    try {
-      customTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || [];
-    } catch(e) {}
-    customTables = customTables.filter(t => t && t.id !== 'table_all_form_responses' && t.name !== '全フォーム回答データ');
-
     // 専用テーブル作成が選択されているか（常時専用独立テーブル）
     const isDedicated = true;
-
-    // このフォームと同名の専用テーブルが存在するか確認
-    const dedicatedTable = customTables.find(t => (t.name === formTitle || t.id === formDef.targetTableId) && t.id !== 'table_all_form_responses');
 
     // 保存先に応じたステータスバッジとアクションボタンの決定
     let statusBadgeHtml = '';
@@ -22056,39 +22082,23 @@
         </div>
       `;
     } else {
-      if (dedicatedTable) {
-        statusBadgeHtml = `
-          <span style="background: #dcfce7; color: #15803d; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #bbf7d0; display: inline-flex; align-items: center; gap: 5px;">
-            <span>✅</span> <span>専用テーブル作成済み（「${escapeHtml(dedicatedTable.name)}」/ ${dedicatedTable.rows ? dedicatedTable.rows.length : 0}件蓄積中）</span>
-          </span>
-        `;
-        actionBtnHtml = `
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <button type="button" id="btn-create-supabase-table" style="background: #f8fafc; color: #0284c7; border: 1px solid #0284c7; font-weight: 700; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;">
-              <span>🔄</span> <span>Supabase物理テーブルを再作成・同期</span>
-            </button>
-            <button type="button" id="btn-col-modal-ok" style="background: #0284c7; color: #fff; border: none; font-weight: 700; font-size: 0.85rem; padding: 7px 20px; border-radius: 6px; cursor: pointer;">閉じる</button>
-          </div>
-        `;
-      } else {
-        statusBadgeHtml = `
-          <span style="background: #fef3c7; color: #b45309; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #fde68a; display: inline-flex; align-items: center; gap: 5px;">
-            <span>⚡</span> <span>専用テーブル未作成（本番送信時、または下のボタンから事前作成できます）</span>
-          </span>
-        `;
-        actionBtnHtml = `
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <button type="button" id="btn-create-supabase-table" style="background: #0284c7; color: #fff; border: 1px solid #0369a1; font-weight: 700; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(2,132,199,0.3); transition: all 0.2s;">
-              <span>⚡</span> <span>Supabase上にこの専用テーブルを事前作成</span>
-            </button>
-            <button type="button" id="btn-col-modal-ok" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 600; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer;">閉じる</button>
-          </div>
-        `;
-      }
+      statusBadgeHtml = `
+        <span style="background: #dcfce7; color: #15803d; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #bbf7d0; display: inline-flex; align-items: center; gap: 5px;">
+          <span>✅</span> <span>専用テーブル作成済み（「${escapeHtml(dedicatedTable.name)}」/ ${dedicatedTable.rows ? dedicatedTable.rows.length : 0}件蓄積中 / 物理テーブル: ${dedicatedTable.physicalTableName || pTableName}）</span>
+        </span>
+      `;
+      actionBtnHtml = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button type="button" id="btn-create-supabase-table" style="background: #f8fafc; color: #0284c7; border: 1px solid #0284c7; font-weight: 700; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;">
+            <span>🔄</span> <span>Supabase物理テーブルを再作成・同期</span>
+          </button>
+          <button type="button" id="btn-col-modal-ok" style="background: #0284c7; color: #fff; border: none; font-weight: 700; font-size: 0.85rem; padding: 7px 20px; border-radius: 6px; cursor: pointer;">閉じる</button>
+        </div>
+      `;
     }
 
     modal.innerHTML = `
-      <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 980px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); overflow: hidden;">
+      <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 1020px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); overflow: hidden;">
         <!-- ヘッダー -->
         <div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; background: #f8fafc;">
           <div>
@@ -22098,7 +22108,7 @@
               <span style="background: #0284c7; color: #fff; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">DB連携</span>
             </div>
             <div style="font-size: 0.78rem; color: #64748b; margin-top: 4px;">
-              フォーム「<strong style="color: #0f172a;">${escapeHtml(formTitle)}</strong>」の回答データ蓄積設定と、カラム構成の確認です。
+              フォーム「<strong style="color: #0f172a;">${escapeHtml(formTitle)}</strong>」の回答データ蓄積設定と、Supabase物理テーブル（<code style="color: #0284c7; font-weight: 700;">${escapeHtml(pTableName)}</code>）のカラム構成です。
             </div>
           </div>
           <button type="button" id="btn-close-col-modal" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1;">&times;</button>
@@ -22128,10 +22138,10 @@
                 <th style="padding: 10px 12px; width: 45px; text-align: center;">#</th>
                 <th style="padding: 10px 12px;">セクション</th>
                 <th style="padding: 10px 12px;">設問タイトル</th>
-                <th style="padding: 10px 12px; color: #0284c7;">本番テーブルカラム名</th>
-                <th style="padding: 10px 12px;">物理キー (dataKey)</th>
+                <th style="padding: 10px 12px; color: #0284c7;">Supabase物理カラム名 (dataKey)</th>
                 <th style="padding: 10px 12px;">型 / 入力形式</th>
                 <th style="padding: 10px 12px;">API連携 / 自動補完</th>
+                <th style="padding: 10px 12px; color: #15803d;">Supabase同期状況</th>
               </tr>
             </thead>
             <tbody>
@@ -22144,63 +22154,62 @@
             <div style="font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
               <span>⚙️</span> システム自動付与カラム（全テーブル共通で記録）
             </div>
-            <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.75rem; color: #64748b;">
-              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px;"><strong>マスターID / コード</strong> (紐づけキー)</span>
-              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px;"><strong>フォーム名</strong> (識別タイトル)</span>
-              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px;"><strong>ステータス</strong> (回答完了 / 途中送信)</span>
-              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px;"><strong>確定登録コード</strong> (8桁確定ID)</span>
-              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px;"><strong>再開用URL</strong> (途中再開リンク)</span>
-              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px;"><strong>回答日時</strong> (タイムスタンプ)</span>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">id (UUID)</span>
+              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">master_id (text)</span>
+              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">form_title (text)</span>
+              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">status (text)</span>
+              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">registration_code (text)</span>
+              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">resume_url (text)</span>
+              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">created_at (timestamp)</span>
             </div>
           </div>
         </div>
 
         <!-- フッター -->
-        <div style="padding: 14px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-          <div style="font-size: 0.78rem; color: #15803d; font-weight: 600;">
-            🌟 回答データは常にこのフォーム専用の「独立テーブル」に自動保存されます。
+        <div style="padding: 14px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-size: 0.78rem; color: #64748b; display: flex; align-items: center; gap: 6px;">
+            <span>💡</span>
+            <span>各設問の設定ドロワー「データベース連携・カラム統一」で指定した物理キー名がそのままSupabaseカラムになります。</span>
           </div>
           ${actionBtnHtml}
         </div>
       </div>
     `;
 
-    modal.style.display = 'flex';
-
-    const closeHandler = () => { modal.style.display = 'none'; };
+    // 閉じるイベント
+    const closeHandler = () => {
+      modal.remove();
+    };
     modal.querySelector('#btn-close-col-modal').onclick = closeHandler;
-    const okBtn = modal.querySelector('#btn-col-modal-ok');
-    if (okBtn) okBtn.onclick = closeHandler;
-    modal.onclick = (e) => { if (e.target === modal) closeHandler(); };
+    modal.querySelector('#btn-col-modal-ok').onclick = closeHandler;
 
-    // 専用テーブル作成トグル切り替えイベント
-    const modalToggle = modal.querySelector('#modal-create-dedicated-table');
-    if (modalToggle) {
-      modalToggle.addEventListener('change', (e) => {
-        formDef.createDedicatedTable = true;
-        formDef.targetTableType = 'dedicated';
-        formDef.targetTableId = dedicatedTable ? dedicatedTable.id : 'dedicated';
-
-        // フォーム定義の保存
+    // トグル切り替えイベント
+    const dedicatedCheckbox = modal.querySelector('#modal-create-dedicated-table');
+    if (dedicatedCheckbox) {
+      dedicatedCheckbox.addEventListener('change', () => {
+        formDef.createDedicatedTable = dedicatedCheckbox.checked;
+        formDef.targetTableType = dedicatedCheckbox.checked ? 'dedicated' : 'all';
         if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
-        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
-
-        // モーダルを更新再描画
         openFormColumnMappingModal(formDef);
-
-        // 全体設定画面側のトグルも更新
         syncGlobalTargetTableSelect(true);
       });
     }
 
-    // ⚡ Supabase上にこのフォーム専用独立テーブルを事前作成するイベント
+    // ⚡ Supabase上にこのフォーム専用独立テーブルを事前作成・再同期するイベント
     const createBtn = modal.querySelector('#btn-create-supabase-table');
     if (createBtn) {
       createBtn.onclick = async () => {
         createBtn.disabled = true;
-        createBtn.innerHTML = '<span>⏳</span> <span>専用テーブル作成中...</span>';
+        createBtn.innerHTML = '<span>⏳</span> <span>Supabase同期実行中...</span>';
 
         try {
+          // 1. 最新の編集内容（window.G）を formDef に確実に反映
+          if (window.G && window.G.sections) {
+            formDef.sections = JSON.parse(JSON.stringify(window.G.sections));
+            formDef.title = window.G.title || formDef.title;
+          }
+
           formDef.createDedicatedTable = true;
           formDef.targetTableType = 'dedicated';
           const newTable = await createDedicatedTableForForm(formDef);
@@ -22208,11 +22217,12 @@
             formDef.targetTableId = newTable.id;
           }
 
-          // 🌟 本番公開スナップショットが存在する場合、スナップショット側も即座に専用テーブル連携へ同期！
+          // 2. 本番公開スナップショットが存在する場合、スナップショット側も即座に同期
           if (formDef.publishedSnapshot) {
             formDef.publishedSnapshot.createDedicatedTable = true;
             formDef.publishedSnapshot.targetTableId = newTable ? newTable.id : 'dedicated';
             formDef.publishedSnapshot.targetTableMode = 'dedicated';
+            formDef.publishedSnapshot.sections = JSON.parse(JSON.stringify(formDef.sections));
             try {
               const allFormsRaw = localStorage.getItem('form_customize_all_forms');
               let allForms = allFormsRaw ? JSON.parse(allFormsRaw) : [];
@@ -22227,17 +22237,17 @@
           if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
           if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
 
-          // モーダル表示を完了状態に再描画
+          // 3. モーダル表示を最新状態で再描画（同期済みバッジが更新される）
           openFormColumnMappingModal(formDef);
           syncGlobalTargetTableSelect(newTable ? newTable.id : true);
           if (typeof updatePublishSyncUI === 'function') updatePublishSyncUI();
 
-          alert(`✅ テーブル「${formTitle}」の同期・再作成が完了しました！\n\n・テーブルID: ${newTable ? newTable.id : ''}\n・Supabase物理テーブル: ${newTable ? (newTable.physicalTableName || getPhysicalTableNameForForm(formDef)) : ''}\n・全${newTable && newTable.columns ? newTable.columns.length : 0}カラムを定義済み\n・回答保存先をこの専用テーブルに設定しました。\n・Synapseの「回答フォーム一覧」からいつでも確認・操作できます。`);
+          alert(`✅ テーブル「${formTitle}」の同期が完了しました！\n\n・Supabase物理テーブル: ${newTable ? (newTable.physicalTableName || getPhysicalTableNameForForm(formDef)) : ''}\n・定義済みカラム数: ${newTable && newTable.columns ? newTable.columns.length : 0}件\n・すべての物理キー（dataKey）がSupabaseへ反映されました。`);
         } catch(err) {
           console.error('Failed to create table:', err);
-          alert(`テーブル作成に失敗しました: ${err.message}`);
+          alert(`テーブル同期に失敗しました: ${err.message}`);
           createBtn.disabled = false;
-          createBtn.innerHTML = '<span>⚡</span> <span>Supabase上にこの専用テーブルを事前作成</span>';
+          createBtn.innerHTML = '<span>🔄</span> <span>Supabase物理テーブルを再作成・同期</span>';
         }
       };
     }
