@@ -52,14 +52,14 @@
         console.warn('[Antigravity] Failed to set default admin session:', e);
       }
 
-      // 🚀 キャッシュを100%強制回避して最新のCSSとJSをロードするインラインローダー (v110)
+      // 🚀 キャッシュを100%強制回避して最新のCSSとJSをロードするインラインローダー (v111)
       (function() {
         const ts = Date.now();
         
         // CSSの注入
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = './assets/custom-editor-v110.css?v=' + ts;
+        link.href = './assets/custom-editor-v111.css?v=' + ts;
         document.head.appendChild(link);
         
         // JS of injection
@@ -69,11 +69,11 @@
         document.head.appendChild(scriptArchify);
 
         const script = document.createElement('script');
-        script.src = './assets/custom-editor-v110.js?v=' + ts;
+        script.src = './assets/custom-editor-v111.js?v=' + ts;
         script.defer = true;
         document.head.appendChild(script);
         
-        console.log('[Antigravity Loader] Force loaded assets with timestamp (v110):', ts);
+        console.log('[Antigravity Loader] Force loaded assets with timestamp (v111):', ts);
       })();
     </script>
   </head>
@@ -117,20 +117,20 @@
           <span class="btn-icon">📱</span>
           <span class="btn-text">プレビュー</span>
         </button>
-        <!-- 🚀 本番環境へ統合（公開更新）ヘッダーボタン（非表示化しドロップダウン内へ集約） -->
-        <button id="btn-header-merge-prod" class="btn btn-success" data-tooltip="最新の編集内容を本番公開リンクへ統合・更新" style="display: none !important;">
-          <span>🚀</span> <span class="btn-text">本番へ統合</span>
+        <!-- 🚀 本番環境へ統合（公開更新）ヘッダーボタン -->
+        <button id="btn-header-merge-prod" class="btn btn-success" data-tooltip="最新の編集内容を本番公開リンクへ反映・公開" style="display: none; align-items: center; gap: 6px; font-weight: 600; padding: 6px 12px; font-size: 0.82rem; border-radius: 6px; margin-right: 6px;">
+          <span>🚀</span> <span class="btn-text">本番へ公開</span>
         </button>
-        <!-- 📊 Supabaseテーブル連携・作成ボタン（公開時および設定画面から行えるためヘッダーは非表示） -->
+        <!-- 📊 Supabaseテーブル連携・作成ボタン（設定画面から行えるためヘッダーは非表示） -->
         <button type="button" id="btn-header-column-preview" class="btn btn-secondary" data-tooltip="Supabaseテーブル連携カラムの確認・事前作成" style="display: none !important;">
           <span class="btn-icon">📊</span>
           <span class="btn-text">テーブル連携・作成</span>
         </button>
-        <!-- 🚀 フォーム公開・共有ボタングループ -->
+        <!-- 🔗 フォーム公開・共有ボタングループ -->
         <div class="share-export-btn-group" id="share-export-group" style="display: none;">
-          <button id="btn-share-form-url" class="btn btn-share-link" data-tooltip="フォームの公開・回答リンク共有メニュー" style="display: inline-flex; align-items: center; gap: 6px;">
-            <span class="btn-icon">🚀</span>
-            <span class="btn-text" id="share-btn-main-label">公開・共有</span>
+          <button id="btn-share-form-url" class="btn btn-share-link" data-tooltip="回答用URLの発行・共有メニュー" style="display: inline-flex; align-items: center; gap: 6px;">
+            <span class="btn-icon">🔗</span>
+            <span class="btn-text" id="share-btn-main-label">共有</span>
           </button>
           <button type="button" id="btn-share-dropdown-toggle" class="btn btn-share-dropdown-toggle" data-tooltip="公開・共有メニューを開く" aria-label="公開・共有メニューを開く">
             <span class="dropdown-arrow">▼</span>
@@ -464,7 +464,24 @@
 
                 <!-- フォーム基本情報設定（タイトル・サブタイトル・説明文） -->
                 <div class="settings-card-basic" style="display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 6px; border: 1px solid var(--color-border); background: rgba(0,0,0,0.05); margin-bottom: 12px;">
-                  <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">📝 フォーム基本情報</span>
+                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">📝 フォーム基本情報</span>
+                    <!-- 📊 専用テーブル作成設定（上部に小さくチェックボックスで配置） -->
+                    <div id="editor-target-table-card" style="display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; background: transparent; border: none;">
+                      <label for="editor-create-dedicated-table" style="display: flex; align-items: center; gap: 5px; font-size: 0.74rem; font-weight: 600; color: var(--color-text); cursor: pointer; margin: 0; user-select: none;">
+                        <input type="checkbox" id="editor-create-dedicated-table" style="width: 14px; height: 14px; cursor: pointer;" checked />
+                        <span>専用テーブルを作成する</span>
+                      </label>
+                      <button type="button" id="btn-open-col-modal-from-settings" class="btn btn-sm" style="font-size: 0.68rem; padding: 2px 7px; background: rgba(0,0,0,0.05); color: var(--color-text-muted); border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer; font-weight: 500;">
+                        ⚙️ カラム詳細
+                      </button>
+                      <!-- 旧互換用の非表示セレクト -->
+                      <select id="editor-target-table-select" style="display: none;">
+                        <option value="dedicated" selected>専用テーブル</option>
+                      </select>
+                      <div id="target-table-status-desc" style="display: none;"></div>
+                    </div>
+                  </div>
                   
                   <!-- 1. フォームのタイトル -->
                   <div class="form-group" style="margin: 0;">
@@ -762,30 +779,6 @@
                   </div>
                 </div>
 
-                <!-- 📊 専用テーブル作成設定（DB連携） -->
-                <div class="form-group-card" id="editor-target-table-card" style="margin-top: 14px; padding: 14px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; transition: all 0.2s;">
-                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                      <label class="editor-toggle-switch" for="editor-create-dedicated-table" style="margin: 0; cursor: pointer;">
-                        <input type="checkbox" id="editor-create-dedicated-table" />
-                        <span class="editor-toggle-slider"></span>
-                      </label>
-                      <label for="editor-create-dedicated-table" style="font-size: 0.83rem; font-weight: 700; color: #1e293b; margin: 0; cursor: pointer;">
-                        専用テーブルを作成する
-                      </label>
-                    </div>
-                    <button type="button" id="btn-open-col-modal-from-settings" class="btn btn-sm" style="font-size: 0.72rem; padding: 3px 10px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; font-weight: 600; transition: all 0.2s;">
-                      カラム・テーブル詳細
-                    </button>
-                  </div>
-                  <!-- 旧互換用の非表示セレクト -->
-                  <select id="editor-target-table-select" style="display: none;">
-                    <option value="dedicated" selected>専用テーブル</option>
-                  </select>
-                  <div id="target-table-status-desc" style="font-size: 0.73rem; color: #64748b; margin-top: 8px; line-height: 1.4;">
-                    💡 回答はすべてこのフォーム専用の「<strong>独立テーブル</strong>」に自動保存されます。
-                  </div>
-                </div>
 
                 <!-- 重複するロゴチェックボックスを非表示化 (JSエラー防止用の非表示インプット) -->
                 <input type="checkbox" id="editor-form-show-logo" style="display: none;" />

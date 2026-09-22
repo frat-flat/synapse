@@ -4874,13 +4874,20 @@
           shareGroup.classList.add('hidden');
         }
       }
+      if (headerMergeBtn) {
+        if (isEditingActiveForm) {
+          headerMergeBtn.style.setProperty('display', 'inline-flex', 'important');
+          headerMergeBtn.classList.remove('hidden');
+        } else {
+          headerMergeBtn.style.setProperty('display', 'none', 'important');
+          headerMergeBtn.classList.add('hidden');
+        }
+      }
       if (headerColBtn) {
         headerColBtn.style.setProperty('display', 'none', 'important');
         headerColBtn.classList.add('hidden');
       }
-      if (!isEditingActiveForm && headerMergeBtn) {
-        headerMergeBtn.style.setProperty('display', 'none', 'important');
-      } else if (typeof updatePublishSyncUI === 'function') {
+      if (isEditingActiveForm && typeof updatePublishSyncUI === 'function') {
         updatePublishSyncUI();
       }
     } catch(e) {
@@ -4936,6 +4943,12 @@
       console.error('[BackButton] Failed to setup listener:', e);
     }
   }
+
+  // 🌟 ヘッダー状態（公開ボタン・共有メニュー・戻るボタン）を常に自動同期
+  setInterval(() => {
+    updateHeaderBackButton();
+    setupHeaderBackButtonListener();
+  }, 250);
 
   function createNewFormDirectlyWithoutPrompt() {
     try {
@@ -18074,7 +18087,11 @@
           mergeBtn.style.border = '1px solid #cbd5e1';
         }
       }
-      if (headerMergeBtn) headerMergeBtn.style.setProperty('display', 'none', 'important');
+      if (headerMergeBtn) {
+        headerMergeBtn.style.setProperty('display', 'inline-flex', 'important');
+        headerMergeBtn.innerHTML = '<span>🚀</span> <span class="btn-text">本番へ公開中</span>';
+        headerMergeBtn.style.background = '#059669';
+      }
       const menuItemMerge = document.getElementById('menu-item-merge-prod');
       if (menuItemMerge) {
         menuItemMerge.style.display = 'flex';
@@ -18104,8 +18121,8 @@
       const mainBtnLabel = document.getElementById('share-btn-main-label');
       if (mainBtnLabel) {
         mainBtnLabel.innerHTML = isUnpublished
-          ? '公開・共有 <span style="background:#dc2626; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">非公開中</span>'
-          : '公開・共有';
+          ? '共有 <span style="background:#dc2626; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">非公開中</span>'
+          : '共有';
       }
     } else {
       if (syncArea) {
@@ -18127,6 +18144,11 @@
         mergeBtn.style.color = '#ffffff';
         mergeBtn.style.border = 'none';
       }
+      if (headerMergeBtn) {
+        headerMergeBtn.style.setProperty('display', 'inline-flex', 'important');
+        headerMergeBtn.innerHTML = '<span>🚀</span> <span class="btn-text">本番へ公開</span>';
+        headerMergeBtn.style.background = '#16a34a';
+      }
       const menuItemMerge = document.getElementById('menu-item-merge-prod');
       if (menuItemMerge) {
         menuItemMerge.style.display = 'flex';
@@ -18143,12 +18165,11 @@
       const mainBtnLabel = document.getElementById('share-btn-main-label');
       if (mainBtnLabel) {
         if (isUnpublished) {
-          mainBtnLabel.innerHTML = '公開・共有 <span style="background:#dc2626; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">非公開中</span> <span style="background:#ef4444; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:2px; font-weight:700;">要統合</span>';
+          mainBtnLabel.innerHTML = '共有 <span style="background:#dc2626; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">非公開中</span> <span style="background:#ef4444; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:2px; font-weight:700;">要公開</span>';
         } else {
-          mainBtnLabel.innerHTML = '公開・共有 <span style="background:#ef4444; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">要統合</span>';
+          mainBtnLabel.innerHTML = '共有 <span style="background:#ef4444; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">要公開</span>';
         }
       }
-      if (headerMergeBtn) headerMergeBtn.style.setProperty('display', 'none', 'important');
     }
   }
 
@@ -22023,13 +22044,9 @@
     }
 
     if (card) {
-      card.style.background = '#f0fdf4';
-      card.style.borderColor = '#86efac';
-    }
-
-    if (statusDesc) {
-      statusDesc.innerHTML = `🌟 回答はこのフォーム専用の独立テーブル「<strong>${escapeHtml(formTitle)}</strong>」（回答フォーム一覧フォルダ）に自動保存されます。`;
-      statusDesc.style.color = '#15803d';
+      card.style.background = 'transparent';
+      card.style.border = 'none';
+      card.style.padding = '0';
     }
   }
 
