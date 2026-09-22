@@ -11,6 +11,23 @@
 
 
 (function() {
+  // 🚀 起動時即時パージ: LocalStorage内の旧ダミーフォームを完全に根絶
+  (function purgeLegacyFormsImmediately() {
+    try {
+      const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+      const raw = localStorage.getItem('form_customize_all_forms');
+      if (raw) {
+        let forms = JSON.parse(raw);
+        if (Array.isArray(forms)) {
+          const clean = forms.filter(f => f && !purgedKeywords.some(p => (f.title || '').includes(p)));
+          if (clean.length !== forms.length) {
+            Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(clean));
+          }
+        }
+      }
+    } catch(e) {}
+  })();
+
   console.log('custom-editor.js loading...');
 
   // 🌐 API連携規則（国税庁・インボイス・郵便番号・全銀協）の拡張保証
@@ -754,7 +771,7 @@
     }
   }
 
-  function createFormFromTemplate(template) {
+  async function createFormFromTemplate(template) {
     try {
       const originalGetItem = localStorage.getItem;
       let allForms = [];
@@ -804,6 +821,37 @@
       localStorage.setItem('form_customize_active_tab', 'editor');
 
       console.log('[Templates] Created new form from template. Index:', activeIdx);
+
+      // クラウドへの即時同期を完了させてからリロード（競合・消滅の防止）
+      if (typeof window.syncFormsToCloud === 'function') {
+        await window.syncFormsToCloud(allForms, true);
+      } else if (typeof syncFormsToCloud === 'function') {
+        await syncFormsToCloud(allForms, true);
+      } else {
+        const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+        const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+        try {
+          await fetch('/api/forms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ allForms: allForms })
+          }).catch(() => null);
+          await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+            method: 'POST',
+            headers: {
+              apikey: sbKey,
+              Authorization: `Bearer ${sbKey}`,
+              'Content-Type': 'application/json',
+              Prefer: 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify({
+              key: 'synapse_form_customize_all_forms',
+              value: allForms,
+              updated_at: new Date().toISOString()
+            })
+          });
+        } catch(e) {}
+      }
 
       // リロードして編集画面で起動
       window.location.reload();
@@ -2092,30 +2140,360 @@
     }, 3000);
   }
 
-  // フォーム自前削除ロジック
-  function deleteFormSelf(titleText) {
+  
+  // システム独自のスタイリッシュな入力プロンプトモーダル表示処理
+  function showSystemPromptModal(title, message, defaultValue, callback) {
+    const existing = document.getElementById('system-prompt-modal');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'system-prompt-modal';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.backgroundColor = 'rgba(15, 23, 42, 0.65)';
+    overlay.style.backdropFilter = 'blur(6px)';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.zIndex = '9999999';
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.2s ease-out';
+
+    const card = document.createElement('div');
+    card.style.background = '#1e293b'; 
+    card.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+    card.style.borderRadius = '16px';
+    card.style.padding = '24px';
+    card.style.width = '90%';
+    card.style.maxWidth = '420px';
+    card.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.5)';
+    card.style.transform = 'scale(0.95)';
+    card.style.transition = 'transform 0.2s ease-out';
+    card.style.color = '#f8fafc';
+    card.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+
+    const safeVal = (defaultValue || '').replace(/"/g, '&quot;');
+    card.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+        <span style="font-size: 1.4rem;">✏️</span>
+        <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: #f8fafc;">${title || 'フォーム名の変更'}</h3>
+      </div>
+      <div style="font-size: 0.88rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 14px;">${message || '新しいフォーム名を入力してください:'}</div>
+      <div style="margin-bottom: 20px;">
+        <input id="sys-prompt-input" type="text" value="${safeVal}" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 10px 14px; border-radius: 8px; font-size: 0.95rem; outline: none; transition: border-color 0.15s;" />
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <button id="sys-prompt-btn-cancel" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #cbd5e1; padding: 9px 18px; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: all 0.15s;">キャンセル</button>
+        <button id="sys-prompt-btn-ok" style="background: #3b82f6; border: none; color: #ffffff; padding: 9px 20px; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: all 0.15s;">保存する</button>
+      </div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    const input = card.querySelector('#sys-prompt-input');
+    requestAnimationFrame(() => {
+      overlay.style.opacity = '1';
+      card.style.transform = 'scale(1)';
+      input.focus();
+      input.select();
+    });
+
+    const close = (val) => {
+      overlay.style.opacity = '0';
+      card.style.transform = 'scale(0.95)';
+      setTimeout(() => {
+        overlay.remove();
+        callback(val);
+      }, 200);
+    };
+
+    const btnCancel = card.querySelector('#sys-prompt-btn-cancel');
+    const btnOk = card.querySelector('#sys-prompt-btn-ok');
+
+    btnCancel.addEventListener('click', () => close(null));
+    btnOk.addEventListener('click', () => close(input.value));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); close(input.value); }
+      else if (e.key === 'Escape') { e.preventDefault(); close(null); }
+    });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close(null);
+    });
+  }
+  window.showSystemPromptModal = showSystemPromptModal;
+
+  // ✏️ フォーム名自前編集ロジック
+  async function renameFormSelf(titleOrIndex) {
     let allForms = [];
     try {
       allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]');
     } catch(e) {}
-
-    const idx = allForms.findIndex(f => f.title === titleText || `${f.title} ${f.subtitle || (f.header && f.header.subtitle) || ''}`.trim() === titleText);
-    if (idx !== -1) {
-      allForms.splice(idx, 1);
-      localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
-      
-      let activeIndex = parseInt(localStorage.getItem('form_customize_active_index') || '0');
-      if (activeIndex >= allForms.length) {
-        activeIndex = Math.max(0, allForms.length - 1);
-        localStorage.setItem('form_customize_active_index', activeIndex.toString());
-      }
-      
-      showCustomToast('フォームを完全に削除しました。', 'success');
-      setTimeout(() => {
-        location.reload();
-      }, 500);
+    if (Array.isArray(window.U) && window.U.length > 0 && allForms.length === 0) {
+      allForms = [...window.U];
     }
+
+    let idx = -1;
+    if (typeof titleOrIndex === 'number' && !isNaN(titleOrIndex)) {
+      idx = titleOrIndex;
+    } else {
+      const rawTarget = String(titleOrIndex || '').trim();
+      idx = allForms.findIndex(f => f && (f.id === rawTarget || (f.title || '').trim() === rawTarget));
+      if (idx === -1 && Array.isArray(window.U)) {
+        idx = window.U.findIndex(f => f && (f.id === rawTarget || (f.title || '').trim() === rawTarget));
+      }
+    }
+
+    const targetForm = (idx >= 0 && idx < allForms.length) ? allForms[idx] : (window.U && window.U[idx]);
+    if (!targetForm) {
+      showCustomToast('対象のフォームが見つかりませんでした。', 'warning');
+      return;
+    }
+
+    const currentTitle = (targetForm.title || '無題のフォーム').trim();
+    showSystemPromptModal('✏️ フォーム名の変更', '新しいフォーム名を入力してください:', currentTitle, async (newTitle) => {
+      if (newTitle === null || newTitle.trim() === '' || newTitle.trim() === currentTitle) {
+        return;
+      }
+
+      const cleanNewTitle = newTitle.trim();
+      targetForm.title = cleanNewTitle;
+      if (window.U && window.U[idx]) {
+        window.U[idx].title = cleanNewTitle;
+      }
+      if (allForms[idx]) {
+        allForms[idx].title = cleanNewTitle;
+      }
+
+      // LocalStorage & Supabase 保存
+      Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(allForms));
+      
+      // Supabase クラウド同期
+      if (typeof syncFormsToCloud === 'function') {
+        await syncFormsToCloud(allForms, true);
+      }
+
+      // DOM上の要素タイトルを即時更新
+      try {
+        const rows = document.querySelectorAll('.gf-list-row, .form-preview-card');
+        rows.forEach(r => {
+          const rowIdx = parseInt(r.dataset.formIndex, 10);
+          if (rowIdx === idx) {
+            const titleEl = r.querySelector('.gf-list-title-text, .card-preview-title-text');
+            if (titleEl) titleEl.textContent = cleanNewTitle;
+            r.dataset.formTitle = cleanNewTitle;
+          }
+        });
+      } catch(e) {}
+
+      // ダッシュボード全体の再描画
+      if (typeof window.Y === 'function') {
+        try { window.Y(); } catch(e) {}
+      }
+
+      showCustomToast(`フォーム名を「${cleanNewTitle}」に変更しました。`, 'success');
+    });
   }
+  window.renameFormSelf = renameFormSelf;
+
+  // フォーム自前削除ロジック（DOM即時消去＆Supabaseクラウドストレージ完全同期版）
+  async function deleteFormSelf(titleOrIndex, skipConfirm = false) {
+    let allForms = [];
+    try {
+      allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]');
+    } catch(e) {}
+    if (Array.isArray(window.U) && window.U.length > 0 && allForms.length === 0) {
+      allForms = [...window.U];
+    }
+
+    let idx = -1;
+    if (typeof titleOrIndex === 'number' && !isNaN(titleOrIndex)) {
+      idx = titleOrIndex;
+    } else {
+      const rawTarget = String(titleOrIndex || '').trim();
+      const cleanTarget = rawTarget.replace(/[🔒\s\u200B-\u200D\uFEFF]/g, '').toLowerCase();
+
+      // 1. 完全一致
+      idx = allForms.findIndex(f => f && (
+        (f.id && f.id === rawTarget) ||
+        (f.title && f.title.trim() === rawTarget) ||
+        (`${f.title || ''} ${f.subtitle || (f.header && f.header.subtitle) || ''}`.trim() === rawTarget)
+      ));
+
+      // 2. 正規化ファジー一致
+      if (idx === -1) {
+        idx = allForms.findIndex(f => {
+          if (!f) return false;
+          const fullT = `${f.title || ''} ${f.subtitle || (f.header && f.header.subtitle) || ''}`.trim();
+          const cleanF = fullT.replace(/[🔒\s\u200B-\u200D\uFEFF]/g, '').toLowerCase();
+          const cleanTitleOnly = (f.title || '').replace(/[🔒\s\u200B-\u200D\uFEFF]/g, '').toLowerCase();
+          return cleanF === cleanTarget || cleanTitleOnly === cleanTarget ||
+                 (cleanF && cleanTarget && (cleanF.includes(cleanTarget) || cleanTarget.includes(cleanF)));
+        });
+      }
+      if (idx === -1 && Array.isArray(window.U)) {
+        idx = window.U.findIndex(f => {
+          if (!f) return false;
+          const fullT = `${f.title || ''} ${f.subtitle || (f.header && f.header.subtitle) || ''}`.trim();
+          const cleanF = fullT.replace(/[🔒\s\u200B-\u200D\uFEFF]/g, '').toLowerCase();
+          const cleanTitleOnly = (f.title || '').replace(/[🔒\s\u200B-\u200D\uFEFF]/g, '').toLowerCase();
+          return cleanF === cleanTarget || cleanTitleOnly === cleanTarget ||
+                 (cleanF && cleanTarget && (cleanF.includes(cleanTarget) || cleanTarget.includes(cleanF)));
+        });
+      }
+    }
+
+    if (idx === -1 || (idx >= allForms.length && (!window.U || idx >= window.U.length))) {
+      console.warn(`[Form Delete] Form not found for:`, titleOrIndex);
+      showCustomToast('対象のフォームが見つかりませんでした。', 'warning');
+      return;
+    }
+
+    const targetForm = (idx >= 0 && idx < allForms.length) ? allForms[idx] : (window.U && window.U[idx]);
+    const targetTitle = (targetForm?.title || '選択したフォーム').trim();
+
+    if (!skipConfirm) {
+      showSystemConfirmModal(`フォーム「${targetTitle}」を完全に削除しますか？`, async (ok) => {
+        if (ok) {
+          await deleteFormSelf(idx, true);
+        }
+      });
+      return;
+    }
+
+    // 🚀 即座に DOM から対象行を削除（ユーザーの目の前から即刻消滅させる）
+    try {
+      const rows = document.querySelectorAll('.gf-list-row, .form-preview-card');
+      rows.forEach(r => {
+        const rowTitle = (r.dataset.formTitle || r.querySelector('.gf-list-title-text')?.textContent || '').trim();
+        const rowIdx = parseInt(r.dataset.formIndex, 10);
+        if (rowIdx === idx || rowTitle === targetTitle || (targetTitle && rowTitle.includes(targetTitle))) {
+          r.remove();
+        }
+      });
+    } catch(domErr) {}
+
+    // 削除実行
+    const deletedForm = (idx >= 0 && idx < allForms.length) ? allForms.splice(idx, 1)[0] : targetForm;
+    const deletedTitle = deletedForm?.title || targetTitle;
+    console.log(`[Form Delete] Deleting form index ${idx}: "${deletedTitle}"`);
+
+    // 削除済み・不要サンプルフォーム（フィードバック・管理者権限）の自動パージ
+    const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+    allForms = allForms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
+
+    // 1. LocalStorage 更新
+    Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(allForms));
+    
+    let activeIndex = parseInt(localStorage.getItem('form_customize_active_index') || '0');
+    if (activeIndex >= allForms.length) {
+      activeIndex = Math.max(0, allForms.length - 1);
+      Storage.prototype.setItem.call(localStorage, 'form_customize_active_index', activeIndex.toString());
+    }
+
+    // 2. Vite メモリ内配列（window.U）の更新
+    if (Array.isArray(window.U)) {
+      const uIdx = window.U.findIndex(f => f && (f === deletedForm || f.id === deletedForm?.id || (f.title || '').trim() === (deletedTitle || '').trim()));
+      if (uIdx !== -1) {
+        window.U.splice(uIdx, 1);
+      } else if (idx >= 0 && idx < window.U.length) {
+        window.U.splice(idx, 1);
+      }
+    }
+    if (typeof window.W !== 'undefined') {
+      window.W = Math.max(0, Math.min(window.W || 0, Math.max(0, (window.U?.length || 1) - 1)));
+    }
+    if (typeof window.G !== 'undefined') {
+      window.G = (window.U && window.U.length > 0) ? window.U[window.W] : null;
+    }
+    if (typeof window.n !== 'undefined') {
+      window.n = window.G;
+    }
+
+    // 3. 🌐 Supabaseクラウドストレージ（synapse_form_customize_all_forms）へ即時保存
+    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+
+    try {
+      await fetch('/api/forms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allForms: allForms })
+      }).catch(() => null);
+    } catch(e) {}
+
+    try {
+      await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: {
+          apikey: sbKey,
+          Authorization: `Bearer ${sbKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          key: 'synapse_form_customize_all_forms',
+          value: allForms,
+          updated_at: new Date().toISOString()
+        })
+      });
+      console.log('[Form Delete] Synced form deletion to Supabase cloud successfully. Remaining forms:', allForms.length);
+    } catch(err) {
+      console.warn('[Form Delete] Failed to sync form deletion to Supabase:', err);
+    }
+
+    // 4. 連携されていたカスタムテーブルのクリーンアップ
+    if (deletedForm && (deletedForm.targetTableId || deletedForm.id)) {
+      try {
+        let curTables = JSON.parse(localStorage.getItem('synapse_custom_tables') || '[]');
+        const tId = deletedForm.targetTableId;
+        const fId = deletedForm.id;
+        curTables = curTables.filter(t => t && t.id !== tId && t.formId !== fId && t.sourceFormId !== fId);
+        Storage.prototype.setItem.call(localStorage, 'synapse_custom_tables', JSON.stringify(curTables));
+        if (tId) localStorage.removeItem(`synapse_table_${tId}`);
+
+        await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+          method: 'POST',
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+          body: JSON.stringify({ key: 'synapse_custom_tables', value: curTables, updated_at: new Date().toISOString() })
+        }).catch(() => null);
+      } catch(e) {}
+    }
+
+    // 5. 親ウィンドウへの削除通知
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'SYNAPSE_FORM_DELETED', formId: deletedForm?.id, formTitle: deletedTitle }, '*');
+    }
+
+    // 6. ダッシュボード一覧の即時再描画（インプレース再描画）
+    if (typeof window.Y === 'function') {
+      try { window.Y(); } catch(e) {}
+    }
+    if (allForms.length === 0) {
+      const listEl = document.getElementById('dashboard-view-list');
+      if (listEl) {
+        listEl.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: var(--color-text-dark);">
+            表示できるフォームがありません。
+          </div>
+        `;
+      }
+      const previewEl = document.getElementById('dashboard-view-preview');
+      if (previewEl) {
+        previewEl.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: var(--color-text-dark); grid-column: 1 / -1;">
+            表示できるフォームがありません。
+          </div>
+        `;
+      }
+    }
+
+    showCustomToast(`フォーム「${deletedTitle}」を完全に削除しました。`, 'success');
+  }
+  window.deleteFormSelf = deleteFormSelf;
 
   // window.confirm をオーバーライドして同期実行を非同期モーダルへ乗っ取る (フォールバック第2防衛線)
   (function setupSystemConfirmOverride() {
@@ -2149,11 +2527,11 @@
       // 通常フォームの削除確認メッセージからタイトルを抽出する
       const deleteFormMatch = message.match(/フォーム「(.*?)」を完全に削除しますか？/);
 
-      showSystemConfirmModal(message, (ok) => {
+      showSystemConfirmModal(message, async (ok) => {
         if (ok) {
           if (deleteFormMatch && deleteFormMatch[1]) {
-            // DOM消滅バグを回避するため、LocalStorageから直接削除を起動
-            deleteFormSelf(deleteFormMatch[1]);
+            // DOM消滅バグを回避するため、LocalStorage・クラウドから直接削除を起動
+            await deleteFormSelf(deleteFormMatch[1], true);
           } else {
             forceConfirmResult = true;
             if (lastClickedDeleteElement) {
@@ -2170,6 +2548,39 @@
     document.addEventListener('click', (e) => {
       const target = e.target;
       
+      // 0. Viteコンテキストメニュー（#gf-context-menu 内のアイテム）
+      const ctxMenu = target.closest('#gf-context-menu');
+      if (ctxMenu && (target.classList.contains('rename-item') || target.closest('.rename-item') || target.textContent.includes('名前の編集'))) {
+        e.stopPropagation();
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const fIdx = parseInt(ctxMenu.dataset.formIndex);
+        ctxMenu.remove();
+        if (typeof renameFormSelf === 'function') {
+          renameFormSelf(fIdx);
+        }
+        return;
+      }
+      if (ctxMenu && (target.classList.contains('delete-item') || target.closest('.delete-item') || target.textContent.includes('削除'))) {
+        e.stopPropagation();
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const fIdx = parseInt(ctxMenu.dataset.formIndex);
+        ctxMenu.remove();
+
+        let allForms = [];
+        try { allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]'); } catch(err) {}
+        const formObj = !isNaN(fIdx) ? allForms[fIdx] : null;
+        const formTitle = formObj ? (formObj.title || '選択したフォーム') : '選択したフォーム';
+
+        showSystemConfirmModal(`フォーム「${formTitle}」を完全に削除しますか？`, async (ok) => {
+          if (ok) {
+            await deleteFormSelf(!isNaN(fIdx) ? fIdx : formTitle, true);
+          }
+        });
+        return;
+      }
+
       const isDeleteMenu = target.closest('li') && target.closest('li').textContent.includes('削除') ||
                            target.classList.contains('btn-delete-template-row') ||
                            target.closest('.btn-delete-template-row') ||
@@ -2215,15 +2626,14 @@
           // 通常のフォーム削除
           const row = target.closest('.gf-list-row');
           if (row) {
+            const formIdxAttr = row.dataset.formIndex;
             const titleTextEl = row.querySelector('.gf-list-title-text') || row.querySelector('.gf-list-title-area span');
-            if (titleTextEl) {
-              const titleText = titleTextEl.textContent.trim();
-              showSystemConfirmModal(`フォーム「${titleText}」を完全に削除しますか？`, (ok) => {
-                if (ok) {
-                  deleteFormSelf(titleText);
-                }
-              });
-            }
+            const titleText = (titleTextEl ? titleTextEl.textContent.trim() : '') || row.dataset.formTitle;
+            showSystemConfirmModal(`フォーム「${titleText}」を完全に削除しますか？`, async (ok) => {
+              if (ok) {
+                await deleteFormSelf(formIdxAttr !== undefined ? parseInt(formIdxAttr) : titleText, true);
+              }
+            });
           }
         }
       }
@@ -15226,14 +15636,9 @@
         allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]');
       } catch(e) {}
 
-      // フォールバック: もし localStorage 内のフォームデータが空の場合はデフォルトのサンプルフォームを補正・ロード
-      if (!allForms || allForms.length === 0) {
-        allForms = [
-          { title: '新規作成されたフォーム', ownerId: 'user_own_editor', isLocked: false },
-          { title: 'お客様フィードバック (サンプル)', ownerId: 'user_all_editor', isLocked: false },
-          { title: '管理者用のアカウント作成', ownerId: 'user_admin', isLocked: true }
-        ];
-      }
+      // 削除済み・不要サンプルフォーム（フィードバック・管理者権限）の自動パージ
+      const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+      allForms = (allForms || []).filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
 
       const activeIndex = parseInt(localStorage.getItem('form_customize_active_index') || '0', 10);
 
@@ -16659,31 +17064,135 @@
   }
   window.getEffectiveFormTitle = getEffectiveFormTitle;
 
-  // 🏷️ フォーム名からサブタイトルを含めたSupabase物理テーブル名を生成
+  // 🏷️ フォーム名からサブタイトルを含めたSupabase物理テーブル名を生成（フォーム毎の固有性を完全保証）
   function getPhysicalTableNameForForm(formDef) {
     if (!formDef) return 'form_default';
-    if (formDef.physicalTableName) return formDef.physicalTableName;
+    if (formDef.physicalTableName && formDef.physicalTableName !== 'form_custom' && formDef.physicalTableName !== 'form_default') {
+      return formDef.physicalTableName;
+    }
 
     const effectiveTitle = getEffectiveFormTitle(formDef);
+    
+    // 1. 主要な既知フォームの固定マッピング
     if (effectiveTitle.includes('紹介代理店') || effectiveTitle.includes('代理店')) {
       return 'form_referral_agency_application';
     }
+    if (effectiveTitle.includes('フィードバック') || effectiveTitle.includes('アンケート') || effectiveTitle.includes('feedback')) {
+      return 'form_customer_feedback';
+    }
+    if (effectiveTitle.includes('管理者') || effectiveTitle.includes('アカウント') || effectiveTitle.includes('account')) {
+      return 'form_admin_account_creation';
+    }
+    if (effectiveTitle.includes('基本情報')) {
+      return 'form_basic_info';
+    }
+    if (effectiveTitle.includes('口座') || effectiveTitle.includes('担当者')) {
+      return 'form_bank_account';
+    }
 
-    const rawId = (formDef.id || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
-    if (rawId && rawId.length > 3 && rawId !== 'form_yosandas') {
+    // 2. formDef.id が英数字を含む場合
+    const rawId = (formDef.id || '').toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '');
+    if (rawId && rawId.length >= 3 && rawId !== 'form_yosandas' && rawId !== 'form_custom') {
       return rawId.startsWith('form_') ? rawId : `form_${rawId}`;
     }
-    const cleanTitle = effectiveTitle.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_');
-    return cleanTitle ? `form_${cleanTitle}` : 'form_custom';
+
+    // 3. タイトルから英数字を抽出できる場合
+    const cleanTitle = effectiveTitle.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+    if (cleanTitle && cleanTitle.length >= 3) {
+      return `form_${cleanTitle}`;
+    }
+
+    // 4. 日本語タイトルのみの場合はハッシュを付与して一意性を完全担保
+    let hash = 0;
+    for (let i = 0; i < effectiveTitle.length; i++) {
+      hash = ((hash << 5) - hash) + effectiveTitle.charCodeAt(i);
+      hash |= 0;
+    }
+    const hexHash = Math.abs(hash).toString(16).padStart(6, '0').slice(0, 8);
+    return `form_tbl_${hexHash}`;
   }
   window.getPhysicalTableNameForForm = getPhysicalTableNameForForm;
 
-  // 📊 フォーム専用独立テーブル作成共通ヘルパー
+  // 📊 フォーム専用独立テーブル作成共通ヘルパー（1フォーム1テーブルの原則を完全保証）
   async function createDedicatedTableForForm(formDef) {
     if (!formDef) return null;
     const formTitle = getEffectiveFormTitle(formDef);
+    const pTableName = getPhysicalTableNameForForm(formDef);
     const sections = formDef.sections || [];
-    const newTableId = `ctbl_${Date.now()}`;
+
+    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+
+    let curTables = [];
+    try { curTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
+
+    // 🔍 既にこのフォーム専用テーブルが存在するか徹底チェック（多重作成の完全防止）
+    let existingTable = curTables.find(t => t && (
+      (formDef.targetTableId && t.id === formDef.targetTableId) ||
+      (formDef.id && t.formId && t.formId === formDef.id) ||
+      (t.name === formTitle) ||
+      (t.formTitle && t.formTitle === formTitle) ||
+      (pTableName && t.physicalTableName && t.physicalTableName === pTableName)
+    ) && t.id !== 'table_all_form_responses');
+
+    if (existingTable) {
+      // 🌟 既存テーブルが存在する場合：新規テーブルIDは発行せず、既存テーブルのID・回答行データ（rows）を100%保持
+      formDef.createDedicatedTable = true;
+      formDef.targetTableId = existingTable.id;
+      formDef.targetTableType = 'dedicated';
+      formDef.physicalTableName = existingTable.physicalTableName || pTableName;
+
+      if (!existingTable.formId && formDef.id) {
+        existingTable.formId = formDef.id;
+      }
+      existingTable.sourceFormId = formDef.id;
+      existingTable.formTitle = formTitle;
+      existingTable.name = formTitle;
+      existingTable.isFormDedicatedTable = true;
+      if (!existingTable.parentMenuId || existingTable.parentMenuId === 'root') {
+        existingTable.parentMenuId = 'forms-accordion';
+      }
+
+      // 追加カラムがあれば安全に同期
+      if (typeof updateDedicatedTableColumns === 'function') {
+        await updateDedicatedTableColumns(existingTable, formDef);
+      }
+
+      localStorage.setItem('synapse_custom_tables', JSON.stringify(curTables));
+      localStorage.setItem(`synapse_table_${existingTable.id}`, JSON.stringify(existingTable));
+
+      // 🌐 Supabase上の物理テーブルが削除されていた場合に備え、CREATE TABLE RPCを必ず呼び出して物理テーブルを再生成・復元
+      try {
+        const rpcCols = (existingTable.columns || []).map(c => ({ id: c.id, label: c.label || c.name, type: c.type || 'text' }));
+        await fetch(`${sbUrl}/rest/v1/rpc/synapse_create_or_alter_table`, {
+          method: 'POST',
+          headers: {
+            apikey: sbKey,
+            Authorization: `Bearer ${sbKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            p_table_name: existingTable.physicalTableName || pTableName,
+            p_columns: rpcCols
+          })
+        });
+        console.log(`[Supabase Physical Table] Verified/Recreated physical table "${existingTable.physicalTableName || pTableName}" on Supabase.`);
+      } catch (rpcErr) {
+        console.warn('[Supabase Physical Table RPC] Error verifying physical table on Supabase:', rpcErr);
+      }
+
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'SYNAPSE_TABLE_UPDATED', table: existingTable }, '*');
+      }
+
+      console.log(`[DedicatedTable] Reusing existing table "${existingTable.name}" (ID: ${existingTable.id}). Physical table ensured on Supabase.`);
+      return existingTable;
+    }
+
+    // --- 初回作成時のみ新規IDを発行 ---
+    const newTableId = (formDef.targetTableId && formDef.targetTableId !== 'dedicated' && formDef.targetTableId !== 'table_all_form_responses')
+      ? formDef.targetTableId
+      : `ctbl_${Date.now()}`;
     const columns = [
       { id: 'master_id', label: 'マスターID / コード', type: 'text', required: false },
       { id: 'form_title', label: 'フォーム名', type: 'text', required: false }
@@ -16746,6 +17255,8 @@
 
     const newTable = {
       id: newTableId,
+      formId: formDef.id,
+      sourceFormId: formDef.id,
       name: formTitle,
       formTitle: formTitle,
       physicalTableName: pTableName,
@@ -16761,9 +17272,11 @@
       rows: []
     };
 
-    let curTables = [];
-    try { curTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
-    const existingIdx = curTables.findIndex(t => t.id === newTableId || t.name === formTitle);
+    const existingIdx = curTables.findIndex(t => 
+      t.id === newTableId || 
+      (formDef.id && t.formId === formDef.id) ||
+      t.name === formTitle
+    );
     if (existingIdx !== -1) {
       curTables[existingIdx] = newTable;
     } else {
@@ -16771,9 +17284,6 @@
     }
     localStorage.setItem('synapse_custom_tables', JSON.stringify(curTables));
     localStorage.setItem(`synapse_table_${newTableId}`, JSON.stringify(newTable));
-
-    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
-    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
 
     try {
       await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
@@ -16808,7 +17318,6 @@
 
       // 🌐 Supabaseクラウド上に物理テーブル（CREATE TABLE）を自動作成 (RPC)
       try {
-        const pTableName = getPhysicalTableNameForForm(formDef);
         const rpcCols = columns.map(c => ({ id: c.id, label: c.label || c.name, type: c.type || 'text' }));
         await fetch(`${sbUrl}/rest/v1/rpc/synapse_create_or_alter_table`, {
           method: 'POST',
@@ -16842,6 +17351,86 @@
     return newTable;
   }
   window.createDedicatedTableForForm = createDedicatedTableForForm;
+
+  // 🌟 全フォームの専用回答テーブルを一括同期・再作成（重複防止・Supabase物理テーブル完全保証）
+  async function syncOrRecreateAllDedicatedTables(options = {}) {
+    console.log('[DedicatedTable Batch] Starting batch synchronization for all forms...');
+    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+
+    let allForms = [];
+    try {
+      allForms = JSON.parse(localStorage.getItem('form_customize_all_forms')) || [];
+    } catch(e) {}
+    if (!allForms || allForms.length === 0) {
+      try {
+        const sbRes = await fetch(`${sbUrl}/rest/v1/synapse_storage?key=eq.synapse_form_customize_all_forms`, {
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+        });
+        const sbData = await sbRes.json();
+        if (sbData && sbData[0] && Array.isArray(sbData[0].value)) {
+          allForms = sbData[0].value;
+        }
+      } catch(err) {}
+    }
+
+    if (!allForms || allForms.length === 0) {
+      console.warn('[DedicatedTable Batch] No forms found to synchronize.');
+      return { success: false, message: '同期対象のフォームが見つかりませんでした。', count: 0 };
+    }
+
+    const results = [];
+    for (let i = 0; i < allForms.length; i++) {
+      const formDef = allForms[i];
+      if (!formDef) continue;
+      
+      const effectiveTitle = getEffectiveFormTitle(formDef);
+      const pTableName = getPhysicalTableNameForForm(formDef);
+      formDef.physicalTableName = pTableName;
+
+      const tbl = await createDedicatedTableForForm(formDef);
+      if (tbl) {
+        formDef.createDedicatedTable = true;
+        formDef.targetTableId = tbl.id;
+        formDef.targetTableType = 'dedicated';
+        if (formDef.publishedSnapshot) {
+          formDef.publishedSnapshot.createDedicatedTable = true;
+          formDef.publishedSnapshot.targetTableId = tbl.id;
+          formDef.publishedSnapshot.targetTableType = 'dedicated';
+          formDef.publishedSnapshot.physicalTableName = pTableName;
+        }
+        results.push({ formTitle: effectiveTitle, tableId: tbl.id, physicalTableName: pTableName, columnsCount: (tbl.columns || []).length });
+      }
+    }
+
+    localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+    try {
+      await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: {
+          apikey: sbKey,
+          Authorization: `Bearer ${sbKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          key: 'synapse_form_customize_all_forms',
+          value: allForms,
+          updated_at: new Date().toISOString()
+        })
+      });
+    } catch(err) {
+      console.warn('[Supabase Sync] Failed to update synapse_form_customize_all_forms:', err);
+    }
+
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'SYNAPSE_ALL_TABLES_SYNCED', results: results }, '*');
+    }
+
+    console.log(`[DedicatedTable Batch] Successfully synchronized ${results.length} form tables:`, results);
+    return { success: true, count: results.length, results: results };
+  }
+  window.syncOrRecreateAllDedicatedTables = syncOrRecreateAllDedicatedTables;
 
   // 🔍 フォームの最新定義と既存専用テーブルを比較し、新設された質問（追加カラム）を特定する
   function getNewColumnsForFormTable(dedicatedTable, formDef) {
@@ -17063,13 +17652,15 @@
     const isSynced = publishStatus.isSynced;
 
     // 専用テーブルの有無判定（本番で1回作成されたテーブルがあるか）
+    const pTableName = getPhysicalTableNameForForm(formObj);
     let existingTables = [];
     try { existingTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
     const dedicatedTable = existingTables.find(t => t && (
       t.id === formObj.targetTableId ||
+      (formObj.id && t.formId && t.formId === formObj.id) ||
       t.name === formTitle ||
       (t.formTitle && t.formTitle === formTitle) ||
-      (t.formId && t.formId === formObj.id)
+      (pTableName && t.physicalTableName && t.physicalTableName === pTableName)
     ) && t.id !== 'table_all_form_responses');
 
     const hasDedicated = !!(dedicatedTable || (formObj.targetTableId && formObj.targetTableId !== 'table_all_form_responses' && formObj.targetTableType === 'dedicated'));
@@ -17184,58 +17775,7 @@
     if (cancelBtn) cancelBtn.onclick = closeMergeProductionModal;
 
     if (executeBtnReal) {
-      executeBtnReal.onclick = async () => {
-        try {
-          const wantDedicated = dedicatedToggle ? dedicatedToggle.checked : true;
-          if (wantDedicated) {
-            formObj.createDedicatedTable = true;
-            formObj.targetTableType = 'dedicated';
-
-            // 専用テーブルが未作成の場合は新規作成して即時連携
-            if (!dedicatedTable) {
-              const newTbl = createFormDedicatedTableInParent(formObj);
-              if (newTbl && newTbl.id) {
-                formObj.targetTableId = newTbl.id;
-              }
-            } else {
-              formObj.targetTableId = dedicatedTable.id;
-              // 既存テーブルの場合、フォーム側の新しい質問項目（未存在カラム）を検出して追記追加
-              if (dedicatedTable.name !== formTitle) {
-                dedicatedTable.name = formTitle;
-              }
-
-              const res = await updateDedicatedTableColumns(dedicatedTable, formObj);
-              if (res && res.updated) {
-                console.log(`[DedicatedTable] Successfully updated table "${dedicatedTable.name}" with ${res.addedColumns.length} new columns.`);
-              } else {
-                console.log(`[DedicatedTable] Table "${dedicatedTable.name}" requires no column updates.`);
-              }
-            }
-          } else {
-            formObj.createDedicatedTable = true;
-            formObj.targetTableType = 'dedicated';
-            formObj.targetTableId = formObj.targetTableId || 'dedicated';
-          }
-
-          if (typeof syncGlobalTargetTableSelect === 'function') {
-            syncGlobalTargetTableSelect(wantDedicated);
-          }
-
-          mergeFormToProduction(idx);
-          closeMergeProductionModal();
-          const currentTitle = getEffectiveFormTitle(formObj);
-          const nextVersion = (formObj.publishedVersion || 1);
-          showToast(`「${currentTitle}」を本番環境へ統合しました。配布済み本番リンクが最新版（v${nextVersion}）に切り替わりました。`, 'success');
-        } catch(err) {
-          console.error('[MergeProductionModal] Error during merge execution:', err);
-          showToast('本番環境への統合中にエラーが発生しました。', 'error');
-        } finally {
-          if (executeBtnReal) {
-            executeBtnReal.disabled = false;
-            executeBtnReal.textContent = '🚀 本番環境へ統合する';
-          }
-        }
-      };
+      executeBtnReal.onclick = executeMergeProductionFromModal;
     }
 
     if (closeBtn && !closeBtn._hooked) {
@@ -17262,7 +17802,8 @@
   window.closeMergeProductionModal = closeMergeProductionModal;
 
   async function executeMergeProductionFromModal() {
-    const { formObj, idx } = getCurrentFormObject(_mergeModalTargetIndex);
+    const targetIdx = _mergeModalTargetIndex !== null ? _mergeModalTargetIndex : (typeof detectActiveFormIndex === 'function' ? detectActiveFormIndex() : 0);
+    const { formObj, idx } = getCurrentFormObject(targetIdx);
     if (!formObj) return;
 
     const executeBtn = document.getElementById('btn-execute-merge-prod');
@@ -17271,20 +17812,40 @@
       executeBtn.textContent = '⏳ 本番公開・反映中...';
     }
 
+    const notifySuccess = (msg) => {
+      showGlobalShareToast(msg);
+      if (typeof showToast === 'function') {
+        showToast(msg, 'success');
+      } else if (window.parent && typeof window.parent.showToast === 'function') {
+        window.parent.showToast(msg, 'success');
+      }
+    };
+
+    const notifyError = (msg) => {
+      showGlobalShareToast(msg);
+      if (typeof showToast === 'function') {
+        showToast(msg, 'error');
+      } else if (window.parent && typeof window.parent.showToast === 'function') {
+        window.parent.showToast(msg, 'error');
+      }
+    };
+
     try {
       const dedicatedToggle = document.getElementById('merge-create-dedicated-table');
-      const wantDedicated = dedicatedToggle ? dedicatedToggle.checked : false;
+      const wantDedicated = dedicatedToggle ? dedicatedToggle.checked : true;
 
       if (wantDedicated) {
         let existingTables = [];
         try { existingTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
         const formTitle = getEffectiveFormTitle(formObj);
+        const pTableName = getPhysicalTableNameForForm(formObj);
         let dedicatedTable = existingTables.find(t => t && (
           t.id === formObj.targetTableId ||
+          (formObj.id && t.formId && t.formId === formObj.id) ||
           t.name === formTitle ||
           (t.formTitle && t.formTitle === formTitle) ||
-          (t.formId && t.formId === formObj.id)
-        ));
+          (pTableName && t.physicalTableName && t.physicalTableName === pTableName)
+        ) && t.id !== 'table_all_form_responses');
 
         if (!dedicatedTable) {
           // 専用テーブルの新規作成は本番で最初の1回のみ
@@ -17295,7 +17856,12 @@
           formObj.createDedicatedTable = true;
           formObj.targetTableId = dedicatedTable.id;
           formObj.targetTableType = 'dedicated';
-          formObj.physicalTableName = dedicatedTable.physicalTableName || getPhysicalTableNameForForm(formObj);
+          formObj.physicalTableName = dedicatedTable.physicalTableName || pTableName;
+          if (!dedicatedTable.formId && formObj.id) {
+            dedicatedTable.formId = formObj.id;
+          }
+          dedicatedTable.sourceFormId = formObj.id;
+          dedicatedTable.isFormDedicatedTable = true;
 
           // フォームタイトル（サブタイトル含む）が変更されていた場合はテーブル表示名も同期更新
           if (dedicatedTable.name !== formTitle) {
@@ -17324,10 +17890,10 @@
       closeMergeProductionModal();
       const currentTitle = getEffectiveFormTitle(formObj);
       const nextVersion = (formObj.publishedVersion || 1);
-      showToast(`「${currentTitle}」を本番環境へ統合しました。配布済み本番リンクが最新版（v${nextVersion}）に切り替わりました。`, 'success');
+      notifySuccess(`「${currentTitle}」を本番環境へ統合しました。配布済み本番リンクが最新版（v${nextVersion}）に切り替わりました。`);
     } catch(err) {
       console.error('[MergeProductionModal] Error during merge execution:', err);
-      showToast('本番環境への統合中にエラーが発生しました。', 'error');
+      notifyError('本番環境への統合中にエラーが発生しました。');
     } finally {
       if (executeBtn) {
         executeBtn.disabled = false;
@@ -17887,6 +18453,35 @@
           }
         });
       }
+
+      const menuSyncAllTables = document.getElementById('menu-item-sync-all-tables');
+      if (menuSyncAllTables && !menuSyncAllTables._hooked) {
+        menuSyncAllTables._hooked = true;
+        menuSyncAllTables.addEventListener('click', async (e) => {
+          e.preventDefault();
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          
+          if (!confirm('全フォームの専用回答テーブルを同期・再生成しますか？\n\n・Supabase上に物理テーブルを作成・確認します\n・Synapse側の回答テーブルと1対1で整合・重複排除します\n・既存の回答データは保持されます')) {
+            return;
+          }
+
+          showGlobalShareToast('⏳ 全フォームの回答テーブルを同期・再生成中...');
+          try {
+            const res = await syncOrRecreateAllDedicatedTables();
+            if (res.success) {
+              const msg = `✅ 全${res.count}件のフォーム専用テーブルを同期・再生成しました！\n\n・Supabase物理テーブルの作成・確認完了\n・Synapse「回答フォーム一覧」に反映完了\n・各テーブルの重複は完全に防止されています`;
+              alert(msg);
+              showGlobalShareToast(`✔ 全${res.count}件のフォームテーブルを同期しました`);
+            } else {
+              alert(`同期失敗: ${res.message}`);
+            }
+          } catch(err) {
+            console.error('Batch sync error:', err);
+            alert(`エラーが発生しました: ${err.message}`);
+          }
+        });
+      }
     }
 
     // 2. プレビュー画面の「🔗 回答用リンクをコピー」ボタン
@@ -17986,73 +18581,87 @@
       closeFooterBtn.addEventListener('click', closeShareUrlModal);
     }
 
-    // 5. コンテキストメニュー（⋮）への「🔗 リンクをコピー」および「📊 テーブル連携確認・作成」自動注入
+    // 5. コンテキストメニュー（⋮）を「✏️ 名前の編集」と「🗑️ 削除」の2項目のみに完全統一（他項目の侵入を100%遮断）
+    const enforceTwoItemsMenu = (menu) => {
+      if (!menu) return;
+      const fIdx = menu.dataset.formIndex !== undefined ? parseInt(menu.dataset.formIndex, 10) : undefined;
+      
+      // 不正な項目（編集、プレビュー、リンクをコピー、テスト用リンクを開く、テーブル連携確認・作成など）を全消去
+      const items = Array.from(menu.children);
+      let renameEl = null;
+      let deleteEl = null;
+
+      items.forEach(child => {
+        const text = (child.textContent || '').trim();
+        if (child.classList.contains('rename-item') || text.includes('名前の編集')) {
+          if (!renameEl) renameEl = child;
+          else child.remove();
+        } else if (child.classList.contains('delete-item') || text.includes('削除')) {
+          if (!deleteEl) deleteEl = child;
+          else child.remove();
+        } else {
+          // 不要項目は即刻消去
+          child.remove();
+        }
+      });
+
+      menu.style.minWidth = '140px';
+      menu.style.padding = '6px 0';
+
+      if (!renameEl) {
+        renameEl = document.createElement('div');
+        renameEl.className = 'menu-item rename-item';
+        renameEl.innerHTML = '✏️ 名前の編集';
+        renameEl.style.padding = '8px 16px';
+        renameEl.style.cursor = 'pointer';
+        renameEl.style.fontSize = '0.9rem';
+        renameEl.style.display = 'flex';
+        renameEl.style.alignItems = 'center';
+        renameEl.style.gap = '8px';
+        menu.insertBefore(renameEl, menu.firstChild);
+      }
+      if (!renameEl._hooked) {
+        renameEl._hooked = true;
+        renameEl.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          menu.remove();
+          if (typeof window.renameFormSelf === 'function') {
+            window.renameFormSelf(fIdx);
+          }
+        };
+      }
+
+      if (!deleteEl) {
+        deleteEl = document.createElement('div');
+        deleteEl.className = 'menu-item delete-item danger-item';
+        deleteEl.innerHTML = '🗑️ 削除';
+        deleteEl.style.padding = '8px 16px';
+        deleteEl.style.cursor = 'pointer';
+        deleteEl.style.fontSize = '0.9rem';
+        deleteEl.style.color = '#dc2626';
+        deleteEl.style.display = 'flex';
+        deleteEl.style.alignItems = 'center';
+        deleteEl.style.gap = '8px';
+        menu.appendChild(deleteEl);
+      }
+      if (!deleteEl._hooked) {
+        deleteEl._hooked = true;
+        deleteEl.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          menu.remove();
+          if (typeof window.deleteFormSelf === 'function') {
+            window.deleteFormSelf(fIdx);
+          }
+        };
+      }
+    };
+    window.enforceTwoItemsMenu = enforceTwoItemsMenu;
+
     const contextMenu = document.getElementById('gf-context-menu');
     if (contextMenu) {
-      const previewItem = contextMenu.querySelector('.preview-item');
-      if (previewItem) {
-        previewItem.remove();
-      }
-      if (!contextMenu._shareHooked) {
-        contextMenu._shareHooked = true;
-        const copyItem = document.createElement('div');
-        copyItem.className = 'menu-item copy-link-item';
-        copyItem.innerHTML = '🔗 リンクをコピー';
-        copyItem.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const fIdx = contextMenu.dataset.formIndex !== undefined ? parseInt(contextMenu.dataset.formIndex, 10) : undefined;
-          contextMenu.remove();
-          copyFormShareUrl(fIdx);
-        });
-
-        const testItem = document.createElement('div');
-        testItem.className = 'menu-item test-link-item';
-        testItem.innerHTML = '🧪 テスト用リンクを開く';
-        testItem.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const fIdx = contextMenu.dataset.formIndex !== undefined ? parseInt(contextMenu.dataset.formIndex, 10) : undefined;
-          contextMenu.remove();
-          const testUrl = getPublicFormShareUrl(fIdx, true, 'test');
-          window.open(testUrl, '_blank');
-          showGlobalShareToast('🧪 テスト送信モード（DB保存なし）で別タブを開きました！');
-        });
-
-        const tableItem = document.createElement('div');
-        tableItem.className = 'menu-item table-link-item';
-        tableItem.innerHTML = '📊 テーブル連携確認・作成';
-        tableItem.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const fIdx = contextMenu.dataset.formIndex !== undefined ? parseInt(contextMenu.dataset.formIndex, 10) : undefined;
-          contextMenu.remove();
-          let targetForm = null;
-          if (fIdx !== undefined && window.U && window.U[fIdx]) {
-            targetForm = window.U[fIdx];
-          } else {
-            targetForm = window.G || window.L;
-          }
-          if (typeof openFormColumnMappingModal === 'function') {
-            openFormColumnMappingModal(targetForm);
-          }
-        });
-
-        const editItem = contextMenu.querySelector('.edit-item');
-        if (editItem) {
-          editItem.insertAdjacentElement('afterend', copyItem);
-          copyItem.insertAdjacentElement('afterend', testItem);
-          testItem.insertAdjacentElement('afterend', tableItem);
-        } else {
-          const deleteItem = contextMenu.querySelector('.delete-item');
-          if (deleteItem) {
-            deleteItem.insertAdjacentElement('beforebegin', copyItem);
-            deleteItem.insertAdjacentElement('beforebegin', testItem);
-            deleteItem.insertAdjacentElement('beforebegin', tableItem);
-          } else {
-            contextMenu.appendChild(copyItem);
-            contextMenu.appendChild(testItem);
-            contextMenu.appendChild(tableItem);
-          }
-        }
-      }
+      enforceTwoItemsMenu(contextMenu);
     }
 
     // 6. URLパラメータ form_idx の監視・自動選択処理
@@ -18088,6 +18697,26 @@
     initShareUrlFeature();
   }
   setInterval(initShareUrlFeature, 250);
+
+  // 🛡️ コンテキストメニュー（⋮）に不要項目が混入するのを100%リアルタイムで阻止する監視オブザーバー
+  (function setupContextMenuGuardian() {
+    const checkAndEnforce = () => {
+      const menu = document.getElementById('gf-context-menu');
+      if (menu && typeof window.enforceTwoItemsMenu === 'function') {
+        window.enforceTwoItemsMenu(menu);
+      }
+    };
+    const observer = new MutationObserver(() => {
+      checkAndEnforce();
+    });
+    if (document.body) {
+      observer.observe(document.body, { childList: true, subtree: true });
+    } else {
+      document.addEventListener('DOMContentLoaded', () => {
+        observer.observe(document.body, { childList: true, subtree: true });
+      });
+    }
+  })();
 
   // グローバル公開
   window.getPublicFormShareUrl = getPublicFormShareUrl;
@@ -18468,17 +19097,23 @@
   let _isCloudSyncing = false;
 
   async function syncFormsToCloud(forms, immediate = false) {
-    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-      console.log('[Cloud Sync] Skipped on local development environment (localhost).');
-      return;
-    }
     if (!forms) {
       try {
         const raw = localStorage.getItem('form_customize_all_forms');
         if (raw) forms = JSON.parse(raw);
       } catch(e) {}
     }
-    if (!forms || !Array.isArray(forms) || forms.length === 0) return;
+    if (!forms || !Array.isArray(forms)) return;
+
+    // パージ対象キーワード（フィードバック・管理者権限）を常時除外
+    const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+    forms = forms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
+
+    // デフォルト初期ダミーフォームの勝手なクラウドアップロードを完全抑止
+    if (forms.length === 1 && (forms[0]?.title === '新規作成されたフォーム' || forms[0]?.title === '無題のフォーム') && !window._userExplicitlyCreated) {
+      console.log('[Cloud Sync] Suppressed auto-upload of placeholder form.');
+      return;
+    }
 
     sanitizeFormBranchingLogic(forms);
 
@@ -18519,7 +19154,7 @@
             updated_at: new Date().toISOString()
           })
         });
-        console.log('[Cloud Sync] Direct Supabase fallback push completed.');
+        console.log('[Cloud Sync] Direct Supabase fallback push completed. Form count:', forms.length);
       } catch(e) {
         console.error('[Cloud Sync] Direct Supabase fallback failed:', e);
       }
@@ -18534,10 +19169,6 @@
 
   async function loadFormsFromCloud() {
     if (_isCloudSyncing) return;
-    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-      console.log('[Cloud Sync] loadFormsFromCloud skipped on local development environment (localhost).');
-      return;
-    }
     _isCloudSyncing = true;
     try {
       let cloudForms = null;
@@ -18545,13 +19176,13 @@
         const res = await fetch('/api/forms?all=1');
         if (res.ok) {
           const data = await res.json();
-          if (data && data.success && Array.isArray(data.forms) && data.forms.length > 0) {
+          if (data && data.success && Array.isArray(data.forms)) {
             cloudForms = data.forms;
           }
         }
       } catch(e) {}
 
-      if (!cloudForms) {
+      if (cloudForms === null) {
         // 直接 Supabase REST API
         try {
           const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
@@ -18561,10 +19192,10 @@
           });
           if (sbRes.ok) {
             const rows = await sbRes.json();
-            if (rows && rows[0] && rows[0].value) {
+            if (rows && rows[0] && rows[0].value !== undefined) {
               let parsed = rows[0].value;
               if (typeof parsed === 'string') parsed = JSON.parse(parsed);
-              if (Array.isArray(parsed) && parsed.length > 0) cloudForms = parsed;
+              if (Array.isArray(parsed)) cloudForms = parsed;
             }
           }
         } catch(e) {}
@@ -18576,46 +19207,51 @@
         if (raw) localForms = JSON.parse(raw);
       } catch(e) {}
 
-      if (cloudForms && cloudForms.length > 0) {
+      if (cloudForms !== null && Array.isArray(cloudForms)) {
+        // パージ対象のフォーム（フィードバック・管理者権限）を完全除外
+        const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+        cloudForms = cloudForms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
+
         console.log('[Cloud Sync] Loaded', cloudForms.length, 'forms from cloud.');
         sanitizeFormBranchingLogic(cloudForms);
         
-        // 破壊的事故防止: ローカルにユーザーが作成した質問が多数ある場合、クラウドが初期状態（1問のみ等）なら上書きを阻止
-        const countQuestions = (formsList) => {
-          if (!Array.isArray(formsList)) return 0;
-          return formsList.reduce((sum, f) => {
-            if (!f || !f.sections) return sum;
-            return sum + f.sections.reduce((s2, sec) => s2 + (sec.questions ? sec.questions.length : 0), 0);
-          }, 0);
-        };
-        const localQCount = countQuestions(localForms);
-        const cloudQCount = countQuestions(cloudForms);
-
-        if (localQCount > 3 && cloudQCount <= 1) {
-          console.warn('[Cloud Sync] Safety Guard: Prevented overwriting richer local forms with blank cloud data.');
-          syncFormsToCloud(localForms);
-          return;
+        // クラウドの定義を正として localStorage および window.U へ同期
+        Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(cloudForms));
+        if (window.U) {
+          window.U.length = 0;
+          cloudForms.forEach(f => window.U.push(f));
+          const curIdx = parseInt(localStorage.getItem('form_customize_active_index') || '0', 10);
+          window.W = Math.max(0, Math.min(curIdx, Math.max(0, window.U.length - 1)));
+          window.G = (window.U.length > 0) ? window.U[window.W] : null;
+          window.n = window.G;
+          if (typeof window.Y === 'function') window.Y();
+          if (typeof window.x === 'function' && window.G) window.x();
         }
-
-        const isLocalDummy = localForms.length === 0 || (localForms.length === 2 && localForms[0].title === '新規作成されたフォーム');
-        if (isLocalDummy || localForms.length < cloudForms.length || (cloudQCount > localQCount)) {
-          _origSetItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(cloudForms));
-          if (window.U) {
-            window.U.length = 0;
-            cloudForms.forEach(f => window.U.push(f));
-            const curIdx = parseInt(localStorage.getItem('form_customize_active_index') || '0', 10);
-            window.W = Math.min(curIdx, window.U.length - 1);
-            window.G = window.U[window.W];
-            window.n = window.G;
-            if (typeof window.x === 'function') window.x();
+        if (cloudForms.length === 0) {
+          const listEl = document.getElementById('dashboard-view-list');
+          if (listEl) {
+            listEl.innerHTML = `
+              <div style="text-align: center; padding: 40px; color: var(--color-text-dark);">
+                表示できるフォームがありません。
+              </div>
+            `;
           }
-        } else if (!isLocalDummy) {
-          // ローカルにユーザーが編集したフォームがある場合、クラウドへバックアップ保存
-          syncFormsToCloud(localForms);
+          const previewEl = document.getElementById('dashboard-view-preview');
+          if (previewEl) {
+            previewEl.innerHTML = `
+              <div style="text-align: center; padding: 40px; color: var(--color-text-dark); grid-column: 1 / -1;">
+                表示できるフォームがありません。
+              </div>
+            `;
+          }
         }
       } else if (localForms.length > 0) {
-        // クラウドが空でローカルにフォームがある場合、即座にクラウドへ初期アップロード
-        syncFormsToCloud(localForms);
+        // クラウドが完全に未初期化の場合のみ、ローカルから不要フォームを除外して初期アップロード
+        const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+        const cleanLocal = localForms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
+        if (cleanLocal.length > 0) {
+          syncFormsToCloud(cleanLocal);
+        }
       }
     } catch(err) {
       console.warn('[Cloud Sync] loadFormsFromCloud exception:', err);
@@ -18623,19 +19259,25 @@
       _isCloudSyncing = false;
     }
   }
+  window.syncFormsToCloud = syncFormsToCloud;
+  window.loadFormsFromCloud = loadFormsFromCloud;
 
   // localStorage.setItem のフック: form_customize_all_forms への書き込み時にクラウドへ自動保存
   const _origSetItem = localStorage.setItem;
   localStorage.setItem = function(key, value) {
     if (key === 'form_customize_all_forms') {
       try {
-        const parsed = JSON.parse(value);
-        const { hasModified } = sanitizeFormBranchingLogic(parsed);
-        if (hasModified) {
+        let parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+          parsed = parsed.filter(f => f && !purgedKeywords.some(p => (f.title || '').includes(p)));
+          const { hasModified } = sanitizeFormBranchingLogic(parsed);
           arguments[1] = JSON.stringify(parsed);
         }
         _origSetItem.apply(this, arguments);
-        syncFormsToCloud(parsed);
+        if (Array.isArray(parsed)) {
+          syncFormsToCloud(parsed);
+        }
         return;
       } catch(e) {}
     }
@@ -21182,6 +21824,9 @@
         `;
         actionBtnHtml = `
           <div style="display: flex; align-items: center; gap: 10px;">
+            <button type="button" id="btn-create-supabase-table" style="background: #f8fafc; color: #0284c7; border: 1px solid #0284c7; font-weight: 700; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;">
+              <span>🔄</span> <span>Supabase物理テーブルを再作成・同期</span>
+            </button>
             <button type="button" id="btn-col-modal-ok" style="background: #0284c7; color: #fff; border: none; font-weight: 700; font-size: 0.85rem; padding: 7px 20px; border-radius: 6px; cursor: pointer;">閉じる</button>
           </div>
         `;
@@ -21347,7 +21992,7 @@
           syncGlobalTargetTableSelect(newTable ? newTable.id : true);
           if (typeof updatePublishSyncUI === 'function') updatePublishSyncUI();
 
-          alert(`✅ テーブル「${formTitle}」を作成し、一覧に登録しました！\n\n・テーブルID: ${newTable ? newTable.id : ''}\n・全${newTable && newTable.columns ? newTable.columns.length : 0}カラムを定義済み\n・回答保存先をこの専用テーブルに設定しました。\n・Synapseの「カスタムテーブル」一覧からいつでも確認・選択できます。`);
+          alert(`✅ テーブル「${formTitle}」の同期・再作成が完了しました！\n\n・テーブルID: ${newTable ? newTable.id : ''}\n・Supabase物理テーブル: ${newTable ? (newTable.physicalTableName || getPhysicalTableNameForForm(formDef)) : ''}\n・全${newTable && newTable.columns ? newTable.columns.length : 0}カラムを定義済み\n・回答保存先をこの専用テーブルに設定しました。\n・Synapseの「回答フォーム一覧」からいつでも確認・操作できます。`);
         } catch(err) {
           console.error('Failed to create table:', err);
           alert(`テーブル作成に失敗しました: ${err.message}`);

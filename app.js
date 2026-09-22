@@ -2946,9 +2946,12 @@ async function syncFromSupabase(showNotification = false) {
 
           if (!ctError && ctData && Array.isArray(ctData.value)) {
             const cleanedTables = ctData.value.map(t => sanitizeAndUnifyTableColumns(t));
-            localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(cleanedTables));
             state.customTables = cleanedTables;
-            cleanedTables.forEach(t => {
+            if (typeof ensureStandardTablesInState === 'function') {
+              ensureStandardTablesInState();
+            }
+            localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+            state.customTables.forEach(t => {
               if (t && t.id) {
                 localStorage.setItem(`synapse_table_${t.id}`, JSON.stringify(t));
               }
@@ -3014,6 +3017,12 @@ function loadStateFromLocalStorage(keys) {
       state.customTables = rawTables.filter(t => !deletedIds.includes(t.id));
       if (Array.isArray(state.customTables)) {
         state.customTables.forEach(t => sanitizeAndUnifyTableColumns(t));
+      }
+      if (typeof ensureStandardTablesInState === 'function') {
+        ensureStandardTablesInState();
+      }
+      if (typeof renderCustomTableList === 'function') {
+        renderCustomTableList();
       }
     } else if (typeof key === 'string' && key.startsWith('synapse_table_')) {
       try {
@@ -3997,97 +4006,27 @@ function ensureStandardTablesInState() {
     }
   });
 
-  // 🌟 各フォーム専用の独立テーブル群
-  const formDedicatedTables = [
-    {
-      id: 'table_form_basic',
-      name: 'フォーム① 基本情報受付テーブル',
-      formTitle: '基本情報受付フォーム',
-      isFormDedicatedTable: true,
-      parentMenuId: 'forms-accordion',
-      columns: [
-        { id: 'id', name: 'マスターID / コード', label: 'マスターID / コード', type: 'text' },
-        { id: 'registeredName', name: '会社名・屋号 / 氏名', label: '会社名・屋号 / 氏名', type: 'text' },
-        { id: 'registeredNameKana', name: 'フリガナ', label: 'フリガナ', type: 'text' },
-        { id: 'repName', name: '代表者氏名', label: '代表者氏名', type: 'text' },
-        { id: 'repTel', name: '代表電話番号', label: '代表電話番号', type: 'text' },
-        { id: 'email', name: 'メールアドレス', label: 'メールアドレス', type: 'text' },
-        { id: 'postalCode', name: '郵便番号', label: '郵便番号', type: 'text' },
-        { id: 'prefecture', name: '都道府県', label: '都道府県', type: 'text' },
-        { id: 'city', name: '市区町村', label: '市区町村', type: 'text' },
-        { id: 'address', name: '番地・ビル名', label: '番地・ビル名', type: 'text' },
-        { id: 'corpNum', name: '13桁法人番号', label: '13桁法人番号', type: 'text' },
-        { id: 'submittedAt', name: '回答日時 / 登録日時', label: '回答日時 / 登録日時', type: 'text' },
-        { id: 'status', name: 'ステータス', label: 'ステータス', type: 'text' }
-      ]
-    },
-    {
-      id: 'table_form_bank',
-      name: 'フォーム② 口座・担当者受付テーブル',
-      formTitle: '口座・担当者受付フォーム',
-      isFormDedicatedTable: true,
-      parentMenuId: 'forms-accordion',
-      columns: [
-        { id: 'id', name: 'マスターID / コード', label: 'マスターID / コード', type: 'text' },
-        { id: 'registeredName', name: '会社名・屋号', label: '会社名・屋号', type: 'text' },
-        { id: 'repName', name: '代表者名', label: '代表者名', type: 'text' },
-        { id: 'invoiceNum', name: 'インボイス登録番号', label: 'インボイス登録番号', type: 'text' },
-        { id: 'bankName', name: '金融機関名', label: '金融機関名', type: 'text' },
-        { id: 'branchName', name: '支店名', label: '支店名', type: 'text' },
-        { id: 'accountType', name: '預金種目', label: '預金種目', type: 'text' },
-        { id: 'accountNumber', name: '口座番号', label: '口座番号', type: 'text' },
-        { id: 'accountHolderKana', name: '口座名義 (カナ)', label: '口座名義 (カナ)', type: 'text' },
-        { id: 'picName', name: '担当者氏名', label: '担当者氏名', type: 'text' },
-        { id: 'picTel', name: '担当者連絡先', label: '担当者連絡先', type: 'text' },
-        { id: 'picEmail', name: '担当者メール', label: '担当者メール', type: 'text' },
-        { id: 'submittedAt', name: '回答日時 / 登録日時', label: '回答日時 / 登録日時', type: 'text' },
-        { id: 'status', name: 'ステータス', label: 'ステータス', type: 'text' }
-      ]
-    }
+  // 🌟 不要となった初期サンプルテーブル群（基本情報・口座担当者）およびユーザー指定削除テーブル（フィードバック・管理者権限）をSynapseから完全に排除
+  const purgedLegacyTableIds = [
+    'table_form_basic', 
+    'table_form_bank',
+    'ctbl_1790055622587_1',
+    'ctbl_1790055622728_2',
+    'form_customer_feedback',
+    'form_admin_account_creation'
   ];
-
-  formDedicatedTables.forEach(fTable => {
-    if (deletedIds && deletedIds.includes(fTable.id)) return;
-    let existing = state.customTables.find(t => t.id === fTable.id);
-    if (!existing) {
-      const defaultWidths = {};
-      fTable.columns.forEach(col => { defaultWidths[col.id] = 130; });
-      const tblObj = {
-        id: fTable.id,
-        name: fTable.name,
-        formTitle: fTable.formTitle,
-        isFormDedicatedTable: fTable.isFormDedicatedTable || false,
-        parentMenuId: fTable.parentMenuId || 'forms-accordion',
-        columns: fTable.columns,
-        visibleColumns: fTable.columns.map(c => c.id),
-        columnWidths: defaultWidths,
-        rowHeights: {},
-        fixedCol: 'none',
-        fixedRow: 'none',
-        cellStyles: {},
-        rows: []
-      };
-      state.customTables.push(tblObj);
-    } else {
-      existing.name = fTable.name;
-      existing.formTitle = fTable.formTitle;
-      if (fTable.isFormDedicatedTable) existing.isFormDedicatedTable = true;
-      if (!existing.columns || existing.columns.length === 0) {
-        existing.columns = fTable.columns;
-        existing.visibleColumns = fTable.columns.map(c => c.id);
-      } else {
-        // 新規必須定義カラムの自動補完（例: 独立テーブル有無など）
-        fTable.columns.forEach(col => {
-          const hasCol = existing.columns.some(c => c.id === col.id || c.name === col.name || c.label === col.label);
-          if (!hasCol) {
-            existing.columns.push(col);
-            if (existing.visibleColumns) existing.visibleColumns.push(col.id);
-            if (existing.columnWidths) existing.columnWidths[col.id] = 130;
-          }
-        });
-      }
-      if (!existing.rows) existing.rows = [];
+  purgedLegacyTableIds.forEach(pId => {
+    localStorage.removeItem(`synapse_table_${pId}`);
+    if (typeof addDeletedTableId === 'function') {
+      addDeletedTableId(pId);
     }
+  });
+  state.customTables = state.customTables.filter(t => {
+    if (!t) return false;
+    if (purgedLegacyTableIds.includes(t.id) || purgedLegacyTableIds.includes(t.physicalTableName) || purgedLegacyTableIds.includes(t.formId)) return false;
+    if (t.formTitle && (t.formTitle.includes('フィードバック') || t.formTitle.includes('管理者権限'))) return false;
+    if (t.name && (t.name.includes('フィードバック') || t.name.includes('管理者権限'))) return false;
+    return true;
   });
 
   // 🌟 全てのフォーム回答テーブル（isFormDedicatedTable または フォーム由来テーブル）を「回答フォーム一覧（forms-accordion）」に格納
@@ -4107,6 +4046,27 @@ function ensureStandardTablesInState() {
         t.parentMenuId = 'forms-accordion';
       }
     }
+  });
+
+  // 🌟 回答フォーム専用テーブルの重複排除（同一フォームから複数テーブルが作成されない設計の厳格保証）
+  const seenFormKeys = new Map();
+  state.customTables = state.customTables.filter(t => {
+    if (!t) return false;
+    if (!t.isFormDedicatedTable && !(t.id && (t.id.startsWith('table_form_') || t.id.startsWith('ctbl_'))) && !t.formTitle) {
+      return true; // フォーム専用テーブル以外はそのまま保持
+    }
+    const formKey = t.formId || t.sourceFormId || (t.formTitle && t.formTitle.trim()) || t.name;
+    if (!formKey) return true;
+    if (seenFormKeys.has(formKey)) {
+      const existing = seenFormKeys.get(formKey);
+      // 行データ（回答レコード）が存在する方を優先的に保持・マージ
+      if ((!existing.rows || existing.rows.length === 0) && (t.rows && t.rows.length > 0)) {
+        existing.rows = t.rows;
+      }
+      return false; // 重複した余剰テーブルを除去
+    }
+    seenFormKeys.set(formKey, t);
+    return true;
   });
 }
 
@@ -8526,12 +8486,14 @@ function renderCustomTable(tableId) {
     syncCtFormatToolbar();
   };
 
-  // 列ヘッダークリック共通ハンドラ
+  // 列ヘッダークリック／ドラッグ選択共通ハンドラ
   const handleCtColumnSelect = (colId, e) => {
     if (e.button !== 0) return; // 左クリックのみ
     e.stopPropagation();
 
-    const visibleCols = tbl.columns.filter(c => (tbl.visibleColumns || []).includes(c.id));
+    state.isSelectingCols = true;
+
+    const visibleCols = tbl.columns.filter(c => visibleColumnIds.includes(c.id));
     const clickIdx = visibleCols.findIndex(c => c.id === colId);
     if (clickIdx === -1) return;
 
@@ -8587,6 +8549,31 @@ function renderCustomTable(tableId) {
     syncCtFormatToolbar();
   };
 
+  // ドラッグ選択用マウスホバーハンドラ
+  const handleCtColumnMouseEnter = (colId) => {
+    if (!state.isSelectingCols || !state.ctColumnSelectAnchor) return;
+    const visibleCols = tbl.columns.filter(c => visibleColumnIds.includes(c.id));
+    const anchorIdx = visibleCols.findIndex(c => c.id === state.ctColumnSelectAnchor);
+    const currentIdx = visibleCols.findIndex(c => c.id === colId);
+    if (anchorIdx === -1 || currentIdx === -1) return;
+
+    state.ctSelectedCell = null;
+    state.ctSelectedRange = null;
+    state.ctSelectedRows.clear();
+    state.ctSelectedCells.clear();
+    state.ctSelectedCols.clear();
+
+    const startIdx = Math.min(anchorIdx, currentIdx);
+    const endIdx = Math.max(anchorIdx, currentIdx);
+    for (let i = startIdx; i <= endIdx; i++) {
+      state.ctSelectedCols.add(visibleCols[i].id);
+    }
+    state.ctColumnSelectLast = colId;
+
+    updateCtSelectionHighlight();
+    syncCtFormatToolbar();
+  };
+
   // 行1: 列記号行
   const lettersRow = document.createElement('tr');
   lettersRow.className = 'col-letters-row';
@@ -8628,6 +8615,10 @@ function renderCustomTable(tableId) {
     th.dataset.colId = col.id;
     th.style.cursor = 'pointer';
 
+    if (state.ctSelectedCols && state.ctSelectedCols.has(col.id)) {
+      th.classList.add('active-col-header');
+    }
+
     if (fixedColIds.includes(col.id)) {
       th.classList.add('fixed-col-header');
       th.style.left = `${leftPosMap[col.id]}px`;
@@ -8635,9 +8626,15 @@ function renderCustomTable(tableId) {
       th.style.zIndex = '32';
     }
 
-    // 列選択イベント
-    th.addEventListener('click', (e) => {
+    // 列選択イベント (mousedown + drag mouseenter)
+    th.addEventListener('mousedown', (e) => {
       handleCtColumnSelect(col.id, e);
+    });
+    th.addEventListener('mouseenter', () => {
+      handleCtColumnMouseEnter(col.id);
+    });
+    th.addEventListener('click', (e) => {
+      e.stopPropagation();
     });
 
     // アルファベット行の右クリックでもコンテキストメニューを表示する
@@ -8697,6 +8694,11 @@ function renderCustomTable(tableId) {
     th.style.width = `${tbl.columnWidths[col.id] || 120}px`;
     th.style.minWidth = `${tbl.columnWidths[col.id] || 120}px`;
     th.dataset.colId = col.id;
+    th.style.cursor = 'pointer';
+
+    if (state.ctSelectedCols && state.ctSelectedCols.has(col.id)) {
+      th.classList.add('active-col-header');
+    }
 
     const previewBg = getPreviewCellBgColor(`custom-table-${tbl.id}`, col.id);
     if (previewBg) {
@@ -8787,16 +8789,25 @@ function renderCustomTable(tableId) {
       showCtContextMenu(e.clientX, e.clientY, tbl, 'col', col.id);
     });
 
-    th.addEventListener('click', (e) => {
+    th.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return;
       if (
         e.target.closest('.filter-icon-btn') ||
         e.target.closest('.col-resize-handle') ||
         e.target.closest('.grant-access-inline-btn') ||
-        e.target.closest('.revoke-access-inline-btn')
+        e.target.closest('.revoke-access-inline-btn') ||
+        e.target.closest('.col-perm-icon-btn')
       ) return;
 
       handleCtColumnSelect(col.id, e);
+    });
+
+    th.addEventListener('mouseenter', () => {
+      handleCtColumnMouseEnter(col.id);
+    });
+
+    th.addEventListener('click', (e) => {
+      e.stopPropagation();
     });
 
     th.appendChild(headerWrapper);
@@ -9376,26 +9387,7 @@ function updateCtSelectionHighlight() {
     th.classList.remove('active-row-header');
   });
 
-  // 5. 選択セルのキーを取得
-  const selectedKeys = getCtSelectedCellKeys();
-  if (selectedKeys.length === 0) return;
-
-  const startCellKey = state.ctSelectedCell ? `${state.ctSelectedCell.rowId}:${state.ctSelectedCell.colId}` : null;
-
-  // 6. データセルのハイライト適用
-  selectedKeys.forEach(key => {
-    const [rowId, colId] = key.split(':');
-    const td = document.querySelector(`#ct-table-body td[data-row-id="${rowId}"][data-col-id="${colId}"]`);
-    if (td) {
-      if (key === startCellKey) {
-        td.classList.add('selected-cell');
-      } else {
-        td.classList.add('selected-row-cell');
-      }
-    }
-  });
-
-  // 7. 行ヘッダー（行番号セル）のハイライト適用
+  // 5. 行ヘッダー（行番号セル）のハイライト適用
   if (state.ctSelectedRows && state.ctSelectedRows.size > 0) {
     const trs = document.querySelectorAll('#ct-table-body tr[data-row-id]');
     trs.forEach(tr => {
@@ -9407,7 +9399,7 @@ function updateCtSelectionHighlight() {
     });
   }
 
-  // 8. 列ヘッダーセルのハイライト適用
+  // 6. 列ヘッダーセルのハイライト適用
   if (state.ctSelectedCols && state.ctSelectedCols.size > 0) {
     state.ctSelectedCols.forEach(colId => {
       const ths = document.querySelectorAll(`#ct-table-thead th[data-col-id="${colId}"]`);
@@ -9415,7 +9407,25 @@ function updateCtSelectionHighlight() {
     });
   }
 
-  // 9. 全選択されている場合は左上の角もハイライト
+  // 7. 選択セルのキーを取得してデータセルのハイライト適用
+  const selectedKeys = getCtSelectedCellKeys();
+  if (selectedKeys.length > 0) {
+    const startCellKey = state.ctSelectedCell ? `${state.ctSelectedCell.rowId}:${state.ctSelectedCell.colId}` : null;
+
+    selectedKeys.forEach(key => {
+      const [rowId, colId] = key.split(':');
+      const td = document.querySelector(`#ct-table-body td[data-row-id="${rowId}"][data-col-id="${colId}"]`);
+      if (td) {
+        if (key === startCellKey) {
+          td.classList.add('selected-cell');
+        } else {
+          td.classList.add('selected-row-cell');
+        }
+      }
+    });
+  }
+
+  // 8. 全選択されている場合は左上の角もハイライト
   const activeTableBody = document.getElementById('ct-table-body');
   if (activeTableBody) {
     const totalCheckboxes = activeTableBody.querySelectorAll('.ct-row-select-checkbox').length;
@@ -15724,6 +15734,9 @@ async function mergeFormToProductionFromParent(formIdentifier) {
       f.publishedAt = snapshot.publishedAt;
       forms[idx] = f;
     }
+
+    const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+    forms = forms.filter(f => f && !purgedKeywords.some(p => (f.title || '').includes(p)));
 
     localStorage.setItem('form_customize_all_forms', JSON.stringify(forms));
 
@@ -22831,16 +22844,55 @@ function handleFormSubmitMessage(event) {
     return;
   }
 
-  // 0. 新規カスタムテーブル事前作成通知の受信（Form Studioから独立テーブル作成時）
-  if (event.data.type === 'SYNAPSE_TABLE_CREATED') {
+  // フォーム削除通知の受信（同期状態の整合）
+  if (event.data.type === 'SYNAPSE_FORM_DELETED') {
+    const { formId, formTitle } = event.data;
+    try {
+      const raw = localStorage.getItem('form_customize_all_forms');
+      if (raw) {
+        let forms = JSON.parse(raw);
+        if (Array.isArray(forms)) {
+          const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+          forms = forms.filter(f => f && !purgedKeywords.some(p => (f.title || '').includes(p)));
+          if (formId) forms = forms.filter(f => f.id !== formId);
+          if (formTitle) forms = forms.filter(f => (f.title || '').trim() !== formTitle.trim());
+          localStorage.setItem('form_customize_all_forms', JSON.stringify(forms));
+          if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+            supabaseClient.from('synapse_storage').upsert({
+              key: 'synapse_form_customize_all_forms',
+              value: forms,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'key' }).catch(() => null);
+          }
+        }
+      }
+    } catch(e) {}
+    return;
+  }
+
+  // 0. 新規カスタムテーブル事前作成/更新通知の受信（Form Studioから独立テーブル作成・更新時）
+  if (event.data.type === 'SYNAPSE_TABLE_CREATED' || event.data.type === 'SYNAPSE_TABLE_UPDATED') {
     const { table } = event.data;
     if (table && table.id) {
       if (!table.parentMenuId || table.parentMenuId === 'root') {
         table.parentMenuId = 'forms-accordion';
       }
-      const existsIdx = state.customTables.findIndex(t => t.id === table.id);
+      // 重複チェック: テーブルID、フォームID、フォームタイトル、物理テーブル名での多重作成防止
+      const existsIdx = state.customTables.findIndex(t => 
+        t.id === table.id || 
+        (table.formId && t.formId && t.formId === table.formId) ||
+        (table.sourceFormId && t.sourceFormId && t.sourceFormId === table.sourceFormId) ||
+        (table.formTitle && t.formTitle && t.formTitle === table.formTitle) ||
+        (table.physicalTableName && t.physicalTableName && t.physicalTableName === table.physicalTableName) ||
+        (table.name && t.name && t.name === table.name && t.isFormDedicatedTable)
+      );
       if (existsIdx !== -1) {
-        state.customTables[existsIdx] = table;
+        const existingRows = state.customTables[existsIdx].rows || [];
+        state.customTables[existsIdx] = {
+          ...table,
+          id: state.customTables[existsIdx].id, // 既存のIDを確実に維持
+          rows: existingRows.length > 0 ? existingRows : (table.rows || [])
+        };
       } else {
         state.customTables.push(table);
       }
@@ -22849,8 +22901,22 @@ function handleFormSubmitMessage(event) {
       if (typeof renderCustomTableList === 'function') {
         renderCustomTableList();
       }
-      console.log(`[Synapse] Registered dedicated table from Form Studio: "${table.name}" (ID: ${table.id}).`);
+      console.log(`[Synapse] Registered/Updated dedicated table from Form Studio: "${table.name}" (ID: ${table.id}). Duplicate creation avoided.`);
     }
+    return;
+  }
+
+  // 0-B. 全フォーム専用テーブル一括同期通知の受信
+  if (event.data.type === 'SYNAPSE_ALL_TABLES_SYNCED') {
+    const raw = localStorage.getItem(STORAGE_KEYS.CUSTOM_TABLES);
+    if (raw) {
+      try { state.customTables = JSON.parse(raw) || []; } catch(e) {}
+    }
+    ensureStandardTablesInState();
+    if (typeof renderCustomTableList === 'function') {
+      renderCustomTableList();
+    }
+    showToast('✔ 全フォームの専用回答テーブルを同期・再生成しました', 'success');
     return;
   }
 
@@ -22985,7 +23051,12 @@ function handleFormSubmitMessage(event) {
     targetTable = state.customTables.find(t => t.id === targetTableId);
   }
 
-  // 1-2. フォーム名・タイトルでの完全一致・部分一致検索
+  // 1-2. フォームIDでの完全一致検索（フォーム名変更時でも確実に同一テーブルへ保存）
+  if (!targetTable && formDef && formDef.id) {
+    targetTable = state.customTables.find(t => t && (t.formId === formDef.id || t.sourceFormId === formDef.id));
+  }
+
+  // 1-3. フォーム名・タイトルでの完全一致・部分一致検索
   if (!targetTable && effectiveFormTitle) {
     targetTable = state.customTables.find(t => 
       t && t.id !== 'table_all_form_responses' && 
@@ -22994,7 +23065,7 @@ function handleFormSubmitMessage(event) {
     );
   }
 
-  // 1-3. まだ独立テーブルが存在しない場合は、このフォーム専用の独立テーブルを自動生成
+  // 1-4. まだ独立テーブルが存在しない場合は、このフォーム専用の独立テーブルを自動生成（1フォーム1テーブル）
   if (!targetTable) {
     isNewTableCreated = true;
     const tableId = (targetTableId && targetTableId !== 'dedicated' && targetTableId !== 'table_all_form_responses') 
@@ -23014,6 +23085,8 @@ function handleFormSubmitMessage(event) {
 
     targetTable = {
       id: tableId,
+      formId: formDef.id || null,
+      sourceFormId: formDef.id || null,
       name: effectiveFormTitle || 'フォーム回答テーブル',
       formTitle: effectiveFormTitle || 'フォーム回答テーブル',
       isFormDedicatedTable: true,
@@ -23120,12 +23193,18 @@ function handleFormSubmitMessage(event) {
     }
 
     // 3. Supabase物理テーブル（例: form_referral_agency_application）への直接INSERT
-    let pTableName = (effectiveTableName.includes('紹介代理店') || effectiveTableName.includes('代理店'))
-      ? 'form_referral_agency_application'
-      : (() => {
-          const rawSlug = (targetTable.id || effectiveTableName || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
-          return rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
-        })();
+    let pTableName = targetTable.physicalTableName || (formDef && formDef.physicalTableName) || (
+      (effectiveTableName.includes('紹介代理店') || effectiveTableName.includes('代理店'))
+        ? 'form_referral_agency_application'
+        : (effectiveTableName.includes('フィードバック') || effectiveTableName.includes('feedback'))
+          ? 'form_customer_feedback'
+          : (effectiveTableName.includes('管理者') || effectiveTableName.includes('アカウント'))
+            ? 'form_admin_account_creation'
+            : (() => {
+                const rawSlug = (targetTable.id || effectiveTableName || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+                return rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
+              })()
+    );
 
     const physRow = {
       id: targetRowId,

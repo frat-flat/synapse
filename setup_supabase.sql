@@ -334,6 +334,34 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
+-- 10-B. テーブル削除用 RPC 関数 (synapse_drop_table)
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.synapse_drop_table(
+  p_table_name text
+)
+RETURNS jsonb AS $$
+DECLARE
+  v_safe_name text;
+BEGIN
+  v_safe_name := lower(regexp_replace(p_table_name, '[^a-zA-Z0-9_]', '_', 'g'));
+  IF v_safe_name !~ '^[a-z]' THEN
+    v_safe_name := 'tbl_' || v_safe_name;
+  END IF;
+
+  -- 危険なシステムテーブルの誤削除を防止
+  IF v_safe_name IN ('synapse_storage', 'synapse_users', 'synapse_user_devices', 'synapse_calendar_events', 'synapse_todo_tasks', 'user_profiles') THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Cannot drop system table');
+  END IF;
+
+  EXECUTE format('DROP TABLE IF EXISTS public.%I CASCADE', v_safe_name);
+  RETURN jsonb_build_object('success', true, 'dropped_table', v_safe_name);
+EXCEPTION WHEN OTHERS THEN
+  RETURN jsonb_build_object('success', false, 'error', SQLERRM);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ============================================================================
 -- 11. フォーム「紹介代理店申込フォーム」専用物理テーブル
 -- （新フォームタイトル「紹介代理店申込フォーム」をテーブル名およびビューに完全反映）
 -- ============================================================================

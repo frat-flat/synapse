@@ -152,6 +152,11 @@ module.exports = async (req, res) => {
         return res.status(400).json({ success: false, error: 'Invalid forms payload' });
       }
 
+      const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+      if (Array.isArray(formsToSave)) {
+        formsToSave = formsToSave.filter(f => f && !purgedKeywords.some(p => (f.title || '').includes(p)));
+      }
+
       // Supabase synapse_storage へ保存（Upsert）
       const saveUrl = `${supabaseUrl}/rest/v1/synapse_storage`;
       const saveRes = await fetch(saveUrl, {

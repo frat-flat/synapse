@@ -11,11 +11,31 @@
 
 
 (function() {
+  // 🚀 起動時即時パージ: LocalStorage内の旧ダミーフォームを完全に根絶
+  (function purgeLegacyFormsImmediately() {
+    try {
+      const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+      const raw = localStorage.getItem('form_customize_all_forms');
+      if (raw) {
+        let forms = JSON.parse(raw);
+        if (Array.isArray(forms)) {
+          const clean = forms.filter(f => f && !purgedKeywords.some(p => (f.title || '').includes(p)));
+          if (clean.length !== forms.length) {
+            Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(clean));
+          }
+        }
+      }
+    } catch(e) {}
+  })();
+
   console.log('custom-editor.js loading...');
 
-  // 🏦 全銀協 銀行名・支店名・支店番号 API連携規則の拡張保証
-  const ensureBankApiConditions = () => {
+  // 🌐 API連携規則（国税庁・インボイス・郵便番号・全銀協）の拡張保証
+  const ensureApiConditions = () => {
     if (window.b && window.b.api && window.b.api.conditions) {
+      window.b.api.conditions.corp_name = '法人名検索（国税庁法人番号API連携）';
+      window.b.api.conditions.invoice_number = 'インボイス登録番号（適格請求書発行事業者API連携）';
+      window.b.api.conditions.zip_code = '郵便番号検索（郵便番号住所検索API連携）';
       window.b.api.conditions.bank_name = '銀行名検索（全銀協金融機関コードAPI連携）';
       window.b.api.conditions.branch_name = '支店名検索（全銀協支店コード・支店番号API連携）';
       window.b.api.conditions.branch_code = '支店番号検索（全銀協支店コードAPI連携）';
@@ -69,6 +89,32 @@
           options: []
         };
       }
+      if (!window.re.bank_account) {
+        window.re.bank_account = {
+          type: "text",
+          title: "口座番号",
+          description: "6〜7桁の半角数字で入力してください（例: 1234567）",
+          placeholder: "0477651",
+          required: true,
+          validation: {
+            category: "regex",
+            condition: "matches",
+            presetKey: "bank_account",
+            value: "^[0-9]{6,7}$",
+            value2: "",
+            errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+          },
+          options: []
+        };
+      } else {
+        window.re.bank_account.description = "6〜7桁の半角数字で入力してください（例: 1234567）";
+        window.re.bank_account.placeholder = "0477651";
+        if (window.re.bank_account.validation) {
+          window.re.bank_account.validation.presetKey = "bank_account";
+          window.re.bank_account.validation.value = "^[0-9]{6,7}$";
+          window.re.bank_account.validation.errorMessage = "正しい口座番号（6〜7桁の半角数字）を入力してください。";
+        }
+      }
       if (window.re.pro_bank && Array.isArray(window.re.pro_bank.questions)) {
         window.re.pro_bank.questions.forEach(q => {
           if (q.title === '金融機関名' || q.title === '銀行名') {
@@ -77,13 +123,23 @@
             q.validation = { category: "api", condition: "branch_name", errorMessage: "実在する支店名を入力または選択してください。" };
           } else if (q.title === '支店番号' || q.title === '支店コード') {
             q.validation = { category: "api", condition: "branch_code", errorMessage: "実在する3桁の支店番号を入力または選択してください。" };
+          } else if (q.title === '口座番号') {
+            q.description = "6〜7桁の半角数字で入力してください（例: 1234567）";
+            q.placeholder = "0477651";
+            q.validation = {
+              category: "regex",
+              condition: "matches",
+              presetKey: "bank_account",
+              value: "^[0-9]{6,7}$",
+              errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+            };
           }
         });
       }
     }
   };
-  ensureBankApiConditions();
-  setInterval(ensureBankApiConditions, 200);
+  ensureApiConditions();
+  setInterval(ensureApiConditions, 200);
 
   // 🚀 スコープ不整合ReferenceErrorを解消するプロキシ定義
   window.saveAndSyncMindmapData = null;
@@ -166,14 +222,14 @@
     }
   })();
 
-  // CSSのキャッシュ破り用動的インジェクション (v91に対応 & 重複ロード防止)
+  // CSSのキャッシュ破り用動的インジェクション (v107に対応 & 重複ロード防止)
   (function injectLatestCSS() {
-    if (document.querySelector('link[href*="custom-editor-v91.css"]')) return;
+    if (document.querySelector('link[href*="custom-editor-v107.css"]')) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = './assets/custom-editor-v91.css?v=' + Date.now();
+    link.href = './assets/custom-editor-v107.css?v=' + Date.now();
     document.head.appendChild(link);
-    console.log('[Custom Flowmap] Injected latest stylesheet (v91):', link.href);
+    console.log('[Custom Flowmap] Injected latest stylesheet (v107):', link.href);
   })();
 
   // 📁 【強固なイベントデリゲーション】新規作成ボタンとギャラリーボタンのフック (プロンプト回避 & ギャラリー起動)
@@ -357,6 +413,76 @@
   // ==========================================================================
 
   const DEFAULT_TEMPLATES = [
+    {
+      title: "法人・個人自動分岐ハイブリッド申請書",
+      description: "申請区分（法人 / 個人事業主）に応じて自動でセクションを切り替え、同一カラムに統合集約するプロ用テンプレートです。",
+      category: "business",
+      stripeColor: "#0284c7",
+      sections: [
+        {
+          id: "sec_hybrid_branch_1",
+          title: "申請区分の選択",
+          description: "申請区分（契約種別）を選択してください。選択内容に応じて次に入力する情報が自動的に切り替わります。",
+          nextAction: "branch",
+          questions: [
+            {
+              id: "q_hybrid_applicant_type",
+              type: "radio",
+              title: "申請区分をお選びください",
+              description: "該当する区分をお選びください",
+              required: true,
+              dataKey: "applicant_type",
+              options: [
+                { label: "🏢 法人として申請", nextSectionId: "sec_hybrid_corp_2" },
+                { label: "👤 個人事業主として申請", nextSectionId: "sec_hybrid_indiv_3" }
+              ]
+            }
+          ]
+        },
+        {
+          id: "sec_hybrid_corp_2",
+          title: "法人情報の入力",
+          description: "法人の基本情報および代表者情報をご入力ください。",
+          nextAction: "submit",
+          questions: [
+            { id: "q_hc_corp_name", type: "text", title: "法人名", description: "法人名を入力して候補から選択してください（国税庁法人番号API照会）", required: true, dataKey: "company_name", validation: { category: "api", condition: "corp_name", errorMessage: "実在する法人名を入力または選択してください。" }, options: [] },
+            { id: "q_hc_corp_kana", type: "text", title: "法人名（カナ）", description: "全角カタカナで入力してください。法人名検索から自動反映されます。", required: true, dataKey: "company_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "company_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
+            { id: "q_hc_zip", type: "text", title: "郵便番号", description: "法人選択で自動入力されます（7桁半角数字）", required: true, dataKey: "zip_code", validation: { category: "regex", condition: "matches", value: "^[0-9]{3}-?[0-9]{4}$", presetKey: "zip", errorMessage: "郵便番号を7桁で入力してください。" }, options: [] },
+            { id: "q_hc_pref", type: "select", title: "都道府県", description: "本店所在地の都道府県を選択してください", required: true, dataKey: "pref", options: JAPAN_PREFECTURES.map(p => ({ label: p })) },
+            { id: "q_hc_city", type: "text", title: "市区町村", required: true, dataKey: "city", options: [] },
+            { id: "q_hc_street", type: "text", title: "町名・番地", description: "自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。", required: true, dataKey: "street", options: [] },
+            { id: "q_hc_building", type: "text", title: "建物名・部屋番号", description: "ビル名・階数・部屋番号等がある場合はご入力ください", required: false, dataKey: "building", options: [] },
+            { id: "q_hc_rep_name", type: "text", title: "代表者名", description: "代表取締役の氏名を入力してください（例: 山田 太郎）", required: true, dataKey: "representative_name", options: [] },
+            { id: "q_hc_rep_kana", type: "text", title: "代表者名（カナ）", description: "代表取締役のフリガナを全角カタカナで入力してください", required: true, dataKey: "representative_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "representative_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
+            { id: "q_hc_email", type: "text", title: "メールアドレス", description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。", required: true, autoReply: true, dataKey: "email", validation: { category: "text", condition: "email", errorMessage: "有効なメールアドレスを入力してください。" }, options: [] },
+            { id: "q_hc_tel", type: "text", title: "電話番号", description: "半角数字（ハイフンなし）で入力してください（例: 0312345678）", required: true, dataKey: "tel", validation: { category: "regex", condition: "matches", value: "^0\\d{9,10}$", presetKey: "tel_no_hyphen", errorMessage: "半角数字（10桁または11桁・ハイフンなし）で入力してください。" }, options: [] },
+            { id: "q_hc_tax_status", type: "radio", title: "税務区分・インボイス登録状況", description: "該当する税務区分を選択してください。法人名選択時に登録が確認された場合は「インボイス登録事業者である。」が自動選択されます。", required: true, dataKey: "tax_invoice_status", options: [{ label: "非課税事業者である。" }, { label: "課税事業者でインボイスは未登録である。" }, { label: "インボイス登録事業者である。" }] },
+            { id: "q_hc_invoice_num", type: "text", title: "インボイス登録番号", description: "T＋13桁の半角数字。法人選択時に国税庁適格請求書発行事業者公表システムへ自動照合されます。", required: false, dataKey: "invoice_number", validation: { category: "api", condition: "invoice_number", errorMessage: "実在する有効なインボイス登録番号（T+13桁）を入力してください。" }, skipLogic: { dependsOn: "q_hc_tax_status", condition: "not_equals", value: "インボイス登録事業者である。", action: "hide" }, options: [] }
+          ]
+        },
+        {
+          id: "sec_hybrid_indiv_3",
+          title: "個人事業主情報の入力",
+          description: "個人事業主または個人の基本情報をご入力ください。",
+          nextAction: "submit",
+          questions: [
+            { id: "q_hi_rep_name", type: "text", title: "氏名（代表者名）", description: "氏名（漢字）を入力してください（例: 山田 太郎）", required: true, dataKey: "representative_name", options: [] },
+            { id: "q_hi_rep_kana", type: "text", title: "氏名（カナ）", description: "氏名のフリガナを全角カタカナで入力してください", required: true, dataKey: "representative_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "representative_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
+            { id: "q_hi_trade_name", type: "text", title: "屋号", description: "屋号をお持ちの場合のみ入力してください（屋号がない場合は空欄のままで進めます）", required: false, dataKey: "company_name", options: [] },
+            { id: "q_hi_trade_kana", type: "text", title: "屋号（カナ）", description: "※屋号を入力された場合は、屋号のフリガナ（全角カタカナ）も必ず入力してください。", required: false, dataKey: "company_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "company_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
+            { id: "q_hi_zip", type: "text", title: "郵便番号", description: "7桁半角数字を入力すると住所を自動補完します（例: 150-0041）", required: true, dataKey: "zip_code", validation: { category: "regex", condition: "matches", value: "^[0-9]{3}-?[0-9]{4}$", presetKey: "zip", errorMessage: "郵便番号を7桁で入力してください。" }, options: [] },
+            { id: "q_hi_pref", type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, dataKey: "pref", options: JAPAN_PREFECTURES.map(p => ({ label: p })) },
+            { id: "q_hi_city", type: "text", title: "市区町村", required: true, dataKey: "city", options: [] },
+            { id: "q_hi_street", type: "text", title: "町名・番地", description: "自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。", required: true, dataKey: "street", options: [] },
+            { id: "q_hi_building", type: "text", title: "建物名・部屋番号", description: "マンション名・アパート名・部屋番号等がある場合はご入力ください", required: false, dataKey: "building", options: [] },
+            { id: "q_hi_email", type: "text", title: "メールアドレス", description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。", required: true, autoReply: true, dataKey: "email", validation: { category: "text", condition: "email", errorMessage: "有効なメールアドレスを入力してください。" }, options: [] },
+            { id: "q_hi_tel", type: "text", title: "電話番号", description: "半角数字（ハイフンなし）で入力してください（例: 09012345678）", required: true, dataKey: "tel", validation: { category: "regex", condition: "matches", value: "^0\\d{9,10}$", presetKey: "tel_no_hyphen", errorMessage: "半角数字（10桁または11桁・ハイフンなし）で入力してください。" }, options: [] },
+            { id: "q_hi_tax_status", type: "radio", title: "税務区分・インボイス登録状況", description: "該当する税務区分を選択してください。「インボイス登録事業者である。」を選択された場合は登録番号の入力とAPI照合を行います。", required: true, dataKey: "tax_invoice_status", options: [{ label: "非課税事業者である。" }, { label: "課税事業者でインボイスは未登録である。" }, { label: "インボイス登録事業者である。" }] },
+            { id: "q_hi_invoice_num", type: "text", title: "インボイス登録番号", description: "T＋13桁の半角数字を入力してください（国税庁公表システムへ照合します）。", required: false, dataKey: "invoice_number", validation: { category: "api", condition: "invoice_number", errorMessage: "国税庁公表システムに登録された有効なインボイス登録番号を入力してください。" }, skipLogic: { dependsOn: "q_hi_tax_status", condition: "not_equals", value: "インボイス登録事業者である。", action: "hide" }, options: [] }
+          ]
+        }
+      ]
+    },
     {
       title: "連絡先情報",
       description: "連絡先情報を収集するためのフォームです。",
@@ -645,7 +771,7 @@
     }
   }
 
-  function createFormFromTemplate(template) {
+  async function createFormFromTemplate(template) {
     try {
       const originalGetItem = localStorage.getItem;
       let allForms = [];
@@ -695,6 +821,37 @@
       localStorage.setItem('form_customize_active_tab', 'editor');
 
       console.log('[Templates] Created new form from template. Index:', activeIdx);
+
+      // クラウドへの即時同期を完了させてからリロード（競合・消滅の防止）
+      if (typeof window.syncFormsToCloud === 'function') {
+        await window.syncFormsToCloud(allForms, true);
+      } else if (typeof syncFormsToCloud === 'function') {
+        await syncFormsToCloud(allForms, true);
+      } else {
+        const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+        const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+        try {
+          await fetch('/api/forms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ allForms: allForms })
+          }).catch(() => null);
+          await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+            method: 'POST',
+            headers: {
+              apikey: sbKey,
+              Authorization: `Bearer ${sbKey}`,
+              'Content-Type': 'application/json',
+              Prefer: 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify({
+              key: 'synapse_form_customize_all_forms',
+              value: allForms,
+              updated_at: new Date().toISOString()
+            })
+          });
+        } catch(e) {}
+      }
 
       // リロードして編集画面で起動
       window.location.reload();
@@ -832,9 +989,9 @@
         if (showDelete) {
           const delBtn = document.createElement('button');
           delBtn.type = 'button';
-          delBtn.className = 'btn-delete-template-direct';
-          delBtn.innerHTML = '🗑️';
+          delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:-2px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
           delBtn.title = 'テンプレートを削除';
+          delBtn.setAttribute('aria-label', 'テンプレートを削除');
           
           delBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -1983,30 +2140,360 @@
     }, 3000);
   }
 
-  // フォーム自前削除ロジック
-  function deleteFormSelf(titleText) {
+  
+  // システム独自のスタイリッシュな入力プロンプトモーダル表示処理
+  function showSystemPromptModal(title, message, defaultValue, callback) {
+    const existing = document.getElementById('system-prompt-modal');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'system-prompt-modal';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.backgroundColor = 'rgba(15, 23, 42, 0.65)';
+    overlay.style.backdropFilter = 'blur(6px)';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.zIndex = '9999999';
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.2s ease-out';
+
+    const card = document.createElement('div');
+    card.style.background = '#1e293b'; 
+    card.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+    card.style.borderRadius = '16px';
+    card.style.padding = '24px';
+    card.style.width = '90%';
+    card.style.maxWidth = '420px';
+    card.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.5)';
+    card.style.transform = 'scale(0.95)';
+    card.style.transition = 'transform 0.2s ease-out';
+    card.style.color = '#f8fafc';
+    card.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+
+    const safeVal = (defaultValue || '').replace(/"/g, '&quot;');
+    card.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+        <span style="font-size: 1.4rem;">✏️</span>
+        <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: #f8fafc;">${title || 'フォーム名の変更'}</h3>
+      </div>
+      <div style="font-size: 0.88rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 14px;">${message || '新しいフォーム名を入力してください:'}</div>
+      <div style="margin-bottom: 20px;">
+        <input id="sys-prompt-input" type="text" value="${safeVal}" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 10px 14px; border-radius: 8px; font-size: 0.95rem; outline: none; transition: border-color 0.15s;" />
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <button id="sys-prompt-btn-cancel" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #cbd5e1; padding: 9px 18px; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: all 0.15s;">キャンセル</button>
+        <button id="sys-prompt-btn-ok" style="background: #3b82f6; border: none; color: #ffffff; padding: 9px 20px; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: all 0.15s;">保存する</button>
+      </div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    const input = card.querySelector('#sys-prompt-input');
+    requestAnimationFrame(() => {
+      overlay.style.opacity = '1';
+      card.style.transform = 'scale(1)';
+      input.focus();
+      input.select();
+    });
+
+    const close = (val) => {
+      overlay.style.opacity = '0';
+      card.style.transform = 'scale(0.95)';
+      setTimeout(() => {
+        overlay.remove();
+        callback(val);
+      }, 200);
+    };
+
+    const btnCancel = card.querySelector('#sys-prompt-btn-cancel');
+    const btnOk = card.querySelector('#sys-prompt-btn-ok');
+
+    btnCancel.addEventListener('click', () => close(null));
+    btnOk.addEventListener('click', () => close(input.value));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); close(input.value); }
+      else if (e.key === 'Escape') { e.preventDefault(); close(null); }
+    });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close(null);
+    });
+  }
+  window.showSystemPromptModal = showSystemPromptModal;
+
+  // ✏️ フォーム名自前編集ロジック
+  async function renameFormSelf(titleOrIndex) {
     let allForms = [];
     try {
       allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]');
     } catch(e) {}
-
-    const idx = allForms.findIndex(f => f.title === titleText);
-    if (idx !== -1) {
-      allForms.splice(idx, 1);
-      localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
-      
-      let activeIndex = parseInt(localStorage.getItem('form_customize_active_index') || '0');
-      if (activeIndex >= allForms.length) {
-        activeIndex = Math.max(0, allForms.length - 1);
-        localStorage.setItem('form_customize_active_index', activeIndex.toString());
-      }
-      
-      showCustomToast('フォームを完全に削除しました。', 'success');
-      setTimeout(() => {
-        location.reload();
-      }, 500);
+    if (Array.isArray(window.U) && window.U.length > 0 && allForms.length === 0) {
+      allForms = [...window.U];
     }
+
+    let idx = -1;
+    if (typeof titleOrIndex === 'number' && !isNaN(titleOrIndex)) {
+      idx = titleOrIndex;
+    } else {
+      const rawTarget = String(titleOrIndex || '').trim();
+      idx = allForms.findIndex(f => f && (f.id === rawTarget || (f.title || '').trim() === rawTarget));
+      if (idx === -1 && Array.isArray(window.U)) {
+        idx = window.U.findIndex(f => f && (f.id === rawTarget || (f.title || '').trim() === rawTarget));
+      }
+    }
+
+    const targetForm = (idx >= 0 && idx < allForms.length) ? allForms[idx] : (window.U && window.U[idx]);
+    if (!targetForm) {
+      showCustomToast('対象のフォームが見つかりませんでした。', 'warning');
+      return;
+    }
+
+    const currentTitle = (targetForm.title || '無題のフォーム').trim();
+    showSystemPromptModal('✏️ フォーム名の変更', '新しいフォーム名を入力してください:', currentTitle, async (newTitle) => {
+      if (newTitle === null || newTitle.trim() === '' || newTitle.trim() === currentTitle) {
+        return;
+      }
+
+      const cleanNewTitle = newTitle.trim();
+      targetForm.title = cleanNewTitle;
+      if (window.U && window.U[idx]) {
+        window.U[idx].title = cleanNewTitle;
+      }
+      if (allForms[idx]) {
+        allForms[idx].title = cleanNewTitle;
+      }
+
+      // LocalStorage & Supabase 保存
+      Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(allForms));
+      
+      // Supabase クラウド同期
+      if (typeof syncFormsToCloud === 'function') {
+        await syncFormsToCloud(allForms, true);
+      }
+
+      // DOM上の要素タイトルを即時更新
+      try {
+        const rows = document.querySelectorAll('.gf-list-row, .form-preview-card');
+        rows.forEach(r => {
+          const rowIdx = parseInt(r.dataset.formIndex, 10);
+          if (rowIdx === idx) {
+            const titleEl = r.querySelector('.gf-list-title-text, .card-preview-title-text');
+            if (titleEl) titleEl.textContent = cleanNewTitle;
+            r.dataset.formTitle = cleanNewTitle;
+          }
+        });
+      } catch(e) {}
+
+      // ダッシュボード全体の再描画
+      if (typeof window.Y === 'function') {
+        try { window.Y(); } catch(e) {}
+      }
+
+      showCustomToast(`フォーム名を「${cleanNewTitle}」に変更しました。`, 'success');
+    });
   }
+  window.renameFormSelf = renameFormSelf;
+
+  // フォーム自前削除ロジック（DOM即時消去＆Supabaseクラウドストレージ完全同期版）
+  async function deleteFormSelf(titleOrIndex, skipConfirm = false) {
+    let allForms = [];
+    try {
+      allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]');
+    } catch(e) {}
+    if (Array.isArray(window.U) && window.U.length > 0 && allForms.length === 0) {
+      allForms = [...window.U];
+    }
+
+    let idx = -1;
+    if (typeof titleOrIndex === 'number' && !isNaN(titleOrIndex)) {
+      idx = titleOrIndex;
+    } else {
+      const rawTarget = String(titleOrIndex || '').trim();
+      const cleanTarget = rawTarget.replace(/[🔒\s\u200B-\u200D\uFEFF]/g, '').toLowerCase();
+
+      // 1. 完全一致
+      idx = allForms.findIndex(f => f && (
+        (f.id && f.id === rawTarget) ||
+        (f.title && f.title.trim() === rawTarget) ||
+        (`${f.title || ''} ${f.subtitle || (f.header && f.header.subtitle) || ''}`.trim() === rawTarget)
+      ));
+
+      // 2. 正規化ファジー一致
+      if (idx === -1) {
+        idx = allForms.findIndex(f => {
+          if (!f) return false;
+          const fullT = `${f.title || ''} ${f.subtitle || (f.header && f.header.subtitle) || ''}`.trim();
+          const cleanF = fullT.replace(/[🔒\s\u200B-\u200D\uFEFF]/g, '').toLowerCase();
+          const cleanTitleOnly = (f.title || '').replace(/[🔒\s\u200B-\u200D\uFEFF]/g, '').toLowerCase();
+          return cleanF === cleanTarget || cleanTitleOnly === cleanTarget ||
+                 (cleanF && cleanTarget && (cleanF.includes(cleanTarget) || cleanTarget.includes(cleanF)));
+        });
+      }
+      if (idx === -1 && Array.isArray(window.U)) {
+        idx = window.U.findIndex(f => {
+          if (!f) return false;
+          const fullT = `${f.title || ''} ${f.subtitle || (f.header && f.header.subtitle) || ''}`.trim();
+          const cleanF = fullT.replace(/[🔒\s\u200B-\u200D\uFEFF]/g, '').toLowerCase();
+          const cleanTitleOnly = (f.title || '').replace(/[🔒\s\u200B-\u200D\uFEFF]/g, '').toLowerCase();
+          return cleanF === cleanTarget || cleanTitleOnly === cleanTarget ||
+                 (cleanF && cleanTarget && (cleanF.includes(cleanTarget) || cleanTarget.includes(cleanF)));
+        });
+      }
+    }
+
+    if (idx === -1 || (idx >= allForms.length && (!window.U || idx >= window.U.length))) {
+      console.warn(`[Form Delete] Form not found for:`, titleOrIndex);
+      showCustomToast('対象のフォームが見つかりませんでした。', 'warning');
+      return;
+    }
+
+    const targetForm = (idx >= 0 && idx < allForms.length) ? allForms[idx] : (window.U && window.U[idx]);
+    const targetTitle = (targetForm?.title || '選択したフォーム').trim();
+
+    if (!skipConfirm) {
+      showSystemConfirmModal(`フォーム「${targetTitle}」を完全に削除しますか？`, async (ok) => {
+        if (ok) {
+          await deleteFormSelf(idx, true);
+        }
+      });
+      return;
+    }
+
+    // 🚀 即座に DOM から対象行を削除（ユーザーの目の前から即刻消滅させる）
+    try {
+      const rows = document.querySelectorAll('.gf-list-row, .form-preview-card');
+      rows.forEach(r => {
+        const rowTitle = (r.dataset.formTitle || r.querySelector('.gf-list-title-text')?.textContent || '').trim();
+        const rowIdx = parseInt(r.dataset.formIndex, 10);
+        if (rowIdx === idx || rowTitle === targetTitle || (targetTitle && rowTitle.includes(targetTitle))) {
+          r.remove();
+        }
+      });
+    } catch(domErr) {}
+
+    // 削除実行
+    const deletedForm = (idx >= 0 && idx < allForms.length) ? allForms.splice(idx, 1)[0] : targetForm;
+    const deletedTitle = deletedForm?.title || targetTitle;
+    console.log(`[Form Delete] Deleting form index ${idx}: "${deletedTitle}"`);
+
+    // 削除済み・不要サンプルフォーム（フィードバック・管理者権限）の自動パージ
+    const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+    allForms = allForms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
+
+    // 1. LocalStorage 更新
+    Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(allForms));
+    
+    let activeIndex = parseInt(localStorage.getItem('form_customize_active_index') || '0');
+    if (activeIndex >= allForms.length) {
+      activeIndex = Math.max(0, allForms.length - 1);
+      Storage.prototype.setItem.call(localStorage, 'form_customize_active_index', activeIndex.toString());
+    }
+
+    // 2. Vite メモリ内配列（window.U）の更新
+    if (Array.isArray(window.U)) {
+      const uIdx = window.U.findIndex(f => f && (f === deletedForm || f.id === deletedForm?.id || (f.title || '').trim() === (deletedTitle || '').trim()));
+      if (uIdx !== -1) {
+        window.U.splice(uIdx, 1);
+      } else if (idx >= 0 && idx < window.U.length) {
+        window.U.splice(idx, 1);
+      }
+    }
+    if (typeof window.W !== 'undefined') {
+      window.W = Math.max(0, Math.min(window.W || 0, Math.max(0, (window.U?.length || 1) - 1)));
+    }
+    if (typeof window.G !== 'undefined') {
+      window.G = (window.U && window.U.length > 0) ? window.U[window.W] : null;
+    }
+    if (typeof window.n !== 'undefined') {
+      window.n = window.G;
+    }
+
+    // 3. 🌐 Supabaseクラウドストレージ（synapse_form_customize_all_forms）へ即時保存
+    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+
+    try {
+      await fetch('/api/forms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allForms: allForms })
+      }).catch(() => null);
+    } catch(e) {}
+
+    try {
+      await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: {
+          apikey: sbKey,
+          Authorization: `Bearer ${sbKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          key: 'synapse_form_customize_all_forms',
+          value: allForms,
+          updated_at: new Date().toISOString()
+        })
+      });
+      console.log('[Form Delete] Synced form deletion to Supabase cloud successfully. Remaining forms:', allForms.length);
+    } catch(err) {
+      console.warn('[Form Delete] Failed to sync form deletion to Supabase:', err);
+    }
+
+    // 4. 連携されていたカスタムテーブルのクリーンアップ
+    if (deletedForm && (deletedForm.targetTableId || deletedForm.id)) {
+      try {
+        let curTables = JSON.parse(localStorage.getItem('synapse_custom_tables') || '[]');
+        const tId = deletedForm.targetTableId;
+        const fId = deletedForm.id;
+        curTables = curTables.filter(t => t && t.id !== tId && t.formId !== fId && t.sourceFormId !== fId);
+        Storage.prototype.setItem.call(localStorage, 'synapse_custom_tables', JSON.stringify(curTables));
+        if (tId) localStorage.removeItem(`synapse_table_${tId}`);
+
+        await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+          method: 'POST',
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+          body: JSON.stringify({ key: 'synapse_custom_tables', value: curTables, updated_at: new Date().toISOString() })
+        }).catch(() => null);
+      } catch(e) {}
+    }
+
+    // 5. 親ウィンドウへの削除通知
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'SYNAPSE_FORM_DELETED', formId: deletedForm?.id, formTitle: deletedTitle }, '*');
+    }
+
+    // 6. ダッシュボード一覧の即時再描画（インプレース再描画）
+    if (typeof window.Y === 'function') {
+      try { window.Y(); } catch(e) {}
+    }
+    if (allForms.length === 0) {
+      const listEl = document.getElementById('dashboard-view-list');
+      if (listEl) {
+        listEl.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: var(--color-text-dark);">
+            表示できるフォームがありません。
+          </div>
+        `;
+      }
+      const previewEl = document.getElementById('dashboard-view-preview');
+      if (previewEl) {
+        previewEl.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: var(--color-text-dark); grid-column: 1 / -1;">
+            表示できるフォームがありません。
+          </div>
+        `;
+      }
+    }
+
+    showCustomToast(`フォーム「${deletedTitle}」を完全に削除しました。`, 'success');
+  }
+  window.deleteFormSelf = deleteFormSelf;
 
   // window.confirm をオーバーライドして同期実行を非同期モーダルへ乗っ取る (フォールバック第2防衛線)
   (function setupSystemConfirmOverride() {
@@ -2040,11 +2527,11 @@
       // 通常フォームの削除確認メッセージからタイトルを抽出する
       const deleteFormMatch = message.match(/フォーム「(.*?)」を完全に削除しますか？/);
 
-      showSystemConfirmModal(message, (ok) => {
+      showSystemConfirmModal(message, async (ok) => {
         if (ok) {
           if (deleteFormMatch && deleteFormMatch[1]) {
-            // DOM消滅バグを回避するため、LocalStorageから直接削除を起動
-            deleteFormSelf(deleteFormMatch[1]);
+            // DOM消滅バグを回避するため、LocalStorage・クラウドから直接削除を起動
+            await deleteFormSelf(deleteFormMatch[1], true);
           } else {
             forceConfirmResult = true;
             if (lastClickedDeleteElement) {
@@ -2061,6 +2548,39 @@
     document.addEventListener('click', (e) => {
       const target = e.target;
       
+      // 0. Viteコンテキストメニュー（#gf-context-menu 内のアイテム）
+      const ctxMenu = target.closest('#gf-context-menu');
+      if (ctxMenu && (target.classList.contains('rename-item') || target.closest('.rename-item') || target.textContent.includes('名前の編集'))) {
+        e.stopPropagation();
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const fIdx = parseInt(ctxMenu.dataset.formIndex);
+        ctxMenu.remove();
+        if (typeof renameFormSelf === 'function') {
+          renameFormSelf(fIdx);
+        }
+        return;
+      }
+      if (ctxMenu && (target.classList.contains('delete-item') || target.closest('.delete-item') || target.textContent.includes('削除'))) {
+        e.stopPropagation();
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const fIdx = parseInt(ctxMenu.dataset.formIndex);
+        ctxMenu.remove();
+
+        let allForms = [];
+        try { allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]'); } catch(err) {}
+        const formObj = !isNaN(fIdx) ? allForms[fIdx] : null;
+        const formTitle = formObj ? (formObj.title || '選択したフォーム') : '選択したフォーム';
+
+        showSystemConfirmModal(`フォーム「${formTitle}」を完全に削除しますか？`, async (ok) => {
+          if (ok) {
+            await deleteFormSelf(!isNaN(fIdx) ? fIdx : formTitle, true);
+          }
+        });
+        return;
+      }
+
       const isDeleteMenu = target.closest('li') && target.closest('li').textContent.includes('削除') ||
                            target.classList.contains('btn-delete-template-row') ||
                            target.closest('.btn-delete-template-row') ||
@@ -2106,15 +2626,14 @@
           // 通常のフォーム削除
           const row = target.closest('.gf-list-row');
           if (row) {
+            const formIdxAttr = row.dataset.formIndex;
             const titleTextEl = row.querySelector('.gf-list-title-text') || row.querySelector('.gf-list-title-area span');
-            if (titleTextEl) {
-              const titleText = titleTextEl.textContent.trim();
-              showSystemConfirmModal(`フォーム「${titleText}」を完全に削除しますか？`, (ok) => {
-                if (ok) {
-                  deleteFormSelf(titleText);
-                }
-              });
-            }
+            const titleText = (titleTextEl ? titleTextEl.textContent.trim() : '') || row.dataset.formTitle;
+            showSystemConfirmModal(`フォーム「${titleText}」を完全に削除しますか？`, async (ok) => {
+              if (ok) {
+                await deleteFormSelf(formIdxAttr !== undefined ? parseInt(formIdxAttr) : titleText, true);
+              }
+            });
           }
         }
       }
@@ -2173,7 +2692,7 @@
   // ============================================================================
   function findQuestionDefById(questionId) {
     if (!questionId) return null;
-    const formSources = [window.n, window.G, window.L];
+    const formSources = [window.F, window.n, window.G, window.L];
     if (window.U && Array.isArray(window.U)) {
       formSources.push(...window.U);
     }
@@ -2197,17 +2716,20 @@
     if (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition) {
       const cond = qDef.validation.condition;
       const isCorpMatch = cond === 'corp_name' || cond === 'company_name';
+      const isZipMatch = cond === 'zip_code' || cond === 'zip';
       return {
         isApi: true,
         category: 'api',
         condition: cond,
         isCorp: isCorpMatch,
         isInvoice: cond === 'invoice_number',
+        isZip: isZipMatch,
         isBank: cond === 'bank_name',
         isBranch: cond === 'branch_name',
         isBranchCode: cond === 'branch_code',
         label: isCorpMatch ? '国税庁法人番号API連携' :
                cond === 'invoice_number' ? '適格請求書発行事業者API連携' :
+               isZipMatch ? '郵便番号住所検索API連携' :
                cond === 'bank_name' ? '全銀協金融機関API連携' :
                cond === 'branch_name' ? '全銀協支店情報API連携' :
                cond === 'branch_code' ? '全銀協支店番号API連携' : 'API連携',
@@ -2215,26 +2737,37 @@
       };
     }
 
-    // ② 補助フォールバック（作成者が入力規則を設定していない場合のタイトル推測アシスト）
-    if (qDef.type === 'text' && qDef.title) {
-      const t = qDef.title;
-      if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
-        return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isBank: false, isBranch: false, isBranchCode: false, label: '適格請求書発行事業者API連携', source: 'title_fallback' };
+    // ② 補助フォールバック（作成者が入力規則を設定していない場合のタイトル・dataKey推測アシスト）
+    if (qDef.type === 'text') {
+      const isKana = qDef.title && (qDef.title.includes('カナ') || qDef.title.includes('フリガナ') || qDef.title.includes('ふりがな'));
+      const isPureTrade = qDef.title && qDef.title.trim() === '屋号';
+
+      if (!isKana && qDef.dataKey === 'company_name' && !isPureTrade) {
+        return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: false, label: '国税庁法人番号API連携', source: 'dataKey' };
       }
-      if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('屋号')) &&
-          !t.includes('カナ') && !t.includes('フリガナ') && !t.includes('ふりがな')) {
-        return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isBank: false, isBranch: false, isBranchCode: false, label: '国税庁法人番号API連携', source: 'title_fallback' };
-      }
-      if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座')) ||
-          t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード'))) {
-        return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isBank: true, isBranch: false, isBranchCode: false, label: '全銀協金融機関API連携', source: 'title_fallback' };
-      }
-      if (t.includes('支店名') || (t.includes('支店') && !t.includes('番号') && !t.includes('コード')) ||
-          t.includes('店舗名') || (t.includes('店舗') && !t.includes('番号') && !t.includes('コード'))) {
-        return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isBank: false, isBranch: true, isBranchCode: false, label: '全銀協支店情報API連携', source: 'title_fallback' };
-      }
-      if (t.includes('支店番号') || t.includes('支店コード') || t.includes('店舗番号') || t.includes('店舗コード') || ((t.includes('支店') || t.includes('店舗')) && t.includes('番号'))) {
-        return { isApi: true, category: 'api', condition: 'branch_code', isCorp: false, isInvoice: false, isBank: false, isBranch: false, isBranchCode: true, label: '全銀協支店番号API連携', source: 'title_fallback' };
+
+      if (qDef.title) {
+        const t = qDef.title;
+        if (t.includes('郵便番号') || t.toLowerCase().includes('zip')) {
+          return { isApi: true, category: 'api', condition: 'zip_code', isCorp: false, isInvoice: false, isZip: true, isBank: false, isBranch: false, isBranchCode: false, label: '郵便番号住所検索API連携', source: 'title_fallback' };
+        }
+        if ((t.includes('インボイス') || t.includes('登録番号')) && !t.includes('法人番号')) {
+          return { isApi: true, category: 'api', condition: 'invoice_number', isCorp: false, isInvoice: true, isZip: false, isBank: false, isBranch: false, isBranchCode: false, label: '適格請求書発行事業者API連携', source: 'title_fallback' };
+        }
+        if ((t.includes('法人名') || t.includes('企業名') || t.includes('会社名') || t.includes('貴社名') || t.includes('御社名') || t.includes('商号')) && !isKana && !isPureTrade) {
+          return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: false, label: '国税庁法人番号API連携', source: 'title_fallback' };
+        }
+        if (t.includes('銀行名') || (t.includes('銀行') && !t.includes('コード') && !t.includes('口座')) ||
+            t.includes('金融機関名') || (t.includes('金融機関') && !t.includes('コード'))) {
+          return { isApi: true, category: 'api', condition: 'bank_name', isCorp: false, isInvoice: false, isZip: false, isBank: true, isBranch: false, isBranchCode: false, label: '全銀協金融機関API連携', source: 'title_fallback' };
+        }
+        if (t.includes('支店名') || (t.includes('支店') && !t.includes('番号') && !t.includes('コード')) ||
+            t.includes('店舗名') || (t.includes('店舗') && !t.includes('番号') && !t.includes('コード'))) {
+          return { isApi: true, category: 'api', condition: 'branch_name', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: true, isBranchCode: false, label: '全銀協支店情報API連携', source: 'title_fallback' };
+        }
+        if (t.includes('支店番号') || t.includes('支店コード') || t.includes('店舗番号') || t.includes('店舗コード') || ((t.includes('支店') || t.includes('店舗')) && t.includes('番号'))) {
+          return { isApi: true, category: 'api', condition: 'branch_code', isCorp: false, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: true, label: '全銀協支店番号API連携', source: 'title_fallback' };
+        }
       }
     }
 
@@ -2412,48 +2945,349 @@
   function setupOverviewSubtabs() {
     const btnGlobal = document.getElementById('btn-subtab-global-settings');
     const btnSection = document.getElementById('btn-subtab-section-design');
+    const btnFlowmap = document.getElementById('btn-subtab-flowmap');
+    const btnSplit = document.getElementById('btn-subtab-split-toggle');
+    const btnSplitDropdown = document.getElementById('btn-split-pair-dropdown-toggle');
+    const splitPairMenu = document.getElementById('split-pair-dropdown-menu');
+    const splitControlGroup = document.querySelector('.split-control-group');
+    
+    const overviewContainer = document.getElementById('form-overview-editor');
     const globalCard = document.querySelector('#form-overview-editor > .form-title-desc-card');
-    const secHeader = document.querySelector('#form-overview-editor > .overview-sections-header');
-    const secList = document.querySelector('#form-overview-editor > #overview-sections-list');
-    const secFooter = document.querySelector('#form-overview-editor > .overview-add-section-footer');
+    const sectionsPane = document.getElementById('overview-sections-pane');
+    const flowmapContainer = document.getElementById('overview-flowmap-container');
 
-    if (!btnGlobal || !btnSection || !globalCard || !secHeader || !secList || !secFooter) return;
+    if (!btnGlobal || !btnSection || !btnFlowmap || !globalCard || !sectionsPane || !flowmapContainer) return;
 
-    const showGlobal = () => {
-      btnGlobal.classList.add('active');
-      btnGlobal.style.borderBottom = '3px solid var(--color-primary)';
-      btnGlobal.style.color = 'var(--color-text)';
-      
-      btnSection.classList.remove('active');
-      btnSection.style.borderBottom = '3px solid transparent';
-      btnSection.style.color = 'var(--color-text-muted)';
+    let currentTab = 'global';
+    let isSplitMode = false;
+    let currentSplitPair = 'section_flowmap'; // 🌟 デフォルト：質問項目 ＋ フローマップ（ユーザー標準）
 
-      globalCard.style.display = 'block';
-      secHeader.style.display = 'none';
-      secList.style.display = 'none';
-      secFooter.style.display = 'none';
+    try {
+      isSplitMode = localStorage.getItem('form_customize_split_mode') === 'true';
+      const savedPair = localStorage.getItem('form_customize_split_pair');
+      if (savedPair && ['section_flowmap', 'global_flowmap', 'global_section'].includes(savedPair)) {
+        currentSplitPair = savedPair;
+      }
+    } catch(e) {}
+
+    const renderFlowmap = () => {
+      if (window.archifyRenderer && window.G) {
+        if (typeof sanitizeFormBranchingLogic === 'function') {
+          sanitizeFormBranchingLogic(window.G);
+        }
+        window.archifyRenderer.render(window.G);
+        if (window.r && typeof window.archifyRenderer.highlightSection === 'function') {
+          window.archifyRenderer.highlightSection(window.r);
+        }
+      }
+    };
+    window.refreshFlowmap = renderFlowmap;
+
+    const setTabStyle = (activeBtn) => {
+      [btnGlobal, btnSection, btnFlowmap].forEach(b => {
+        if (!b) return;
+        if (b === activeBtn) {
+          b.classList.add('active');
+          b.style.borderBottom = '3px solid var(--color-primary, #3182ce)';
+          b.style.color = 'var(--color-text, #1e293b)';
+        } else {
+          b.classList.remove('active');
+          b.style.borderBottom = '3px solid transparent';
+          b.style.color = 'var(--color-text-muted, #64748b)';
+        }
+      });
     };
 
-    const showSection = () => {
-      btnSection.classList.add('active');
-      btnSection.style.borderBottom = '3px solid var(--color-primary)';
-      btnSection.style.color = 'var(--color-text)';
-      
-      btnGlobal.classList.remove('active');
-      btnGlobal.style.borderBottom = '3px solid transparent';
-      btnGlobal.style.color = 'var(--color-text-muted)';
+    const updateViews = () => {
+      const activeSecEditor = document.getElementById('active-section-editor');
+      const livePreviewPane = document.querySelector('.editor-live-preview-pane');
+      const workspaceBody = document.getElementById('editor-workspace-body');
+      const isEditingSection = (window.r !== null && window.r !== undefined);
 
-      globalCard.style.display = 'none';
-      secHeader.style.display = 'flex';
-      secList.style.display = 'grid';
-      secFooter.style.display = 'block';
+      if (btnSplit) {
+        btnSplit.classList.toggle('active', isSplitMode);
+      }
+      if (splitControlGroup) {
+        splitControlGroup.classList.toggle('active', isSplitMode);
+      }
+
+      // ドロップダウン内のラジオボタンと選択ハイライトの同期
+      document.querySelectorAll('.split-pair-option').forEach(opt => {
+        const pair = opt.dataset.pair;
+        const radio = opt.querySelector('input[type="radio"]');
+        const isSelected = pair === currentSplitPair;
+        if (radio) radio.checked = isSelected;
+        opt.classList.toggle('selected', isSelected);
+      });
+
+      // 🌟 1. 2画面同時表示（スプリットモード）
+      if (isSplitMode) {
+        document.body.classList.add('split-active');
+        if (workspaceBody) {
+          workspaceBody.classList.add('split-mode-active');
+          workspaceBody.setAttribute('data-split-mode', 'true');
+          workspaceBody.setAttribute('data-split-pair', currentSplitPair);
+        }
+        if (overviewContainer) {
+          overviewContainer.classList.add('split-mode-active');
+        }
+        // スマホライブプレビューは完全非表示
+        if (livePreviewPane) livePreviewPane.style.setProperty('display', 'none', 'important');
+
+        // 右ペイン: フローマップを表示（global_sectionペア時以外）
+        if (currentSplitPair === 'global_section' && !isEditingSection) {
+          flowmapContainer.style.setProperty('display', 'none', 'important');
+        } else {
+          flowmapContainer.style.setProperty('display', 'flex', 'important');
+          flowmapContainer.classList.remove('full-tab-mode');
+        }
+
+        if (isEditingSection) {
+          // 🚀 【ユーザー最重要要望】実際の質問項目の設定画面 ＋ フローマップ
+          // 左ペイン: 質問項目設定画面を表示
+          if (activeSecEditor) {
+            activeSecEditor.style.setProperty('display', 'block', 'important');
+          }
+          // 全体概要画面は完全に非表示にして右端への圧迫を防止！
+          if (overviewContainer) {
+            overviewContainer.style.setProperty('display', 'none', 'important');
+          }
+          // タブのアクティブスタイルをリセット
+          setTabStyle(null);
+        } else {
+          // 全体概要表示中（window.r === null）
+          if (activeSecEditor) {
+            activeSecEditor.style.setProperty('display', 'none', 'important');
+          }
+          if (overviewContainer) {
+            overviewContainer.style.setProperty('display', 'block', 'important');
+          }
+
+          if (currentSplitPair === 'section_flowmap') {
+            // セクション構成一覧 ＋ フローマップ
+            setTabStyle(btnSection);
+            globalCard.style.display = 'none';
+            sectionsPane.style.display = 'block';
+          } else if (currentSplitPair === 'global_section') {
+            // 全体設定 ＋ セクション構成一覧
+            setTabStyle(btnGlobal);
+            globalCard.style.display = 'block';
+            sectionsPane.style.display = 'block';
+          } else {
+            // 全体設定 ＋ フローマップ
+            setTabStyle(btnGlobal);
+            globalCard.style.display = 'block';
+            sectionsPane.style.display = 'none';
+          }
+        }
+
+        renderFlowmap();
+        setTimeout(() => {
+          if (window.archifyRenderer) {
+            window.archifyRenderer.fitView();
+            if (isEditingSection && window.r) {
+              window.archifyRenderer.highlightSection(window.r);
+            }
+          }
+        }, 120);
+        return;
+      }
+
+      // 🌟 2. 通常（単一画面）モード
+      document.body.classList.remove('split-active');
+      if (workspaceBody) {
+        workspaceBody.classList.remove('split-mode-active');
+        workspaceBody.removeAttribute('data-split-mode');
+      }
+      if (overviewContainer) {
+        overviewContainer.classList.remove('split-mode-active');
+      }
+
+      // フローマップ単独全画面タブの場合
+      if (currentTab === 'flowmap') {
+        setTabStyle(btnFlowmap);
+        if (overviewContainer) overviewContainer.style.setProperty('display', 'none', 'important');
+        if (activeSecEditor) activeSecEditor.style.setProperty('display', 'none', 'important');
+        if (livePreviewPane) livePreviewPane.style.setProperty('display', 'none', 'important');
+        flowmapContainer.style.setProperty('display', 'flex', 'important');
+        flowmapContainer.classList.add('full-tab-mode');
+        renderFlowmap();
+        setTimeout(() => {
+          if (window.archifyRenderer) window.archifyRenderer.fitView();
+        }, 120);
+        return;
+      }
+
+      // フローマップは非表示、プレビューは表示復元
+      flowmapContainer.style.setProperty('display', 'none', 'important');
+      if (livePreviewPane) livePreviewPane.style.removeProperty('display');
+
+      if (isEditingSection) {
+        // セクション編集中
+        if (activeSecEditor) activeSecEditor.style.setProperty('display', 'block', 'important');
+        if (overviewContainer) overviewContainer.style.setProperty('display', 'none', 'important');
+        setTabStyle(null);
+      } else {
+        // 全体概要
+        if (activeSecEditor) activeSecEditor.style.setProperty('display', 'none', 'important');
+        if (overviewContainer) overviewContainer.style.setProperty('display', 'block', 'important');
+        if (currentTab === 'global') {
+          setTabStyle(btnGlobal);
+          globalCard.style.display = 'block';
+          sectionsPane.style.display = 'none';
+        } else if (currentTab === 'section') {
+          setTabStyle(btnSection);
+          globalCard.style.display = 'none';
+          sectionsPane.style.display = 'block';
+        }
+      }
     };
 
-    btnGlobal.addEventListener('click', showGlobal);
-    btnSection.addEventListener('click', showSection);
+    window.updateEditorSplitViews = updateViews;
 
-    // 初期状態は「全体設定」を表示
-    showGlobal();
+    btnGlobal.addEventListener('click', () => {
+      window.r = null;
+      currentTab = 'global';
+      const ovBtn = document.getElementById('sidebar-item-overview') || document.getElementById('btn-back-to-overview');
+      if (ovBtn) ovBtn.click();
+      if (window.x) window.x();
+      setTimeout(updateViews, 20);
+    });
+
+    btnSection.addEventListener('click', () => {
+      window.r = null;
+      currentTab = 'section';
+      const ovBtn = document.getElementById('sidebar-item-overview') || document.getElementById('btn-back-to-overview');
+      if (ovBtn) ovBtn.click();
+      if (window.x) window.x();
+      setTimeout(updateViews, 20);
+    });
+
+    btnFlowmap.addEventListener('click', () => {
+      currentTab = 'flowmap';
+      isSplitMode = false;
+      try { localStorage.setItem('form_customize_split_mode', 'false'); } catch(e) {}
+      updateViews();
+    });
+
+    if (btnSplit) {
+      btnSplit.addEventListener('click', () => {
+        isSplitMode = !isSplitMode;
+        try {
+          localStorage.setItem('form_customize_split_mode', isSplitMode ? 'true' : 'false');
+        } catch(e) {}
+        updateViews();
+      });
+    }
+
+    // 組み合わせ選択ドロップダウン開閉
+    if (btnSplitDropdown && splitPairMenu) {
+      btnSplitDropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = splitPairMenu.classList.contains('show');
+        splitPairMenu.classList.toggle('show', !isOpen);
+        btnSplitDropdown.setAttribute('aria-expanded', !isOpen ? 'true' : 'false');
+      });
+
+      // オプション選択時
+      document.querySelectorAll('.split-pair-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+          const pair = opt.dataset.pair;
+          if (pair) {
+            currentSplitPair = pair;
+            isSplitMode = true; // ペアを選択したら即座に2画面表示ON
+            try {
+              localStorage.setItem('form_customize_split_mode', 'true');
+              localStorage.setItem('form_customize_split_pair', currentSplitPair);
+            } catch(e) {}
+            splitPairMenu.classList.remove('show');
+            btnSplitDropdown.setAttribute('aria-expanded', 'false');
+            if (currentSplitPair === 'global_flowmap' || currentSplitPair === 'global_section') {
+              currentTab = 'global';
+            } else {
+              currentTab = 'section';
+            }
+            updateViews();
+          }
+        });
+      });
+
+      // 外側クリックでメニューを閉じる
+      document.addEventListener('click', (e) => {
+        if (splitControlGroup && !splitControlGroup.contains(e.target)) {
+          splitPairMenu.classList.remove('show');
+          btnSplitDropdown.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+
+    let renderDebounceTimer = null;
+    const debouncedRenderFlowmap = (delay = 80) => {
+      clearTimeout(renderDebounceTimer);
+      renderDebounceTimer = setTimeout(renderFlowmap, delay);
+    };
+
+    // 分岐ドロップダウン変更・入力変更時にフローマップをリアルタイム更新
+    document.addEventListener('change', (e) => {
+      const target = e.target;
+      if (!target) return;
+      if (target.id === 'editor-section-next' || 
+          target.classList.contains('question-branch-select') ||
+          target.classList.contains('option-next-select') ||
+          target.closest('.question-item') ||
+          target.closest('.section-meta-edit')) {
+        debouncedRenderFlowmap(50);
+      }
+    });
+
+    document.addEventListener('input', (e) => {
+      const target = e.target;
+      if (!target) return;
+      if (target.closest('.question-item') || target.closest('.section-meta-edit') || target.id === 'form-title-input') {
+        debouncedRenderFlowmap(200);
+      }
+    });
+
+    // セクション編集DOMの変更（質問の追加・削除・並び替えなど）を監視して自動同期
+    if (sectionsPane && window.MutationObserver) {
+      const secObserver = new MutationObserver((mutations) => {
+        // 余計な属性変更ループを防ぐため、子ノード変更のみを対象
+        const hasChildChanges = mutations.some(m => m.type === 'childList');
+        if (hasChildChanges) {
+          debouncedRenderFlowmap(150);
+        }
+      });
+      secObserver.observe(sectionsPane, { childList: true, subtree: true });
+    }
+
+    // 質問項目やセクションカードをクリックしたときに、フローマップ側の該当ルートを自動ハイライト
+    document.addEventListener('click', (e) => {
+      const qItem = e.target.closest('.question-item');
+      if (qItem && window.archifyRenderer) {
+        const qId = qItem.dataset.questionId || qItem.id;
+        if (qId) {
+          window.archifyRenderer.highlightRouteForNode(qId);
+        }
+      }
+    });
+
+    // 初期状態の反映
+    updateViews();
+
+    // フォーム切り替え時にフローマップを自動再描画するフック
+    setTimeout(() => {
+      if (typeof window.X === 'function' && !window.X._archifyHooked) {
+        const origX = window.X;
+        window.X = function(...args) {
+          const res = origX.apply(this, args);
+          setTimeout(() => {
+            if (window.refreshFlowmap) window.refreshFlowmap();
+          }, 100);
+          return res;
+        };
+        window.X._archifyHooked = true;
+      }
+    }, 500);
   }
 
   function enforceLightHeader() {
@@ -2479,6 +3313,13 @@
       headerNav.style.setProperty('background-color', '#f1f5f9', 'important');
       headerNav.style.setProperty('border-color', '#e2e8f0', 'important');
     }
+    // グローバルナビのフローマップ・回答プレビューは不要のため確実に非表示
+    const flowmapTab = document.getElementById('btn-tab-flowmap');
+    if (flowmapTab) flowmapTab.style.setProperty('display', 'none', 'important');
+    const previewTab = document.getElementById('btn-tab-preview');
+    if (previewTab) previewTab.style.setProperty('display', 'none', 'important');
+    const previewPanel = document.getElementById('panel-preview');
+    if (previewPanel) previewPanel.style.setProperty('display', 'none', 'important');
 
     // アクティブなタブ（選択箇所）の文字色を「白(#ffffff)」に、背景を「青」に強制固定する
     const activeTabs = document.querySelectorAll('.nav-tab.active');
@@ -3582,7 +4423,13 @@
       const proKeys = [
         'appearance', 'header', 'announcement', 'displayMode', 'progressIndicator',
         'showLogo', 'headerImage', 'headerImageScale', 'headerImagePosition', 'headerImagePositionX',
-        'logoType', 'logoPosition', 'logoImageUrl', 'useHeaderImage', 'useBgImage', 'bgTheme', 'bgCustomUrl'
+        'logoType', 'logoPosition', 'logoImageUrl', 'useHeaderImage', 'useBgImage', 'bgTheme', 'bgCustomUrl',
+        'headerStyle', 'headerAlign', 'subtitlePosition',
+        'titleBadgeShape', 'titleBadgeStyle', 'titleBadgeBgType', 'titleBadgeBgCustom', 'titleBadgeColorType', 'titleBadgeColorCustom',
+        'titleWarpShape', 'titleWarpStrength', 'titleWarpEffect',
+        'titleLightAngle', 'titleLightIntensity',
+        'titleColorType', 'titleColorCustom',
+        'titleFontFamily', 'titleFontTarget'
       ];
       if (!preserveCurrentMode && savedForm.editorMode !== undefined) {
         window.G.editorMode = savedForm.editorMode;
@@ -3625,6 +4472,24 @@
     if (window.G.useHeaderImage === undefined) window.G.useHeaderImage = false;
     if (window.G.useBgImage === undefined) window.G.useBgImage = false;
     if (window.G.bgTheme === undefined) window.G.bgTheme = "";
+    if (window.G.headerStyle === undefined) window.G.headerStyle = "card-accent-top";
+    if (window.G.headerAlign === undefined) window.G.headerAlign = "left";
+    if (window.G.subtitlePosition === undefined) window.G.subtitlePosition = "below";
+    if (window.G.titleBadgeShape === undefined) window.G.titleBadgeShape = "none";
+    if (window.G.titleBadgeStyle === undefined) window.G.titleBadgeStyle = "fill";
+    if (window.G.titleBadgeBgType === undefined) window.G.titleBadgeBgType = "primary";
+    if (window.G.titleBadgeBgCustom === undefined) window.G.titleBadgeBgCustom = "#1a73e8";
+    if (window.G.titleBadgeColorType === undefined) window.G.titleBadgeColorType = "white";
+    if (window.G.titleBadgeColorCustom === undefined) window.G.titleBadgeColorCustom = "#ffffff";
+    if (window.G.titleWarpShape === undefined) window.G.titleWarpShape = "none";
+    if (window.G.titleWarpStrength === undefined) window.G.titleWarpStrength = 50;
+    if (window.G.titleWarpEffect === undefined) window.G.titleWarpEffect = "none";
+    if (window.G.titleLightAngle === undefined) window.G.titleLightAngle = 315;
+    if (window.G.titleLightIntensity === undefined) window.G.titleLightIntensity = 60;
+    if (window.G.titleColorType === undefined) window.G.titleColorType = "default";
+    if (window.G.titleColorCustom === undefined) window.G.titleColorCustom = "#1a73e8";
+    if (window.G.titleFontFamily === undefined) window.G.titleFontFamily = "default";
+    if (window.G.titleFontTarget === undefined) window.G.titleFontTarget = "both";
 
     const g = window.G;
 
@@ -3650,6 +4515,116 @@
     document.getElementById('editor-pro-subtitle').value = (g.header && g.header.subtitle) ? g.header.subtitle : (g.subtitle || "");
     document.getElementById('editor-pro-disclaimer').value = g.header.disclaimer || "";
 
+    // タイトル枠スタイル・文字配置・サブタイトル位置のプレフィル
+    const headerStyleEl = document.getElementById('editor-header-style');
+    if (headerStyleEl) headerStyleEl.value = g.headerStyle || 'card-accent-top';
+
+    const headerAlignVal = g.headerAlign || 'left';
+    const headerAlignEl = document.getElementById('editor-header-align');
+    if (headerAlignEl) headerAlignEl.value = headerAlignVal;
+    document.querySelectorAll('.btn-header-align').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-align') === headerAlignVal);
+    });
+
+    const subtitlePosEl = document.getElementById('editor-subtitle-position');
+    if (subtitlePosEl) subtitlePosEl.value = g.subtitlePosition || 'below';
+
+    // 🔤 タイトルフォント（書体）のプレフィル
+    const titleFontFamilyEl = document.getElementById('editor-title-font-family');
+    const titleFontTargetEl = document.getElementById('editor-title-font-target');
+    if (titleFontFamilyEl) titleFontFamilyEl.value = g.titleFontFamily || 'default';
+    if (titleFontTargetEl) titleFontTargetEl.value = g.titleFontTarget || 'both';
+
+    // 🎨 タイトル文字色のプレフィル
+    const titleColorTypeEl = document.getElementById('editor-title-color-type');
+    const titleColorCustomEl = document.getElementById('editor-title-color-custom');
+    const titleColorVal = g.titleColorType || 'default';
+    if (titleColorTypeEl) titleColorTypeEl.value = titleColorVal;
+    if (titleColorCustomEl) {
+      titleColorCustomEl.value = g.titleColorCustom || '#1a73e8';
+      titleColorCustomEl.style.display = titleColorVal === 'custom' ? 'inline-block' : 'none';
+    }
+
+    // 🔤 タイトル文字変形＆立体エフェクトのプレフィル
+    const titleWarpShapeEl = document.getElementById('editor-title-warp-shape');
+    const titleWarpStrengthContainer = document.getElementById('editor-title-warp-strength-container');
+    const titleWarpStrengthEl = document.getElementById('editor-title-warp-strength');
+    const titleWarpStrengthNumEl = document.getElementById('editor-title-warp-strength-num');
+    const titleWarpEffectEl = document.getElementById('editor-title-warp-effect');
+    const titleLightingContainer = document.getElementById('editor-title-lighting-container');
+    const titleLightAngleEl = document.getElementById('editor-title-light-angle');
+    const titleLightAngleNumEl = document.getElementById('editor-title-light-angle-num');
+    const titleLightIntensityEl = document.getElementById('editor-title-light-intensity');
+    const titleLightIntensityNumEl = document.getElementById('editor-title-light-intensity-num');
+
+    const warpShapeVal = g.titleWarpShape || 'none';
+    if (titleWarpShapeEl) titleWarpShapeEl.value = warpShapeVal;
+    if (titleWarpStrengthContainer) titleWarpStrengthContainer.style.display = warpShapeVal !== 'none' ? 'block' : 'none';
+
+    // 変形強度の数値化（旧light/medium/strongからの後方互換変換）
+    let warpStrengthVal = 50;
+    if (g.titleWarpStrength === 'light') warpStrengthVal = 25;
+    else if (g.titleWarpStrength === 'medium') warpStrengthVal = 50;
+    else if (g.titleWarpStrength === 'strong') warpStrengthVal = 75;
+    else if (typeof g.titleWarpStrength === 'number') warpStrengthVal = g.titleWarpStrength;
+    else if (typeof g.titleWarpStrength === 'string' && !isNaN(parseInt(g.titleWarpStrength, 10))) warpStrengthVal = parseInt(g.titleWarpStrength, 10);
+    g.titleWarpStrength = warpStrengthVal;
+
+    if (titleWarpStrengthEl) titleWarpStrengthEl.value = warpStrengthVal;
+    if (titleWarpStrengthNumEl) titleWarpStrengthNumEl.value = warpStrengthVal;
+
+    const warpEffectVal = g.titleWarpEffect || 'none';
+    if (titleWarpEffectEl) titleWarpEffectEl.value = warpEffectVal;
+    if (titleLightingContainer) titleLightingContainer.style.display = warpEffectVal !== 'none' ? 'block' : 'none';
+
+    const lightAngleVal = g.titleLightAngle !== undefined ? g.titleLightAngle : 315;
+    if (titleLightAngleEl) titleLightAngleEl.value = lightAngleVal;
+    if (titleLightAngleNumEl) titleLightAngleNumEl.value = lightAngleVal;
+
+    // 8方向ボタンのアクティブ状態更新
+    document.querySelectorAll('.btn-light-dir').forEach(btn => {
+      const bAngle = parseInt(btn.dataset.angle, 10);
+      if (Math.abs(bAngle - lightAngleVal) < 23 || (bAngle === 0 && lightAngleVal >= 338)) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    const lightIntensityVal = g.titleLightIntensity !== undefined ? g.titleLightIntensity : 60;
+    if (titleLightIntensityEl) titleLightIntensityEl.value = lightIntensityVal;
+    if (titleLightIntensityNumEl) titleLightIntensityNumEl.value = lightIntensityVal;
+
+    // 🏷️ タイトル外枠（簡易ロゴ化）バッジ設定のプレフィル
+    const titleBadgeShapeEl = document.getElementById('editor-title-badge-shape');
+    const titleBadgeOptionsEl = document.getElementById('editor-title-badge-options');
+    const titleBadgeStyleEl = document.getElementById('editor-title-badge-style');
+    const titleBadgeBgTypeEl = document.getElementById('editor-title-badge-bg-type');
+    const titleBadgeBgCustomEl = document.getElementById('editor-title-badge-bg-custom');
+    const titleBadgeColorTypeEl = document.getElementById('editor-title-badge-color-type');
+    const titleBadgeColorCustomEl = document.getElementById('editor-title-badge-color-custom');
+
+    const shapeVal = g.titleBadgeShape || 'none';
+    if (titleBadgeShapeEl) titleBadgeShapeEl.value = shapeVal;
+    if (titleBadgeOptionsEl) titleBadgeOptionsEl.style.display = shapeVal !== 'none' ? 'block' : 'none';
+    if (titleBadgeStyleEl) titleBadgeStyleEl.value = g.titleBadgeStyle || 'fill';
+
+    const bgTypeVal = g.titleBadgeBgType || 'primary';
+    if (titleBadgeBgTypeEl) titleBadgeBgTypeEl.value = bgTypeVal;
+    if (titleBadgeBgCustomEl) {
+      titleBadgeBgCustomEl.value = g.titleBadgeBgCustom || '#1a73e8';
+      titleBadgeBgCustomEl.style.display = bgTypeVal === 'custom' ? 'block' : 'none';
+    }
+
+    const colorTypeVal = g.titleBadgeColorType || 'white';
+    if (titleBadgeColorTypeEl) titleBadgeColorTypeEl.value = colorTypeVal;
+    if (titleBadgeColorCustomEl) {
+      titleBadgeColorCustomEl.value = g.titleBadgeColorCustom || '#ffffff';
+      titleBadgeColorCustomEl.style.display = colorTypeVal === 'custom' ? 'block' : 'none';
+    }
+
+    updateTitleDetailsActiveBadge();
+
     document.getElementById('editor-pro-display-mode').value = g.displayMode;
     document.getElementById('editor-pro-progress-indicator').value = g.progressIndicator;
 
@@ -3673,9 +4648,14 @@
         container.style.display = "none";
       }
     };
-    prefillFontSize('editor-pro-size-title', 'editor-pro-size-title-custom-container', 'editor-pro-size-title-custom-val', g.appearance.fontSizes.title);
-    prefillFontSize('editor-pro-size-section', 'editor-pro-size-section-custom-container', 'editor-pro-size-section-custom-val', g.appearance.fontSizes.section);
-    prefillFontSize('editor-pro-size-label', 'editor-pro-size-label-custom-container', 'editor-pro-size-label-custom-val', g.appearance.fontSizes.label);
+    const titleFontSize = (g.appearance && g.appearance.fontSizes && g.appearance.fontSizes.title) || 'large';
+    const sectionFontSize = (g.appearance && g.appearance.fontSizes && g.appearance.fontSizes.section) || 'medium';
+    const labelFontSize = (g.appearance && g.appearance.fontSizes && g.appearance.fontSizes.label) || 'medium';
+
+    prefillFontSize('editor-title-font-size', 'editor-title-size-custom-container', 'editor-title-size-custom-val', titleFontSize);
+    prefillFontSize('editor-pro-size-title', 'editor-pro-size-title-custom-container', 'editor-pro-size-title-custom-val', titleFontSize);
+    prefillFontSize('editor-pro-size-section', 'editor-pro-size-section-custom-container', 'editor-pro-size-section-custom-val', sectionFontSize);
+    prefillFontSize('editor-pro-size-label', 'editor-pro-size-label-custom-container', 'editor-pro-size-label-custom-val', labelFontSize);
 
     document.getElementById('editor-pro-show-duration').checked = !!g.announcement.showDuration;
     document.getElementById('editor-pro-show-alert').checked = !!g.announcement.showAlertBox;
@@ -3856,17 +4836,73 @@
     }
   }
 
-  // 🔙 共通ヘッダーの「←（戻る）」ボタンの表示状態を動的に切り替える
+  // 🧭 現在表示中の画面（タブ）をDOM状態から高信頼で判定
+  function detectActiveTab() {
+    try {
+      const editorPanel = document.getElementById('panel-editor');
+      if (editorPanel && editorPanel.classList.contains('active')) return 'editor';
+      const flowmapPanel = document.getElementById('panel-flowmap');
+      if (flowmapPanel && flowmapPanel.classList.contains('active')) return 'flowmap';
+      const previewPanel = document.getElementById('panel-preview');
+      if (previewPanel && previewPanel.classList.contains('active')) return 'preview';
+      const activeNav = document.querySelector('.nav-tab.active');
+      if (activeNav && activeNav.dataset.tab) return activeNav.dataset.tab;
+      const dashPanel = document.getElementById('panel-dashboard');
+      if (dashPanel && dashPanel.classList.contains('active')) return 'dashboard';
+      return localStorage.getItem('form_customize_active_tab') || 'dashboard';
+    } catch(e) {
+      return 'dashboard';
+    }
+  }
+
+  // 🔗 共通ヘッダーの「リンクを発行」ボタングループの表示状態を動的に切り替える
+  function updateHeaderShareButtons(tabName) {
+    try {
+      const activeTab = tabName || detectActiveTab();
+      const shareGroup = document.getElementById('share-export-group');
+      const headerMergeBtn = document.getElementById('btn-header-merge-prod');
+      const headerColBtn = document.getElementById('btn-header-column-preview');
+      const isEditingActiveForm = activeTab && activeTab !== 'dashboard' && activeTab !== 'templates';
+
+      if (shareGroup) {
+        // ホーム（ダッシュボード）やテンプレート一覧画面では非表示、個別フォーム作業中（editor, flow, preview等）のみ表示
+        if (isEditingActiveForm) {
+          shareGroup.style.setProperty('display', 'inline-flex', 'important');
+          shareGroup.classList.remove('hidden');
+        } else {
+          shareGroup.style.setProperty('display', 'none', 'important');
+          shareGroup.classList.add('hidden');
+        }
+      }
+      if (headerColBtn) {
+        headerColBtn.style.setProperty('display', 'none', 'important');
+        headerColBtn.classList.add('hidden');
+      }
+      if (!isEditingActiveForm && headerMergeBtn) {
+        headerMergeBtn.style.setProperty('display', 'none', 'important');
+      } else if (typeof updatePublishSyncUI === 'function') {
+        updatePublishSyncUI();
+      }
+    } catch(e) {
+      console.error('[ShareButtons] Failed to update state:', e);
+    }
+  }
+
+  // 🔙 共通ヘッダーの「←（戻る）」ボタンおよびアクションの表示状態を動的に切り替える
   function updateHeaderBackButton(tabName) {
     try {
+      const activeTab = tabName || detectActiveTab();
       const backBtn = document.getElementById('btn-back-to-dashboard');
       if (backBtn) {
-        if (tabName && tabName !== 'dashboard') {
+        if (activeTab && activeTab !== 'dashboard') {
           backBtn.style.setProperty('display', 'inline-flex', 'important');
         } else {
           backBtn.style.setProperty('display', 'none', 'important');
         }
       }
+
+      // 🔗 「リンクを発行」ボタングループの表示状態の動的切り替え
+      updateHeaderShareButtons(activeTab);
     } catch(e) {
       console.error('[BackButton] Failed to update state:', e);
     }
@@ -4397,7 +5433,15 @@
       const simpleTitle = document.getElementById('editor-form-title');
       if (simpleTitle) simpleTitle.value = v;
     });
-    bindInput('editor-pro-subtitle', v => window.G.header.subtitle = v);
+    bindInput('editor-pro-subtitle', v => {
+      window.G.header.subtitle = v;
+      window.G.subtitle = v;
+      if (window.U && window.U[window.W]) {
+        window.U[window.W].subtitle = v;
+        window.U[window.W].header = window.U[window.W].header || {};
+        window.U[window.W].header.subtitle = v;
+      }
+    });
     bindInput('editor-pro-disclaimer', v => {
       window.G.header.disclaimer = v;
       window.G.description = v; // 簡易版説明も同期
@@ -4410,6 +5454,276 @@
 
     bindChange('editor-pro-display-mode', v => window.G.displayMode = v);
     bindChange('editor-pro-progress-indicator', v => window.G.progressIndicator = v);
+
+    bindChange('editor-header-style', v => {
+      window.G.headerStyle = v;
+      if (window.U && window.U[window.W]) window.U[window.W].headerStyle = v;
+      if (window.n) window.n.headerStyle = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    document.querySelectorAll('.btn-header-align').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const align = btn.getAttribute('data-align') || 'left';
+        document.querySelectorAll('.btn-header-align').forEach(b => b.classList.toggle('active', b === btn));
+        const hiddenAlign = document.getElementById('editor-header-align');
+        if (hiddenAlign) hiddenAlign.value = align;
+        window.G.headerAlign = align;
+        if (window.U && window.U[window.W]) window.U[window.W].headerAlign = align;
+        if (window.n) window.n.headerAlign = align;
+        applyPreviewTheme();
+        renderLivePreview();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      });
+    });
+
+    bindChange('editor-subtitle-position', v => {
+      window.G.subtitlePosition = v;
+      if (window.U && window.U[window.W]) window.U[window.W].subtitlePosition = v;
+      if (window.n) window.n.subtitlePosition = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    // 🎨 タイトル文字色のイベントリスナー
+    bindChange('editor-title-color-type', v => {
+      window.G.titleColorType = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleColorType = v;
+      if (window.n) window.n.titleColorType = v;
+      const customEl = document.getElementById('editor-title-color-custom');
+      if (customEl) customEl.style.display = v === 'custom' ? 'inline-block' : 'none';
+      // バッジ文字色とも同期
+      const badgeColorEl = document.getElementById('editor-title-badge-color-type');
+      if (badgeColorEl && v !== 'default') badgeColorEl.value = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindInput('editor-title-color-custom', v => {
+      window.G.titleColorCustom = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleColorCustom = v;
+      if (window.n) window.n.titleColorCustom = v;
+      const badgeCustomEl = document.getElementById('editor-title-badge-color-custom');
+      if (badgeCustomEl) badgeCustomEl.value = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    // 🔤 タイトルフォント（書体）のイベントリスナー
+    bindChange('editor-title-font-family', v => {
+      window.G.titleFontFamily = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleFontFamily = v;
+      if (window.n) window.n.titleFontFamily = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      updateTitleDetailsActiveBadge();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-font-target', v => {
+      window.G.titleFontTarget = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleFontTarget = v;
+      if (window.n) window.n.titleFontTarget = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      updateTitleDetailsActiveBadge();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    // 🔤 タイトル文字変形＆立体ロゴエフェクトのイベントリスナー
+    const titleWarpStrengthContainer = document.getElementById('editor-title-warp-strength-container');
+    const titleLightingContainer = document.getElementById('editor-title-lighting-container');
+
+    bindChange('editor-title-warp-shape', v => {
+      window.G.titleWarpShape = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleWarpShape = v;
+      if (window.n) window.n.titleWarpShape = v;
+      if (titleWarpStrengthContainer) {
+        titleWarpStrengthContainer.style.display = v !== 'none' ? 'block' : 'none';
+      }
+      applyPreviewTheme();
+      renderLivePreview();
+      updateTitleDetailsActiveBadge();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    const onWarpStrengthChange = (val) => {
+      const num = Math.max(1, Math.min(200, parseInt(val, 10) || 50));
+      window.G.titleWarpStrength = num;
+      if (window.U && window.U[window.W]) window.U[window.W].titleWarpStrength = num;
+      if (window.n) window.n.titleWarpStrength = num;
+      const slider = document.getElementById('editor-title-warp-strength');
+      const numInput = document.getElementById('editor-title-warp-strength-num');
+      if (slider && parseInt(slider.value, 10) !== num) slider.value = num;
+      if (numInput && parseInt(numInput.value, 10) !== num) numInput.value = num;
+      fastUpdateLivePreview('title_warp');
+      applyPreviewTheme();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    };
+    bindInput('editor-title-warp-strength', onWarpStrengthChange);
+    bindChange('editor-title-warp-strength', onWarpStrengthChange);
+    bindInput('editor-title-warp-strength-num', onWarpStrengthChange);
+    bindChange('editor-title-warp-strength-num', onWarpStrengthChange);
+
+    bindChange('editor-title-warp-effect', v => {
+      window.G.titleWarpEffect = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleWarpEffect = v;
+      if (window.n) window.n.titleWarpEffect = v;
+      if (titleLightingContainer) {
+        titleLightingContainer.style.display = v !== 'none' ? 'block' : 'none';
+      }
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    // 💡 ライティング（光の向き・角度）のイベントリスナー
+    const onLightAngleChange = (val) => {
+      let deg = parseInt(val, 10);
+      if (isNaN(deg)) deg = 315;
+      deg = ((deg % 360) + 360) % 360;
+      window.G.titleLightAngle = deg;
+      if (window.U && window.U[window.W]) window.U[window.W].titleLightAngle = deg;
+      if (window.n) window.n.titleLightAngle = deg;
+      const slider = document.getElementById('editor-title-light-angle');
+      const numInput = document.getElementById('editor-title-light-angle-num');
+      if (slider && parseInt(slider.value, 10) !== deg) slider.value = deg;
+      if (numInput && parseInt(numInput.value, 10) !== deg) numInput.value = deg;
+
+      // 8方向ボタンのactive更新
+      document.querySelectorAll('.btn-light-dir').forEach(btn => {
+        const bAngle = parseInt(btn.dataset.angle, 10);
+        if (Math.abs(bAngle - deg) < 23 || (bAngle === 0 && deg >= 338)) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      fastUpdateLivePreview('title_warp');
+      applyPreviewTheme();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    };
+    bindInput('editor-title-light-angle', onLightAngleChange);
+    bindChange('editor-title-light-angle', onLightAngleChange);
+    bindInput('editor-title-light-angle-num', onLightAngleChange);
+    bindChange('editor-title-light-angle-num', onLightAngleChange);
+
+    // 8方向クイックボタンのクリック
+    document.querySelectorAll('.btn-light-dir').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const angle = parseInt(btn.dataset.angle, 10);
+        onLightAngleChange(angle);
+      });
+    });
+
+    // 💡 ライティング（光の強弱・メリハリ）のイベントリスナー
+    const onLightIntensityChange = (val) => {
+      const num = Math.max(1, Math.min(100, parseInt(val, 10) || 60));
+      window.G.titleLightIntensity = num;
+      if (window.U && window.U[window.W]) window.U[window.W].titleLightIntensity = num;
+      if (window.n) window.n.titleLightIntensity = num;
+      const slider = document.getElementById('editor-title-light-intensity');
+      const numInput = document.getElementById('editor-title-light-intensity-num');
+      if (slider && parseInt(slider.value, 10) !== num) slider.value = num;
+      if (numInput && parseInt(numInput.value, 10) !== num) numInput.value = num;
+
+      fastUpdateLivePreview('title_warp');
+      applyPreviewTheme();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    };
+    bindInput('editor-title-light-intensity', onLightIntensityChange);
+    bindChange('editor-title-light-intensity', onLightIntensityChange);
+    bindInput('editor-title-light-intensity-num', onLightIntensityChange);
+    bindChange('editor-title-light-intensity-num', onLightIntensityChange);
+
+    // 🏷️ タイトル外枠（簡易ロゴ化）バッジ設定のイベントリスナー
+    const titleBadgeOptionsEl = document.getElementById('editor-title-badge-options');
+    bindChange('editor-title-badge-shape', v => {
+      window.G.titleBadgeShape = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleBadgeShape = v;
+      if (window.n) window.n.titleBadgeShape = v;
+      if (titleBadgeOptionsEl) {
+        titleBadgeOptionsEl.style.display = v !== 'none' ? 'block' : 'none';
+      }
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-badge-style', v => {
+      window.G.titleBadgeStyle = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleBadgeStyle = v;
+      if (window.n) window.n.titleBadgeStyle = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-badge-bg-type', v => {
+      window.G.titleBadgeBgType = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleBadgeBgType = v;
+      if (window.n) window.n.titleBadgeBgType = v;
+      const customBgEl = document.getElementById('editor-title-badge-bg-custom');
+      if (customBgEl) customBgEl.style.display = v === 'custom' ? 'block' : 'none';
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-badge-bg-custom', v => {
+      window.G.titleBadgeBgCustom = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleBadgeBgCustom = v;
+      if (window.n) window.n.titleBadgeBgCustom = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-badge-color-type', v => {
+      window.G.titleBadgeColorType = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleBadgeColorType = v;
+      if (window.n) window.n.titleBadgeColorType = v;
+      const customColorEl = document.getElementById('editor-title-badge-color-custom');
+      if (customColorEl) customColorEl.style.display = v === 'custom' ? 'block' : 'none';
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
+
+    bindChange('editor-title-badge-color-custom', v => {
+      window.G.titleBadgeColorCustom = v;
+      if (window.U && window.U[window.W]) window.U[window.W].titleBadgeColorCustom = v;
+      if (window.n) window.n.titleBadgeColorCustom = v;
+      applyPreviewTheme();
+      renderLivePreview();
+      if (typeof window.S === 'function') window.S();
+      if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    });
 
     bindInput('editor-pro-contrast', v => {
       window.G.appearance.contrast = parseInt(v, 10);
@@ -4447,6 +5761,41 @@
           container.style.setProperty("display", "none", "important");
           window.G.appearance.fontSizes[key] = selectVal;
         }
+
+        // タイトルフォントサイズ変更時のパートナーコントロールとの双方向同期
+        if (key === 'title') {
+          const partnerSelectId = (selectId === 'editor-title-font-size') ? 'editor-pro-size-title' : 'editor-title-font-size';
+          const partnerContainerId = (selectId === 'editor-title-font-size') ? 'editor-pro-size-title-custom-container' : 'editor-title-size-custom-container';
+          const partnerValId = (selectId === 'editor-title-font-size') ? 'editor-pro-size-title-custom-val' : 'editor-title-size-custom-val';
+          const pSelect = document.getElementById(partnerSelectId);
+          const pContainer = document.getElementById(partnerContainerId);
+          const pInput = document.getElementById(partnerValId);
+          if (pSelect && pSelect.value !== selectVal) {
+            pSelect.value = selectVal;
+          }
+          if (pInput && input && pInput.value !== input.value) {
+            pInput.value = input.value;
+          }
+          if (pContainer) {
+            pContainer.style.setProperty("display", selectVal === 'custom' ? 'flex' : 'none', "important");
+          }
+
+          // エディタ入力欄自身の文字サイズスタイルも連動
+          const titleInput = document.getElementById('editor-form-title');
+          if (titleInput) {
+            if (selectVal === 'custom') {
+              const px = parseInt(input.value) || 24;
+              titleInput.style.fontSize = `${Math.min(Math.max(px, 14), 28)}px`;
+            } else if (selectVal === 'small') {
+              titleInput.style.fontSize = '1.05rem';
+            } else if (selectVal === 'medium') {
+              titleInput.style.fontSize = '1.2rem';
+            } else {
+              titleInput.style.fontSize = '1.35rem';
+            }
+          }
+        }
+
         renderLivePreview();
         applyPreviewTheme();
       };
@@ -4455,6 +5804,7 @@
       input.addEventListener('input', updateVal);
     };
 
+    bindFontSizeControl('editor-title-font-size', 'editor-title-size-custom-container', 'editor-title-size-custom-val', 'title');
     bindFontSizeControl('editor-pro-size-title', 'editor-pro-size-title-custom-container', 'editor-pro-size-title-custom-val', 'title');
     bindFontSizeControl('editor-pro-size-section', 'editor-pro-size-section-custom-container', 'editor-pro-size-section-custom-val', 'section');
     bindFontSizeControl('editor-pro-size-label', 'editor-pro-size-label-custom-container', 'editor-pro-size-label-custom-val', 'label');
@@ -4609,6 +5959,286 @@
     });
   }
 
+  function resolveTitleTextColor(g, badgeShape, badgeStyle) {
+    if (!g) return '';
+    const colorType = g.titleColorType || (g.titleBadgeShape && g.titleBadgeShape !== 'none' ? g.titleBadgeColorType : 'default');
+    const customColor = g.titleColorCustom || g.titleBadgeColorCustom || '#1a73e8';
+
+    if (colorType === 'primary') return 'var(--color-primary, #1a73e8)';
+    if (colorType === 'dark') return '#202124';
+    if (colorType === 'white') return '#ffffff';
+    if (colorType === 'custom') return customColor;
+    if (badgeShape && badgeShape !== 'none' && badgeStyle === 'fill') {
+      return (g.titleBadgeColorType === 'dark') ? '#202124' : '#ffffff';
+    }
+    return '';
+  }
+  window.resolveTitleTextColor = resolveTitleTextColor;
+
+  // 🔤 タイトル・サブタイトル用フォントファミリーマップ
+  const TITLE_FONT_MAP = {
+    'default': "'Noto Sans JP', sans-serif",
+    'noto-serif': "'Noto Serif JP', serif",
+    'rounded': "'M PLUS Rounded 1c', sans-serif",
+    'dela-gothic': "'Dela Gothic One', sans-serif",
+    'zen-kaku': "'Zen Kaku Gothic New', sans-serif",
+    'kaisei': "'Kaisei Decol', serif"
+  };
+  window.TITLE_FONT_MAP = TITLE_FONT_MAP;
+
+  function applyTitleFontToElement(titleEl, subtitleEl, fontKey, targetScope) {
+    const fontValue = TITLE_FONT_MAP[fontKey] || TITLE_FONT_MAP['default'];
+    if (titleEl) {
+      titleEl.style.setProperty('font-family', fontValue, 'important');
+    }
+    if (subtitleEl) {
+      if (targetScope === 'both') {
+        subtitleEl.style.setProperty('font-family', fontValue, 'important');
+      } else {
+        subtitleEl.style.removeProperty('font-family');
+      }
+    }
+  }
+  window.applyTitleFontToElement = applyTitleFontToElement;
+
+  function updateTitleDetailsActiveBadge() {
+    const g = window.G || {};
+    const badgeEl = document.getElementById('title-details-active-badge');
+    if (!badgeEl) return;
+
+    const hasFont = g.titleFontFamily && g.titleFontFamily !== 'default';
+    const hasWarp = g.titleWarpShape && g.titleWarpShape !== 'none';
+    const hasEffect = g.titleWarpEffect && g.titleWarpEffect !== 'none';
+    const hasBadge = g.titleBadgeShape && g.titleBadgeShape !== 'none';
+    const hasCustomSize = g.appearance && g.appearance.fontSizes && g.appearance.fontSizes.title && g.appearance.fontSizes.title !== 'large';
+    const hasCustomColor = g.titleColorType && g.titleColorType !== 'default';
+    const hasCustomStyle = g.headerStyle && g.headerStyle !== 'card-accent-top';
+    const hasCustomAlign = g.headerAlign && g.headerAlign !== 'left';
+
+    const isConfigured = !!(hasFont || hasWarp || hasEffect || hasBadge || hasCustomSize || hasCustomColor || hasCustomStyle || hasCustomAlign);
+    badgeEl.style.display = isConfigured ? 'inline-block' : 'none';
+  }
+  window.updateTitleDetailsActiveBadge = updateTitleDetailsActiveBadge;
+
+  function applyTitleTextWarp(titleEl, text, warpShape, warpStrength, warpEffect, textColor, lightAngle, lightIntensity) {
+    if (!titleEl) return;
+    warpShape = warpShape || 'none';
+    warpEffect = warpEffect || 'none';
+
+    // 強度の数値パース（1〜100、旧light=25, medium=50, strong=75）
+    let strNum = 50;
+    if (warpStrength === 'light') strNum = 25;
+    else if (warpStrength === 'medium') strNum = 50;
+    else if (warpStrength === 'strong') strNum = 75;
+    else if (typeof warpStrength === 'number') strNum = warpStrength;
+    else if (typeof warpStrength === 'string' && !isNaN(parseInt(warpStrength, 10))) strNum = parseInt(warpStrength, 10);
+    strNum = Math.max(1, Math.min(200, strNum));
+    const strRatio = strNum / 100; // 0.01 〜 2.0
+
+    // 光の向き（0〜360、デフォルト315）と強さ（1〜100、デフォルト60）
+    let angle = (typeof lightAngle === 'number') ? lightAngle : 315;
+    angle = ((angle % 360) + 360) % 360;
+    let intensity = (typeof lightIntensity === 'number') ? lightIntensity : 60;
+    intensity = Math.max(1, Math.min(100, intensity));
+    const intensityRatio = intensity / 100;
+
+    // 基本文字色
+    if (textColor) {
+      titleEl.style.setProperty('color', textColor, 'important');
+      titleEl.style.setProperty('--neon-color', textColor);
+    } else {
+      titleEl.style.removeProperty('color');
+      titleEl.style.removeProperty('--neon-color');
+    }
+
+    if (warpShape === 'none' && warpEffect === 'none') {
+      titleEl.textContent = text;
+      return;
+    }
+
+    const span = document.createElement('span');
+    span.className = 'title-text-warp';
+    if (textColor) {
+      span.style.setProperty('color', textColor, 'important');
+      span.style.setProperty('--neon-color', textColor);
+    }
+
+    // 💡 光と影（ライティング＆シャドウ計算: ぼやけを排除したソリッド多層押し出し）
+    const rad = (angle * Math.PI) / 180;
+    const lx = Math.cos(rad);
+    const ly = Math.sin(rad);
+    const sx = -lx;
+    const sy = -ly;
+
+    if (warpEffect === '3d') {
+      span.classList.add('text-effect-3d');
+      const maxDist = 1.8 + intensityRatio * 3.2; // 1.8px 〜 5.0px
+      const steps = Math.max(3, Math.round(2 + intensityRatio * 3)); // 3〜5段
+      const drops = [];
+
+      // 光の当たる側のベベル・ハイライト
+      const hlX = (lx * 1.0).toFixed(1);
+      const hlY = (ly * 1.0).toFixed(1);
+      const hlAlpha = (0.3 + 0.35 * intensityRatio).toFixed(2);
+      drops.push(`drop-shadow(${hlX}px ${hlY}px 0 rgba(255, 255, 255, ${hlAlpha}))`);
+
+      // ソリッド多層押し出しレイヤー (blur: 0 のハードエッジ)
+      for (let s = 1; s <= steps; s++) {
+        const d = (maxDist * (s / steps)).toFixed(1);
+        const stepX = (sx * d).toFixed(1);
+        const stepY = (sy * d).toFixed(1);
+        const alpha = (Math.min(0.7, (0.18 + (s / steps) * 0.38) * (0.8 + 0.4 * intensityRatio))).toFixed(2);
+        drops.push(`drop-shadow(${stepX}px ${stepY}px 0 rgba(0, 0, 0, ${alpha}))`);
+      }
+
+      // 接地アンビエントシャドウ (わずか1pxの極細ぼかしで輪郭を汚さず自然に接地)
+      const fDist = (maxDist + 0.8).toFixed(1);
+      const fX = (sx * fDist).toFixed(1);
+      const fY = (sy * fDist).toFixed(1);
+      const fAlpha = (0.25 * intensityRatio).toFixed(2);
+      drops.push(`drop-shadow(${fX}px ${fY}px 1px rgba(0, 0, 0, ${fAlpha}))`);
+
+      span.style.setProperty('--title-shadow-filter', drops.join(' '));
+    } else if (warpEffect === 'gold') {
+      span.classList.add('text-effect-gold');
+      const gradAngle = Math.round((angle + 180) % 360);
+      span.style.setProperty('--gold-gradient', `linear-gradient(${gradAngle}deg, #fff4b8 0%, #ffd700 35%, #e67e22 70%, #8c3b00 100%)`);
+      const steps = Math.max(3, Math.round(2 + intensityRatio * 3));
+      const drops = [];
+      for (let s = 1; s <= steps; s++) {
+        const d = (2.2 * (s / steps)).toFixed(1);
+        const stepX = (sx * d).toFixed(1);
+        const stepY = (sy * d).toFixed(1);
+        drops.push(`drop-shadow(${stepX}px ${stepY}px 0 #7a3a00)`);
+      }
+      const fX = (sx * 2.8).toFixed(1);
+      const fY = (sy * 2.8).toFixed(1);
+      drops.push(`drop-shadow(${fX}px ${fY}px 1.5px rgba(0, 0, 0, ${(0.4 * intensityRatio).toFixed(2)}))`);
+      span.style.setProperty('--title-shadow-filter', drops.join(' '));
+    } else if (warpEffect === 'neon') {
+      span.classList.add('text-effect-neon');
+      const b1 = Math.max(2, Math.round(4 * intensityRatio));
+      const b2 = Math.max(6, Math.round(12 * intensityRatio));
+      const b3 = Math.max(12, Math.round(22 * intensityRatio));
+      span.style.textShadow = `0 0 ${b1}px var(--neon-color, #00e5ff), 0 0 ${b2}px var(--neon-color, #00e5ff), 0 0 ${b3}px var(--neon-color, #00e5ff)`;
+    } else if (warpEffect === 'outline') {
+      span.classList.add('text-effect-outline');
+      const ox = (sx * 2 * intensityRatio).toFixed(1);
+      const oy = (sy * 2 * intensityRatio).toFixed(1);
+      span.style.setProperty('--title-shadow-filter', `drop-shadow(${ox}px ${oy}px 1px rgba(0, 0, 0, ${(0.45 * intensityRatio).toFixed(2)}))`);
+    }
+
+    // 🔤 各変形形状のダイナミック描画
+    if (warpShape === 'skew') {
+      span.classList.add('text-warp-skew');
+      const skewX = Math.min(50, Math.round(8 + strRatio * 20));
+      span.style.setProperty('--warp-skew', skewX + 'deg');
+      span.textContent = text;
+    } else if (warpShape === 'trapezoid-down' || warpShape === 'trapezoid-up' || warpShape === 'perspective-left' || warpShape === 'perspective-right' || warpShape === 'slope-up' || warpShape === 'roof') {
+      span.classList.add('text-warp-slope-container');
+      const chars = Array.from(text || '');
+      const len = chars.length;
+
+      if (warpShape === 'trapezoid-down') {
+        span.style.alignItems = 'flex-end';
+        chars.forEach((ch, i) => {
+          const cSpan = document.createElement('span');
+          cSpan.textContent = ch;
+          cSpan.style.display = 'inline-block';
+          cSpan.style.transformOrigin = 'center bottom';
+          const norm = len <= 1 ? 0 : (i - (len - 1) / 2) / ((len - 1) / 2);
+          const skew = norm * (16 * strRatio);
+          cSpan.style.transform = `skewX(${(-1 * skew).toFixed(1)}deg)`;
+          const margin = Math.abs(norm) * (1.5 * strRatio);
+          cSpan.style.margin = `0 ${margin.toFixed(1)}px`;
+          if (textColor) cSpan.style.color = textColor;
+          span.appendChild(cSpan);
+        });
+      } else if (warpShape === 'trapezoid-up') {
+        span.style.alignItems = 'flex-end';
+        chars.forEach((ch, i) => {
+          const cSpan = document.createElement('span');
+          cSpan.textContent = ch;
+          cSpan.style.display = 'inline-block';
+          cSpan.style.transformOrigin = 'center bottom';
+          const norm = len <= 1 ? 0 : (i - (len - 1) / 2) / ((len - 1) / 2);
+          const skew = norm * (-14 * strRatio);
+          cSpan.style.transform = `skewX(${(-1 * skew).toFixed(1)}deg)`;
+          if (textColor) cSpan.style.color = textColor;
+          span.appendChild(cSpan);
+        });
+      } else if (warpShape === 'perspective-left') {
+        span.style.alignItems = 'flex-end';
+        chars.forEach((ch, i) => {
+          const cSpan = document.createElement('span');
+          cSpan.textContent = ch;
+          cSpan.style.display = 'inline-block';
+          cSpan.style.transformOrigin = 'center bottom';
+          const ratio = len <= 1 ? 0 : i / (len - 1);
+          const minScale = Math.max(0.35, 1.0 - 0.45 * strRatio);
+          const maxScale = Math.min(2.2, 1.0 + 0.65 * strRatio);
+          const curScale = maxScale - ratio * (maxScale - minScale);
+          cSpan.style.fontSize = `${Math.round(curScale * 100)}%`;
+          if (textColor) cSpan.style.color = textColor;
+          span.appendChild(cSpan);
+        });
+      } else if (warpShape === 'perspective-right') {
+        span.style.alignItems = 'flex-end';
+        chars.forEach((ch, i) => {
+          const cSpan = document.createElement('span');
+          cSpan.textContent = ch;
+          cSpan.style.display = 'inline-block';
+          cSpan.style.transformOrigin = 'center bottom';
+          const ratio = len <= 1 ? 0 : i / (len - 1);
+          const minScale = Math.max(0.35, 1.0 - 0.45 * strRatio);
+          const maxScale = Math.min(2.2, 1.0 + 0.65 * strRatio);
+          const curScale = minScale + ratio * (maxScale - minScale);
+          cSpan.style.fontSize = `${Math.round(curScale * 100)}%`;
+          if (textColor) cSpan.style.color = textColor;
+          span.appendChild(cSpan);
+        });
+      } else if (warpShape === 'slope-up') {
+        span.style.alignItems = 'flex-end';
+        chars.forEach((ch, i) => {
+          const cSpan = document.createElement('span');
+          cSpan.textContent = ch;
+          cSpan.style.display = 'inline-block';
+          cSpan.style.transformOrigin = 'center bottom';
+          const ratio = len <= 1 ? 0 : i / (len - 1);
+          const minScale = Math.max(0.35, 1.0 - 0.48 * strRatio);
+          const maxScale = Math.min(2.4, 1.0 + 0.95 * strRatio);
+          const curScale = minScale + ratio * (maxScale - minScale);
+          cSpan.style.fontSize = `${Math.round(curScale * 100)}%`;
+          if (textColor) cSpan.style.color = textColor;
+          span.appendChild(cSpan);
+        });
+      } else if (warpShape === 'roof') {
+        span.style.alignItems = 'flex-end';
+        chars.forEach((ch, i) => {
+          const cSpan = document.createElement('span');
+          cSpan.textContent = ch;
+          cSpan.style.display = 'inline-block';
+          cSpan.style.transformOrigin = 'center bottom';
+          const dist = len <= 1 ? 0 : Math.abs(i - (len - 1) / 2) / ((len - 1) / 2);
+          const maxScale = Math.min(2.4, 1.0 + 0.85 * strRatio);
+          const minScale = Math.max(0.35, 1.0 - 0.45 * strRatio);
+          const curScale = maxScale - dist * (maxScale - minScale);
+          const archLift = -1 * (18 * strRatio * (1 - Math.pow(dist, 1.4)));
+          cSpan.style.fontSize = `${Math.round(curScale * 100)}%`;
+          cSpan.style.transform = `translateY(${archLift.toFixed(1)}px)`;
+          if (textColor) cSpan.style.color = textColor;
+          span.appendChild(cSpan);
+        });
+      }
+    } else {
+      span.textContent = text;
+    }
+
+    titleEl.innerHTML = '';
+    titleEl.appendChild(span);
+  }
+  window.applyTitleTextWarp = applyTitleTextWarp;
+
   function applyPreviewTheme() {
     const previewContainer = document.querySelector('.preview-container');
     const previewCard = document.querySelector('.preview-card');
@@ -4667,7 +6297,50 @@
     const previewTitle = document.getElementById('preview-form-title');
     const previewDesc = document.getElementById('preview-form-desc');
     if (previewTitle) {
-      previewTitle.textContent = isPro ? ((g.header ? g.header.title : null) || g.title || "セクション") : (g.title || "セクション");
+      const rawTitle = isPro ? ((g.header ? g.header.title : null) || g.title || "セクション") : (g.title || "セクション");
+
+      // 🏷️ タイトル外枠（簡易ロゴ化）バッジの適用
+      const badgeShape = g.titleBadgeShape || 'none';
+      const badgeStyle = g.titleBadgeStyle || 'fill';
+      const badgeBgType = g.titleBadgeBgType || 'primary';
+      const badgeBgCustom = g.titleBadgeBgCustom || '#1a73e8';
+      const badgeColorType = g.titleBadgeColorType || 'white';
+      const badgeColorCustom = g.titleBadgeColorCustom || '#ffffff';
+
+      previewTitle.classList.remove(
+        'title-badge',
+        'badge-style-fill',
+        'badge-style-outline',
+        'badge-shape-trapezoid-down',
+        'badge-shape-trapezoid-up',
+        'badge-shape-parallelogram',
+        'badge-shape-ribbon',
+        'badge-shape-capsule',
+        'badge-shape-chamfer',
+        'badge-shape-retro'
+      );
+      previewTitle.style.removeProperty('--badge-bg');
+      previewTitle.style.removeProperty('--badge-color');
+
+      if (badgeShape && badgeShape !== 'none') {
+        previewTitle.classList.add('title-badge', `badge-shape-${badgeShape}`, `badge-style-${badgeStyle}`);
+
+        let actualBg = 'var(--color-primary, #1a73e8)';
+        if (badgeBgType === 'dark') actualBg = '#202124';
+        else if (badgeBgType === 'custom') actualBg = badgeBgCustom;
+        previewTitle.style.setProperty('--badge-bg', actualBg);
+
+        let actualColor = '#ffffff';
+        if (badgeColorType === 'dark') actualColor = '#202124';
+        else if (badgeColorType === 'primary') actualColor = 'var(--color-primary, #1a73e8)';
+        else if (badgeColorType === 'custom') actualColor = badgeColorCustom;
+        previewTitle.style.setProperty('--badge-color', actualColor);
+      }
+
+      // 🔤 タイトル文字自体の変形（ワープテキスト＆立体ロゴ）および文字色の適用
+      const titleTextColor = resolveTitleTextColor(g, badgeShape, badgeStyle);
+      applyTitleTextWarp(previewTitle, rawTitle, g.titleWarpShape, g.titleWarpStrength, g.titleWarpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+      applyTitleFontToElement(previewTitle, subtitleP, g.titleFontFamily, g.titleFontTarget);
     }
 
     // サブタイトルの取得と反映（リアルタイム入力値＆データオブジェクト双方対応）
@@ -4682,6 +6355,36 @@
       } else {
         subtitleP.textContent = "";
         subtitleP.style.display = 'none';
+      }
+      applyTitleFontToElement(previewTitle, subtitleP, g.titleFontFamily, g.titleFontTarget);
+    }
+
+    // 枠スタイル・配置・サブタイトル位置の適用
+    const headerStyle = g.headerStyle || 'card-accent-top';
+    const headerAlign = g.headerAlign || 'left';
+    const subtitlePosition = g.subtitlePosition || 'below';
+
+    previewCard.classList.remove(
+      'header-style-card-accent-top',
+      'header-style-card-simple',
+      'header-style-card-accent-left',
+      'header-style-card-shadow',
+      'header-style-frameless',
+      'header-style-frameless-underline'
+    );
+    previewCard.classList.add(`header-style-${headerStyle}`);
+
+    const previewFormHeader = document.getElementById('preview-form-header');
+    if (previewFormHeader) {
+      previewFormHeader.classList.remove('header-align-left', 'header-align-center', 'header-align-right');
+      previewFormHeader.classList.add(`header-align-${headerAlign}`);
+
+      if (subtitleP && previewTitle && previewDesc) {
+        if (subtitlePosition === 'above') {
+          previewFormHeader.insertBefore(subtitleP, previewTitle);
+        } else {
+          previewFormHeader.insertBefore(subtitleP, previewDesc);
+        }
       }
     }
 
@@ -4896,9 +6599,26 @@
         if (['radio', 'select'].includes(q.type) && q.options) {
           const val = window.V[q.id];
           if (val) {
-            const opt = q.options.find(o => o.label === val);
+            const cleanVal = String(val).trim();
+            // セマンティック最優先安全弁
+            if (cleanVal.includes('個人') && !cleanVal.includes('法人')) {
+              const pSec = sections.find(s => s && s.title && s.title.includes('個人') && !s.title.includes('法人'));
+              if (pSec) return pSec;
+            } else if (cleanVal.includes('法人')) {
+              const cSec = sections.find(s => s && s.title && s.title.includes('法人'));
+              if (cSec) return cSec;
+            }
+
+            const opt = q.options.find(o => o && String(o.label).trim() === cleanVal) ||
+                        q.options.find(o => o && cleanVal.includes(String(o.label).trim()));
             if (opt && opt.nextSectionId && opt.nextSectionId !== 'partial_submit' && opt.nextSectionId !== 'submit') {
-              const target = sections.find(s => s.id === opt.nextSectionId);
+              let target = sections.find(s => s.id === opt.nextSectionId);
+              if (!target && opt.nextSectionId.startsWith('q_')) {
+                target = sections.find(s => (s.questions || []).some(q => q.id === opt.nextSectionId));
+              }
+              if (!target) {
+                target = sections.find(s => s.title && (s.title.includes(opt.nextSectionId) || opt.nextSectionId.includes(s.title)));
+              }
               if (target) return target;
             }
           }
@@ -4908,7 +6628,13 @@
 
     const act = section.nextAction;
     if (act && !['next', 'submit', 'partial_submit'].includes(act)) {
-      const target = sections.find(s => s.id === act);
+      let target = sections.find(s => s.id === act);
+      if (!target && typeof act === 'string' && act.startsWith('q_')) {
+        target = sections.find(s => (s.questions || []).some(q => q.id === act));
+      }
+      if (!target && typeof act === 'string') {
+        target = sections.find(s => s.title && (s.title.includes(act) || act.includes(s.title)));
+      }
       if (target) return target;
     }
 
@@ -5414,7 +7140,9 @@
         isPartialSubmit: true,
         rowId: rowId,
         currentSectionId: currentSecId,
-        nextSectionId: nextSecId
+        nextSectionId: nextSecId,
+        env: 'test',
+        branch: 'test'
       }, '*');
     }
 
@@ -5446,6 +7174,34 @@
       if (typeof window.Ct === 'function' && !window.Ct._hasInvoiceRepValidationWrapped) {
         const origCt = window.Ct;
         window.Ct = function() {
+          // 口座番号の正規表現と入力値を堅牢に正規化（プレビュー時の誤判定を根絶）
+          const formSources = [window.L, window.G, window.n];
+          formSources.forEach(src => {
+            if (src && src.sections) {
+              src.sections.forEach(s => {
+                (s.questions || []).forEach(q => {
+                  const isAcct = (q.dataKey === 'account_number') || (q.title && (q.title.includes('口座番号') || (!q.title.includes('名義') && q.title.includes('口座'))));
+                  if (isAcct) {
+                    if (q.validation && q.validation.category === 'regex') {
+                      q.validation.value = '^[0-9]{6,7}$';
+                      q.validation.errorMessage = '正しい口座番号（6〜7桁の半角数字）を入力してください。';
+                    }
+                    if (window.V && typeof window.V[q.id] === 'string') {
+                      window.V[q.id] = window.V[q.id].replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[^\d]/g, '');
+                    }
+                  }
+                  const isHolder = (q.dataKey === 'account_holder_kana') || (q.title && (q.title.includes('口座名義') || q.title.includes('名義人') || (q.title.includes('口座') && q.title.includes('名義'))));
+                  if (isHolder) {
+                    if (q.validation && q.validation.category === 'regex') {
+                      q.validation.value = '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$';
+                      q.validation.errorMessage = '口座名義はカナと（）.のみで入力してください。';
+                    }
+                  }
+                });
+              });
+            }
+          });
+
           const baseResult = origCt();
           if (!baseResult) return false;
 
@@ -5543,14 +7299,155 @@
     };
     wrapStIfNeeded();
 
-    // キャプチャフェーズで #btn-preview-next のクリックを最優先フック
+    function findStreetQuestionInPreviewSection(section) {
+      if (!section || !section.questions) return null;
+      return section.questions.find(q => {
+        const d = (q.description || '');
+        const t = (q.title || '');
+        if (q.dataKey === 'street') return true;
+        if (q.id && q.id.includes('street') && !q.id.includes('building')) return true;
+        if (d.includes('番地・号') || (d.includes('番地') && d.includes('追記'))) return true;
+        if ((t.includes('町名') || t.includes('番地')) && !t.includes('建物') && !t.includes('部屋')) return true;
+        return false;
+      });
+    }
+
+    function showStreetConfirmModalPreview(section, streetQ, isSubmit, onProceed) {
+      let modalEl = document.getElementById('street-confirm-modal');
+      if (!modalEl) {
+        onProceed();
+        return;
+      }
+
+      const container = document.getElementById('preview-section-container') || document;
+      const card = container.querySelector(`.preview-q-card[data-question-id="${streetQ.id}"]`);
+      const inputEl = card ? card.querySelector('input[type="text"], textarea') : null;
+
+      let streetVal = (window.V && window.V[streetQ.id] != null) ? String(window.V[streetQ.id]).trim() : '';
+      if (!streetVal && inputEl) {
+        streetVal = (inputEl.value || '').trim();
+      }
+
+      const alertTextEl = modalEl.querySelector('#street-confirm-alert-text');
+      const addrContextEl = modalEl.querySelector('#street-confirm-address-context');
+      const currentValEl = modalEl.querySelector('#street-confirm-current-val');
+      const statusEl = modalEl.querySelector('#street-confirm-status');
+      const btnProceed = modalEl.querySelector('#btn-street-modal-proceed');
+      const btnCancel = modalEl.querySelector('#btn-street-modal-cancel');
+
+      if (alertTextEl) {
+        const desc = (streetQ.description || '').trim();
+        const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        if (desc) {
+          alertTextEl.innerHTML = esc(desc).replace(/【(.*?)】/g, '<strong>【$1】</strong>');
+        } else {
+          alertTextEl.innerHTML = '自動補完された住所の末尾に、必ず<strong>【番地・号（数字）】</strong>を追記してください。';
+        }
+      }
+
+      const prefQ = (section.questions || []).find(q => q.dataKey === 'pref' || (q.title && q.title.includes('都道府県')));
+      const cityQ = (section.questions || []).find(q => q.dataKey === 'city' || (q.title && (q.title.includes('市区町村') || q.title.includes('市町村'))));
+      let prefVal = prefQ ? ((window.V && window.V[prefQ.id]) || '') : '';
+      let cityVal = cityQ ? ((window.V && window.V[cityQ.id]) || '') : '';
+      if (!prefVal && prefQ) {
+        const pCard = container.querySelector(`.preview-q-card[data-question-id="${prefQ.id}"]`);
+        const pInput = pCard ? pCard.querySelector('select, input') : null;
+        if (pInput) prefVal = pInput.value || '';
+      }
+      if (!cityVal && cityQ) {
+        const cCard = container.querySelector(`.preview-q-card[data-question-id="${cityQ.id}"]`);
+        const cInput = cCard ? cCard.querySelector('input') : null;
+        if (cInput) cityVal = cInput.value || '';
+      }
+
+      if (addrContextEl) {
+        if (prefVal || cityVal) {
+          addrContextEl.style.display = 'block';
+          addrContextEl.textContent = `📍 ${prefVal} ${cityVal}`.trim();
+        } else {
+          addrContextEl.style.display = 'none';
+        }
+      }
+
+      if (currentValEl) {
+        currentValEl.textContent = streetVal || '（未入力）';
+      }
+
+      const hasDigits = /[\d０-９]/.test(streetVal);
+      const hasKanjiNum = /[一二三四五六七八九十]/.test(streetVal);
+      const endsWithTown = /(?:丁目|町|大字|字|通|区|市)$/.test(streetVal.replace(/[\s　]+$/, ''));
+      const isMissingBanchi = (!hasDigits && !hasKanjiNum) || endsWithTown || !streetVal;
+
+      if (statusEl) {
+        if (isMissingBanchi) {
+          statusEl.className = 'street-confirm-status-notice street-confirm-status-warning';
+          statusEl.innerHTML = '<span>⚠️</span> <span>番地・号（数字）がまだ入力されていない可能性があります。</span>';
+        } else {
+          statusEl.className = 'street-confirm-status-notice street-confirm-status-ok';
+          statusEl.innerHTML = '<span>✓</span> <span>番地・号（数字）が正しく入力されているかご確認ください。</span>';
+        }
+      }
+
+      if (btnProceed) {
+        btnProceed.textContent = isSubmit ? 'このまま送信する ✓' : 'このまま次へ進む →';
+      }
+
+      modalEl.style.display = 'flex';
+      requestAnimationFrame(() => {
+        modalEl.classList.add('show');
+      });
+
+      const hideModal = () => {
+        modalEl.classList.remove('show');
+        setTimeout(() => {
+          modalEl.style.display = 'none';
+        }, 200);
+      };
+
+      btnCancel.onclick = () => {
+        hideModal();
+        if (inputEl) {
+          inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => {
+            inputEl.focus();
+            try {
+              const len = inputEl.value.length;
+              inputEl.setSelectionRange(len, len);
+            } catch(e) {}
+            if (card) {
+              card.classList.remove('street-focus-highlight');
+              void card.offsetWidth;
+              card.classList.add('street-focus-highlight');
+            }
+          }, 250);
+        }
+      };
+
+      btnProceed.onclick = () => {
+        hideModal();
+        onProceed();
+      };
+
+      modalEl.onclick = (e) => {
+        if (e.target === modalEl) {
+          btnCancel.click();
+        }
+      };
+    }
+
+    // キャプチャフェーズで #btn-preview-next / #btn-preview-submit のクリックを最優先フック
     if (!window._hasPreviewNextCaptureHooked) {
       window._hasPreviewNextCaptureHooked = true;
       document.addEventListener('click', (e) => {
-        const btn = e.target.closest('#btn-preview-next');
+        const btn = e.target.closest('#btn-preview-next, #btn-preview-submit, #preview-next-btn, #preview-submit-btn');
         if (!btn) return;
         const panelPreview = document.getElementById('panel-preview');
         if (!panelPreview || (!panelPreview.classList.contains('active') && panelPreview.style.display === 'none')) return;
+
+        if (window._bypassStreetConfirmOnce) {
+          window._bypassStreetConfirmOnce = false;
+          return;
+        }
 
         const formData = window.L || window.G || window.n;
         if (!formData || !formData.sections) return;
@@ -5565,6 +7462,19 @@
             e.stopImmediatePropagation();
             return;
           }
+        }
+
+        // 町名・番地の入力確認ポップアップ判定
+        const streetQ = findStreetQuestionInPreviewSection(curSec);
+        if (streetQ) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          const isSubmit = btn.id.includes('submit');
+          showStreetConfirmModalPreview(curSec, streetQ, isSubmit, () => {
+            window._bypassStreetConfirmOnce = true;
+            btn.click();
+          });
+          return;
         }
 
         // 途中送信が設定されているセクション完了時の割り込み
@@ -5703,6 +7613,25 @@
           evaluateLiveSkipLogic();
           injectDraftSavePanelToPreview();
         }
+      } else if (event.data.type === 'SYNAPSE_FORCE_MERGE_COMPLETED') {
+        try {
+          const raw = localStorage.getItem('form_customize_all_forms');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              window.U = parsed;
+              const idx = (window.W !== undefined ? window.W : (parseInt(localStorage.getItem('form_customize_active_index'), 10) || 0));
+              if (window.U[idx]) {
+                window.G = window.U[idx];
+              }
+            }
+          }
+          if (typeof updatePublishSyncUI === 'function') {
+            updatePublishSyncUI();
+          }
+        } catch (e) {
+          console.warn('[Message: SYNAPSE_FORCE_MERGE_COMPLETED] Error updating UI:', e);
+        }
       }
     });
   }
@@ -5757,7 +7686,7 @@
         saveBtn.disabled = true;
         saveBtn.textContent = '保存中...';
         const data = window.V || {};
-        window.parent.postMessage({ type: 'FORM_SUBMIT', formTitle: window.L.title || '無題のフォーム', data: data, isTemporary: true, rowId: window.currentResumeRowId || null }, '*');
+        window.parent.postMessage({ type: 'FORM_SUBMIT', formTitle: window.L.title || '無題のフォーム', data: data, isTemporary: true, rowId: window.currentResumeRowId || null, env: 'test', branch: 'test' }, '*');
       });
     }
     const copyBtn = draftPanel.querySelector('#btn-preview-draft-url-copy');
@@ -6103,8 +8032,19 @@
 
   function renderRichTextWithLinks(text) {
     if (!text) return '';
+
+    // 0. 未許可のHTMLタグ（span, div, p, font 等）のクリーンアップ＆意味のある装飾の抽出
+    let cleaned = String(text);
+    // スタイル付きspanの装飾（下線・太字・斜体）を正規タグへ変換
+    cleaned = cleaned
+      .replace(/<span\b[^>]*?style="[^"]*?text-decoration:\s*[^;]*underline[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<u>$1</u>')
+      .replace(/<span\b[^>]*?style="[^"]*?font-weight:\s*[^;]*(?:bold|[6-9]00)[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<strong>$1</strong>')
+      .replace(/<span\b[^>]*?style="[^"]*?font-style:\s*italic[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<em>$1</em>')
+      // 装飾を持たないすべての span, font, div, p, header, section, span 等のタグ自体を剥ぎ取りテキストのみ抽出
+      .replace(/<\/?(?:span|font|div|p|header|section|article|bdo|bdi|label)\b[^>]*>/gi, '');
+
     // 1. HTMLエスケープ（XSS対策）
-    let escaped = escapeHtml(text);
+    let escaped = escapeHtml(cleaned);
 
     // 2. 下線: <u>...</u> (エスケープされた &lt;u&gt;...&lt;/u&gt;)
     escaped = escaped.replace(/&lt;u\b.*?&gt;(.*?)&lt;\/u&gt;/gi, '<u style="text-decoration: underline;">$1</u>');
@@ -6125,6 +8065,9 @@
       }
       return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="rich-embedded-link" style="color:var(--color-primary, #0056b3); text-decoration:underline; font-weight:500; cursor:pointer;" onclick="event.stopPropagation();">${label}</a>`;
     });
+
+    // 万が一残ったエスケープ済み span/font 等のゴミタグを除去
+    escaped = escaped.replace(/&lt;\/?(?:span|font|div|p)\b.*?&gt;/gi, '');
 
     // 3. 太字: **...**
     escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
@@ -6663,7 +8606,14 @@
 
   function markdownOrHtmlToWysiwyg(text) {
     if (!text) return '';
-    let str = text;
+    let str = String(text);
+
+    // 不要な未許可タグのクリーンアップ＆意味のある装飾の抽出
+    str = str
+      .replace(/<span\b[^>]*?style="[^"]*?text-decoration:\s*[^;]*underline[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<u>$1</u>')
+      .replace(/<span\b[^>]*?style="[^"]*?font-weight:\s*[^;]*(?:bold|[6-9]00)[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<strong>$1</strong>')
+      .replace(/<span\b[^>]*?style="[^"]*?font-style:\s*italic[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<em>$1</em>')
+      .replace(/<\/?(?:span|font|header|section|article)\b[^>]*>/gi, '');
 
     // 下線: <u>...</u> -> <u style="text-decoration: underline;">...</u>
     str = str.replace(/<u\b[^>]*>(.*?)<\/u>/gi, '<u style="text-decoration: underline;">$1</u>');
@@ -6687,39 +8637,18 @@
     if (!editorEl) return '';
     const clone = editorEl.cloneNode(true);
 
-    // <br> を改行プレースホルダーに置換
+    // 1. <br> を改行プレースホルダーに置換
     const brs = clone.querySelectorAll('br');
     brs.forEach(br => br.replaceWith('___LINE_BREAK___'));
 
-    // <div> や <p>（Enterキーで生成されるブロック）の先頭に改行プレースホルダーを挿入
+    // 2. <div> や <p>（Enterキーで生成されるブロック）の先頭に改行プレースホルダーを挿入
     const blocks = clone.querySelectorAll('div, p');
     blocks.forEach(b => {
       const brPlaceholder = document.createTextNode('___LINE_BREAK___');
       b.parentNode.insertBefore(brPlaceholder, b);
     });
 
-    // <u> タグの標準化
-    const uTags = clone.querySelectorAll('u');
-    uTags.forEach(u => {
-      u.removeAttribute('style');
-      u.removeAttribute('class');
-    });
-
-    // <strong>, <b> タグの標準化
-    const bTags = clone.querySelectorAll('b, strong');
-    bTags.forEach(b => {
-      b.removeAttribute('style');
-      b.removeAttribute('class');
-    });
-
-    // <em>, <i> タグの標準化
-    const iTags = clone.querySelectorAll('i, em');
-    iTags.forEach(i => {
-      i.removeAttribute('style');
-      i.removeAttribute('class');
-    });
-
-    // <a> タグの標準化（Markdownリンク形式に変換）
+    // 3. <a> タグの標準化（Markdownリンク形式に変換）
     const aTags = clone.querySelectorAll('a');
     aTags.forEach(a => {
       const href = a.getAttribute('href') || '';
@@ -6731,13 +8660,57 @@
       }
     });
 
+    // 4. span や font などのインライン装飾要素の解析とunwrap
+    const spans = clone.querySelectorAll('span, font');
+    spans.forEach(el => {
+      const style = el.getAttribute('style') || '';
+      const isUnderline = /text-decoration\s*:\s*[^;]*underline/i.test(style);
+      const isBold = /font-weight\s*:\s*[^;]*(bold|[6-9]00)/i.test(style);
+      const isItalic = /font-style\s*:\s*italic/i.test(style);
+
+      const frag = document.createDocumentFragment();
+      while (el.firstChild) {
+        frag.appendChild(el.firstChild);
+      }
+
+      let wrapper = frag;
+      if (isUnderline) {
+        const u = document.createElement('u');
+        u.appendChild(wrapper);
+        wrapper = u;
+      }
+      if (isBold) {
+        const s = document.createElement('strong');
+        s.appendChild(wrapper);
+        wrapper = s;
+      }
+      if (isItalic) {
+        const em = document.createElement('em');
+        em.appendChild(wrapper);
+        wrapper = em;
+      }
+
+      el.parentNode.replaceChild(wrapper, el);
+    });
+
+    // 5. 許可タグ（u, strong, b, em, i）以外のあらゆる未許可HTML要素をunwrap
+    const allEls = Array.from(clone.querySelectorAll('*'));
+    allEls.forEach(el => {
+      const tag = el.tagName.toLowerCase();
+      if (!['u', 'strong', 'b', 'em', 'i'].includes(tag)) {
+        while (el.firstChild) {
+          el.parentNode.insertBefore(el.firstChild, el);
+        }
+        el.remove();
+      } else {
+        el.removeAttribute('style');
+        el.removeAttribute('class');
+      }
+    });
+
     let html = clone.innerHTML;
 
-    // span装飾の吸収
     html = html
-      .replace(/<span style="[^"]*text-decoration:\s*underline[^"]*">(.*?)<\/span>/gi, '<u>$1</u>')
-      .replace(/<span style="[^"]*font-weight:\s*bold[^"]*">(.*?)<\/span>/gi, '<strong>$1</strong>')
-      .replace(/<span style="[^"]*font-style:\s*italic[^"]*">(.*?)<\/span>/gi, '<em>$1</em>')
       .replace(/&nbsp;/g, ' ')
       .replace(/___LINE_BREAK___/g, '\n')
       .trim();
@@ -7014,12 +8987,14 @@
           }
         }
 
-        if (qDef.type === 'text' && (normalizeText(qDef.title).includes('郵便') || normalizeText(qDef.title).includes('zip'))) {
+        const apiCfg = getQuestionApiConfig(qDef);
+        const isZipQuestion = (apiCfg && apiCfg.isZip) || (qDef.type === 'text' && (normalizeText(qDef.title).includes('郵便') || normalizeText(qDef.title).includes('zip')));
+        if (isZipQuestion) {
           const zipInput = card.querySelector('input');
           if (zipInput && !zipInput.dataset.zipBound) {
             zipInput.dataset.zipBound = "1";
-            zipInput.maxLength = 7;
-            zipInput.placeholder = "例: 7300013";
+            zipInput.maxLength = 8;
+            zipInput.placeholder = "例: 123-4567 または 1234567";
             
             let zipLookupTimer = null;
             zipInput.addEventListener('input', (e) => {
@@ -7149,6 +9124,11 @@
         const isAccountHolder = qDef.type === 'text' && (qDef.title.includes('口座名義') || qDef.title.includes('名義人') || qDef.title.includes('名義'));
         if (isAccountHolder) {
           setupAccountHolderValidation(card, qDef);
+        }
+
+        const isAcctNum = qDef.type === 'text' && ((qDef.dataKey === 'account_number') || (qDef.title && (qDef.title.includes('口座番号') || (!qDef.title.includes('名義') && qDef.title.includes('口座')))));
+        if (isAcctNum) {
+          setupAccountNumberValidation(card, qDef);
         }
 
         const innerInput = card.querySelector('input, textarea, select');
@@ -7549,7 +9529,10 @@
 
     const prefSelect = filterContainer.querySelector('.corp-pref-filter');
 
-    const executeSearch = () => {
+    let searchSeq = 0;
+
+    const executeSearch = async () => {
+      const currentSeq = ++searchSeq;
       const curPanel = card.querySelector('.corp-search-panel') || searchPanel;
       const rawVal = input.value.trim();
       const val = normalizeText(rawVal);
@@ -7560,36 +9543,80 @@
         return;
       }
 
-      // 1. ローカルDBから近似値（正規化・部分一致）照会
-      let matched = CORP_DATABASE.filter(item => {
-        const normName = normalizeText(item.name);
-        const normKana = normalizeText(item.nameKana || "");
-        return normName.includes(val) || normKana.includes(val);
-      });
-
-      if (selPref !== "") {
-        matched = matched.filter(item => item.pref === selPref);
+      // 検索中ローディング表示
+      if (curPanel) {
+        curPanel.innerHTML = `
+          <div style="padding:10px 12px; font-size:0.75rem; color:#718096; display:flex; align-items:center; gap:8px;">
+            <div style="width:14px; height:14px; border:2px solid #cbd5e0; border-top-color:#2b6cb0; border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+            <span>🏛️ 国税庁法人番号APIを照会中...</span>
+          </div>
+        `;
+        curPanel.style.display = 'block';
       }
 
-      // 2. 一致がない場合、選択エリア（都道府県）内での近似値候補を生成
-      let listToRender = matched;
-      if (listToRender.length === 0) {
-        const clean = rawVal.replace(/(株式会社|有限会社|合同会社|ホールディングス)/g, '').trim() || rawVal;
-        const targetPref = selPref || "東京都";
-        const dynamicCandidates = [
-          { name: `株式会社${clean}`, nameKana: `カブシキガイシャ${clean}`, num: generateHashNum(clean + "1"), pref: targetPref, estDate: "2018-04-01", isDynamic: true },
-          { name: `${clean}株式会社`, nameKana: `${clean}カブシキガイシャ`, num: generateHashNum(clean + "2"), pref: targetPref, estDate: "2015-10-12", isDynamic: true },
-          { name: `合同会社${clean}`, nameKana: `ゴウドウガイシャ${clean}`, num: generateHashNum(clean + "3"), pref: targetPref, estDate: "2021-06-01", isDynamic: true },
-          { name: `${clean}ホールディングス株式会社`, nameKana: `${clean}ホールディングスカブシキガイシャ`, num: generateHashNum(clean + "4"), pref: targetPref, estDate: "2008-01-20", isDynamic: true }
-        ];
-        listToRender = dynamicCandidates;
+      let listToRender = [];
+      let isLiveApi = false;
+
+      // 1. 国税庁中継API (/api/corp-search) の非同期呼出
+      try {
+        let apiUrl = `/api/corp-search?name=${encodeURIComponent(rawVal)}&pref=${encodeURIComponent(selPref)}`;
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') {
+          apiUrl = `https://synapse-wayway.vercel.app/api/corp-search?name=${encodeURIComponent(rawVal)}&pref=${encodeURIComponent(selPref)}`;
+        }
+        const res = await fetch(apiUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.results) && data.results.length > 0) {
+            let filteredResults = data.results;
+            if (selPref && selPref.trim() !== '') {
+              filteredResults = filteredResults.filter(item => {
+                return (item.pref && item.pref.includes(selPref)) || (item.address && item.address.includes(selPref));
+              });
+            }
+            if (filteredResults.length > 0) {
+              listToRender = filteredResults.slice(0, 50).map(item => ({
+                name: item.name,
+                nameKana: item.nameKana || "",
+                num: item.num,
+                pref: item.pref,
+                cityName: item.cityName || "",
+                street: item.street || "",
+                postCode: item.postCode || "",
+                address: item.address || "",
+                regDate: item.regDate || "",
+                invoiceNum: item.invoiceNum || (item.num ? `T${item.num}` : "")
+              }));
+              isLiveApi = true;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[setupCorpApiSearch] Live API failed, falling back to local master:', err);
+      }
+
+      // 新しい検索リクエストが既に開始されていたら破棄
+      if (currentSeq !== searchSeq) return;
+
+      // 2. API通信不能・オフライン時のみ内蔵マスタにフォールバック
+      if (!isLiveApi && listToRender.length === 0) {
+        let matched = CORP_DATABASE.filter(item => {
+          const normName = normalizeText(item.name);
+          const normKana = normalizeText(item.nameKana || "");
+          return normName.includes(val) || normKana.includes(val);
+        });
+
+        if (selPref !== "") {
+          matched = matched.filter(item => item.pref === selPref);
+        }
+        listToRender = matched;
       }
 
       if (listToRender.length > 0) {
         const prefLabel = selPref ? `【${escapeHtml(selPref)}】` : '';
+        const statusBadge = isLiveApi ? '🏛️ 国税庁公式照会データ' : '🏛️ 法人番号照会候補';
         curPanel.innerHTML = `
           <div style="padding:6px 12px; background:#f8f9fa; border-bottom:1px solid #edf2f7; font-size:0.7rem; color:#4a5568; display:flex; justify-content:space-between; align-items:center; font-weight:600;">
-            <span>🏛️ 国税庁法人番号API照会候補 ${prefLabel} (${listToRender.length}件)</span>
+            <span>${statusBadge} ${prefLabel} (${listToRender.length}件)</span>
             <span style="font-size:0.65rem; color:#718096;">選択で上書き反映＆インボイス自動入力</span>
           </div>
         `;
@@ -7598,6 +9625,8 @@
           row.className = 'corp-search-candidate-item';
           row.style.cssText = 'padding:8px 12px; cursor:pointer; font-size:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); transition:background-color 0.15s;';
           const kanaHtml = item.nameKana ? `<span style="font-size:0.68rem; color:#718096; margin-left:6px;">(${escapeHtml(item.nameKana)})</span>` : '';
+          const addressText = item.address || `${item.pref || ''}${item.cityName || ''}${item.street || ''}`.trim() || item.pref || '';
+          const addressLabel = addressText ? ` | 所在地: ${escapeHtml(addressText)}` : '';
           row.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <div>
@@ -7607,7 +9636,7 @@
               <span style="background:#e6f4ea; color:#137333; font-size:0.65rem; padding:1px 6px; border-radius:10px; font-weight:600;">✓ 実在確認済</span>
             </div>
             <div style="font-size:0.7rem; color:var(--color-text-muted); margin-top:2px;">
-              法人番号: <span style="font-family:monospace; color:#2d3748; font-weight:600;">${item.num}</span> | 所在地: ${item.pref}
+              法人番号: <span style="font-family:monospace; color:#2d3748; font-weight:600;">${item.num}</span>${addressLabel}
             </div>
           `;
           row.onmouseenter = () => { row.style.backgroundColor = '#f1f5f9'; };
@@ -7621,9 +9650,9 @@
             curPanel.style.display = 'none';
             activeApiMetadata.company_name = item.name;
             activeApiMetadata.corporate_number = item.num;
-            activeApiMetadata.establishmentDate = item.estDate || "2020-01-01";
+            activeApiMetadata.establishmentDate = item.estDate || item.regDate || "2020-01-01";
             
-            // カナ表記・インボイス登録番号・法人番号の動的連携
+            // カナ表記・インボイス登録番号・法人番号・住所等の動的連携
             autoFillCorpRelatedFields(item);
             triggerInputChange(input);
           });
@@ -7631,7 +9660,14 @@
         });
         curPanel.style.display = 'block';
       } else {
-        curPanel.style.display = 'none';
+        const prefLabel = selPref ? `【${escapeHtml(selPref)}】` : '';
+        curPanel.innerHTML = `
+          <div style="padding:12px; font-size:0.75rem; color:#718096; text-align:center; line-height:1.4;">
+            国税庁API照会: 一致する法人情報が見つかりませんでした ${prefLabel}
+            <div style="font-size:0.68rem; color:#a0aec0; margin-top:4px;">（屋号または個人事業主の方はそのまま手入力して進めていただけます）</div>
+          </div>
+        `;
+        curPanel.style.display = 'block';
       }
     };
 
@@ -7646,7 +9682,7 @@
           return;
         }
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(executeSearch, 150);
+        debounceTimer = setTimeout(executeSearch, 250);
       });
       input.addEventListener('focus', () => {
         if (input.value.trim().length > 0) {
@@ -8544,18 +10580,27 @@
 
     if (!input.dataset.accountHolderBound) {
       input.dataset.accountHolderBound = "1";
-      const kanaRegex = /^[ァ-ヶｦ-ﾟー\-()（）.\．\・\s　]+$/;
+      const kanaRegex = /^[ァ-ヶｦ-ﾟー\-‐―()（）.\．\・\s　]+$/;
       const convertHiragana = (str) => {
         if (!str) return '';
         return str.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
       };
 
-      const validate = () => {
+      let isComposing = false;
+      input.addEventListener('compositionstart', () => { isComposing = true; });
+      input.addEventListener('compositionend', () => {
+        isComposing = false;
+        validate(true);
+      });
+
+      const validate = (doConvert) => {
         let val = input.value;
-        const converted = convertHiragana(val);
-        if (converted !== val) {
-          val = converted;
-          input.value = val;
+        if (doConvert) {
+          const converted = convertHiragana(val);
+          if (converted !== val) {
+            val = converted;
+            input.value = val;
+          }
         }
 
         const trimmed = val.trim();
@@ -8569,8 +10614,43 @@
           clearIntegrityError(card);
         }
       };
-      input.addEventListener('input', validate);
-      input.addEventListener('blur', validate);
+      input.addEventListener('input', (e) => {
+        if (isComposing || (e && e.isComposing)) return;
+        validate(false);
+      });
+      input.addEventListener('blur', () => {
+        validate(true);
+      });
+    }
+  }
+
+  function setupAccountNumberValidation(card, qDef) {
+    const input = card.querySelector('input');
+    if (!input) return;
+    input.placeholder = "例: 0477651 (6〜7桁の半角数字)";
+    input.maxLength = 7;
+
+    if (!input.dataset.acctNumBound) {
+      input.dataset.acctNumBound = "1";
+      const normalizeVal = (val) => {
+        return (val || '').replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/[^\d]/g, '');
+      };
+
+      input.addEventListener('input', (e) => {
+        const curVal = e.target.value;
+        const normalized = normalizeVal(curVal);
+        if (normalized !== curVal) {
+          e.target.value = normalized;
+        }
+        if (window.V) {
+          window.V[qDef.id] = normalized;
+        }
+        if (qDef.validation && qDef.validation.category === 'regex') {
+          qDef.validation.value = '^[0-9]{6,7}$';
+          qDef.validation.errorMessage = '正しい口座番号（6〜7桁の半角数字）を入力してください。';
+        }
+        clearIntegrityError(card);
+      });
     }
   }
 
@@ -8601,6 +10681,710 @@
       }
     };
   }
+
+    function buildCorpInfoQuestions(baseTime = Date.now(), corpGrpId = `grp_corp_info_${baseTime}`, corpGrpTitle = '法人情報') {
+      const taxStatusQId = `q_tax_status_${baseTime + 11}`;
+      return [
+        {
+          id: `q_corp_name_${baseTime}`,
+          type: "text",
+          title: "法人名",
+          description: "法人名を入力して候補から選択してください（国税庁法人番号API照会）",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "company_name",
+          validation: {
+            category: "api",
+            condition: "corp_name",
+            value: "",
+            value2: "",
+            errorMessage: "実在する法人名を入力または選択してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_corp_kana_${baseTime + 1}`,
+          type: "text",
+          title: "法人名（カナ）",
+          description: "全角カタカナで入力してください。法人名検索から自動反映されます。",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "company_kana",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^[ァ-ヶｦ-ﾟー\\s　]+$",
+            presetKey: "company_kana",
+            value2: "",
+            errorMessage: "全角カタカナで入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_zip_${baseTime + 2}`,
+          type: "text",
+          title: "郵便番号",
+          description: "法人選択で自動入力されます（7桁半角数字）",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "zip_code",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^[0-9]{3}-?[0-9]{4}$",
+            presetKey: "zip",
+            value2: "",
+            errorMessage: "郵便番号を7桁で入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_pref_${baseTime + 3}`,
+          type: "select",
+          title: "都道府県",
+          description: "本店所在地の都道府県を選択してください",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "pref",
+          options: JAPAN_PREFECTURES.map(p => ({ label: p }))
+        },
+        {
+          id: `q_city_${baseTime + 4}`,
+          type: "text",
+          title: "市区町村",
+          description: "",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "city",
+          options: []
+        },
+        {
+          id: `q_street_${baseTime + 5}`,
+          type: "text",
+          title: "町名・番地",
+          description: "自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "street",
+          options: []
+        },
+        {
+          id: `q_building_${baseTime + 6}`,
+          type: "text",
+          title: "建物名・部屋番号",
+          description: "ビル名・階数・部屋番号等がある場合はご入力ください",
+          required: false,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "building",
+          options: []
+        },
+        {
+          id: `q_rep_name_${baseTime + 7}`,
+          type: "text",
+          title: "代表者名",
+          description: "代表取締役の氏名を入力してください（例: 山田 太郎）",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "representative_name",
+          options: []
+        },
+        {
+          id: `q_rep_kana_${baseTime + 8}`,
+          type: "text",
+          title: "代表者名（カナ）",
+          description: "代表取締役のフリガナを全角カタカナで入力してください",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "representative_kana",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^[ァ-ヶｦ-ﾟー\\s　]+$",
+            presetKey: "representative_kana",
+            value2: "",
+            errorMessage: "全角カタカナで入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_email_${baseTime + 9}`,
+          type: "text",
+          title: "メールアドレス",
+          description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。",
+          required: true,
+          autoReply: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "email",
+          validation: {
+            category: "text",
+            condition: "email",
+            value: "",
+            value2: "",
+            errorMessage: "有効なメールアドレスを入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_tel_${baseTime + 10}`,
+          type: "text",
+          title: "電話番号",
+          description: "半角数字（ハイフンなし）で入力してください（例: 0312345678）",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "tel",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^0\\d{9,10}$",
+            presetKey: "tel_no_hyphen",
+            value2: "",
+            errorMessage: "半角数字（10桁または11桁・ハイフンなし）で入力してください。"
+          },
+          options: []
+        },
+        {
+          id: taxStatusQId,
+          type: "radio",
+          title: "税務区分・インボイス登録状況",
+          description: "該当する税務区分を選択してください。法人名選択時に登録が確認された場合は「インボイス登録事業者である。」が自動選択されます。",
+          required: true,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "tax_invoice_status",
+          options: [
+            { label: "非課税事業者である。" },
+            { label: "課税事業者でインボイスは未登録である。" },
+            { label: "インボイス登録事業者である。" }
+          ]
+        },
+        {
+          id: `q_invoice_num_${baseTime + 12}`,
+          type: "text",
+          title: "インボイス登録番号",
+          description: "T＋13桁の半角数字。法人選択時に国税庁適格請求書発行事業者公表システムへ自動照合されます。",
+          required: false,
+          groupId: corpGrpId,
+          groupTitle: corpGrpTitle,
+          dataKey: "invoice_number",
+          validation: {
+            category: "api",
+            condition: "invoice_number",
+            value: "",
+            value2: "",
+            errorMessage: "実在する有効なインボイス登録番号（T+13桁）を入力してください。"
+          },
+          skipLogic: {
+            dependsOn: taxStatusQId,
+            condition: "not_equals",
+            value: "インボイス登録事業者である。",
+            action: "hide"
+          },
+          options: []
+        }
+      ];
+    }
+
+    function buildIndivInfoQuestions(baseTime = Date.now(), indivGrpId = `grp_indiv_info_${baseTime}`, indivGrpTitle = '個人事業主情報') {
+      const taxStatusQId = `q_tax_status_${baseTime + 11}`;
+      return [
+        {
+          id: `q_rep_name_${baseTime}`,
+          type: "text",
+          title: "氏名（代表者名）",
+          description: "氏名（漢字）を入力してください（例: 山田 太郎）",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "representative_name",
+          options: []
+        },
+        {
+          id: `q_rep_kana_${baseTime + 1}`,
+          type: "text",
+          title: "氏名（カナ）",
+          description: "氏名のフリガナを全角カタカナで入力してください",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "representative_kana",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^[ァ-ヶｦ-ﾟー\\s　]+$",
+            presetKey: "representative_kana",
+            value2: "",
+            errorMessage: "全角カタカナで入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_trade_name_${baseTime + 2}`,
+          type: "text",
+          title: "屋号",
+          description: "屋号をお持ちの場合のみ入力してください（屋号がない場合は空欄のままで進めます）",
+          required: false,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "company_name",
+          options: []
+        },
+        {
+          id: `q_trade_kana_${baseTime + 3}`,
+          type: "text",
+          title: "屋号（カナ）",
+          description: "※屋号を入力された場合は、屋号のフリガナ（全角カタカナ）も必ず入力してください。",
+          required: false,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "company_kana",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^[ァ-ヶｦ-ﾟー\\s　]+$",
+            presetKey: "company_kana",
+            value2: "",
+            errorMessage: "全角カタカナで入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_zip_${baseTime + 4}`,
+          type: "text",
+          title: "郵便番号",
+          description: "7桁半角数字を入力すると住所を自動補完します（例: 150-0041）",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "zip_code",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^[0-9]{3}-?[0-9]{4}$",
+            presetKey: "zip",
+            value2: "",
+            errorMessage: "郵便番号を7桁で入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_pref_${baseTime + 5}`,
+          type: "select",
+          title: "都道府県",
+          description: "お住まいの都道府県を選択してください",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "pref",
+          options: JAPAN_PREFECTURES.map(p => ({ label: p }))
+        },
+        {
+          id: `q_city_${baseTime + 6}`,
+          type: "text",
+          title: "市区町村",
+          description: "",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "city",
+          options: []
+        },
+        {
+          id: `q_street_${baseTime + 7}`,
+          type: "text",
+          title: "町名・番地",
+          description: "自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "street",
+          options: []
+        },
+        {
+          id: `q_building_${baseTime + 8}`,
+          type: "text",
+          title: "建物名・部屋番号",
+          description: "マンション名・アパート名・部屋番号等がある場合はご入力ください",
+          required: false,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "building",
+          options: []
+        },
+        {
+          id: `q_email_${baseTime + 9}`,
+          type: "text",
+          title: "メールアドレス",
+          description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。",
+          required: true,
+          autoReply: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "email",
+          validation: {
+            category: "text",
+            condition: "email",
+            value: "",
+            value2: "",
+            errorMessage: "有効なメールアドレスを入力してください。"
+          },
+          options: []
+        },
+        {
+          id: `q_tel_${baseTime + 10}`,
+          type: "text",
+          title: "電話番号",
+          description: "半角数字（ハイフンなし）で入力してください（例: 09012345678）",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "tel",
+          validation: {
+            category: "regex",
+            condition: "matches",
+            value: "^0\\d{9,10}$",
+            presetKey: "tel_no_hyphen",
+            value2: "",
+            errorMessage: "半角数字（10桁または11桁・ハイフンなし）で入力してください。"
+          },
+          options: []
+        },
+        {
+          id: taxStatusQId,
+          type: "radio",
+          title: "税務区分・インボイス登録状況",
+          description: "該当する税務区分を選択してください。「インボイス登録事業者である。」を選択された場合は登録番号の入力とAPI照合を行います。",
+          required: true,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "tax_invoice_status",
+          options: [
+            { label: "非課税事業者である。" },
+            { label: "課税事業者でインボイスは未登録である。" },
+            { label: "インボイス登録事業者である。" }
+          ]
+        },
+        {
+          id: `q_invoice_num_${baseTime + 12}`,
+          type: "text",
+          title: "インボイス登録番号",
+          description: "T＋13桁の半角数字を入力してください（国税庁公表システムへ照合します）。",
+          required: false,
+          groupId: indivGrpId,
+          groupTitle: indivGrpTitle,
+          dataKey: "invoice_number",
+          validation: {
+            category: "api",
+            condition: "invoice_number",
+            value: "",
+            value2: "",
+            errorMessage: "国税庁公表システムに登録された有効なインボイス登録番号を入力してください。"
+          },
+          skipLogic: {
+            dependsOn: taxStatusQId,
+            condition: "not_equals",
+            value: "インボイス登録事業者である。",
+            action: "hide"
+          },
+          options: []
+        }
+      ];
+    }
+    window.buildCorpInfoQuestions = buildCorpInfoQuestions;
+    window.buildIndivInfoQuestions = buildIndivInfoQuestions;
+
+    function executeApplyPreset(val, activeSec, baseTime) {
+      if (!val) return;
+
+      if (val === 'pro_branch_hybrid') {
+        const secCorpId = `sec_corp_${baseTime + 1}`;
+        const secIndivId = `sec_indiv_${baseTime + 2}`;
+
+        const branchSec = {
+          id: `sec_branch_${baseTime}`,
+          title: "申請区分の選択",
+          description: "申請区分（契約種別）を選択してください。選択内容に応じて次に入力する情報が自動的に切り替わります。",
+          nextAction: "branch",
+          questions: [
+            {
+              id: `q_branch_type_${baseTime}`,
+              type: "radio",
+              title: "申請区分をお選びください",
+              description: "該当する区分をお選びください",
+              required: true,
+              dataKey: "applicant_type",
+              options: [
+                { label: "🏢 法人として申請", nextSectionId: secCorpId },
+                { label: "👤 個人事業主として申請", nextSectionId: secIndivId }
+              ]
+            }
+          ]
+        };
+
+        const corpSec = {
+          id: secCorpId,
+          title: "法人情報の入力",
+          description: "法人の基本情報および代表者情報をご入力ください。",
+          nextAction: "submit",
+          questions: buildCorpInfoQuestions(baseTime + 10, `grp_corp_${baseTime + 10}`, '法人情報')
+        };
+
+        const indivSec = {
+          id: secIndivId,
+          title: "個人事業主情報の入力",
+          description: "個人事業主または個人の基本情報をご入力ください。",
+          nextAction: "submit",
+          questions: buildIndivInfoQuestions(baseTime + 20, `grp_indiv_${baseTime + 20}`, '個人事業主情報')
+        };
+
+        if (!window.n.sections) window.n.sections = [];
+        const isSingleInitialSec = window.n.sections.length <= 1 &&
+          (!window.n.sections[0] || !window.n.sections[0].questions || window.n.sections[0].questions.length <= 1);
+        if (isSingleInitialSec) {
+          window.n.sections = [branchSec, corpSec, indivSec];
+        } else {
+          window.n.sections.push(branchSec, corpSec, indivSec);
+        }
+        window.r = branchSec.id;
+        if (window.le) window.le(branchSec);
+        if (window.S) window.S(true);
+        if (window.x) window.x();
+        renderLivePreview();
+        return;
+      }
+
+      if (!activeSec) return;
+
+      const isSingleInitialQ = activeSec.questions.length === 1 &&
+        (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
+        !activeSec.questions[0].required && !activeSec.questions[0].validation;
+      if (isSingleInitialQ) {
+        activeSec.questions = [];
+      }
+
+      if (val === 'pro_corp_info') {
+        const corpGrpId = `grp_corp_info_${baseTime}`;
+        const corpGrpTitle = '法人情報';
+        activeSec.questions.push(...buildCorpInfoQuestions(baseTime, corpGrpId, corpGrpTitle));
+      } else if (val === 'pro_individual_info') {
+        const indivGrpId = `grp_indiv_info_${baseTime}`;
+        const indivGrpTitle = '個人事業主情報';
+        activeSec.questions.push(...buildIndivInfoQuestions(baseTime, indivGrpId, indivGrpTitle));
+      } else if (val === 'email_autoreply') {
+        activeSec.questions.push({
+          id: `q_email_${baseTime}`,
+          type: "text",
+          title: "メールアドレス",
+          description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。",
+          required: true,
+          autoReply: true,
+          dataKey: "email",
+          validation: {
+            category: "text",
+            condition: "email",
+            value: "",
+            value2: "",
+            errorMessage: "有効なメールアドレスを入力してください。"
+          },
+          options: []
+        });
+      } else if (val === 'pro_corp_address') {
+        const corpGrpId = `grp_corp_${baseTime}`;
+        const corpGrpTitle = '法人住所';
+        activeSec.questions.push(
+          {
+            id: `q_corp_name_${baseTime}`,
+            type: "text",
+            title: "法人名・屋号",
+            description: "法人名を入力して候補から選択してください（個人事業主の方は直接入力可能です）",
+            required: true,
+            groupId: corpGrpId,
+            groupTitle: corpGrpTitle,
+            dataKey: "company_name",
+            validation: {
+              category: "api",
+              condition: "corp_name",
+              value: "",
+              value2: "",
+              errorMessage: "実在する法人名を入力または選択してください。"
+            },
+            options: []
+          },
+          { id: `q_zip_${baseTime + 1}`, type: "text", title: "郵便番号", description: "法人選択または7桁入力で住所を自動補完します", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "zip_code" },
+          { id: `q_pref_${baseTime + 2}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "pref" },
+          { id: `q_city_${baseTime + 3}`, type: "text", title: "市区町村", description: "", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "city" },
+          { id: `q_street_${baseTime + 4}`, type: "text", title: "町名・番地", description: "自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "street" },
+          { id: `q_building_${baseTime + 5}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: corpGrpId, groupTitle: corpGrpTitle, dataKey: "building" }
+        );
+      } else if (val === 'pro_address') {
+        const addrGrpId = `grp_addr_${baseTime}`;
+        const addrGrpTitle = '住所';
+        const addrGrpDesc = 'ご住所を入力してください';
+        activeSec.questions.push(
+          { id: `q_zip_${baseTime}`, type: "text", title: "郵便番号", description: "7桁半角数字を入力すると住所を自動補完します", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "zip_code" },
+          { id: `q_pref_${baseTime + 1}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "pref" },
+          { id: `q_city_${baseTime + 2}`, type: "text", title: "市区町村", description: "", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "city" },
+          { id: `q_street_${baseTime + 3}`, type: "text", title: "町名・番地", description: "自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "street" },
+          { id: `q_building_${baseTime + 4}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc, dataKey: "building" }
+        );
+      } else if (val === 'pro_bank') {
+        const bankGrpId = `grp_bank_${baseTime}`;
+        const bankGrpTitle = '銀行口座';
+        activeSec.questions.push(
+          {
+            id: `q_bank_name_${baseTime}`,
+            type: "text",
+            title: "銀行名",
+            description: "銀行名を入力または検索して選択してください",
+            required: true,
+            groupId: bankGrpId,
+            groupTitle: bankGrpTitle,
+            dataKey: "bank_name",
+            validation: {
+              category: "api",
+              condition: "bank_name",
+              value: "",
+              value2: "",
+              errorMessage: "実在する銀行名を入力または選択してください。"
+            },
+            options: []
+          },
+          {
+            id: `q_bank_code_${baseTime}`,
+            type: "text",
+            title: "金融機関コード",
+            description: "銀行名を選択すると自動入力されます（半角数字4桁）",
+            required: true,
+            groupId: bankGrpId,
+            groupTitle: bankGrpTitle,
+            dataKey: "bank_code",
+            validation: {
+              category: "regex",
+              condition: "matches",
+              value: "^[0-9]{4}$",
+              presetKey: "custom",
+              value2: "",
+              errorMessage: "半角数字4桁で入力してください。"
+            },
+            options: []
+          },
+          {
+            id: `q_branch_code_${baseTime}`,
+            type: "text",
+            title: "支店番号",
+            description: "3桁の半角数字を入力すると支店名が補完されます",
+            required: true,
+            groupId: bankGrpId,
+            groupTitle: bankGrpTitle,
+            dataKey: "branch_code",
+            validation: {
+              category: "regex",
+              condition: "matches",
+              value: "^[0-9]{3}$",
+              presetKey: "custom",
+              value2: "",
+              errorMessage: "半角数字3桁で入力してください。"
+            },
+            options: []
+          },
+          {
+            id: `q_branch_name_${baseTime}`,
+            type: "text",
+            title: "支店名",
+            description: "支店名を入力または候補から選択してください",
+            required: true,
+            groupId: bankGrpId,
+            groupTitle: bankGrpTitle,
+            dataKey: "branch_name",
+            validation: {
+              category: "api",
+              condition: "branch_name",
+              value: "",
+              value2: "",
+              errorMessage: "実在する支店名を入力または選択してください。"
+            },
+            options: []
+          },
+          {
+            id: `q_account_type_${baseTime}`,
+            type: "radio",
+            title: "口座種別",
+            description: "口座の種別を選択してください",
+            required: true,
+            groupId: bankGrpId,
+            groupTitle: bankGrpTitle,
+            dataKey: "account_type",
+            validation: null,
+            options: [
+              { label: "普通" },
+              { label: "当座" },
+              { label: "貯蓄" }
+            ]
+          },
+          {
+            id: `q_account_number_${baseTime}`,
+            type: "text",
+            title: "口座番号",
+            description: "6〜7桁の半角数字で入力してください（例: 1234567）",
+            required: true,
+            groupId: bankGrpId,
+            groupTitle: bankGrpTitle,
+            dataKey: "account_number",
+            validation: {
+              category: "regex",
+              condition: "matches",
+              value: "^[0-9]{6,7}$",
+              presetKey: "bank_account",
+              value2: "",
+              errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+            },
+            options: []
+          },
+          {
+            id: `q_account_holder_${baseTime}`,
+            type: "text",
+            title: "口座名義（カナ）",
+            description: "カナ、カッコ（）、ドット（.）で入力してください（例: カ）ヤマダ タロウ）",
+            required: true,
+            groupId: bankGrpId,
+            groupTitle: bankGrpTitle,
+            dataKey: "account_holder_kana",
+            validation: {
+              category: "regex",
+              condition: "matches",
+              value: "^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$",
+              presetKey: "account_holder_kana",
+              value2: "",
+              errorMessage: "口座名義はカナと（）.のみで入力してください。"
+            },
+            options: []
+          }
+        );
+      } else if (val === 'pro_password') {
+        activeSec.questions.push(
+          { id: `q_pw_${baseTime}`, type: "password", title: "パスワード", description: "伏せ字で表示されます", required: true, dataKey: "password" }
+        );
+      }
+
+      if (window.le && activeSec) window.le(activeSec);
+      if (window.S) window.S(true);
+      if (window.x) window.x();
+      renderLivePreview();
+    }
+
+  window.buildCorpInfoQuestions = buildCorpInfoQuestions;
+  window.buildIndivInfoQuestions = buildIndivInfoQuestions;
+  window.executeApplyPreset = executeApplyPreset;
 
   function patchPresetSelectMenu() {
     // 単体プリセットに「銀行名」「支店名」を補完
@@ -8637,12 +11421,40 @@
           options: []
         };
       }
+      if (!window.re.bank_account) {
+        window.re.bank_account = {
+          type: "text",
+          title: "口座番号",
+          description: "6〜7桁の半角数字で入力してください（例: 1234567）",
+          placeholder: "0477651",
+          required: true,
+          validation: {
+            category: "regex",
+            condition: "matches",
+            presetKey: "bank_account",
+            value: "^[0-9]{6,7}$",
+            value2: "",
+            errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+          },
+          options: []
+        };
+      }
       if (window.re.pro_bank && Array.isArray(window.re.pro_bank.questions)) {
         window.re.pro_bank.questions.forEach(q => {
           if (q.title === '金融機関名' || q.title === '銀行名') {
             q.validation = { category: "api", condition: "bank_name", errorMessage: "実在する金融機関名を入力または選択してください。" };
           } else if (q.title === '支店名') {
             q.validation = { category: "api", condition: "branch_name", errorMessage: "実在する支店名を入力または選択してください。" };
+          } else if (q.title === '口座番号') {
+            q.description = "6〜7桁の半角数字で入力してください（例: 1234567）";
+            q.placeholder = "0477651";
+            q.validation = {
+              category: "regex",
+              condition: "matches",
+              presetKey: "bank_account",
+              value: "^[0-9]{6,7}$",
+              errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+            };
           }
         });
       }
@@ -8651,13 +11463,28 @@
     const presetSelect = document.getElementById('select-preset-question');
     if (!presetSelect) return;
 
-    if (!presetSelect.querySelector('option[value="pro_corp_address"]') || !presetSelect.querySelector('option[value="pro_address"]')) {
+    if (!presetSelect.querySelector('option[value="pro_corp_info"]') || !presetSelect.querySelector('option[value="pro_individual_info"]')) {
       // 既存のoptGroupがあれば除去して再作成
-      const existingGroup = presetSelect.querySelector('optgroup[label*="郵便・銀行・PW"]');
+      const existingGroup = presetSelect.querySelector('optgroup[label*="郵便・銀行・PW"], optgroup[label*="プロプリセット"]');
       if (existingGroup) existingGroup.remove();
 
       const optGroup = document.createElement('optgroup');
-      optGroup.label = "🏢 郵便・銀行・PW 必須プリセット";
+      optGroup.label = "🚀 ビジネス・本人確認 プロプリセット";
+
+      const optCorpInfo = document.createElement('option');
+      optCorpInfo.value = "pro_corp_info";
+      optCorpInfo.textContent = "🏢 法人情報一括セット（法人名・カナ・代表者・所在地・税務区分3択・インボイス）";
+      optGroup.appendChild(optCorpInfo);
+
+      const optIndivInfo = document.createElement('option');
+      optIndivInfo.value = "pro_individual_info";
+      optIndivInfo.textContent = "👤 個人事業主情報一括セット（氏名・カナ・屋号・住所・税務区分3択・インボイス）";
+      optGroup.appendChild(optIndivInfo);
+
+      const optHybrid = document.createElement('option');
+      optHybrid.value = "pro_branch_hybrid";
+      optHybrid.textContent = "🔀 法人・個人自動分岐セット（汎用ハイブリッド・カラム共通化）";
+      optGroup.appendChild(optHybrid);
 
       const optCorpAddr = document.createElement('option');
       optCorpAddr.value = "pro_corp_address";
@@ -8699,11 +11526,72 @@
       optBranchCodeSingle.textContent = "支店番号（全銀協API連携）";
       presetSelect.appendChild(optBranchCodeSingle);
     }
+    if (!presetSelect.querySelector('option[value="bank_account"]')) {
+      const optBankAcctSingle = document.createElement('option');
+      optBankAcctSingle.value = "bank_account";
+      optBankAcctSingle.textContent = "口座番号（6〜7桁半角数字）";
+      presetSelect.appendChild(optBankAcctSingle);
+    }
+
+    // ✉️ メールアドレス（2種類: 通常 / 回答控え自動送信）
+    if (window.re) {
+      if (!window.re.email) {
+        window.re.email = {
+          type: "text",
+          title: "メールアドレス",
+          description: "ご連絡可能なメールアドレスを入力してください。",
+          required: true,
+          autoReply: false,
+          validation: {
+            category: "text",
+            condition: "email",
+            value: "",
+            value2: "",
+            errorMessage: "有効なメールアドレスを入力してください。"
+          },
+          options: []
+        };
+      } else {
+        window.re.email.autoReply = false;
+      }
+
+      window.re.email_autoreply = {
+        type: "text",
+        title: "メールアドレス",
+        description: "ご回答内容の控えをこのメールアドレス宛てにお送りします。",
+        required: true,
+        autoReply: true,
+        validation: {
+          category: "text",
+          condition: "email",
+          value: "",
+          value2: "",
+          errorMessage: "有効なメールアドレスを入力してください。"
+        },
+        options: []
+      };
+    }
+
+    // プリセットセレクトボックス内の表示名調整
+    const optEmail = presetSelect.querySelector('option[value="email"]');
+    if (optEmail) {
+      optEmail.textContent = "✉️ メールアドレス（通常・入力のみ）";
+      if (!presetSelect.querySelector('option[value="email_autoreply"]')) {
+        const optAutoreply = document.createElement('option');
+        optAutoreply.value = "email_autoreply";
+        optAutoreply.textContent = "📨 メールアドレス（回答控えを自動送信）";
+        if (optEmail.nextSibling) {
+          presetSelect.insertBefore(optAutoreply, optEmail.nextSibling);
+        } else {
+          presetSelect.appendChild(optAutoreply);
+        }
+      }
+    }
 
     const originalWe = window.we;
     const selectChanger = (e) => {
       const val = e.target.value;
-      if (!val.startsWith('pro_')) return;
+      if (!val.startsWith('pro_') && val !== 'email_autoreply') return;
 
       e.stopPropagation();
       e.preventDefault();
@@ -8713,210 +11601,19 @@
         activeSec = window.n.sections[0];
         window.r = activeSec.id;
       }
-      if (!activeSec) return;
 
       const baseTime = Date.now();
-
-      if (val === 'pro_corp_address') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
-
-        const corpGrpId = `grp_corp_${baseTime}`;
-        const corpGrpTitle = '法人住所';
-        activeSec.questions.push(
-          {
-            id: `q_corp_name_${baseTime}`,
-            type: "text",
-            title: "法人名・屋号",
-            description: "法人名を入力して候補から選択してください（個人事業主の方は直接入力可能です）",
-            required: true,
-            groupId: corpGrpId,
-            groupTitle: corpGrpTitle,
-            validation: {
-              category: "api",
-              condition: "corp_name",
-              value: "",
-              value2: "",
-              errorMessage: "実在する法人名を入力または選択してください。"
-            },
-            options: []
-          },
-          { id: `q_zip_${baseTime + 1}`, type: "text", title: "郵便番号", description: "法人選択または7桁入力で住所を自動補完します", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_pref_${baseTime + 2}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_city_${baseTime + 3}`, type: "text", title: "市区町村", description: "", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_street_${baseTime + 4}`, type: "text", title: "町名・番地", description: "", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_building_${baseTime + 5}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: corpGrpId, groupTitle: corpGrpTitle }
-        );
-      } else if (val === 'pro_address') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
-
-        const addrGrpId = `grp_addr_${baseTime}`;
-        const addrGrpTitle = '住所';
-        const addrGrpDesc = 'ご住所を入力してください';
-        activeSec.questions.push(
-          { id: `q_zip_${baseTime}`, type: "text", title: "郵便番号", description: "7桁半角数字を入力すると住所を自動補完します", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_pref_${baseTime + 1}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_city_${baseTime + 2}`, type: "text", title: "市区町村", description: "", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_street_${baseTime + 3}`, type: "text", title: "町名・番地", description: "", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_building_${baseTime + 4}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc }
-        );
-      } else if (val === 'pro_bank') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
-
-        const bankGrpId = `grp_bank_${baseTime}`;
-        const bankGrpTitle = '銀行口座';
-        activeSec.questions.push(
-          {
-            id: `q_bank_name_${baseTime}`,
-            type: "text",
-            title: "銀行名",
-            description: "銀行名を入力または検索して選択してください",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "api",
-              condition: "bank_name",
-              value: "",
-              value2: "",
-              errorMessage: "実在する銀行名を入力または選択してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_bank_code_${baseTime}`,
-            type: "text",
-            title: "金融機関コード",
-            description: "銀行名を選択すると自動入力されます（半角数字4桁）",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "regex",
-              condition: "matches",
-              value: "^[0-9]{4}$",
-              presetKey: "custom",
-              value2: "",
-              errorMessage: "半角数字4桁で入力してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_branch_code_${baseTime}`,
-            type: "text",
-            title: "支店番号",
-            description: "3桁の半角数字を入力すると支店名が補完されます",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "regex",
-              condition: "matches",
-              value: "^[0-9]{3}$",
-              presetKey: "custom",
-              value2: "",
-              errorMessage: "半角数字3桁で入力してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_branch_name_${baseTime}`,
-            type: "text",
-            title: "支店名",
-            description: "支店名を入力または候補から選択してください",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "api",
-              condition: "branch_name",
-              value: "",
-              value2: "",
-              errorMessage: "実在する支店名を入力または選択してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_account_type_${baseTime}`,
-            type: "radio",
-            title: "口座種別",
-            description: "口座の種別を選択してください",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: null,
-            options: [
-              { label: "普通" },
-              { label: "当座" },
-              { label: "貯蓄" }
-            ]
-          },
-          {
-            id: `q_account_number_${baseTime}`,
-            type: "text",
-            title: "口座番号",
-            description: "7桁の半角数字で入力してください（例: 1234567）",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "regex",
-              condition: "matches",
-              value: "^[0-9]{7}$",
-              presetKey: "custom",
-              value2: "",
-              errorMessage: "正しい口座番号（7桁の半角数字）を入力してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_account_holder_${baseTime}`,
-            type: "text",
-            title: "口座名義（カナ）",
-            description: "カナ、カッコ（）、ドット（.）で入力してください（例: カ）ヤマダ タロウ）",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "regex",
-              condition: "matches",
-              value: "^[ァ-ヶｦ-ﾟー\\-()（）.\\．\\・\\s　]+$",
-              presetKey: "account_holder_kana",
-              value2: "",
-              errorMessage: "口座名義はカナと（）.のみで入力してください。"
-            },
-            options: []
-          }
-        );
-      } else if (val === 'pro_password') {
-        activeSec.questions.push(
-          { id: `q_pw_${baseTime}`, type: "password", title: "パスワード", description: "伏せ字で表示されます", required: true }
-        );
-      }
-
       e.target.value = "";
-      if (window.S) window.S();
-      if (window.x) window.x();
-      renderLivePreview();
+      if (typeof executeApplyPreset === 'function') {
+        executeApplyPreset(val, activeSec, baseTime);
+      } else if (typeof window.executeApplyPreset === 'function') {
+        window.executeApplyPreset(val, activeSec, baseTime);
+      }
     };
 
     presetSelect.removeEventListener('change', window.we);
     presetSelect.addEventListener('change', (e) => {
-      if (e.target.value.startsWith('pro_')) {
+      if (e.target.value.startsWith('pro_') || e.target.value === 'email_autoreply') {
         selectChanger(e);
       } else {
         if (typeof originalWe === 'function') {
@@ -8929,215 +11626,21 @@
     });
   }
 
-  // グローバルキャプチャフェーズでも確実に pro_ プリセットを検知
+  // グローバルキャプチャフェーズでも確実に pro_ および email_autoreply プリセットを検知
   document.addEventListener('change', (e) => {
-    if (e.target && e.target.id === 'select-preset-question' && e.target.value && e.target.value.startsWith('pro_')) {
+    if (e.target && e.target.id === 'select-preset-question' && e.target.value && (e.target.value.startsWith('pro_') || e.target.value === 'email_autoreply')) {
       const activeSec = (window.n && window.n.sections) ? (window.n.sections.find(s => s.id === window.r) || window.n.sections[0]) : null;
-      if (!activeSec) return;
-      window.r = activeSec.id;
+      if (activeSec) {
+        window.r = activeSec.id;
+      }
 
       const val = e.target.value;
       const baseTime = Date.now();
-
-      if (val === 'pro_corp_address') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
-
-        const corpGrpId = `grp_corp_${baseTime}`;
-        const corpGrpTitle = '法人住所';
-        activeSec.questions.push(
-          {
-            id: `q_corp_name_${baseTime}`,
-            type: "text",
-            title: "法人名・屋号",
-            description: "法人名を入力して候補から選択してください（個人事業主の方は直接入力可能です）",
-            required: true,
-            groupId: corpGrpId,
-            groupTitle: corpGrpTitle,
-            validation: {
-              category: "api",
-              condition: "corp_name",
-              value: "",
-              value2: "",
-              errorMessage: "実在する法人名を入力または選択してください。"
-            },
-            options: []
-          },
-          { id: `q_zip_${baseTime + 1}`, type: "text", title: "郵便番号", description: "法人選択または7桁入力で住所を自動補完します", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_pref_${baseTime + 2}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_city_${baseTime + 3}`, type: "text", title: "市区町村", description: "", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_street_${baseTime + 4}`, type: "text", title: "町名・番地", description: "", required: true, groupId: corpGrpId, groupTitle: corpGrpTitle },
-          { id: `q_building_${baseTime + 5}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: corpGrpId, groupTitle: corpGrpTitle }
-        );
-      } else if (val === 'pro_address') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
-
-        const addrGrpId = `grp_addr_${baseTime}`;
-        const addrGrpTitle = '住所';
-        const addrGrpDesc = 'ご住所を入力してください';
-        activeSec.questions.push(
-          { id: `q_zip_${baseTime}`, type: "text", title: "郵便番号", description: "7桁半角数字を入力すると住所を自動補完します", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_pref_${baseTime + 1}`, type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, options: JAPAN_PREFECTURES.map(p => ({ label: p })), groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_city_${baseTime + 2}`, type: "text", title: "市区町村", description: "", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_street_${baseTime + 3}`, type: "text", title: "町名・番地", description: "", required: true, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc },
-          { id: `q_building_${baseTime + 4}`, type: "text", title: "建物名・部屋番号", description: "マンション名・ビル名・部屋番号等がある場合はご入力ください", required: false, groupId: addrGrpId, groupTitle: addrGrpTitle, groupDescription: addrGrpDesc }
-        );
-      } else if (val === 'pro_bank') {
-        const isSingleInitialQ = activeSec.questions.length === 1 &&
-          (activeSec.questions[0].title === "質問 1" || !activeSec.questions[0].title) &&
-          !activeSec.questions[0].required && !activeSec.questions[0].validation;
-        if (isSingleInitialQ) {
-          activeSec.questions = [];
-        }
-
-        const bankGrpId = `grp_bank_${baseTime}`;
-        const bankGrpTitle = '銀行口座';
-        activeSec.questions.push(
-          {
-            id: `q_bank_name_${baseTime}`,
-            type: "text",
-            title: "銀行名",
-            description: "銀行名を入力または検索して選択してください",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "api",
-              condition: "bank_name",
-              value: "",
-              value2: "",
-              errorMessage: "実在する銀行名を入力または選択してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_bank_code_${baseTime}`,
-            type: "text",
-            title: "金融機関コード",
-            description: "銀行名を選択すると自動入力されます（半角数字4桁）",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "regex",
-              condition: "matches",
-              value: "^[0-9]{4}$",
-              presetKey: "custom",
-              value2: "",
-              errorMessage: "半角数字4桁で入力してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_branch_code_${baseTime}`,
-            type: "text",
-            title: "支店番号",
-            description: "3桁の半角数字を入力すると支店名が補完されます",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "regex",
-              condition: "matches",
-              value: "^[0-9]{3}$",
-              presetKey: "custom",
-              value2: "",
-              errorMessage: "半角数字3桁で入力してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_branch_name_${baseTime}`,
-            type: "text",
-            title: "支店名",
-            description: "支店名を入力または候補から選択してください",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "api",
-              condition: "branch_name",
-              value: "",
-              value2: "",
-              errorMessage: "実在する支店名を入力または選択してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_account_type_${baseTime}`,
-            type: "radio",
-            title: "口座種別",
-            description: "口座の種別を選択してください",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: null,
-            options: [
-              { label: "普通" },
-              { label: "当座" },
-              { label: "貯蓄" }
-            ]
-          },
-          {
-            id: `q_account_number_${baseTime}`,
-            type: "text",
-            title: "口座番号",
-            description: "7桁の半角数字で入力してください（例: 1234567）",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "regex",
-              condition: "matches",
-              value: "^[0-9]{7}$",
-              presetKey: "custom",
-              value2: "",
-              errorMessage: "正しい口座番号（7桁の半角数字）を入力してください。"
-            },
-            options: []
-          },
-          {
-            id: `q_account_holder_${baseTime}`,
-            type: "text",
-            title: "口座名義（カナ）",
-            description: "カナ、カッコ（）、ドット（.）で入力してください（例: カ）ヤマダ タロウ）",
-            required: true,
-            groupId: bankGrpId,
-            groupTitle: bankGrpTitle,
-            validation: {
-              category: "regex",
-              condition: "matches",
-              value: "^[ァ-ヶｦ-ﾟー\\-()（）.\\．\\・\\s　]+$",
-              presetKey: "account_holder_kana",
-              value2: "",
-              errorMessage: "口座名義はカナと（）.のみで入力してください。"
-            },
-            options: []
-          }
-        );
-      } else if (val === 'pro_password') {
-        activeSec.questions.push(
-          { id: `q_pw_${baseTime}`, type: "password", title: "パスワード", description: "伏せ字で表示されます", required: true }
-        );
-      }
-
       e.target.value = "";
       e.stopPropagation();
       e.preventDefault();
 
-      if (window.le && activeSec) window.le(activeSec);
-      if (window.S) window.S();
-      if (window.x) window.x();
-      renderLivePreview();
+      executeApplyPreset(val, activeSec, baseTime);
     }
   }, true);
 
@@ -9201,7 +11704,17 @@
       groups: [],
       questions: []
     };
-    const formObj = window.n || window.G;
+    const formSources = [window.n, window.G, window.F, window.L];
+    if (window.U && Array.isArray(window.U)) {
+      formSources.push(...window.U);
+    }
+    let formObj = null;
+    for (const fs of formSources) {
+      if (fs && fs.sections && Array.isArray(fs.sections) && fs.sections.length > 0) {
+        formObj = fs;
+        break;
+      }
+    }
     if (!formObj || !formObj.sections) return result;
 
     const sections = formObj.sections;
@@ -9254,11 +11767,13 @@
     }
     return result;
   }
+  window.getAvailableSourcesFor = getAvailableSourcesFor;
 
   // 後方互換用ラッパー
   function getAvailableSourceQuestionsFor(targetSecId, targetQId) {
     return getAvailableSourcesFor(targetSecId, targetQId).questions;
   }
+  window.getAvailableSourceQuestionsFor = getAvailableSourceQuestionsFor;
 
   function injectSameAsAboveEditorUI(qCard, qDef, sec) {
     if (!qCard || !qDef || !sec) return;
@@ -9501,6 +12016,11 @@
           if (curSec) {
             curSec.nextAction = e.target.value;
             if (window.S) window.S();
+            if (typeof window.refreshFlowmap === 'function') {
+              window.refreshFlowmap();
+            } else if (window.archifyRenderer && (window.G || window.n)) {
+              window.archifyRenderer.render(window.G || window.n);
+            }
           }
         });
       }
@@ -9522,200 +12042,90 @@
       updateHint();
     }
 
-    // --- 質問の並び替え（▲ / ▼）ボタンの注入（全モード共通） ---
+    // --- 設問内・各選択肢の分岐先プルダウン（.option-branch-select）への途中送信オプション注入 ---
+    const injectOptionPartialSubmit = () => {
+      const branchSelects = document.querySelectorAll('.option-branch-select, .option-transition-select');
+      const curSec = sec || (window.n && window.n.sections ? window.n.sections.find(s => s.id === window.r) : null);
+      branchSelects.forEach(sel => {
+        let pOpt = sel.querySelector('option[value="partial_submit"]');
+        if (!pOpt) {
+          pOpt = document.createElement('option');
+          pOpt.value = 'partial_submit';
+          pOpt.textContent = '💾 途中送信（コード確定＆続きリンク発行）';
+          const submitOpt = sel.querySelector('option[value="submit"]');
+          if (submitOpt) {
+            submitOpt.insertAdjacentElement('afterend', pOpt);
+          } else {
+            sel.appendChild(pOpt);
+          }
+        }
+
+        // 親行・質問データから現在の nextSectionId を確認して反映
+        const optRow = sel.closest('.option-edit-row');
+        const qCard = sel.closest('.question-card');
+        if (optRow && qCard && curSec && curSec.questions) {
+          const qId = qCard.dataset.questionId;
+          const qDef = curSec.questions.find(q => q.id === qId);
+          if (qDef && qDef.options) {
+            const allRows = Array.from(qCard.querySelectorAll('.option-edit-row'));
+            const optIdx = allRows.indexOf(optRow);
+            if (optIdx !== -1 && qDef.options[optIdx]) {
+              if (qDef.options[optIdx].nextSectionId === 'partial_submit') {
+                sel.value = 'partial_submit';
+              }
+            }
+          }
+        }
+
+        if (!sel._hasPartialSubmitSyncHandler) {
+          sel._hasPartialSubmitSyncHandler = true;
+          sel.addEventListener('change', () => {
+            if (typeof window.refreshFlowmap === 'function') {
+              window.refreshFlowmap();
+            } else if (window.archifyRenderer && (window.G || window.n)) {
+              window.archifyRenderer.render(window.G || window.n);
+            }
+          });
+        }
+      });
+    };
+    injectOptionPartialSubmit();
+
+    // 選択肢追加やタイプ変更を監視して自動注入
+    const qContainer = document.getElementById('questions-container');
+    if (qContainer && !qContainer._hasPartialSubmitObserver) {
+      qContainer._hasPartialSubmitObserver = true;
+      const optObserver = new MutationObserver(() => {
+        injectOptionPartialSubmit();
+      });
+      optObserver.observe(qContainer, { childList: true, subtree: true });
+    }
+
+    // --- 質問の並び替えボタン（メイン編集画面では動かさないため固定・非表示） ---
     const allQCards = document.querySelectorAll('#questions-container .question-card');
-    allQCards.forEach((qCard, idx) => {
+    allQCards.forEach((qCard) => {
       const qId = qCard.dataset.questionId;
       const curSec = sec || (window.n && window.n.sections ? window.n.sections.find(s => s.id === window.r) : null);
       const qDef = (curSec && curSec.questions) ? curSec.questions.find(q => q.id === qId) : null;
       if (!qDef) return;
 
-      const actionsRow = qCard.querySelector('.question-card-actions');
-      if (actionsRow && !actionsRow.querySelector('.btn-move-q-up')) {
-        let btnGroup = actionsRow.querySelector('.question-action-buttons');
-        if (!btnGroup) {
-          btnGroup = document.createElement('div');
-          btnGroup.className = 'question-action-buttons';
-          btnGroup.style.display = 'flex';
-          btnGroup.style.gap = '6px';
-          btnGroup.style.alignItems = 'center';
+      // 既存の並び替えボタンがあれば削除して完全固定
+      const existingUp = qCard.querySelector('.btn-move-q-up');
+      if (existingUp) existingUp.remove();
+      const existingDown = qCard.querySelector('.btn-move-q-down');
+      if (existingDown) existingDown.remove();
 
-          const delBtn = actionsRow.querySelector('.btn-danger');
-          if (delBtn) {
-            actionsRow.appendChild(btnGroup);
-            btnGroup.appendChild(delBtn);
-          } else {
-            actionsRow.appendChild(btnGroup);
-          }
-        }
-
-        const upBtn = document.createElement('button');
-        upBtn.type = 'button';
-        upBtn.className = 'btn btn-sm btn-secondary btn-move-q-up';
-        upBtn.innerHTML = '▲';
-        upBtn.title = '上へ移動';
-        upBtn.disabled = (idx === 0);
-        upBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          moveQuestionInEditor(sec, idx, idx - 1);
-        });
-
-        const downBtn = document.createElement('button');
-        downBtn.type = 'button';
-        downBtn.className = 'btn btn-sm btn-secondary btn-move-q-down';
-        downBtn.innerHTML = '▼';
-        downBtn.title = '下へ移動';
-        downBtn.disabled = (idx === sec.questions.length - 1);
-        downBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          moveQuestionInEditor(sec, idx, idx + 1);
-        });
-
-        const firstChild = btnGroup.firstChild;
-        btnGroup.insertBefore(downBtn, firstChild);
-        btnGroup.insertBefore(upBtn, downBtn);
-      }
-
-      // 📋 「前述と同じ（同上）」自動入力設定UIの注入
-      injectSameAsAboveEditorUI(qCard, qDef, sec);
+      // 📋 「前述と同じ（同上）」および「プロ版限定スキップ」は詳細設定ドロワーに集約
+      // 質問カード本体からはインラインUIを排除してスッキリ固定化
+      const existingSame = qCard.querySelector('.same-as-above-editor-container');
+      if (existingSame) existingSame.remove();
+      const existingSkip = qCard.querySelector('.pro-skip-logic-container');
+      if (existingSkip) existingSkip.remove();
     });
 
-    if (editorMode !== 'pro' || !sec || !sec.questions) return;
+    // 質問カード本体のインラインUIクリーンアップ（念のため残存要素も全消去）
+    document.querySelectorAll('#questions-container .same-as-above-editor-container, #questions-container .pro-skip-logic-container').forEach(el => el.remove());
 
-    const qCards = document.querySelectorAll('#questions-container .question-card');
-    qCards.forEach(qCard => {
-      const qId = qCard.dataset.questionId;
-      const qDef = sec.questions.find(q => q.id === qId);
-      if (!qDef) return;
-
-      if (qCard.querySelector('.pro-skip-logic-container')) return;
-
-      const skipContainer = document.createElement('div');
-      skipContainer.className = 'pro-skip-logic-container';
-      skipContainer.style.cssText = 'margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--color-border); display:flex; flex-direction:column; gap:8px;';
-
-      const otherQuestions = sec.questions.filter(q => q.id !== qId);
-      let optionsHtml = '<option value="">-- スキップ分岐を設定しない --</option>';
-      otherQuestions.forEach(oq => {
-        optionsHtml += `<option value="${oq.id}">${oq.title || '無題の質問'}</option>`;
-      });
-
-      qDef.skipLogic = qDef.skipLogic || { dependsOn: "", condition: "equals", value: "", value2: "", action: "disable" };
-
-      skipContainer.innerHTML = `
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-          <span style="font-size:0.8rem; font-weight:600; color:var(--color-primary);">⚡ プロ版限定: セクション内スキップ（条件分岐）</span>
-          <span style="font-size: 0.68rem; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 600;">書式ルール対応</span>
-        </div>
-        <div class="skip-logic-row" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <select class="form-control skip-depends-select" style="flex:2; min-width:150px; font-size:0.82rem; height:34px; padding:4px 8px; box-sizing:border-box;">
-            ${optionsHtml}
-          </select>
-          <select class="form-control skip-condition-select" style="flex:2; min-width:140px; font-size:0.82rem; height:34px; padding:4px 8px; box-sizing:border-box;">
-            <optgroup label="空白">
-              <option value="is_empty">空白</option>
-              <option value="is_not_empty">空白ではない</option>
-            </optgroup>
-            <optgroup label="テキスト">
-              <option value="text_contains">次を含むテキスト</option>
-              <option value="text_not_contains">次を含まないテキスト</option>
-              <option value="text_starts_with">次で始まるテキスト</option>
-              <option value="text_ends_with">次で終わるテキスト</option>
-              <option value="text_equals">完全一致するテキスト</option>
-            </optgroup>
-            <optgroup label="日付">
-              <option value="date_is">日付</option>
-              <option value="date_before">次より前の日付</option>
-              <option value="date_after">次より後の日付</option>
-            </optgroup>
-            <optgroup label="数値 / 比較">
-              <option value="greater_than">次より大きい</option>
-              <option value="greater_than_or_equal">以上</option>
-              <option value="less_than">次より小さい</option>
-              <option value="less_than_or_equal">以下</option>
-              <option value="equals" selected>次と等しい</option>
-              <option value="not_equals">次と等しくない</option>
-              <option value="between">次の間にある</option>
-              <option value="not_between">次の間にない</option>
-            </optgroup>
-          </select>
-          <div class="skip-value-wrapper" style="flex:2; min-width:140px; display:flex; gap:6px; align-items:center;">
-            <input type="text" class="form-control skip-value-input" style="flex:1; font-size:0.82rem; height:34px; padding:4px 8px; box-sizing:border-box;" placeholder="トリガー値" />
-            <span class="skip-between-sep" style="display:none; font-size:0.8rem; color:#64748b; font-weight:600;">〜</span>
-            <input type="text" class="form-control skip-value2-input" style="display:none; flex:1; font-size:0.82rem; height:34px; padding:4px 8px; box-sizing:border-box;" placeholder="終了値" />
-          </div>
-          <select class="form-control skip-action-select" style="flex:1; min-width:110px; font-size:0.82rem; height:34px; padding:4px 8px; box-sizing:border-box;">
-            <option value="disable">非活性にする</option>
-            <option value="hide">非表示にする</option>
-          </select>
-        </div>
-      `;
-
-      const actionsRow = qCard.querySelector('.question-card-actions');
-      if (actionsRow) {
-        qCard.insertBefore(skipContainer, actionsRow);
-      }
-
-      const depSelect = skipContainer.querySelector('.skip-depends-select');
-      const condSelect = skipContainer.querySelector('.skip-condition-select');
-      const valWrapper = skipContainer.querySelector('.skip-value-wrapper');
-      const valInput = skipContainer.querySelector('.skip-value-input');
-      const sepSpan = skipContainer.querySelector('.skip-between-sep');
-      const val2Input = skipContainer.querySelector('.skip-value2-input');
-      const actSelect = skipContainer.querySelector('.skip-action-select');
-
-      depSelect.value = qDef.skipLogic.dependsOn || "";
-      condSelect.value = qDef.skipLogic.condition || "equals";
-      actSelect.value = qDef.skipLogic.action || "disable";
-      valInput.value = qDef.skipLogic.value || "";
-      val2Input.value = qDef.skipLogic.value2 || "";
-
-      const updateValueInputVisibility = () => {
-        const cond = condSelect.value;
-        if (cond === 'is_empty' || cond === 'is_not_empty') {
-          valWrapper.style.display = 'none';
-        } else {
-          valWrapper.style.display = 'flex';
-          if (cond === 'between' || cond === 'not_between') {
-            valInput.placeholder = '開始値';
-            sepSpan.style.display = 'inline';
-            val2Input.style.display = 'block';
-          } else {
-            sepSpan.style.display = 'none';
-            val2Input.style.display = 'none';
-            if (cond.startsWith('date_')) {
-              valInput.placeholder = 'YYYY-MM-DD';
-            } else if (cond === 'greater_than' || cond === 'greater_than_or_equal' || cond === 'less_than' || cond === 'less_than_or_equal') {
-              valInput.placeholder = '比較数値';
-            } else {
-              valInput.placeholder = 'トリガー値';
-            }
-          }
-        }
-      };
-      updateValueInputVisibility();
-
-      const saveLogic = () => {
-        qDef.skipLogic.dependsOn = depSelect.value;
-        qDef.skipLogic.condition = condSelect.value;
-        qDef.skipLogic.action = actSelect.value;
-        qDef.skipLogic.value = valInput.value;
-        qDef.skipLogic.value2 = val2Input.value;
-        if (window.S) window.S();
-        renderLivePreview();
-      };
-
-      depSelect.addEventListener('change', saveLogic);
-      condSelect.addEventListener('change', () => {
-        updateValueInputVisibility();
-        saveLogic();
-      });
-      actSelect.addEventListener('change', saveLogic);
-      valInput.addEventListener('input', saveLogic);
-      val2Input.addEventListener('input', saveLogic);
-    });
     injectRichTextToolbars();
   }
 
@@ -9989,16 +12399,16 @@
           const grpEl = document.createElement('div');
           grpEl.className = 'editor-question-group' + (isCollapsed ? ' is-collapsed' : '');
           grpEl.dataset.groupId = gId;
-          grpEl.setAttribute('draggable', 'true');
+          grpEl.setAttribute('draggable', 'false');
 
           grpEl.innerHTML = `
             <div class="group-card-header">
               <div class="group-header-left">
-                <span class="group-drag-handle" title="ドラッグしてグループ全体を並び替え">⠿</span>
                 <span class="group-title-display" title="クリックしてグループ名を変更">${escapeHtml(gTitle)}</span>
                 <span class="group-count-badge" title="クリックで開閉">${cluster.questions.length}問</span>
               </div>
               <div class="group-header-right">
+                <button type="button" class="group-btn btn-group-settings" title="グループの一括自動入力などの詳細設定を開く">⚙️ 詳細設定</button>
                 <button type="button" class="group-btn btn-add-q-to-group" title="このグループ内に新しい質問を追加">＋ 質問追加</button>
                 <button type="button" class="group-btn btn-ungroup" title="グループを解除して個別の質問に戻す">グループ解除</button>
                 <button type="button" class="group-btn group-btn-danger btn-delete-group" title="グループと配下の質問を削除">削除</button>
@@ -10011,7 +12421,7 @@
                 <span class="group-desc-text">${gDesc ? (typeof renderRichTextWithLinks === 'function' ? renderRichTextWithLinks(gDesc) : escapeHtml(gDesc)) : '＋ グループの説明文を追加（任意）'}</span>
               </div>
             </div>
-            <div class="group-same-as-above-bar" style="display: none;">
+            <div class="group-same-as-above-bar" style="display: none !important;">
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                 <label class="group-same-as-above-toggle-label">
                   <input type="checkbox" class="group-same-as-above-toggle" />
@@ -10188,7 +12598,7 @@
           }
 
           if (priorGroups.length > 0) {
-            sameBar.style.display = 'block';
+            sameBar.style.display = 'none'; // 詳細設定に組み込むため常時表示はせず非表示固定
             const sameToggle = sameBar.querySelector('.group-same-as-above-toggle');
             const sameDetails = sameBar.querySelector('.group-same-as-above-details');
             const sameSelect = sameBar.querySelector('.group-same-as-above-source-select');
@@ -10270,6 +12680,25 @@
               });
               if (window.S) window.S(true);
               if (window.renderLivePreview) window.renderLivePreview();
+            });
+          }
+
+          // 2-0. グループ詳細設定ボタン
+          const grpSettingsBtn = grpEl.querySelector('.btn-group-settings');
+          if (grpSettingsBtn) {
+            grpSettingsBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const firstQ = cluster.questions[0]?.q;
+              if (firstQ) {
+                openQuestionSettingsDrawer(firstQ.id);
+                setTimeout(() => {
+                  const grpSec = document.getElementById('drawer-groupsame-section');
+                  if (grpSec) grpSec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 150);
+              } else {
+                if (window.showSectionToast) window.showSectionToast('グループ内に質問がありません');
+              }
             });
           }
 
@@ -10355,122 +12784,8 @@
             }
           });
 
-          // 6. DnD on editor group container
-          grpEl.addEventListener('dragstart', (e) => {
-            if (e.target.closest('input, textarea, select, button, .rich-text-content-editable, a, label')) {
-              e.preventDefault();
-              return;
-            }
-            window._currentDnD = { type: 'question-group', sectionId: curSec.id, groupId: gId, groupTitle: gTitle };
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', JSON.stringify(window._currentDnD));
-            grpEl.classList.add('is-dragging');
-          });
-
-          grpEl.addEventListener('dragend', () => {
-            grpEl.classList.remove('is-dragging');
-            document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
-              el.classList.remove('drag-over-top', 'drag-over-bottom');
-            });
-            window._currentDnD = null;
-          });
-
-          grpEl.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            if (!window._currentDnD) return;
-            if (window._currentDnD.type === 'question-group' && window._currentDnD.groupId === gId) return;
-            e.dataTransfer.dropEffect = 'move';
-            const rect = grpEl.getBoundingClientRect();
-            const h = rect.height || 100;
-            const isOverTop = (e.clientY - rect.top) <= h / 2;
-            if (isOverTop) {
-              grpEl.classList.add('drag-over-top');
-              grpEl.classList.remove('drag-over-bottom');
-            } else {
-              grpEl.classList.add('drag-over-bottom');
-              grpEl.classList.remove('drag-over-top');
-            }
-          });
-
-          grpEl.addEventListener('dragleave', (e) => {
-            if (!grpEl.contains(e.relatedTarget)) {
-              grpEl.classList.remove('drag-over-top', 'drag-over-bottom');
-            }
-          });
-
-          grpEl.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const isTop = grpEl.classList.contains('drag-over-top');
-            grpEl.classList.remove('drag-over-top', 'drag-over-bottom');
-
-            if (!window._currentDnD) return;
-
-            if (window._currentDnD.type === 'question-group') {
-              const srcSec = window.n.sections.find(s => s.id === window._currentDnD.sectionId);
-              const srcGroupId = window._currentDnD.groupId;
-              if (!srcSec || srcGroupId === gId) return;
-
-              const movedQList = [];
-              srcSec.questions = srcSec.questions.filter(q => {
-                if (q.groupId === srcGroupId) {
-                  movedQList.push(q);
-                  return false;
-                }
-                return true;
-              });
-
-              const tgtFirstIdx = curSec.questions.findIndex(q => q.groupId === gId);
-              if (tgtFirstIdx !== -1) {
-                let insertIdx = tgtFirstIdx;
-                if (!isTop) {
-                  for (let i = curSec.questions.length - 1; i >= 0; i--) {
-                    if (curSec.questions[i].groupId === gId) {
-                      insertIdx = i + 1;
-                      break;
-                    }
-                  }
-                }
-                curSec.questions.splice(insertIdx, 0, ...movedQList);
-              } else {
-                curSec.questions.push(...movedQList);
-              }
-
-              if (window.S) window.S(true);
-              if (window.le) window.le(curSec);
-              if (window.x) window.x();
-              if (window.renderLivePreview) window.renderLivePreview();
-              if (window.showSectionToast) window.showSectionToast(`グループ「${window._currentDnD.groupTitle || 'グループ'}」を並び替えました`);
-            } else if (window._currentDnD.type === 'question') {
-              const srcSec = window.n.sections.find(s => s.id === window._currentDnD.sectionId);
-              const srcQId = window._currentDnD.questionId;
-              if (!srcSec) return;
-              const qIdx = srcSec.questions.findIndex(x => x.id === srcQId);
-              if (qIdx === -1) return;
-
-              const [movedQ] = srcSec.questions.splice(qIdx, 1);
-              movedQ.groupId = gId;
-              movedQ.groupTitle = gTitle;
-
-              const tgtFirstIdx = curSec.questions.findIndex(q => q.groupId === gId);
-              let insertIdx = tgtFirstIdx;
-              if (!isTop) {
-                for (let i = curSec.questions.length - 1; i >= 0; i--) {
-                  if (curSec.questions[i].groupId === gId) {
-                    insertIdx = i + 1;
-                    break;
-                  }
-                }
-              }
-              curSec.questions.splice(insertIdx, 0, movedQ);
-
-              if (window.S) window.S(true);
-              if (window.le) window.le(curSec);
-              if (window.x) window.x();
-              if (window.renderLivePreview) window.renderLivePreview();
-              if (window.showSectionToast) window.showSectionToast(`質問「${movedQ.title || '無題'}」を「${gTitle}」に追加しました`);
-            }
-          });
+          // 6. メイン編集エリアでのグループDnDは無効化（左側セクション一覧からのみ並び替え可能にするため固定）
+          // DnDイベントリスナーは登録せず、誤作動を防止
 
           container.appendChild(grpEl);
         }
@@ -11083,255 +13398,161 @@
     });
   }
 
-  // 2. メイン編集画面の質問カード（.question-card）のドラッグハンドル注入 ＆ DnD
+  // 2. メイン編集画面の質問カード（.question-card）の固定化（ドラッグ無効化・固定表示）
   function injectQuestionCardDnD() {
     const qCards = document.querySelectorAll('#questions-container .question-card');
-    if (!qCards.length || !window.n || !window.n.sections) return;
+    if (!qCards.length) return;
 
-    const curSec = (window.n.sections.find(s => s.id === window.r)) || window.n.sections[0];
-    if (!curSec || !curSec.questions) return;
+    qCards.forEach((card) => {
+      // 既存のドラッグハンドルがあれば削除
+      const handleBar = card.querySelector('.question-card-drag-handle');
+      if (handleBar) handleBar.remove();
 
-    qCards.forEach((card, idx) => {
-      const qId = card.dataset.questionId;
-      if (!qId) return;
+      // カードを固定化（ドラッグ不可）
+      card.setAttribute('draggable', 'false');
+      card.style.cursor = 'default';
+      card.classList.remove('is-dragging', 'drag-over-top', 'drag-over-bottom');
+    });
+  }
 
-      if (!card.querySelector('.question-card-drag-handle')) {
-        const handleBar = document.createElement('div');
-        handleBar.className = 'question-card-drag-handle';
-        handleBar.innerHTML = '⠿ ⠿ ⠿';
-        handleBar.title = 'ドラッグして質問カードを並び替え';
-        card.insertBefore(handleBar, card.firstChild);
+  // 3. 概要画面のセクションカード（.overview-section-card）の固定化（ドラッグ無効化・固定表示）
+  function injectOverviewSectionDnD() {
+    const ovCards = document.querySelectorAll('#overview-sections-list .overview-section-card');
+    if (!ovCards.length) return;
+
+    ovCards.forEach((card) => {
+      // 既存のドラッグハンドルがあれば削除
+      const handle = card.querySelector('.sidebar-drag-handle');
+      if (handle) handle.remove();
+
+      // カードを固定化（ドラッグ不可）
+      card.setAttribute('draggable', 'false');
+      card.style.cursor = 'default';
+      card.classList.remove('is-dragging', 'drag-over-top', 'drag-over-bottom');
+    });
+  }
+
+  function injectValidationNoticeEnhancements() {
+    const containers = document.querySelectorAll('.validation-edit-container');
+    containers.forEach(container => {
+      const selects = container.querySelectorAll('.form-group-row select');
+      if (selects.length < 2) return;
+      const catSelect = selects[0];
+      const ruleSelect = selects[1];
+      if (catSelect.value !== 'api') return;
+
+      // 1. zip_code option がない場合は追加
+      if (!ruleSelect.querySelector('option[value="zip_code"]')) {
+        const opt = document.createElement('option');
+        opt.value = 'zip_code';
+        opt.textContent = '郵便番号検索（郵便番号住所検索API連携）';
+        const bankOpt = ruleSelect.querySelector('option[value="bank_name"]');
+        if (bankOpt) {
+          ruleSelect.insertBefore(opt, bankOpt);
+        } else {
+          ruleSelect.appendChild(opt);
+        }
       }
 
-      if (!card._hasCardDnD) {
-        card._hasCardDnD = true;
-        card.setAttribute('draggable', 'true');
-
-        card.addEventListener('dragstart', (e) => {
-          const target = e.target;
-          if (target.closest('input, textarea, select, button, .rich-text-content-editable, a, label')) {
-            e.preventDefault();
-            return;
-          }
-
-          window._currentDnD = { type: 'question', sectionId: curSec.id, questionId: qId, index: idx };
-          e.dataTransfer.effectAllowed = 'move';
-          e.dataTransfer.setData('text/plain', JSON.stringify(window._currentDnD));
-          card.classList.add('is-dragging');
-        });
-
-        card.addEventListener('dragend', () => {
-          card.classList.remove('is-dragging');
-          document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
-            el.classList.remove('drag-over-top', 'drag-over-bottom');
-          });
-          window._currentDnD = null;
-        });
-
-        card.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          if (!window._currentDnD || (window._currentDnD.type !== 'question' && window._currentDnD.type !== 'question-group')) return;
-          if (window._currentDnD.type === 'question' && window._currentDnD.questionId === qId) return;
-          e.dataTransfer.dropEffect = 'move';
-
-          const rect = card.getBoundingClientRect();
-          const h = rect.height || 100;
-          let isOverTop = true;
-          if (e.clientY !== undefined && !isNaN(e.clientY)) {
-            isOverTop = (e.clientY - rect.top) <= h / 2;
-          } else if (card.classList.contains('drag-over-bottom')) {
-            isOverTop = false;
-          }
-          if (isOverTop) {
-            card.classList.add('drag-over-top');
-            card.classList.remove('drag-over-bottom');
-          } else {
-            card.classList.add('drag-over-bottom');
-            card.classList.remove('drag-over-top');
-          }
-        });
-
-        card.addEventListener('dragleave', (e) => {
-          if (!card.contains(e.relatedTarget)) {
-            card.classList.remove('drag-over-top', 'drag-over-bottom');
-          }
-        });
-
-        card.addEventListener('drop', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          let isTop = card.classList.contains('drag-over-top');
-          if (!isTop && !card.classList.contains('drag-over-bottom')) {
-            const rect = card.getBoundingClientRect();
-            const cY = (e.clientY !== undefined && !isNaN(e.clientY)) ? e.clientY : rect.top;
-            isTop = (cY - rect.top) <= rect.height / 2;
-          }
-          card.classList.remove('drag-over-top', 'drag-over-bottom');
-
-          if (!window._currentDnD) return;
-
-          if (window._currentDnD.type === 'question-group') {
-            const srcSec = window.n.sections.find(s => s.id === window._currentDnD.sectionId);
-            const tgtSec = curSec;
-            if (!srcSec || !tgtSec) return;
-            const srcGroupId = window._currentDnD.groupId;
-            const movedQList = [];
-            srcSec.questions = srcSec.questions.filter(x => {
-              if (x.groupId === srcGroupId) {
-                movedQList.push(x);
-                return false;
-              }
-              return true;
-            });
-            let targetIdx = tgtSec.questions.findIndex(x => x.id === qId);
-            const insertIdx = isTop ? targetIdx : targetIdx + 1;
-            tgtSec.questions.splice(insertIdx, 0, ...movedQList);
-            if (window.S) window.S(true);
-            if (window.le) window.le(tgtSec);
-            if (window.x) window.x();
-            if (window.renderLivePreview) window.renderLivePreview();
-            if (window.showSectionToast) window.showSectionToast(`グループを並び替えました`);
-            return;
-          }
-
-          if (window._currentDnD.type !== 'question') return;
-          const srcSecId = window._currentDnD.sectionId;
-          const srcQId = window._currentDnD.questionId;
-          if (srcQId === qId) return;
-
-          const srcSec = window.n.sections.find(s => s.id === srcSecId);
-          const tgtSec = curSec;
-          if (!srcSec || !tgtSec) return;
-
-          const fromIdx = srcSec.questions.findIndex(x => x.id === srcQId);
-          if (fromIdx === -1) return;
-
-          const [movedQ] = srcSec.questions.splice(fromIdx, 1);
-          let targetIdx = tgtSec.questions.findIndex(x => x.id === qId);
-          const insertIdx = isTop ? targetIdx : targetIdx + 1;
-          const targetQ = tgtSec.questions.find(x => x.id === qId);
-          if (targetQ) {
-            movedQ.groupId = targetQ.groupId || null;
-            movedQ.groupTitle = targetQ.groupTitle || null;
-          }
-          tgtSec.questions.splice(insertIdx, 0, movedQ);
-
-          if (window.S) window.S(true);
-          if (window.le) window.le(tgtSec);
-          if (window.x) window.x();
-          if (window.renderLivePreview) window.renderLivePreview();
-          if (window.showSectionToast) {
-            if (srcSecId === tgtSec.id) {
-              window.showSectionToast(`質問「${movedQ.title || '無題'}」を並び替えました`);
-            } else {
-              window.showSectionToast(`質問「${movedQ.title || '無題'}」を「${tgtSec.title || 'セクション'}」へ移動しました`);
+      // 2. 判定ルール変更時の自動エラーメッセージ補正
+      if (!ruleSelect.dataset.zipChangeBound) {
+        ruleSelect.dataset.zipChangeBound = '1';
+        ruleSelect.addEventListener('change', () => {
+          if (ruleSelect.value === 'zip_code') {
+            const errInput = container.querySelector('input.form-control[placeholder*="エラー時に表示するテキスト"]');
+            if (errInput && (!errInput.value || errInput.value.includes('法人名') || errInput.value.includes('銀行名') || errInput.value.includes('支店'))) {
+              errInput.value = '正しい郵便番号（7桁の半角数字）を入力してください。';
+              errInput.dispatchEvent(new Event('input', { bubbles: true }));
             }
           }
         });
       }
+
+      // 3. 判定ルールが zip_code の場合の案内ボックス同期
+      if (ruleSelect.value === 'zip_code') {
+        const notice = container.querySelector('.api-validation-notice');
+        if (notice && notice.dataset.zipNoticeBound !== 'zip_code') {
+          notice.dataset.zipNoticeBound = 'zip_code';
+          notice.innerHTML = `
+            <div style="font-weight:600; margin-bottom:4px; display:flex; align-items:center; gap:6px;">📮 郵便番号・住所検索API連携（ZipCloud連携）</div>
+            <div style="color:var(--color-text-muted); font-size:0.8rem;">回答者が7桁の郵便番号を入力する際、実在する住所（都道府県・市区町村・町域）をリアルタイム検索・自動補完します。</div>
+          `;
+        }
+      }
     });
   }
 
-  // 3. 概要画面のセクションカード（.overview-section-card）のDnD
-  function injectOverviewSectionDnD() {
-    const ovCards = document.querySelectorAll('#overview-sections-list .overview-section-card');
-    if (!ovCards.length || !window.n || !window.n.sections) return;
+  // 📨 メールアドレス質問（通常 / 回答控え自動送信）の設定トグル
+  function injectEmailAutoReplyToggle() {
+    const cards = document.querySelectorAll('.question-card');
+    cards.forEach(card => {
+      const qId = card.dataset.questionId;
+      if (!qId) return;
+      const q = findQuestionDefById(qId);
+      if (!q) return;
 
-    ovCards.forEach((card, idx) => {
-      const secDef = window.n.sections[idx];
-      if (!secDef) return;
+      const v = q.validation || {};
+      const isEmailVal = (v.category === 'text' && v.condition === 'email') || (v.category === 'regex' && v.presetKey === 'email') || (v.value && v.value.includes('@'));
+      const isEmailTitle = /メール|email|mail/i.test(q.title || '');
+      const isEmailQuestion = isEmailVal || isEmailTitle || q.autoReply !== undefined;
 
-      if (!card.querySelector('.sidebar-drag-handle')) {
-        const badge = card.querySelector('.overview-section-badge');
-        if (badge) {
-          const handle = document.createElement('span');
-          handle.className = 'sidebar-drag-handle';
-          handle.innerHTML = '⠿';
-          handle.style.marginRight = '6px';
-          handle.title = 'ドラッグしてセクションを並び替え';
-          badge.insertBefore(handle, badge.firstChild);
+      let existing = card.querySelector('.email-autoreply-toggle-container');
+
+      if (!isEmailQuestion) {
+        if (existing) existing.remove();
+        return;
+      }
+
+      const isChecked = !!q.autoReply;
+
+      if (!existing) {
+        existing = document.createElement('div');
+        existing.className = 'email-autoreply-toggle-container';
+        existing.style.cssText = 'margin-top: 12px; margin-bottom: 6px; padding: 10px 12px; background: rgba(26, 115, 232, 0.06); border: 1px solid rgba(26, 115, 232, 0.25); border-radius: 6px;';
+        
+        const valContainer = card.querySelector('.validation-edit-container');
+        if (valContainer) {
+          valContainer.parentNode.insertBefore(existing, valContainer);
+        } else {
+          const actions = card.querySelector('.question-card-actions');
+          if (actions) {
+            actions.parentNode.insertBefore(existing, actions);
+          } else {
+            card.appendChild(existing);
+          }
         }
       }
 
-      if (!card._hasOvDnD) {
-        card._hasOvDnD = true;
-        card.setAttribute('draggable', 'true');
+      if (existing.dataset.boundAutoReply === (isChecked ? '1' : '0')) return;
+      existing.dataset.boundAutoReply = isChecked ? '1' : '0';
 
-        card.addEventListener('dragstart', (e) => {
-          if (e.target.closest('button, input, textarea, a')) {
-            e.preventDefault();
-            return;
+      existing.innerHTML = `
+        <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; font-weight: 600; color: var(--color-text); margin: 0;">
+          <input type="checkbox" class="chk-email-autoreply" ${isChecked ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px;" />
+          <span>📨 回答送信後にこのアドレス宛てに回答内容の控えを自動送信する</span>
+        </label>
+        <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-left: 24px; margin-top: 4px; line-height: 1.4;">
+          ${isChecked 
+            ? '<span style="color:#1a73e8; font-weight:600;">✅【回答控え自動送信が有効】</span> 回答者がフォームを送信完了した際、入力内容のまとめメールがこのメールアドレス宛てに自動配信されます。' 
+            : '<span style="color:var(--color-text-muted);">⚪【通常のメールアドレス】</span> 入力のみ行われ、回答控えメールの自動送信は行われません。'}
+        </div>
+      `;
+
+      const chk = existing.querySelector('.chk-email-autoreply');
+      if (chk) {
+        chk.addEventListener('change', (e) => {
+          q.autoReply = e.target.checked;
+          if (q.autoReply) {
+            if (!q.description || q.description === '説明（任意）' || q.description === 'ご連絡可能なメールアドレスを入力してください。') {
+              q.description = 'ご回答内容の控えをこのメールアドレス宛てにお送りします。';
+              const descInput = card.querySelector('.q-desc-input');
+              if (descInput) descInput.value = q.description;
+            }
           }
-          window._currentDnD = { type: 'section', sectionId: secDef.id, index: idx };
-          e.dataTransfer.effectAllowed = 'move';
-          e.dataTransfer.setData('text/plain', JSON.stringify(window._currentDnD));
-          card.classList.add('is-dragging');
-        });
-
-        card.addEventListener('dragend', () => {
-          card.classList.remove('is-dragging');
-          document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
-            el.classList.remove('drag-over-top', 'drag-over-bottom');
-          });
-          window._currentDnD = null;
-        });
-
-        card.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          if (!window._currentDnD || window._currentDnD.type !== 'section') return;
-          if (window._currentDnD.sectionId === secDef.id) return;
-          e.dataTransfer.dropEffect = 'move';
-
-          const rect = card.getBoundingClientRect();
-          const h = rect.height || 60;
-          let isOverTop = true;
-          if (e.clientY !== undefined && !isNaN(e.clientY)) {
-            isOverTop = (e.clientY - rect.top) <= h / 2;
-          } else if (card.classList.contains('drag-over-bottom')) {
-            isOverTop = false;
-          }
-          if (isOverTop) {
-            card.classList.add('drag-over-top');
-            card.classList.remove('drag-over-bottom');
-          } else {
-            card.classList.add('drag-over-bottom');
-            card.classList.remove('drag-over-top');
-          }
-        });
-
-        card.addEventListener('dragleave', (e) => {
-          if (!card.contains(e.relatedTarget)) {
-            card.classList.remove('drag-over-top', 'drag-over-bottom');
-          }
-        });
-
-        card.addEventListener('drop', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          let isTop = card.classList.contains('drag-over-top');
-          if (!isTop && !card.classList.contains('drag-over-bottom')) {
-            const rect = card.getBoundingClientRect();
-            const cY = (e.clientY !== undefined && !isNaN(e.clientY)) ? e.clientY : rect.top;
-            isTop = (cY - rect.top) <= rect.height / 2;
-          }
-          card.classList.remove('drag-over-top', 'drag-over-bottom');
-
-          if (!window._currentDnD || window._currentDnD.type !== 'section') return;
-          const srcId = window._currentDnD.sectionId;
-          if (srcId === secDef.id) return;
-
-          const fromIdx = window.n.sections.findIndex(s => s.id === srcId);
-          let toIdx = window.n.sections.findIndex(s => s.id === secDef.id);
-          if (fromIdx !== -1 && toIdx !== -1) {
-            const [movedSec] = window.n.sections.splice(fromIdx, 1);
-            let targetIdx = window.n.sections.findIndex(s => s.id === secDef.id);
-            const insertIdx = isTop ? targetIdx : targetIdx + 1;
-            window.n.sections.splice(insertIdx, 0, movedSec);
-            if (window.S) window.S(true);
-            if (window.x) window.x();
-            if (window.renderLivePreview) window.renderLivePreview();
-            if (window.showSectionToast) window.showSectionToast(`セクション「${movedSec.title || '無題'}」を移動しました`);
-          }
+          if (window.S) window.S(true);
+          existing.dataset.boundAutoReply = q.autoReply ? '1' : '0';
+          injectEmailAutoReplyToggle();
+          if (window.renderLivePreview) window.renderLivePreview();
         });
       }
     });
@@ -11344,11 +13565,14 @@
     if (originalLe) {
       window.le = function(sec) {
         originalLe(sec);
+        patchPresetSelectMenu();
         renderLivePreview();
         injectSectionEnhancements(sec);
         injectRichTextToolbars();
         injectQuestionGroupSystem(sec);
         injectDnDSystem();
+        injectValidationNoticeEnhancements();
+        injectEmailAutoReplyToggle();
       };
     }
 
@@ -11356,19 +13580,30 @@
     if (originalX) {
       window.x = function() {
         originalX();
+        patchPresetSelectMenu();
         renderLivePreview();
         injectSectionEnhancements();
         injectRichTextToolbars();
         injectQuestionGroupSystem();
         injectDnDSystem();
+        injectValidationNoticeEnhancements();
+        injectEmailAutoReplyToggle();
+        if (typeof window.updateEditorSplitViews === 'function') {
+          window.updateEditorSplitViews();
+        }
       };
     }
 
     // アクティブセクション編集画面が表示されているときの一時保存UI・途中送信UIおよび書式ツールバー、DnDの自律維持
     setInterval(() => {
+      patchPresetSelectMenu();
+      if (typeof syncWindowIe === 'function') syncWindowIe();
+      if (typeof patchRegexPresetDropdowns === 'function') patchRegexPresetDropdowns();
       injectRichTextToolbars();
       injectQuestionGroupSystem();
       injectDnDSystem();
+      injectValidationNoticeEnhancements();
+      injectEmailAutoReplyToggle();
       const activeSectionEditor = document.getElementById('active-section-editor');
       if (activeSectionEditor && activeSectionEditor.style.display !== 'none') {
         const metaEdit = activeSectionEditor.querySelector('.section-meta-edit');
@@ -11387,6 +13622,7 @@
       const target = e.target;
       if (target.closest('.question-card') || target.closest('.section-meta-edit') || target.closest('.form-title-desc-card') || target.closest('.form-group')) {
         renderLivePreview();
+        if (typeof debouncedRenderFlowmap === 'function') debouncedRenderFlowmap(150);
       }
     });
 
@@ -11394,6 +13630,7 @@
       const target = e.target;
       if (target.closest('.question-card') || target.closest('.section-meta-edit') || target.closest('.form-title-desc-card')) {
         renderLivePreview();
+        if (typeof debouncedRenderFlowmap === 'function') debouncedRenderFlowmap(150);
       }
     });
 
@@ -11405,6 +13642,9 @@
         setTimeout(() => {
           injectSectionEnhancements();
           renderLivePreview();
+          if (typeof window.updateEditorSplitViews === 'function') {
+            window.updateEditorSplitViews();
+          }
         }, 40);
       }
       const ovEditBtn = e.target.closest('#overview-sections-list .overview-section-card .btn-primary');
@@ -11416,12 +13656,20 @@
           }
           injectSectionEnhancements();
           renderLivePreview();
+          if (typeof window.updateEditorSplitViews === 'function') {
+            window.updateEditorSplitViews();
+          }
         }, 40);
       }
       const ovTab = e.target.closest('#sidebar-item-overview') || e.target.closest('#btn-back-to-overview');
       if (ovTab) {
         window.r = null;
-        setTimeout(renderLivePreview, 40);
+        setTimeout(() => {
+          renderLivePreview();
+          if (typeof window.updateEditorSplitViews === 'function') {
+            window.updateEditorSplitViews();
+          }
+        }, 40);
       }
     });
   }
@@ -11629,6 +13877,8 @@
             if (input) input.disabled = true;
           } else {
             card.style.display = 'none';
+            const inputs = card.querySelectorAll('input, textarea, select');
+            inputs.forEach(inp => { inp.value = ''; });
           }
           delete values[q.id];
           delete values[q.id + "_confirm"];
@@ -11776,7 +14026,52 @@
     const proTitleVal = (g.header && g.header.title) ? g.header.title : currentFormTitle;
     const proDescVal = (g.header && g.header.disclaimer) ? g.header.disclaimer : currentFormDesc;
 
-    if (liveTitleH) liveTitleH.textContent = isPro ? (proTitleVal || "フォーム") : (currentFormTitle || "フォーム");
+    if (liveTitleH) {
+      const liveRawTitle = isPro ? (proTitleVal || "フォーム") : (currentFormTitle || "フォーム");
+
+      // 🏷️ タイトル外枠（簡易ロゴ化）バッジの適用
+      const badgeShape = g.titleBadgeShape || 'none';
+      const badgeStyle = g.titleBadgeStyle || 'fill';
+      const badgeBgType = g.titleBadgeBgType || 'primary';
+      const badgeBgCustom = g.titleBadgeBgCustom || '#1a73e8';
+      const badgeColorType = g.titleBadgeColorType || 'white';
+      const badgeColorCustom = g.titleBadgeColorCustom || '#ffffff';
+
+      liveTitleH.classList.remove(
+        'title-badge',
+        'badge-style-fill',
+        'badge-style-outline',
+        'badge-shape-trapezoid-down',
+        'badge-shape-trapezoid-up',
+        'badge-shape-parallelogram',
+        'badge-shape-ribbon',
+        'badge-shape-capsule',
+        'badge-shape-chamfer',
+        'badge-shape-retro'
+      );
+      liveTitleH.style.removeProperty('--badge-bg');
+      liveTitleH.style.removeProperty('--badge-color');
+
+      if (badgeShape && badgeShape !== 'none') {
+        liveTitleH.classList.add('title-badge', `badge-shape-${badgeShape}`, `badge-style-${badgeStyle}`);
+
+        let actualBg = 'var(--color-primary, #1a73e8)';
+        if (badgeBgType === 'dark') actualBg = '#202124';
+        else if (badgeBgType === 'custom') actualBg = badgeBgCustom;
+        liveTitleH.style.setProperty('--badge-bg', actualBg);
+
+        let actualColor = '#ffffff';
+        if (badgeColorType === 'dark') actualColor = '#202124';
+        else if (badgeColorType === 'primary') actualColor = 'var(--color-primary, #1a73e8)';
+        else if (badgeColorType === 'custom') actualColor = badgeColorCustom;
+        liveTitleH.style.setProperty('--badge-color', actualColor);
+      }
+
+      // 🔤 タイトル文字自体の変形（ワープテキスト＆立体ロゴ）および文字色の適用
+      const titleTextColor = resolveTitleTextColor(g, badgeShape, badgeStyle);
+      applyTitleTextWarp(liveTitleH, liveRawTitle, g.titleWarpShape, g.titleWarpStrength, g.titleWarpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+      applyTitleFontToElement(liveTitleH, liveSubtitleP, g.titleFontFamily, g.titleFontTarget);
+    }
 
     // サブタイトルの取得と反映（リアルタイム入力値＆データオブジェクト双方対応）
     const currentSubtitle = document.getElementById('editor-pro-subtitle') 
@@ -11791,9 +14086,40 @@
         liveSubtitleP.textContent = "";
         liveSubtitleP.style.display = 'none';
       }
+      applyTitleFontToElement(liveTitleH, liveSubtitleP, g.titleFontFamily, g.titleFontTarget);
     }
 
     if (liveDescP) liveDescP.innerHTML = renderRichTextWithLinks(isPro ? proDescVal : currentFormDesc);
+
+    // ライブプレビューの枠スタイル・配置・サブタイトル位置の適用
+    const liveFormHeader = document.getElementById('live-preview-form-header');
+    if (liveFormHeader) {
+      const headerStyle = g.headerStyle || 'card-accent-top';
+      const headerAlign = g.headerAlign || 'left';
+      const subtitlePosition = g.subtitlePosition || 'below';
+
+      liveFormHeader.classList.remove(
+        'header-style-card-accent-top',
+        'header-style-card-simple',
+        'header-style-card-accent-left',
+        'header-style-card-shadow',
+        'header-style-frameless',
+        'header-style-frameless-underline',
+        'header-align-left',
+        'header-align-center',
+        'header-align-right'
+      );
+      liveFormHeader.classList.add(`header-style-${headerStyle}`);
+      liveFormHeader.classList.add(`header-align-${headerAlign}`);
+
+      if (liveSubtitleP && liveTitleH && liveDescP) {
+        if (subtitlePosition === 'above') {
+          liveFormHeader.insertBefore(liveSubtitleP, liveTitleH);
+        } else {
+          liveFormHeader.insertBefore(liveSubtitleP, liveDescP);
+        }
+      }
+    }
 
     // ライブプレビューのヘッダー画像表示制御
     const liveHeaderImgContainer = document.getElementById('live-preview-header-image-container');
@@ -12057,7 +14383,8 @@
           // ライブプレビューでも操作・検索できるように disabled を解除
           inputHtml = `<input type="text" class="form-control form-control-sm" placeholder="${placeholder}" style="background: var(--color-bg-input);" />${apiBadge}`;
         } else {
-          inputHtml = `<input type="text" class="form-control form-control-sm" placeholder="${placeholder}" disabled style="opacity: 0.8; background: var(--color-bg-input);" />`;
+          const autoReplyBadge = q.autoReply ? `<div style="font-size:0.68rem; color:#1a73e8; margin-top:3px; display:flex; align-items:center; gap:4px; font-weight:600;">📨 回答送信後に回答の控えが届きます</div>` : '';
+          inputHtml = `<input type="text" class="form-control form-control-sm" placeholder="${placeholder}" disabled style="opacity: 0.8; background: var(--color-bg-input);" />${autoReplyBadge}`;
         }
       } else if (q.type === 'textarea' || q.type === 'paragraph') {
         inputHtml = `<textarea class="form-control form-control-sm" rows="2" placeholder="自由回答を入力してください" disabled style="opacity: 0.8; background: var(--color-bg-input);"></textarea>`;
@@ -12168,12 +14495,12 @@
             currentPreviewGrpEl.appendChild(grpDesc);
           }
 
-          // グループ一括同上チェックボックスプレビュー
+          // グループ一括同上チェックボックスプレビュー（デフォルトONを反映）
           if (q.sameAsAbove && q.sameAsAbove.enabled && (q.sameAsAbove.sourceType === 'group' || (q.sameAsAbove.sourceQuestionId && q.sameAsAbove.sourceQuestionId.startsWith('group:')))) {
             const grpSameWrap = document.createElement('div');
             grpSameWrap.className = 'preview-group-same-as-above';
             grpSameWrap.innerHTML = `
-              <input type="checkbox" disabled style="margin: 0;" />
+              <input type="checkbox" disabled checked style="margin: 0;" />
               <span>${escapeHtml(q.sameAsAbove.label || '前述のグループと同じ')}</span>
             `;
             currentPreviewGrpEl.appendChild(grpSameWrap);
@@ -12225,21 +14552,41 @@
 
   // 高速インプレース・プレビュー更新（文字入力時の全DOM破棄・チラつき・遅延を解消）
   function fastUpdateLivePreview(type, value, extra) {
-    if (type === 'form_title') {
+    if (type === 'form_title' || type === 'title_warp') {
+      const g = window.G || {};
+      const warpShape = g.titleWarpShape || 'none';
+      const warpStrength = g.titleWarpStrength || 50;
+      const warpEffect = g.titleWarpEffect || 'none';
+      const titleTextColor = resolveTitleTextColor(g, g.titleBadgeShape || 'none', g.titleBadgeStyle || 'fill');
+      const curTitle = value || (document.getElementById('editor-pro-title') ? document.getElementById('editor-pro-title').value : '') || (g.header ? g.header.title : '') || g.title || "フォーム";
       const el = document.getElementById('live-preview-form-title');
-      if (el) el.textContent = value || "フォーム";
+      if (el) {
+        applyTitleTextWarp(el, curTitle, warpShape, warpStrength, warpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+        applyTitleFontToElement(el, null, g.titleFontFamily, g.titleFontTarget);
+      }
       const mob = document.querySelector('.mobile-preview-title');
-      if (mob) mob.textContent = value || "フォーム";
+      if (mob) {
+        applyTitleTextWarp(mob, curTitle, warpShape, warpStrength, warpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+        applyTitleFontToElement(mob, null, g.titleFontFamily, g.titleFontTarget);
+      }
+      const panelTitle = document.getElementById('preview-form-title');
+      if (panelTitle) {
+        applyTitleTextWarp(panelTitle, curTitle, warpShape, warpStrength, warpEffect, titleTextColor, g.titleLightAngle, g.titleLightIntensity);
+        applyTitleFontToElement(panelTitle, null, g.titleFontFamily, g.titleFontTarget);
+      }
     } else if (type === 'subtitle' || type === 'form_subtitle') {
+      const g = window.G || {};
       const liveSub = document.getElementById('live-preview-form-subtitle');
       if (liveSub) {
         liveSub.textContent = value || "";
         liveSub.style.display = (value && value.trim() !== "") ? 'block' : 'none';
+        applyTitleFontToElement(null, liveSub, g.titleFontFamily, g.titleFontTarget);
       }
       const panelSub = document.getElementById('preview-form-subtitle');
       if (panelSub) {
         panelSub.textContent = value || "";
         panelSub.style.display = (value && value.trim() !== "") ? 'block' : 'none';
+        applyTitleFontToElement(null, panelSub, g.titleFontFamily, g.titleFontTarget);
       }
     } else if (type === 'form_desc') {
       const el = document.getElementById('live-preview-form-desc');
@@ -12315,12 +14662,14 @@
     if (force) {
       if (_livePreviewRaf) { cancelAnimationFrame(_livePreviewRaf); _livePreviewRaf = null; }
       renderLivePreview();
+      if (typeof window.refreshFlowmap === 'function') window.refreshFlowmap();
       return;
     }
     if (_livePreviewRaf) return;
     _livePreviewRaf = requestAnimationFrame(() => {
       _livePreviewRaf = null;
       renderLivePreview();
+      if (typeof window.refreshFlowmap === 'function') window.refreshFlowmap();
     });
   }
   window.triggerLivePreview = debouncedTriggerLivePreview;
@@ -12468,6 +14817,16 @@
           if (q) q.scrollText = t.value;
         }
         fastUpdateLivePreview('question_scroll', t.value, { questionId: qId });
+      } else if (t.id === 'editor-title-badge-bg-custom' || t.id === 'editor-title-badge-color-custom') {
+        if (t.id === 'editor-title-badge-bg-custom') {
+          if (window.G) window.G.titleBadgeBgCustom = t.value;
+          if (window.n) window.n.titleBadgeBgCustom = t.value;
+        } else {
+          if (window.G) window.G.titleBadgeColorCustom = t.value;
+          if (window.n) window.n.titleBadgeColorCustom = t.value;
+        }
+        applyPreviewTheme();
+        renderLivePreview();
       } else {
         const card = t.closest('.question-card');
         if (card && t.placeholder && t.placeholder.includes('タイトル')) {
@@ -12481,6 +14840,189 @@
             fastUpdateLivePreview('option_label', t.value, { questionId: card.dataset.questionId, optionIndex: optIdx });
           }
         }
+      }
+    });
+
+    panel.addEventListener('change', (e) => {
+      const t = e.target;
+      if (!t) return;
+      if (t.id === 'editor-header-style') {
+        if (window.G) window.G.headerStyle = t.value;
+        if (window.n) window.n.headerStyle = t.value;
+        if (window.U && window.U[window.W]) window.U[window.W].headerStyle = t.value;
+        applyPreviewTheme();
+        renderLivePreview();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      } else if (t.id === 'editor-subtitle-position') {
+        if (window.G) window.G.subtitlePosition = t.value;
+        if (window.n) window.n.subtitlePosition = t.value;
+        if (window.U && window.U[window.W]) window.U[window.W].subtitlePosition = t.value;
+        applyPreviewTheme();
+        renderLivePreview();
+        updateTitleDetailsActiveBadge();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      } else if (t.id === 'editor-title-font-family' || t.id === 'editor-title-font-target') {
+        const fontFamEl = document.getElementById('editor-title-font-family');
+        const fontTarEl = document.getElementById('editor-title-font-target');
+        const ffVal = fontFamEl ? fontFamEl.value : 'default';
+        const ftVal = fontTarEl ? fontTarEl.value : 'both';
+        if (window.G) {
+          window.G.titleFontFamily = ffVal;
+          window.G.titleFontTarget = ftVal;
+        }
+        if (window.n) {
+          window.n.titleFontFamily = ffVal;
+          window.n.titleFontTarget = ftVal;
+        }
+        if (window.U && window.U[window.W]) {
+          window.U[window.W].titleFontFamily = ffVal;
+          window.U[window.W].titleFontTarget = ftVal;
+        }
+        updateTitleDetailsActiveBadge();
+        applyPreviewTheme();
+        renderLivePreview();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      } else if (t.id === 'editor-title-color-type' || t.id === 'editor-title-color-custom') {
+        const colorTypeEl = document.getElementById('editor-title-color-type');
+        const colorCustomEl = document.getElementById('editor-title-color-custom');
+        const tcVal = colorTypeEl ? colorTypeEl.value : 'default';
+        const tccVal = colorCustomEl ? colorCustomEl.value : '#1a73e8';
+
+        if (colorCustomEl) colorCustomEl.style.display = tcVal === 'custom' ? 'inline-block' : 'none';
+
+        const updateTitleColor = (obj) => {
+          if (!obj) return;
+          obj.titleColorType = tcVal;
+          obj.titleColorCustom = tccVal;
+        };
+        updateTitleColor(window.G);
+        updateTitleColor(window.n);
+        if (window.U && window.U[window.W]) updateTitleColor(window.U[window.W]);
+
+        applyPreviewTheme();
+        renderLivePreview();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      } else if (t.id === 'editor-title-warp-shape' || t.id === 'editor-title-warp-strength' || t.id === 'editor-title-warp-strength-num' || t.id === 'editor-title-warp-effect' || t.id === 'editor-title-light-angle' || t.id === 'editor-title-light-angle-num' || t.id === 'editor-title-light-intensity' || t.id === 'editor-title-light-intensity-num') {
+        const warpShapeEl = document.getElementById('editor-title-warp-shape');
+        const warpStrengthEl = document.getElementById('editor-title-warp-strength');
+        const warpStrengthNumEl = document.getElementById('editor-title-warp-strength-num');
+        const warpEffectEl = document.getElementById('editor-title-warp-effect');
+        const lightAngleEl = document.getElementById('editor-title-light-angle');
+        const lightAngleNumEl = document.getElementById('editor-title-light-angle-num');
+        const lightIntensityEl = document.getElementById('editor-title-light-intensity');
+        const lightIntensityNumEl = document.getElementById('editor-title-light-intensity-num');
+        const strengthContainer = document.getElementById('editor-title-warp-strength-container');
+        const lightingContainer = document.getElementById('editor-title-lighting-container');
+
+        const wsVal = warpShapeEl ? warpShapeEl.value : 'none';
+        let wstVal = 50;
+        if (t.id === 'editor-title-warp-strength') wstVal = parseInt(t.value, 10) || 50;
+        else if (t.id === 'editor-title-warp-strength-num') wstVal = parseInt(t.value, 10) || 50;
+        else if (warpStrengthEl) wstVal = parseInt(warpStrengthEl.value, 10) || 50;
+        wstVal = Math.max(1, Math.min(200, wstVal));
+
+        if (warpStrengthEl && parseInt(warpStrengthEl.value, 10) !== wstVal) warpStrengthEl.value = wstVal;
+        if (warpStrengthNumEl && parseInt(warpStrengthNumEl.value, 10) !== wstVal) warpStrengthNumEl.value = wstVal;
+
+        const weVal = warpEffectEl ? warpEffectEl.value : 'none';
+
+        let laVal = 315;
+        if (t.id === 'editor-title-light-angle') laVal = parseInt(t.value, 10);
+        else if (t.id === 'editor-title-light-angle-num') laVal = parseInt(t.value, 10);
+        else if (lightAngleEl) laVal = parseInt(lightAngleEl.value, 10);
+        if (isNaN(laVal)) laVal = 315;
+        laVal = ((laVal % 360) + 360) % 360;
+
+        if (lightAngleEl && parseInt(lightAngleEl.value, 10) !== laVal) lightAngleEl.value = laVal;
+        if (lightAngleNumEl && parseInt(lightAngleNumEl.value, 10) !== laVal) lightAngleNumEl.value = laVal;
+
+        let liVal = 60;
+        if (t.id === 'editor-title-light-intensity') liVal = parseInt(t.value, 10) || 60;
+        else if (t.id === 'editor-title-light-intensity-num') liVal = parseInt(t.value, 10) || 60;
+        else if (lightIntensityEl) liVal = parseInt(lightIntensityEl.value, 10) || 60;
+        liVal = Math.max(1, Math.min(100, liVal));
+
+        if (lightIntensityEl && parseInt(lightIntensityEl.value, 10) !== liVal) lightIntensityEl.value = liVal;
+        if (lightIntensityNumEl && parseInt(lightIntensityNumEl.value, 10) !== liVal) lightIntensityNumEl.value = liVal;
+
+        if (strengthContainer) strengthContainer.style.display = wsVal !== 'none' ? 'block' : 'none';
+        if (lightingContainer) lightingContainer.style.display = weVal !== 'none' ? 'block' : 'none';
+
+        const updateWarp = (obj) => {
+          if (!obj) return;
+          obj.titleWarpShape = wsVal;
+          obj.titleWarpStrength = wstVal;
+          obj.titleWarpEffect = weVal;
+          obj.titleLightAngle = laVal;
+          obj.titleLightIntensity = liVal;
+        };
+        updateWarp(window.G);
+        updateWarp(window.n);
+        if (window.U && window.U[window.W]) updateWarp(window.U[window.W]);
+
+        fastUpdateLivePreview('title_warp');
+        applyPreviewTheme();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      } else if (t.id === 'editor-title-badge-shape' || t.id === 'editor-title-badge-style' || t.id === 'editor-title-badge-bg-type' || t.id === 'editor-title-badge-bg-custom' || t.id === 'editor-title-badge-color-type' || t.id === 'editor-title-badge-color-custom') {
+        const shapeEl = document.getElementById('editor-title-badge-shape');
+        const styleEl = document.getElementById('editor-title-badge-style');
+        const bgTypeEl = document.getElementById('editor-title-badge-bg-type');
+        const bgCustomEl = document.getElementById('editor-title-badge-bg-custom');
+        const colorTypeEl = document.getElementById('editor-title-badge-color-type');
+        const colorCustomEl = document.getElementById('editor-title-badge-color-custom');
+        const optionsContainer = document.getElementById('editor-title-badge-options');
+
+        const sVal = shapeEl ? shapeEl.value : 'none';
+        const stVal = styleEl ? styleEl.value : 'fill';
+        const bgtVal = bgTypeEl ? bgTypeEl.value : 'primary';
+        const bgcVal = bgCustomEl ? bgCustomEl.value : '#1a73e8';
+        const ctVal = colorTypeEl ? colorTypeEl.value : 'white';
+        const ccVal = colorCustomEl ? colorCustomEl.value : '#ffffff';
+
+        if (optionsContainer) optionsContainer.style.display = sVal !== 'none' ? 'block' : 'none';
+        if (bgCustomEl) bgCustomEl.style.display = bgtVal === 'custom' ? 'block' : 'none';
+        if (colorCustomEl) colorCustomEl.style.display = ctVal === 'custom' ? 'block' : 'none';
+
+        const updateTarget = (obj) => {
+          if (!obj) return;
+          obj.titleBadgeShape = sVal;
+          obj.titleBadgeStyle = stVal;
+          obj.titleBadgeBgType = bgtVal;
+          obj.titleBadgeBgCustom = bgcVal;
+          obj.titleBadgeColorType = ctVal;
+          obj.titleBadgeColorCustom = ccVal;
+        };
+        updateTarget(window.G);
+        updateTarget(window.n);
+        if (window.U && window.U[window.W]) updateTarget(window.U[window.W]);
+
+        applyPreviewTheme();
+        renderLivePreview();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+      }
+    });
+
+    panel.addEventListener('click', (e) => {
+      const alignBtn = e.target.closest('.btn-header-align');
+      if (alignBtn) {
+        e.preventDefault();
+        const align = alignBtn.getAttribute('data-align') || 'left';
+        document.querySelectorAll('.btn-header-align').forEach(b => b.classList.toggle('active', b === alignBtn));
+        const hiddenAlign = document.getElementById('editor-header-align');
+        if (hiddenAlign) hiddenAlign.value = align;
+        if (window.G) window.G.headerAlign = align;
+        if (window.n) window.n.headerAlign = align;
+        if (window.U && window.U[window.W]) window.U[window.W].headerAlign = align;
+        applyPreviewTheme();
+        renderLivePreview();
+        if (typeof window.S === 'function') window.S();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
       }
     });
   }
@@ -12540,6 +15082,13 @@
     // 1. 未装飾のセレクトボックスの装飾
     const deleteBtns = editorPanel.querySelectorAll('.btn-delete-option');
     deleteBtns.forEach(btn => {
+      // 統一したゴミ箱の線画アイコンに自動補正
+      if (!btn.querySelector('svg')) {
+        btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
+        btn.title = '選択肢を削除';
+        btn.setAttribute('aria-label', '選択肢を削除');
+      }
+
       const parent = btn.parentElement;
       if (!parent) return;
 
@@ -12577,16 +15126,8 @@
       
       if (currentSecId) {
         allSelects.forEach(select => {
-          // もしセレクトボックスの現在の選択値が空値（""）または "next" である場合は、
-          // 整合性向上のため、自動的に「隣のセクションのID」を選択値に割り当てて、UI表示を同期させる
-          if (select.value === "" || select.value === "next") {
-            const nextSec = window.n.sections[currentIdx + 1];
-            if (nextSec) {
-              select.value = nextSec.id;
-              // React 側に値の更新を通知する
-              select.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-          }
+          // 空値（""）は「デフォルトの進行（同一セクション内の次の質問へ進む）」を表す正常な値のため、
+          // 勝手に別セクションへ上書きしない。
 
           const options = select.querySelectorAll('option');
           let needChangeTrigger = false;
@@ -12696,7 +15237,7 @@
         `;
       } else if (node.type === 'option') {
         const activeState = window.G;
-        let optionsHtml = '<option value="next">デフォルト（次の項目へ）</option><option value="submit">回答を送信して終了</option>';
+        let optionsHtml = '<option value="next">デフォルト（次の項目へ）</option><option value="partial_submit" ' + (node.nextSectionId==='partial_submit'?'selected':'') + '>💾 途中送信（コード確定＆続きリンク発行）</option><option value="submit" ' + (node.nextSectionId==='submit'?'selected':'') + '>回答を送信して終了</option>';
         activeState.sections.forEach(sec => {
           optionsHtml += `<option value="${sec.id}" ${node.nextSectionId===sec.id?'selected':''}>セクションへ移動: ${sec.title || sec.id}</option>`;
         });
@@ -12865,10 +15406,28 @@
       
       const idx = parseInt(activeIndex);
       if (allForms[idx]) {
-        const oldFormCopy = JSON.parse(JSON.stringify(allForms[idx]));
-        
         allForms[idx].title = window.G.title;
+        allForms[idx].subtitle = (window.G.header && window.G.header.subtitle) ? window.G.header.subtitle : (window.G.subtitle || '');
         allForms[idx].sections = window.G.sections;
+        
+        if (window.G.headerStyle !== undefined) allForms[idx].headerStyle = window.G.headerStyle;
+        if (window.G.headerAlign !== undefined) allForms[idx].headerAlign = window.G.headerAlign;
+        if (window.G.subtitlePosition !== undefined) allForms[idx].subtitlePosition = window.G.subtitlePosition;
+        if (window.G.titleBadgeShape !== undefined) allForms[idx].titleBadgeShape = window.G.titleBadgeShape;
+        if (window.G.titleBadgeStyle !== undefined) allForms[idx].titleBadgeStyle = window.G.titleBadgeStyle;
+        if (window.G.titleBadgeBgType !== undefined) allForms[idx].titleBadgeBgType = window.G.titleBadgeBgType;
+        if (window.G.titleBadgeBgCustom !== undefined) allForms[idx].titleBadgeBgCustom = window.G.titleBadgeBgCustom;
+        if (window.G.titleBadgeColorType !== undefined) allForms[idx].titleBadgeColorType = window.G.titleBadgeColorType;
+        if (window.G.titleBadgeColorCustom !== undefined) allForms[idx].titleBadgeColorCustom = window.G.titleBadgeColorCustom;
+        if (window.G.titleWarpShape !== undefined) allForms[idx].titleWarpShape = window.G.titleWarpShape;
+        if (window.G.titleWarpStrength !== undefined) allForms[idx].titleWarpStrength = window.G.titleWarpStrength;
+        if (window.G.titleWarpEffect !== undefined) allForms[idx].titleWarpEffect = window.G.titleWarpEffect;
+        if (window.G.titleLightAngle !== undefined) allForms[idx].titleLightAngle = window.G.titleLightAngle;
+        if (window.G.titleLightIntensity !== undefined) allForms[idx].titleLightIntensity = window.G.titleLightIntensity;
+        if (window.G.titleColorType !== undefined) allForms[idx].titleColorType = window.G.titleColorType;
+        if (window.G.titleColorCustom !== undefined) allForms[idx].titleColorCustom = window.G.titleColorCustom;
+        if (window.G.titleFontFamily !== undefined) allForms[idx].titleFontFamily = window.G.titleFontFamily;
+        if (window.G.titleFontTarget !== undefined) allForms[idx].titleFontTarget = window.G.titleFontTarget;
         
         if (window.G.editorMode !== undefined) allForms[idx].editorMode = window.G.editorMode;
         if (window.G.header !== undefined) allForms[idx].header = window.G.header;
@@ -12992,7 +15551,6 @@
     let lastLoadedFormTitle = "";
 
     const customF = function(masterState) {
-      console.log('[React Flow Bridge] Triggering render inside flowmap iframe...');
       if (masterState) {
         window.G = window.G || {};
         const isFormSwitched = (masterState.title !== lastLoadedFormTitle);
@@ -13023,9 +15581,15 @@
           updateHeaderActiveFormTitle(masterState.title);
         }
       }
-      const iframe = document.getElementById('flowmap-iframe');
-      if (iframe && iframe.contentWindow && iframe.contentWindow.triggerFlowmapRender) {
-        iframe.contentWindow.triggerFlowmapRender();
+      
+      // 🛡️ フォーム分岐ロジックの自己修復＆サニタイズ
+      if (window.G && typeof sanitizeFormBranchingLogic === 'function') {
+        sanitizeFormBranchingLogic(window.G);
+      }
+
+      // 🔀 Archify フローマップの直接レンダリング
+      if (window.archifyRenderer && window.G) {
+        window.archifyRenderer.render(window.G);
       }
     };
 
@@ -13033,29 +15597,13 @@
       Object.defineProperty(window, 'F', {
         get: () => customF,
         set: (val) => {
-          console.log('[Custom Flowmap] Blocked attempt to overwrite window.F with:', val);
+          console.log('[Archify Flowmap] Blocked attempt to overwrite window.F with:', val);
         },
         configurable: true
       });
-      console.log('[Custom Flowmap] window.F locked successfully!');
+      console.log('[Archify Flowmap] window.F locked to Archify engine successfully!');
     } catch (err) {
-      console.error('[Custom Flowmap] Failed to lock window.F:', err);
       window.F = customF;
-    }
-
-    const refreshBtn = document.getElementById('btn-refresh-flowmap');
-    if (refreshBtn) {
-      const newRefreshBtn = refreshBtn.cloneNode(true);
-      refreshBtn.parentNode.replaceChild(newRefreshBtn, refreshBtn);
-      newRefreshBtn.addEventListener('click', () => {
-        if (confirm('レイアウトを自動配置にリセットしますか？')) {
-          localStorage.removeItem('form_customize_flowmap_coords');
-        }
-        const iframe = document.getElementById('flowmap-iframe');
-        if (iframe && iframe.contentWindow && iframe.contentWindow.triggerFlowmapRender) {
-          iframe.contentWindow.triggerFlowmapRender();
-        }
-      });
     }
 
     if (window.G) {
@@ -13088,14 +15636,9 @@
         allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]');
       } catch(e) {}
 
-      // フォールバック: もし localStorage 内のフォームデータが空の場合はデフォルトのサンプルフォームを補正・ロード
-      if (!allForms || allForms.length === 0) {
-        allForms = [
-          { title: '新規作成されたフォーム', ownerId: 'user_own_editor', isLocked: false },
-          { title: 'お客様フィードバック (サンプル)', ownerId: 'user_all_editor', isLocked: false },
-          { title: '管理者用のアカウント作成', ownerId: 'user_admin', isLocked: true }
-        ];
-      }
+      // 削除済み・不要サンプルフォーム（フィードバック・管理者権限）の自動パージ
+      const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+      allForms = (allForms || []).filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
 
       const activeIndex = parseInt(localStorage.getItem('form_customize_active_index') || '0', 10);
 
@@ -13607,17 +16150,20 @@
   // =========================================================================
   const REGEX_PRESET_DEFINITIONS = {
     custom: { label: "カスタム（式を直接入力）", pattern: "" },
+    bank_account: { label: "口座番号 (6〜7桁) (例: 1234567)", pattern: "^[0-9]{6,7}$" },
     zip: { label: "郵便番号 (例: 123-4567)", pattern: "^\\d{3}-\\d{4}$" },
     zip_nohyphen: { label: "郵便番号（-無） (例: 1234567)", pattern: "^\\d{7}$" },
     tel_both: { label: "電話番号（固定・携帯 共通） (例: 03-1234-5678 / 090-1234-5678)", pattern: "^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$" },
+    tel_both_nohyphen: { label: "電話番号（固定・携帯 共通）（-無） (例: 0312345678 / 09012345678)", pattern: "^0\\d{9,10}$" },
     phone: { label: "携帯電話のみ (例: 090-1234-5678)", pattern: "^(070|080|090)-\\d{4}-\\d{4}$" },
     phone_nohyphen: { label: "携帯電話のみ（-無） (例: 09012345678)", pattern: "^(070|080|090)\\d{8}$" },
-    birthdate: { label: "生年月日 (例: 1990/01/01)", pattern: "^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$" }
+    email: { label: "メールアドレス (例: name@example.com)", pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" },
+    birthdate: { label: "生年月日 (例: 1990/01/01)", pattern: "^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$" },
+    account_holder_kana: { label: "口座名義（カナ・（）.許可） (例: カ）ヤマダ タロウ)", pattern: "^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$" }
   };
   window.REGEX_PRESET_DEFINITIONS = REGEX_PRESET_DEFINITIONS;
 
   if (window.ie) {
-    delete window.ie.tel_both_nohyphen;
     delete window.ie.tel_both_flexible;
     delete window.ie.tel;
     delete window.ie.tel_nohyphen;
@@ -13626,7 +16172,7 @@
     });
   }
 
-  // プリセット質問定義 (window.re) の電話番号および生年月日
+  // プリセット質問定義 (window.re) の電話番号、生年月日および口座番号
   if (window.re) {
     if (window.re.tel) {
       window.re.tel.description = "ハイフンを含めて半角数字で入力してください。（例: 03-1234-5678 または 090-1234-5678）";
@@ -13651,6 +16197,32 @@
         },
         options: []
       };
+    }
+    if (!window.re.bank_account) {
+      window.re.bank_account = {
+        type: "text",
+        title: "口座番号",
+        description: "6〜7桁の半角数字で入力してください（例: 1234567）",
+        placeholder: "0477651",
+        required: true,
+        validation: {
+          category: "regex",
+          condition: "matches",
+          presetKey: "bank_account",
+          value: "^[0-9]{6,7}$",
+          value2: "",
+          errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+        },
+        options: []
+      };
+    } else {
+      window.re.bank_account.description = "6〜7桁の半角数字で入力してください（例: 1234567）";
+      window.re.bank_account.placeholder = "0477651";
+      if (window.re.bank_account.validation) {
+        window.re.bank_account.validation.presetKey = "bank_account";
+        window.re.bank_account.validation.value = "^[0-9]{6,7}$";
+        window.re.bank_account.validation.errorMessage = "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+      }
     }
   }
 
@@ -13680,7 +16252,7 @@
     }
 
     // 3. メールアドレス
-    if (cat === 'text' && cond === 'email') {
+    if ((cat === 'text' && cond === 'email') || preset === 'email' || (pattern && pattern.includes('@') && pattern.includes('[a-zA-Z]'))) {
       return '半角英数字で正しいメールアドレスを入力してください。（例: name@example.com）';
     }
 
@@ -13715,6 +16287,12 @@
         return '半角数字で入力してください。ハイフンの有無はどちらでも構いません。（例: 123-4567 または 1234567）';
       }
       return 'ハイフンを含めて半角数字で入力してください。（例: 123-4567）';
+    }
+
+    // 7.5 町名・番地判定
+    const isStreet = preset === 'street' || cond === 'street' || ((/町名|番地/.test(t) || /street/i.test(t)) && !/建物|部屋|ビル|マンション|郵便/.test(t));
+    if (isStreet) {
+      return '自動補完された住所の末尾に、必ず【番地・号（数字）】を追記してください。';
     }
 
     // 8. 電話番号判定 (プリセット、タイトル、または正規表現パターン)
@@ -13768,8 +16346,9 @@
     }
 
     // 10. 口座番号
-    if (/口座番号/.test(t) || (!/名義/.test(t) && /口座/.test(t)) || pattern === '^\\d{7}$' || pattern === '^\\d{6,7}$') {
-      return '7桁の半角数字で入力してください。（例: 1234567）';
+    const isAcctNumPat = pattern && (pattern.includes('d{7}') || pattern.includes('d{6,7}') || pattern.includes('0-9]{7}') || pattern.includes('0-9]{6,7}'));
+    if (preset === 'bank_account' || /口座番号/.test(t) || (!/名義/.test(t) && /口座/.test(t)) || isAcctNumPat) {
+      return '6〜7桁の半角数字で入力してください。（例: 1234567）';
     }
 
     // 11. インボイス登録番号
@@ -13853,8 +16432,14 @@
     }
 
     // 口座番号
-    if (/口座番号/.test(t) || (!/名義/.test(t) && /口座/.test(t)) || pattern === '^\\d{7}$') {
-      return '正しい口座番号（7桁の半角数字）を入力してください。';
+    const isAcctNumPat = pattern && (pattern.includes('d{7}') || pattern.includes('d{6,7}') || pattern.includes('0-9]{7}') || pattern.includes('0-9]{6,7}'));
+    if (preset === 'bank_account' || /口座番号/.test(t) || (!/名義/.test(t) && /口座/.test(t)) || isAcctNumPat) {
+      return '正しい口座番号（6〜7桁の半角数字）を入力してください。';
+    }
+
+    // メールアドレス
+    if (preset === 'email' || (pattern && pattern.includes('@') && pattern.includes('[a-zA-Z]'))) {
+      return '正しいメールアドレスの形式で入力してください（例: name@example.com）。';
     }
 
     if (pattern === '^[a-zA-Z0-9]+$') {
@@ -13875,7 +16460,26 @@
     formObj.sections.forEach(sec => {
       if (!sec || !sec.questions) return;
       sec.questions.forEach(q => {
-        if (!q || !q.validation) return;
+        if (!q) return;
+        const t = (q.title || '').trim();
+        const isAcctHolder = (q.dataKey === 'account_holder_kana') || ((t.includes('口座名義') || t.includes('名義人') || (t.includes('口座') && t.includes('名義'))) && (t.includes('カナ') || t.includes('フリガナ') || t.includes('ふりがな') || (q.validation && q.validation.category === 'regex' && /^[ァ-ヶ]/.test(q.validation.value || ''))));
+        if (isAcctHolder) {
+          const desc = q.description || '';
+          if (!desc || desc.includes('全角カタカナで入力してください')) {
+            q.description = 'カナ、カッコ（）、ドット（.）で入力してください。（例: カ）ヤマダ タロウ）';
+            modified = true;
+          }
+          if (q.validation && q.validation.category === 'regex') {
+            if (q.validation.value !== '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$' || q.validation.presetKey !== 'account_holder_kana') {
+              q.validation.value = '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$';
+              q.validation.presetKey = 'account_holder_kana';
+              q.validation.errorMessage = '口座名義はカナと（）.のみで入力してください。';
+              modified = true;
+            }
+          }
+        }
+
+        if (!q.validation) return;
         const v = q.validation;
         const desc = q.description || '';
         if (v.category === 'regex') {
@@ -13937,8 +16541,20 @@
     });
   }
 
+  function syncWindowIe() {
+    if (window.ie) {
+      delete window.ie.tel_both_flexible;
+      delete window.ie.tel;
+      delete window.ie.tel_nohyphen;
+      Object.keys(REGEX_PRESET_DEFINITIONS).forEach(k => {
+        window.ie[k] = REGEX_PRESET_DEFINITIONS[k];
+      });
+    }
+  }
+
   // 正規表現プリセットドロップダウンの拡張と自動説明文連携
   function patchRegexPresetDropdowns() {
+    syncWindowIe();
     const selects = document.querySelectorAll('.val-inputs-container select');
     selects.forEach(sel => {
       const hasZip = Array.from(sel.options).some(opt => opt.value === 'zip');
@@ -13950,10 +16566,9 @@
 
       const needsUpdate = currentKeys.length !== targetKeys.length ||
         !currentKeys.includes('birthdate') ||
-        currentKeys.includes('tel_both_nohyphen') ||
-        currentKeys.includes('tel_both_flexible') ||
-        currentKeys.includes('tel') ||
-        currentKeys.includes('tel_nohyphen');
+        !currentKeys.includes('email') ||
+        !currentKeys.includes('bank_account') ||
+        !currentKeys.includes('tel_both_nohyphen');
 
       if (needsUpdate) {
         sel.innerHTML = "";
@@ -13972,6 +16587,12 @@
       const opt = document.createElement('option');
       opt.value = 'birthdate';
       opt.textContent = '生年月日';
+      presetSelect.appendChild(opt);
+    }
+    if (presetSelect && !presetSelect.querySelector('option[value="bank_account"]')) {
+      const opt = document.createElement('option');
+      opt.value = 'bank_account';
+      opt.textContent = '口座番号 (6〜7桁)';
       presetSelect.appendChild(opt);
     }
 
@@ -14051,6 +16672,7 @@
 
   // 正規表現プリセット選択変更時の自動同期（キャプチャフェーズで検知して確実に適用）
   document.addEventListener('change', (e) => {
+    syncWindowIe();
     const sel = e.target;
     if (!sel || !sel.closest || !sel.closest('.val-inputs-container')) return;
     const isPresetSelect = Array.from(sel.options || []).some(opt => opt.value === 'tel_both' || opt.value === 'zip');
@@ -14072,6 +16694,11 @@
       if (newKey !== 'custom' && pattern) {
         q.validation.value = pattern;
       }
+    }
+
+    const patternInput = card.querySelector('.val-inputs-container input[type="text"]');
+    if (patternInput && pattern) {
+      patternInput.value = pattern;
     }
 
     const dummyVal = Object.assign({}, q.validation, {
@@ -14178,17 +16805,19 @@
   }
 
   let _currentShareModalFormIndex = null;
+  let _currentShareModalEnv = 'production'; // 'production' (main) | 'test' (test branch)
 
   function updateShareModalOpenTabBtn(targetUrl) {
     const openTabBtn = document.getElementById('btn-open-share-url-tab');
     if (openTabBtn) {
       openTabBtn.onclick = () => {
+        try { syncFormsToCloud(null, true); } catch(e) {}
         window.open(targetUrl, '_blank');
       };
     }
   }
 
-  function getPublicFormShareUrl(formIndex, shorten = true) {
+  function getPublicFormShareUrl(formIndex, shorten = true, env = 'production') {
     const origin = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : '';
     let pathname = window.location.pathname || '';
     
@@ -14210,16 +16839,19 @@
     const { formObj, idx } = getCurrentFormObject(formIndex);
     const formId = formObj && formObj.id ? formObj.id : `form_${idx}`;
     
-    // バックグラウンドでクラウド（Supabase）への保存・同期を実行
-    try { syncFormsToCloud(); } catch(e) {}
+    // バックグラウンドでクラウド（Supabase）への保存・即時同期を実行
+    try { syncFormsToCloud(null, true); } catch(e) {}
+
+    const isTest = (env === 'test');
+    const envParam = isTest ? (shorten ? '?env=test' : '&env=test') : '';
 
     // 短縮URL (Google Forms短縮URL風: 例 https://synapse-wayway.vercel.app/f/0)
     if (shorten) {
-      return `${origin}/f/${idx}`;
+      return `${origin}/f/${idx}${envParam}`;
     }
 
     // 完全URL (例: https://synapse-wayway.vercel.app/form-customize/view.html?id=form_0)
-    return `${origin}${viewPath}?id=${encodeURIComponent(formId)}&form_idx=${idx}`;
+    return `${origin}${viewPath}?id=${encodeURIComponent(formId)}&form_idx=${idx}${envParam}`;
   }
 
   function showGlobalShareToast(msg) {
@@ -14241,11 +16873,12 @@
   }
 
   async function copyFormShareUrl(formIndex, silent = false, forceShorten = true) {
-    const url = getPublicFormShareUrl(formIndex, forceShorten);
+    const url = getPublicFormShareUrl(formIndex, forceShorten, _currentShareModalEnv || 'production');
     if (navigator.clipboard && navigator.clipboard.writeText) {
       try {
         await navigator.clipboard.writeText(url);
-        if (!silent) showGlobalShareToast('回答者用短縮リンクをクリップボードにコピーしました！');
+        const envLabel = _currentShareModalEnv === 'test' ? 'テスト送信リンク' : '本番用共有リンク';
+        if (!silent) showGlobalShareToast(`${envLabel}をクリップボードにコピーしました！`);
       } catch (e) {
         fallbackCopy(url, silent);
       }
@@ -14264,18 +16897,1271 @@
     textarea.select();
     try {
       document.execCommand('copy');
-      if (!silent) showGlobalShareToast('回答者用短縮リンクをクリップボードにコピーしました！');
+      const envLabel = _currentShareModalEnv === 'test' ? 'テスト送信リンク' : '本番用共有リンク';
+      if (!silent) showGlobalShareToast(`${envLabel}をクリップボードにコピーしました！`);
     } catch (e) {
       console.warn('Copy failed:', e);
     }
     textarea.remove();
   }
 
+  // =========================================================================
+  // 🌿 Gitブランチ型 本番統合（公開更新 / Merge to main）管理モジュール
+  // =========================================================================
+
+  function checkFormPublishStatus(formObj) {
+    if (!formObj) return { isSynced: true, version: 1 };
+    const version = formObj.publishedVersion || 1;
+    if (!formObj.publishedSnapshot || !formObj.publishedSnapshot.sections) {
+      // まだ一度も明示的に本番統合されていない初期フォーム
+      const hasSections = formObj.sections && formObj.sections.length > 0;
+      return { isSynced: !hasSections, version: 1, isInitial: true, publishedAt: null };
+    }
+
+    const extractCore = (f) => ({
+      title: (f.title || '').trim(),
+      subtitle: (f.subtitle || '').trim(),
+      description: (f.description || '').trim(),
+      headerStyle: f.headerStyle || 'card-accent-top',
+      headerAlign: f.headerAlign || 'left',
+      subtitlePosition: f.subtitlePosition || 'below',
+      titleBadgeShape: f.titleBadgeShape || 'none',
+      titleBadgeStyle: f.titleBadgeStyle || 'fill',
+      titleBadgeBgType: f.titleBadgeBgType || 'primary',
+      titleBadgeBgCustom: f.titleBadgeBgCustom || '#1a73e8',
+      titleBadgeColorType: f.titleBadgeColorType || 'white',
+      titleBadgeColorCustom: f.titleBadgeColorCustom || '#ffffff',
+      titleWarpShape: f.titleWarpShape || 'none',
+      titleWarpStrength: f.titleWarpStrength !== undefined ? f.titleWarpStrength : 50,
+      titleWarpEffect: f.titleWarpEffect || 'none',
+      titleLightAngle: f.titleLightAngle !== undefined ? f.titleLightAngle : 315,
+      titleLightIntensity: f.titleLightIntensity !== undefined ? f.titleLightIntensity : 60,
+      titleColorType: f.titleColorType || 'default',
+      titleColorCustom: f.titleColorCustom || '#1a73e8',
+      titleFontFamily: f.titleFontFamily || 'default',
+      titleFontTarget: f.titleFontTarget || 'both',
+      targetTableMode: 'dedicated',
+      targetTableId: f.targetTableId || 'dedicated',
+      createDedicatedTable: true,
+      sections: (f.sections || []).map(sec => ({
+        id: sec.id,
+        title: (sec.title || '').trim(),
+        description: (sec.description || '').trim(),
+        questions: (sec.questions || []).map(q => ({
+          id: q.id,
+          title: (q.title || '').trim(),
+          type: q.type,
+          required: !!q.required,
+          options: q.options || [],
+          dataKey: q.dataKey || null,
+          validation: q.validation || null,
+          apiConfig: q.apiConfig || null
+        }))
+      }))
+    });
+
+    const currentCore = JSON.stringify(extractCore(formObj));
+    const publishedCore = JSON.stringify(extractCore(formObj.publishedSnapshot));
+    const isSynced = (currentCore === publishedCore);
+
+    return {
+      isSynced,
+      version,
+      publishedAt: formObj.publishedAt || null
+    };
+  }
+
+  function mergeFormToProduction(formIndex) {
+    const { formObj, idx } = getCurrentFormObject(formIndex);
+    if (!formObj) return;
+
+    const currentTitle = formObj.title || '無題のフォーム';
+    const currentVersion = formObj.publishedVersion || 1;
+    const nextVersion = currentVersion + 1;
+
+    // クリーンな公開スナップショットを作成（循環参照や不要メタデータを除去）
+    const snapshot = {
+      id: formObj.id || `form_${idx}`,
+      title: formObj.title || '無題のフォーム',
+      subtitle: formObj.subtitle || '',
+      description: formObj.description || '',
+      headerStyle: formObj.headerStyle || 'card-accent-top',
+      headerAlign: formObj.headerAlign || 'left',
+      subtitlePosition: formObj.subtitlePosition || 'below',
+      titleBadgeShape: formObj.titleBadgeShape || 'none',
+      titleBadgeStyle: formObj.titleBadgeStyle || 'fill',
+      titleBadgeBgType: formObj.titleBadgeBgType || 'primary',
+      titleBadgeBgCustom: formObj.titleBadgeBgCustom || '#1a73e8',
+      titleBadgeColorType: formObj.titleBadgeColorType || 'white',
+      titleBadgeColorCustom: formObj.titleBadgeColorCustom || '#ffffff',
+      titleWarpShape: formObj.titleWarpShape || 'none',
+      titleWarpStrength: formObj.titleWarpStrength !== undefined ? formObj.titleWarpStrength : 50,
+      titleWarpEffect: formObj.titleWarpEffect || 'none',
+      titleLightAngle: formObj.titleLightAngle !== undefined ? formObj.titleLightAngle : 315,
+      titleLightIntensity: formObj.titleLightIntensity !== undefined ? formObj.titleLightIntensity : 60,
+      titleColorType: formObj.titleColorType || 'default',
+      titleColorCustom: formObj.titleColorCustom || '#1a73e8',
+      titleFontFamily: formObj.titleFontFamily || 'default',
+      titleFontTarget: formObj.titleFontTarget || 'both',
+      sections: JSON.parse(JSON.stringify(formObj.sections || [])),
+      theme: formObj.theme ? JSON.parse(JSON.stringify(formObj.theme)) : null,
+      settings: formObj.settings ? JSON.parse(JSON.stringify(formObj.settings)) : null,
+      appearance: formObj.appearance ? JSON.parse(JSON.stringify(formObj.appearance)) : null,
+      estimatedTime: formObj.estimatedTime || null,
+      targetTableMode: 'dedicated',
+      targetTableId: formObj.targetTableId || 'dedicated',
+      createDedicatedTable: true,
+      isUnpublished: !!formObj.isUnpublished,
+      publishedVersion: nextVersion,
+      publishedAt: new Date().toISOString()
+    };
+
+    formObj.publishedSnapshot = snapshot;
+    formObj.publishedVersion = nextVersion;
+    formObj.publishedAt = snapshot.publishedAt;
+
+    // window.U の該当インデックスも確実に更新
+    if (window.U && window.U[idx]) {
+      window.U[idx] = formObj;
+    }
+
+    // localStorage の form_customize_all_forms へ保存（フックにより Supabase へ自動同期される）
+    try {
+      const allFormsRaw = localStorage.getItem('form_customize_all_forms');
+      let allForms = allFormsRaw ? JSON.parse(allFormsRaw) : [];
+      if (allForms[idx]) {
+        allForms[idx] = formObj;
+      } else {
+        const fIdx = allForms.findIndex(f => f && (f.id === formObj.id || f.title === formObj.title));
+        if (fIdx !== -1) allForms[fIdx] = formObj;
+        else allForms.push(formObj);
+      }
+      localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+    } catch(e) {
+      console.warn('[Merge] Failed to update localStorage allForms:', e);
+    }
+
+    // UIを更新
+    updatePublishSyncUI(idx);
+
+    // トースト通知
+    showGlobalShareToast(`「${currentTitle}」を本番公開リンクへ統合しました！（v${nextVersion}）`);
+    if (typeof showToast === 'function') {
+      showToast(`「${currentTitle}」を本番環境へ統合しました。配布済み本番リンクが最新版（v${nextVersion}）に切り替わりました。`, 'success');
+    }
+  }
+
+  // 🏷️ フォーム名（必ずサブタイトルまで結合）生成共通ヘルパー
+  function getEffectiveFormTitle(formDef) {
+    if (!formDef) return '無題のフォーム';
+    const rawTitle = (typeof formDef === 'string' ? formDef : (formDef.title || formDef.name || '無題のフォーム')).trim();
+    if (typeof formDef === 'string') return rawTitle;
+    const rawSubtitle = (formDef.subtitle || (formDef.header && formDef.header.subtitle) || '').trim();
+    if (rawSubtitle && !rawTitle.includes(rawSubtitle)) {
+      return `${rawTitle} ${rawSubtitle}`;
+    }
+    return rawTitle || '無題のフォーム';
+  }
+  window.getEffectiveFormTitle = getEffectiveFormTitle;
+
+  // 🏷️ フォーム名からサブタイトルを含めたSupabase物理テーブル名を生成（フォーム毎の固有性を完全保証）
+  function getPhysicalTableNameForForm(formDef) {
+    if (!formDef) return 'form_default';
+    if (formDef.physicalTableName && formDef.physicalTableName !== 'form_custom' && formDef.physicalTableName !== 'form_default') {
+      return formDef.physicalTableName;
+    }
+
+    const effectiveTitle = getEffectiveFormTitle(formDef);
+    
+    // 1. 主要な既知フォームの固定マッピング
+    if (effectiveTitle.includes('紹介代理店') || effectiveTitle.includes('代理店')) {
+      return 'form_referral_agency_application';
+    }
+    if (effectiveTitle.includes('フィードバック') || effectiveTitle.includes('アンケート') || effectiveTitle.includes('feedback')) {
+      return 'form_customer_feedback';
+    }
+    if (effectiveTitle.includes('管理者') || effectiveTitle.includes('アカウント') || effectiveTitle.includes('account')) {
+      return 'form_admin_account_creation';
+    }
+    if (effectiveTitle.includes('基本情報')) {
+      return 'form_basic_info';
+    }
+    if (effectiveTitle.includes('口座') || effectiveTitle.includes('担当者')) {
+      return 'form_bank_account';
+    }
+
+    // 2. formDef.id が英数字を含む場合
+    const rawId = (formDef.id || '').toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '');
+    if (rawId && rawId.length >= 3 && rawId !== 'form_yosandas' && rawId !== 'form_custom') {
+      return rawId.startsWith('form_') ? rawId : `form_${rawId}`;
+    }
+
+    // 3. タイトルから英数字を抽出できる場合
+    const cleanTitle = effectiveTitle.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+    if (cleanTitle && cleanTitle.length >= 3) {
+      return `form_${cleanTitle}`;
+    }
+
+    // 4. 日本語タイトルのみの場合はハッシュを付与して一意性を完全担保
+    let hash = 0;
+    for (let i = 0; i < effectiveTitle.length; i++) {
+      hash = ((hash << 5) - hash) + effectiveTitle.charCodeAt(i);
+      hash |= 0;
+    }
+    const hexHash = Math.abs(hash).toString(16).padStart(6, '0').slice(0, 8);
+    return `form_tbl_${hexHash}`;
+  }
+  window.getPhysicalTableNameForForm = getPhysicalTableNameForForm;
+
+  // 📊 フォーム専用独立テーブル作成共通ヘルパー（1フォーム1テーブルの原則を完全保証）
+  async function createDedicatedTableForForm(formDef) {
+    if (!formDef) return null;
+    const formTitle = getEffectiveFormTitle(formDef);
+    const pTableName = getPhysicalTableNameForForm(formDef);
+    const sections = formDef.sections || [];
+
+    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+
+    let curTables = [];
+    try { curTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
+
+    // 🔍 既にこのフォーム専用テーブルが存在するか徹底チェック（多重作成の完全防止）
+    let existingTable = curTables.find(t => t && (
+      (formDef.targetTableId && t.id === formDef.targetTableId) ||
+      (formDef.id && t.formId && t.formId === formDef.id) ||
+      (t.name === formTitle) ||
+      (t.formTitle && t.formTitle === formTitle) ||
+      (pTableName && t.physicalTableName && t.physicalTableName === pTableName)
+    ) && t.id !== 'table_all_form_responses');
+
+    if (existingTable) {
+      // 🌟 既存テーブルが存在する場合：新規テーブルIDは発行せず、既存テーブルのID・回答行データ（rows）を100%保持
+      formDef.createDedicatedTable = true;
+      formDef.targetTableId = existingTable.id;
+      formDef.targetTableType = 'dedicated';
+      formDef.physicalTableName = existingTable.physicalTableName || pTableName;
+
+      if (!existingTable.formId && formDef.id) {
+        existingTable.formId = formDef.id;
+      }
+      existingTable.sourceFormId = formDef.id;
+      existingTable.formTitle = formTitle;
+      existingTable.name = formTitle;
+      existingTable.isFormDedicatedTable = true;
+      if (!existingTable.parentMenuId || existingTable.parentMenuId === 'root') {
+        existingTable.parentMenuId = 'forms-accordion';
+      }
+
+      // 追加カラムがあれば安全に同期
+      if (typeof updateDedicatedTableColumns === 'function') {
+        await updateDedicatedTableColumns(existingTable, formDef);
+      }
+
+      localStorage.setItem('synapse_custom_tables', JSON.stringify(curTables));
+      localStorage.setItem(`synapse_table_${existingTable.id}`, JSON.stringify(existingTable));
+
+      // 🌐 Supabase上の物理テーブルが削除されていた場合に備え、CREATE TABLE RPCを必ず呼び出して物理テーブルを再生成・復元
+      try {
+        const rpcCols = (existingTable.columns || []).map(c => ({ id: c.id, label: c.label || c.name, type: c.type || 'text' }));
+        await fetch(`${sbUrl}/rest/v1/rpc/synapse_create_or_alter_table`, {
+          method: 'POST',
+          headers: {
+            apikey: sbKey,
+            Authorization: `Bearer ${sbKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            p_table_name: existingTable.physicalTableName || pTableName,
+            p_columns: rpcCols
+          })
+        });
+        console.log(`[Supabase Physical Table] Verified/Recreated physical table "${existingTable.physicalTableName || pTableName}" on Supabase.`);
+      } catch (rpcErr) {
+        console.warn('[Supabase Physical Table RPC] Error verifying physical table on Supabase:', rpcErr);
+      }
+
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'SYNAPSE_TABLE_UPDATED', table: existingTable }, '*');
+      }
+
+      console.log(`[DedicatedTable] Reusing existing table "${existingTable.name}" (ID: ${existingTable.id}). Physical table ensured on Supabase.`);
+      return existingTable;
+    }
+
+    // --- 初回作成時のみ新規IDを発行 ---
+    const newTableId = (formDef.targetTableId && formDef.targetTableId !== 'dedicated' && formDef.targetTableId !== 'table_all_form_responses')
+      ? formDef.targetTableId
+      : `ctbl_${Date.now()}`;
+    const columns = [
+      { id: 'master_id', label: 'マスターID / コード', type: 'text', required: false },
+      { id: 'form_title', label: 'フォーム名', type: 'text', required: false }
+    ];
+
+    sections.forEach((sec) => {
+      (sec.questions || []).forEach(q => {
+        const colId = q.dataKey || `col_${q.id}`;
+        const colName = (q.title || q.dataKey || q.id || '').trim();
+        let colType = 'text';
+        if (q.type === 'date') colType = 'date';
+        else if (q.type === 'select' || q.type === 'radio') colType = 'select';
+        else if (q.type === 'number') colType = 'number';
+
+        // 🔍 同一のキー（dataKey/id）を持つカラムが既に存在するかチェック
+        const existingCol = columns.find(c => c.id === colId);
+        if (existingCol) {
+          // 同一キーの設問が存在する場合：別カラムを作らず1つのカラムに統合
+          // ラベルが異なる場合（例: 法人名 と 屋号）はスラッシュで繋いで「法人名 / 屋号」にする
+          if (colName && !existingCol.label.includes(colName)) {
+            existingCol.label = `${existingCol.label} / ${colName}`;
+            existingCol.name = existingCol.label;
+          }
+          if (q.required) existingCol.required = true;
+          // choices のマージ
+          if (Array.isArray(q.options) && q.options.length > 0) {
+            if (!existingCol.choices) existingCol.choices = [];
+            const existingVals = new Set(existingCol.choices.map(c => typeof c === 'object' ? (c.label || c.value) : c));
+            q.options.forEach(opt => {
+              const val = typeof opt === 'object' ? (opt.label || opt.value) : opt;
+              if (val && !existingVals.has(val)) {
+                existingCol.choices.push({ value: val });
+                existingVals.add(val);
+              }
+            });
+          }
+          return; // 重複追加を防止
+        }
+
+        columns.push({
+          id: colId,
+          label: colName,
+          name: colName,
+          type: colType,
+          required: q.required || false,
+          choices: q.options ? q.options.map(opt => ({ value: (typeof opt === 'object' ? (opt.label || opt.value) : opt) })) : undefined
+        });
+      });
+    });
+
+    columns.push(
+      { id: 'status', label: 'ステータス', type: 'select', choices: [{ value: '回答完了', color: '#10b981' }, { value: '途中送信', color: '#f59e0b' }], required: false },
+      { id: 'registration_code', label: '確定登録コード', type: 'text', required: false },
+      { id: 'resume_url', label: '再開用URL', type: 'text', required: false },
+      { id: 'created_at', label: '送信日時', type: 'date', required: false }
+    );
+
+    const defaultWidths = {};
+    columns.forEach(col => { defaultWidths[col.id] = 130; });
+
+    const newTable = {
+      id: newTableId,
+      formId: formDef.id,
+      sourceFormId: formDef.id,
+      name: formTitle,
+      formTitle: formTitle,
+      physicalTableName: pTableName,
+      isFormDedicatedTable: true,
+      parentMenuId: 'forms-accordion',
+      columns: columns,
+      visibleColumns: columns.map(c => c.id),
+      columnWidths: defaultWidths,
+      rowHeights: {},
+      fixedCol: 'none',
+      fixedRow: 'none',
+      cellStyles: {},
+      rows: []
+    };
+
+    const existingIdx = curTables.findIndex(t => 
+      t.id === newTableId || 
+      (formDef.id && t.formId === formDef.id) ||
+      t.name === formTitle
+    );
+    if (existingIdx !== -1) {
+      curTables[existingIdx] = newTable;
+    } else {
+      curTables.push(newTable);
+    }
+    localStorage.setItem('synapse_custom_tables', JSON.stringify(curTables));
+    localStorage.setItem(`synapse_table_${newTableId}`, JSON.stringify(newTable));
+
+    try {
+      await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: {
+          apikey: sbKey,
+          Authorization: `Bearer ${sbKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          key: `synapse_table_${newTableId}`,
+          value: newTable,
+          updated_at: new Date().toISOString()
+        })
+      });
+
+      await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: {
+          apikey: sbKey,
+          Authorization: `Bearer ${sbKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          key: 'synapse_custom_tables',
+          value: curTables,
+          updated_at: new Date().toISOString()
+        })
+      });
+
+      // 🌐 Supabaseクラウド上に物理テーブル（CREATE TABLE）を自動作成 (RPC)
+      try {
+        const rpcCols = columns.map(c => ({ id: c.id, label: c.label || c.name, type: c.type || 'text' }));
+        await fetch(`${sbUrl}/rest/v1/rpc/synapse_create_or_alter_table`, {
+          method: 'POST',
+          headers: {
+            apikey: sbKey,
+            Authorization: `Bearer ${sbKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            p_table_name: pTableName,
+            p_columns: rpcCols
+          })
+        });
+        console.log(`[Supabase Physical Table] RPC triggered for table "${pTableName}".`);
+      } catch (rpcErr) {
+        console.warn('[Supabase Physical Table RPC] Failed to create physical table via RPC (RPC might not be installed yet):', rpcErr);
+      }
+    } catch (netErr) {
+      console.warn('[Supabase Sync] Network error during table registration:', netErr);
+    }
+
+    formDef.createDedicatedTable = true;
+    formDef.targetTableId = newTableId;
+    formDef.targetTableType = 'dedicated';
+    formDef.physicalTableName = pTableName;
+
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'SYNAPSE_TABLE_CREATED', table: newTable }, '*');
+    }
+
+    return newTable;
+  }
+  window.createDedicatedTableForForm = createDedicatedTableForForm;
+
+  // 🌟 全フォームの専用回答テーブルを一括同期・再作成（重複防止・Supabase物理テーブル完全保証）
+  async function syncOrRecreateAllDedicatedTables(options = {}) {
+    console.log('[DedicatedTable Batch] Starting batch synchronization for all forms...');
+    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+
+    let allForms = [];
+    try {
+      allForms = JSON.parse(localStorage.getItem('form_customize_all_forms')) || [];
+    } catch(e) {}
+    if (!allForms || allForms.length === 0) {
+      try {
+        const sbRes = await fetch(`${sbUrl}/rest/v1/synapse_storage?key=eq.synapse_form_customize_all_forms`, {
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+        });
+        const sbData = await sbRes.json();
+        if (sbData && sbData[0] && Array.isArray(sbData[0].value)) {
+          allForms = sbData[0].value;
+        }
+      } catch(err) {}
+    }
+
+    if (!allForms || allForms.length === 0) {
+      console.warn('[DedicatedTable Batch] No forms found to synchronize.');
+      return { success: false, message: '同期対象のフォームが見つかりませんでした。', count: 0 };
+    }
+
+    const results = [];
+    for (let i = 0; i < allForms.length; i++) {
+      const formDef = allForms[i];
+      if (!formDef) continue;
+      
+      const effectiveTitle = getEffectiveFormTitle(formDef);
+      const pTableName = getPhysicalTableNameForForm(formDef);
+      formDef.physicalTableName = pTableName;
+
+      const tbl = await createDedicatedTableForForm(formDef);
+      if (tbl) {
+        formDef.createDedicatedTable = true;
+        formDef.targetTableId = tbl.id;
+        formDef.targetTableType = 'dedicated';
+        if (formDef.publishedSnapshot) {
+          formDef.publishedSnapshot.createDedicatedTable = true;
+          formDef.publishedSnapshot.targetTableId = tbl.id;
+          formDef.publishedSnapshot.targetTableType = 'dedicated';
+          formDef.publishedSnapshot.physicalTableName = pTableName;
+        }
+        results.push({ formTitle: effectiveTitle, tableId: tbl.id, physicalTableName: pTableName, columnsCount: (tbl.columns || []).length });
+      }
+    }
+
+    localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+    try {
+      await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: {
+          apikey: sbKey,
+          Authorization: `Bearer ${sbKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          key: 'synapse_form_customize_all_forms',
+          value: allForms,
+          updated_at: new Date().toISOString()
+        })
+      });
+    } catch(err) {
+      console.warn('[Supabase Sync] Failed to update synapse_form_customize_all_forms:', err);
+    }
+
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'SYNAPSE_ALL_TABLES_SYNCED', results: results }, '*');
+    }
+
+    console.log(`[DedicatedTable Batch] Successfully synchronized ${results.length} form tables:`, results);
+    return { success: true, count: results.length, results: results };
+  }
+  window.syncOrRecreateAllDedicatedTables = syncOrRecreateAllDedicatedTables;
+
+  // 🔍 フォームの最新定義と既存専用テーブルを比較し、新設された質問（追加カラム）を特定する
+  function getNewColumnsForFormTable(dedicatedTable, formDef) {
+    if (!dedicatedTable || !formDef) return { newColumnsToAdd: [], existingColCount: 0 };
+
+    const formQuestions = [];
+    (formDef.sections || []).forEach(sec => {
+      (sec.questions || []).forEach(q => {
+        if (q) formQuestions.push(q);
+      });
+    });
+
+    const cols = Array.isArray(dedicatedTable.columns) ? dedicatedTable.columns : [];
+    const existingColIds = new Set(cols.map(c => c && c.id).filter(Boolean));
+    const existingColLabels = new Set(cols.map(c => c && (c.label || c.name || '').trim()).filter(Boolean));
+
+    const newColumnsToAdd = [];
+    formQuestions.forEach(q => {
+      const colId = q.dataKey || `col_${q.id}`;
+      const colName = (q.title || q.dataKey || q.id || '').trim();
+
+      const hasId = existingColIds.has(colId) || (q.id && existingColIds.has(q.id)) || (q.dataKey && existingColIds.has(q.dataKey));
+      const hasLabel = colName && existingColLabels.has(colName);
+
+      if (hasId) {
+        // 既存カラムが存在する場合はラベル統合（例: 法人名 と 屋号 を統一）
+        const targetCol = cols.find(c => c && (c.id === colId || c.id === q.id || c.id === q.dataKey));
+        if (targetCol && colName && !targetCol.label.includes(colName)) {
+          targetCol.label = `${targetCol.label} / ${colName}`;
+          targetCol.name = targetCol.label;
+        }
+        return;
+      }
+
+      if (!hasId && !hasLabel) {
+        let colType = 'text';
+        if (q.type === 'date') colType = 'date';
+        else if (q.type === 'select' || q.type === 'radio') colType = 'select';
+        else if (q.type === 'number') colType = 'number';
+
+        let choices = undefined;
+        if (Array.isArray(q.options) && q.options.length > 0) {
+          choices = q.options.map(opt => {
+            if (typeof opt === 'object' && opt !== null) {
+              return { value: opt.label || opt.value || '' };
+            }
+            return { value: String(opt) };
+          });
+        }
+
+        const newCol = {
+          id: colId,
+          label: colName,
+          name: colName,
+          type: colType,
+          required: !!q.required,
+          choices: choices
+        };
+        newColumnsToAdd.push(newCol);
+        existingColIds.add(colId);
+        if (q.id) existingColIds.add(q.id);
+        if (q.dataKey) existingColIds.add(q.dataKey);
+        if (colName) existingColLabels.add(colName);
+      }
+    });
+
+    return { newColumnsToAdd, existingColCount: cols.length };
+  }
+  window.getNewColumnsForFormTable = getNewColumnsForFormTable;
+
+  // 🔄 テストから本番へ統合する際、追加カラムがあった場合のみ既存専用テーブルを更新する
+  async function updateDedicatedTableColumns(dedicatedTable, formDef) {
+    if (!dedicatedTable || !formDef) return { updated: false, addedColumns: [] };
+
+    const { newColumnsToAdd } = getNewColumnsForFormTable(dedicatedTable, formDef);
+    if (!newColumnsToAdd || newColumnsToAdd.length === 0) {
+      console.log(`[DedicatedTable] No new columns detected for "${dedicatedTable.name}". Table preserved as-is.`);
+      return { updated: false, addedColumns: [] };
+    }
+
+    console.log(`[DedicatedTable] Adding ${newColumnsToAdd.length} new columns to existing table "${dedicatedTable.name}"...`, newColumnsToAdd);
+
+    if (!Array.isArray(dedicatedTable.columns)) dedicatedTable.columns = [];
+    
+    // システムカラム（status, registration_code, resume_url, created_at）の直前に新カラムを挿入
+    const sysColKeys = ['status', 'registration_code', 'resume_url', 'created_at'];
+    let insertIdx = dedicatedTable.columns.findIndex(c => c && sysColKeys.includes(c.id));
+    if (insertIdx === -1) insertIdx = dedicatedTable.columns.length;
+
+    dedicatedTable.columns.splice(insertIdx, 0, ...newColumnsToAdd);
+
+    // visibleColumnsの更新
+    if (Array.isArray(dedicatedTable.visibleColumns)) {
+      newColumnsToAdd.forEach(c => {
+        if (!dedicatedTable.visibleColumns.includes(c.id)) {
+          dedicatedTable.visibleColumns.push(c.id);
+        }
+      });
+    }
+
+    // columnWidthsの更新
+    if (!dedicatedTable.columnWidths) dedicatedTable.columnWidths = {};
+    newColumnsToAdd.forEach(c => {
+      if (!dedicatedTable.columnWidths[c.id]) {
+        dedicatedTable.columnWidths[c.id] = 130;
+      }
+    });
+
+    // 1. synapse_custom_tables の保存・更新
+    let curTables = [];
+    try { curTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
+    const existingIdx = curTables.findIndex(t => t && t.id === dedicatedTable.id);
+    if (existingIdx !== -1) {
+      curTables[existingIdx] = dedicatedTable;
+    } else {
+      curTables.push(dedicatedTable);
+    }
+    localStorage.setItem('synapse_custom_tables', JSON.stringify(curTables));
+
+    // 2. synapse_table_${id} の更新（既存行データを保持したままカラム定義のみマージ）
+    let fullTable = dedicatedTable;
+    try {
+      const raw = localStorage.getItem(`synapse_table_${dedicatedTable.id}`);
+      if (raw) {
+        fullTable = JSON.parse(raw);
+        fullTable.columns = dedicatedTable.columns;
+        fullTable.visibleColumns = dedicatedTable.visibleColumns;
+        fullTable.columnWidths = dedicatedTable.columnWidths;
+      }
+    } catch(e) {}
+    localStorage.setItem(`synapse_table_${dedicatedTable.id}`, JSON.stringify(fullTable));
+
+    // 3. Supabaseへの非同期同期
+    const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+    const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+
+    try {
+      await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+        body: JSON.stringify({ key: `synapse_table_${dedicatedTable.id}`, value: fullTable, updated_at: new Date().toISOString() })
+      });
+      await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+        method: 'POST',
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+        body: JSON.stringify({ key: 'synapse_custom_tables', value: curTables, updated_at: new Date().toISOString() })
+      });
+    } catch(netErr) {
+      console.warn('[Supabase Sync] Network error during table columns update:', netErr);
+    }
+
+    // 🌐 Supabaseクラウド上の物理テーブルへ追加カラムを動的反映 (RPC)
+    if (newColumnsToAdd && newColumnsToAdd.length > 0) {
+      try {
+        const rawSlug = (formDef.id || formDef.title || dedicatedTable.name || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        const pTableName = rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
+        const rpcCols = newColumnsToAdd.map(c => ({ id: c.id, label: c.label || c.name, type: c.type || 'text' }));
+        await fetch(`${sbUrl}/rest/v1/rpc/synapse_create_or_alter_table`, {
+          method: 'POST',
+          headers: {
+            apikey: sbKey,
+            Authorization: `Bearer ${sbKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            p_table_name: pTableName,
+            p_columns: rpcCols
+          })
+        });
+        console.log(`[Supabase Physical Table] Added ${newColumnsToAdd.length} columns to table "${pTableName}" via RPC.`);
+      } catch (rpcErr) {
+        console.warn('[Supabase Physical Table Alter RPC]', rpcErr);
+      }
+    }
+
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'SYNAPSE_TABLE_UPDATED', table: fullTable, addedColumns: newColumnsToAdd }, '*');
+    }
+
+    return { updated: true, addedColumns: newColumnsToAdd };
+  }
+  window.updateDedicatedTableColumns = updateDedicatedTableColumns;
+
+  // 🚀 本番公開・統合モーダル（公開時に専用テーブル作成を選択可能）
+  let _mergeModalTargetIndex = null;
+
+  function openMergeProductionModal(formIndex) {
+    const { formObj, idx } = getCurrentFormObject(formIndex);
+    if (!formObj) return;
+    _mergeModalTargetIndex = idx;
+
+    const modal = document.getElementById('modal-merge-production');
+    if (!modal) {
+      // モーダル要素がない場合は従来の確認ダイアログ
+      const title = getEffectiveFormTitle(formObj);
+      const nextVer = ((formObj && formObj.publishedVersion) || 1) + 1;
+      if (confirm(`「${title}」の最新編集内容を本番公開リンクへ統合（公開更新）しますか？\n\n・新バージョン: v${nextVer}\n・配布済みの本番URLは変更されず、回答画面が最新版へ切り替わります。\n・過去のテスト送信データが本番に混ざることはありません。`)) {
+        mergeFormToProduction(idx);
+      }
+      return;
+    }
+
+    const titleEl = document.getElementById('merge-modal-form-title');
+    const verEl = document.getElementById('merge-modal-version-text');
+    const dedicatedToggle = document.getElementById('merge-create-dedicated-table');
+    const tableCard = document.getElementById('merge-target-table-card');
+    const tableDesc = document.getElementById('merge-target-table-desc');
+    const labelEl = document.getElementById('merge-create-dedicated-table-label');
+    const badgeEl = document.getElementById('merge-table-badge');
+
+    const formTitle = getEffectiveFormTitle(formObj);
+    const curVer = formObj.publishedVersion || 1;
+    const nextVer = curVer + 1;
+
+    if (titleEl) titleEl.textContent = formTitle;
+    if (verEl) verEl.textContent = `v${curVer} → v${nextVer}`;
+
+    const publishStatus = checkFormPublishStatus(formObj);
+    const isSynced = publishStatus.isSynced;
+
+    // 専用テーブルの有無判定（本番で1回作成されたテーブルがあるか）
+    const pTableName = getPhysicalTableNameForForm(formObj);
+    let existingTables = [];
+    try { existingTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
+    const dedicatedTable = existingTables.find(t => t && (
+      t.id === formObj.targetTableId ||
+      (formObj.id && t.formId && t.formId === formObj.id) ||
+      t.name === formTitle ||
+      (t.formTitle && t.formTitle === formTitle) ||
+      (pTableName && t.physicalTableName && t.physicalTableName === pTableName)
+    ) && t.id !== 'table_all_form_responses');
+
+    const hasDedicated = !!(dedicatedTable || (formObj.targetTableId && formObj.targetTableId !== 'table_all_form_responses' && formObj.targetTableType === 'dedicated'));
+
+    // 再統合内容がない（同期中）かつ専用テーブル未作成の状態で開かれた場合は、自動でトグルをONにして作成を即時支援
+    let isDedicated = hasDedicated;
+    if (isSynced && !hasDedicated) {
+      isDedicated = true;
+    } else if (formObj.createDedicatedTable === true || formObj.targetTableType === 'dedicated') {
+      isDedicated = true;
+    }
+
+    if (dedicatedToggle) {
+      dedicatedToggle.checked = isDedicated;
+    }
+
+    // ヘッダーアイコン・タイトルの動的更新
+    const headerIconEl = document.getElementById('merge-modal-header-icon');
+    const headerTextEl = document.getElementById('merge-modal-header-text');
+    if (headerIconEl && headerTextEl) {
+      if (isSynced && !hasDedicated) {
+        headerIconEl.textContent = '📊';
+        headerTextEl.textContent = '専用テーブル作成・本番連携';
+      } else if (isSynced && hasDedicated) {
+        headerIconEl.textContent = '📊';
+        headerTextEl.textContent = '専用テーブル設定・本番公開';
+      } else {
+        headerIconEl.textContent = '🚀';
+        headerTextEl.textContent = '本番環境へ統合（公開更新）';
+      }
+    }
+
+    // 実行ボタンのラベル
+    const executeBtn = document.getElementById('btn-execute-merge-prod');
+    if (executeBtn) {
+      if (isSynced && !hasDedicated) {
+        executeBtn.textContent = '📊 専用テーブルを作成して反映';
+      } else if (isSynced && hasDedicated) {
+        executeBtn.textContent = '🚀 設定を本番へ反映';
+      } else {
+        executeBtn.textContent = '🚀 本番環境へ統合して公開';
+      }
+    }
+
+    const updateMergeModalTableUI = (checked) => {
+      if (!tableCard || !tableDesc) return;
+      if (checked) {
+        tableCard.style.borderColor = '#cbd5e1';
+        tableCard.style.background = '#f8fafc';
+
+        if (dedicatedTable) {
+          const { newColumnsToAdd } = getNewColumnsForFormTable(dedicatedTable, formObj);
+          if (labelEl) labelEl.textContent = '専用テーブルと連携中';
+
+          if (badgeEl) {
+            badgeEl.style.display = 'inline-block';
+            if (newColumnsToAdd.length > 0) {
+              badgeEl.textContent = `+${newColumnsToAdd.length} カラム追加`;
+              badgeEl.style.background = '#e0f2fe';
+              badgeEl.style.color = '#0369a1';
+            } else {
+              badgeEl.textContent = 'カラム変更なし';
+              badgeEl.style.background = '#f1f5f9';
+              badgeEl.style.color = '#64748b';
+            }
+          }
+
+          if (newColumnsToAdd.length > 0) {
+            const previewNames = newColumnsToAdd.map(c => c.label).slice(0, 2).join('、') + (newColumnsToAdd.length > 2 ? ` 他${newColumnsToAdd.length - 2}件` : '');
+            tableDesc.innerHTML = `🔄 既存テーブル「${dedicatedTable.name || formTitle}」に新設された<strong>${newColumnsToAdd.length}件</strong>のカラム（${previewNames}）を自動追加します。`;
+            tableDesc.style.color = '#0369a1';
+          } else {
+            tableDesc.innerHTML = `✅ 既存テーブル「${dedicatedTable.name || formTitle}」と連携中（追加カラムはありません）。`;
+            tableDesc.style.color = '#475569';
+          }
+        } else {
+          if (labelEl) labelEl.textContent = 'このフォーム専用のテーブルを作成する';
+          if (badgeEl) {
+            badgeEl.style.display = 'inline-block';
+            badgeEl.textContent = '初回作成';
+            badgeEl.style.background = '#fef3c7';
+            badgeEl.style.color = '#92400e';
+          }
+          tableDesc.innerHTML = `💡 初回本番公開時に専用テーブル「<strong>${formTitle}</strong>」を自動作成します。`;
+          tableDesc.style.color = '#475569';
+        }
+      } else {
+        tableCard.style.borderColor = '#e2e8f0';
+        tableCard.style.background = '#ffffff';
+        if (labelEl) labelEl.textContent = '専用テーブルと連携しない';
+        if (badgeEl) badgeEl.style.display = 'none';
+        tableDesc.innerHTML = `💡 回答はフォーム専用の独立テーブルに保存されます。`;
+        tableDesc.style.color = '#94a3b8';
+      }
+    };
+
+    updateMergeModalTableUI(isDedicated);
+
+    if (dedicatedToggle && !dedicatedToggle._hooked) {
+      dedicatedToggle._hooked = true;
+      dedicatedToggle.addEventListener('change', (e) => {
+        updateMergeModalTableUI(e.target.checked);
+      });
+    }
+
+    // モーダル内ボタンのイベント紐付け
+    const closeBtn = document.getElementById('btn-close-merge-modal');
+    const cancelBtn = document.getElementById('btn-cancel-merge-modal');
+    const executeBtnReal = document.getElementById('btn-execute-merge-prod');
+
+    if (closeBtn) closeBtn.onclick = closeMergeProductionModal;
+    if (cancelBtn) cancelBtn.onclick = closeMergeProductionModal;
+
+    if (executeBtnReal) {
+      executeBtnReal.onclick = executeMergeProductionFromModal;
+    }
+
+    if (closeBtn && !closeBtn._hooked) {
+      closeBtn._hooked = true;
+      closeBtn.onclick = closeMergeProductionModal;
+    }
+    if (cancelBtn && !cancelBtn._hooked) {
+      cancelBtn._hooked = true;
+      cancelBtn.onclick = closeMergeProductionModal;
+    }
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+  }
+  window.openMergeProductionModal = openMergeProductionModal;
+
+  function closeMergeProductionModal() {
+    const modal = document.getElementById('modal-merge-production');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.style.display = 'none';
+    }
+    _mergeModalTargetIndex = null;
+  }
+  window.closeMergeProductionModal = closeMergeProductionModal;
+
+  async function executeMergeProductionFromModal() {
+    const targetIdx = _mergeModalTargetIndex !== null ? _mergeModalTargetIndex : (typeof detectActiveFormIndex === 'function' ? detectActiveFormIndex() : 0);
+    const { formObj, idx } = getCurrentFormObject(targetIdx);
+    if (!formObj) return;
+
+    const executeBtn = document.getElementById('btn-execute-merge-prod');
+    if (executeBtn) {
+      executeBtn.disabled = true;
+      executeBtn.textContent = '⏳ 本番公開・反映中...';
+    }
+
+    const notifySuccess = (msg) => {
+      showGlobalShareToast(msg);
+      if (typeof showToast === 'function') {
+        showToast(msg, 'success');
+      } else if (window.parent && typeof window.parent.showToast === 'function') {
+        window.parent.showToast(msg, 'success');
+      }
+    };
+
+    const notifyError = (msg) => {
+      showGlobalShareToast(msg);
+      if (typeof showToast === 'function') {
+        showToast(msg, 'error');
+      } else if (window.parent && typeof window.parent.showToast === 'function') {
+        window.parent.showToast(msg, 'error');
+      }
+    };
+
+    try {
+      const dedicatedToggle = document.getElementById('merge-create-dedicated-table');
+      const wantDedicated = dedicatedToggle ? dedicatedToggle.checked : true;
+
+      if (wantDedicated) {
+        let existingTables = [];
+        try { existingTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
+        const formTitle = getEffectiveFormTitle(formObj);
+        const pTableName = getPhysicalTableNameForForm(formObj);
+        let dedicatedTable = existingTables.find(t => t && (
+          t.id === formObj.targetTableId ||
+          (formObj.id && t.formId && t.formId === formObj.id) ||
+          t.name === formTitle ||
+          (t.formTitle && t.formTitle === formTitle) ||
+          (pTableName && t.physicalTableName && t.physicalTableName === pTableName)
+        ) && t.id !== 'table_all_form_responses');
+
+        if (!dedicatedTable) {
+          // 専用テーブルの新規作成は本番で最初の1回のみ
+          dedicatedTable = await createDedicatedTableForForm(formObj);
+          console.log(`[DedicatedTable] First-time production table created:`, dedicatedTable?.id);
+        } else {
+          // すでに存在する場合：テーブルIDを確実に紐付け、追加カラムがあった場合のみテーブルを更新
+          formObj.createDedicatedTable = true;
+          formObj.targetTableId = dedicatedTable.id;
+          formObj.targetTableType = 'dedicated';
+          formObj.physicalTableName = dedicatedTable.physicalTableName || pTableName;
+          if (!dedicatedTable.formId && formObj.id) {
+            dedicatedTable.formId = formObj.id;
+          }
+          dedicatedTable.sourceFormId = formObj.id;
+          dedicatedTable.isFormDedicatedTable = true;
+
+          // フォームタイトル（サブタイトル含む）が変更されていた場合はテーブル表示名も同期更新
+          if (dedicatedTable.name !== formTitle) {
+            dedicatedTable.name = formTitle;
+            dedicatedTable.formTitle = formTitle;
+          }
+
+          const res = await updateDedicatedTableColumns(dedicatedTable, formObj);
+          if (res && res.updated) {
+            console.log(`[DedicatedTable] Successfully updated table "${dedicatedTable.name}" with ${res.addedColumns.length} new columns.`);
+          } else {
+            console.log(`[DedicatedTable] Table "${dedicatedTable.name}" requires no column updates.`);
+          }
+        }
+      } else {
+        formObj.createDedicatedTable = true;
+        formObj.targetTableType = 'dedicated';
+        formObj.targetTableId = formObj.targetTableId || 'dedicated';
+      }
+
+      if (typeof syncGlobalTargetTableSelect === 'function') {
+        syncGlobalTargetTableSelect(wantDedicated);
+      }
+
+      mergeFormToProduction(idx);
+      closeMergeProductionModal();
+      const currentTitle = getEffectiveFormTitle(formObj);
+      const nextVersion = (formObj.publishedVersion || 1);
+      notifySuccess(`「${currentTitle}」を本番環境へ統合しました。配布済み本番リンクが最新版（v${nextVersion}）に切り替わりました。`);
+    } catch(err) {
+      console.error('[MergeProductionModal] Error during merge execution:', err);
+      notifyError('本番環境への統合中にエラーが発生しました。');
+    } finally {
+      if (executeBtn) {
+        executeBtn.disabled = false;
+        executeBtn.textContent = '🚀 本番環境へ統合する';
+      }
+    }
+  }
+  window.executeMergeProductionFromModal = executeMergeProductionFromModal;
+
+  // 🔒 フォームの非公開・公開（受付停止・再開）切り替え
+  async function toggleFormPublishStatus(formIndex) {
+    const { formObj, idx } = getCurrentFormObject(formIndex);
+    if (!formObj) return;
+
+    const currentlyUnpublished = !!formObj.isUnpublished;
+    const newUnpublished = !currentlyUnpublished;
+    const formTitle = formObj.title || '無題のフォーム';
+
+    const confirmMsg = newUnpublished
+      ? `「${formTitle}」を【非公開（受付停止）】にしますか？\n\n・本番URLにアクセスした回答者には受付停止案内が表示されます。\n・いつでも再度公開（受付再開）することができます。`
+      : `「${formTitle}」の【公開（受付再開）】を行いますか？\n\n・本番URLで回答者が再度フォームへアクセス・回答できるようになります。`;
+
+    if (!confirm(confirmMsg)) return;
+
+    formObj.isUnpublished = newUnpublished;
+    if (formObj.publishedSnapshot) {
+      formObj.publishedSnapshot.isUnpublished = newUnpublished;
+    }
+
+    if (window.U && window.U[idx]) {
+      window.U[idx] = formObj;
+    }
+
+    try {
+      const allFormsRaw = localStorage.getItem('form_customize_all_forms');
+      let allForms = allFormsRaw ? JSON.parse(allFormsRaw) : [];
+      if (allForms[idx]) {
+        allForms[idx] = formObj;
+      } else {
+        const fIdx = allForms.findIndex(f => f && (f.id === formObj.id || f.title === formObj.title));
+        if (fIdx !== -1) allForms[fIdx] = formObj;
+        else allForms.push(formObj);
+      }
+      localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+    } catch(e) {
+      console.warn('[Unpublish] Failed to update localStorage:', e);
+    }
+
+    if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+    if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+
+    updatePublishSyncUI(idx);
+
+    const toastMsg = newUnpublished
+      ? `🔒「${formTitle}」を非公開（受付停止）にしました。本番リンクでの回答が停止されました。`
+      : `🟢「${formTitle}」を公開（受付再開）しました。本番リンクでの回答受付を再開しました。`;
+
+    showGlobalShareToast(toastMsg);
+    if (typeof showToast === 'function') {
+      showToast(toastMsg, newUnpublished ? 'warning' : 'success');
+    }
+  }
+  window.toggleFormPublishStatus = toggleFormPublishStatus;
+
+  function updatePublishSyncUI(targetIndex) {
+    const { formObj, idx } = getCurrentFormObject(targetIndex);
+    if (!formObj) return;
+
+    const status = checkFormPublishStatus(formObj);
+    const isUnpublished = !!formObj.isUnpublished;
+
+    // 🔒 非公開（受付停止）状態のUI反映
+    const statusBar = document.getElementById('share-publish-status-bar');
+    const statusText = document.getElementById('share-publish-status-text');
+    const statusIcon = document.getElementById('share-publish-status-icon');
+    const statusLabel = document.getElementById('share-publish-status-label');
+    const modalToggleBtn = document.getElementById('btn-modal-toggle-publish');
+    const menuToggleTitle = document.getElementById('menu-toggle-publish-title');
+    const menuToggleIcon = document.getElementById('menu-toggle-publish-icon');
+    const menuToggleDesc = document.getElementById('menu-toggle-publish-desc');
+
+    if (statusBar) {
+      if (isUnpublished) {
+        statusBar.style.background = '#fef2f2';
+        statusBar.style.borderColor = '#fca5a5';
+      } else {
+        statusBar.style.background = '#f0fdf4';
+        statusBar.style.borderColor = '#bbf7d0';
+      }
+    }
+    if (statusText) {
+      statusText.style.color = isUnpublished ? '#991b1b' : '#166534';
+    }
+    if (statusIcon) {
+      statusIcon.textContent = isUnpublished ? '🔴' : '🟢';
+    }
+    if (statusLabel) {
+      statusLabel.textContent = isUnpublished ? '本番受付停止中（非公開）' : '本番受付中（公開中）';
+    }
+    if (modalToggleBtn) {
+      if (isUnpublished) {
+        modalToggleBtn.innerHTML = '🔓 フォームを公開（受付再開）';
+        modalToggleBtn.style.color = '#15803d';
+        modalToggleBtn.style.background = '#f0fdf4';
+        modalToggleBtn.style.borderColor = '#86efac';
+      } else {
+        modalToggleBtn.innerHTML = '🔒 フォームを非公開にする';
+        modalToggleBtn.style.color = '#dc2626';
+        modalToggleBtn.style.background = '#fef2f2';
+        modalToggleBtn.style.borderColor = '#f87171';
+      }
+    }
+    if (menuToggleTitle) {
+      menuToggleTitle.textContent = isUnpublished ? 'フォームを公開（受付再開）する' : 'フォームを非公開にする';
+      menuToggleTitle.style.color = isUnpublished ? '#15803d' : '#dc2626';
+    }
+    if (menuToggleIcon) {
+      menuToggleIcon.textContent = isUnpublished ? '🔓' : '🔒';
+    }
+    if (menuToggleDesc) {
+      menuToggleDesc.textContent = isUnpublished ? '本番リンクでの回答受付を再開します' : '本番リンクの回答受付を停止します';
+    }
+
+    // モーダル内要素
+    const syncArea = document.getElementById('share-publish-sync-area');
+    const syncDot = document.getElementById('share-publish-sync-dot');
+    const syncTitle = document.getElementById('share-publish-sync-title');
+    const versionBadge = document.getElementById('share-publish-version-badge');
+    const syncDesc = document.getElementById('share-publish-sync-desc');
+    const mergeBtn = document.getElementById('btn-merge-to-production');
+
+    // ヘッダーボタン
+    const headerMergeBtn = document.getElementById('btn-header-merge-prod');
+
+    if (versionBadge) {
+      versionBadge.textContent = `v${status.version}`;
+    }
+
+    if (status.isSynced) {
+      if (syncArea) {
+        syncArea.style.borderColor = '#cbd5e1';
+        syncArea.style.background = '#f8fafc';
+      }
+      if (syncDot) syncDot.style.background = '#10b981';
+      if (syncTitle) {
+        syncTitle.textContent = '本番公開リンクと同期中';
+        syncTitle.style.color = '#1e293b';
+      }
+      if (syncDesc) {
+        const pubTime = status.publishedAt ? new Date(status.publishedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
+        syncDesc.textContent = pubTime 
+          ? `現在の編集内容は本番公開リンクに反映されています（最終統合: ${pubTime}）。`
+          : '現在の編集内容は本番公開リンクに反映されています。';
+      }
+      let customTables = [];
+      try { customTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || []; } catch(e) {}
+      const curFormTitle = getEffectiveFormTitle(formObj);
+      const dedicatedTable = customTables.find(t => t && (
+        t.id === formObj.targetTableId ||
+        t.name === curFormTitle ||
+        (t.formTitle && t.formTitle === curFormTitle) ||
+        (t.formId && t.formId === formObj.id)
+      ) && t.id !== 'table_all_form_responses');
+
+      const isDedicatedActive = !!(dedicatedTable || (formObj.targetTableId && formObj.targetTableId !== 'table_all_form_responses' && formObj.targetTableType === 'dedicated'));
+
+      if (mergeBtn) {
+        mergeBtn.style.display = 'inline-flex';
+        if (!isDedicatedActive) {
+          mergeBtn.innerHTML = '📊 テーブル作成';
+          mergeBtn.style.background = '#0284c7';
+          mergeBtn.style.color = '#ffffff';
+          mergeBtn.style.border = 'none';
+        } else {
+          mergeBtn.innerHTML = '📊 テーブル設定';
+          mergeBtn.style.background = '#f1f5f9';
+          mergeBtn.style.color = '#334155';
+          mergeBtn.style.border = '1px solid #cbd5e1';
+        }
+      }
+      if (headerMergeBtn) headerMergeBtn.style.setProperty('display', 'none', 'important');
+      const menuItemMerge = document.getElementById('menu-item-merge-prod');
+      if (menuItemMerge) {
+        menuItemMerge.style.display = 'flex';
+        const titleEl = menuItemMerge.querySelector('.menu-title');
+        const descEl = menuItemMerge.querySelector('.menu-desc');
+        const iconEl = menuItemMerge.querySelector('.menu-icon');
+        if (!isDedicatedActive) {
+          if (iconEl) iconEl.textContent = '📊';
+          if (titleEl) {
+            titleEl.textContent = '専用テーブル作成';
+            titleEl.style.color = '#0284c7';
+          }
+          if (descEl) {
+            descEl.textContent = 'フォーム専用の独立テーブルを作成して回答を保存';
+          }
+        } else {
+          if (iconEl) iconEl.textContent = '📊';
+          if (titleEl) {
+            titleEl.textContent = '専用テーブル設定';
+            titleEl.style.color = '#475569';
+          }
+          if (descEl) {
+            descEl.textContent = '専用テーブルのカラム構成確認・追加カラム更新';
+          }
+        }
+      }
+      const mainBtnLabel = document.getElementById('share-btn-main-label');
+      if (mainBtnLabel) {
+        mainBtnLabel.innerHTML = isUnpublished
+          ? '公開・共有 <span style="background:#dc2626; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">非公開中</span>'
+          : '公開・共有';
+      }
+    } else {
+      if (syncArea) {
+        syncArea.style.borderColor = '#f59e0b';
+        syncArea.style.background = '#fffbeb';
+      }
+      if (syncDot) syncDot.style.background = '#f59e0b';
+      if (syncTitle) {
+        syncTitle.textContent = '未統合の変更があります（test branch）';
+        syncTitle.style.color = '#b45309';
+      }
+      if (syncDesc) {
+        syncDesc.textContent = '編集中の最新内容はテスト用リンクでのみ確認できます。本番公開リンク（main）は旧バージョンのまま保護されています。';
+      }
+      if (mergeBtn) {
+        mergeBtn.style.display = 'inline-flex';
+        mergeBtn.innerHTML = '🚀 本番環境へ統合';
+        mergeBtn.style.background = '#673ab7';
+        mergeBtn.style.color = '#ffffff';
+        mergeBtn.style.border = 'none';
+      }
+      const menuItemMerge = document.getElementById('menu-item-merge-prod');
+      if (menuItemMerge) {
+        menuItemMerge.style.display = 'flex';
+        const titleEl = menuItemMerge.querySelector('.menu-title');
+        const descEl = menuItemMerge.querySelector('.menu-desc');
+        if (titleEl) {
+          titleEl.textContent = '本番へ統合（公開更新）';
+          titleEl.style.color = '#16a34a';
+        }
+        if (descEl) {
+          descEl.textContent = '最新の編集内容・テーブル設定を本番公開リンクへ反映';
+        }
+      }
+      const mainBtnLabel = document.getElementById('share-btn-main-label');
+      if (mainBtnLabel) {
+        if (isUnpublished) {
+          mainBtnLabel.innerHTML = '公開・共有 <span style="background:#dc2626; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">非公開中</span> <span style="background:#ef4444; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:2px; font-weight:700;">要統合</span>';
+        } else {
+          mainBtnLabel.innerHTML = '公開・共有 <span style="background:#ef4444; color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:700;">要統合</span>';
+        }
+      }
+      if (headerMergeBtn) headerMergeBtn.style.setProperty('display', 'none', 'important');
+    }
+  }
+
+  window.checkFormPublishStatus = checkFormPublishStatus;
+  window.mergeFormToProduction = mergeFormToProduction;
+  window.updatePublishSyncUI = updatePublishSyncUI;
+
   async function openShareUrlModal(formIndex) {
     const modal = document.getElementById('modal-share-url');
     if (!modal) return;
     const { formObj, idx } = getCurrentFormObject(formIndex);
     _currentShareModalFormIndex = idx;
+    _currentShareModalEnv = 'production'; // デフォルトは本番リンク
     const formTitle = formObj && formObj.title ? formObj.title : '無題のフォーム';
 
     const titleEl = document.getElementById('share-modal-form-title');
@@ -14286,19 +18172,152 @@
     const toastEl = document.getElementById('share-modal-copy-toast');
     if (toastEl) toastEl.style.display = 'none';
 
-    const isShorten = shortenCheckbox ? shortenCheckbox.checked : true;
-    const url = getPublicFormShareUrl(idx, isShorten);
-    if (inputEl) inputEl.value = url;
-    updateShareModalOpenTabBtn(url);
+    const prodTabBtn = document.getElementById('share-tab-prod');
+    const testTabBtn = document.getElementById('share-tab-test');
+    const envNotice = document.getElementById('share-env-notice');
+    const envNoticeTitle = document.getElementById('share-env-notice-title');
+    const envNoticeDesc = document.getElementById('share-env-notice-desc');
+    const urlLabel = document.getElementById('share-modal-url-label');
+    const testStatusBadge = document.getElementById('share-test-status-badge');
+    const testToolsArea = document.getElementById('share-test-tools-area');
+    const clearTestBtn = document.getElementById('btn-clear-test-data');
+
+    // URL更新ヘルパー
+    const refreshModalUrl = () => {
+      const isShorten = shortenCheckbox ? shortenCheckbox.checked : true;
+      const url = getPublicFormShareUrl(_currentShareModalFormIndex, isShorten, _currentShareModalEnv);
+      if (inputEl) inputEl.value = url;
+      updateShareModalOpenTabBtn(url);
+    };
+
+    // タブ表示切り替えヘルパー
+    const applyEnvTab = (env) => {
+      _currentShareModalEnv = env;
+      if (env === 'production') {
+        if (prodTabBtn) {
+          prodTabBtn.style.background = '#673ab7';
+          prodTabBtn.style.color = '#ffffff';
+          prodTabBtn.classList.add('active');
+        }
+        if (testTabBtn) {
+          testTabBtn.style.background = 'transparent';
+          testTabBtn.style.color = '#64748b';
+          testTabBtn.classList.remove('active');
+        }
+        if (envNotice) {
+          envNotice.style.background = '#f8fafc';
+          envNotice.style.borderColor = '#cbd5e1';
+          envNotice.style.color = '#475569';
+        }
+        if (envNoticeTitle) {
+          envNoticeTitle.textContent = '🚀 本番公開用URL (main branch)';
+          envNoticeTitle.style.color = '#1e293b';
+        }
+        if (envNoticeDesc) {
+          envNoticeDesc.textContent = '一般回答者・顧客向けの公式リンクです。回答データは本番マスターテーブルへ正規保存されます。';
+        }
+        if (urlLabel) urlLabel.textContent = '本番用URL（一般回答者向け）';
+        if (testStatusBadge) testStatusBadge.style.display = 'none';
+        if (testToolsArea) testToolsArea.style.display = 'none';
+      } else {
+        if (prodTabBtn) {
+          prodTabBtn.style.background = 'transparent';
+          prodTabBtn.style.color = '#64748b';
+          prodTabBtn.classList.remove('active');
+        }
+        if (testTabBtn) {
+          testTabBtn.style.background = '#d97706';
+          testTabBtn.style.color = '#ffffff';
+          testTabBtn.classList.add('active');
+        }
+        if (envNotice) {
+          envNotice.style.background = '#fffbeb';
+          envNotice.style.borderColor = '#fde68a';
+          envNotice.style.color = '#92400e';
+        }
+        if (envNoticeTitle) {
+          envNoticeTitle.textContent = '🧪 テスト送信専用URL (test branch)';
+          envNoticeTitle.style.color = '#b45309';
+        }
+        if (envNoticeDesc) {
+          envNoticeDesc.textContent = '公開前・公開後の動作検証用リンクです。編集内容は常に自動で即時反映されます。テスト送信時はデータベースへの書き込みが一切行われないため、本番への混入や不要データの消去作業の心配なく何度でも安全に検証できます。';
+        }
+        if (urlLabel) urlLabel.textContent = 'テスト送信専用URL（動作検証用・本番隔離）';
+        if (testStatusBadge) testStatusBadge.style.display = 'inline-block';
+        if (testToolsArea) testToolsArea.style.display = 'flex';
+      }
+      refreshModalUrl();
+    };
+
+    if (prodTabBtn && !prodTabBtn._hooked) {
+      prodTabBtn._hooked = true;
+      prodTabBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        applyEnvTab('production');
+      });
+    }
+
+    if (testTabBtn && !testTabBtn._hooked) {
+      testTabBtn._hooked = true;
+      testTabBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        applyEnvTab('test');
+      });
+    }
+
+    if (clearTestBtn && !clearTestBtn._hooked) {
+      clearTestBtn._hooked = true;
+      clearTestBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (confirm(`「${formTitle}」のテスト送信データをすべて消去（初期化）しますか？\n※ 本番データは一切削除されません。`)) {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+              type: 'CLEAR_FORM_TEST_DATA',
+              formTitle: formTitle
+            }, '*');
+          }
+          // ローカルストレージのテストデータも消去
+          try {
+            const testKey = `form_responses_test_${formObj.id || 'default'}`;
+            localStorage.removeItem(testKey);
+          } catch(err) {}
+          showGlobalShareToast('テスト送信データをリセットしました！');
+        }
+      });
+    }
 
     if (shortenCheckbox && !shortenCheckbox._hooked) {
       shortenCheckbox._hooked = true;
       shortenCheckbox.addEventListener('change', () => {
-        const currentUrl = getPublicFormShareUrl(_currentShareModalFormIndex, shortenCheckbox.checked);
-        if (inputEl) inputEl.value = currentUrl;
-        updateShareModalOpenTabBtn(currentUrl);
+        refreshModalUrl();
       });
     }
+
+    // 🚀 本番環境へ統合（公開更新 / Merge to main）ボタンのイベント紐付け
+    const mergeBtn = document.getElementById('btn-merge-to-production');
+    if (mergeBtn && !mergeBtn._hooked) {
+      mergeBtn._hooked = true;
+      mergeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openMergeProductionModal(_currentShareModalFormIndex);
+      });
+    }
+
+    // 🔒 フォーム非公開・公開（受付停止・再開）ボタンのイベント紐付け
+    const modalTogglePublishBtn = document.getElementById('btn-modal-toggle-publish');
+    if (modalTogglePublishBtn && !modalTogglePublishBtn._hooked) {
+      modalTogglePublishBtn._hooked = true;
+      modalTogglePublishBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleFormPublishStatus(_currentShareModalFormIndex);
+      });
+    }
+
+    // 本番統合ステータスの更新
+    updatePublishSyncUI(_currentShareModalFormIndex);
+
+    // 初期タブ適用
+    applyEnvTab('production');
 
     modal.classList.add('active');
     modal.style.display = 'flex';
@@ -14313,6 +18332,22 @@
   }
 
   function initShareUrlFeature() {
+    // 初期タブに応じた表示切り替え（DOMから確実に判定）
+    const initialTab = (typeof detectActiveTab === 'function') ? detectActiveTab() : (localStorage.getItem('form_customize_active_tab') || 'dashboard');
+    if (typeof updateHeaderShareButtons === 'function') {
+      updateHeaderShareButtons(initialTab);
+    }
+
+    // 🚀 ヘッダーのクイック「本番へ統合」ボタン
+    const headerMergeBtn = document.getElementById('btn-header-merge-prod');
+    if (headerMergeBtn && !headerMergeBtn._hooked) {
+      headerMergeBtn._hooked = true;
+      headerMergeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openMergeProductionModal();
+      });
+    }
+
     // 1. ヘッダーの「🔗 リンクを発行」ボタン
     const shareBtn = document.getElementById('btn-share-form-url');
     if (shareBtn && !shareBtn._hooked) {
@@ -14344,6 +18379,54 @@
         }
       });
 
+      const menuMerge = document.getElementById('menu-item-merge-prod');
+      if (menuMerge && !menuMerge._hooked) {
+        menuMerge._hooked = true;
+        menuMerge.addEventListener('click', (e) => {
+          e.preventDefault();
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          openMergeProductionModal();
+        });
+      }
+
+      // 🔒 ドロップダウン内の「フォームを非公開にする / 公開する」メニュー項目
+      const menuTogglePublish = document.getElementById('menu-item-toggle-publish');
+      if (menuTogglePublish && !menuTogglePublish._hooked) {
+        menuTogglePublish._hooked = true;
+        menuTogglePublish.addEventListener('click', (e) => {
+          e.preventDefault();
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          toggleFormPublishStatus();
+        });
+      }
+
+      const menuTestLink = document.getElementById('menu-item-test-link');
+      if (menuTestLink && !menuTestLink._hooked) {
+        menuTestLink._hooked = true;
+        menuTestLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          const testUrl = getPublicFormShareUrl(undefined, true, 'test');
+          window.open(testUrl, '_blank');
+          showGlobalShareToast('🧪 テスト送信モード（DB保存なし）で別タブを開きました！');
+        });
+      }
+
+      const menuColPreview = document.getElementById('menu-item-column-preview');
+      if (menuColPreview && !menuColPreview._hooked) {
+        menuColPreview._hooked = true;
+        menuColPreview.addEventListener('click', (e) => {
+          e.preventDefault();
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          const { formObj } = getCurrentFormObject();
+          openFormColumnMappingModal(formObj || window.G || window.L);
+        });
+      }
+
       const menuShareLink = document.getElementById('menu-item-share-link');
       if (menuShareLink && !menuShareLink._hooked) {
         menuShareLink._hooked = true;
@@ -14367,6 +18450,35 @@
           if (modalExport && jsonTextarea && window.G) {
             jsonTextarea.value = JSON.stringify(window.G, null, 2);
             modalExport.classList.add('active');
+          }
+        });
+      }
+
+      const menuSyncAllTables = document.getElementById('menu-item-sync-all-tables');
+      if (menuSyncAllTables && !menuSyncAllTables._hooked) {
+        menuSyncAllTables._hooked = true;
+        menuSyncAllTables.addEventListener('click', async (e) => {
+          e.preventDefault();
+          dropdownMenu.classList.remove('active');
+          if (exportGroup) exportGroup.classList.remove('open');
+          
+          if (!confirm('全フォームの専用回答テーブルを同期・再生成しますか？\n\n・Supabase上に物理テーブルを作成・確認します\n・Synapse側の回答テーブルと1対1で整合・重複排除します\n・既存の回答データは保持されます')) {
+            return;
+          }
+
+          showGlobalShareToast('⏳ 全フォームの回答テーブルを同期・再生成中...');
+          try {
+            const res = await syncOrRecreateAllDedicatedTables();
+            if (res.success) {
+              const msg = `✅ 全${res.count}件のフォーム専用テーブルを同期・再生成しました！\n\n・Supabase物理テーブルの作成・確認完了\n・Synapse「回答フォーム一覧」に反映完了\n・各テーブルの重複は完全に防止されています`;
+              alert(msg);
+              showGlobalShareToast(`✔ 全${res.count}件のフォームテーブルを同期しました`);
+            } else {
+              alert(`同期失敗: ${res.message}`);
+            }
+          } catch(err) {
+            console.error('Batch sync error:', err);
+            alert(`エラーが発生しました: ${err.message}`);
           }
         });
       }
@@ -14469,22 +18581,87 @@
       closeFooterBtn.addEventListener('click', closeShareUrlModal);
     }
 
-    // 5. コンテキストメニュー（⋮）への「🔗 リンクをコピー」自動注入
-    const contextMenu = document.getElementById('gf-context-menu');
-    if (contextMenu && !contextMenu._shareHooked) {
-      contextMenu._shareHooked = true;
-      const previewItem = contextMenu.querySelector('.preview-item');
-      if (previewItem) {
-        const copyItem = document.createElement('div');
-        copyItem.className = 'menu-item copy-link-item';
-        copyItem.innerHTML = '🔗 リンクをコピー';
-        copyItem.addEventListener('click', (e) => {
-          e.stopPropagation();
-          contextMenu.remove();
-          copyFormShareUrl();
-        });
-        previewItem.insertAdjacentElement('afterend', copyItem);
+    // 5. コンテキストメニュー（⋮）を「✏️ 名前の編集」と「🗑️ 削除」の2項目のみに完全統一（他項目の侵入を100%遮断）
+    const enforceTwoItemsMenu = (menu) => {
+      if (!menu) return;
+      const fIdx = menu.dataset.formIndex !== undefined ? parseInt(menu.dataset.formIndex, 10) : undefined;
+      
+      // 不正な項目（編集、プレビュー、リンクをコピー、テスト用リンクを開く、テーブル連携確認・作成など）を全消去
+      const items = Array.from(menu.children);
+      let renameEl = null;
+      let deleteEl = null;
+
+      items.forEach(child => {
+        const text = (child.textContent || '').trim();
+        if (child.classList.contains('rename-item') || text.includes('名前の編集')) {
+          if (!renameEl) renameEl = child;
+          else child.remove();
+        } else if (child.classList.contains('delete-item') || text.includes('削除')) {
+          if (!deleteEl) deleteEl = child;
+          else child.remove();
+        } else {
+          // 不要項目は即刻消去
+          child.remove();
+        }
+      });
+
+      menu.style.minWidth = '140px';
+      menu.style.padding = '6px 0';
+
+      if (!renameEl) {
+        renameEl = document.createElement('div');
+        renameEl.className = 'menu-item rename-item';
+        renameEl.innerHTML = '✏️ 名前の編集';
+        renameEl.style.padding = '8px 16px';
+        renameEl.style.cursor = 'pointer';
+        renameEl.style.fontSize = '0.9rem';
+        renameEl.style.display = 'flex';
+        renameEl.style.alignItems = 'center';
+        renameEl.style.gap = '8px';
+        menu.insertBefore(renameEl, menu.firstChild);
       }
+      if (!renameEl._hooked) {
+        renameEl._hooked = true;
+        renameEl.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          menu.remove();
+          if (typeof window.renameFormSelf === 'function') {
+            window.renameFormSelf(fIdx);
+          }
+        };
+      }
+
+      if (!deleteEl) {
+        deleteEl = document.createElement('div');
+        deleteEl.className = 'menu-item delete-item danger-item';
+        deleteEl.innerHTML = '🗑️ 削除';
+        deleteEl.style.padding = '8px 16px';
+        deleteEl.style.cursor = 'pointer';
+        deleteEl.style.fontSize = '0.9rem';
+        deleteEl.style.color = '#dc2626';
+        deleteEl.style.display = 'flex';
+        deleteEl.style.alignItems = 'center';
+        deleteEl.style.gap = '8px';
+        menu.appendChild(deleteEl);
+      }
+      if (!deleteEl._hooked) {
+        deleteEl._hooked = true;
+        deleteEl.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          menu.remove();
+          if (typeof window.deleteFormSelf === 'function') {
+            window.deleteFormSelf(fIdx);
+          }
+        };
+      }
+    };
+    window.enforceTwoItemsMenu = enforceTwoItemsMenu;
+
+    const contextMenu = document.getElementById('gf-context-menu');
+    if (contextMenu) {
+      enforceTwoItemsMenu(contextMenu);
     }
 
     // 6. URLパラメータ form_idx の監視・自動選択処理
@@ -14497,14 +18674,14 @@
         if (!isNaN(targetIdx) && window.U && window.U[targetIdx]) {
           if (window.W !== targetIdx) {
             if (typeof window.X === 'function') {
-              window.X(targetIdx, urlParams.get('active_tab') || 'preview');
+              window.X(targetIdx, urlParams.get('active_tab') || 'editor');
             } else {
               window.W = targetIdx;
               window.G = window.U[targetIdx];
               window.n = window.G;
               localStorage.setItem('form_customize_active_index', targetIdx.toString());
               if (typeof window.Z === 'function') {
-                window.Z(urlParams.get('active_tab') || 'preview');
+                window.Z(urlParams.get('active_tab') || 'editor');
               }
             }
           }
@@ -14521,15 +18698,35 @@
   }
   setInterval(initShareUrlFeature, 250);
 
+  // 🛡️ コンテキストメニュー（⋮）に不要項目が混入するのを100%リアルタイムで阻止する監視オブザーバー
+  (function setupContextMenuGuardian() {
+    const checkAndEnforce = () => {
+      const menu = document.getElementById('gf-context-menu');
+      if (menu && typeof window.enforceTwoItemsMenu === 'function') {
+        window.enforceTwoItemsMenu(menu);
+      }
+    };
+    const observer = new MutationObserver(() => {
+      checkAndEnforce();
+    });
+    if (document.body) {
+      observer.observe(document.body, { childList: true, subtree: true });
+    } else {
+      document.addEventListener('DOMContentLoaded', () => {
+        observer.observe(document.body, { childList: true, subtree: true });
+      });
+    }
+  })();
+
   // グローバル公開
   window.getPublicFormShareUrl = getPublicFormShareUrl;
   window.copyFormShareUrl = copyFormShareUrl;
   window.openShareUrlModal = openShareUrlModal;
 
 // ===================================================
-// フローマップ 凡例モーダル & クイック凡例トグル制御 (強固な即時実行 & デリゲーション)
+// サイドバー表示の正常化
 // ===================================================
-(function initFlowmapLegendAndSidebar() {
+(function initSidebarSetup() {
   function setup() {
     const sidebar = document.querySelector('.editor-sidebar');
     if (sidebar) {
@@ -14546,53 +18743,6 @@
   } else {
     setup();
   }
-
-  // グローバルイベントデリゲーションで確実にクリックをハンドリング
-  document.addEventListener('click', (e) => {
-    const modal = document.getElementById('flowmap-legend-modal');
-    
-    // 1. 凡例を開くボタン
-    if (e.target.closest('#btn-flowmap-legend') || e.target.closest('#btn-quick-legend-detail')) {
-      e.preventDefault();
-      if (modal) modal.classList.add('active');
-      return;
-    }
-
-    // 2. 凡例を閉じるボタン
-    if (e.target.closest('#btn-flowmap-legend-close') || e.target.closest('#btn-flowmap-legend-close-footer')) {
-      e.preventDefault();
-      if (modal) modal.classList.remove('active');
-      return;
-    }
-
-    // 3. モーダル背景クリックで閉じる
-    if (modal && e.target === modal) {
-      modal.classList.remove('active');
-      return;
-    }
-
-    // 4. クイック凡例の折りたたみトグル
-    if (e.target.closest('#btn-quick-legend-toggle')) {
-      e.preventDefault();
-      const quickLegend = document.getElementById('flowmap-quick-legend');
-      const btnToggle = document.getElementById('btn-quick-legend-toggle');
-      if (quickLegend && btnToggle) {
-        quickLegend.classList.toggle('collapsed');
-        btnToggle.textContent = quickLegend.classList.contains('collapsed') ? '＋' : '−';
-      }
-      return;
-    }
-  });
-
-  // ESCキーで閉じる
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      const modal = document.getElementById('flowmap-legend-modal');
-      if (modal && modal.classList.contains('active')) {
-        modal.classList.remove('active');
-      }
-    }
-  });
 })();
 
 // ===================================================
@@ -14648,11 +18798,12 @@
   // =========================================================================
   // 🏢 法人名・屋号の案内文 & 未入力時半角ハイフン自動補填入力規則機能
   // =========================================================================
-  const AUTO_HYPHEN_NOTICE_TEXT = '※ 個人事業主の方で屋号がない場合は、未入力のまま「次へ」へお進みください。';
+  const AUTO_HYPHEN_NOTICE_TEXT = '';
 
   function cleanHyphenNotice(text) {
     if (!text) return text;
     return text
+      .replace(/[\r\n]*※?\s*個人事業主の方で屋号がない場合は[、\s]*未入力のまま[「『]?次へ[」』]?へお進みください。?/g, '')
       .replace(/（自動で半角ハイフン「-」が補填されます）/g, '')
       .replace(/\(自動で半角ハイフン「-」が補填されます\)/g, '')
       .replace(/。自動で半角ハイフン「-」が補填されます/g, '')
@@ -14719,6 +18870,13 @@
             if (form && form.sections) {
               form.sections.forEach(sec => {
                 (sec.questions || []).forEach(q => {
+                  const isCorp = q.title && (q.title.includes('法人名') || q.title.includes('会社名') || q.title.includes('企業名')) && !q.title.includes('屋号');
+                  if (isCorp) {
+                    if (q.validation && (q.validation.condition === 'auto_hyphen' || q.validation.autoHyphen)) {
+                      delete q.validation;
+                      updated = true;
+                    }
+                  }
                   if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
                     if (q.description) {
                       const cleaned = cleanHyphenNotice(q.description);
@@ -14727,11 +18885,7 @@
                         updated = true;
                       }
                     }
-                    if (!q.description || !q.description.includes('屋号がない場合')) {
-                      q.description = (q.description ? q.description + '\n' : '') + AUTO_HYPHEN_NOTICE_TEXT;
-                      updated = true;
-                    }
-                    if (!q.validation || q.validation.condition !== 'auto_hyphen') {
+                    if (!q.validation && q.title.includes('屋号') && !q.title.includes('法人名')) {
                       q.validation = { category: 'text', condition: 'auto_hyphen', value: '', value2: '', errorMessage: '' };
                       updated = true;
                     }
@@ -14750,21 +18904,21 @@
     formsToCheck.forEach(form => {
       form.sections.forEach(sec => {
         (sec.questions || []).forEach(q => {
+          const isCorp = q.title && (q.title.includes('法人名') || q.title.includes('会社名') || q.title.includes('企業名')) && !q.title.includes('屋号');
+          if (isCorp) {
+            if (q.validation && (q.validation.condition === 'auto_hyphen' || q.validation.autoHyphen)) {
+              delete q.validation;
+            }
+          }
           if (q.title && (q.title.includes('法人名') || q.title.includes('屋号'))) {
             if (q.description) {
               q.description = cleanHyphenNotice(q.description);
             }
-            if (!q.description || !q.description.includes('屋号がない場合')) {
-              q.description = (q.description ? q.description + '\n' : '') + AUTO_HYPHEN_NOTICE_TEXT;
-            }
             const descInput = document.querySelector(`.q-desc-input[data-question-id="${q.id}"]`);
             if (descInput) {
               descInput.value = cleanHyphenNotice(descInput.value);
-              if (!descInput.value.includes('屋号がない場合')) {
-                descInput.value = q.description;
-              }
             }
-            if (!q.validation || q.validation.condition !== 'auto_hyphen') {
+            if (!q.validation && q.title.includes('屋号') && !q.title.includes('法人名')) {
               q.validation = { category: 'text', condition: 'auto_hyphen', value: '', value2: '', errorMessage: '' };
             }
           }
@@ -14788,10 +18942,11 @@
         if (!card) return;
         const titleEl = card.querySelector('.question-title, .preview-q-title');
         const titleText = titleEl ? titleEl.textContent : '';
-        const isCorp = (titleText.includes('法人名') || titleText.includes('屋号')) &&
+        // 法人名には絶対にハイフン補填を適用しない（個人事業主の屋号のみ対象）
+        const isTrade = titleText.includes('屋号') && !titleText.includes('法人名') && !titleText.includes('会社名') && !titleText.includes('企業名') &&
                        !titleText.includes('カナ') && !titleText.includes('フリガナ') && !titleText.includes('ふりがな');
         
-        if (isCorp) {
+        if (isTrade) {
           if (!input.value || input.value.trim() === '' || input.value.trim() === '-') {
             isSoleProprietorNoTrade = true;
             input.value = '-';
@@ -14801,15 +18956,15 @@
         }
       });
 
-      // 個人事業で屋号がない場合はカナ欄も自動で半角ハイフン「-」を補填
+      // 個人事業で屋号がない場合は屋号カナ欄も自動で半角ハイフン「-」を補填
       if (isSoleProprietorNoTrade) {
         inputs.forEach(input => {
           const card = input.closest('.question-card, .preview-question-card');
           if (!card) return;
           const titleEl = card.querySelector('.question-title, .preview-q-title');
           const titleText = titleEl ? titleEl.textContent : '';
-          const isKana = titleText.includes('カナ') || titleText.includes('フリガナ') || titleText.includes('ふりがな');
-          if (isKana && (!input.value || input.value.trim() === '')) {
+          const isTradeKana = titleText.includes('屋号') && (titleText.includes('カナ') || titleText.includes('フリガナ') || titleText.includes('ふりがな'));
+          if (isTradeKana && (!input.value || input.value.trim() === '')) {
             input.value = '-';
             input.dispatchEvent(new Event('input', { bubbles: true }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
@@ -14835,22 +18990,136 @@
   }
 
   // =========================================================================
+  // 🛡️ フォーム分岐ロジック整合性ガード＆自動サニタイズ（自己修復エンジン）
+  // =========================================================================
+  function sanitizeFormBranchingLogic(forms) {
+    if (!forms) return { forms, hasModified: false };
+    const formList = Array.isArray(forms) ? forms : [forms];
+    let hasModified = false;
+
+    formList.forEach(form => {
+      if (!form || !Array.isArray(form.sections)) return;
+
+      const allQuestionIds = new Set();
+      form.sections.forEach(sec => {
+        (sec.questions || []).forEach(q => {
+          if (q && q.id) allQuestionIds.add(q.id);
+        });
+      });
+
+      form.sections.forEach(sec => {
+        const questions = sec.questions || [];
+        questions.forEach(q => {
+          if (!q) return;
+
+          // 1. 都道府県等の汎用select項目で全選択肢が誤って他セクションを指している等の誤爆正規化
+          const isPrefSelect = q.type === 'select' && (q.title && (q.title.includes('都道府県') || q.title.includes('住所')));
+          if (isPrefSelect && Array.isArray(q.options)) {
+            q.options.forEach(opt => {
+              if (opt && opt.nextSectionId && opt.nextSectionId !== 'next') {
+                opt.nextSectionId = 'next';
+                hasModified = true;
+              }
+            });
+          }
+
+          // 2. 選択肢の nextSectionId に質問IDが入ってしまっている場合の正規化
+          if (Array.isArray(q.options)) {
+            q.options.forEach(opt => {
+              if (!opt) return;
+              if (opt.nextSectionId && allQuestionIds.has(opt.nextSectionId)) {
+                console.warn(`[Sanitize] Option "${opt.label}" had questionId "${opt.nextSectionId}" as nextSectionId. Reset to "next".`);
+                opt.nextSectionId = 'next';
+                hasModified = true;
+              }
+            });
+          }
+
+          // 3. 同一セクション内でこの質問の選択肢に依存して表示される後続質問（インボイス登録番号など）がある場合、
+          // その選択肢が勝手に別セクションへ飛ぶのを防ぐ！
+          const dependentSubQs = questions.filter(otherQ => {
+            if (!otherQ || otherQ.id === q.id) return false;
+            const sl = otherQ.skipLogic;
+            return sl && sl.dependsOn === q.id;
+          });
+
+          if (dependentSubQs.length > 0 && Array.isArray(q.options)) {
+            q.options.forEach(opt => {
+              if (!opt) return;
+              const activatesSubQ = dependentSubQs.some(subQ => {
+                const sl = subQ.skipLogic;
+                if (sl.action === 'hide' && sl.condition === 'not_equals' && sl.value === opt.label) return true;
+                if (sl.action === 'show' && sl.condition === 'equals' && sl.value === opt.label) return true;
+                return false;
+              });
+
+              if (activatesSubQ) {
+                if (opt.nextSectionId && opt.nextSectionId !== 'next' && opt.nextSectionId !== 'same') {
+                  console.warn(`[Sanitize] Option "${opt.label}" displays sub-question within the same section, but had nextSectionId="${opt.nextSectionId}". Reset to "next".`);
+                  opt.nextSectionId = 'next';
+                  hasModified = true;
+                }
+              }
+            });
+          }
+
+          // 4. 同一セクション内に後続の質問が存在する通常の選択項目（口座種別など）において、
+          // 全選択肢が誤って "submit"（送信完了）を指してしまい後続質問がスキップされてしまう誤爆の防止
+          const qIdxInSec = questions.indexOf(q);
+          const isLastQInSection = (qIdxInSec === questions.length - 1);
+          if (!isLastQInSection && Array.isArray(q.options) && q.options.length > 0) {
+            const hasSubsequentQuestions = (questions.length - 1 > qIdxInSec);
+            const isAccountType = (q.dataKey === 'account_type' || (q.title && q.title.includes('口座種別')));
+            const allOptionsAreSubmit = q.options.every(opt => opt && opt.nextSectionId === 'submit');
+
+            if ((isAccountType && allOptionsAreSubmit) || (hasSubsequentQuestions && allOptionsAreSubmit && !dependentSubQs.length)) {
+              console.warn(`[Sanitize] Question "${q.title}" had subsequent questions in same section, but all options were set to "submit". Resetting option branches to default.`);
+              q.options.forEach(opt => {
+                if (opt && opt.nextSectionId === 'submit') {
+                  delete opt.nextSectionId;
+                  hasModified = true;
+                }
+              });
+            }
+          }
+        });
+      });
+    });
+
+    return { forms, hasModified };
+  }
+  window.sanitizeFormBranchingLogic = sanitizeFormBranchingLogic;
+
+  // =========================================================================
   // ☁️ クラウド（Supabase）自動同期モジュール (全ブラウザ・端末共有)
   // =========================================================================
   let _cloudSyncDebounceTimer = null;
   let _isCloudSyncing = false;
 
-  async function syncFormsToCloud(forms) {
+  async function syncFormsToCloud(forms, immediate = false) {
     if (!forms) {
       try {
         const raw = localStorage.getItem('form_customize_all_forms');
         if (raw) forms = JSON.parse(raw);
       } catch(e) {}
     }
-    if (!forms || !Array.isArray(forms) || forms.length === 0) return;
+    if (!forms || !Array.isArray(forms)) return;
+
+    // パージ対象キーワード（フィードバック・管理者権限）を常時除外
+    const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+    forms = forms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
+
+    // デフォルト初期ダミーフォームの勝手なクラウドアップロードを完全抑止
+    if (forms.length === 1 && (forms[0]?.title === '新規作成されたフォーム' || forms[0]?.title === '無題のフォーム') && !window._userExplicitlyCreated) {
+      console.log('[Cloud Sync] Suppressed auto-upload of placeholder form.');
+      return;
+    }
+
+    sanitizeFormBranchingLogic(forms);
 
     clearTimeout(_cloudSyncDebounceTimer);
-    _cloudSyncDebounceTimer = setTimeout(async () => {
+
+    const doSync = async () => {
       try {
         console.log('[Cloud Sync] Pushing forms to Supabase...', forms.length, 'forms');
         // 1. サーバーレス API (/api/forms) への POST
@@ -14885,11 +19154,17 @@
             updated_at: new Date().toISOString()
           })
         });
-        console.log('[Cloud Sync] Direct Supabase fallback push completed.');
+        console.log('[Cloud Sync] Direct Supabase fallback push completed. Form count:', forms.length);
       } catch(e) {
         console.error('[Cloud Sync] Direct Supabase fallback failed:', e);
       }
-    }, 300);
+    };
+
+    if (immediate) {
+      return doSync();
+    } else {
+      _cloudSyncDebounceTimer = setTimeout(doSync, 300);
+    }
   }
 
   async function loadFormsFromCloud() {
@@ -14901,13 +19176,13 @@
         const res = await fetch('/api/forms?all=1');
         if (res.ok) {
           const data = await res.json();
-          if (data && data.success && Array.isArray(data.forms) && data.forms.length > 0) {
+          if (data && data.success && Array.isArray(data.forms)) {
             cloudForms = data.forms;
           }
         }
       } catch(e) {}
 
-      if (!cloudForms) {
+      if (cloudForms === null) {
         // 直接 Supabase REST API
         try {
           const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
@@ -14917,10 +19192,10 @@
           });
           if (sbRes.ok) {
             const rows = await sbRes.json();
-            if (rows && rows[0] && rows[0].value) {
+            if (rows && rows[0] && rows[0].value !== undefined) {
               let parsed = rows[0].value;
               if (typeof parsed === 'string') parsed = JSON.parse(parsed);
-              if (Array.isArray(parsed) && parsed.length > 0) cloudForms = parsed;
+              if (Array.isArray(parsed)) cloudForms = parsed;
             }
           }
         } catch(e) {}
@@ -14932,27 +19207,51 @@
         if (raw) localForms = JSON.parse(raw);
       } catch(e) {}
 
-      if (cloudForms && cloudForms.length > 0) {
+      if (cloudForms !== null && Array.isArray(cloudForms)) {
+        // パージ対象のフォーム（フィードバック・管理者権限）を完全除外
+        const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+        cloudForms = cloudForms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
+
         console.log('[Cloud Sync] Loaded', cloudForms.length, 'forms from cloud.');
-        const isLocalDummy = localForms.length === 0 || (localForms.length === 2 && localForms[0].title === '新規作成されたフォーム');
-        if (isLocalDummy || localForms.length < cloudForms.length) {
-          _origSetItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(cloudForms));
-          if (window.U) {
-            window.U.length = 0;
-            cloudForms.forEach(f => window.U.push(f));
-            const curIdx = parseInt(localStorage.getItem('form_customize_active_index') || '0', 10);
-            window.W = Math.min(curIdx, window.U.length - 1);
-            window.G = window.U[window.W];
-            window.n = window.G;
-            if (typeof window.x === 'function') window.x();
+        sanitizeFormBranchingLogic(cloudForms);
+        
+        // クラウドの定義を正として localStorage および window.U へ同期
+        Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(cloudForms));
+        if (window.U) {
+          window.U.length = 0;
+          cloudForms.forEach(f => window.U.push(f));
+          const curIdx = parseInt(localStorage.getItem('form_customize_active_index') || '0', 10);
+          window.W = Math.max(0, Math.min(curIdx, Math.max(0, window.U.length - 1)));
+          window.G = (window.U.length > 0) ? window.U[window.W] : null;
+          window.n = window.G;
+          if (typeof window.Y === 'function') window.Y();
+          if (typeof window.x === 'function' && window.G) window.x();
+        }
+        if (cloudForms.length === 0) {
+          const listEl = document.getElementById('dashboard-view-list');
+          if (listEl) {
+            listEl.innerHTML = `
+              <div style="text-align: center; padding: 40px; color: var(--color-text-dark);">
+                表示できるフォームがありません。
+              </div>
+            `;
           }
-        } else if (!isLocalDummy) {
-          // ローカルにユーザーが編集したフォームがある場合、クラウドへバックアップ保存
-          syncFormsToCloud(localForms);
+          const previewEl = document.getElementById('dashboard-view-preview');
+          if (previewEl) {
+            previewEl.innerHTML = `
+              <div style="text-align: center; padding: 40px; color: var(--color-text-dark); grid-column: 1 / -1;">
+                表示できるフォームがありません。
+              </div>
+            `;
+          }
         }
       } else if (localForms.length > 0) {
-        // クラウドが空でローカルにフォームがある場合、即座にクラウドへ初期アップロード
-        syncFormsToCloud(localForms);
+        // クラウドが完全に未初期化の場合のみ、ローカルから不要フォームを除外して初期アップロード
+        const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+        const cleanLocal = localForms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
+        if (cleanLocal.length > 0) {
+          syncFormsToCloud(cleanLocal);
+        }
       }
     } catch(err) {
       console.warn('[Cloud Sync] loadFormsFromCloud exception:', err);
@@ -14960,17 +19259,29 @@
       _isCloudSyncing = false;
     }
   }
+  window.syncFormsToCloud = syncFormsToCloud;
+  window.loadFormsFromCloud = loadFormsFromCloud;
 
   // localStorage.setItem のフック: form_customize_all_forms への書き込み時にクラウドへ自動保存
   const _origSetItem = localStorage.setItem;
   localStorage.setItem = function(key, value) {
-    _origSetItem.apply(this, arguments);
     if (key === 'form_customize_all_forms') {
       try {
-        const parsed = JSON.parse(value);
-        syncFormsToCloud(parsed);
+        let parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
+          parsed = parsed.filter(f => f && !purgedKeywords.some(p => (f.title || '').includes(p)));
+          const { hasModified } = sanitizeFormBranchingLogic(parsed);
+          arguments[1] = JSON.stringify(parsed);
+        }
+        _origSetItem.apply(this, arguments);
+        if (Array.isArray(parsed)) {
+          syncFormsToCloud(parsed);
+        }
+        return;
       } catch(e) {}
     }
+    _origSetItem.apply(this, arguments);
   };
 
   // 起動時の初期同期
@@ -15129,8 +19440,8 @@
           pattern = "^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$";
         }
       } else if (q.includes('口座') || q.includes('こうざ')) {
-        text = "💳 **口座番号**の正規表現です。\n\n一般的に使用される口座番号（7桁の半角数字）に一致させるには、以下の正規表現を使用します：\n`^\\d{7}$`\n\n※桁数が異なる（例: 6桁）金融機関を考慮する場合は、範囲指定（例: 6〜7桁 `^\\d{6,7}$`）に変更することもできます。";
-        pattern = "^\\d{7}$";
+        text = "💳 **口座番号**の正規表現です。\n\n一般的に使用される口座番号（6〜7桁の半角数字）に一致させるには、以下の正規表現を使用します：\n`^[0-9]{6,7}$`\n\n※信用金庫や一部金融機関の6桁口座にも完全対応した推奨設定です。";
+        pattern = "^[0-9]{6,7}$";
       } else if (q.includes('インボイス') || q.includes('いんぼいす') || q.includes('登録番号')) {
         text = "🧾 **インボイス登録番号**の正規表現です。\n\n適格請求書発行事業者の登録番号（Tで始まる13桁の半角数字）に一致させるには、以下の表現を使用します：\n`^T\\d{13}$`\n\n※先頭のアルファベット大文字「T」と、それに続く13桁の数字を厳密に制限する形式です。";
         pattern = "^T\\d{13}$";
@@ -15313,34 +19624,94 @@
       try {
         const clientApiKey = localStorage.getItem('synapse_gemini_api_key') || '';
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000);
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-        const response = await fetch('/api/regex-ai', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            message: q,
-            history: window._regexChatHistory.slice(-6),
-            clientApiKey: clientApiKey
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          throw new Error(`Server returned HTTP ${response.status}`);
+        // APIエンドポイントの解決（ローカル環境やfile:プロトコルでも本番APIへ通信可能に）
+        let apiEndpoint = '/api/regex-ai';
+        if (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          apiEndpoint = 'https://synapse-wayway.vercel.app/api/regex-ai';
         }
 
-        const data = await response.json();
+        let data = null;
+        let fetchFailed = false;
+        let fetchErrorMsg = '';
 
-        if (data.success && data.reply) {
+        try {
+          const response = await fetch(apiEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              message: q,
+              history: window._regexChatHistory.slice(-6),
+              clientApiKey: clientApiKey
+            }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            throw new Error(`Server HTTP ${response.status}`);
+          }
+          data = await response.json();
+        } catch (serverErr) {
+          fetchFailed = true;
+          fetchErrorMsg = serverErr.message || '通信タイムアウトまたはネットワーク障害';
+          console.warn('[Regex AI Assistant] Server endpoint failed, checking direct Gemini client fallback:', serverErr);
+
+          // 🌟 直接Gemini APIフォールバック: クライアント側にAPIキーがある場合は直接Google Gemini APIを呼ぶ
+          if (clientApiKey) {
+            try {
+              const directModel = 'gemini-1.5-flash';
+              const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${directModel}:generateContent?key=${encodeURIComponent(clientApiKey)}`;
+              const sysPrompt = `あなたはWebフォームおよびGoogleスプレッドシートのRE2正規表現に特化した親切なAIアシスタントです。必ず以下のJSON形式のみを出力してください: {"reply": "丁寧な解説", "pattern": "^正規表現パターン$"}`;
+              
+              const directResp = await fetch(directUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-goog-api-key': clientApiKey
+                },
+                body: JSON.stringify({
+                  systemInstruction: { parts: [{ text: sysPrompt }] },
+                  contents: [{ role: 'user', parts: [{ text: q }] }],
+                  generationConfig: { temperature: 0.2, maxOutputTokens: 1000, responseMimeType: 'application/json' }
+                })
+              });
+              if (directResp.ok) {
+                const directJson = await directResp.json();
+                const partText = directJson.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (partText) {
+                  const parsed = JSON.parse(partText);
+                  data = {
+                    success: true,
+                    reply: parsed.reply || partText,
+                    pattern: parsed.pattern || ''
+                  };
+                  fetchFailed = false;
+                }
+              } else {
+                const dErrText = await directResp.text();
+                try {
+                  const dErrJson = JSON.parse(dErrText);
+                  fetchErrorMsg = dErrJson.error?.message || dErrText;
+                } catch(e) {
+                  fetchErrorMsg = dErrText;
+                }
+              }
+            } catch (directErr) {
+              console.warn('[Regex AI Assistant] Direct Gemini call also failed:', directErr);
+            }
+          }
+        }
+
+        if (data && data.success && data.reply) {
           // Gemini APIからの完全な回答
           finishAndScroll();
           renderBotResponse(formatRegexMarkdown(data.reply), data.pattern || '');
           window._regexChatHistory.push({ role: 'model', text: data.reply });
-        } else if (data.isConfigured === false) {
+        } else if (data && data.isConfigured === false) {
           // APIキー未設定 → ローカル辞書へ安全にフォールバック
           finishAndScroll();
           const fallback = generateRegexAiResponse(q);
@@ -15351,27 +19722,34 @@
           </div>`;
           renderBotResponse(formatRegexMarkdown(fallback.text), fallback.pattern || '', banner);
           window._regexChatHistory.push({ role: 'model', text: fallback.text });
-        } else {
+        } else if (data) {
           // 何らかのAPI側エラー
           finishAndScroll();
           const fallback = generateRegexAiResponse(q);
+          const errorDetail = data.detail ? `<div style="font-size:0.75rem; color:#c5221f; margin-top:2px; word-break:break-all; font-family:monospace;">${escapeHtml(data.detail)}</div>` : '';
           const banner = `<div style="background: rgba(234, 67, 53, 0.1); border-left: 3px solid #ea4335; padding: 6px 10px; margin-bottom: 8px; font-size: 0.8rem; border-radius: 4px; color: var(--color-text);">
-            ⚠️ <strong>Gemini APIエラー（ローカル簡易辞書で回答中）</strong>: ${data.message || '通信エラー'}<br>
-            <a href="javascript:void(0)" id="btn-prompt-gemini-key" style="color:#1a73e8; text-decoration:underline; font-weight:600; margin-top:3px; display:inline-block;">🔑 APIキーを再設定する</a>
+            ⚠️ <strong>Gemini APIエラー（ローカル簡易辞書で回答中）</strong>: ${escapeHtml(data.message || '通信エラー')}<br>
+            ${errorDetail}
+            <a href="javascript:void(0)" id="btn-prompt-gemini-key" style="color:#1a73e8; text-decoration:underline; font-weight:600; margin-top:3px; display:inline-block;">🔑 APIキーをブラウザに再設定して試す</a>
+          </div>`;
+          renderBotResponse(formatRegexMarkdown(fallback.text), fallback.pattern || '', banner);
+          window._regexChatHistory.push({ role: 'model', text: fallback.text });
+        } else {
+          // 通信エラー（ローカル辞書へ安全にフォールバック）
+          finishAndScroll();
+          const fallback = generateRegexAiResponse(q);
+          const banner = `<div style="background: rgba(234, 67, 53, 0.1); border-left: 3px solid #ea4335; padding: 6px 10px; margin-bottom: 8px; font-size: 0.8rem; border-radius: 4px; color: var(--color-text);">
+            ⚠️ <strong>通信エラー（ローカル簡易辞書で回答中）</strong>: ${escapeHtml(fetchErrorMsg)}<br>
+            <a href="javascript:void(0)" id="btn-prompt-gemini-key" style="color:#1a73e8; text-decoration:underline; font-weight:600; margin-top:3px; display:inline-block;">🔑 APIキーを設定して再試行</a>
           </div>`;
           renderBotResponse(formatRegexMarkdown(fallback.text), fallback.pattern || '', banner);
           window._regexChatHistory.push({ role: 'model', text: fallback.text });
         }
-      } catch (err) {
-        console.warn('[Regex AI Assistant] Gemini API fetch failed, falling back to local dictionary:', err);
+      } catch (outerErr) {
+        console.error('[Regex AI Assistant] Unexpected error in handleRegexChatSubmit:', outerErr);
         finishAndScroll();
         const fallback = generateRegexAiResponse(q);
-        const banner = `<div style="background: rgba(234, 67, 53, 0.1); border-left: 3px solid #ea4335; padding: 6px 10px; margin-bottom: 8px; font-size: 0.8rem; border-radius: 4px; color: var(--color-text);">
-          ⚠️ <strong>通信エラー（ローカル簡易辞書で回答中）</strong><br>
-          <a href="javascript:void(0)" id="btn-prompt-gemini-key" style="color:#1a73e8; text-decoration:underline; font-weight:600; margin-top:3px; display:inline-block;">🔑 APIキーを設定して再試行</a>
-        </div>`;
-        renderBotResponse(formatRegexMarkdown(fallback.text), fallback.pattern || '', banner);
-        window._regexChatHistory.push({ role: 'model', text: fallback.text });
+        renderBotResponse(formatRegexMarkdown(fallback.text), fallback.pattern || '');
       }
 
       history.scrollTop = history.scrollHeight;
@@ -15458,6 +19836,16 @@
       const rows = Array.from(container.querySelectorAll('.option-edit-row'));
       if (rows.length === 0) return;
 
+      // 🗑️ 選択肢削除ボタンの統一線画ゴミ箱アイコンを確実に維持
+      rows.forEach(r => {
+        const btn = r.querySelector('.btn-delete-option');
+        if (btn && !btn.querySelector('svg')) {
+          btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
+          btn.title = '選択肢を削除';
+          btn.setAttribute('aria-label', '選択肢を削除');
+        }
+      });
+
       let rowsWrap = container.querySelector('.options-edit-rows-wrap');
       
       // 1. ラッパーが存在しない場合の自動ラップ（フォールバック）
@@ -15543,4 +19931,2429 @@
   } else {
     ensureCompactOptionsContainers();
   }
+
+  // =========================================================================
+  // ⚙️ 質問設定の2層分離（詳細設定スライドドロワー）＆ 案内用AIコンシェルジュ
+  // =========================================================================
+
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  let _activeDrawerQuestionId = null;
+  let _currentAiAdvice = null;
+
+  function getDrawerFormSections() {
+    const formSources = [window.n, window.G, window.F, window.L];
+    if (window.U && Array.isArray(window.U)) formSources.push(...window.U);
+    for (const fs of formSources) {
+      if (fs && fs.sections && Array.isArray(fs.sections) && fs.sections.length > 0) {
+        return fs.sections;
+      }
+    }
+    return [];
+  }
+
+  function getDrawerAvailableSources(secId, qId, grpId) {
+    if (typeof getAvailableSourcesFor === 'function') {
+      return getAvailableSourcesFor(secId, qId, grpId);
+    }
+    if (typeof window.getAvailableSourcesFor === 'function') {
+      return window.getAvailableSourcesFor(secId, qId, grpId);
+    }
+    return { groups: [], questions: [] };
+  }
+
+  // バリデーションの短縮ラベル取得
+  function getValidationShortLabel(v) {
+    if (!v) return '';
+    const cat = v.category || '';
+    const cond = v.condition || '';
+    if (cat === 'text') {
+      if (cond === 'email') return 'メールアドレス';
+      if (cond === 'url') return 'URL';
+      if (cond === 'auto_hyphen') return '屋号ハイフン補填';
+      return 'テキスト';
+    }
+    if (cat === 'api') {
+      if (cond === 'corp_name') return '国税庁法人API';
+      if (cond === 'invoice_number') return 'インボイス照合';
+      if (cond === 'zip_code') return '郵便番号検索';
+      if (cond === 'bank_name') return '全銀協銀行検索';
+      if (cond === 'branch_name') return '全銀協支店検索';
+      return 'API連携';
+    }
+    if (cat === 'regex') {
+      if (v.presetKey === 'tel_both' || cond === 'tel') return '電話番号';
+      if (v.presetKey === 'birthdate') return '生年月日';
+      if (v.presetKey === 'zip' || v.presetKey === 'zip_nohyphen') return '郵便番号';
+      if (v.presetKey === 'account_holder_kana') return '口座名義カナ';
+      return '正規表現';
+    }
+    if (cat === 'number') return '数値';
+    if (cat === 'length') return '文字数制限';
+    return '入力規則';
+  }
+
+  // 1. 質問カードの超軽量化 & バッジ・詳細設定ボタン注入
+  function injectQuestionCardCompactStylesAndBadges() {
+    const qCards = document.querySelectorAll('#questions-container .question-card');
+    if (!qCards || qCards.length === 0) return;
+
+    qCards.forEach(card => {
+      const qId = card.dataset.questionId;
+      if (!qId) return;
+
+      const q = findQuestionDefById(qId);
+      if (!q) return;
+
+      // 1. 軽量化クラスの付与
+      if (!card.classList.contains('compact-settings')) {
+        card.classList.add('compact-settings');
+      }
+
+      // 2. メディア添付チェックボックスの親form-groupを特定してクラス付与（CSSで隠すため）
+      const formGroups = card.querySelectorAll(':scope > .form-group');
+      formGroups.forEach(fg => {
+        if (fg.textContent && fg.textContent.includes('説明用メディア') && !fg.classList.contains('question-card-media-toggle-group')) {
+          fg.classList.add('question-card-media-toggle-group');
+        }
+      });
+
+      // 3. 設定バッジエリアの管理
+      let badgesWrap = card.querySelector('.question-card-badges');
+      if (!badgesWrap) {
+        badgesWrap = document.createElement('div');
+        badgesWrap.className = 'question-card-badges';
+
+        const actions = card.querySelector('.question-card-actions');
+        if (actions) {
+          actions.parentNode.insertBefore(badgesWrap, actions);
+        } else {
+          card.appendChild(badgesWrap);
+        }
+      }
+
+      // バッジの動的再描画
+      const badgeSignature = [
+        q.dataKey || '',
+        q.validation ? `${q.validation.category}:${q.validation.condition}:${q.validation.presetKey || ''}` : '',
+        q.autoReply ? 'autoreply' : '',
+        (q.media && q.media.url) ? 'media' : '',
+        q.scrollRequired ? 'scroll' : '',
+        (q.sameAsAbove && q.sameAsAbove.enabled) ? `same:${q.sameAsAbove.sourceQuestionId || ''}` : '',
+        (q.skipLogic && q.skipLogic.dependsOn) ? `skip:${q.skipLogic.dependsOn}:${q.skipLogic.condition || ''}` : ''
+      ].join('|');
+
+      if (badgesWrap.dataset.lastSignature !== badgeSignature) {
+        badgesWrap.dataset.lastSignature = badgeSignature;
+        badgesWrap.innerHTML = '';
+
+        let badgeCount = 0;
+
+        // ① カラム統一（dataKey）バッジ
+        if (q.dataKey) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-datakey';
+          b.innerHTML = `🏷️ 列: <strong>${escapeHtml(q.dataKey)}</strong>`;
+          b.title = '他の質問と同一の列名で保存されます（クリックで詳細設定）';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+          badgeCount++;
+        }
+
+        // ② 入力規則バッジ
+        if (q.validation) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-validation';
+          b.innerHTML = `🛡️ ${escapeHtml(getValidationShortLabel(q.validation))}`;
+          b.title = '回答の入力規則が有効です（クリックで詳細設定）';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+          badgeCount++;
+        }
+
+        // ③ 回答控え自動送信バッジ
+        if (q.autoReply) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-autoreply';
+          b.innerHTML = `📨 回答控え有効`;
+          b.title = '送信後にこのメール宛に控えが届きます（クリックで詳細設定）';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+          badgeCount++;
+        }
+
+        // ④ 説明用メディアバッジ
+        if (q.media && q.media.url) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-media';
+          b.innerHTML = `📎 メディア添付`;
+          b.title = '画像または動画が添付されています（クリックで詳細設定）';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+          badgeCount++;
+        }
+
+        // ⑤ 規約スクロール必須バッジ
+        if (q.scrollRequired) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-scroll';
+          b.innerHTML = `📜 規約ロック`;
+          b.title = '最下部スクロール必須ロックが有効です（クリックで詳細設定）';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+          badgeCount++;
+        }
+        // ⑥ 📋 「前述と同じ（同上）」自動入力バッジ
+        if (q.sameAsAbove && q.sameAsAbove.enabled) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-sameasabove';
+          b.innerHTML = q.sameAsAbove.sourceType === 'group' ? `📁 グループ同上連動` : `📋 同上入力`;
+          b.title = '前述の入力値から自動補完されます（クリックで詳細設定）';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+          badgeCount++;
+        }
+
+        // ⑦ ⚡ セクション内スキップ（条件分岐）バッジ
+        if (q.skipLogic && q.skipLogic.dependsOn) {
+          const b = document.createElement('span');
+          b.className = 'q-setting-badge badge-skiplogic';
+          b.innerHTML = `⚡ スキップ分岐`;
+          b.title = '条件分岐ルールが設定されています（クリックで詳細設定）';
+          b.addEventListener('click', (e) => { e.stopPropagation(); openQuestionSettingsDrawer(qId); });
+          badgesWrap.appendChild(b);
+          badgeCount++;
+        }
+
+        // 未設定時はボタンの重複を避けるため何も表示しない（詳細設定はアクション行の「⚙️ 詳細設定」ボタンに一本化）
+      }
+
+      // 4. アクション行に「⚙️ 詳細設定」ボタンを注入
+      const actions = card.querySelector('.question-card-actions');
+      if (actions && !actions.querySelector('.btn-open-q-drawer')) {
+        const btnDrawer = document.createElement('button');
+        btnDrawer.type = 'button';
+        btnDrawer.className = 'btn-open-q-drawer';
+        btnDrawer.innerHTML = '⚙️ 詳細設定';
+        btnDrawer.title = 'カラム統一、入力規則、メール控えなどの詳細設定を開く';
+        btnDrawer.dataset.questionId = qId;
+        btnDrawer.dataset.qid = qId;
+        btnDrawer.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openQuestionSettingsDrawer(qId);
+        });
+
+        // 削除ボタンや移動ボタンの手前に配置
+        const actionBtns = actions.querySelector('.question-action-buttons');
+        if (actionBtns) {
+          actionBtns.insertBefore(btnDrawer, actionBtns.firstChild);
+        } else {
+          actions.appendChild(btnDrawer);
+        }
+      }
+    });
+  }
+
+  // 2. AIコンシェルジュによる質問意図の自動解析
+  function analyzeQuestionForAiConcierge(q) {
+    const title = (q.title || '').trim();
+    const lower = title.toLowerCase();
+
+    // 他のセクションの質問一覧を取得して相関関係（法人 vs 屋号など）を検出
+    const allQuestions = [];
+    const rootForm = window.F || window.n || window.G || window.L;
+    if (rootForm && rootForm.sections) {
+      rootForm.sections.forEach(s => {
+        (s.questions || []).forEach(otherQ => {
+          if (otherQ && otherQ.id !== q.id) allQuestions.push(otherQ);
+        });
+      });
+    }
+
+    // 1. メールアドレス
+    if (lower.includes('メール') || lower.includes('mail') || lower.includes('アドレス')) {
+      return {
+        type: 'email',
+        recommendationTitle: '✉️ メールアドレス（控え自動送信 & email列統合）',
+        explanation: 'メールアドレス形式の検証を適用し、送信後に自動で回答控えメールを届ける設定をおすすめします。',
+        dataKey: 'email',
+        unifyColumn: true,
+        validation: {
+          category: 'text',
+          condition: 'email',
+          value: '',
+          value2: '',
+          errorMessage: '有効なメールアドレスを入力してください。'
+        },
+        autoReply: true,
+        items: [
+          'データベース出力列名: <strong>email</strong> に統一',
+          '入力規則: <strong>テキスト ➔ メールアドレス</strong>（自動判定）',
+          '回答控えメール: <strong>自動配信をON</strong> に設定'
+        ]
+      };
+    }
+
+    // 2. 法人名 / 会社名
+    if (lower.includes('法人名') || lower.includes('会社名') || lower.includes('企業名') || lower.includes('商号')) {
+      return {
+        type: 'corp_name',
+        recommendationTitle: '🏛️ 法人名検索（国税庁API連携 & company_name列統合）',
+        explanation: '国税庁法人番号APIによるリアルタイム検索と、DB列「company_name」への統一をおすすめします。',
+        dataKey: 'company_name',
+        unifyColumn: true,
+        validation: {
+          category: 'api',
+          condition: 'corp_name',
+          value: '',
+          value2: '',
+          errorMessage: '実在する法人名を入力または選択してください。'
+        },
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>company_name</strong> に統一',
+          '入力規則: <strong>API連携 ➔ 国税庁法人番号API</strong>',
+          'エラー表示: 実在する法人名を選択してください'
+        ]
+      };
+    }
+
+    // 3. 屋号
+    if (lower.includes('屋号')) {
+      const hasCorp = allQuestions.some(oq => (oq.title || '').includes('法人名') || (oq.title || '').includes('会社名'));
+      const exp = hasCorp 
+        ? '別セクションの「法人名」と同一の列名「company_name」に一本化し、屋号がない場合の自動ハイフン補填を設定することを推奨します。'
+        : '個人事業主の屋号として未入力時の自動ハイフン補填を有効化し、列名「company_name」に統一することをおすすめします。';
+      return {
+        type: 'trade_name',
+        recommendationTitle: '🏢 屋号（法人名と同一列 company_name に一本化）',
+        explanation: exp,
+        dataKey: 'company_name',
+        unifyColumn: true,
+        validation: {
+          category: 'text',
+          condition: 'auto_hyphen',
+          value: '',
+          value2: '',
+          errorMessage: ''
+        },
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>company_name</strong> に統一（法人名と合流）',
+          '入力規則: <strong>未入力時は自動で半角ハイフン補填（屋号なし対応）</strong>'
+        ]
+      };
+    }
+
+    // 4. 電話番号
+    if (lower.includes('電話') || lower.includes('tel') || lower.includes('携帯') || lower.includes('スマホ')) {
+      return {
+        type: 'tel',
+        recommendationTitle: '📞 電話番号（固定・携帯共通バリデーション & tel列統合）',
+        explanation: '固定電話と携帯電話の双方に対応した正規表現チェックと、DB列「tel」への統一をおすすめします。',
+        dataKey: 'tel',
+        unifyColumn: true,
+        validation: {
+          category: 'regex',
+          condition: 'matches',
+          value: '^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$',
+          presetKey: 'tel_both',
+          value2: '',
+          errorMessage: '正しい電話番号の形式で入力してください。'
+        },
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>tel</strong> に統一',
+          '入力規則: <strong>正規表現（固定・携帯共通ハイフン形式）</strong>'
+        ]
+      };
+    }
+
+    // 5. 郵便番号
+    if (lower.includes('郵便') || lower.includes('〒') || lower.includes('zip')) {
+      return {
+        type: 'zip',
+        recommendationTitle: '📮 郵便番号（ZipCloud連携 & zip_code列統合）',
+        explanation: '郵便番号から都道府県・市区町村を自動入力するAPI連携と、列「zip_code」への統一をおすすめします。',
+        dataKey: 'zip_code',
+        unifyColumn: true,
+        validation: {
+          category: 'api',
+          condition: 'zip_code',
+          value: '',
+          value2: '',
+          errorMessage: '正しい郵便番号（7桁の半角数字）を入力してください。'
+        },
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>zip_code</strong> に統一',
+          '入力規則: <strong>API連携 ➔ 郵便番号検索（ZipCloud連携）</strong>'
+        ]
+      };
+    }
+
+    // 6. 代表者名 / 氏名
+    if (lower.includes('代表') || lower.includes('氏名') || lower.includes('名前') || lower.includes('name')) {
+      const isKana = lower.includes('カナ') || lower.includes('フリガナ');
+      const key = isKana ? 'representative_kana' : 'representative_name';
+      return {
+        type: 'representative',
+        recommendationTitle: isKana ? '👤 氏名カナ（representative_kana列統合）' : '👤 氏名（representative_name列統合）',
+        explanation: `代表取締役氏名や個人事業主氏名をDB列「${key}」に集約することをおすすめします。`,
+        dataKey: key,
+        unifyColumn: true,
+        validation: null,
+        autoReply: false,
+        items: [
+          `データベース出力列名: <strong>${key}</strong> に統一`
+        ]
+      };
+    }
+
+    // 7. インボイス / 登録番号
+    if (lower.includes('インボイス') || lower.includes('登録番号') || lower.includes('invoice')) {
+      return {
+        type: 'invoice',
+        recommendationTitle: '🧾 インボイス登録番号（公表システムAPI照合 & invoice_number列統合）',
+        explanation: 'T+13桁の登録番号を国税庁公表システムと照合し、列「invoice_number」に統一することをおすすめします。',
+        dataKey: 'invoice_number',
+        unifyColumn: true,
+        validation: {
+          category: 'api',
+          condition: 'invoice_number',
+          value: '',
+          value2: '',
+          errorMessage: '正しくインボイス登録番号（Tで始まる13桁の数字）を入力してください。'
+        },
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>invoice_number</strong> に統一',
+          '入力規則: <strong>API連携 ➔ インボイス登録番号（国税庁照合）</strong>'
+        ]
+      };
+    }
+
+    // 8. 住所 / 番地
+    if (lower.includes('住所') || lower.includes('所在地') || lower.includes('番地') || lower.includes('町名')) {
+      return {
+        type: 'address',
+        recommendationTitle: '📍 住所・番地（street列統合）',
+        explanation: '法人所在地と個人の住所を共通のDB列「street」に一本化することをおすすめします。',
+        dataKey: 'street',
+        unifyColumn: true,
+        validation: null,
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>street</strong> に統一'
+        ]
+      };
+    }
+
+    // 9. 生年月日
+    if (lower.includes('生年月日') || lower.includes('誕生') || lower.includes('birth')) {
+      return {
+        type: 'birthdate',
+        recommendationTitle: '🎂 生年月日（birthdate列統合 & 日付書式判定）',
+        explanation: 'YYYY/MM/DD形式の書式チェックと、列「birthdate」への統一をおすすめします。',
+        dataKey: 'birthdate',
+        unifyColumn: true,
+        validation: {
+          category: 'regex',
+          condition: 'matches',
+          value: '^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$',
+          presetKey: 'birthdate',
+          value2: '',
+          errorMessage: '正しい生年月日を入力してください（例: 1990/01/01）。'
+        },
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>birthdate</strong> に統一',
+          '入力規則: <strong>正規表現（YYYY/MM/DD形式）</strong>'
+        ]
+      };
+    }
+
+    // 汎用
+    return {
+      type: 'generic',
+      recommendationTitle: '⚙️ 基本設定',
+      explanation: '他の質問とDB列を統一したい場合は「カラムの統一」をONにし、適切な列キーを指定してください。',
+      dataKey: '',
+      unifyColumn: false,
+      validation: null,
+      autoReply: false,
+      items: [
+        '必要に応じて入力規則やカラム統一を設定してください'
+      ]
+    };
+  }
+
+  // 3. ドロワー DOM の生成
+  function ensureQuestionSettingsDrawerDom() {
+    if (document.getElementById('question-settings-drawer')) return;
+
+    // オーバーレイ
+    const backdrop = document.createElement('div');
+    backdrop.id = 'question-settings-drawer-backdrop';
+    backdrop.className = 'question-settings-drawer-backdrop';
+    document.body.appendChild(backdrop);
+
+    // ドロワー本体
+    const drawer = document.createElement('div');
+    drawer.id = 'question-settings-drawer';
+    drawer.className = 'question-settings-drawer';
+    drawer.setAttribute('aria-hidden', 'true');
+    drawer.innerHTML = `
+      <div class="drawer-header">
+        <div class="drawer-header-left">
+          <span class="drawer-header-icon">⚙️</span>
+          <div class="drawer-header-titles">
+            <h3 id="drawer-q-title" class="drawer-q-title">質問詳細設定</h3>
+            <span id="drawer-q-type-badge" class="drawer-q-type-badge">記述式</span>
+          </div>
+        </div>
+        <button type="button" id="btn-close-q-drawer" class="drawer-close-btn" title="閉じる">✕</button>
+      </div>
+
+      <div class="drawer-body">
+        <!-- 1. 🤖 案内用AIコンシェルジュ -->
+        <div id="drawer-ai-panel" class="drawer-section ai-concierge-panel">
+          <div class="ai-concierge-header">
+            <span class="ai-concierge-title">🤖 案内用AIコンシェルジュ</span>
+            <span class="ai-sparkle-badge">✨ リアルタイム診断</span>
+          </div>
+          <div id="drawer-ai-recommendation-box" class="ai-recommendation-box"></div>
+          <div class="ai-actions-row">
+            <button type="button" id="btn-apply-ai-rec" class="ai-apply-btn">✨ おすすめ設定を一括適用</button>
+            <button type="button" id="btn-toggle-ai-chat" class="ai-chat-toggle-btn">💬 AIに相談する</button>
+          </div>
+          <div id="drawer-ai-chat-container" class="ai-chat-container" style="display: none;">
+            <div id="drawer-ai-chat-messages" class="ai-chat-messages">
+              <div class="ai-chat-msg bot">こんにちは！質問の入力規則やカラム統一について何でもご質問ください。</div>
+            </div>
+            <div class="ai-chat-input-row">
+              <input type="text" id="drawer-ai-chat-input" class="form-control form-control-sm" placeholder="AIに質問・相談を入力..." />
+              <button type="button" id="btn-send-drawer-ai-chat" class="btn btn-primary btn-sm">送信</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 🏷️ データベース出力列（カラム）の統一設定 -->
+        <div class="drawer-section">
+          <div class="drawer-section-title">🏷️ データベース出力列（カラム）の統一設定</div>
+          <div class="drawer-section-desc">
+            別セクションの質問（例: 法人名と屋号、法人住所と個人住所）でも、同一の列名（dataKey）を設定するとDBや集計シートで1列に集約されます。
+          </div>
+          
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-unify-column-toggle" />
+            <span>他の質問と出力列（カラム）を統一する</span>
+          </label>
+
+          <div id="drawer-column-unified-box" style="display: none; margin-top: 10px;">
+            <label class="drawer-field-label">共通カラム（列キー）の選択</label>
+            <select id="drawer-column-select" class="form-control form-control-sm">
+              <option value="company_name">🏢 法人名・屋号 (company_name)</option>
+              <option value="company_kana">🏢 法人名カナ・屋号カナ (company_kana)</option>
+              <option value="representative_name">👤 代表者名・氏名 (representative_name)</option>
+              <option value="representative_kana">👤 代表者カナ・氏名カナ (representative_kana)</option>
+              <option value="zip_code">📮 郵便番号 (zip_code)</option>
+              <option value="pref">📍 都道府県 (pref)</option>
+              <option value="city">📍 市区町村 (city)</option>
+              <option value="street">📍 町名・番地 (street)</option>
+              <option value="building">📍 建物名・部屋番号 (building)</option>
+              <option value="email">✉️ メールアドレス (email)</option>
+              <option value="tel">📞 電話番号 (tel)</option>
+              <option value="tax_invoice_status">🧾 税務区分・インボイス状況 (tax_invoice_status)</option>
+              <option value="invoice_number">🧾 インボイス登録番号 (invoice_number)</option>
+              <option value="__custom__">✏️ 自由入力（カスタムキー）</option>
+            </select>
+
+            <div id="drawer-custom-key-wrap" style="margin-top: 8px;">
+              <input type="text" id="drawer-column-key-input" class="form-control form-control-sm" placeholder="半角英数字（例: company_name）" />
+            </div>
+
+            <div class="drawer-chips-wrap" style="margin-top: 8px;">
+              <span class="drawer-chip" data-key="company_name">🏢 法人名・屋号</span>
+              <span class="drawer-chip" data-key="street">📍 住所・番地</span>
+              <span class="drawer-chip" data-key="representative_name">👤 代表者・氏名</span>
+              <span class="drawer-chip" data-key="email">✉️ メール</span>
+              <span class="drawer-chip" data-key="tel">📞 電話番号</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 🛡️ 回答の入力規則（検証・バリデーション） -->
+        <div class="drawer-section">
+          <div class="drawer-section-title">🛡️ 回答の入力規則（検証・バリデーション）</div>
+          
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-validation-toggle" />
+            <span>回答の入力規則を有効にする</span>
+          </label>
+
+          <div id="drawer-validation-fields" style="display: none; margin-top: 10px;">
+            <div class="drawer-field-row">
+              <div class="drawer-field-col">
+                <label class="drawer-field-label">規則の種類</label>
+                <select id="drawer-val-category" class="form-control form-control-sm">
+                  <option value="text">テキスト</option>
+                  <option value="regex">正規表現</option>
+                  <option value="number">数値</option>
+                  <option value="api">API連携</option>
+                  <option value="length">長さ</option>
+                </select>
+              </div>
+              <div class="drawer-field-col">
+                <label class="drawer-field-label">判定ルール</label>
+                <select id="drawer-val-condition" class="form-control form-control-sm"></select>
+              </div>
+            </div>
+
+            <div id="drawer-val-pattern-row" style="margin-top: 8px; display: none;">
+              <div class="drawer-field-row">
+                <div class="drawer-field-col">
+                  <label class="drawer-field-label">常用パターン</label>
+                  <select id="drawer-val-preset" class="form-control form-control-sm"></select>
+                </div>
+                <div class="drawer-field-col">
+                  <label class="drawer-field-label">正規表現パターン</label>
+                  <input type="text" id="drawer-val-pattern" class="form-control form-control-sm" placeholder="^[0-9]+$" />
+                </div>
+              </div>
+            </div>
+
+            <div id="drawer-val-api-notice" class="drawer-help-text" style="display: none; margin-top: 8px; padding: 8px 10px; background: rgba(26,115,232,0.08); border-radius: 6px; border: 1px solid rgba(26,115,232,0.25);"></div>
+
+            <div style="margin-top: 8px;">
+              <label class="drawer-field-label">カスタムエラーメッセージ</label>
+              <input type="text" id="drawer-val-error-msg" class="form-control form-control-sm" placeholder="エラー時に表示するテキスト" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 📨 回答控えメール設定 -->
+        <div class="drawer-section" id="drawer-autoreply-section">
+          <div class="drawer-section-title">📨 回答控えメール自動送信</div>
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-autoreply-toggle" />
+            <span>回答送信後にこのアドレス宛に回答内容の控えを自動送信する</span>
+          </label>
+          <div class="drawer-help-text">
+            ※ この質問に入力されたメールアドレス宛に、回答完了直後に控えメールが自動配信されます。
+          </div>
+        </div>
+
+        <!-- 5. 📎 説明用メディア添付 -->
+        <div class="drawer-section">
+          <div class="drawer-section-title">📎 説明用メディア添付</div>
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-media-toggle" />
+            <span>説明用メディア（画像・動画・ファイル）を添付する</span>
+          </label>
+          <div id="drawer-media-fields" style="display: none; margin-top: 10px;">
+            <label class="drawer-field-label">メディア種別とURL</label>
+            <div style="display: flex; gap: 6px;">
+              <select id="drawer-media-type" class="form-control form-control-sm" style="width: 100px;">
+                <option value="image">画像</option>
+                <option value="video">動画</option>
+              </select>
+              <input type="text" id="drawer-media-url" class="form-control form-control-sm" placeholder="https://example.com/sample.png" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. 📜 スクロール必須（規約同意ロック） -->
+        <div class="drawer-section" id="drawer-scroll-section">
+          <div class="drawer-section-title">📜 スクロール必須（規約同意ロック）</div>
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-scroll-toggle" />
+            <span>最下部までスクロールするまで回答をロックする</span>
+          </label>
+          <div id="drawer-scroll-fields" style="display: none; margin-top: 10px;">
+            <label class="drawer-field-label">スクロール表示する本文・規約テキスト</label>
+            <textarea id="drawer-scroll-text" class="form-control form-control-sm" rows="3" placeholder="【利用規約】ここに規約本文を入力してください..."></textarea>
+          </div>
+        </div>
+
+        <!-- 7. 📋 「前述と同じ（同上）」自動入力設定 -->
+        <div class="drawer-section" id="drawer-sameasabove-section">
+          <div class="drawer-section-title">📋 「前述と同じ（同上）」自動入力設定</div>
+          <div class="drawer-section-desc">
+            回答者がチェックを入れると、前述の入力内容（またはグループ内の全項目）が自動で入力欄に流し込まれます。
+          </div>
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-sameasabove-toggle" />
+            <span>「前述と同じ（同上）」自動入力を有効にする</span>
+          </label>
+          <div id="drawer-sameasabove-fields" style="display: none; margin-top: 10px;">
+            <div style="display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 180px;">
+                <label class="drawer-field-label">コピー元の質問またはグループ</label>
+                <select id="drawer-sameasabove-source-select" class="form-control form-control-sm"></select>
+              </div>
+              <div style="flex: 1; min-width: 180px;">
+                <label class="drawer-field-label">表示チェックボックスの文言</label>
+                <input type="text" id="drawer-sameasabove-label-input" class="form-control form-control-sm" placeholder="例: 本社住所と同じ" />
+              </div>
+            </div>
+            <div class="drawer-help-text" style="margin-top: 6px;">
+              💡 回答者がチェックを入れると、前述の回答値が自動で入力欄に流し込まれます。
+            </div>
+          </div>
+        </div>
+
+        <!-- 8. ⚡ プロ版限定: セクション内スキップ（条件分岐） -->
+        <div class="drawer-section" id="drawer-skiplogic-section">
+          <div class="drawer-section-title">⚡ プロ版限定: セクション内スキップ（条件分岐）</div>
+          <div class="drawer-section-desc">
+            同一セクション内の他の質問の回答条件に応じて、この質問を非活性（入力不可）または非表示にするルールを設定できます。
+          </div>
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-skiplogic-toggle" />
+            <span>セクション内スキップ（条件分岐）を有効にする</span>
+          </label>
+          <div id="drawer-skiplogic-fields" style="display: none; margin-top: 10px;">
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div>
+                <label class="drawer-field-label">対象となるトリガー質問</label>
+                <select id="drawer-skiplogic-depends-select" class="form-control form-control-sm"></select>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <div style="flex: 2; min-width: 140px;">
+                  <label class="drawer-field-label">分岐判定条件</label>
+                  <select id="drawer-skiplogic-condition-select" class="form-control form-control-sm">
+                    <optgroup label="空白">
+                      <option value="is_empty">空白</option>
+                      <option value="is_not_empty">空白ではない</option>
+                    </optgroup>
+                    <optgroup label="テキスト">
+                      <option value="text_contains">次を含むテキスト</option>
+                      <option value="text_not_contains">次を含まないテキスト</option>
+                      <option value="text_starts_with">次で始まるテキスト</option>
+                      <option value="text_ends_with">次で終わるテキスト</option>
+                      <option value="text_equals">完全一致するテキスト</option>
+                    </optgroup>
+                    <optgroup label="日付">
+                      <option value="date_is">日付</option>
+                      <option value="date_before">次より前の日付</option>
+                      <option value="date_after">次より後の日付</option>
+                    </optgroup>
+                    <optgroup label="数値 / 比較">
+                      <option value="greater_than">次より大きい</option>
+                      <option value="greater_than_or_equal">以上</option>
+                      <option value="less_than">次より小さい</option>
+                      <option value="less_than_or_equal">以下</option>
+                      <option value="equals" selected>次と等しい</option>
+                      <option value="not_equals">次と等しくない</option>
+                      <option value="between">次の間にある</option>
+                      <option value="not_between">次の間にない</option>
+                    </optgroup>
+                  </select>
+                </div>
+                <div style="flex: 2; min-width: 140px;" id="drawer-skiplogic-val-wrapper">
+                  <label class="drawer-field-label">トリガー値</label>
+                  <div style="display: flex; gap: 4px; align-items: center;">
+                    <input type="text" id="drawer-skiplogic-value-input" class="form-control form-control-sm" placeholder="トリガー値" />
+                    <span id="drawer-skiplogic-between-sep" style="display: none; font-size: 0.8rem; color: #64748b;">〜</span>
+                    <input type="text" id="drawer-skiplogic-value2-input" class="form-control form-control-sm" style="display: none;" placeholder="終了値" />
+                  </div>
+                </div>
+                <div style="flex: 1; min-width: 110px;">
+                  <label class="drawer-field-label">動作</label>
+                  <select id="drawer-skiplogic-action-select" class="form-control form-control-sm">
+                    <option value="disable">非活性にする</option>
+                    <option value="hide">非表示にする</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 9. 📁 所属グループの一括自動入力設定 -->
+        <div class="drawer-section" id="drawer-groupsame-section" style="display: none;">
+          <div class="drawer-section-title">📁 所属グループの一括自動入力設定</div>
+          <div class="drawer-section-desc">
+            この質問が所属するグループ全体について、前述の別グループの内容を一括自動入力させることができます。
+          </div>
+          <label class="drawer-checkbox-label">
+            <input type="checkbox" id="drawer-groupsame-toggle" />
+            <span>前述のグループと同じ内容を一括自動入力する</span>
+          </label>
+          <div id="drawer-groupsame-fields" style="display: none; margin-top: 10px;">
+            <div style="display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 180px;">
+                <label class="drawer-field-label">コピー元のグループ</label>
+                <select id="drawer-groupsame-source-select" class="form-control form-control-sm"></select>
+              </div>
+              <div style="flex: 1; min-width: 180px;">
+                <label class="drawer-field-label">表示チェックボックスの文言</label>
+                <input type="text" id="drawer-groupsame-label-input" class="form-control form-control-sm" placeholder="例: 本社情報と同じ" />
+              </div>
+            </div>
+            <div class="drawer-help-text" style="margin-top: 6px;">
+              💡 このグループ内のすべての該当質問に一括自動入力が適用されます。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer-footer">
+        <button type="button" id="btn-save-close-q-drawer" class="btn btn-primary" style="width: 100%;">完了して閉じる</button>
+      </div>
+    `;
+
+    document.body.appendChild(drawer);
+
+    // イベントバインド
+    const closeBtn = drawer.querySelector('#btn-close-q-drawer');
+    const saveCloseBtn = drawer.querySelector('#btn-save-close-q-drawer');
+    closeBtn.addEventListener('click', closeQuestionSettingsDrawer);
+    saveCloseBtn.addEventListener('click', closeQuestionSettingsDrawer);
+    backdrop.addEventListener('click', closeQuestionSettingsDrawer);
+
+    // ESCキー対応
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && drawer.classList.contains('is-open')) {
+        closeQuestionSettingsDrawer();
+      }
+    });
+
+    // カラム統一切り替え
+    const unifyToggle = drawer.querySelector('#drawer-unify-column-toggle');
+    const unifiedBox = drawer.querySelector('#drawer-column-unified-box');
+    const columnSelect = drawer.querySelector('#drawer-column-select');
+    const customKeyInput = drawer.querySelector('#drawer-column-key-input');
+    const chipsWrap = drawer.querySelector('.drawer-chips-wrap');
+
+    unifyToggle.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      if (unifyToggle.checked) {
+        unifiedBox.style.display = 'block';
+        if (!q.dataKey) {
+          const defKey = suggestDefaultDataKey(q.title);
+          q.dataKey = defKey;
+          customKeyInput.value = defKey;
+          syncColumnSelectWithKey(defKey);
+        }
+      } else {
+        unifiedBox.style.display = 'none';
+        delete q.dataKey;
+      }
+      persistDrawerChanges();
+    });
+
+    columnSelect.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      const val = columnSelect.value;
+      if (val === '__custom__') {
+        customKeyInput.focus();
+      } else {
+        q.dataKey = val;
+        customKeyInput.value = val;
+        persistDrawerChanges();
+      }
+    });
+
+    customKeyInput.addEventListener('input', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      const val = customKeyInput.value.trim();
+      q.dataKey = val;
+      syncColumnSelectWithKey(val);
+      persistDrawerChanges();
+    });
+
+    chipsWrap.querySelectorAll('.drawer-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const q = findQuestionDefById(_activeDrawerQuestionId);
+        if (!q) return;
+        const key = chip.dataset.key;
+        unifyToggle.checked = true;
+        unifiedBox.style.display = 'block';
+        q.dataKey = key;
+        customKeyInput.value = key;
+        syncColumnSelectWithKey(key);
+        persistDrawerChanges();
+      });
+    });
+
+    // バリデーション切り替え
+    const valToggle = drawer.querySelector('#drawer-validation-toggle');
+    const valFields = drawer.querySelector('#drawer-validation-fields');
+    const valCatSelect = drawer.querySelector('#drawer-val-category');
+    const valCondSelect = drawer.querySelector('#drawer-val-condition');
+    const valPatternRow = drawer.querySelector('#drawer-val-pattern-row');
+    const valPresetSelect = drawer.querySelector('#drawer-val-preset');
+    const valPatternInput = drawer.querySelector('#drawer-val-pattern');
+    const valApiNotice = drawer.querySelector('#drawer-val-api-notice');
+    const valErrorInput = drawer.querySelector('#drawer-val-error-msg');
+
+    valToggle.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      if (valToggle.checked) {
+        valFields.style.display = 'block';
+        if (!q.validation) {
+          if (/口座番号/.test(q.title || '')) {
+            q.validation = {
+              category: 'regex',
+              condition: 'matches',
+              presetKey: 'bank_account',
+              value: '^[0-9]{6,7}$',
+              value2: '',
+              errorMessage: '正しい口座番号（6〜7桁の半角数字）を入力してください。'
+            };
+          } else if ((q.dataKey === 'account_holder_kana') || /口座名義|名義/.test(q.title || '')) {
+            q.validation = {
+              category: 'regex',
+              condition: 'matches',
+              presetKey: 'account_holder_kana',
+              value: '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$',
+              value2: '',
+              errorMessage: '口座名義はカナと（）.のみで入力してください。'
+            };
+          } else {
+            q.validation = { category: 'text', condition: 'email', value: '', value2: '', errorMessage: '有効なメールアドレスを入力してください。' };
+          }
+        }
+        syncDrawerValidationInputs(q.validation);
+      } else {
+        valFields.style.display = 'none';
+        q.validation = null;
+      }
+      persistDrawerChanges();
+    });
+
+    valCatSelect.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      const cat = valCatSelect.value;
+      let defErr = cat === 'number' ? '数値を入力してください。' : (cat === 'api' ? '実在する候補を選択してください。' : '入力値が正しくありません。');
+      const bObj = window.b && window.b[cat] ? window.b[cat] : null;
+      const firstCond = bObj ? Object.keys(bObj.conditions)[0] : 'email';
+
+      let presetKey = 'custom';
+      let patVal = '';
+      if (cat === 'regex') {
+        if (/口座番号/.test(q.title || '')) {
+          presetKey = 'bank_account';
+          patVal = '^[0-9]{6,7}$';
+          defErr = '正しい口座番号（6〜7桁の半角数字）を入力してください。';
+        } else if ((q.dataKey === 'account_holder_kana') || /口座名義|名義/.test(q.title || '')) {
+          presetKey = 'account_holder_kana';
+          patVal = '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$';
+          defErr = '口座名義はカナと（）.のみで入力してください。';
+        } else if (window.getAutoErrorMessageForQuestion) {
+          const autoErr = window.getAutoErrorMessageForQuestion(q.title, { category: 'regex' });
+          if (autoErr && autoErr !== '入力値が正しくありません。') defErr = autoErr;
+        }
+      }
+
+      q.validation = { category: cat, condition: firstCond, value: patVal, value2: '', errorMessage: defErr };
+      if (cat === 'regex') q.validation.presetKey = presetKey;
+
+      syncDrawerValidationConditionOptions(cat, firstCond);
+      syncDrawerValidationPatternAndNotice(q.validation);
+      valErrorInput.value = defErr;
+      persistDrawerChanges();
+    });
+
+    valCondSelect.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.validation) return;
+      q.validation.condition = valCondSelect.value;
+      q.validation.value = '';
+      q.validation.value2 = '';
+      if (q.validation.category === 'api') {
+        const c = q.validation.condition;
+        q.validation.errorMessage = c === 'zip_code' ? '正しい郵便番号（7桁の半角数字）を入力してください。'
+          : (c === 'invoice_number' ? '正しくインボイス登録番号（Tで始まる13桁の数字）を入力してください。'
+          : (c === 'bank_name' ? '実在する銀行名を入力または選択してください。'
+          : (c === 'branch_name' ? '実在する支店名を入力または選択してください。'
+          : '実在する法人名を入力または選択してください。')));
+        valErrorInput.value = q.validation.errorMessage;
+      }
+      syncDrawerValidationPatternAndNotice(q.validation);
+      persistDrawerChanges();
+    });
+
+    valPresetSelect.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.validation) return;
+      const pk = valPresetSelect.value;
+      q.validation.presetKey = pk;
+      if (pk !== 'custom' && window.ie && window.ie[pk]) {
+        q.validation.value = window.ie[pk].pattern;
+        valPatternInput.value = q.validation.value;
+      }
+      if (window.getAutoErrorMessageForQuestion) {
+        const er = window.getAutoErrorMessageForQuestion(q.title, q.validation);
+        if (er) {
+          q.validation.errorMessage = er;
+          valErrorInput.value = er;
+        }
+      }
+      persistDrawerChanges();
+    });
+
+    valPatternInput.addEventListener('input', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.validation) return;
+      q.validation.value = valPatternInput.value;
+      q.validation.presetKey = 'custom';
+      valPresetSelect.value = 'custom';
+      persistDrawerChanges();
+    });
+
+    valErrorInput.addEventListener('input', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.validation) return;
+      q.validation.errorMessage = valErrorInput.value;
+      persistDrawerChanges();
+    });
+
+    // 回答控えメール
+    const autoReplyToggle = drawer.querySelector('#drawer-autoreply-toggle');
+    autoReplyToggle.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      q.autoReply = autoReplyToggle.checked;
+      persistDrawerChanges();
+    });
+
+    // メディア添付
+    const mediaToggle = drawer.querySelector('#drawer-media-toggle');
+    const mediaFields = drawer.querySelector('#drawer-media-fields');
+    const mediaType = drawer.querySelector('#drawer-media-type');
+    const mediaUrl = drawer.querySelector('#drawer-media-url');
+
+    mediaToggle.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      if (mediaToggle.checked) {
+        mediaFields.style.display = 'block';
+        q.media = { type: mediaType.value, url: mediaUrl.value };
+      } else {
+        mediaFields.style.display = 'none';
+        delete q.media;
+      }
+      persistDrawerChanges();
+    });
+
+    mediaType.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.media) return;
+      q.media.type = mediaType.value;
+      persistDrawerChanges();
+    });
+
+    mediaUrl.addEventListener('input', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.media) return;
+      q.media.url = mediaUrl.value;
+      persistDrawerChanges();
+    });
+
+    // スクロール規約ロック
+    const scrollToggle = drawer.querySelector('#drawer-scroll-toggle');
+    const scrollFields = drawer.querySelector('#drawer-scroll-fields');
+    const scrollText = drawer.querySelector('#drawer-scroll-text');
+
+    scrollToggle.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      if (scrollToggle.checked) {
+        scrollFields.style.display = 'block';
+        q.scrollRequired = true;
+        if (!q.scrollText) q.scrollText = '【利用規約】最下部までスクロールされるまで、回答コントロールはロックされます。';
+        scrollText.value = q.scrollText;
+      } else {
+        scrollFields.style.display = 'none';
+        delete q.scrollRequired;
+      }
+      persistDrawerChanges();
+    });
+
+    scrollText.addEventListener('input', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      q.scrollText = scrollText.value;
+      persistDrawerChanges();
+    });
+
+    // AIコンシェルジュ：おすすめ一括適用ボタン
+    const btnApplyAi = drawer.querySelector('#btn-apply-ai-rec');
+    btnApplyAi.addEventListener('click', () => {
+      if (!_currentAiAdvice) return;
+      applyAiAdviceToActiveQuestion(_currentAiAdvice);
+    });
+
+    // AIチャットトグル & 送信
+    const btnToggleAiChat = drawer.querySelector('#btn-toggle-ai-chat');
+    const chatContainer = drawer.querySelector('#drawer-ai-chat-container');
+    const chatInput = drawer.querySelector('#drawer-ai-chat-input');
+    const btnSendAiChat = drawer.querySelector('#btn-send-drawer-ai-chat');
+
+    btnToggleAiChat.addEventListener('click', () => {
+      const isShowing = chatContainer.style.display !== 'none';
+      chatContainer.style.display = isShowing ? 'none' : 'flex';
+      if (!isShowing) chatInput.focus();
+    });
+
+    const handleSendChat = async () => {
+      const text = chatInput.value.trim();
+      if (!text) return;
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      const chatMessages = drawer.querySelector('#drawer-ai-chat-messages');
+
+      // ユーザー発言追加
+      const userMsg = document.createElement('div');
+      userMsg.className = 'ai-chat-msg user';
+      userMsg.textContent = text;
+      chatMessages.appendChild(userMsg);
+      chatInput.value = '';
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      // ボット返答プレースホルダー
+      const botMsg = document.createElement('div');
+      botMsg.className = 'ai-chat-msg bot';
+      botMsg.innerHTML = '<span class="ai-sparkle-icon">✨</span> 考え中...';
+      chatMessages.appendChild(botMsg);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      try {
+        const clientApiKey = localStorage.getItem('synapse_gemini_api_key') || '';
+        const systemPrompt = `あなたはSynapse組織統制型フォームビルダーの専属AIコンシェルジュです。質問「${q ? q.title : ''}」の設計や入力規則、カラム統一（dataKey）について、初心者にもわかりやすく親切に日本語でアドバイスしてください。`;
+        const res = await fetch('/api/regex-ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: `${systemPrompt}\nユーザーの相談: ${text}`,
+            userKey: clientApiKey
+          })
+        });
+        const data = await res.json();
+        if (data && data.text) {
+          botMsg.innerHTML = data.text.replace(/\n/g, '<br>');
+        } else {
+          // フォールバック
+          botMsg.textContent = `質問「${q ? q.title : ''}」について：業務用途に合わせて「カラム統一」で列名を統一するか、入力規則で正しい形式を担保するのがおすすめです。`;
+        }
+      } catch (err) {
+        botMsg.textContent = `質問「${q ? q.title : ''}」について：業務用途に合わせて「カラム統一」で列名を統一するか、入力規則で正しい形式を担保するのがおすすめです。`;
+      }
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    };
+
+    btnSendAiChat.addEventListener('click', handleSendChat);
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleSendChat();
+    });
+
+    // 📋 同上入力イベント
+    const sameToggle = drawer.querySelector('#drawer-sameasabove-toggle');
+    const sameFields = drawer.querySelector('#drawer-sameasabove-fields');
+    const sameSourceSelect = drawer.querySelector('#drawer-sameasabove-source-select');
+    const sameLabelInput = drawer.querySelector('#drawer-sameasabove-label-input');
+
+    sameToggle.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      if (!q.sameAsAbove) q.sameAsAbove = {};
+      q.sameAsAbove.enabled = sameToggle.checked;
+      sameFields.style.display = sameToggle.checked ? 'block' : 'none';
+
+      if (sameToggle.checked) {
+        const curSec = findSectionByQuestionId(q.id);
+        const sources = curSec ? getDrawerAvailableSources(curSec.id, q.id, q.groupId) : { groups: [], questions: [] };
+        const allOpts = [...sources.groups.map(g => ({ id: g.id, title: g.title, isGroup: true })), ...sources.questions.map(x => ({ id: x.id, title: x.title, isGroup: false }))];
+        if (!q.sameAsAbove.sourceQuestionId || !allOpts.some(s => s.id === q.sameAsAbove.sourceQuestionId)) {
+          q.sameAsAbove.sourceQuestionId = sameSourceSelect.value || (allOpts[0] ? allOpts[0].id : '');
+        }
+        sameSourceSelect.value = q.sameAsAbove.sourceQuestionId;
+
+        const isGrp = q.sameAsAbove.sourceQuestionId && q.sameAsAbove.sourceQuestionId.startsWith('group:');
+        q.sameAsAbove.sourceType = isGrp ? 'group' : 'question';
+        if (isGrp) q.sameAsAbove.sourceGroupId = q.sameAsAbove.sourceQuestionId.replace('group:', '');
+        else delete q.sameAsAbove.sourceGroupId;
+
+        if (!q.sameAsAbove.label || !q.sameAsAbove.label.trim()) {
+          const chosen = allOpts.find(s => s.id === q.sameAsAbove.sourceQuestionId);
+          const defLbl = chosen ? `${chosen.title}と同じ` : '前述の入力と同じ';
+          q.sameAsAbove.label = defLbl;
+          sameLabelInput.value = defLbl;
+        }
+      }
+      persistDrawerChanges();
+    });
+
+    sameSourceSelect.addEventListener('change', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.sameAsAbove) return;
+      const sId = sameSourceSelect.value;
+      q.sameAsAbove.sourceQuestionId = sId;
+      const isGrp = sId && sId.startsWith('group:');
+      q.sameAsAbove.sourceType = isGrp ? 'group' : 'question';
+      if (isGrp) q.sameAsAbove.sourceGroupId = sId.replace('group:', '');
+      else delete q.sameAsAbove.sourceGroupId;
+
+      const curSec = findSectionByQuestionId(q.id);
+      const sources = curSec ? getDrawerAvailableSources(curSec.id, q.id, q.groupId) : { groups: [], questions: [] };
+      const allOpts = [...sources.groups.map(g => ({ id: g.id, title: g.title })), ...sources.questions.map(x => ({ id: x.id, title: x.title }))];
+      const chosen = allOpts.find(s => s.id === sId);
+      const newLbl = chosen ? `${chosen.title}と同じ` : '前述の入力と同じ';
+      q.sameAsAbove.label = newLbl;
+      sameLabelInput.value = newLbl;
+      persistDrawerChanges();
+    });
+
+    sameLabelInput.addEventListener('input', () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.sameAsAbove) return;
+      q.sameAsAbove.label = sameLabelInput.value;
+      persistDrawerChanges();
+    });
+
+    // ⚡ スキップ分岐イベント
+    const skipToggle = drawer.querySelector('#drawer-skiplogic-toggle');
+    const skipFields = drawer.querySelector('#drawer-skiplogic-fields');
+    const skipDependsSelect = drawer.querySelector('#drawer-skiplogic-depends-select');
+    const skipConditionSelect = drawer.querySelector('#drawer-skiplogic-condition-select');
+    const skipValInput = drawer.querySelector('#drawer-skiplogic-value-input');
+    const skipVal2Input = drawer.querySelector('#drawer-skiplogic-value2-input');
+    const skipActionSelect = drawer.querySelector('#drawer-skiplogic-action-select');
+
+    const saveDrawerSkipLogic = () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q) return;
+      if (!q.skipLogic) q.skipLogic = {};
+      if (skipToggle.checked) {
+        q.skipLogic.dependsOn = skipDependsSelect.value;
+        q.skipLogic.condition = skipConditionSelect.value;
+        q.skipLogic.action = skipActionSelect.value;
+        q.skipLogic.value = skipValInput.value;
+        q.skipLogic.value2 = skipVal2Input.value;
+      } else {
+        delete q.skipLogic.dependsOn;
+      }
+      persistDrawerChanges();
+    };
+
+    skipToggle.addEventListener('change', () => {
+      skipFields.style.display = skipToggle.checked ? 'block' : 'none';
+      saveDrawerSkipLogic();
+    });
+    skipDependsSelect.addEventListener('change', saveDrawerSkipLogic);
+    skipConditionSelect.addEventListener('change', () => {
+      syncDrawerSkipVisibility();
+      saveDrawerSkipLogic();
+    });
+    skipActionSelect.addEventListener('change', saveDrawerSkipLogic);
+    skipValInput.addEventListener('input', saveDrawerSkipLogic);
+    skipVal2Input.addEventListener('input', saveDrawerSkipLogic);
+
+    // 📁 所属グループ同上イベント
+    const grpSameToggle = drawer.querySelector('#drawer-groupsame-toggle');
+    const grpSameFields = drawer.querySelector('#drawer-groupsame-fields');
+    const grpSameSelect = drawer.querySelector('#drawer-groupsame-source-select');
+    const grpSameInput = drawer.querySelector('#drawer-groupsame-label-input');
+
+    const saveGroupSame = () => {
+      const q = findQuestionDefById(_activeDrawerQuestionId);
+      if (!q || !q.groupId) return;
+      const curSec = findSectionByQuestionId(q.id);
+      if (!curSec || !curSec.questions) return;
+
+      const checked = grpSameToggle.checked;
+      grpSameFields.style.display = checked ? 'block' : 'none';
+      const targetGId = grpSameSelect.value;
+      const lbl = grpSameInput.value.trim() || '前述のグループと同じ';
+
+      curSec.questions.forEach(item => {
+        if (item.groupId === q.groupId) {
+          if (!item.sameAsAbove) item.sameAsAbove = {};
+          item.sameAsAbove.enabled = checked;
+          if (checked) {
+            item.sameAsAbove.sourceType = 'group';
+            item.sameAsAbove.sourceGroupId = targetGId;
+            item.sameAsAbove.sourceQuestionId = 'group:' + targetGId;
+            item.sameAsAbove.label = lbl;
+          }
+        }
+      });
+      persistDrawerChanges();
+    };
+
+    grpSameToggle.addEventListener('change', saveGroupSame);
+    grpSameSelect.addEventListener('change', saveGroupSame);
+    grpSameInput.addEventListener('input', saveGroupSame);
+  }
+
+  function findSectionByQuestionId(questionId) {
+    if (!questionId) return null;
+    const formSources = [window.n, window.G, window.F, window.L];
+    if (window.U && Array.isArray(window.U)) {
+      formSources.push(...window.U);
+    }
+    for (const formSrc of formSources) {
+      if (formSrc && formSrc.sections && Array.isArray(formSrc.sections)) {
+        for (const sec of formSrc.sections) {
+          if (!sec || !sec.questions) continue;
+          if (sec.questions.some(q => q && q.id === questionId)) {
+            return sec;
+          }
+        }
+      }
+    }
+    return null;
+  }
+  window.findSectionByQuestionId = findSectionByQuestionId;
+
+  function syncDrawerSkipVisibility() {
+    const condSelect = document.getElementById('drawer-skiplogic-condition-select');
+    const valWrapper = document.getElementById('drawer-skiplogic-val-wrapper');
+    const valInput = document.getElementById('drawer-skiplogic-value-input');
+    const sepSpan = document.getElementById('drawer-skiplogic-between-sep');
+    const val2Input = document.getElementById('drawer-skiplogic-value2-input');
+    if (!condSelect || !valWrapper || !valInput) return;
+
+    const cond = condSelect.value;
+    if (cond === 'is_empty' || cond === 'is_not_empty') {
+      valWrapper.style.display = 'none';
+    } else {
+      valWrapper.style.display = 'block';
+      if (cond === 'between' || cond === 'not_between') {
+        valInput.placeholder = '開始値';
+        if (sepSpan) sepSpan.style.display = 'inline';
+        if (val2Input) val2Input.style.display = 'block';
+      } else {
+        if (sepSpan) sepSpan.style.display = 'none';
+        if (val2Input) val2Input.style.display = 'none';
+        if (cond.startsWith('date_')) {
+          valInput.placeholder = 'YYYY-MM-DD';
+        } else if (cond === 'greater_than' || cond === 'greater_than_or_equal' || cond === 'less_than' || cond === 'less_than_or_equal') {
+          valInput.placeholder = '比較数値';
+        } else {
+          valInput.placeholder = 'トリガー値';
+        }
+      }
+    }
+  }
+
+  function syncColumnSelectWithKey(key) {
+    const columnSelect = document.getElementById('drawer-column-select');
+    if (!columnSelect) return;
+    const hasOption = Array.from(columnSelect.options).some(o => o.value === key);
+    if (hasOption) {
+      columnSelect.value = key;
+    } else {
+      columnSelect.value = '__custom__';
+    }
+  }
+
+  function suggestDefaultDataKey(title) {
+    const t = (title || '').toLowerCase();
+    if (t.includes('法人') || t.includes('会社') || t.includes('屋号')) return 'company_name';
+    if (t.includes('メール') || t.includes('mail')) return 'email';
+    if (t.includes('電話') || t.includes('tel')) return 'tel';
+    if (t.includes('郵便') || t.includes('〒')) return 'zip_code';
+    if (t.includes('代表') || t.includes('氏名') || t.includes('名前')) return 'representative_name';
+    if (t.includes('住所') || t.includes('所在地') || t.includes('番地')) return 'street';
+    if (t.includes('インボイス') || t.includes('登録番号')) return 'invoice_number';
+    return 'custom_field';
+  }
+
+  function syncDrawerValidationConditionOptions(category, currentCondition) {
+    const valCondSelect = document.getElementById('drawer-val-condition');
+    if (!valCondSelect) return;
+    valCondSelect.innerHTML = '';
+    const bObj = window.b && window.b[category] ? window.b[category] : null;
+    if (bObj && bObj.conditions) {
+      Object.keys(bObj.conditions).forEach(condKey => {
+        const opt = document.createElement('option');
+        opt.value = condKey;
+        opt.textContent = bObj.conditions[condKey];
+        valCondSelect.appendChild(opt);
+      });
+      valCondSelect.value = currentCondition || Object.keys(bObj.conditions)[0];
+    }
+  }
+
+  function syncDrawerValidationPatternAndNotice(val) {
+    const patternRow = document.getElementById('drawer-val-pattern-row');
+    const apiNotice = document.getElementById('drawer-val-api-notice');
+    const presetSelect = document.getElementById('drawer-val-preset');
+    const patternInput = document.getElementById('drawer-val-pattern');
+    if (!patternRow || !apiNotice) return;
+
+    if (!val) {
+      patternRow.style.display = 'none';
+      apiNotice.style.display = 'none';
+      return;
+    }
+
+    if (val.category === 'regex') {
+      patternRow.style.display = 'block';
+      apiNotice.style.display = 'none';
+      presetSelect.innerHTML = '';
+      if (window.ie) {
+        Object.keys(window.ie).forEach(k => {
+          const opt = document.createElement('option');
+          opt.value = k;
+          opt.textContent = window.ie[k].label;
+          presetSelect.appendChild(opt);
+        });
+      }
+      presetSelect.value = val.presetKey || 'custom';
+      patternInput.value = val.value || '';
+    } else if (val.category === 'api') {
+      patternRow.style.display = 'none';
+      apiNotice.style.display = 'block';
+      const c = val.condition;
+      if (c === 'corp_name') {
+        apiNotice.innerHTML = '🏛️ <strong>国税庁法人番号API連携</strong>: 実在する法人名・所在地をリアルタイム検索・自動補完します。';
+      } else if (c === 'invoice_number') {
+        apiNotice.innerHTML = '🧾 <strong>国税庁適格請求書API連携</strong>: T+13桁の登録番号を公表システムと照会・補完します。';
+      } else if (c === 'zip_code') {
+        apiNotice.innerHTML = '📮 <strong>ZipCloud API連携</strong>: 郵便番号から都道府県・市区町村・町域を自動検索・補完します。';
+      } else {
+        apiNotice.innerHTML = '🏦 <strong>全銀協API連携</strong>: 実在する金融機関コードや支店情報を自動検索します。';
+      }
+    } else {
+      patternRow.style.display = 'none';
+      apiNotice.style.display = 'none';
+    }
+  }
+
+  function syncDrawerValidationInputs(val) {
+    const valCatSelect = document.getElementById('drawer-val-category');
+    const valErrorInput = document.getElementById('drawer-val-error-msg');
+    if (!valCatSelect || !val) return;
+
+    valCatSelect.value = val.category || 'text';
+    syncDrawerValidationConditionOptions(val.category, val.condition);
+    syncDrawerValidationPatternAndNotice(val);
+    valErrorInput.value = val.errorMessage || '';
+  }
+
+  function renderAiRecommendationBox(advice) {
+    const recBox = document.getElementById('drawer-ai-recommendation-box');
+    if (!recBox || !advice) return;
+    recBox.innerHTML = `
+      <div class="ai-rec-title">${escapeHtml(advice.recommendationTitle || 'AI推奨設定')}</div>
+      <div class="ai-rec-desc">${escapeHtml(advice.explanation || '')}</div>
+      <ul class="ai-rec-list">
+        ${(advice.items || []).map(item => `<li>${item}</li>`).join('')}
+      </ul>
+    `;
+  }
+
+  async function fetchDynamicGeminiDiagnosis(q) {
+    if (!q) return;
+    const qId = q.id;
+    const sparkleBadge = document.querySelector('.ai-sparkle-badge');
+    if (sparkleBadge) {
+      sparkleBadge.className = 'ai-sparkle-badge is-thinking';
+      sparkleBadge.innerHTML = '🤖 AIが文脈を思考中...';
+    }
+
+    try {
+      // フォーム内の他の質問を収集
+      const otherQuestions = [];
+      const rootForm = window.F || window.n || window.G || window.L;
+      if (rootForm && rootForm.sections) {
+        rootForm.sections.forEach(s => {
+          (s.questions || []).forEach(item => {
+            if (item && item.id !== qId) {
+              otherQuestions.push({
+                id: item.id,
+                title: item.title || '',
+                type: item.type || 'text'
+              });
+            }
+          });
+        });
+      }
+
+      // エンドポイント決定（同一オリジン /api/regex-ai）
+      const endpoint = '/api/regex-ai';
+
+      const clientApiKey = localStorage.getItem('synapse_gemini_api_key') || '';
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'diagnose_question',
+          question: {
+            id: q.id,
+            title: q.title || '',
+            type: q.type || 'text',
+            description: q.description || ''
+          },
+          otherQuestions: otherQuestions,
+          clientApiKey: clientApiKey
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error(`API responded with ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data && data.success && data.advice && _activeDrawerQuestionId === qId) {
+        _currentAiAdvice = data.advice;
+        renderAiRecommendationBox(_currentAiAdvice);
+
+        if (sparkleBadge) {
+          sparkleBadge.className = 'ai-sparkle-badge is-dynamic';
+          sparkleBadge.innerHTML = '✨ AI動的診断完了';
+        }
+      } else {
+        if (sparkleBadge) {
+          sparkleBadge.className = 'ai-sparkle-badge';
+          sparkleBadge.innerHTML = '✨ リアルタイム診断';
+        }
+      }
+    } catch (err) {
+      console.warn('[AI Concierge] Dynamic Gemini diagnosis fallback to local:', err);
+      if (sparkleBadge) {
+        sparkleBadge.className = 'ai-sparkle-badge';
+        sparkleBadge.innerHTML = '✨ リアルタイム診断';
+      }
+    }
+  }
+
+  // 4. ドロワーを開く
+  function openQuestionSettingsDrawer(questionId) {
+    ensureQuestionSettingsDrawerDom();
+    const q = findQuestionDefById(questionId);
+    if (!q) {
+      console.warn('[QuestionSettingsDrawer] Question not found for id:', questionId);
+      return;
+    }
+
+    _activeDrawerQuestionId = questionId;
+
+    const drawer = document.getElementById('question-settings-drawer');
+    const backdrop = document.getElementById('question-settings-drawer-backdrop');
+    const titleEl = document.getElementById('drawer-q-title');
+    const typeBadge = document.getElementById('drawer-q-type-badge');
+
+    titleEl.textContent = q.title || '無題の質問';
+    const typeLabels = { text: '記述式 (短文)', paragraph: '記述式 (長文)', radio: 'ラジオボタン', checkbox: 'チェックボックス', select: 'プルダウン', file: 'ファイル' };
+    typeBadge.textContent = typeLabels[q.type] || q.type;
+
+    // AIコンシェルジュの診断（まずローカルルールを0秒即時表示）
+    _currentAiAdvice = analyzeQuestionForAiConcierge(q);
+    renderAiRecommendationBox(_currentAiAdvice);
+    const btnApplyAi = document.getElementById('btn-apply-ai-rec');
+    btnApplyAi.classList.remove('applied');
+    btnApplyAi.innerHTML = '✨ おすすめ設定を一括適用';
+
+    // 並行して教育プロンプトを注入したGeminiによる動的推論診断を実行
+    fetchDynamicGeminiDiagnosis(q);
+
+    // カラム統一
+    const unifyToggle = document.getElementById('drawer-unify-column-toggle');
+    const unifiedBox = document.getElementById('drawer-column-unified-box');
+    const customKeyInput = document.getElementById('drawer-column-key-input');
+    unifyToggle.checked = !!q.dataKey;
+    unifiedBox.style.display = q.dataKey ? 'block' : 'none';
+    customKeyInput.value = q.dataKey || '';
+    syncColumnSelectWithKey(q.dataKey || '');
+
+    // バリデーション
+    const valToggle = document.getElementById('drawer-validation-toggle');
+    const valFields = document.getElementById('drawer-validation-fields');
+    valToggle.checked = !!q.validation;
+    valFields.style.display = q.validation ? 'block' : 'none';
+    if (q.validation) {
+      syncDrawerValidationInputs(q.validation);
+    }
+
+    // 回答控えメール
+    const autoReplyToggle = document.getElementById('drawer-autoreply-toggle');
+    autoReplyToggle.checked = !!q.autoReply;
+
+    // メディア
+    const mediaToggle = document.getElementById('drawer-media-toggle');
+    const mediaFields = document.getElementById('drawer-media-fields');
+    const mediaType = document.getElementById('drawer-media-type');
+    const mediaUrl = document.getElementById('drawer-media-url');
+    mediaToggle.checked = !!(q.media && q.media.url);
+    mediaFields.style.display = (q.media && q.media.url) ? 'block' : 'none';
+    if (q.media) {
+      mediaType.value = q.media.type || 'image';
+      mediaUrl.value = q.media.url || '';
+    } else {
+      mediaUrl.value = '';
+    }
+
+    // スクロール規約
+    const scrollToggle = document.getElementById('drawer-scroll-toggle');
+    const scrollFields = document.getElementById('drawer-scroll-fields');
+    const scrollText = document.getElementById('drawer-scroll-text');
+    scrollToggle.checked = !!q.scrollRequired;
+    scrollFields.style.display = q.scrollRequired ? 'block' : 'none';
+    scrollText.value = q.scrollText || '';
+
+    // 7. 📋 「前述と同じ（同上）」自動入力の同期
+    const sameSection = document.getElementById('drawer-sameasabove-section');
+    const sameToggle = document.getElementById('drawer-sameasabove-toggle');
+    const sameFields = document.getElementById('drawer-sameasabove-fields');
+    const sameSourceSelect = document.getElementById('drawer-sameasabove-source-select');
+    const sameLabelInput = document.getElementById('drawer-sameasabove-label-input');
+
+    const curSec = findSectionByQuestionId(q.id);
+    const sources = curSec ? getDrawerAvailableSources(curSec.id, q.id, q.groupId) : { groups: [], questions: [] };
+    const allAvailableCount = sources.groups.length + sources.questions.length;
+
+    if (sameSection) {
+      if (allAvailableCount > 0) {
+        sameSection.style.display = 'block';
+        let optHtml = '';
+        if (sources.groups.length > 0) {
+          optHtml += '<optgroup label="先行グループ">';
+          sources.groups.forEach(g => {
+            optHtml += `<option value="group:${escapeHtml(g.id)}">${escapeHtml(g.title)}（グループ内全項目）</option>`;
+          });
+          optHtml += '</optgroup>';
+        }
+        if (sources.questions.length > 0) {
+          optHtml += '<optgroup label="先行質問">';
+          sources.questions.forEach(oq => {
+            optHtml += `<option value="${escapeHtml(oq.id)}">${escapeHtml(oq.title || '無題')}</option>`;
+          });
+          optHtml += '</optgroup>';
+        }
+        sameSourceSelect.innerHTML = optHtml;
+
+        const isSameActive = !!(q.sameAsAbove && q.sameAsAbove.enabled);
+        sameToggle.checked = isSameActive;
+        sameFields.style.display = isSameActive ? 'block' : 'none';
+        if (q.sameAsAbove && q.sameAsAbove.sourceQuestionId) {
+          sameSourceSelect.value = q.sameAsAbove.sourceQuestionId;
+        }
+        sameLabelInput.value = (q.sameAsAbove && q.sameAsAbove.label) || '';
+      } else {
+        sameSection.style.display = 'none';
+      }
+    }
+
+    // 8. ⚡ プロ版限定: セクション内スキップ（条件分岐）の同期
+    const skipSection = document.getElementById('drawer-skiplogic-section');
+    const skipToggle = document.getElementById('drawer-skiplogic-toggle');
+    const skipFields = document.getElementById('drawer-skiplogic-fields');
+    const skipDependsSelect = document.getElementById('drawer-skiplogic-depends-select');
+    const skipConditionSelect = document.getElementById('drawer-skiplogic-condition-select');
+    const skipValInput = document.getElementById('drawer-skiplogic-value-input');
+    const skipVal2Input = document.getElementById('drawer-skiplogic-value2-input');
+    const skipActionSelect = document.getElementById('drawer-skiplogic-action-select');
+
+    const otherQuestions = curSec ? curSec.questions.filter(x => x.id !== q.id) : [];
+    if (skipSection) {
+      if (otherQuestions.length > 0) {
+        skipSection.style.display = 'block';
+        let optHtml = '<option value="">-- スキップ分岐を設定しない --</option>';
+        otherQuestions.forEach(oq => {
+          optHtml += `<option value="${escapeHtml(oq.id)}">${escapeHtml(oq.title || '無題の質問')}</option>`;
+        });
+        skipDependsSelect.innerHTML = optHtml;
+
+        const hasSkip = !!(q.skipLogic && q.skipLogic.dependsOn);
+        skipToggle.checked = hasSkip;
+        skipFields.style.display = hasSkip ? 'block' : 'none';
+        if (hasSkip) {
+          skipDependsSelect.value = q.skipLogic.dependsOn || '';
+          skipConditionSelect.value = q.skipLogic.condition || 'equals';
+          skipActionSelect.value = q.skipLogic.action || 'disable';
+          skipValInput.value = q.skipLogic.value || '';
+          skipVal2Input.value = q.skipLogic.value2 || '';
+        } else {
+          skipDependsSelect.value = '';
+          skipConditionSelect.value = 'equals';
+          skipActionSelect.value = 'disable';
+          skipValInput.value = '';
+          skipVal2Input.value = '';
+        }
+        syncDrawerSkipVisibility();
+      } else {
+        skipSection.style.display = 'none';
+      }
+    }
+
+    // 9. 📁 所属グループの一括自動入力設定の同期
+    const grpSameSection = document.getElementById('drawer-groupsame-section');
+    const grpSameToggle = document.getElementById('drawer-groupsame-toggle');
+    const grpSameFields = document.getElementById('drawer-groupsame-fields');
+    const grpSameSelect = document.getElementById('drawer-groupsame-source-select');
+    const grpSameInput = document.getElementById('drawer-groupsame-label-input');
+
+    if (grpSameSection) {
+      if (q.groupId && curSec) {
+        const sections = getDrawerFormSections();
+        const curSecIdx = sections.findIndex(s => s.id === curSec.id);
+        const priorGroups = [];
+        const seenPriorGIds = new Set([q.groupId]);
+
+        for (let sIdx = 0; sIdx <= curSecIdx; sIdx++) {
+          const sItem = sections[sIdx];
+          if (!sItem || !sItem.questions) continue;
+          for (let qIdx = 0; qIdx < sItem.questions.length; qIdx++) {
+            const qItem = sItem.questions[qIdx];
+            if (sIdx === curSecIdx && qItem.groupId === q.groupId) break;
+            if (qItem.groupId && qItem.groupTitle && !seenPriorGIds.has(qItem.groupId)) {
+              seenPriorGIds.add(qItem.groupId);
+              priorGroups.push({
+                groupId: qItem.groupId,
+                title: qItem.groupTitle,
+                sectionTitle: sItem.title || `セクション ${sIdx + 1}`
+              });
+            }
+          }
+          if (sIdx === curSecIdx) break;
+        }
+
+        if (priorGroups.length > 0) {
+          grpSameSection.style.display = 'block';
+          let optHtml = '';
+          priorGroups.forEach(pg => {
+            optHtml += `<option value="${escapeHtml(pg.groupId)}">[${escapeHtml(pg.sectionTitle)}] ${escapeHtml(pg.title)}</option>`;
+          });
+          grpSameSelect.innerHTML = optHtml;
+
+          const isGroupSameActive = !!(q.sameAsAbove && q.sameAsAbove.enabled && q.sameAsAbove.sourceType === 'group');
+          grpSameToggle.checked = isGroupSameActive;
+          grpSameFields.style.display = isGroupSameActive ? 'block' : 'none';
+          if (isGroupSameActive && q.sameAsAbove.sourceGroupId) {
+            grpSameSelect.value = q.sameAsAbove.sourceGroupId;
+          }
+          grpSameInput.value = (q.sameAsAbove && q.sameAsAbove.label) || '';
+        } else {
+          grpSameSection.style.display = 'none';
+        }
+      } else {
+        grpSameSection.style.display = 'none';
+      }
+    }
+
+    // 表示アニメーション
+    drawer.classList.add('is-open');
+    backdrop.classList.add('is-open');
+    drawer.setAttribute('aria-hidden', 'false');
+  }
+
+  // 5. ドロワーを閉じる
+  function closeQuestionSettingsDrawer() {
+    const drawer = document.getElementById('question-settings-drawer');
+    const backdrop = document.getElementById('question-settings-drawer-backdrop');
+    if (!drawer) return;
+
+    drawer.classList.remove('is-open');
+    if (backdrop) backdrop.classList.remove('is-open');
+    drawer.setAttribute('aria-hidden', 'true');
+
+    persistDrawerChanges();
+    injectQuestionCardCompactStylesAndBadges();
+    _activeDrawerQuestionId = null;
+  }
+  window.openQuestionSettingsDrawer = openQuestionSettingsDrawer;
+  window.closeQuestionSettingsDrawer = closeQuestionSettingsDrawer;
+
+  // AIのおすすめ一括適用
+  function applyAiAdviceToActiveQuestion(advice) {
+    const q = findQuestionDefById(_activeDrawerQuestionId);
+    if (!q || !advice) return;
+
+    // 1. カラム統一
+    if (advice.unifyColumn && advice.dataKey) {
+      q.dataKey = advice.dataKey;
+      const unifyToggle = document.getElementById('drawer-unify-column-toggle');
+      const unifiedBox = document.getElementById('drawer-column-unified-box');
+      const customKeyInput = document.getElementById('drawer-column-key-input');
+      unifyToggle.checked = true;
+      unifiedBox.style.display = 'block';
+      customKeyInput.value = advice.dataKey;
+      syncColumnSelectWithKey(advice.dataKey);
+    }
+
+    // 2. バリデーション
+    const valToggle = document.getElementById('drawer-validation-toggle');
+    const valFields = document.getElementById('drawer-validation-fields');
+    if (advice.validation) {
+      q.validation = JSON.parse(JSON.stringify(advice.validation));
+      valToggle.checked = true;
+      valFields.style.display = 'block';
+      syncDrawerValidationInputs(q.validation);
+    } else {
+      q.validation = null;
+      valToggle.checked = false;
+      valFields.style.display = 'none';
+    }
+
+    // 3. 回答控えメール
+    const autoReplyToggle = document.getElementById('drawer-autoreply-toggle');
+    q.autoReply = !!advice.autoReply;
+    autoReplyToggle.checked = !!advice.autoReply;
+
+    // 保存とフィードバック
+    persistDrawerChanges();
+
+    const btnApplyAi = document.getElementById('btn-apply-ai-rec');
+    btnApplyAi.classList.add('applied');
+    btnApplyAi.innerHTML = '✓ おすすめ設定を適用しました！';
+    setTimeout(() => {
+      btnApplyAi.classList.remove('applied');
+      btnApplyAi.innerHTML = '✨ おすすめ設定を一括適用';
+    }, 2000);
+  }
+
+  // ==========================================
+  // 📊 本番テーブル連携カラム確認モーダル
+  // ==========================================
+  // ==========================================
+  // 📊 本番テーブル連携カラム確認＆保存先設定モーダル
+  // ==========================================
+  function openFormColumnMappingModal(targetFormDef = null) {
+    const formDef = targetFormDef || window.G || window.L || {};
+    const formTitle = getEffectiveFormTitle(formDef);
+    const sections = formDef.sections || [];
+
+    let modal = document.getElementById('form-column-mapping-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'form-column-mapping-modal';
+      modal.className = 'column-mapping-modal-overlay';
+      modal.style.cssText = 'position: fixed; inset: 0; z-index: 100000; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 20px;';
+      document.body.appendChild(modal);
+    }
+
+    let rowsHtml = '';
+    let colIndex = 1;
+
+    sections.forEach((sec, sIdx) => {
+      const secTitle = sec.title || `セクション ${sIdx + 1}`;
+      (sec.questions || []).forEach(q => {
+        const qTitle = q.title || '(無題の設問)';
+        const colName = q.title || q.dataKey || q.id;
+        const dataKey = q.dataKey || '-';
+        const typeLabel = q.type === 'text' ? 'テキスト' :
+                          q.type === 'radio' ? '単一選択 (ラジオ)' :
+                          q.type === 'checkbox' ? '複数選択 (チェック)' :
+                          q.type === 'select' ? 'プルダウン' :
+                          q.type === 'textarea' ? '複数行テキスト' : q.type;
+
+        // API連携情報の抽出
+        let apiBadge = '<span style="color: #94a3b8;">-</span>';
+        if (q.validation && q.validation.category === 'api') {
+          if (q.validation.condition === 'corp_name') apiBadge = '<span style="background: #e0f2fe; color: #0284c7; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">国税庁法人番号API</span>';
+          else if (q.validation.condition === 'invoice_number') apiBadge = '<span style="background: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">国税庁インボイス公表API</span>';
+        } else if (q.dataKey === 'zip_code' || qTitle.includes('郵便番号')) {
+          apiBadge = '<span style="background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">郵便番号住所自動補完</span>';
+        } else if (qTitle.includes('銀行') || q.dataKey === 'bank_name') {
+          apiBadge = '<span style="background: #f3e8ff; color: #7e22ce; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">全銀協 金融機関API</span>';
+        }
+
+        const requiredBadge = q.required ? '<span style="color: #dc2626; font-weight: bold; margin-left: 2px;">*</span>' : '';
+
+        rowsHtml += `
+          <tr style="border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; transition: background 0.15s;">
+            <td style="padding: 10px 12px; color: #64748b; font-family: monospace; text-align: center;">${colIndex++}</td>
+            <td style="padding: 10px 12px; color: #475569; font-weight: 500;">${escapeHtml(secTitle)}</td>
+            <td style="padding: 10px 12px; color: #1e293b; font-weight: 600;">${escapeHtml(qTitle)}${requiredBadge}</td>
+            <td style="padding: 10px 12px; color: #0284c7; font-weight: 700; font-family: monospace;">${escapeHtml(colName)}</td>
+            <td style="padding: 10px 12px; color: #64748b; font-family: monospace;">${escapeHtml(dataKey)}</td>
+            <td style="padding: 10px 12px; color: #334155;">${escapeHtml(typeLabel)}</td>
+            <td style="padding: 10px 12px;">${apiBadge}</td>
+          </tr>
+        `;
+      });
+    });
+
+    // Supabase / LocalStorage 上のテーブル一覧を取得
+    let customTables = [];
+    try {
+      customTables = JSON.parse(localStorage.getItem('synapse_custom_tables')) || [];
+    } catch(e) {}
+    customTables = customTables.filter(t => t && t.id !== 'table_all_form_responses' && t.name !== '全フォーム回答データ');
+
+    // 専用テーブル作成が選択されているか（常時専用独立テーブル）
+    const isDedicated = true;
+
+    // このフォームと同名の専用テーブルが存在するか確認
+    const dedicatedTable = customTables.find(t => (t.name === formTitle || t.id === formDef.targetTableId) && t.id !== 'table_all_form_responses');
+
+    // 保存先に応じたステータスバッジとアクションボタンの決定
+    let statusBadgeHtml = '';
+    let actionBtnHtml = '';
+
+    if (!dedicatedTable) {
+      statusBadgeHtml = `
+        <span style="background: #fef3c7; color: #b45309; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #fde68a; display: inline-flex; align-items: center; gap: 5px;">
+          <span>⚡</span> <span>専用テーブル未作成（本番送信時、または下のボタンから事前作成できます）</span>
+        </span>
+      `;
+      actionBtnHtml = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button type="button" id="btn-create-supabase-table" style="background: #0284c7; color: #fff; border: 1px solid #0369a1; font-weight: 700; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(2,132,199,0.3); transition: all 0.2s;">
+            <span>⚡</span> <span>このフォーム専用のテーブルを作成して連携</span>
+          </button>
+          <button type="button" id="btn-col-modal-ok" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 600; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer;">閉じる</button>
+        </div>
+      `;
+    } else {
+      if (dedicatedTable) {
+        statusBadgeHtml = `
+          <span style="background: #dcfce7; color: #15803d; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #bbf7d0; display: inline-flex; align-items: center; gap: 5px;">
+            <span>✅</span> <span>専用テーブル作成済み（「${escapeHtml(dedicatedTable.name)}」/ ${dedicatedTable.rows ? dedicatedTable.rows.length : 0}件蓄積中）</span>
+          </span>
+        `;
+        actionBtnHtml = `
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <button type="button" id="btn-create-supabase-table" style="background: #f8fafc; color: #0284c7; border: 1px solid #0284c7; font-weight: 700; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;">
+              <span>🔄</span> <span>Supabase物理テーブルを再作成・同期</span>
+            </button>
+            <button type="button" id="btn-col-modal-ok" style="background: #0284c7; color: #fff; border: none; font-weight: 700; font-size: 0.85rem; padding: 7px 20px; border-radius: 6px; cursor: pointer;">閉じる</button>
+          </div>
+        `;
+      } else {
+        statusBadgeHtml = `
+          <span style="background: #fef3c7; color: #b45309; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #fde68a; display: inline-flex; align-items: center; gap: 5px;">
+            <span>⚡</span> <span>専用テーブル未作成（本番送信時、または下のボタンから事前作成できます）</span>
+          </span>
+        `;
+        actionBtnHtml = `
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <button type="button" id="btn-create-supabase-table" style="background: #0284c7; color: #fff; border: 1px solid #0369a1; font-weight: 700; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(2,132,199,0.3); transition: all 0.2s;">
+              <span>⚡</span> <span>Supabase上にこの専用テーブルを事前作成</span>
+            </button>
+            <button type="button" id="btn-col-modal-ok" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 600; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer;">閉じる</button>
+          </div>
+        `;
+      }
+    }
+
+    modal.innerHTML = `
+      <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 980px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); overflow: hidden;">
+        <!-- ヘッダー -->
+        <div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; background: #f8fafc;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">📊</span>
+              <h2 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0;">専用テーブル連携・カラム設定</h2>
+              <span style="background: #0284c7; color: #fff; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">DB連携</span>
+            </div>
+            <div style="font-size: 0.78rem; color: #64748b; margin-top: 4px;">
+              フォーム「<strong style="color: #0f172a;">${escapeHtml(formTitle)}</strong>」の回答データ蓄積設定と、カラム構成の確認です。
+            </div>
+          </div>
+          <button type="button" id="btn-close-col-modal" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1;">&times;</button>
+        </div>
+
+        <!-- 専用テーブル作成設定バー（上部バー） -->
+        <div style="padding: 12px 24px; background: ${isDedicated ? '#f0fdf4' : '#f8fafc'}; border-bottom: 1px solid ${isDedicated ? '#bbf7d0' : '#e2e8f0'}; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <label class="editor-toggle-switch" for="modal-create-dedicated-table" style="margin: 0; cursor: pointer;">
+              <input type="checkbox" id="modal-create-dedicated-table" ${isDedicated ? 'checked' : ''} />
+              <span class="editor-toggle-slider"></span>
+            </label>
+            <label for="modal-create-dedicated-table" style="font-size: 0.85rem; font-weight: 700; color: #0f172a; margin: 0; cursor: pointer;">
+              このフォーム専用のテーブルを作成する
+            </label>
+          </div>
+          <div>
+            ${statusBadgeHtml}
+          </div>
+        </div>
+
+        <!-- テーブル本体スクロールエリア -->
+        <div style="flex: 1; overflow-y: auto; padding: 0 24px 20px 24px;">
+          <table style="width: 100%; border-collapse: collapse; margin-top: 16px; text-align: left;">
+            <thead>
+              <tr style="background: #f1f5f9; color: #475569; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #cbd5e1; position: sticky; top: 0; z-index: 10;">
+                <th style="padding: 10px 12px; width: 45px; text-align: center;">#</th>
+                <th style="padding: 10px 12px;">セクション</th>
+                <th style="padding: 10px 12px;">設問タイトル</th>
+                <th style="padding: 10px 12px; color: #0284c7;">本番テーブルカラム名</th>
+                <th style="padding: 10px 12px;">物理キー (dataKey)</th>
+                <th style="padding: 10px 12px;">型 / 入力形式</th>
+                <th style="padding: 10px 12px;">API連携 / 自動補完</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <!-- 自動付与システム共通カラムの明示 -->
+          <div style="margin-top: 20px; padding: 12px 16px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span>⚙️</span> システム自動付与カラム（全テーブル共通で記録）
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.75rem; color: #64748b;">
+              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px;"><strong>マスターID / コード</strong> (紐づけキー)</span>
+              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px;"><strong>フォーム名</strong> (識別タイトル)</span>
+              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px;"><strong>ステータス</strong> (回答完了 / 途中送信)</span>
+              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px;"><strong>確定登録コード</strong> (8桁確定ID)</span>
+              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px;"><strong>再開用URL</strong> (途中再開リンク)</span>
+              <span style="background: #fff; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px;"><strong>回答日時</strong> (タイムスタンプ)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- フッター -->
+        <div style="padding: 14px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+          <div style="font-size: 0.78rem; color: #15803d; font-weight: 600;">
+            🌟 回答データは常にこのフォーム専用の「独立テーブル」に自動保存されます。
+          </div>
+          ${actionBtnHtml}
+        </div>
+      </div>
+    `;
+
+    modal.style.display = 'flex';
+
+    const closeHandler = () => { modal.style.display = 'none'; };
+    modal.querySelector('#btn-close-col-modal').onclick = closeHandler;
+    const okBtn = modal.querySelector('#btn-col-modal-ok');
+    if (okBtn) okBtn.onclick = closeHandler;
+    modal.onclick = (e) => { if (e.target === modal) closeHandler(); };
+
+    // 専用テーブル作成トグル切り替えイベント
+    const modalToggle = modal.querySelector('#modal-create-dedicated-table');
+    if (modalToggle) {
+      modalToggle.addEventListener('change', (e) => {
+        formDef.createDedicatedTable = true;
+        formDef.targetTableType = 'dedicated';
+        formDef.targetTableId = dedicatedTable ? dedicatedTable.id : 'dedicated';
+
+        // フォーム定義の保存
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+
+        // モーダルを更新再描画
+        openFormColumnMappingModal(formDef);
+
+        // 全体設定画面側のトグルも更新
+        syncGlobalTargetTableSelect(true);
+      });
+    }
+
+    // ⚡ Supabase上にこのフォーム専用独立テーブルを事前作成するイベント
+    const createBtn = modal.querySelector('#btn-create-supabase-table');
+    if (createBtn) {
+      createBtn.onclick = async () => {
+        createBtn.disabled = true;
+        createBtn.innerHTML = '<span>⏳</span> <span>専用テーブル作成中...</span>';
+
+        try {
+          formDef.createDedicatedTable = true;
+          formDef.targetTableType = 'dedicated';
+          const newTable = await createDedicatedTableForForm(formDef);
+          if (newTable && newTable.id) {
+            formDef.targetTableId = newTable.id;
+          }
+
+          // 🌟 本番公開スナップショットが存在する場合、スナップショット側も即座に専用テーブル連携へ同期！
+          if (formDef.publishedSnapshot) {
+            formDef.publishedSnapshot.createDedicatedTable = true;
+            formDef.publishedSnapshot.targetTableId = newTable ? newTable.id : 'dedicated';
+            formDef.publishedSnapshot.targetTableMode = 'dedicated';
+            try {
+              const allFormsRaw = localStorage.getItem('form_customize_all_forms');
+              let allForms = allFormsRaw ? JSON.parse(allFormsRaw) : [];
+              const fIdx = allForms.findIndex(f => f && (f.id === formDef.id || f.title === formDef.title));
+              if (fIdx !== -1) {
+                allForms[fIdx] = formDef;
+                localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+              }
+            } catch(e) {}
+          }
+
+          if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+          if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+
+          // モーダル表示を完了状態に再描画
+          openFormColumnMappingModal(formDef);
+          syncGlobalTargetTableSelect(newTable ? newTable.id : true);
+          if (typeof updatePublishSyncUI === 'function') updatePublishSyncUI();
+
+          alert(`✅ テーブル「${formTitle}」の同期・再作成が完了しました！\n\n・テーブルID: ${newTable ? newTable.id : ''}\n・Supabase物理テーブル: ${newTable ? (newTable.physicalTableName || getPhysicalTableNameForForm(formDef)) : ''}\n・全${newTable && newTable.columns ? newTable.columns.length : 0}カラムを定義済み\n・回答保存先をこの専用テーブルに設定しました。\n・Synapseの「回答フォーム一覧」からいつでも確認・操作できます。`);
+        } catch(err) {
+          console.error('Failed to create table:', err);
+          alert(`テーブル作成に失敗しました: ${err.message}`);
+          createBtn.disabled = false;
+          createBtn.innerHTML = '<span>⚡</span> <span>Supabase上にこの専用テーブルを事前作成</span>';
+        }
+      };
+    }
+    modal.onclick = (e) => { if (e.target === modal) closeHandler(); };
+  }
+  window.openFormColumnMappingModal = openFormColumnMappingModal;
+
+  // フォーム全体設定の保存先テーブルUIと同期するヘルパー
+  function syncGlobalTargetTableSelect(forcedVal) {
+    const globalToggle = document.getElementById('editor-create-dedicated-table');
+    const globalSelect = document.getElementById('editor-target-table-select');
+    const statusDesc = document.getElementById('target-table-status-desc');
+    const card = document.getElementById('editor-target-table-card');
+
+    const formDef = window.G || window.L || {};
+    const formTitle = getEffectiveFormTitle(formDef);
+
+    if (globalToggle) {
+      globalToggle.checked = true;
+    }
+    if (globalSelect) {
+      globalSelect.value = 'dedicated';
+    }
+
+    if (card) {
+      card.style.background = '#f0fdf4';
+      card.style.borderColor = '#86efac';
+    }
+
+    if (statusDesc) {
+      statusDesc.innerHTML = `🌟 回答はこのフォーム専用の独立テーブル「<strong>${escapeHtml(formTitle)}</strong>」（回答フォーム一覧フォルダ）に自動保存されます。`;
+      statusDesc.style.color = '#15803d';
+    }
+  }
+
+  // フォーム全体設定の保存先テーブルUI初期化
+  function setupTargetTableGlobalSettingsUI() {
+    const globalToggle = document.getElementById('editor-create-dedicated-table');
+    const globalSelect = document.getElementById('editor-target-table-select');
+    const openModalBtn = document.getElementById('btn-open-col-modal-from-settings');
+
+    const formDef = window.G || window.L || {};
+    formDef.createDedicatedTable = true;
+    formDef.targetTableType = 'dedicated';
+    if (!formDef.targetTableId || formDef.targetTableId === 'table_all_form_responses') {
+      formDef.targetTableId = 'dedicated';
+    }
+    const formKey = (formDef.id || '') + '_dedicated';
+
+    if (globalToggle && globalToggle.dataset.lastFormKey !== formKey) {
+      globalToggle.dataset.lastFormKey = formKey;
+      syncGlobalTargetTableSelect(true);
+    }
+
+    if (globalToggle && !globalToggle.dataset.bound) {
+      globalToggle.dataset.bound = 'true';
+      globalToggle.checked = true;
+      globalToggle.addEventListener('change', (e) => {
+        const curDef = window.G || window.L || {};
+        curDef.createDedicatedTable = true;
+        curDef.targetTableType = 'dedicated';
+        curDef.targetTableId = 'dedicated';
+
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        globalToggle.checked = true;
+        globalToggle.dataset.lastFormKey = (curDef.id || '') + '_dedicated';
+        syncGlobalTargetTableSelect(true);
+      });
+    }
+
+    // 互換性のための非表示セレクトイベント
+    if (globalSelect && !globalSelect.dataset.bound) {
+      globalSelect.dataset.bound = 'true';
+      globalSelect.value = 'dedicated';
+      globalSelect.addEventListener('change', (e) => {
+        if (globalToggle) globalToggle.checked = true;
+        const curDef = window.G || window.L || {};
+        curDef.createDedicatedTable = true;
+        curDef.targetTableType = 'dedicated';
+        curDef.targetTableId = 'dedicated';
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        syncGlobalTargetTableSelect(true);
+      });
+    }
+
+    if (openModalBtn && !openModalBtn.dataset.bound) {
+      openModalBtn.dataset.bound = 'true';
+      openModalBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        let targetForm = window.G || window.n || window.L;
+        if (typeof getCurrentFormObject === 'function') {
+          const cur = getCurrentFormObject();
+          if (cur && cur.formObj) targetForm = cur.formObj;
+        }
+        openFormColumnMappingModal(targetForm);
+      });
+    }
+  }
+  setInterval(setupTargetTableGlobalSettingsUI, 500);
+
+  // ヘッダーボタンの初期化
+  function setupHeaderColumnPreviewButton() {
+    const btn = document.getElementById('btn-header-column-preview');
+    if (btn && !btn.dataset.bound) {
+      btn.dataset.bound = 'true';
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        let targetForm = window.G || window.n || window.L;
+        if (typeof getCurrentFormObject === 'function') {
+          const cur = getCurrentFormObject();
+          if (cur && cur.formObj) targetForm = cur.formObj;
+        }
+        openFormColumnMappingModal(targetForm);
+      });
+    }
+  }
+  setInterval(setupHeaderColumnPreviewButton, 500);
+
+  // 変更の永続化とライブ同期
+  function persistDrawerChanges() {
+    if (window.S) window.S();
+    if (typeof renderLivePreview === 'function') renderLivePreview();
+    injectQuestionCardCompactStylesAndBadges();
+  }
+
+  // 監視と初期化ループへの登録
+  setInterval(injectQuestionCardCompactStylesAndBadges, 250);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      injectQuestionCardCompactStylesAndBadges();
+      setupHeaderColumnPreviewButton();
+    });
+  } else {
+    injectQuestionCardCompactStylesAndBadges();
+    setupHeaderColumnPreviewButton();
+  }
 })();
+
+// =========================================================================
+// 📱 スマホ向け 長押し（Long Press）ツールチップ ＆ Undo（元に戻す）トーストシステム
+// =========================================================================
+(function() {
+  // --- 1. Undo（元に戻す）トーストシステム ---
+  let undoContainer = null;
+  let undoTimer = null;
+
+  window.showUndoToast = function({ message, undoText = '元に戻す', onUndo, duration = 5500 }) {
+    if (!undoContainer) {
+      undoContainer = document.querySelector('.synapse-undo-toast-container');
+      if (!undoContainer) {
+        undoContainer = document.createElement('div');
+        undoContainer.className = 'synapse-undo-toast-container';
+        document.body.appendChild(undoContainer);
+      }
+    }
+
+    if (undoTimer) {
+      clearTimeout(undoTimer);
+      undoTimer = null;
+    }
+    undoContainer.innerHTML = '';
+
+    const toast = document.createElement('div');
+    toast.className = 'synapse-undo-toast';
+
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'synapse-undo-toast-message';
+    msgSpan.textContent = message;
+
+    const undoBtn = document.createElement('button');
+    undoBtn.type = 'button';
+    undoBtn.className = 'synapse-undo-toast-btn';
+    undoBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px;"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>' + undoText;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'synapse-undo-toast-close';
+    closeBtn.setAttribute('aria-label', '閉じる');
+    closeBtn.textContent = '✕';
+
+    toast.appendChild(msgSpan);
+    toast.appendChild(undoBtn);
+    toast.appendChild(closeBtn);
+    undoContainer.appendChild(toast);
+
+    function dismiss(anim = true) {
+      if (undoTimer) {
+        clearTimeout(undoTimer);
+        undoTimer = null;
+      }
+      if (!anim) {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+        return;
+      }
+      toast.classList.add('hiding');
+      setTimeout(() => {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 200);
+    }
+
+    undoBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dismiss(false);
+      if (typeof onUndo === 'function') {
+        try {
+          onUndo();
+        } catch (err) {
+          console.error('[UndoToast] Failed to execute onUndo:', err);
+        }
+      }
+    });
+
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dismiss(true);
+    });
+
+    undoTimer = setTimeout(() => {
+      dismiss(true);
+    }, duration);
+  };
+
+  // --- 2. スマホ向け 長押し（Long Press）ツールチップ ---
+  let longPressTimer = null;
+  let isLongPressTriggered = false;
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let activeTipEl = null;
+
+  function hideMobileTooltip() {
+    if (activeTipEl && activeTipEl.parentNode) {
+      activeTipEl.parentNode.removeChild(activeTipEl);
+    }
+    activeTipEl = null;
+  }
+
+  function showMobileTooltip(targetEl, text) {
+    hideMobileTooltip();
+    const tip = document.createElement('div');
+    tip.className = 'synapse-mobile-tooltip';
+    tip.textContent = text;
+    document.body.appendChild(tip);
+
+    const rect = targetEl.getBoundingClientRect();
+    const tipRect = tip.getBoundingClientRect();
+
+    let left = rect.left + rect.width / 2 - tipRect.width / 2;
+    let top = rect.top - tipRect.height - 10;
+
+    if (top < 10) {
+      top = rect.bottom + 10;
+      tip.classList.add('placement-bottom');
+    }
+
+    left = Math.max(10, Math.min(window.innerWidth - tipRect.width - 10, left));
+
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+    activeTipEl = tip;
+  }
+
+  // 長押し後の誤タップ（ボタン実行）を防止するキャプチャリスナー
+  document.addEventListener('click', function(e) {
+    if (window._suppressNextClick) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      window._suppressNextClick = false;
+      return false;
+    }
+  }, true);
+
+  document.addEventListener('touchstart', function(e) {
+    if (!e.touches || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const target = e.target.closest('[data-tooltip], [title], [aria-label]');
+    if (!target) return;
+
+    const text = target.getAttribute('data-tooltip') || target.getAttribute('title') || target.getAttribute('aria-label');
+    if (!text || !text.trim()) return;
+
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    isLongPressTriggered = false;
+
+    clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(function() {
+      isLongPressTriggered = true;
+      window._suppressNextClick = true;
+      if (navigator.vibrate) {
+        try { navigator.vibrate(20); } catch (_) {}
+      }
+      showMobileTooltip(target, text.trim());
+    }, 380);
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!longPressTimer && !isLongPressTriggered) return;
+    if (!e.touches || e.touches.length === 0) return;
+    const touch = e.touches[0];
+    const dist = Math.hypot(touch.clientX - touchStartX, touch.clientY - touchStartY);
+    if (dist > 10) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+      if (isLongPressTriggered) {
+        hideMobileTooltip();
+        isLongPressTriggered = false;
+      }
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', function(e) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+    if (isLongPressTriggered) {
+      window._suppressNextClick = true;
+      setTimeout(function() {
+        window._suppressNextClick = false;
+      }, 400);
+      setTimeout(function() {
+        hideMobileTooltip();
+        isLongPressTriggered = false;
+      }, 800);
+    }
+  }, { passive: false });
+
+  document.addEventListener('touchcancel', function() {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+    hideMobileTooltip();
+    isLongPressTriggered = false;
+  });
+})();
+
+// =========================================================================
+// 🎯 ホーム一覧からのフォーム選択時のヘッダー表示即時同期
+// =========================================================================
+(function() {
+  document.addEventListener('click', function(e) {
+    const row = e.target.closest('.gf-list-row');
+    if (row && !e.target.closest('.gf-list-action-area')) {
+      localStorage.setItem('form_customize_active_tab', 'editor');
+      setTimeout(function() {
+        if (typeof updateHeaderBackButton === 'function') {
+          updateHeaderBackButton('editor');
+        }
+      }, 30);
+    }
+  }, true);
+})();
+
+
+
