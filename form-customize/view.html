@@ -1694,8 +1694,8 @@
             formDefinition = await decodeFormData(dataParam);
           }
 
-          // 直接フォームデータ指定（テスト・埋め込み用）
-          if (!formDefinition) {
+          // 直接フォームデータ指定（埋め込み用プレビュー。テスト環境時は最新ドラフトを優先するため除外）
+          if (!formDefinition && !window.IS_TEST_ENV) {
             try {
               const directForm = localStorage.getItem('synapse_form_data');
               if (directForm) {

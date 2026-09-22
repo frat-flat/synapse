@@ -16819,6 +16819,7 @@
     const openTabBtn = document.getElementById('btn-open-share-url-tab');
     if (openTabBtn) {
       openTabBtn.onclick = () => {
+        if (typeof window.flushFormSave === 'function') window.flushFormSave();
         try { syncFormsToCloud(null, true); } catch(e) {}
         window.open(targetUrl, '_blank');
       };
@@ -16826,6 +16827,7 @@
   }
 
   function getPublicFormShareUrl(formIndex, shorten = true, env = 'production') {
+    if (typeof window.flushFormSave === 'function') window.flushFormSave();
     const origin = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : '';
     let pathname = window.location.pathname || '';
     
@@ -18348,6 +18350,7 @@
       shareBtn._hooked = true;
       shareBtn.addEventListener('click', (e) => {
         e.preventDefault();
+        if (typeof window.flushFormSave === 'function') window.flushFormSave();
         copyFormShareUrl(); // ワンクリックで即時クリップボードにコピー
         openShareUrlModal(); // Google Forms風の共有モーダルを開く
       });

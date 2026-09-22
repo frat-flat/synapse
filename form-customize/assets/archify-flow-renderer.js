@@ -180,34 +180,38 @@
 
       // 📌 常設凡例フローティングミニパネルの折りたたみ / 展開
       const legendPanel = document.getElementById('flowmap-floating-legend');
+      const legendHeader = document.getElementById('flowmap-legend-header');
       const btnLegendToggle = document.getElementById('btn-legend-toggle');
+
       if (legendPanel && btnLegendToggle) {
-        btnLegendToggle.addEventListener('click', (e) => {
-          e.stopPropagation();
+        const toggleLegend = (e) => {
+          if (e) e.stopPropagation();
           const isCollapsed = legendPanel.classList.toggle('is-collapsed');
           btnLegendToggle.textContent = isCollapsed ? '＋' : '─';
-          btnLegendToggle.title = isCollapsed ? '凡例を展開' : '凡例を最小化';
+          btnLegendToggle.title = isCollapsed ? '凡例を展開' : '凡例を折りたたむ';
           try {
             localStorage.setItem('archify_legend_collapsed', isCollapsed ? '1' : '0');
           } catch(err){}
-        });
+        };
 
-        // クリックで折りたたみ状態から展開
-        legendPanel.addEventListener('click', (e) => {
-          if (legendPanel.classList.contains('is-collapsed')) {
+        btnLegendToggle.addEventListener('click', toggleLegend);
+
+        if (legendHeader) {
+          legendHeader.addEventListener('click', (e) => {
+            // 「📖 詳しく」ボタンが押された場合はトグルしない
             if (e.target.closest('#btn-legend-open-guide')) return;
+            toggleLegend(e);
+          });
+        }
+
+        // デフォルトは折りたたみ状態（明示的に'0'が保存されている場合のみ展開）
+        try {
+          const savedState = localStorage.getItem('archify_legend_collapsed');
+          if (savedState === '0') {
             legendPanel.classList.remove('is-collapsed');
             btnLegendToggle.textContent = '─';
-            btnLegendToggle.title = '凡例を最小化';
-            try {
-              localStorage.setItem('archify_legend_collapsed', '0');
-            } catch(err){}
-          }
-        });
-
-        // 保存された状態の復元
-        try {
-          if (localStorage.getItem('archify_legend_collapsed') === '1') {
+            btnLegendToggle.title = '凡例を折りたたむ';
+          } else {
             legendPanel.classList.add('is-collapsed');
             btnLegendToggle.textContent = '＋';
             btnLegendToggle.title = '凡例を展開';

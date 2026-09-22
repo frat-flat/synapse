@@ -1139,16 +1139,16 @@
               <div id="archify-flowmap-viewport" class="archify-flowmap-viewport">
                 <svg id="archify-flowmap-svg" width="100%" height="100%" style="width: 100% !important; height: 100% !important; min-height: 100% !important; display: block !important;"></svg>
 
-                <!-- 📌 フローマップ常設 凡例ミニパネル（折りたたみ可能） -->
-                <div id="flowmap-floating-legend" class="flowmap-floating-legend">
-                  <div class="legend-header">
+                <!-- 📌 フローマップ常設 凡例ミニパネル（デフォルト折りたたみ / 超コンパクト） -->
+                <div id="flowmap-floating-legend" class="flowmap-floating-legend is-collapsed">
+                  <div class="legend-header" id="flowmap-legend-header" title="クリックで凡例を開閉">
                     <div class="legend-title">
                       <span class="legend-icon">📌</span>
-                      <span class="legend-title-text">記号・線の見方</span>
+                      <span class="legend-title-text">記号・凡例</span>
                     </div>
                     <div class="legend-actions">
-                      <button type="button" id="btn-legend-open-guide" class="btn-legend-guide" title="詳しい見方・解説を見る">📖 詳しく</button>
-                      <button type="button" id="btn-legend-toggle" class="btn-legend-toggle" title="凡例を最小化">─</button>
+                      <button type="button" id="btn-legend-open-guide" class="btn-legend-guide" title="詳しい見方ガイドを開く">📖 詳しく</button>
+                      <button type="button" id="btn-legend-toggle" class="btn-legend-toggle" title="凡例を展開">＋</button>
                     </div>
                   </div>
                   <div id="flowmap-legend-body" class="legend-body">
@@ -1157,23 +1157,23 @@
                       <div class="legend-group-title">矢印（接続線）</div>
                       <div class="legend-item">
                         <span class="legend-line line-sequence"></span>
-                        <span class="legend-desc"><strong>通常進行:</strong> 次の質問へ進む（実線）</span>
+                        <span class="legend-desc"><strong>通常:</strong> 次へ（実線）</span>
                       </div>
                       <div class="legend-item">
                         <span class="legend-line line-section"></span>
-                        <span class="legend-desc"><strong>セクション進行:</strong> 次のセクションへ（青点線）</span>
+                        <span class="legend-desc"><strong>セクション:</strong> 次へ（青点線）</span>
                       </div>
                       <div class="legend-item">
                         <span class="legend-line line-branch"></span>
-                        <span class="legend-desc"><strong>分岐ジャンプ:</strong> 指定先・送信へ（橙点線）</span>
+                        <span class="legend-desc"><strong>分岐:</strong> ジャンプ（橙点線）</span>
                       </div>
                       <div class="legend-item">
                         <span class="legend-line line-subq"></span>
-                        <span class="legend-desc"><strong>条件付き出現:</strong> 選択時に入力欄出現（緑点線）</span>
+                        <span class="legend-desc"><strong>条件付:</strong> 出現（緑点線）</span>
                       </div>
                       <div class="legend-item">
                         <span class="legend-line line-partial"></span>
-                        <span class="legend-desc"><strong>途中送信:</strong> コード確定・保存（水色点線）</span>
+                        <span class="legend-desc"><strong>途中送信:</strong> 保存（水色点線）</span>
                       </div>
                     </div>
                     <!-- 枠（ノードの種類） -->
@@ -1181,15 +1181,15 @@
                       <div class="legend-group-title">枠（カード）</div>
                       <div class="legend-item">
                         <span class="legend-chip chip-question"></span>
-                        <span class="legend-desc"><strong>通常質問:</strong> 分岐のない選択肢は集約</span>
+                        <span class="legend-desc"><strong>質問:</strong> 選択肢集約</span>
                       </div>
                       <div class="legend-item">
                         <span class="legend-chip chip-option"></span>
-                        <span class="legend-desc"><strong>分岐選択肢:</strong> 行き先が変わる項目のみ展開</span>
+                        <span class="legend-desc"><strong>分岐選択肢:</strong> 個別展開</span>
                       </div>
                       <div class="legend-item">
                         <span class="legend-chip chip-submit"></span>
-                        <span class="legend-desc"><strong>🏁 送信完了:</strong> フォームのゴール</span>
+                        <span class="legend-desc"><strong>送信完了:</strong> ゴール</span>
                       </div>
                     </div>
                   </div>
