@@ -9712,6 +9712,32 @@ body.login-active #login-notification-modal {
   }
 }
 
+/* 🔄 テーブル列ドラッグ＆ドロップ並び替え用スタイル */
+.ct-col-dragging {
+  opacity: 0.45 !important;
+  background-color: #cbd5e1 !important;
+  cursor: grabbing !important;
+}
+
+.ct-col-drop-before {
+  box-shadow: inset 4px 0 0 0 #2563eb !important;
+  background-color: rgba(37, 99, 235, 0.08) !important;
+}
+
+.ct-col-drop-after {
+  box-shadow: inset -4px 0 0 0 #2563eb !important;
+  background-color: rgba(37, 99, 235, 0.08) !important;
+}
+
+#ct-table-thead th[draggable="true"] {
+  cursor: grab;
+}
+
+#ct-table-thead th[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+
 
 
 

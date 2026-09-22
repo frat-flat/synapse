@@ -7860,6 +7860,144 @@ function setupMasterRowContextMenu(prefix, rowIndex, rowNumTd) {
   });
 }
 
+// 🔄 カスタムテーブル列の並び替え実行処理（ドラッグ＆ドロップおよびメニュー移動共通）
+function reorderCustomTableColumn(tbl, srcColId, destColId, position = 'before') {
+  if (!tbl || !srcColId || !destColId || srcColId === destColId) return;
+  if (!Array.isArray(tbl.columns)) return;
+
+  // ロック判定
+  if (typeof isTableLocked === 'function' && isTableLocked(tbl.id)) {
+    showToast('テーブルがロックされています。列を並び替えるには上部の鍵アイコンでロックを解除してください。', 'warning');
+    return;
+  }
+
+  // 1. tbl.columns の並び替え
+  const srcColIdx = tbl.columns.findIndex(c => c && c.id === srcColId);
+  if (srcColIdx === -1) return;
+  const [removedCol] = tbl.columns.splice(srcColIdx, 1);
+
+  let destColIdx = tbl.columns.findIndex(c => c && c.id === destColId);
+  if (destColIdx === -1) {
+    tbl.columns.push(removedCol);
+  } else {
+    if (position === 'after') {
+      tbl.columns.splice(destColIdx + 1, 0, removedCol);
+    } else {
+      tbl.columns.splice(destColIdx, 0, removedCol);
+    }
+  }
+
+  // 2. tbl.visibleColumns の並び替え（同期）
+  if (Array.isArray(tbl.visibleColumns)) {
+    const srcVisIdx = tbl.visibleColumns.indexOf(srcColId);
+    if (srcVisIdx !== -1) {
+      tbl.visibleColumns.splice(srcVisIdx, 1);
+      const destVisIdx = tbl.visibleColumns.indexOf(destColId);
+      if (destVisIdx === -1) {
+        tbl.visibleColumns.push(srcColId);
+      } else {
+        if (position === 'after') {
+          tbl.visibleColumns.splice(destVisIdx + 1, 0, srcColId);
+        } else {
+          tbl.visibleColumns.splice(destVisIdx, 0, srcColId);
+        }
+      }
+    }
+  }
+
+  // 3. 永続化（LocalStorage & Supabase）
+  saveCustomTables();
+  localStorage.setItem(`synapse_table_${tbl.id}`, JSON.stringify(tbl));
+  if (typeof syncToSupabase === 'function') {
+    syncToSupabase(`synapse_table_${tbl.id}`, tbl);
+  }
+
+  // 4. 再描画
+  renderCustomTable(tbl.id);
+  const colName = removedCol.label || removedCol.name || srcColId;
+  showToast(`列「${colName}」の並び順を変更しました。`, 'info');
+}
+window.reorderCustomTableColumn = reorderCustomTableColumn;
+
+// 🔄 列の左右1つ移動（コンテキストメニュー用）
+function moveCustomTableColumnRelative(tbl, colId, direction) {
+  if (!tbl || !colId || !Array.isArray(tbl.columns)) return;
+  const visibleColumnIds = tbl.visibleColumns && tbl.visibleColumns.length > 0
+    ? tbl.visibleColumns
+    : tbl.columns.map(c => c.id);
+  const visCols = tbl.columns.filter(c => visibleColumnIds.includes(c.id));
+  const currentVisIdx = visCols.findIndex(c => c.id === colId);
+  if (currentVisIdx === -1) return;
+
+  if (direction === 'left' && currentVisIdx > 0) {
+    const prevCol = visCols[currentVisIdx - 1];
+    reorderCustomTableColumn(tbl, colId, prevCol.id, 'before');
+  } else if (direction === 'right' && currentVisIdx < visCols.length - 1) {
+    const nextCol = visCols[currentVisIdx + 1];
+    reorderCustomTableColumn(tbl, colId, nextCol.id, 'after');
+  }
+}
+window.moveCustomTableColumnRelative = moveCustomTableColumnRelative;
+
+// 🔄 列ヘッダーへのドラッグ＆ドロップ並び替えリスナー設定
+function setupCtColumnReorder(th, colId, tbl) {
+  if (!th || !colId || !tbl) return;
+
+  th.setAttribute('draggable', 'true');
+
+  th.addEventListener('dragstart', (e) => {
+    // リサイズハンドルや各種ボタンの操作時はドラッグを開始しない
+    if (
+      e.target.closest('.col-resize-handle') ||
+      e.target.closest('.filter-icon-btn') ||
+      e.target.closest('.grant-access-inline-btn') ||
+      e.target.closest('.revoke-access-inline-btn') ||
+      e.target.closest('.col-perm-icon-btn')
+    ) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.setData('text/plain', colId);
+    e.dataTransfer.effectAllowed = 'move';
+    window._draggedCtColId = colId;
+    th.classList.add('ct-col-dragging');
+  });
+
+  th.addEventListener('dragover', (e) => {
+    if (!window._draggedCtColId || window._draggedCtColId === colId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = th.getBoundingClientRect();
+    const isLeft = (e.clientX - rect.left) < rect.width / 2;
+    th.classList.toggle('ct-col-drop-before', isLeft);
+    th.classList.toggle('ct-col-drop-after', !isLeft);
+  });
+
+  th.addEventListener('dragleave', () => {
+    th.classList.remove('ct-col-drop-before', 'ct-col-drop-after');
+  });
+
+  th.addEventListener('drop', (e) => {
+    e.preventDefault();
+    th.classList.remove('ct-col-drop-before', 'ct-col-drop-after');
+    const srcColId = e.dataTransfer.getData('text/plain') || window._draggedCtColId;
+    const destColId = colId;
+    if (!srcColId || srcColId === destColId) return;
+    const rect = th.getBoundingClientRect();
+    const isLeft = (e.clientX - rect.left) < rect.width / 2;
+    reorderCustomTableColumn(tbl, srcColId, destColId, isLeft ? 'before' : 'after');
+  });
+
+  th.addEventListener('dragend', () => {
+    th.classList.remove('ct-col-dragging', 'ct-col-drop-before', 'ct-col-drop-after');
+    window._draggedCtColId = null;
+    document.querySelectorAll('.ct-col-drop-before, .ct-col-drop-after, .ct-col-dragging').forEach(el => {
+      el.classList.remove('ct-col-drop-before', 'ct-col-drop-after', 'ct-col-dragging');
+    });
+  });
+}
+window.setupCtColumnReorder = setupCtColumnReorder;
+
 // カスタムコンテキストメニューの表示
 function showCtContextMenu(x, y, tbl, type, targetId) {
   if (window.logToDebugPanel) {
@@ -7877,6 +8015,9 @@ function showCtContextMenu(x, y, tbl, type, targetId) {
 
   const widthItem = document.getElementById('ct-menu-change-width');
   const heightItem = document.getElementById('ct-menu-change-height');
+  const moveLeftItem = document.getElementById('ct-menu-move-col-left');
+  const moveRightItem = document.getElementById('ct-menu-move-col-right');
+  const deleteRowItem = document.getElementById('ct-menu-delete-row');
   const dropdownSettingsItem = document.getElementById('ct-menu-dropdown-settings');
 
   const mergeItem = document.getElementById('ct-menu-merge-columns');
@@ -7888,8 +8029,24 @@ function showCtContextMenu(x, y, tbl, type, targetId) {
   if (type === 'col') {
     if (widthItem) widthItem.style.display = 'block';
     if (heightItem) heightItem.style.display = 'none';
+    if (deleteRowItem) deleteRowItem.style.display = 'none';
     if (dropdownSettingsItem) dropdownSettingsItem.style.display = 'block';
     if (createTableItem) createTableItem.style.display = 'none';
+
+    // 左右移動メニューの表示判定
+    if (moveLeftItem || moveRightItem) {
+      const visibleColumnIds = tbl.visibleColumns && tbl.visibleColumns.length > 0
+        ? tbl.visibleColumns
+        : (tbl.columns || []).map(c => c.id);
+      const visCols = (tbl.columns || []).filter(c => visibleColumnIds.includes(c.id));
+      const curIdx = visCols.findIndex(c => c.id === targetId);
+      if (moveLeftItem) {
+        moveLeftItem.style.display = (curIdx > 0) ? 'block' : 'none';
+      }
+      if (moveRightItem) {
+        moveRightItem.style.display = (curIdx !== -1 && curIdx < visCols.length - 1) ? 'block' : 'none';
+      }
+    }
 
     const colFormulaItem = document.getElementById('ct-menu-col-formula');
     if (colFormulaItem) {
@@ -7928,6 +8085,9 @@ function showCtContextMenu(x, y, tbl, type, targetId) {
   } else {
     if (widthItem) widthItem.style.display = 'none';
     if (heightItem) heightItem.style.display = 'block';
+    if (moveLeftItem) moveLeftItem.style.display = 'none';
+    if (moveRightItem) moveRightItem.style.display = 'none';
+    if (deleteRowItem) deleteRowItem.style.display = 'block';
     if (dropdownSettingsItem) dropdownSettingsItem.style.display = 'none';
     if (mergeItem) mergeItem.style.display = 'none';
     if (switchPrimaryItem) switchPrimaryItem.style.display = 'none';
@@ -8704,6 +8864,9 @@ function renderCustomTable(tableId) {
       showCtContextMenu(e.clientX, e.clientY, tbl, 'col', col.id);
     });
 
+    // 🔄 列のドラッグ＆ドロップ並び替えの有効化
+    setupCtColumnReorder(th, col.id, tbl);
+
     lettersRow.appendChild(th);
     visibleColIndex++;
   });
@@ -8875,6 +9038,9 @@ function renderCustomTable(tableId) {
       th.style.position = 'sticky';
       th.style.zIndex = '32';
     }
+
+    // 🔄 列のドラッグ＆ドロップ並び替えの有効化
+    setupCtColumnReorder(th, col.id, tbl);
 
     namesRow.appendChild(th);
   });
@@ -10355,20 +10521,67 @@ function setupCtButtonsEvents() {
     const tbl = state.customTables.find(t => t.id === state.activeCustomTableId);
     if (!tbl) return;
 
-    if (state.ctSelectedRows.size === 0) {
-      showToast('削除する行を選択してください。', 'warning');
+    // 🎯 削除対象行IDの総合収集（チェックボックス、行番号ヘッダー、セル選択、範囲選択すべてに対応）
+    const targetRowIdSet = new Set(state.ctSelectedRows ? Array.from(state.ctSelectedRows) : []);
+
+    // 1. セル選択（単一セル）からの行取得
+    if (state.ctSelectedCell && state.ctSelectedCell.rowId) {
+      targetRowIdSet.add(state.ctSelectedCell.rowId);
+    }
+
+    // 2. 範囲選択・複数セル選択（ctSelectedCells）からの行取得
+    if (state.ctSelectedCells && state.ctSelectedCells.size > 0) {
+      state.ctSelectedCells.forEach(cellKey => {
+        const parts = String(cellKey).split(':');
+        if (parts.length >= 1 && parts[0]) {
+          targetRowIdSet.add(parts[0]);
+        }
+      });
+    }
+
+    // 3. テーブル内チェックボックスDOMのフォールバック取得
+    const tbody = document.getElementById('ct-table-body');
+    if (tbody) {
+      const checkedBoxes = tbody.querySelectorAll('.ct-row-select-checkbox:checked');
+      checkedBoxes.forEach(cb => {
+        if (cb.value) targetRowIdSet.add(cb.value);
+      });
+    }
+
+    // 4. フォーカス中の要素からのフォールバック取得
+    const activeEl = document.activeElement;
+    if (activeEl && tbody && tbody.contains(activeEl)) {
+      const tr = activeEl.closest('tr');
+      if (tr && tr.dataset.rowId) {
+        targetRowIdSet.add(tr.dataset.rowId);
+      }
+    }
+
+    if (targetRowIdSet.size === 0) {
+      showToast('削除したい行のセル、行番号、または左端のチェックボックスを選択してください。', 'warning');
       return;
     }
 
-    if (!confirm(`選択された ${state.ctSelectedRows.size} 件の行を削除しますか？`)) {
+    const count = targetRowIdSet.size;
+    const confirmMsg = `選択された ${count} 件の行をSynapseテーブルから削除しますか？\n\n※この操作を実行してもSupabase上の回答生ログや元データには影響しません。\n※この操作は元に戻せません。`;
+    if (!confirm(confirmMsg)) {
       return;
     }
 
-    tbl.rows = tbl.rows.filter(row => !state.ctSelectedRows.has(row.id));
-    state.ctSelectedRows.clear();
+    tbl.rows = (tbl.rows || []).filter(row => !targetRowIdSet.has(row.id));
+    if (state.ctSelectedRows) state.ctSelectedRows.clear();
+    state.ctSelectedCell = null;
+    state.ctSelectedRange = null;
+    if (state.ctSelectedCells) state.ctSelectedCells.clear();
+
     saveCustomTables();
+    localStorage.setItem(`synapse_table_${tbl.id}`, JSON.stringify(tbl));
+    if (typeof syncToSupabase === 'function') {
+      syncToSupabase(`synapse_table_${tbl.id}`, tbl);
+    }
+
     renderCustomTable(tbl.id);
-    showToast('選択された行を削除しました。', 'success');
+    showToast(`選択された ${count} 件の行を削除しました。`, 'success');
   });
 
   // 🗑️ カスタムテーブルの安全削除共通処理
@@ -11175,6 +11388,53 @@ function setupCtButtonsEvents() {
     const menu = document.getElementById('ct-context-menu');
     if (menu) menu.style.display = 'none';
     openCtResizeDialog();
+  });
+
+  // ⬅️ 列を左へ移動
+  document.getElementById('ct-menu-move-col-left')?.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('ct-context-menu');
+    if (menu) menu.style.display = 'none';
+    if (!ctResizeState.tblId || !ctResizeState.targetId) return;
+    const tbl = findCustomOrMasterTable(ctResizeState.tblId);
+    if (tbl) moveCustomTableColumnRelative(tbl, ctResizeState.targetId, 'left');
+  });
+
+  // ➡️ 列を右へ移動
+  document.getElementById('ct-menu-move-col-right')?.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('ct-context-menu');
+    if (menu) menu.style.display = 'none';
+    if (!ctResizeState.tblId || !ctResizeState.targetId) return;
+    const tbl = findCustomOrMasterTable(ctResizeState.tblId);
+    if (tbl) moveCustomTableColumnRelative(tbl, ctResizeState.targetId, 'right');
+  });
+
+  // 🗑️ この行を削除
+  document.getElementById('ct-menu-delete-row')?.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('ct-context-menu');
+    if (menu) menu.style.display = 'none';
+    if (!ctResizeState.tblId) return;
+    const tbl = findCustomOrMasterTable(ctResizeState.tblId);
+    if (!tbl) return;
+    const rIdx = ctResizeState.targetId;
+    const targetRow = (tbl.rows || [])[rIdx];
+    if (!targetRow) return;
+
+    if (!confirm(`行 ${rIdx + 1} をSynapseテーブルから削除しますか？\n\n※この操作を実行してもSupabase上の回答生ログや元データには影響しません。\n※この操作は元に戻せません。`)) {
+      return;
+    }
+
+    tbl.rows.splice(rIdx, 1);
+    if (state.ctSelectedRows) state.ctSelectedRows.delete(targetRow.id);
+    saveCustomTables();
+    localStorage.setItem(`synapse_table_${tbl.id}`, JSON.stringify(tbl));
+    if (typeof syncToSupabase === 'function') {
+      syncToSupabase(`synapse_table_${tbl.id}`, tbl);
+    }
+    renderCustomTable(tbl.id);
+    showToast(`行 ${rIdx + 1} を削除しました。`, 'success');
   });
   document.getElementById('ct-menu-dropdown-settings')?.addEventListener('mousedown', (e) => {
     e.stopPropagation();
