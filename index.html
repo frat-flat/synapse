@@ -4911,6 +4911,21 @@
       この操作は元に戻せません。Synapse上のテーブルデータはすべて消去されます。<br>
       <span style="font-size: 0.75rem; color: #6b7280;">（※Supabase上の回答生ログや物理テーブルには影響しません）</span>
     </div>
+
+    <!-- 🛡️ 第1段階: フォーム連携テーブル専用の重大リスク確認チェックボックス -->
+    <div id="safety-delete-form-warning" style="display: none; margin-bottom: 1rem; padding: 0.75rem; background: #fff1f2; border: 1.5px solid #fecdd3; border-radius: 6px;">
+      <div style="font-size: 0.8rem; font-weight: 700; color: #be123c; margin-bottom: 4px; display: flex; align-items: center; gap: 5px;">
+        <span>🛡️</span> フォーム連携テーブルの重要保護（オーナー専用）
+      </div>
+      <div style="font-size: 0.75rem; color: #9f1239; line-height: 1.4; margin-bottom: 8px;">
+        このテーブルは回答フォームと連携しています。削除するとSynapse上の回答一覧・蓄積データへの参照が完全に失われます。
+      </div>
+      <label style="display: flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 700; color: #881337; cursor: pointer; user-select: none;">
+        <input type="checkbox" id="safety-delete-risk-ack" style="width: 16px; height: 16px; cursor: pointer; accent-color: #e11d48;" />
+        <span>フォーム回答データが削除される重大なリスクを理解しました（同意）</span>
+      </label>
+    </div>
+
     <div style="margin-bottom: 1rem;">
       <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-secondary, #475569);">
         誤操作を防ぐため、確認として上記の<strong>テーブル名</strong>を入力してください：

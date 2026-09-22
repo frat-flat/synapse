@@ -8171,7 +8171,7 @@ function adjustOverflowCells(tableElement) {
   });
 }
 
-// 🗑️ テーブル安全削除モーダル制御（誤操作防止・テーブル名完全一致確認）
+// 🗑️ テーブル安全削除モーダル制御（誤操作防止・テーブル名完全一致確認・3段階安全機構）
 function openDeleteTableSafetyModal(tbl) {
   if (!tbl) return;
 
@@ -8180,8 +8180,20 @@ function openDeleteTableSafetyModal(tbl) {
   const inputEl = document.getElementById('safety-delete-input');
   const confirmBtn = document.getElementById('safety-delete-confirm-btn');
   const cancelBtn = document.getElementById('safety-delete-cancel-btn');
+  const formWarningEl = document.getElementById('safety-delete-form-warning');
+  const riskAckCheckbox = document.getElementById('safety-delete-risk-ack');
 
   if (!modal || !nameEl || !inputEl || !confirmBtn) return;
+
+  const isFormTable = Boolean(tbl.isFormDedicatedTable || tbl.formId || tbl.sourceFormId || tbl.id === 'table_all_form_responses' || tbl.parentMenuId === 'forms-accordion');
+
+  // 第1段階: フォーム連携テーブル専用警告・チェックボックス
+  if (formWarningEl) {
+    formWarningEl.style.display = isFormTable ? 'block' : 'none';
+  }
+  if (riskAckCheckbox) {
+    riskAckCheckbox.checked = false;
+  }
 
   nameEl.textContent = tbl.name;
   inputEl.value = '';
@@ -8194,10 +8206,20 @@ function openDeleteTableSafetyModal(tbl) {
 
   modal.style.display = 'flex';
   modal.classList.add('active');
-  setTimeout(() => { inputEl.focus(); }, 80);
+  setTimeout(() => { 
+    if (!isFormTable || (riskAckCheckbox && riskAckCheckbox.checked)) {
+      inputEl.focus(); 
+    } else if (riskAckCheckbox) {
+      riskAckCheckbox.focus();
+    }
+  }, 80);
 
   const checkMatch = () => {
-    const isMatch = inputEl.value.trim() === tbl.name.trim();
+    // フォーム連携テーブルの場合、第1段階の同意チェックボックスが必須
+    const isAckChecked = !isFormTable || (riskAckCheckbox && riskAckCheckbox.checked);
+    // 第2段階: テーブル名が完全一致しているか
+    const isMatch = isAckChecked && (inputEl.value.trim() === tbl.name.trim());
+
     if (isMatch) {
       confirmBtn.disabled = false;
       confirmBtn.style.background = '#dc2626';
@@ -8216,6 +8238,9 @@ function openDeleteTableSafetyModal(tbl) {
   };
 
   inputEl.oninput = checkMatch;
+  if (riskAckCheckbox) {
+    riskAckCheckbox.onchange = checkMatch;
+  }
   inputEl.onkeydown = (e) => {
     if (e.key === 'Enter' && !confirmBtn.disabled) {
       confirmBtn.click();
@@ -8230,6 +8255,10 @@ function openDeleteTableSafetyModal(tbl) {
     inputEl.value = '';
     inputEl.oninput = null;
     inputEl.onkeydown = null;
+    if (riskAckCheckbox) {
+      riskAckCheckbox.onchange = null;
+      riskAckCheckbox.checked = false;
+    }
     confirmBtn.onclick = null;
     if (cancelBtn) cancelBtn.onclick = null;
     modal.onclick = null;
@@ -8242,6 +8271,17 @@ function openDeleteTableSafetyModal(tbl) {
 
   confirmBtn.onclick = () => {
     if (confirmBtn.disabled) return;
+
+    // 第3段階: フォーム連携テーブルの場合は最終実行確認ダイアログ
+    if (isFormTable) {
+      const finalConfirm = window.confirm(
+        `【最終確認・警告】\n\n本当にフォーム連携テーブル「${tbl.name}」を完全に削除しますか？\n\n・Synapse上の回答蓄積データへの参照が失われます。\n・この操作を取り消すことはできません。\n\n削除を実行する場合は「OK」を押してください。`
+      );
+      if (!finalConfirm) {
+        return; // キャンセルされた場合は削除を中断
+      }
+    }
+
     closeModal();
     executeDeleteCustomTable(tbl.id, tbl.name);
   };
@@ -8335,10 +8375,19 @@ function renderCustomTable(tableId) {
   // 🗑️ テーブル削除ボタンの制御
   const deleteTableBtn = document.getElementById('ct-delete-table-btn');
   if (deleteTableBtn) {
-    deleteTableBtn.style.display = 'inline-flex';
-    deleteTableBtn.onclick = () => {
-      openDeleteTableSafetyModal(tbl);
-    };
+    const isFormTable = Boolean(tbl.isFormDedicatedTable || tbl.formId || tbl.sourceFormId || tbl.id === 'table_all_form_responses' || tbl.parentMenuId === 'forms-accordion');
+    const isOwner = (typeof isOwnerUser === 'function') ? isOwnerUser() : true;
+
+    // フォームから作成されたテーブルの場合、オーナー権限のみ表示（非オーナーは完全非表示）
+    if (isFormTable && !isOwner) {
+      deleteTableBtn.style.display = 'none';
+      deleteTableBtn.onclick = null;
+    } else {
+      deleteTableBtn.style.display = 'inline-flex';
+      deleteTableBtn.onclick = () => {
+        openDeleteTableSafetyModal(tbl);
+      };
+    }
   }
 
   const nameInput = document.getElementById('ct-table-name-input');
@@ -13585,14 +13634,26 @@ function renderTableControlBar(tableId, parentContainerEl) {
         };
 
         const firstLineCells = parseCSVLine(lines[0]);
-        // 1行目のいずれかの値が、列定義のlabel / name / idのいずれかと一致すればヘッダーと判定
+        // ヘッダーセルから物理キー（例: [法人情報] 郵便番号 (main_zip) -> main_zip）を抽出するヘルパー
+        const extractKeyFromHeader = (str) => {
+          if (!str) return null;
+          const m = String(str).trim().match(/\(([^)]+)\)$/);
+          return m ? m[1].trim().toLowerCase() : null;
+        };
+
+        // 1行目のいずれかの値が、列定義のid / label / name、またはヘッダー内の(物理キー)と一致すればヘッダーと判定
         const isHeader = firstLineCells.some(h => {
           const hNorm = (h || '').trim().toLowerCase();
-          return meta.columns.some(col => 
-            (col.label && col.label.trim().toLowerCase() === hNorm) ||
-            (col.name && col.name.trim().toLowerCase() === hNorm) ||
-            (col.id && col.id.trim().toLowerCase() === hNorm)
-          );
+          const extractedKey = extractKeyFromHeader(h);
+          return meta.columns.some(col => {
+            const colIdNorm = (col.id || '').trim().toLowerCase();
+            const colLabelNorm = (col.label || '').trim().toLowerCase();
+            const colNameNorm = (col.name || '').trim().toLowerCase();
+            return (extractedKey && extractedKey === colIdNorm) ||
+                   hNorm === colIdNorm ||
+                   hNorm === colLabelNorm ||
+                   hNorm === colNameNorm;
+          });
         });
         let startIndex = 0;
         const colMap = {};
@@ -13600,12 +13661,38 @@ function renderTableControlBar(tableId, parentContainerEl) {
         if (isHeader) {
           startIndex = 1;
           meta.columns.forEach(col => {
-            const idx = firstLineCells.findIndex(h => {
-              const hNorm = (h || '').trim().toLowerCase();
-              return (col.label && col.label.trim().toLowerCase() === hNorm) ||
-                     (col.name && col.name.trim().toLowerCase() === hNorm) ||
-                     (col.id && col.id.trim().toLowerCase() === hNorm);
+            const colIdNorm = (col.id || '').trim().toLowerCase();
+            const colLabelNorm = (col.label || '').trim().toLowerCase();
+            const colNameNorm = (col.name || '').trim().toLowerCase();
+
+            // 1. ヘッダー末尾の (物理キー) と col.id の完全一致（最優先・ミスマッチ防止100%保証）
+            let idx = firstLineCells.findIndex(h => {
+              const ext = extractKeyFromHeader(h);
+              return ext && ext === colIdNorm;
             });
+
+            // 2. 物理キーそのものがヘッダーセルに入っている場合
+            if (idx === -1) {
+              idx = firstLineCells.findIndex(h => (h || '').trim().toLowerCase() === colIdNorm);
+            }
+
+            // 3. ラベルまたは名称の完全一致
+            if (idx === -1) {
+              idx = firstLineCells.findIndex(h => {
+                const hNorm = (h || '').trim().toLowerCase();
+                return (colLabelNorm && hNorm === colLabelNorm) || (colNameNorm && hNorm === colNameNorm);
+              });
+            }
+
+            // 4. [グループ名] 設問名 などの前方一致・部分一致
+            if (idx === -1 && (colLabelNorm || colNameNorm)) {
+              idx = firstLineCells.findIndex(h => {
+                const hNorm = (h || '').trim().toLowerCase();
+                return (colLabelNorm && (hNorm.includes(colLabelNorm) || colLabelNorm.includes(hNorm))) ||
+                       (colNameNorm && (hNorm.includes(colNameNorm) || colNameNorm.includes(hNorm)));
+              });
+            }
+
             if (idx !== -1) colMap[col.id] = idx;
           });
         } else {
@@ -49803,9 +49890,20 @@ function exportTableToFile(tableId, format) {
     cols = cols.filter(c => !hiddenColIds.includes(c.id));
   }
   cols = cols.filter(c => !c.hidden);
-  if (cols.length === 0) cols = meta.columns;
+  // 同名ラベルの重複検出と物理キーの自動補填（CSV出力時の重複防止）
+  const labelCounts = {};
+  cols.forEach(c => {
+    const rawLabel = (c.name || c.label || c.id || '').trim();
+    labelCounts[rawLabel] = (labelCounts[rawLabel] || 0) + 1;
+  });
 
-  const headers = cols.map(c => c.name || c.label || c.id);
+  const headers = cols.map(c => {
+    let rawLabel = (c.name || c.label || c.id || '').trim();
+    if (labelCounts[rawLabel] > 1 && c.id && !rawLabel.includes(c.id)) {
+      rawLabel = `${rawLabel} (${c.id})`;
+    }
+    return rawLabel;
+  });
   const rows = meta.rows || [];
 
   const now = new Date();
