@@ -4875,13 +4875,8 @@
         }
       }
       if (headerMergeBtn) {
-        if (isEditingActiveForm) {
-          headerMergeBtn.style.setProperty('display', 'inline-flex', 'important');
-          headerMergeBtn.classList.remove('hidden');
-        } else {
-          headerMergeBtn.style.setProperty('display', 'none', 'important');
-          headerMergeBtn.classList.add('hidden');
-        }
+        headerMergeBtn.style.setProperty('display', 'none', 'important');
+        headerMergeBtn.classList.add('hidden');
       }
       if (headerColBtn) {
         headerColBtn.style.setProperty('display', 'none', 'important');
@@ -18088,9 +18083,7 @@
         }
       }
       if (headerMergeBtn) {
-        headerMergeBtn.style.setProperty('display', 'inline-flex', 'important');
-        headerMergeBtn.innerHTML = '<span>🚀</span> <span class="btn-text">本番へ公開中</span>';
-        headerMergeBtn.style.background = '#059669';
+        headerMergeBtn.style.setProperty('display', 'none', 'important');
       }
       const menuItemMerge = document.getElementById('menu-item-merge-prod');
       if (menuItemMerge) {
@@ -18145,9 +18138,7 @@
         mergeBtn.style.border = 'none';
       }
       if (headerMergeBtn) {
-        headerMergeBtn.style.setProperty('display', 'inline-flex', 'important');
-        headerMergeBtn.innerHTML = '<span>🚀</span> <span class="btn-text">本番へ公開</span>';
-        headerMergeBtn.style.background = '#16a34a';
+        headerMergeBtn.style.setProperty('display', 'none', 'important');
       }
       const menuItemMerge = document.getElementById('menu-item-merge-prod');
       if (menuItemMerge) {
@@ -18226,16 +18217,7 @@
           testTabBtn.classList.remove('active');
         }
         if (envNotice) {
-          envNotice.style.background = '#f8fafc';
-          envNotice.style.borderColor = '#cbd5e1';
-          envNotice.style.color = '#475569';
-        }
-        if (envNoticeTitle) {
-          envNoticeTitle.textContent = '🚀 本番公開用URL (main branch)';
-          envNoticeTitle.style.color = '#1e293b';
-        }
-        if (envNoticeDesc) {
-          envNoticeDesc.textContent = '一般回答者・顧客向けの公式リンクです。回答データは本番マスターテーブルへ正規保存されます。';
+          envNotice.style.display = 'none';
         }
         if (urlLabel) urlLabel.textContent = '本番用URL（一般回答者向け）';
         if (testStatusBadge) testStatusBadge.style.display = 'none';
@@ -18252,16 +18234,7 @@
           testTabBtn.classList.add('active');
         }
         if (envNotice) {
-          envNotice.style.background = '#fffbeb';
-          envNotice.style.borderColor = '#fde68a';
-          envNotice.style.color = '#92400e';
-        }
-        if (envNoticeTitle) {
-          envNoticeTitle.textContent = '🧪 テスト送信専用URL (test branch)';
-          envNoticeTitle.style.color = '#b45309';
-        }
-        if (envNoticeDesc) {
-          envNoticeDesc.textContent = '公開前・公開後の動作検証用リンクです。編集内容は常に自動で即時反映されます。テスト送信時はデータベースへの書き込みが一切行われないため、本番への混入や不要データの消去作業の心配なく何度でも安全に検証できます。';
+          envNotice.style.display = 'none';
         }
         if (urlLabel) urlLabel.textContent = 'テスト送信専用URL（動作検証用・本番隔離）';
         if (testStatusBadge) testStatusBadge.style.display = 'inline-block';
