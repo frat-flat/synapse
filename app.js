@@ -52840,7 +52840,7 @@ const APPOINT_DEFAULT_PRESET_FORMS = [
     desc: 'プラン選択、導入規模、契約希望時期など',
     appointIntegration: {
       enabled: true,
-      fields: { customerName: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true, memo: true }
+      fields: { customerName: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true }
     }
   },
   {
@@ -52849,7 +52849,7 @@ const APPOINT_DEFAULT_PRESET_FORMS = [
     desc: 'インボイス番号、手数料振込先口座、取扱商材など',
     appointIntegration: {
       enabled: true,
-      fields: { customerName: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true, memo: true }
+      fields: { customerName: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true }
     }
   }
 ];
@@ -52858,27 +52858,52 @@ const APPOINT_DEFAULT_PRESET_FORMS = [
 function getAppointAvailableForms() {
   const forms = [];
   try {
-    const customForms = JSON.parse(localStorage.getItem('synapse_custom_forms') || '[]');
-    if (Array.isArray(customForms)) {
-      customForms.forEach(f => {
-        if (f && f.appointIntegration && f.appointIntegration.enabled) {
+    // フォームエディタの保存先（form_customize_all_forms）およびフォールバック（synapse_custom_forms）から読み込み
+    let allForms = [];
+    try {
+      allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]');
+    } catch(e) {}
+    if (!Array.isArray(allForms) || allForms.length === 0) {
+      try {
+        allForms = JSON.parse(localStorage.getItem('synapse_custom_forms') || '[]');
+      } catch(e) {}
+    }
+
+    if (Array.isArray(allForms)) {
+      allForms.forEach(f => {
+        if (!f) return;
+        const fid = f.id || '';
+        const ftitle = f.title || f.name || fid;
+        const isPreset = fid === 'form_yosandas' || fid === 'form_agency' || ftitle.includes('ヨサンダス') || ftitle.includes('代理店');
+        
+        // appointIntegration が明示されている場合はその enabled 値を尊重。未定義かつプリセットなら true
+        const isEnabled = f.appointIntegration ? (f.appointIntegration.enabled === true) : isPreset;
+
+        if (isEnabled) {
           forms.push({
-            id: f.id,
-            name: f.title || f.name || f.id,
-            desc: f.description || f.subtitle || 'カスタム連携フォーム',
-            appointIntegration: f.appointIntegration
+            id: fid,
+            name: ftitle,
+            desc: f.description || f.subtitle || '連携フォーム',
+            appointIntegration: f.appointIntegration || {
+              enabled: true,
+              fields: { customerName: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true }
+            }
           });
         }
       });
     }
-  } catch(e) {}
 
-  // プリセット（ヨサンダス申込、代理店申込）のフォールバック
-  APPOINT_DEFAULT_PRESET_FORMS.forEach(preset => {
-    if (!forms.some(f => f.id === preset.id)) {
-      forms.push(preset);
-    }
-  });
+    // まだ一度も保存されていない初期状態用のプリセットフォールバック
+    // ※ allForms 内に同IDや同タイトルのフォームが既に存在し、それが OFF（isEnabled === false）の場合は絶対に復活させない！
+    APPOINT_DEFAULT_PRESET_FORMS.forEach(preset => {
+      const existsInAll = Array.isArray(allForms) && allForms.some(f => f && (f.id === preset.id || (f.title && f.title.includes(preset.name)) || (f.name && f.name.includes(preset.name))));
+      if (!existsInAll && !forms.some(f => f.id === preset.id)) {
+        forms.push(preset);
+      }
+    });
+  } catch(e) {
+    console.error('[getAppointAvailableForms] Error:', e);
+  }
 
   return forms;
 }
@@ -53210,7 +53235,6 @@ function openAppointIssueModal() {
         if (flds.meetingType !== false) badges.push('🌐 流入経路');
         if (flds.sourceCategory !== false) badges.push('🏷️ 流入詳細');
         if (flds.introducer !== false && flds.introducerName !== false) badges.push('👥 紹介者(ID)');
-        if (flds.memo !== false) badges.push('📝 メモ');
         const badgesHtml = badges.length > 0 
           ? `<div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 0.35rem;">
                <span style="font-size: 0.68rem; color: var(--text-muted); line-height: 1.4;">引継ぎ項目:</span>
@@ -53439,8 +53463,7 @@ function issueAppointForm(formId) {
     appointDate: true,
     meetingType: true,
     sourceCategory: true,
-    introducer: true,
-    memo: true
+    introducer: true
   };
 
   // アポイント情報スナップショット（appointSnapshot）の自動構築
@@ -53477,9 +53500,6 @@ function issueAppointForm(formId) {
     if (effIntroType) appointSnapshot.introducerType = effIntroType;
   }
 
-  if (flds.memo !== false && (data.memo || data.notes)) {
-    appointSnapshot.memo = data.memo || data.notes;
-  }
   if (data.id) {
     appointSnapshot.appointId = data.id;
   }

@@ -246,6 +246,13 @@
           <div class="dashboard-toolbar-gf">
             <h3 id="dashboard-group-title" class="group-title">今日</h3>
             <div class="toolbar-right-controls">
+              <!-- 📅 アポイント連携絞り込みフィルター -->
+              <select id="appoint-filter-select" style="background: #ffffff; border: 1px solid #dadce0; color: #3c4043; font-size: 0.8rem; font-family: inherit; font-weight: 500; cursor: pointer; outline: none; margin-right: 8px; padding: 4px 8px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                <option value="all">すべてのフォーム</option>
+                <option value="appoint_only">📅 アポ連携のみ</option>
+                <option value="non_appoint">アポ連携なし</option>
+              </select>
+
               <div class="control-dropdown" id="btn-owner-filter" style="position: relative;">
                 <span id="owner-filter-text">オーナー指定なし</span>
                 <span class="arrow-down">▼</span>
@@ -827,9 +834,6 @@
                       </label>
                       <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
                         <input type="checkbox" id="editor-appoint-field-introducer" checked /> 👥 紹介者（本登録ID/仮ID/氏名）
-                      </label>
-                      <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                        <input type="checkbox" id="editor-appoint-field-memo" checked /> 📝 商談メモ
                       </label>
                     </div>
                     <div style="font-size: 0.68rem; color: var(--color-text-muted); margin-top: 4px; line-height: 1.3;">

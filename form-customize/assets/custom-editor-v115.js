@@ -5022,14 +5022,109 @@
   }
 
   function startDashboardHookLoop() {
+    // 📅 アポイント連携絞り込みフィルターのイベントリスナー初期化
+    function setupAppointFilterListener() {
+      const filterEl = document.getElementById('appoint-filter-select');
+      if (filterEl && !filterEl.dataset.bound) {
+        filterEl.dataset.bound = 'true';
+        filterEl.addEventListener('change', () => {
+          const currentFilter = filterEl.value;
+          const dashboardItems = document.querySelectorAll('.gf-list-row, .form-preview-card, #dashboard-view-list tbody tr, .dashboard-preview-card');
+          dashboardItems.forEach(item => {
+            const isAppointLinked = item.dataset.appointLinked === 'true';
+            if (currentFilter === 'appoint_only') {
+              item.style.display = isAppointLinked ? '' : 'none';
+            } else if (currentFilter === 'non_appoint') {
+              item.style.display = !isAppointLinked ? '' : 'none';
+            } else {
+              item.style.display = '';
+            }
+          });
+        });
+      }
+    }
+    setupAppointFilterListener();
+
     setInterval(() => {
       try {
-        // 1. 新規フォーム作成ボタンのフックはグローバルデリゲーションで処理されるため省略します。
+        setupAppointFilterListener();
 
-        // 2. リスト表示（テーブル行）への「⭐ テンプレート登録」ボタン自動アペンド＆日付フォーマット処理
+        // 1. 全フォームデータの読み込み
+        const key = 'form_customize_all_forms';
+        let allForms = [];
+        try {
+          allForms = JSON.parse(localStorage.getItem(key) || '[]');
+        } catch(e) {}
+
+        const appointFilterEl = document.getElementById('appoint-filter-select');
+        const currentFilter = appointFilterEl ? appointFilterEl.value : 'all';
+
+        // 2. リスト表示およびカード表示のアイテム走査（アポ連携バッジ付与 ＆ 絞り込みフィルター適用）
+        const dashboardItems = document.querySelectorAll('.gf-list-row, .form-preview-card, #dashboard-view-list tbody tr, .dashboard-preview-card');
+        dashboardItems.forEach((item, idx) => {
+          let formIdx = -1;
+          if (item.dataset.formIndex !== undefined && item.dataset.formIndex !== '') {
+            formIdx = parseInt(item.dataset.formIndex, 10);
+          } else {
+            formIdx = idx;
+          }
+
+          const titleEl = item.querySelector('.gf-list-title-text, .card-preview-title-text, .card-title, h3, h4, td:first-child');
+          const itemTitle = (item.dataset.formTitle || (titleEl ? titleEl.textContent : '')).trim();
+
+          let form = null;
+          if (formIdx >= 0 && formIdx < allForms.length) {
+            form = allForms[formIdx];
+          }
+          if (!form && itemTitle) {
+            form = allForms.find(f => f && (f.title === itemTitle || (f.title && f.title.includes(itemTitle))));
+          }
+
+          const isPreset = form ? (form.id === 'form_yosandas' || form.id === 'form_agency' || (form.title && (form.title.includes('ヨサンダス') || form.title.includes('代理店')))) : (itemTitle.includes('ヨサンダス') || itemTitle.includes('代理店'));
+          const isAppointLinked = form ? (form.appointIntegration ? form.appointIntegration.enabled === true : isPreset) : isPreset;
+
+          item.dataset.appointLinked = isAppointLinked ? 'true' : 'false';
+
+          // 2-1. 📅 アポ連携バッジの付与 / 削除
+          let badgeEl = item.querySelector('.badge-appoint-sync');
+          if (isAppointLinked) {
+            if (!badgeEl) {
+              badgeEl = document.createElement('span');
+              badgeEl.className = 'badge-appoint-sync';
+              badgeEl.innerHTML = '📅 アポ連携';
+              badgeEl.style.cssText = 'display: inline-flex; align-items: center; gap: 3px; font-size: 0.68rem; font-weight: 700; color: #1e40af; background: #dbeafe; border: 1px solid #bfdbfe; padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle; white-space: nowrap; line-height: 1.2; flex-shrink: 0;';
+
+              const textGroup = item.querySelector('.gf-list-title-text-group');
+              if (textGroup) {
+                textGroup.appendChild(badgeEl);
+              } else if (titleEl) {
+                titleEl.insertAdjacentElement('afterend', badgeEl);
+              } else {
+                item.appendChild(badgeEl);
+              }
+            }
+          } else {
+            if (badgeEl) {
+              badgeEl.remove();
+            }
+          }
+
+          // 2-2. 絞り込みフィルターの適用
+          if (currentFilter === 'appoint_only') {
+            item.style.display = isAppointLinked ? '' : 'none';
+          } else if (currentFilter === 'non_appoint') {
+            item.style.display = !isAppointLinked ? '' : 'none';
+          } else {
+            if (item.style.display === 'none' && !item.dataset.hiddenByOtherFilter) {
+              item.style.display = '';
+            }
+          }
+        });
+
+        // 3. リスト表示（テーブル行）への「⭐ テンプレート登録」ボタン自動アペンド＆日付フォーマット処理
         const listRows = document.querySelectorAll('#dashboard-view-list tbody tr');
         listRows.forEach((row, idx) => {
-          // 2-1. テンプレート登録ボタンの自動アペンド
+          // 3-1. テンプレート登録ボタンの自動アペンド
           if (!row.dataset.templateHooked) {
             row.dataset.templateHooked = "true";
             const actionTd = row.querySelector('td:last-child');
@@ -5049,14 +5144,8 @@
             }
           }
 
-          // 2-2. 今日以外の日付セルを YYYY/MM/DD へ自動書き換え
+          // 3-2. 今日以外の日付セルを YYYY/MM/DD へ自動書き換え
           try {
-            const key = 'form_customize_all_forms';
-            let allForms = [];
-            try {
-              allForms = JSON.parse(localStorage.getItem(key) || '[]');
-            } catch(e) {}
-
             const form = allForms[idx];
             if (form) {
               const formDateStr = form.lastModified || form.date;
@@ -5091,10 +5180,10 @@
           }
         });
 
-        // 3. プレビューカード（グリッド表示）への「⭐ テンプレート登録」ボタン自動アペンド＆日付フォーマット処理
+        // 4. プレビューカード（グリッド表示）への「⭐ テンプレート登録」ボタン自動アペンド＆日付フォーマット処理
         const previewCards = document.querySelectorAll('#dashboard-view-preview .dashboard-preview-card');
         previewCards.forEach((card, idx) => {
-          // 3-1. テンプレート登録ボタンの自動アペンド
+          // 4-1. テンプレート登録ボタンの自動アペンド
           if (!card.dataset.templateHooked) {
             card.dataset.templateHooked = "true";
             const footer = card.querySelector('.card-footer') || card;
@@ -5115,14 +5204,8 @@
             }
           }
 
-          // 3-2. 今日以外の日付セルを YYYY/MM/DD へ自動書き換え
+          // 4-2. 今日以外の日付セルを YYYY/MM/DD へ自動書き換え
           try {
-            const key = 'form_customize_all_forms';
-            let allForms = [];
-            try {
-              allForms = JSON.parse(localStorage.getItem(key) || '[]');
-            } catch(e) {}
-
             const form = allForms[idx];
             if (form) {
               const formDateStr = form.lastModified || form.date;
@@ -5156,14 +5239,14 @@
           }
         });
 
-        // 4. テンプレートバーの自動再描画（他のレンダラによって空にされていたら再描画）
+        // 5. テンプレートバーの自動再描画（他のレンダラによって空にされていたら再描画）
         const barGrid = document.getElementById('template-bar-cards-grid');
         if (barGrid && barGrid.children.length === 0) {
           console.log('[Dashboard Hook] Template bar grid is empty, re-rendering...');
           renderTemplateBar();
         }
 
-        // 5. フォーム説明文 textarea の高さ自動追従
+        // 6. フォーム説明文 textarea の高さ自動追従
         const formDescEl = document.getElementById('editor-form-desc');
         if (formDescEl && document.activeElement !== formDescEl) {
           autoResizeTextarea(formDescEl);
@@ -22733,7 +22816,32 @@
   setInterval(setupTargetTableGlobalSettingsUI, 500);
 
   // 📅 アポイント連携設定のUI初期化＆データ同期ヘルパー
-  const APPOINT_FIELD_KEYS = ['customerName', 'appointDate', 'meetingType', 'sourceCategory', 'introducer', 'memo'];
+  const APPOINT_FIELD_KEYS = ['customerName', 'appointDate', 'meetingType', 'sourceCategory', 'introducer'];
+
+  // フォームエディタでアポイント連携設定が変更された際、form_customize_all_forms へ即時同期保存するヘルパー
+  function syncAppointIntegrationToStorage(curDef) {
+    if (!curDef) return;
+    try {
+      const allFormsRaw = localStorage.getItem('form_customize_all_forms');
+      if (allFormsRaw) {
+        const allForms = JSON.parse(allFormsRaw);
+        if (Array.isArray(allForms)) {
+          let updated = false;
+          allForms.forEach(f => {
+            if (f && (f.id === curDef.id || (curDef.title && f.title === curDef.title))) {
+              f.appointIntegration = JSON.parse(JSON.stringify(curDef.appointIntegration));
+              updated = true;
+            }
+          });
+          if (updated) {
+            localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('[syncAppointIntegrationToStorage] Error:', e);
+    }
+  }
 
   function setupAppointIntegrationSettingsUI() {
     const enabledToggle = document.getElementById('editor-appoint-integration-enabled');
@@ -22757,8 +22865,7 @@
           appointDate: true,
           meetingType: true,
           sourceCategory: true,
-          introducer: true,
-          memo: true
+          introducer: true
         }
       };
     } else if (!formDef.appointIntegration.fields) {
@@ -22767,8 +22874,7 @@
         appointDate: true,
         meetingType: true,
         sourceCategory: true,
-        introducer: true,
-        memo: true
+        introducer: true
       };
     } else {
       // 互換性フォールバック
@@ -22801,10 +22907,22 @@
       enabledToggle.addEventListener('change', (e) => {
         const curDef = window.G || window.n || window.L || {};
         if (!curDef.appointIntegration) curDef.appointIntegration = { enabled: false, fields: {} };
+        
+        // ⚠️ 連携解除防止ガード: トグルをOFFにしようとした際、安全確認ダイアログを表示
+        if (!e.target.checked) {
+          const confirmed = window.confirm('⚠️ アポイント連携を解除しますか？\n\n解除すると、アポイント詳細画面からこのフォームが発行できなくなります。\n本当に連携を解除しますか？');
+          if (!confirmed) {
+            e.preventDefault();
+            e.target.checked = true;
+            return;
+          }
+        }
+
         curDef.appointIntegration.enabled = e.target.checked;
         detailsPanel.style.display = e.target.checked ? 'flex' : 'none';
         enabledToggle.dataset.lastFormKey = `${curDef.id || ''}_${curDef.appointIntegration.enabled}`;
 
+        syncAppointIntegrationToStorage(curDef);
         if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
         if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
         if (typeof window.S === 'function') window.S();
@@ -22820,6 +22938,7 @@
             if (!curDef.appointIntegration.fields) curDef.appointIntegration.fields = {};
             curDef.appointIntegration.fields[key] = e.target.checked;
 
+            syncAppointIntegrationToStorage(curDef);
             if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
             if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
             if (typeof window.S === 'function') window.S();
@@ -22843,6 +22962,7 @@
             curDef.appointIntegration.fields[k] = !anyChecked;
           });
 
+          syncAppointIntegrationToStorage(curDef);
           if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
           if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
           if (typeof window.S === 'function') window.S();
