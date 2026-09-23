@@ -7276,3 +7276,34 @@ html, body {
   display: none !important;
 }
 
+/* フォーム全体設定アコーディオン内のフォームコントロールの文字見切れ防止・配置崩れ防止 */
+.title-details-content select.form-control,
+.title-details-content input.form-control,
+.settings-card-pro select.form-control,
+.settings-card-pro input.form-control {
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 3px 8px !important;
+  font-size: 0.75rem !important;
+  line-height: 1.4 !important;
+  box-sizing: border-box !important;
+}
+
+.size-adjust-row {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 4px 0 !important;
+}
+
+.size-adjust-row label {
+  margin: 0 !important;
+  font-size: 0.74rem !important;
+  font-weight: 600 !important;
+  color: var(--color-text-muted) !important;
+  text-align: left !important;
+}
+
