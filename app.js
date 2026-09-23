@@ -52950,18 +52950,57 @@ if (document.readyState === 'loading') {
 // 🌟 アポイント画面 連携フォーム管理 & 発行機能
 // ============================================================
 
-const APPOINT_AVAILABLE_FORMS = [
+const APPOINT_DEFAULT_PRESET_FORMS = [
   {
     id: 'form_yosandas',
     name: 'ヨサンダス申込フォーム',
-    desc: 'プラン選択、導入規模、契約希望時期など'
+    desc: 'プラン選択、導入規模、契約希望時期など',
+    appointIntegration: {
+      enabled: true,
+      fields: { customerName: true, appointDate: true, meetingType: true, issuerName: true, introducerName: true, memo: true }
+    }
   },
   {
     id: 'form_agency',
     name: '代理店申込フォーム',
-    desc: 'インボイス番号、手数料振込先口座、取扱商材など'
+    desc: 'インボイス番号、手数料振込先口座、取扱商材など',
+    appointIntegration: {
+      enabled: true,
+      fields: { customerName: true, appointDate: true, meetingType: true, issuerName: true, introducerName: true, memo: true }
+    }
   }
 ];
+
+// 📋 アポイント連携対象フォームを動的に取得（フォームエディタ側の「アポイント連携設定」と完全連動）
+function getAppointAvailableForms() {
+  const forms = [];
+  try {
+    const customForms = JSON.parse(localStorage.getItem('synapse_custom_forms') || '[]');
+    if (Array.isArray(customForms)) {
+      customForms.forEach(f => {
+        if (f && f.appointIntegration && f.appointIntegration.enabled) {
+          forms.push({
+            id: f.id,
+            name: f.title || f.name || f.id,
+            desc: f.description || f.subtitle || 'カスタム連携フォーム',
+            appointIntegration: f.appointIntegration
+          });
+        }
+      });
+    }
+  } catch(e) {}
+
+  // プリセット（ヨサンダス申込、代理店申込）のフォールバック
+  APPOINT_DEFAULT_PRESET_FORMS.forEach(preset => {
+    if (!forms.some(f => f.id === preset.id)) {
+      forms.push(preset);
+    }
+  });
+
+  return forms;
+}
+window.getAppointAvailableForms = getAppointAvailableForms;
+const APPOINT_AVAILABLE_FORMS = APPOINT_DEFAULT_PRESET_FORMS;
 
 function getCurrentAppointData() {
   if (state.tabs && state.activeTabId) {
@@ -53264,81 +53303,63 @@ function openAppointIssueModal() {
     if (data) data.linkedForms = [];
   }
 
-  const isYosandasIssued = data?.linkedForms?.some(f => f.formId === 'form_yosandas' && f.status !== 'invalidated');
-  const isAgencyIssued = data?.linkedForms?.some(f => f.formId === 'form_agency' && f.status !== 'invalidated');
+  // 📋 アポイント連携対象フォームを動的にレンダリング
+  const listContainer = document.getElementById('appoint-available-forms-list');
+  if (listContainer) {
+    listContainer.innerHTML = '';
+    const availableForms = getAppointAvailableForms();
 
-  const optY = document.getElementById('opt-issue-yosandas');
-  const btnY = document.getElementById('btn-select-yosandas');
-  if (optY && btnY) {
-    if (isYosandasIssued) {
-      optY.classList.add('disabled');
-      btnY.className = 'btn btn-sm btn-secondary';
-      btnY.textContent = '発行済み';
-      btnY.disabled = true;
+    if (availableForms.length === 0) {
+      listContainer.innerHTML = `
+        <div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; background: var(--bg-surface-elevated); border-radius: var(--radius-sm);">
+          現在、アポイント連携可能なフォームがありません。<br>フォームエディタの「アポイント連携設定」で連携を有効にしてください。
+        </div>
+      `;
     } else {
-      optY.classList.remove('disabled');
-      btnY.className = 'btn btn-sm btn-primary';
-      btnY.textContent = '選択する';
-      btnY.disabled = false;
-    }
-  }
+      availableForms.forEach(formItem => {
+        const isIssued = data?.linkedForms?.some(f => f.formId === formItem.id && f.status !== 'invalidated');
 
-  const optA = document.getElementById('opt-issue-agency');
-  const btnA = document.getElementById('btn-select-agency');
-  if (optA && btnA) {
-    if (isAgencyIssued) {
-      optA.classList.add('disabled');
-      btnA.className = 'btn btn-sm btn-secondary';
-      btnA.textContent = '発行済み';
-      btnA.disabled = true;
-    } else {
-      optA.classList.remove('disabled');
-      btnA.className = 'btn btn-sm btn-primary';
-      btnA.textContent = '選択する';
-      btnA.disabled = false;
-    }
-  }
+        // 引継ぎ設定バッジの生成
+        const flds = formItem.appointIntegration?.fields || {};
+        const badges = [];
+        if (flds.customerName !== false) badges.push('🏢 顧客名');
+        if (flds.appointDate !== false) badges.push('📅 日時');
+        if (flds.meetingType !== false) badges.push('🤝 面談');
+        if (flds.issuerName !== false) badges.push('👤 担当');
+        if (flds.introducerName !== false) badges.push('👥 紹介');
+        if (flds.memo !== false) badges.push('📝 メモ');
+        const badgesHtml = badges.length > 0 
+          ? `<div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 0.35rem;">
+               <span style="font-size: 0.68rem; color: var(--text-muted); line-height: 1.4;">引継ぎ項目:</span>
+               ${badges.map(b => `<span style="font-size: 0.65rem; background: rgba(59, 130, 246, 0.08); color: var(--primary); padding: 1px 5px; border-radius: 3px;">${escapeHtml(b)}</span>`).join('')}
+             </div>`
+          : '';
 
-  // 📋 アポイント引継ぎ設定の復元（前回保存値、または全選択）
-  try {
-    const savedConfig = JSON.parse(localStorage.getItem('synapse_appoint_inherit_config') || 'null');
-    const fields = [
-      { id: 'appoint-inherit-customer-name', key: 'customerName' },
-      { id: 'appoint-inherit-appoint-date', key: 'appointDate' },
-      { id: 'appoint-inherit-meeting-type', key: 'meetingType' },
-      { id: 'appoint-inherit-issuer', key: 'issuer' },
-      { id: 'appoint-inherit-introducer', key: 'introducer' },
-      { id: 'appoint-inherit-memo', key: 'memo' }
-    ];
-    fields.forEach(f => {
-      const el = document.getElementById(f.id);
-      if (el) {
-        if (savedConfig && typeof savedConfig[f.key] === 'boolean') {
-          el.checked = savedConfig[f.key];
-        } else {
-          el.checked = true;
+        const itemEl = document.createElement('div');
+        itemEl.className = 'appoint-form-select-item';
+        itemEl.style.cssText = `border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; cursor: ${isIssued ? 'default' : 'pointer'}; transition: all 0.15s; background: var(--bg-surface-elevated); ${isIssued ? 'opacity: 0.7;' : ''}`;
+
+        itemEl.innerHTML = `
+          <div style="flex: 1; min-width: 0; padding-right: 0.75rem;">
+            <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+              <span>${escapeHtml(formItem.name)}</span>
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">${escapeHtml(formItem.desc)}</div>
+            ${badgesHtml}
+          </div>
+          <button type="button" class="btn btn-sm ${isIssued ? 'btn-secondary' : 'btn-primary'}" style="font-size: 0.75rem; padding: 0.3rem 0.75rem; flex-shrink: 0;" ${isIssued ? 'disabled' : ''}>
+            ${isIssued ? '発行済み' : '選択する'}
+          </button>
+        `;
+
+        if (!isIssued) {
+          itemEl.addEventListener('click', () => issueAppointForm(formItem.id));
         }
-      }
-    });
-  } catch(e) {}
 
-  // すべて切替リンクのイベントバインド
-  const toggleAllBtn = document.getElementById('btn-appoint-inherit-toggle-all');
-  if (toggleAllBtn && !toggleAllBtn.dataset.bound) {
-    toggleAllBtn.dataset.bound = 'true';
-    toggleAllBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const cbs = [
-        'appoint-inherit-customer-name',
-        'appoint-inherit-appoint-date',
-        'appoint-inherit-meeting-type',
-        'appoint-inherit-issuer',
-        'appoint-inherit-introducer',
-        'appoint-inherit-memo'
-      ].map(id => document.getElementById(id)).filter(Boolean);
-      const anyChecked = cbs.some(cb => cb.checked);
-      cbs.forEach(cb => { cb.checked = !anyChecked; });
-    });
+        listContainer.appendChild(itemEl);
+      });
+    }
   }
 
   if (modal) {
@@ -53516,7 +53537,8 @@ function issueAppointForm(formId) {
   const ctx = getEffectiveAppointMasterContext(data);
   const masterId = ctx.masterId || data.id;
 
-  const targetDef = APPOINT_AVAILABLE_FORMS.find(f => f.id === formId);
+  const availableForms = getAppointAvailableForms();
+  const targetDef = availableForms.find(f => f.id === formId);
   const formName = targetDef ? targetDef.name : formId;
 
   // フォーム発行ユーザー（担当者）
@@ -53528,39 +53550,36 @@ function issueAppointForm(formId) {
   const introducerName = document.getElementById('appoint-hidden-introducer-name')?.value || data.introducerName || '';
   const introducerType = document.getElementById('appoint-hidden-introducer-type')?.value || data.introducerType || '';
 
-  // 📋 アポイント引継ぎ項目の選択状態を取得＆次回記憶
-  const inheritConfig = {
-    customerName: document.getElementById('appoint-inherit-customer-name') ? document.getElementById('appoint-inherit-customer-name').checked : true,
-    appointDate: document.getElementById('appoint-inherit-appoint-date') ? document.getElementById('appoint-inherit-appoint-date').checked : true,
-    meetingType: document.getElementById('appoint-inherit-meeting-type') ? document.getElementById('appoint-inherit-meeting-type').checked : true,
-    issuer: document.getElementById('appoint-inherit-issuer') ? document.getElementById('appoint-inherit-issuer').checked : true,
-    introducer: document.getElementById('appoint-inherit-introducer') ? document.getElementById('appoint-inherit-introducer').checked : true,
-    memo: document.getElementById('appoint-inherit-memo') ? document.getElementById('appoint-inherit-memo').checked : true
+  // 📋 フォーム側で事前設定された「アポイント引継ぎ・回答記録項目」ルールを取得
+  const flds = targetDef?.appointIntegration?.fields || {
+    customerName: true,
+    appointDate: true,
+    meetingType: true,
+    issuerName: true,
+    introducerName: true,
+    memo: true
   };
-  try {
-    localStorage.setItem('synapse_appoint_inherit_config', JSON.stringify(inheritConfig));
-  } catch(e) {}
 
-  // アポイント情報スナップショット（appointSnapshot）の構築
+  // アポイント情報スナップショット（appointSnapshot）の自動構築
   const appointSnapshot = {};
-  if (inheritConfig.customerName && (data.customerName || data.name)) {
+  if (flds.customerName !== false && (data.customerName || data.name)) {
     appointSnapshot.customerName = data.customerName || data.name;
   }
-  if (inheritConfig.appointDate && (data.date || data.appointDate)) {
+  if (flds.appointDate !== false && (data.date || data.appointDate)) {
     appointSnapshot.appointDate = data.date || data.appointDate;
     appointSnapshot.date = data.date || data.appointDate;
   }
-  if (inheritConfig.meetingType) {
+  if (flds.meetingType !== false) {
     const mType = data.meetingType || (data.onlineCategory ? `オンライン (${data.onlineCategory})` : '');
     if (mType) appointSnapshot.meetingType = mType;
   }
-  if (inheritConfig.issuer && issuerName) {
+  if (flds.issuerName !== false && issuerName) {
     appointSnapshot.issuerName = issuerName;
   }
-  if (inheritConfig.introducer && (introducerName || data.introducerName)) {
+  if (flds.introducerName !== false && (introducerName || data.introducerName)) {
     appointSnapshot.introducerName = introducerName || data.introducerName;
   }
-  if (inheritConfig.memo && (data.memo || data.notes)) {
+  if (flds.memo !== false && (data.memo || data.notes)) {
     appointSnapshot.memo = data.memo || data.notes;
   }
   if (data.id) {
@@ -53691,33 +53710,7 @@ function initAppointLinkedFormsEvents() {
     });
   }
 
-  const btnY = document.getElementById('btn-select-yosandas');
-  if (btnY) {
-    btnY.addEventListener('click', (e) => {
-      e.stopPropagation();
-      issueAppointForm('form_yosandas');
-    });
-  }
-  const optY = document.getElementById('opt-issue-yosandas');
-  if (optY) {
-    optY.addEventListener('click', () => {
-      if (!optY.classList.contains('disabled')) issueAppointForm('form_yosandas');
-    });
-  }
 
-  const btnA = document.getElementById('btn-select-agency');
-  if (btnA) {
-    btnA.addEventListener('click', (e) => {
-      e.stopPropagation();
-      issueAppointForm('form_agency');
-    });
-  }
-  const optA = document.getElementById('opt-issue-agency');
-  if (optA) {
-    optA.addEventListener('click', () => {
-      if (!optA.classList.contains('disabled')) issueAppointForm('form_agency');
-    });
-  }
 
   // リアルタイム同期リスナー（BroadcastChannel & storage イベント）
   if (typeof BroadcastChannel !== 'undefined') {

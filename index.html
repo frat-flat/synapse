@@ -5326,74 +5326,13 @@
         現在のアポイント（マスタID: <strong id="modal-appoint-master-id-text" style="font-family: monospace; color: var(--primary);">-</strong>）に紐づけて発行するフォームを選択してください：
       </p>
 
-      <!-- 選択肢: ヨサンダス申込 -->
-      <div class="appoint-form-select-item" id="opt-issue-yosandas" style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.15s; background: var(--bg-surface-elevated);">
-        <div>
-          <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-            <span>ヨサンダス申込フォーム</span>
-          </div>
-          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">プラン選択、導入規模、契約希望時期など</div>
-        </div>
-        <button type="button" class="btn btn-sm btn-primary" id="btn-select-yosandas" style="font-size: 0.75rem; padding: 0.25rem 0.65rem;">選択する</button>
+      <!-- 📋 アポイント連携対象フォーム動的リスト -->
+      <div id="appoint-available-forms-list" style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 380px; overflow-y: auto; padding-right: 2px;">
+        <!-- JSでアポイント連携がONのフォームが動的にレンダリングされます -->
       </div>
 
-      <!-- 選択肢: 代理店申込 -->
-      <div class="appoint-form-select-item" id="opt-issue-agency" style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.15s; background: var(--bg-surface-elevated);">
-        <div>
-          <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-            <span>代理店申込フォーム</span>
-          </div>
-          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">インボイス番号、手数料振込先口座、取扱商材など</div>
-        </div>
-        <button type="button" class="btn btn-sm btn-primary" id="btn-select-agency" style="font-size: 0.75rem; padding: 0.25rem 0.65rem;">選択する</button>
-      </div>
-
-      <!-- 📋 アポイント情報の引継ぎ・回答記録設定パネル -->
-      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem 0.9rem; margin-top: 0.25rem;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-          <div style="font-weight: 600; font-size: 0.8rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.35rem;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
-            <span>アポイント内容の引継ぎ・回答記録設定</span>
-          </div>
-          <div style="font-size: 0.7rem; color: var(--text-muted);">
-            <a href="javascript:void(0)" id="btn-appoint-inherit-toggle-all" style="color: var(--primary); text-decoration: none;">すべて切替</a>
-          </div>
-        </div>
-        <p style="font-size: 0.72rem; color: var(--text-secondary); margin: 0 0 0.5rem 0; line-height: 1.4;">
-          チェックしたアポイント情報はフォーム回答へ自動引継ぎされ、専用回答テーブルにカラムとして保存されます：
-        </p>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.75rem; font-size: 0.75rem; color: var(--text-secondary);">
-          <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; user-select: none;">
-            <input type="checkbox" id="appoint-inherit-customer-name" checked style="accent-color: var(--primary);">
-            <span>🏢 顧客名・企業名</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; user-select: none;">
-            <input type="checkbox" id="appoint-inherit-appoint-date" checked style="accent-color: var(--primary);">
-            <span>📅 アポイント日時</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; user-select: none;">
-            <input type="checkbox" id="appoint-inherit-meeting-type" checked style="accent-color: var(--primary);">
-            <span>🤝 面談形式</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; user-select: none;">
-            <input type="checkbox" id="appoint-inherit-issuer" checked style="accent-color: var(--primary);">
-            <span>👤 発行担当者</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; user-select: none;">
-            <input type="checkbox" id="appoint-inherit-introducer" checked style="accent-color: var(--primary);">
-            <span>👥 紹介者</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; user-select: none;">
-            <input type="checkbox" id="appoint-inherit-memo" checked style="accent-color: var(--primary);">
-            <span>📝 商談メモ</span>
-          </label>
-        </div>
-      </div>
-
-      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">
-        ※ 一度発行されたフォームは「発行済み」となり二重発行が防止されます。
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; display: flex; justify-content: space-between; align-items: center; line-height: 1.4;">
+        <span>※ 各フォームで設定されたアポイント引継ぎ項目（顧客名・日時・メモ等）が自動的に回答データへ記録されます。</span>
       </div>
     </div>
   </div>

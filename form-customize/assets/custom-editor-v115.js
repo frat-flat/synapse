@@ -22732,6 +22732,118 @@
   }
   setInterval(setupTargetTableGlobalSettingsUI, 500);
 
+  // 📅 アポイント連携設定のUI初期化＆データ同期ヘルパー
+  const APPOINT_FIELD_KEYS = ['customerName', 'appointDate', 'meetingType', 'issuerName', 'introducerName', 'memo'];
+
+  function setupAppointIntegrationSettingsUI() {
+    const enabledToggle = document.getElementById('editor-appoint-integration-enabled');
+    const detailsPanel = document.getElementById('editor-appoint-integration-details');
+    const toggleAllBtn = document.getElementById('btn-editor-appoint-toggle-all');
+    if (!enabledToggle || !detailsPanel) return;
+
+    const formDef = window.G || window.n || window.L;
+    if (!formDef) return;
+
+    const formId = formDef.id || '';
+    const formTitle = formDef.title || '';
+
+    // 初回初期化: 既存のヨサンダス申込や代理店申込、またはappointIntegration未設定の場合
+    if (!formDef.appointIntegration) {
+      const isPresetAppointForm = formId.includes('yosandas') || formId.includes('agency') || formTitle.includes('ヨサンダス') || formTitle.includes('代理店');
+      formDef.appointIntegration = {
+        enabled: isPresetAppointForm,
+        fields: {
+          customerName: true,
+          appointDate: true,
+          meetingType: true,
+          issuerName: true,
+          introducerName: true,
+          memo: true
+        }
+      };
+    } else if (!formDef.appointIntegration.fields) {
+      formDef.appointIntegration.fields = {
+        customerName: true,
+        appointDate: true,
+        meetingType: true,
+        issuerName: true,
+        introducerName: true,
+        memo: true
+      };
+    }
+
+    // フォームが切り替わった場合、または未同期の場合にUIへ反映
+    const currentFormKey = `${formId}_${formDef.appointIntegration.enabled}`;
+    if (enabledToggle.dataset.lastFormKey !== currentFormKey) {
+      enabledToggle.dataset.lastFormKey = currentFormKey;
+      enabledToggle.checked = !!formDef.appointIntegration.enabled;
+      detailsPanel.style.display = enabledToggle.checked ? 'flex' : 'none';
+
+      APPOINT_FIELD_KEYS.forEach(key => {
+        const cb = document.getElementById(`editor-appoint-field-${key}`);
+        if (cb) {
+          cb.checked = formDef.appointIntegration.fields[key] !== false;
+        }
+      });
+    }
+
+    // イベントリスナーのバインド（未バインド時のみ）
+    if (!enabledToggle.dataset.bound) {
+      enabledToggle.dataset.bound = 'true';
+      enabledToggle.addEventListener('change', (e) => {
+        const curDef = window.G || window.n || window.L || {};
+        if (!curDef.appointIntegration) curDef.appointIntegration = { enabled: false, fields: {} };
+        curDef.appointIntegration.enabled = e.target.checked;
+        detailsPanel.style.display = e.target.checked ? 'flex' : 'none';
+        enabledToggle.dataset.lastFormKey = `${curDef.id || ''}_${curDef.appointIntegration.enabled}`;
+
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        if (typeof window.S === 'function') window.S();
+      });
+
+      APPOINT_FIELD_KEYS.forEach(key => {
+        const cb = document.getElementById(`editor-appoint-field-${key}`);
+        if (cb && !cb.dataset.bound) {
+          cb.dataset.bound = 'true';
+          cb.addEventListener('change', (e) => {
+            const curDef = window.G || window.n || window.L || {};
+            if (!curDef.appointIntegration) curDef.appointIntegration = { enabled: true, fields: {} };
+            if (!curDef.appointIntegration.fields) curDef.appointIntegration.fields = {};
+            curDef.appointIntegration.fields[key] = e.target.checked;
+
+            if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+            if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+            if (typeof window.S === 'function') window.S();
+          });
+        }
+      });
+
+      if (toggleAllBtn && !toggleAllBtn.dataset.bound) {
+        toggleAllBtn.dataset.bound = 'true';
+        toggleAllBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const curDef = window.G || window.n || window.L || {};
+          if (!curDef.appointIntegration) curDef.appointIntegration = { enabled: true, fields: {} };
+          if (!curDef.appointIntegration.fields) curDef.appointIntegration.fields = {};
+
+          const cbs = APPOINT_FIELD_KEYS.map(k => document.getElementById(`editor-appoint-field-${k}`)).filter(Boolean);
+          const anyChecked = cbs.some(cb => cb.checked);
+          cbs.forEach(cb => {
+            cb.checked = !anyChecked;
+            const k = cb.id.replace('editor-appoint-field-', '');
+            curDef.appointIntegration.fields[k] = !anyChecked;
+          });
+
+          if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+          if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+          if (typeof window.S === 'function') window.S();
+        });
+      }
+    }
+  }
+  setInterval(setupAppointIntegrationSettingsUI, 500);
+
   // ヘッダーボタンの初期化
   function setupHeaderColumnPreviewButton() {
     const btn = document.getElementById('btn-header-column-preview');
