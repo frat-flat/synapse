@@ -9124,7 +9124,7 @@
                 zipLookupTimer = setTimeout(async () => {
                   const addr = await lookupAddressFromZip(val);
                   if (addr) {
-                    autoFillAddressFields(addr);
+                    autoFillAddressFields(addr, card, qDef);
                     clearIntegrityError(card);
                   } else {
                     showIntegrityError(card, '郵便番号に合致する住所が見つかりません。');
@@ -9255,8 +9255,26 @@
     });
   }
 
-  function autoFillAddressFields(addr) {
-    const containers = [
+  function autoFillAddressFields(addr, sourceCard, qDef) {
+    if (!addr) return;
+
+    // 🛡️ グループ閉鎖化:
+    // 郵便番号カードが属する親グループ（.preview-question-group）を最優先で特定
+    let targetScope = null;
+    let isInsideGroup = false;
+
+    if (sourceCard) {
+      const grp = sourceCard.closest('.preview-question-group');
+      if (grp) {
+        targetScope = grp;
+        isInsideGroup = true;
+      } else {
+        // グループ外の場合は、同一セクションブロックに限定
+        targetScope = sourceCard.closest('.preview-section-block') || sourceCard.parentElement;
+      }
+    }
+
+    const containers = targetScope ? [targetScope] : [
       document.getElementById('preview-section-container'),
       document.getElementById('live-preview-section-container')
     ].filter(Boolean);
@@ -9265,7 +9283,14 @@
       const inputs = container.querySelectorAll('.preview-q-card input, .preview-q-card select');
       inputs.forEach(input => {
         const card = input.closest('.preview-q-card');
-        const title = card ? (card.querySelector('.preview-q-title') || card.querySelector('h3'))?.textContent || "" : "";
+        if (!card) return;
+
+        // グループ外の郵便番号の場合、グループに属しているカードは絶対に上書きしない
+        if (!isInsideGroup && card.closest('.preview-question-group')) {
+          return;
+        }
+
+        const title = (card.querySelector('.preview-q-title') || card.querySelector('h3'))?.textContent || "";
         
         if (title.includes('都道府県')) {
           input.value = addr.pref;
@@ -9315,6 +9340,250 @@
       }
     });
   }
+
+  // ============================================================================
+  // 📮 【住所項目のグループ化状態検証 ＆ 警告ポップアップシステム】
+  // ユーザー指示:
+  // 1. 郵便番号から住所を入力する際はグループのみしか入力できないようにし、グループ内で閉じてAPIを作動させる。
+  // 2. そうでない場合（グループ化されていない場合）は警告のポップアップを出す。
+  // ============================================================================
+
+  function detectAddressGroupIssues(formDef) {
+    const target = formDef || window.G || window.n || (window.U && window.U[window.W]);
+    if (!target || !target.sections) return [];
+
+    const issues = [];
+
+    target.sections.forEach((sec, sIdx) => {
+      const questions = sec.questions || [];
+      const addressQuestions = [];
+      const zipQuestions = [];
+
+      questions.forEach(q => {
+        const title = (q.title || '').trim();
+        const normTitle = typeof normalizeText === 'function' ? normalizeText(title) : title;
+        const isZip = normTitle.includes('郵便') || normTitle.includes('zip') || (q.validation && q.validation.condition === 'zip_code') || q.dataKey === 'zip_code';
+        const isAddr = normTitle.includes('都道府県') || normTitle.includes('市区町村') || normTitle.includes('町名') || normTitle.includes('番地') || normTitle.includes('住所') || q.dataKey === 'pref' || q.dataKey === 'city' || q.dataKey === 'street';
+
+        if (isZip) zipQuestions.push(q);
+        if (isAddr) addressQuestions.push(q);
+      });
+
+      if (zipQuestions.length > 0 || addressQuestions.length > 0) {
+        // グループに属していない孤立した項目を抽出
+        const ungroupedZips = zipQuestions.filter(q => !q.groupId);
+        const ungroupedAddrs = addressQuestions.filter(q => !q.groupId);
+
+        // グループに属しているが、同一グループ内に郵便番号と住所項目の両方が揃っていないケース
+        const splitZips = zipQuestions.filter(zq => {
+          if (!zq.groupId) return false;
+          const hasAddrInSameGroup = addressQuestions.some(aq => aq.groupId === zq.groupId);
+          return !hasAddrInSameGroup;
+        });
+
+        if (ungroupedZips.length > 0 || ungroupedAddrs.length > 0 || splitZips.length > 0) {
+          issues.push({
+            secId: sec.id,
+            secTitle: sec.title || `セクション ${sIdx + 1}`,
+            ungroupedZips,
+            ungroupedAddrs,
+            splitZips,
+            totalIssues: ungroupedZips.length + ungroupedAddrs.length + splitZips.length
+          });
+        }
+      }
+    });
+
+    return issues;
+  }
+  window.detectAddressGroupIssues = detectAddressGroupIssues;
+
+  function showAddressGroupWarningModal(issues, onProceedCallback) {
+    const existing = document.getElementById('address-group-warning-modal');
+    if (existing) existing.remove();
+
+    if (!issues || issues.length === 0) {
+      if (typeof onProceedCallback === 'function') onProceedCallback();
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'address-group-warning-modal';
+    overlay.style.cssText = `
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999999;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    `;
+
+    let issueItemsHtml = '';
+    issues.forEach(issue => {
+      const qNames = [
+        ...issue.ungroupedZips.map(q => `📮 ${escapeHtml(q.title || '郵便番号')}`),
+        ...issue.ungroupedAddrs.map(q => `📍 ${escapeHtml(q.title || '住所項目')}`),
+        ...issue.splitZips.map(q => `⚠️ ${escapeHtml(q.title || '郵便番号')} (住所と別グループ)`)
+      ];
+      issueItemsHtml += `
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+          <div style="font-weight: 700; font-size: 0.88rem; color: #1e293b; margin-bottom: 6px;">
+            📑 ${escapeHtml(issue.secTitle)}
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            ${qNames.map(name => `<span style="background: #fee2e2; color: #991b1b; padding: 3px 8px; border-radius: 4px; font-size: 0.78rem; font-weight: 600;">${name}</span>`).join('')}
+          </div>
+        </div>
+      `;
+    });
+
+    overlay.innerHTML = `
+      <div style="background: #ffffff; border-radius: 14px; width: 92%; max-width: 540px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden; border: 1px solid #e2e8f0;">
+        <div style="background: linear-gradient(135deg, #fef2f2, #fff7ed); padding: 18px 24px; border-bottom: 1px solid #fee2e2; display: flex; align-items: center; gap: 12px;">
+          <div style="width: 40px; height: 40px; border-radius: 50%; background: #fee2e2; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0;">
+            ⚠️
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #991b1b;">住所項目のグループ化に関する警告</h3>
+            <p style="margin: 2px 0 0; font-size: 0.78rem; color: #7f1d1d;">郵便番号APIの誤連動・上書きを防止するための必須要件です</p>
+          </div>
+        </div>
+        <div style="padding: 20px 24px; max-height: 60vh; overflow-y: auto;">
+          <p style="margin: 0 0 14px; font-size: 0.85rem; color: #334155; line-height: 1.6;">
+            フォーム内に<strong>「質問グループ」にまとめられていない住所項目</strong>が検出されました。<br>
+            郵便番号APIは、上部や他の住所（住民票住所や会社住所等）との誤連動を防ぐため、<strong>同一グループ内でのみ閉じて作動</strong>する仕様となっています。<br>
+            意図した通りに住所を自動補完させるため、これらの設問を同一の質問グループにまとめてください。
+          </p>
+          <div style="margin-bottom: 16px;">
+            ${issueItemsHtml}
+          </div>
+          <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 4px; font-size: 0.8rem; color: #1e40af; line-height: 1.5;">
+            💡 <strong>ワンクリック修復:</strong> 下記のボタンを押すと、検出された住所項目を自動的に「質問グループ」へまとめ、安全にAPIが動作する状態へ修復します。
+          </div>
+        </div>
+        <div style="background: #f8fafc; padding: 14px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px;">
+          <button id="btn-address-warning-cancel" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; padding: 9px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.15s;">
+            閉じる
+          </button>
+          <button id="btn-address-warning-autogroup" style="background: #2563eb; border: none; color: #ffffff; padding: 9px 20px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(37,99,235,0.3); transition: all 0.15s;">
+            <span>📁 自動でグループにまとめる</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#btn-address-warning-cancel').addEventListener('click', () => {
+      overlay.remove();
+      if (typeof onProceedCallback === 'function') onProceedCallback();
+    });
+
+    overlay.querySelector('#btn-address-warning-autogroup').addEventListener('click', () => {
+      autoFixAddressGrouping(issues);
+      overlay.remove();
+      if (typeof showCustomToast === 'function') {
+        showCustomToast('住所項目を質問グループにまとめました！', 'success');
+      }
+      if (typeof onProceedCallback === 'function') onProceedCallback();
+    });
+  }
+  window.showAddressGroupWarningModal = showAddressGroupWarningModal;
+
+  function autoFixAddressGrouping(issues) {
+    if (!issues || issues.length === 0) return;
+    const curForm = window.G || window.n || (window.U && window.U[window.W]);
+    if (!curForm || !curForm.sections) return;
+
+    issues.forEach(issue => {
+      const sec = curForm.sections.find(s => s.id === issue.secId);
+      if (!sec) return;
+
+      const newGrpId = `grp_addr_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+      const newGrpTitle = '住所情報';
+      const newGrpDesc = 'ご住所を入力してください';
+
+      (sec.questions || []).forEach(q => {
+        const isTarget = issue.ungroupedZips.some(uz => uz.id === q.id) ||
+                         issue.ungroupedAddrs.some(ua => ua.id === q.id) ||
+                         issue.splitZips.some(sz => sz.id === q.id);
+        if (isTarget) {
+          q.groupId = newGrpId;
+          q.groupTitle = newGrpTitle;
+          q.groupDescription = newGrpDesc;
+        }
+      });
+    });
+
+    if (typeof window.le === 'function') {
+      const activeSec = curForm.sections.find(s => s.id === window.r) || curForm.sections[0];
+      if (activeSec) window.le(activeSec);
+    }
+    if (typeof window.Q === 'function') window.Q();
+    if (typeof window.S === 'function') window.S(true);
+    if (typeof window.x === 'function') window.x();
+    if (typeof renderLivePreview === 'function') renderLivePreview();
+    if (typeof syncFormsToCloud === 'function') syncFormsToCloud(null, true);
+    updateAddressGroupWarningBanner();
+  }
+  window.autoFixAddressGrouping = autoFixAddressGrouping;
+
+  function updateAddressGroupWarningBanner() {
+    const questionsContainer = document.getElementById('questions-container');
+    if (!questionsContainer) return;
+
+    const existingBanner = document.getElementById('address-group-warning-banner');
+    const issues = detectAddressGroupIssues();
+
+    const curSecId = window.r;
+    const curSecIssue = issues.find(i => !curSecId || i.secId === curSecId);
+
+    if (curSecIssue) {
+      if (!existingBanner) {
+        const banner = document.createElement('div');
+        banner.id = 'address-group-warning-banner';
+        banner.style.cssText = `
+          background: #fef2f2;
+          border: 1.5px solid #f87171;
+          border-radius: 8px;
+          padding: 10px 14px;
+          margin-bottom: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        `;
+        banner.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #991b1b; font-weight: 600;">
+            <span style="font-size: 1.1rem;">⚠️</span>
+            <span>住所項目（郵便番号・住所等）がグループ化されていません。誤連動防止のため、同一グループにまとめる必要があります。</span>
+          </div>
+          <div style="display: flex; gap: 8px; flex-shrink: 0;">
+            <button id="btn-banner-details-address-group" class="btn btn-sm btn-secondary" type="button" style="font-size: 0.78rem; padding: 4px 10px; background: #ffffff; border: 1px solid #fca5a5; color: #991b1b; cursor: pointer; border-radius: 6px;">
+              詳細確認
+            </button>
+            <button id="btn-banner-fix-address-group" class="btn btn-sm btn-primary" type="button" style="font-size: 0.78rem; padding: 4px 12px; background: #dc2626; border: none; color: #ffffff; font-weight: 700; cursor: pointer; border-radius: 6px; box-shadow: 0 1px 4px rgba(220,38,38,0.25);">
+              📁 グループにまとめる
+            </button>
+          </div>
+        `;
+        questionsContainer.parentNode.insertBefore(banner, questionsContainer);
+
+        banner.querySelector('#btn-banner-details-address-group').addEventListener('click', () => {
+          showAddressGroupWarningModal(issues);
+        });
+        banner.querySelector('#btn-banner-fix-address-group').addEventListener('click', () => {
+          autoFixAddressGrouping(issues);
+        });
+      }
+    } else {
+      if (existingBanner) existingBanner.remove();
+    }
+  }
+  window.updateAddressGroupWarningBanner = updateAddressGroupWarningBanner;
 
   let isAutoFilling = false;
 
@@ -11523,6 +11792,11 @@
       } catch(e) {
         console.warn('[executeApplyPreset] renderLivePreview error:', e);
       }
+      try {
+        if (typeof updateAddressGroupWarningBanner === 'function') {
+          updateAddressGroupWarningBanner();
+        }
+      } catch(e) {}
     }
 
   window.buildCorpInfoQuestions = buildCorpInfoQuestions;
@@ -11759,12 +12033,27 @@
       if (e.target.value.startsWith('pro_') || e.target.value === 'email_autoreply') {
         selectChanger(e);
       } else {
+        const addedVal = e.target.value;
         if (typeof originalWe === 'function') {
           originalWe(e);
         } else if (typeof window.we === 'function') {
           window.we(e);
         }
         renderLivePreview();
+        try {
+          if (typeof updateAddressGroupWarningBanner === 'function') {
+            updateAddressGroupWarningBanner();
+          }
+        } catch(err) {}
+
+        if (['zip', 'address', 'prefecture'].includes(addedVal)) {
+          setTimeout(() => {
+            const issues = detectAddressGroupIssues();
+            if (issues.length > 0) {
+              showAddressGroupWarningModal(issues);
+            }
+          }, 200);
+        }
       }
     });
   }
@@ -13746,6 +14035,11 @@
         injectDnDSystem();
         injectValidationNoticeEnhancements();
         injectEmailAutoReplyToggle();
+        try {
+          if (typeof updateAddressGroupWarningBanner === 'function') {
+            updateAddressGroupWarningBanner();
+          }
+        } catch(e) {}
       };
     }
 
@@ -13764,6 +14058,11 @@
         if (typeof window.updateEditorSplitViews === 'function') {
           window.updateEditorSplitViews();
         }
+        try {
+          if (typeof updateAddressGroupWarningBanner === 'function') {
+            updateAddressGroupWarningBanner();
+          }
+        } catch(e) {}
       };
     }
 
@@ -13774,6 +14073,11 @@
       if (typeof patchRegexPresetDropdowns === 'function') patchRegexPresetDropdowns();
       injectRichTextToolbars();
       injectQuestionGroupSystem();
+      try {
+        if (typeof updateAddressGroupWarningBanner === 'function') {
+          updateAddressGroupWarningBanner();
+        }
+      } catch(e) {}
       injectDnDSystem();
       injectValidationNoticeEnhancements();
       injectEmailAutoReplyToggle();

@@ -3440,31 +3440,45 @@
         window.autoFillCorpRelatedFields = autoFillCorpRelatedFields;
 
         // 📮 郵便番号からの住所自動補完ハンドラ（公開回答画面 view.html 用）
+        // ユーザー指示: 郵便番号からグループ内のみで閉じてAPIを作動させ、他グループへの誤連動を完全に防止
         function autoFillAddressFromZipInView(addr, sourceZipQId) {
           if (!addr || !formDefinition || !formDefinition.sections) return;
 
           let srcQ = null;
+          let srcSec = null;
           if (sourceZipQId) {
             for (const sec of formDefinition.sections) {
               srcQ = (sec.questions || []).find(q => q.id === sourceZipQId);
-              if (srcQ) break;
+              if (srcQ) {
+                srcSec = sec;
+                break;
+              }
             }
           }
           const srcGroupId = srcQ ? srcQ.groupId : null;
 
           formDefinition.sections.forEach(sec => {
+            // 🛡️ スコープガード:
+            // 1. 郵便番号がグループ外の場合、別セクションへの住所波及を完全遮断
+            if (!srcGroupId && srcSec && sec !== srcSec) {
+              return;
+            }
+
             (sec.questions || []).forEach(q => {
               // 🛡️ スコープガード:
-              // 1. 郵便番号がグループに所属している場合、同じグループ以外の質問には絶対に住所を補完しない！
+              // 1. 郵便番号がグループに所属している場合、同じグループ以外の質問には絶対に住所を補完しない（グループ内完結）！
               if (srcGroupId && q.groupId !== srcGroupId) {
                 return;
               }
-              // 2. 郵便番号がグループ外の場合、グループに所属する質問には補完しない
+              // 2. 郵便番号がグループ外の場合、グループに所属する質問には絶対に補完しない
               if (!srcGroupId && q.groupId) {
                 return;
               }
-              // 3. 「前述と同じ」が設定されている項目で、同上チェックがOFFの場合は絶対に補完しない
-              if (q.sameAsAbove && q.sameAsAbove.enabled && !isGroupSameAsAboveActive(q.groupId) && !isQuestionSameAsAboveActive(q)) {
+              // 3. 同上（住民票住所と同じ等）が有効で、かつ現在同上チェックがON（アクティブ）の場合、
+              // 上部からの同期値が優先されるため、郵便番号APIによる直接上書きはスキップする
+              // （※同上チェックがOFFの時は独立入力モードであるため、正常に自グループ内の住所を補完する）
+              const isSameActive = (q.groupId && isGroupSameAsAboveActive(q.groupId)) || isQuestionSameAsAboveActive(q);
+              if (isSameActive) {
                 return;
               }
 
@@ -7690,11 +7704,31 @@
             }));
           } catch(e) {}
 
+          // 設問メタデータ（カラム差分・dataKeyマッピング解析用）
+          const questionMeta = [];
+          if (formDefinition && Array.isArray(formDefinition.sections)) {
+            formDefinition.sections.forEach(s => {
+              (s.questions || []).forEach(q => {
+                questionMeta.push({
+                  id: q.id,
+                  title: q.title || '',
+                  dataKey: q.dataKey || '',
+                  type: q.type || 'text',
+                  required: !!q.required,
+                  sectionTitle: s.title || ''
+                });
+              });
+            });
+          }
+
           // 1. 親ウィンドウ (iframe) への postMessage 送信（常に各フォーム専用の独立テーブルへ送信）
           if (window.parent && window.parent !== window) {
             window.parent.postMessage({
               type: 'FORM_SUBMIT',
               formTitle: effectiveFormTitle,
+              formId: formDefinition.id,
+              formDefinition: formDefinition,
+              questionMeta: questionMeta,
               createDedicatedTable: true,
               targetTableId: formDefinition.targetTableId || 'dedicated',
               targetTableType: 'dedicated',
