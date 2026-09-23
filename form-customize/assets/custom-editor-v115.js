@@ -3027,9 +3027,16 @@
             const optSelects = card.querySelectorAll('select.option-branch-select, select.option-transition-select');
             optInputs.forEach((optInp, optIdx) => {
               if (q.options && q.options[optIdx]) {
-                q.options[optIdx].label = optInp.value;
-                if (optSelects[optIdx] && optSelects[optIdx].value) {
-                  q.options[optIdx].nextAction = optSelects[optIdx].value;
+                if (optInp) q.options[optIdx].label = optInp.value;
+                if (optSelects[optIdx]) {
+                  const val = optSelects[optIdx].value;
+                  if (val) {
+                    q.options[optIdx].nextSectionId = val;
+                    q.options[optIdx].nextAction = val;
+                  } else {
+                    delete q.options[optIdx].nextSectionId;
+                    delete q.options[optIdx].nextAction;
+                  }
                 }
               }
             });
@@ -3042,6 +3049,9 @@
 
     const renderFlowmap = () => {
       syncCurrentDomToFormData();
+      if (typeof window.flushFormSave === 'function') {
+        try { window.flushFormSave(); } catch(e) {}
+      }
       if (window.archifyRenderer && window.G) {
         if (typeof sanitizeFormBranchingLogic === 'function') {
           sanitizeFormBranchingLogic(window.G);
@@ -3327,39 +3337,32 @@
       );
     };
 
-    // 🔄 手動「最新化 / フローマップ更新」ボタンのハンドラー
-    const setupFlowRefreshButtons = () => {
-      const handleRefresh = (btn, label = 'フローマップ') => {
-        if (!btn) return;
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
+    // 🔄 手動「更新」ボタンのハンドラー（動的DOM対応・イベントデリゲーション）
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('#btn-flow-refresh, #btn-sync-flowmap-from-questions');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
 
-          const icon = btn.querySelector('.refresh-spin-icon');
-          if (icon) {
-            icon.style.display = 'inline-block';
-            icon.style.transition = 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)';
-            icon.style.transform = 'rotate(360deg)';
-            setTimeout(() => {
-              icon.style.transition = 'none';
-              icon.style.transform = 'rotate(0deg)';
-            }, 460);
-          }
+      const icon = btn.querySelector('.refresh-spin-icon');
+      if (icon) {
+        icon.style.display = 'inline-block';
+        icon.style.transition = 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)';
+        icon.style.transform = 'rotate(360deg)';
+        setTimeout(() => {
+          icon.style.transition = 'none';
+          icon.style.transform = 'rotate(0deg)';
+        }, 460);
+      }
 
-          // 即座にフローマップを完全再描画
-          renderFlowmap();
+      // 即座にフローマップを完全再描画
+      renderFlowmap();
 
-          // ユーザーへのフィードバック（トースト通知）
-          if (typeof showGlobalToast === 'function') {
-            showGlobalToast('✨ フローマップを最新に更新しました！');
-          }
-        });
-      };
-
-      handleRefresh(document.getElementById('btn-flow-refresh'), 'フローマップ');
-      handleRefresh(document.getElementById('btn-sync-flowmap-from-questions'), '質問設定');
-    };
-    setupFlowRefreshButtons();
+      // ユーザーへのフィードバック（トースト通知）
+      if (typeof showGlobalToast === 'function') {
+        showGlobalToast('✨ フローマップを最新に更新しました！');
+      }
+    }, true);
 
     // 1. 分岐先変更・セレクト・チェック・ラジオ変更時は 0ms（瞬時）でフローマップ更新
     document.addEventListener('change', (e) => {
@@ -24145,7 +24148,7 @@
     const submitBtn = document.getElementById('btn-submit-global-ai-prompt');
 
     if (statusBadge) {
-      statusBadge.textContent = '⏳ Gemini が全体最適化を分析中...';
+      statusBadge.textContent = '分析中...';
       statusBadge.style.background = '#e0f2fe';
       statusBadge.style.color = '#0284c7';
     }
@@ -24188,7 +24191,7 @@
     renderGlobalAiAdvice(advice);
 
     if (statusBadge) {
-      statusBadge.textContent = '✨ リアルタイム全体診断';
+      statusBadge.textContent = 'リアルタイム全体診断';
       statusBadge.style.background = '';
       statusBadge.style.color = '';
     }
