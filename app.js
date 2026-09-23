@@ -2165,15 +2165,26 @@ function updatePartyIdSelectionDisplay(tableBody) {
   }
 
   if (selectAllCheckbox) {
-    if (totalCount > 0 && selectedCount === totalCount) {
-      selectAllCheckbox.checked = true;
-      selectAllCheckbox.indeterminate = false;
-    } else if (selectedCount > 0) {
+    if (totalCount === 0) {
       selectAllCheckbox.checked = false;
-      selectAllCheckbox.indeterminate = true;
+      selectAllCheckbox.indeterminate = false;
+      selectAllCheckbox.disabled = true;
+      selectAllCheckbox.style.cursor = 'not-allowed';
+      selectAllCheckbox.style.opacity = '0.4';
     } else {
-      selectAllCheckbox.checked = false;
-      selectAllCheckbox.indeterminate = false;
+      selectAllCheckbox.disabled = false;
+      selectAllCheckbox.style.cursor = 'pointer';
+      selectAllCheckbox.style.opacity = '1';
+      if (selectedCount === totalCount) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+      } else if (selectedCount > 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+      } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+      }
     }
   }
 
