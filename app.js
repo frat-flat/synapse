@@ -753,11 +753,6 @@ const MOCK_CORPORATES = [
   { name: '株式会社テストコーポレーション', code: '9010001999999', address: '東京都新宿区西新宿1-1-1' }
 ];
 
-const MOCK_INTRODUCERS = [
-  { id: 'H6K4PN9M', name: '田中 代理店', status: '代理店登録済', company: '株式会社田中エージェンシー', count: 12, similarity: 100 },
-  { id: 'P5Q9RS7T', name: '高橋 紹介パートナー', status: 'パートナー', company: '個人パートナー', count: 5, similarity: 90 },
-  { id: 'W3X5YT7N', name: '渡辺 エージェント', status: '代理店登録済', company: '渡辺コンサルティング', count: 8, similarity: 80 }
-];
 
 // ローカルストレージキー
 const STORAGE_KEYS = {
@@ -1159,7 +1154,6 @@ let state = {
   selectedExistingCustomer: null,
   addedCustomFields: new Set(),
   editingAppointId: null, // 下書き編集用ID
-  selectedIntroducer: null, // 選択された紹介者情報
 
   // 条件付き書式ルール
   conditionalFormats: {
@@ -15135,8 +15129,6 @@ function saveTabState(tab) {
         code: document.getElementById('corp-info-code')?.value.trim() || '',
         address: document.getElementById('corp-info-address')?.value.trim() || ''
       };
-    } else if (fieldType === 'introducer') {
-      customFieldsData['introducer'] = state.selectedIntroducer;
     } else {
       const inputEl = document.getElementById(`custom-field-input-${fieldType}`);
       if (inputEl) {
@@ -15159,7 +15151,6 @@ function saveTabState(tab) {
     connectedLinks: state.connectedLinks || {}, // 現在の接続状況を保存
     selectedExistingCustomer: state.selectedExistingCustomer,
     addedCustomFields: Array.from(state.addedCustomFields),
-    selectedIntroducer: state.selectedIntroducer,
     introducerId: document.getElementById('appoint-hidden-introducer-id')?.value || (tab.appointData?.introducerId || ''),
     introducerName: document.getElementById('appoint-hidden-introducer-name')?.value || (tab.appointData?.introducerName || ''),
     introducerType: document.getElementById('appoint-hidden-introducer-type')?.value || (tab.appointData?.introducerType || ''),
@@ -15175,7 +15166,6 @@ function loadTabState(tab) {
   document.getElementById('appointment-form').reset();
   document.getElementById('custom-fields-list').innerHTML = '';
   state.addedCustomFields.clear();
-  state.selectedIntroducer = null;
   state.selectedExistingCustomer = null;
   state.editingAppointId = null;
   state.connectedLinks = {}; // 接続情報の初期化
@@ -15320,8 +15310,13 @@ function loadTabState(tab) {
 
   // 追加項目の復元
   if (data.addedCustomFields) {
+    // 過去データに 'introducer' が残っていた場合は除外
+    data.addedCustomFields = data.addedCustomFields.filter(f => f !== 'introducer');
+    if (data.customFields) {
+      delete data.customFields['introducer'];
+    }
     data.addedCustomFields.forEach(fieldType => {
-      addCustomField(fieldType, data.customFields[fieldType]);
+      addCustomField(fieldType, data.customFields ? data.customFields[fieldType] : '');
     });
   }
 
@@ -15828,7 +15823,6 @@ function openTab(id, type, title, appointData = null) {
       connectedLinks: {}, // 接続データを初期化
       addedCustomFields: [],
       selectedExistingCustomer: null,
-      selectedIntroducer: null,
       introducerId: '',
       introducerName: '',
       introducerType: '',
@@ -17933,7 +17927,6 @@ function setupEventListeners() {
     { id: 'industry', label: '業種' },
     { id: 'biz_details', label: '事業内容' },
     { id: 'zoom', label: 'Zoom URL' },
-    { id: 'introducer', label: '紹介者 (DB検索)' },
     { id: 'rep_furigana', label: '代表者フリガナ' },
     { id: 'corp_furigana', label: '法人名フリガナ' },
     { id: 'corp_num', label: '法人番号' },
@@ -21820,7 +21813,6 @@ const FIELD_LABELS = {
   industry: '業種',
   biz_details: '事業内容',
   zoom: 'Zoom URL',
-  introducer: '紹介者',
   rep_furigana: '代表者フリガナ',
   corp_furigana: '法人名フリガナ',
   corp_num: '法人番号',
@@ -21829,6 +21821,7 @@ const FIELD_LABELS = {
 };
 
 function addCustomField(fieldType, value = '') {
+  if (fieldType === 'introducer') return; // 追加項目としての紹介者は完全排除
   if (state.addedCustomFields.has(fieldType)) {
     showToast(`「${FIELD_LABELS[fieldType]}」はすでに追加されています。`, 'warning');
     const existingInput = document.getElementById(`custom-field-input-${fieldType}`);
@@ -21883,44 +21876,18 @@ function addCustomField(fieldType, value = '') {
         </div>
       `;
       break;
-    case 'introducer':
-      // 紹介者検索用の特別なHTML
-      inputHtml = `
-        <div style="background: var(--bg-surface-elevated); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); width: 100%;">
-          <div style="position: relative; margin-bottom: 0.5rem;">
-            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">紹介者検索 <span class="api-badge" style="background: var(--primary-glow); color: var(--primary); border-color: rgba(99,102,241,0.3)">代理店DB連携</span></label>
-            <input type="text" id="introducer-search-input" placeholder="名前で検索（例：田中、高橋）..." style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem;">
-            <div id="introducer-api-dropdown" class="search-results-dropdown"></div>
-          </div>
-          <div id="introducer-attached-box" style="display: ${value ? 'flex' : 'none'};">
-            <!-- 選択された紹介者バッジ -->
-            <div class="introducer-display-box" style="width: 100%;">
-              <div>
-                <span class="badge badge-existing" id="intro-status-badge">${value ? value.status : ''}</span>
-                <span class="introducer-name" id="intro-display-name" style="margin-left: 0.5rem;">${value ? value.name : ''}</span>
-                <div class="introducer-meta" id="intro-display-meta" style="margin-top: 0.2rem;">
-                  所属: ${value ? value.company : ''} | 過去アポイント: ${value ? value.count : 0}件
-                </div>
-              </div>
-              <button type="button" class="btn-text" id="btn-remove-introducer" style="color: var(--danger); font-size: 0.75rem;">解除</button>
-            </div>
-          </div>
-          <input type="hidden" id="custom-field-input-introducer" name="introducer" value="${value ? JSON.stringify(value) : ''}">
-        </div>
-      `;
-      break;
     default:
       inputHtml = `<input type="text" id="custom-field-input-${fieldType}" name="${fieldType}" value="${value}" placeholder="${FIELD_LABELS[fieldType]}を入力" style="width: 100%; box-sizing: border-box; height: 42px; padding: 0.6rem 0.75rem; font-size: 0.9rem;">`;
   }
 
   const isFull = (state.customFieldWidths && state.customFieldWidths[fieldType] === 'full') ||
-                 (fieldType === 'corp_info' || fieldType === 'introducer');
+                 (fieldType === 'corp_info');
   if (isFull) {
     row.classList.add('field-span-full');
   }
 
-  // corp_infoとintroducer以外の通常フィールドに幅切替ボタンを提供
-  const showWidthToggle = (fieldType !== 'corp_info' && fieldType !== 'introducer');
+  // corp_info以外の通常フィールドに幅切替ボタンを提供
+  const showWidthToggle = (fieldType !== 'corp_info');
   const widthToggleBtnHtml = showWidthToggle ? `
     <button type="button" class="btn-field-width-toggle ${isFull ? 'is-full' : ''}" id="btn-toggle-width-${fieldType}" onclick="toggleFieldWidth('${fieldType}')" title="項目の幅（全幅／標準）を切り替え">
       <span>${isFull ? '全幅' : '標準'}</span>
@@ -21950,8 +21917,6 @@ function addCustomField(fieldType, value = '') {
   // イベント設定
   if (fieldType === 'corp_info') {
     setupCorpApiSearch();
-  } else if (fieldType === 'introducer') {
-    setupIntroducerSearch(value);
   } else {
     // リアルタイム関連データ検知のトリガーを設定
     const inputEl = document.getElementById(`custom-field-input-${fieldType}`);
@@ -22079,11 +22044,6 @@ function removeCustomField(fieldType) {
   if (chk) {
     chk.checked = false;
   }
-  
-  // 紹介者のリセット
-  if (fieldType === 'introducer') {
-    state.selectedIntroducer = null;
-  }
 
   // 関連アラート非表示チェック（該当項目が消えたら消す）
   checkAlertVisibility();
@@ -22160,75 +22120,6 @@ function setupCorpApiSearch() {
   }, true);
 }
 
-// 紹介者検索DBシミュレーション
-function setupIntroducerSearch(existingValue = null) {
-  const searchInput = document.getElementById('introducer-search-input');
-  const dropdown = document.getElementById('introducer-api-dropdown');
-  const attachedBox = document.getElementById('introducer-attached-box');
-  const hiddenInput = document.getElementById('custom-field-input-introducer');
-  const displayName = document.getElementById('intro-display-name');
-  const displayMeta = document.getElementById('intro-display-meta');
-  const statusBadge = document.getElementById('intro-status-badge');
-  const removeBtn = document.getElementById('btn-remove-introducer');
-
-  if (existingValue) {
-    state.selectedIntroducer = existingValue;
-  }
-
-  searchInput.addEventListener('input', (e) => {
-    const query = e.target.value.trim().toLowerCase();
-    if (!query) {
-      dropdown.style.display = 'none';
-      return;
-    }
-
-    const matched = MOCK_INTRODUCERS.filter(i => 
-      i.name.toLowerCase().includes(query) || i.company.toLowerCase().includes(query)
-    );
-
-    dropdown.innerHTML = '';
-    if (matched.length === 0) {
-      dropdown.innerHTML = '<div class="search-result-item" style="color: var(--text-muted);">紹介者候補が見つかりません</div>';
-    } else {
-      matched.forEach(intro => {
-        const item = document.createElement('div');
-        item.className = 'search-result-item';
-        item.innerHTML = `
-          <div class="search-result-title">${intro.name} <span class="badge badge-new" style="font-size: 0.65rem; margin-left: 0.5rem; padding: 0.05rem 0.3rem;">類似度: ${intro.similarity}%</span></div>
-          <div class="search-result-sub">${intro.company} | アポイント: ${intro.count}回</div>
-        `;
-        item.addEventListener('click', () => {
-          state.selectedIntroducer = intro;
-          hiddenInput.value = JSON.stringify(intro);
-          displayName.textContent = intro.name;
-          displayMeta.textContent = `所属: ${intro.company} | 過去アポイント: ${intro.count}件`;
-          statusBadge.textContent = intro.status;
-          
-          attachedBox.style.display = 'flex';
-          searchInput.value = '';
-          dropdown.style.display = 'none';
-          
-          showToast('紹介者を紐付けました。', 'success');
-        });
-        dropdown.appendChild(item);
-      });
-    }
-    dropdown.style.display = 'block';
-  });
-
-  removeBtn.addEventListener('click', () => {
-    state.selectedIntroducer = null;
-    hiddenInput.value = '';
-    attachedBox.style.display = 'none';
-  });
-
-  // ドロップダウン外クリックで閉じる
-  document.addEventListener('mousedown', (e) => {
-    if (e.target !== searchInput && e.target !== dropdown) {
-      dropdown.style.display = 'none';
-    }
-  }, true);
-}
 
 // 関連データ検知シミュレーション
 function detectRelatedData(fieldType, value) {
@@ -23342,7 +23233,7 @@ function handleFormSubmit(e) {
                          (category === '営業' || (typeof category === 'string' && category.includes('営業')));
   const introId = document.getElementById('appoint-hidden-introducer-id')?.value;
 
-  if (isSalesOffline && !introId && !state.selectedIntroducer) {
+  if (isSalesOffline && !introId) {
     openNoIntroducerConfirmModal(() => {
       saveAppointmentData('official');
     });
@@ -24723,8 +24614,6 @@ function autoSaveAppointmentDraft() {
         code: document.getElementById('corp-info-code')?.value.trim() || '',
         address: document.getElementById('corp-info-address')?.value.trim() || ''
       };
-    } else if (fieldType === 'introducer') {
-      customFieldsData['introducer'] = state.selectedIntroducer;
     } else {
       const inputEl = document.getElementById(`custom-field-input-${fieldType}`);
       if (inputEl) {
@@ -24807,8 +24696,6 @@ function saveAppointmentData(status) {
         code: document.getElementById('corp-info-code')?.value.trim() || '',
         address: document.getElementById('corp-info-address')?.value.trim() || ''
       };
-    } else if (fieldType === 'introducer') {
-      customFieldsData['introducer'] = state.selectedIntroducer;
     } else {
       const inputEl = document.getElementById(`custom-field-input-${fieldType}`);
       if (inputEl) {
@@ -24961,7 +24848,6 @@ function saveAppointmentData(status) {
   // 編集状態リセット
   state.editingAppointId = null;
   state.selectedExistingCustomer = null;
-  state.selectedIntroducer = null;
   state.isFormDirty = false;
 
   showToast(status === 'official' ? 'アポイントを正式登録しました。' : 'アポイントを下書き保存（一時保存）しました。', 'success');
@@ -24998,8 +24884,7 @@ function editAppointment(appointId) {
     customFields: appoint.customFields || {},
     connectedLinks: appoint.connectedLinks || {}, // 接続データを渡す
     selectedExistingCustomer: appoint.customerType === 'existing' ? state.customers.find(c => c.id === appoint.customerId) : null,
-    addedCustomFields: Object.keys(appoint.customFields || {}),
-    selectedIntroducer: appoint.customFields?.introducer,
+    addedCustomFields: Object.keys(appoint.customFields || {}).filter(k => k !== 'introducer'),
     status: appoint.status,
     viewOnly: false,
     isFormDirty: false
@@ -25030,8 +24915,7 @@ function viewAppointmentDetails(appointId) {
     customFields: appoint.customFields || {},
     connectedLinks: appoint.connectedLinks || {}, // 接続データを渡す
     selectedExistingCustomer: appoint.customerType === 'existing' ? state.customers.find(c => c.id === appoint.customerId) : null,
-    addedCustomFields: Object.keys(appoint.customFields || {}),
-    selectedIntroducer: appoint.customFields?.introducer,
+    addedCustomFields: Object.keys(appoint.customFields || {}).filter(k => k !== 'introducer'),
     status: appoint.status,
     viewOnly: true,
     isFormDirty: false
@@ -25102,7 +24986,6 @@ async function handleDeleteDraft() {
 
     state.editingAppointId = null;
     state.selectedExistingCustomer = null;
-    state.selectedIntroducer = null;
     state.isFormDirty = false;
     
     currentTab.appointData.isFormDirty = false;
@@ -52957,7 +52840,7 @@ const APPOINT_DEFAULT_PRESET_FORMS = [
     desc: 'プラン選択、導入規模、契約希望時期など',
     appointIntegration: {
       enabled: true,
-      fields: { customerName: true, appointDate: true, meetingType: true, issuerName: true, introducerName: true, memo: true }
+      fields: { customerName: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true, memo: true }
     }
   },
   {
@@ -52966,7 +52849,7 @@ const APPOINT_DEFAULT_PRESET_FORMS = [
     desc: 'インボイス番号、手数料振込先口座、取扱商材など',
     appointIntegration: {
       enabled: true,
-      fields: { customerName: true, appointDate: true, meetingType: true, issuerName: true, introducerName: true, memo: true }
+      fields: { customerName: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true, memo: true }
     }
   }
 ];
@@ -53324,9 +53207,9 @@ function openAppointIssueModal() {
         const badges = [];
         if (flds.customerName !== false) badges.push('🏢 顧客名');
         if (flds.appointDate !== false) badges.push('📅 日時');
-        if (flds.meetingType !== false) badges.push('🤝 面談');
-        if (flds.issuerName !== false) badges.push('👤 担当');
-        if (flds.introducerName !== false) badges.push('👥 紹介');
+        if (flds.meetingType !== false) badges.push('🌐 流入経路');
+        if (flds.sourceCategory !== false) badges.push('🏷️ 流入詳細');
+        if (flds.introducer !== false && flds.introducerName !== false) badges.push('👥 紹介者(ID)');
         if (flds.memo !== false) badges.push('📝 メモ');
         const badgesHtml = badges.length > 0 
           ? `<div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 0.35rem;">
@@ -53555,8 +53438,8 @@ function issueAppointForm(formId) {
     customerName: true,
     appointDate: true,
     meetingType: true,
-    issuerName: true,
-    introducerName: true,
+    sourceCategory: true,
+    introducer: true,
     memo: true
   };
 
@@ -53569,16 +53452,31 @@ function issueAppointForm(formId) {
     appointSnapshot.appointDate = data.date || data.appointDate;
     appointSnapshot.date = data.date || data.appointDate;
   }
+
+  // 1. 流入経路（大分類: オンライン / オフライン）
   if (flds.meetingType !== false) {
-    const mType = data.meetingType || (data.onlineCategory ? `オンライン (${data.onlineCategory})` : '');
-    if (mType) appointSnapshot.meetingType = mType;
+    const rawType = data.meetingType || data.sourceType || '';
+    const normType = (rawType === 'online') ? 'オンライン' : (rawType === 'offline' ? 'オフライン' : rawType);
+    if (normType) appointSnapshot.meetingType = normType;
   }
-  if (flds.issuerName !== false && issuerName) {
-    appointSnapshot.issuerName = issuerName;
+
+  // 2. 流入詳細（詳細分類: 広告、営業、追加された新選択肢等）
+  if (flds.sourceCategory !== false) {
+    const cat = data.onlineCategory || data.sourceCategory || '';
+    if (cat) appointSnapshot.sourceCategory = cat;
   }
-  if (flds.introducerName !== false && (introducerName || data.introducerName)) {
-    appointSnapshot.introducerName = introducerName || data.introducerName;
+
+  // 3. 紹介者情報（本登録Party ID / 最新仮ID / 紹介者名）
+  // オフライン→営業選択時に入力・紐付けされた紹介者IDおよび氏名を記録
+  if (flds.introducer !== false && flds.introducerName !== false) {
+    const effIntroId = introducerId || data.introducerId || '';
+    const effIntroName = introducerName || data.introducerName || '';
+    const effIntroType = introducerType || data.introducerType || '';
+    if (effIntroId) appointSnapshot.introducerId = effIntroId;
+    if (effIntroName) appointSnapshot.introducerName = effIntroName;
+    if (effIntroType) appointSnapshot.introducerType = effIntroType;
   }
+
   if (flds.memo !== false && (data.memo || data.notes)) {
     appointSnapshot.memo = data.memo || data.notes;
   }
@@ -54032,8 +53930,8 @@ function buildAgencyNetworkDataset() {
         if (!existNode) {
           // 紹介元（親）の特定
           let parentNodeId = "AGY-1002"; // デフォルトB社配下等
-          if (latestApp.referralSource || latestApp.introducer) {
-            const refQuery = String(latestApp.referralSource || latestApp.introducer).trim();
+          const refQuery = String(latestApp.introducerId || latestApp.introducerName || latestApp.referralSource || latestApp.introducer || '').trim();
+          if (refQuery) {
             const matchedParent = dataset.find(d => (d.name && d.name.includes(refQuery)) || d.masterId === refQuery || d.id === refQuery);
             if (matchedParent) parentNodeId = matchedParent.id;
           }

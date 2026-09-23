@@ -7570,21 +7570,29 @@
             if (snap.appointDate || snap.date) {
               submitData['[アポ] アポイント日時'] = snap.appointDate || snap.date;
             }
+            // 1. 流入経路（オンライン / オフライン）
             if (snap.meetingType) {
-              submitData['[アポ] 面談形式'] = snap.meetingType;
+              submitData['[アポ] 流入経路'] = snap.meetingType;
             }
-            if (snap.issuerName) {
-              submitData['[アポ] 発行担当者'] = snap.issuerName;
+            // 2. 流入詳細（カテゴリ：広告、営業、その他追加選択肢）
+            if (snap.sourceCategory) {
+              submitData['[アポ] 流入詳細'] = snap.sourceCategory;
+            }
+            // 3. 紹介者情報（本登録ID / 仮ID / 氏名）
+            if (snap.introducerId) {
+              submitData['[アポ] 紹介者ID'] = snap.introducerId;
+              submitData['introducer_id'] = snap.introducerId;
             }
             if (snap.introducerName) {
-              submitData['[アポ] 紹介者'] = snap.introducerName;
+              submitData['[アポ] 紹介者名'] = snap.introducerName;
+              submitData['introducer_name'] = snap.introducerName;
             }
             if (snap.memo) {
               submitData['[アポ] 商談メモ'] = snap.memo;
             }
           }
 
-          // フォーム発行ユーザーID（アポインター / 担当者ID）の紐づけ
+          // フォーム発行ユーザー情報（重複を完全排除し、システム共通カラム「発行担当者」として常時自動記録）
           let currentIssuerId = window.FORM_ISSUER_ID;
           let currentIssuerName = '';
           if (window.FORM_MASTER_ID) {
@@ -7597,9 +7605,11 @@
               }
             } catch(e) {}
           }
-          if (currentIssuerId) {
-            submitData['issuer_id'] = currentIssuerId;
-            if (currentIssuerName) submitData['issuer_name'] = currentIssuerName;
+          if (currentIssuerId || currentIssuerName) {
+            const effIssuer = currentIssuerName || currentIssuerId;
+            submitData['発行担当者'] = effIssuer;
+            submitData['issuer_name'] = effIssuer;
+            if (currentIssuerId) submitData['issuer_id'] = currentIssuerId;
           }
 
           // 紹介者ID（introducer_id / introducer_name）の紐づけ

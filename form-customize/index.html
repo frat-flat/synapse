@@ -820,20 +820,21 @@
                         <input type="checkbox" id="editor-appoint-field-appointDate" checked /> 📅 アポイント日時
                       </label>
                       <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                        <input type="checkbox" id="editor-appoint-field-meetingType" checked /> 🤝 面談形式
+                        <input type="checkbox" id="editor-appoint-field-meetingType" checked /> 🌐 流入経路（オンライン/オフライン）
                       </label>
                       <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                        <input type="checkbox" id="editor-appoint-field-issuerName" checked /> 👤 発行担当者
+                        <input type="checkbox" id="editor-appoint-field-sourceCategory" checked /> 🏷️ 流入詳細（カテゴリ）
                       </label>
                       <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                        <input type="checkbox" id="editor-appoint-field-introducerName" checked /> 👥 紹介者
+                        <input type="checkbox" id="editor-appoint-field-introducer" checked /> 👥 紹介者（本登録ID/仮ID/氏名）
                       </label>
                       <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
                         <input type="checkbox" id="editor-appoint-field-memo" checked /> 📝 商談メモ
                       </label>
                     </div>
                     <div style="font-size: 0.68rem; color: var(--color-text-muted); margin-top: 4px; line-height: 1.3;">
-                      ※ チェックされた項目は、回答送信時に回答テーブルへ専用カラム（<code>[アポ] 〇〇</code>）として自動保存されます。
+                      ※ チェックされた項目は回答テーブルへ専用カラム（<code>[アポ] 〇〇</code>）として自動保存されます。<br>
+                      ※ 発行担当者情報は基本メタデータとして重複なく常に自動記録されます。
                     </div>
                   </div>
                 </div>

@@ -22733,7 +22733,7 @@
   setInterval(setupTargetTableGlobalSettingsUI, 500);
 
   // 📅 アポイント連携設定のUI初期化＆データ同期ヘルパー
-  const APPOINT_FIELD_KEYS = ['customerName', 'appointDate', 'meetingType', 'issuerName', 'introducerName', 'memo'];
+  const APPOINT_FIELD_KEYS = ['customerName', 'appointDate', 'meetingType', 'sourceCategory', 'introducer', 'memo'];
 
   function setupAppointIntegrationSettingsUI() {
     const enabledToggle = document.getElementById('editor-appoint-integration-enabled');
@@ -22756,8 +22756,8 @@
           customerName: true,
           appointDate: true,
           meetingType: true,
-          issuerName: true,
-          introducerName: true,
+          sourceCategory: true,
+          introducer: true,
           memo: true
         }
       };
@@ -22766,10 +22766,18 @@
         customerName: true,
         appointDate: true,
         meetingType: true,
-        issuerName: true,
-        introducerName: true,
+        sourceCategory: true,
+        introducer: true,
         memo: true
       };
+    } else {
+      // 互換性フォールバック
+      if (formDef.appointIntegration.fields.introducer === undefined && formDef.appointIntegration.fields.introducerName !== undefined) {
+        formDef.appointIntegration.fields.introducer = formDef.appointIntegration.fields.introducerName;
+      }
+      if (formDef.appointIntegration.fields.sourceCategory === undefined) {
+        formDef.appointIntegration.fields.sourceCategory = true;
+      }
     }
 
     // フォームが切り替わった場合、または未同期の場合にUIへ反映
