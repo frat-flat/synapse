@@ -938,11 +938,358 @@ function sanitizeAndUnifyTableColumns(tbl) {
 }
 window.sanitizeAndUnifyTableColumns = sanitizeAndUnifyTableColumns;
 
+// 🧪 ============================================================================
+// 🧪 テスト専用回答テーブル 本番カラム差分アナライザー ＆ UIコントロール
+// 🧪 ============================================================================
+
+// 本番カラム差分アナライザー
+function analyzeFormColumnDiff(testTable, sourceFormTitle, formDef, questionMeta) {
+  if (!testTable) return null;
+
+  let prodTable = null;
+  const cleanTitle = (sourceFormTitle || testTable.sourceProdFormTitle || testTable.name || '')
+    .replace(/^🧪\s*\[テスト\]\s*/, '')
+    .trim();
+
+  if (formDef && formDef.id) {
+    prodTable = (state.customTables || []).find(t => !t.isTestTable && (t.formId === formDef.id || t.sourceFormId === formDef.id));
+  }
+  if (!prodTable && cleanTitle) {
+    prodTable = (state.customTables || []).find(t => !t.isTestTable && (t.name === cleanTitle || t.formTitle === cleanTitle));
+  }
+  if (!prodTable && formDef && formDef.targetTableId && formDef.targetTableId !== 'dedicated') {
+    prodTable = (state.customTables || []).find(t => !t.isTestTable && t.id === formDef.targetTableId);
+  }
+
+  const prodColMap = new Map();
+  if (prodTable && Array.isArray(prodTable.columns)) {
+    prodTable.columns.forEach(c => {
+      if (!c) return;
+      const keyName = (c.name || c.label || '').trim();
+      if (keyName) prodColMap.set(keyName, c);
+      if (c.dataKey) prodColMap.set(c.dataKey.trim(), c);
+      if (c.id) prodColMap.set(c.id, c);
+    });
+  }
+
+  const qMetaList = Array.isArray(questionMeta) ? questionMeta : (testTable.savedQuestionMeta || []);
+  if (Array.isArray(questionMeta) && questionMeta.length > 0) {
+    testTable.savedQuestionMeta = questionMeta;
+  }
+  const qMetaByTitle = new Map();
+  const qMetaByDataKey = new Map();
+  qMetaList.forEach(qm => {
+    if (qm.title) qMetaByTitle.set(qm.title.trim(), qm);
+    if (qm.dataKey) qMetaByDataKey.set(qm.dataKey.trim(), qm);
+  });
+
+  const SYSTEM_COLUMNS = new Set(['ステータス', 'フォーム名', '回答日時 / 登録日時', '送信種別', '再開用URL', '回答ID', 'master_id', 'token']);
+
+  const diffList = [];
+  let matchedCount = 0;
+  let mappedCount = 0;
+  let newOrModCount = 0;
+  let systemCount = 0;
+
+  (testTable.columns || []).forEach(col => {
+    const colName = (col.name || col.label || '').trim();
+    if (!colName) return;
+
+    if (SYSTEM_COLUMNS.has(colName) || colName.startsWith('[アポ]') || colName === '発行担当者') {
+      systemCount++;
+      diffList.push({
+        colId: col.id,
+        colName: colName,
+        status: 'system',
+        badgeText: '⚙️ システム',
+        badgeClass: 'col-diff-system',
+        targetProdCol: colName,
+        isModified: false,
+        desc: 'システム共通メタデータ列（全回答共通で同一名称で保存されます）'
+      });
+      return;
+    }
+
+    const meta = qMetaByTitle.get(colName) || qMetaByDataKey.get(colName) || null;
+    const dataKey = meta ? (meta.dataKey || '').trim() : '';
+
+    let matchedProdCol = null;
+    let isMapped = false;
+
+    if (prodColMap.has(colName)) {
+      matchedProdCol = prodColMap.get(colName);
+    } else if (dataKey && prodColMap.has(dataKey)) {
+      matchedProdCol = prodColMap.get(dataKey);
+      isMapped = true;
+    }
+
+    if (matchedProdCol && !isMapped) {
+      matchedCount++;
+      diffList.push({
+        colId: col.id,
+        colName: colName,
+        status: 'matched',
+        badgeText: '🟢 本番一致',
+        badgeClass: 'col-diff-matched',
+        targetProdCol: matchedProdCol.name || matchedProdCol.label || colName,
+        isModified: false,
+        dataKey: dataKey || null,
+        desc: `本番テーブルの「${matchedProdCol.name || matchedProdCol.label || colName}」列と完全に一致。本番環境でもこの列にそのまま格納されます。`
+      });
+    } else if (matchedProdCol && isMapped) {
+      mappedCount++;
+      const targetName = matchedProdCol.name || matchedProdCol.label || dataKey;
+      diffList.push({
+        colId: col.id,
+        colName: colName,
+        status: 'mapped',
+        badgeText: `🔵 ➔ 本番 [${targetName}]`,
+        badgeClass: 'col-diff-mapped',
+        targetProdCol: targetName,
+        isModified: false,
+        dataKey: dataKey,
+        desc: `設問名「${colName}」は、データ連携キー（${dataKey}）により本番の「${targetName}」列へ自動的に格納されます。`
+      });
+    } else {
+      newOrModCount++;
+      const hasProdTable = prodTable && prodTable.columns && prodTable.columns.length > 0;
+      const explanation = hasProdTable
+        ? `本番テーブル「${prodTable.name}」にはまだ存在しない新規・修正列です。本番公開時に本番テーブル側にも新設・反映されます。`
+        : `本番テーブルが未作成のため、本番公開時にこの名称「${colName}」で新設されます。`;
+      diffList.push({
+        colId: col.id,
+        colName: colName,
+        status: 'modified_or_new',
+        badgeText: '🟡 新規・修正',
+        badgeClass: 'col-diff-new',
+        targetProdCol: null,
+        isModified: true,
+        dataKey: dataKey || null,
+        desc: explanation
+      });
+    }
+  });
+
+  const missingInTest = [];
+  if (prodTable && Array.isArray(prodTable.columns)) {
+    prodTable.columns.forEach(pc => {
+      const pName = (pc.name || pc.label || '').trim();
+      const inTest = diffList.some(d => d.colName === pName || d.targetProdCol === pName);
+      if (!inTest && !SYSTEM_COLUMNS.has(pName)) {
+        missingInTest.push(pName);
+      }
+    });
+  }
+
+  const diffSummary = {
+    analyzedAt: new Date().toISOString(),
+    prodTableId: prodTable ? prodTable.id : null,
+    prodTableName: prodTable ? prodTable.name : cleanTitle,
+    hasProdTable: !!prodTable,
+    matchedCount,
+    mappedCount,
+    newOrModCount,
+    systemCount,
+    totalCount: testTable.columns.length,
+    missingInTest,
+    diffList
+  };
+
+  testTable.columnDiffInfo = diffSummary;
+  return diffSummary;
+}
+window.analyzeFormColumnDiff = analyzeFormColumnDiff;
+
+// 🔍 本番カラム詳細対比モーダル
+function openFormColumnDiffModal(testTable) {
+  if (!testTable) return;
+  const diffInfo = testTable.columnDiffInfo || analyzeFormColumnDiff(testTable);
+  if (!diffInfo) return;
+
+  let modal = document.getElementById('form-col-diff-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'form-col-diff-modal';
+    modal.className = 'modal-backdrop';
+    modal.style.cssText = 'display: none; position: fixed; inset: 0; z-index: 10000; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 20px;';
+    document.body.appendChild(modal);
+  }
+
+  const rowsHtml = (diffInfo.diffList || []).map((item, idx) => {
+    let badgeHtml = '';
+    if (item.status === 'matched') {
+      badgeHtml = '<span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; background: #dcfce7; color: #166534; border: 1px solid #bbf7d0;">🟢 本番一致</span>';
+    } else if (item.status === 'mapped') {
+      badgeHtml = `<span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe;">${escapeHtml(item.badgeText)}</span>`;
+    } else if (item.status === 'modified_or_new') {
+      badgeHtml = '<span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; background: #fef9c3; color: #854d0e; border: 1px solid #fef08a;">🟡 新規・修正差分</span>';
+    } else {
+      badgeHtml = '<span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.72rem; font-weight: 600; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">⚙️ システム列</span>';
+    }
+
+    const prodTargetText = item.targetProdCol
+      ? `<span style="font-weight: 700; color: #0f172a;">${escapeHtml(item.targetProdCol)}</span>`
+      : `<span style="color: #94a3b8; font-style: italic;">（本番未作成）</span>`;
+
+    const dataKeyText = item.dataKey
+      ? `<code style="background: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-size: 0.72rem; color: #2563eb;">${escapeHtml(item.dataKey)}</code>`
+      : `<span style="color: #cbd5e1;">-</span>`;
+
+    return `
+      <tr style="border-bottom: 1px solid #f1f5f9; transition: background-color 0.15s;" onmouseover="this.style.backgroundColor='#f8fafc'" onmouseout="this.style.backgroundColor='transparent'">
+        <td style="padding: 10px 12px; font-size: 0.78rem; font-weight: 600; color: #334155;">${escapeHtml(item.colName)}</td>
+        <td style="padding: 10px 12px; font-size: 0.75rem;">${dataKeyText}</td>
+        <td style="padding: 10px 12px; font-size: 0.78rem;">${prodTargetText}</td>
+        <td style="padding: 10px 12px; text-align: center;">${badgeHtml}</td>
+        <td style="padding: 10px 12px; font-size: 0.75rem; color: #64748b; line-height: 1.4;">${escapeHtml(item.desc)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const missingHtml = (diffInfo.missingInTest && diffInfo.missingInTest.length > 0)
+    ? `
+      <div style="margin-top: 16px; padding: 12px 14px; background: #fffbeb; border: 1px dashed #fcd34d; border-radius: 8px;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: #92400e; margin-bottom: 4px;">
+          ⚠️ 本番テーブルに存在するが、今回のテスト回答に含まれていない列 (${diffInfo.missingInTest.length}列):
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+          ${diffInfo.missingInTest.map(m => `<span style="background: #ffffff; border: 1px solid #fef3c7; color: #78350f; font-size: 0.74rem; padding: 2px 8px; border-radius: 4px; font-weight: 500;">${escapeHtml(m)}</span>`).join('')}
+        </div>
+      </div>
+    `
+    : '';
+
+  modal.innerHTML = `
+    <div style="background: #ffffff; width: 100%; max-width: 920px; max-height: 88vh; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; overflow: hidden; animation: modalPop 0.2s ease-out;">
+      <div style="padding: 18px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.4rem;">📊</span>
+          <div>
+            <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #0f172a;">本番カラム対比・データ流入先一覧</h3>
+            <span style="font-size: 0.75rem; color: #64748b;">対象本番テーブル: <strong>${escapeHtml(diffInfo.prodTableName)}</strong>（全${diffInfo.totalCount}列中、本番一致: ${diffInfo.matchedCount}列、マッピング: ${diffInfo.mappedCount}列、新規・修正: ${diffInfo.newOrModCount}列）</span>
+          </div>
+        </div>
+        <button type="button" id="btn-close-col-diff-modal" style="background: transparent; border: none; font-size: 1.3rem; color: #94a3b8; cursor: pointer; padding: 4px 8px; border-radius: 6px;">✕</button>
+      </div>
+
+      <div style="padding: 20px 24px; overflow-y: auto; flex: 1;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+          <thead>
+            <tr style="border-bottom: 2px solid #e2e8f0; background: #f8fafc;">
+              <th style="padding: 10px 12px; font-size: 0.75rem; font-weight: 700; color: #475569;">テスト送信カラム名</th>
+              <th style="padding: 10px 12px; font-size: 0.75rem; font-weight: 700; color: #475569;">連携キー (dataKey)</th>
+              <th style="padding: 10px 12px; font-size: 0.75rem; font-weight: 700; color: #475569;">本番での格納先カラム</th>
+              <th style="padding: 10px 12px; font-size: 0.75rem; font-weight: 700; color: #475569; text-align: center;">判定ステータス</th>
+              <th style="padding: 10px 12px; font-size: 0.75rem; font-weight: 700; color: #475569;">説明・流入仕様</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+        ${missingHtml}
+      </div>
+
+      <div style="padding: 14px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: flex-end;">
+        <button type="button" id="btn-col-diff-modal-ok" style="background: #1e293b; color: #ffffff; border: none; font-size: 0.85rem; font-weight: 700; padding: 8px 24px; border-radius: 6px; cursor: pointer;">閉じる</button>
+      </div>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+  const close = () => { modal.style.display = 'none'; };
+  modal.querySelector('#btn-close-col-diff-modal').onclick = close;
+  modal.querySelector('#btn-col-diff-modal-ok').onclick = close;
+  modal.onclick = (e) => { if (e.target === modal) close(); };
+}
+window.openFormColumnDiffModal = openFormColumnDiffModal;
+
+// 🧪 テスト専用テーブル用バナーの描画
+function renderTestTableDiffBanner(tableId, containerEl) {
+  let tbl = (state.customTables || []).find(t => t.id === tableId);
+  if (!tbl) {
+    try {
+      const raw = localStorage.getItem(`synapse_table_${tableId}`);
+      if (raw) {
+        tbl = JSON.parse(raw);
+        if (tbl && Array.isArray(state.customTables)) state.customTables.push(tbl);
+      }
+    } catch(e) {}
+  }
+  if (!tbl || !tbl.isTestTable) return;
+
+  const diffInfo = tbl.columnDiffInfo || analyzeFormColumnDiff(tbl);
+  if (!diffInfo) return;
+
+  let existingBanner = document.getElementById('test-table-diff-banner');
+  if (existingBanner) existingBanner.remove();
+
+  const banner = document.createElement('div');
+  banner.id = 'test-table-diff-banner';
+  banner.className = 'test-table-diff-banner';
+  banner.style.cssText = 'margin: 0 0 12px 0; padding: 12px 16px; background: #f8fafc; border: 1px solid #cbd5e1; border-left: 5px solid #6366f1; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
+
+  const diffSummaryText = diffInfo.newOrModCount > 0
+    ? `<span style="color: #854d0e; font-weight: 700; background: #fef9c3; border: 1px solid #fef08a; padding: 3px 8px; border-radius: 4px;">🟡 新規・修正差分: ${diffInfo.newOrModCount}列</span>`
+    : `<span style="color: #166534; font-weight: 700; background: #dcfce7; border: 1px solid #bbf7d0; padding: 3px 8px; border-radius: 4px;">✨ 差分なし（本番完全適合）</span>`;
+
+  banner.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 1.15rem;">🧪</span>
+        <span style="font-weight: 800; font-size: 0.92rem; color: #1e293b;">テスト専用回答テーブル</span>
+        <span style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; font-weight: 600;">🛡️ 本番Supabase隔離中（書き込みゼロ）</span>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button type="button" id="btn-open-col-diff-modal" style="background: #ffffff; border: 1px solid #cbd5e1; color: #334155; font-size: 0.75rem; padding: 5px 12px; border-radius: 6px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+          <span>🔍</span> 本番カラム詳細対比表
+        </button>
+        <button type="button" id="btn-clear-test-data" style="background: #ffffff; border: 1px solid #fca5a5; color: #dc2626; font-size: 0.75rem; padding: 5px 12px; border-radius: 6px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+          <span>🗑️</span> テスト回答をクリア
+        </button>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px; font-size: 0.78rem; flex-wrap: wrap; align-items: center; background: #ffffff; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+      <span style="color: #64748b; font-weight: 700;">本番カラム対比状況（全${diffInfo.totalCount}列）:</span>
+      <span style="color: #166534; font-weight: 700; background: #dcfce7; border: 1px solid #bbf7d0; padding: 3px 8px; border-radius: 4px;">🟢 本番完全一致: ${diffInfo.matchedCount}列</span>
+      ${diffInfo.mappedCount > 0 ? `<span style="color: #1e40af; font-weight: 700; background: #dbeafe; border: 1px solid #bfdbfe; padding: 3px 8px; border-radius: 4px;">🔵 本番マッピング: ${diffInfo.mappedCount}列</span>` : ''}
+      ${diffSummaryText}
+      <span style="margin-left: auto; color: #64748b; font-size: 0.72rem;">対比本番: <strong>${escapeHtml(diffInfo.prodTableName)}</strong></span>
+    </div>
+  `;
+
+  if (containerEl) {
+    containerEl.insertBefore(banner, containerEl.firstChild);
+  }
+
+  banner.querySelector('#btn-open-col-diff-modal').onclick = () => {
+    openFormColumnDiffModal(tbl);
+  };
+  banner.querySelector('#btn-clear-test-data').onclick = () => {
+    if (confirm(`テスト専用回答テーブル「${tbl.name}」の蓄積されたテスト回答データ（全${tbl.rows ? tbl.rows.length : 0}件）をすべてクリアしますか？\n（本番データには一切影響ありません）`)) {
+      tbl.rows = [];
+      originalSetItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+      originalSetItem(`synapse_table_${tbl.id}`, JSON.stringify(tbl));
+      renderCustomTable(tbl.id);
+      showToast('テスト回答データをすべてクリアしました。', 'info');
+    }
+  };
+}
+window.renderTestTableDiffBanner = renderTestTableDiffBanner;
+
 // LocalStorageの更新をフックしてSupabaseと自動同期するラッパー
 const originalSetItem = localStorage.setItem.bind(localStorage);
+window.originalSetItem = originalSetItem;
 localStorage.setItem = function(key, value) {
   originalSetItem(key, value);
+  // 🛡️ テスト送信中またはテスト専用テーブルはSupabaseへの自動同期から完全に隔離（書き込みゼロ保証）
+  if (window.__isHandlingTestSubmission) {
+    return;
+  }
   if (!isSyncing && typeof syncToSupabase === 'function') {
+    if (typeof key === 'string' && (key.includes('table_test_') || key.startsWith('synapse_table_table_test_'))) {
+      return;
+    }
     const isTargetKey = (Object.values(STORAGE_KEYS).includes(key) || 
                         key === 'synapse_dbmake_partners' || 
                         key.startsWith('SYNAPSE_') || 
@@ -950,7 +1297,19 @@ localStorage.setItem = function(key, value) {
                         key !== 'synapse_sync_queue';
     if (isTargetKey) {
       setTimeout(() => {
-        syncToSupabase(key, value);
+        if (window.__isHandlingTestSubmission) return;
+        let syncVal = value;
+        // 🛡️ 本番Supabaseクラウド（synapse_storage）にはテスト専用テーブルを一切含めない（完全隔離保証）
+        if (key === STORAGE_KEYS.CUSTOM_TABLES || key === 'synapse_custom_tables') {
+          try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+              const prodOnly = parsed.filter(t => !t || !t.isTestTable);
+              syncVal = JSON.stringify(prodOnly);
+            }
+          } catch(e) {}
+        }
+        syncToSupabase(key, syncVal);
       }, 50);
     }
   }
@@ -2664,6 +3023,19 @@ function getTableIdFromStorageKey(key) {
 
 // Supabaseへのデータ送信 (プッシュ)
 async function syncToSupabase(key, value) {
+  // 🛡️ テスト実行中およびテスト専用テーブルのSupabase通信を完全遮断（書き込みゼロ保証）
+  if (window.__isHandlingTestSubmission) {
+    return;
+  }
+  if (typeof key === 'string' && (key.includes('table_test_') || key.startsWith('synapse_table_table_test_'))) {
+    return;
+  }
+  if (key === STORAGE_KEYS.CUSTOM_TABLES || key === 'synapse_custom_tables') {
+    if (Array.isArray(value)) {
+      value = value.filter(t => !t || !t.isTestTable);
+    }
+  }
+
   // 🛡️ サーバー通信時の編集保護（WRITEガード）
   // オーナー以外の一般ユーザーがテーブルデータを同期しようとした場合、編集ロックおよびアクセス権限を厳格検証
   const targetTableId = getTableIdFromStorageKey(key);
@@ -3065,7 +3437,14 @@ async function syncFromSupabase(showNotification = false) {
             .maybeSingle();
 
           if (!ctError && ctData && Array.isArray(ctData.value)) {
+            // 🛡️ ローカルのテスト専用テーブルを退避（クラウド同期による消去を防止）
+            const localTestTables = (state.customTables || []).filter(t => t && (t.isTestTable || (t.id && t.id.startsWith('table_test_'))));
             const cleanedTables = ctData.value.map(t => sanitizeAndUnifyTableColumns(t));
+            localTestTables.forEach(tt => {
+              if (!cleanedTables.some(ct => ct.id === tt.id)) {
+                cleanedTables.push(tt);
+              }
+            });
             state.customTables = cleanedTables;
             if (typeof ensureStandardTablesInState === 'function') {
               ensureStandardTablesInState();
@@ -3134,7 +3513,26 @@ function loadStateFromLocalStorage(keys) {
     } else if (key === STORAGE_KEYS.CUSTOM_TABLES) {
       const rawTables = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_TABLES)) || [];
       const deletedIds = (typeof getDeletedTableIds === 'function') ? getDeletedTableIds() : [];
+      // 🛡️ テスト専用テーブルをローカルストレージや既存stateから保持（消去防止）
+      const localTestTables = (state.customTables || []).filter(t => t && (t.isTestTable || (t.id && t.id.startsWith('table_test_'))));
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('synapse_table_table_test_') || k.startsWith('table_test_'))) {
+            const tt = JSON.parse(localStorage.getItem(k));
+            if (tt && tt.id && !localTestTables.some(item => item.id === tt.id)) {
+              localTestTables.push(tt);
+            }
+          }
+        }
+      } catch(e) {}
+
       state.customTables = rawTables.filter(t => !deletedIds.includes(t.id));
+      localTestTables.forEach(tt => {
+        if (!state.customTables.some(t => t.id === tt.id)) {
+          state.customTables.push(tt);
+        }
+      });
       if (Array.isArray(state.customTables)) {
         state.customTables.forEach(t => sanitizeAndUnifyTableColumns(t));
       }
@@ -4024,9 +4422,14 @@ function addDeletedTableId(id) {
 }
 
 function saveCustomTables() {
+  if (window.__isHandlingTestSubmission) {
+    originalSetItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+    return;
+  }
   localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
   if (typeof syncToSupabase === 'function') {
-    syncToSupabase(STORAGE_KEYS.CUSTOM_TABLES, state.customTables);
+    const prodOnly = (state.customTables || []).filter(t => !t || !t.isTestTable);
+    syncToSupabase(STORAGE_KEYS.CUSTOM_TABLES, prodOnly);
   }
 }
 
@@ -4752,6 +5155,15 @@ function shouldShowFolder(folderId) {
 
 // テーブル（シート）の閲覧可否判定
 function checkTableAccess(tableId) {
+  // 🧪 テスト専用テーブルは開発・検証環境用のため常にアクセス許可
+  if (typeof tableId === 'string' && (tableId.startsWith('table_test_') || tableId.includes('table_test_'))) {
+    return { visible: true, grayout: false };
+  }
+  const currentTbl = (state.customTables || []).find(t => t.id === tableId);
+  if (currentTbl && currentTbl.isTestTable) {
+    return { visible: true, grayout: false };
+  }
+
   const userId = getCurrentUserId();
   const isOwner = isOwnerUser();
 
@@ -4815,6 +5227,14 @@ function checkTableAccess(tableId) {
 
 // カラム（列）の閲覧可否判定
 function checkColumnAccess(tableId, colId) {
+  // 🧪 テスト専用テーブルは開発・検証環境用のため全カラムアクセス許可
+  if (typeof tableId === 'string' && (tableId.startsWith('table_test_') || tableId.includes('table_test_'))) {
+    return { visible: true, grayout: false };
+  }
+  const currentTbl = (state.customTables || []).find(t => t.id === tableId);
+  if (currentTbl && currentTbl.isTestTable) {
+    return { visible: true, grayout: false };
+  }
   // 承認待ちユーザーはすべての列（マスタ類）を非表示にする
   if (state.currentUser && state.currentUser.status === 'pending') {
     return { visible: false, grayout: false };
@@ -8742,6 +9162,15 @@ function renderCustomTable(tableId) {
   const listSection = document.querySelector('#custom-table-screen .list-section');
   if (listSection) {
     renderTableControlBar(tableId, listSection);
+    // 🧪 テスト専用テーブルの場合は本番差分サマリーバーを描画
+    if (tbl.isTestTable) {
+      if (typeof renderTestTableDiffBanner === 'function') {
+        renderTestTableDiffBanner(tableId, listSection);
+      }
+    } else {
+      const exBanner = document.getElementById('test-table-diff-banner');
+      if (exBanner) exBanner.remove();
+    }
   }
 
   // 🗑️ テーブル削除ボタンの制御
@@ -9162,8 +9591,52 @@ function renderCustomTable(tableId) {
     labelSpan.style.textOverflow = 'ellipsis';
     labelSpan.style.flex = '1';
     labelSpan.style.minWidth = '0';
-    labelSpan.title = ctHeaderText;
     headerWrapper.appendChild(labelSpan);
+
+    // 🧪 テスト専用テーブルの場合、本番カラム差分バッジをヘッダー内に描画
+    if (tbl.isTestTable) {
+      const diffInfo = tbl.columnDiffInfo || (typeof analyzeFormColumnDiff === 'function' ? analyzeFormColumnDiff(tbl) : null);
+      if (diffInfo && Array.isArray(diffInfo.diffList)) {
+        const dItem = diffInfo.diffList.find(d => d.colId === col.id || d.colName === col.name || d.colName === col.label);
+        if (dItem) {
+          const badge = document.createElement('span');
+          badge.className = 'ct-col-diff-badge ' + (dItem.badgeClass || '');
+          badge.style.cssText = 'margin-left: 4px; padding: 1px 6px; border-radius: 9999px; font-size: 0.65rem; font-weight: 700; white-space: nowrap; cursor: pointer; flex-shrink: 0;';
+          if (dItem.status === 'matched') {
+            badge.style.background = '#dcfce7';
+            badge.style.color = '#166534';
+            badge.style.border = '1px solid #bbf7d0';
+            badge.textContent = '🟢 一致';
+            badge.title = `本番の「${dItem.targetProdCol}」列と完全一致。クリックで対比詳細を表示`;
+          } else if (dItem.status === 'mapped') {
+            badge.style.background = '#dbeafe';
+            badge.style.color = '#1e40af';
+            badge.style.border = '1px solid #bfdbfe';
+            badge.textContent = `🔵➔${dItem.targetProdCol}`;
+            badge.title = `連携キー（${dItem.dataKey || ''}）により本番「${dItem.targetProdCol}」へ自動格納。クリックで対比詳細を表示`;
+          } else if (dItem.status === 'modified_or_new') {
+            badge.style.background = '#fef9c3';
+            badge.style.color = '#854d0e';
+            badge.style.border = '1px solid #fef08a';
+            badge.textContent = '🟡 新規/修正';
+            badge.title = '本番テーブルに存在しない新規または修正カラム。クリックで対比詳細を表示';
+          } else {
+            badge.style.background = '#f1f5f9';
+            badge.style.color = '#475569';
+            badge.style.border = '1px solid #e2e8f0';
+            badge.textContent = '⚙️';
+            badge.title = 'システム共通列。クリックで対比詳細を表示';
+          }
+          badge.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            if (typeof openFormColumnDiffModal === 'function') {
+              openFormColumnDiffModal(tbl);
+            }
+          });
+          headerWrapper.appendChild(badge);
+        }
+      }
+    }
 
     const filterBtn = document.createElement('span');
     filterBtn.className = 'filter-icon-btn';
@@ -15923,8 +16396,9 @@ function openTab(id, type, title, appointData = null) {
       saveTabState(currentTab);
     }
 
-    // デフォルトのアポイントメントデータを作成
-    const defaultAppointData = appointData || {
+    // デフォルトのアポイントメントデータを作成（アポイント画面専用）
+    const isAppoint = type === 'appointment-screen';
+    const defaultAppointData = appointData || (isAppoint ? {
       id: generate8DigitId(), // 仮でローカル生成
       date: (() => {
         const now = new Date();
@@ -15948,11 +16422,11 @@ function openTab(id, type, title, appointData = null) {
       status: 'draft',
       viewOnly: false,
       isFormDirty: false,
-      isPartyIdLoading: !appointData // 新規アポイントの時のみ非同期ロード
-    };
+      isPartyIdLoading: true // 新規アポイントの時のみ非同期ロード
+    } : null);
 
     // 新規の下書きアポイントレコードを登録DBにも登録（既存の下書き機能と互換）
-    if (type === 'appointment-screen' && !appointData) {
+    if (isAppoint && !appointData && defaultAppointData) {
       const isExistInAppoints = state.appointments.some(a => a.id === defaultAppointData.id);
       if (!isExistInAppoints) {
         state.appointments.push({
@@ -16000,7 +16474,7 @@ function openTab(id, type, title, appointData = null) {
   activateTab(id);
 
   // 新規アポイント時の非同期Party ID取得と差し替え
-  if (tab.appointData && tab.appointData.isPartyIdLoading) {
+  if (type === 'appointment-screen' && tab.appointData && tab.appointData.isPartyIdLoading) {
     const tempId = tab.appointData.id;
     const displayEl = document.getElementById('display-appoint-id');
     if (displayEl) {
@@ -16139,7 +16613,9 @@ function activateTab(id) {
     renderCustomTable(tableId);
 
     // 🌐 クラウド（Supabase）から該当テーブルの最新定義・行データを取得して同期
-    if (supabaseClient) {
+    const targetTbl = (state.customTables || []).find(t => t.id === tableId);
+    const isTestTbl = tableId.startsWith('table_test_') || (targetTbl && targetTbl.isTestTable);
+    if (supabaseClient && !isTestTbl) {
       supabaseClient
         .from('synapse_storage')
         .select('value')
@@ -23640,11 +24116,14 @@ function handleFormSubmitMessage(event) {
   const formTitle = event.data.formTitle || formDef.title || formDef.name;
   const targetTableId = event.data.targetTableId || formDef.targetTableId;
   const targetTableType = event.data.targetTableType || formDef.targetTableType || 'dedicated';
-  const { data, isTemporary, isPartialSubmit, rowId: clientRowId, nextSectionId, currentSectionId, env, branch } = event.data;
+  const { data, isTemporary, isPartialSubmit, rowId: clientRowId, nextSectionId, currentSectionId, env, branch, questionMetaList } = event.data;
   if (!data) return;
 
   // 🧪 テスト送信フラグの判定（Gitブランチ型環境分離: test vs production）
   const isTestSubmission = env === 'test' || branch === 'test';
+  if (isTestSubmission) {
+    window.__isHandlingTestSubmission = true;
+  }
   const effectiveFormTitle = formTitle || '無題のフォーム';
 
   // 事前に行IDを決定（新規なら採番、既存なら引き継ぐ）
@@ -23671,93 +24150,122 @@ function handleFormSubmitMessage(event) {
 
   console.log(`%c[Form Submit]%c Received submission for form "${effectiveFormTitle}" (targetTableId: ${targetTableId || 'dedicated'}, targetTableType: ${targetTableType || 'dedicated'}, isTest: ${isTestSubmission}, isTemporary: ${!!isTemporary}, isPartial: ${!!isPartialSubmit}, rowId: ${targetRowId}):`, "color: #3b82f6; font-weight: bold;", "color: inherit;", data);
 
-  // ⚠️ テスト送信時はDBテーブルを作成・汚染しない（ユーザー指定仕様: テストデータ用テーブルは不要）
-  if (isTestSubmission) {
-    const testCode = 'TEST_' + Math.floor(10000000 + Math.random() * 90000000).toString().substring(0, 8);
-    if (event.source && typeof event.source.postMessage === 'function') {
-      event.source.postMessage({
-        type: isTemporary ? 'FORM_SUBMIT_TEMPORARY_RESPONSE' : 'FORM_SUBMIT_RESPONSE',
-        success: true,
-        rowId: targetRowId,
-        partnerId: null,
-        registrationCode: testCode,
-        isTemporary: !!isTemporary,
-        isPartialSubmit: !!isPartialSubmit,
-        resumeUrl: resumeUrl,
-        nextSectionId: nextSectionId || null,
-        formTitle: formTitle
-      }, '*');
-    }
-    showToast(`【テスト送信】「${formTitle}」のテスト送信を受け付けました（DBテーブルには書き込まれません）。`, 'info');
-    return;
-  }
-
   // ----------------------------------------------------
   // 1. 保存先テーブルの特定と独立テーブル有無の判定
-  // ----------------------------------------------------
-  // ----------------------------------------------------
-  // 1. 保存先となる各フォーム専用の独立テーブルを特定・自動生成
   // ----------------------------------------------------
   let targetTable = null;
   let isNewTableCreated = false;
 
-  // 1-1. 指定テーブルIDでの検索
-  if (targetTableId && targetTableId !== 'dedicated' && targetTableId !== 'table_all_form_responses') {
-    targetTable = state.customTables.find(t => t.id === targetTableId);
-  }
-
-  // 1-2. フォームIDでの完全一致検索（フォーム名変更時でも確実に同一テーブルへ保存）
-  if (!targetTable && formDef && formDef.id) {
-    targetTable = state.customTables.find(t => t && (t.formId === formDef.id || t.sourceFormId === formDef.id));
-  }
-
-  // 1-3. フォーム名・タイトルでの完全一致・部分一致検索
-  if (!targetTable && effectiveFormTitle) {
+  if (isTestSubmission) {
+    // 🧪 【テスト専用回答テーブル】本番DBと完全隔離されたテスト専用テーブルを特定または新設
+    const testTableId = 'table_test_' + (formDef.id || (targetTableId ? String(targetTableId).replace(/^table_test_/, '').replace(/^table_/, '') : 'default'));
     targetTable = state.customTables.find(t => 
-      t && t.id !== 'table_all_form_responses' && 
-      (t.name === effectiveFormTitle || t.formTitle === effectiveFormTitle || 
-       t.name.includes(effectiveFormTitle) || effectiveFormTitle.includes(t.name))
+      t && (t.id === testTableId || (t.isTestTable && (t.formId === formDef.id || t.sourceFormId === formDef.id || t.name === `🧪 [テスト] ${effectiveFormTitle}` || t.sourceProdFormTitle === effectiveFormTitle)))
     );
-  }
 
-  // 1-4. まだ独立テーブルが存在しない場合は、このフォーム専用の独立テーブルを自動生成（1フォーム1テーブル）
-  if (!targetTable) {
-    isNewTableCreated = true;
-    const tableId = (targetTableId && targetTableId !== 'dedicated' && targetTableId !== 'table_all_form_responses') 
-      ? targetTableId 
-      : ('table_' + Date.now());
+    if (!targetTable) {
+      isNewTableCreated = true;
+      const columns = Object.keys(data).map((key, idx) => ({
+        id: 'col_' + Math.random().toString(36).substr(2, 9),
+        label: key,
+        name: key,
+        type: 'text',
+        required: idx === 0
+      }));
 
-    const columns = Object.keys(data).map((key, idx) => ({
-      id: 'col_' + Math.random().toString(36).substr(2, 9),
-      label: key,
-      name: key,
-      type: 'text',
-      required: idx === 0
-    }));
+      const defaultWidths = {};
+      columns.forEach(col => { defaultWidths[col.id] = 120; });
 
-    const defaultWidths = {};
-    columns.forEach(col => { defaultWidths[col.id] = 120; });
+      targetTable = {
+        id: testTableId,
+        formId: formDef.id || null,
+        sourceFormId: formDef.id || null,
+        sourceProdFormTitle: effectiveFormTitle,
+        name: `🧪 [テスト] ${effectiveFormTitle}`,
+        formTitle: `🧪 [テスト] ${effectiveFormTitle}`,
+        isTestTable: true,
+        isFormDedicatedTable: true,
+        parentMenuId: 'forms-accordion',
+        columns: columns,
+        visibleColumns: columns.map(c => c.id),
+        columnWidths: defaultWidths,
+        rowHeights: {},
+        fixedCol: 'none',
+        fixedRow: 'none',
+        cellStyles: {},
+        rows: []
+      };
+      state.customTables.push(targetTable);
+    } else {
+      targetTable.isTestTable = true;
+      targetTable.sourceProdFormTitle = effectiveFormTitle;
+      if (!targetTable.name.startsWith('🧪')) {
+        targetTable.name = `🧪 [テスト] ${effectiveFormTitle}`;
+      }
+      if (!targetTable.parentMenuId || targetTable.parentMenuId === 'root') {
+        targetTable.parentMenuId = 'forms-accordion';
+      }
+    }
+  } else {
+    // 本番用テーブルの特定・自動生成
+    // 1-1. 指定テーブルIDでの検索
+    if (targetTableId && targetTableId !== 'dedicated' && targetTableId !== 'table_all_form_responses') {
+      targetTable = state.customTables.find(t => t.id === targetTableId && !t.isTestTable);
+    }
 
-    targetTable = {
-      id: tableId,
-      formId: formDef.id || null,
-      sourceFormId: formDef.id || null,
-      name: effectiveFormTitle || 'フォーム回答テーブル',
-      formTitle: effectiveFormTitle || 'フォーム回答テーブル',
-      isFormDedicatedTable: true,
-      parentMenuId: 'forms-accordion',
-      columns: columns,
-      visibleColumns: columns.map(c => c.id),
-      columnWidths: defaultWidths,
-      rowHeights: {},
-      fixedCol: 'none',
-      fixedRow: 'none',
-      cellStyles: {},
-      rows: []
-    };
-    state.customTables.push(targetTable);
-  } else if (!targetTable.parentMenuId || targetTable.parentMenuId === 'root') {
-    targetTable.parentMenuId = 'forms-accordion';
+    // 1-2. フォームIDでの完全一致検索（フォーム名変更時でも確実に同一テーブルへ保存）
+    if (!targetTable && formDef && formDef.id) {
+      targetTable = state.customTables.find(t => t && !t.isTestTable && (t.formId === formDef.id || t.sourceFormId === formDef.id));
+    }
+
+    // 1-3. フォーム名・タイトルでの完全一致・部分一致検索
+    if (!targetTable && effectiveFormTitle) {
+      targetTable = state.customTables.find(t => 
+        t && !t.isTestTable && t.id !== 'table_all_form_responses' && 
+        (t.name === effectiveFormTitle || t.formTitle === effectiveFormTitle || 
+         t.name.includes(effectiveFormTitle) || effectiveFormTitle.includes(t.name))
+      );
+    }
+
+    // 1-4. まだ独立テーブルが存在しない場合は、このフォーム専用の独立テーブルを自動生成（1フォーム1テーブル）
+    if (!targetTable) {
+      isNewTableCreated = true;
+      const tableId = (targetTableId && targetTableId !== 'dedicated' && targetTableId !== 'table_all_form_responses') 
+        ? targetTableId 
+        : ('table_' + Date.now());
+
+      const columns = Object.keys(data).map((key, idx) => ({
+        id: 'col_' + Math.random().toString(36).substr(2, 9),
+        label: key,
+        name: key,
+        type: 'text',
+        required: idx === 0
+      }));
+
+      const defaultWidths = {};
+      columns.forEach(col => { defaultWidths[col.id] = 120; });
+
+      targetTable = {
+        id: tableId,
+        formId: formDef.id || null,
+        sourceFormId: formDef.id || null,
+        name: effectiveFormTitle || 'フォーム回答テーブル',
+        formTitle: effectiveFormTitle || 'フォーム回答テーブル',
+        isFormDedicatedTable: true,
+        parentMenuId: 'forms-accordion',
+        columns: columns,
+        visibleColumns: columns.map(c => c.id),
+        columnWidths: defaultWidths,
+        rowHeights: {},
+        fixedCol: 'none',
+        fixedRow: 'none',
+        cellStyles: {},
+        rows: []
+      };
+      state.customTables.push(targetTable);
+    } else if (!targetTable.parentMenuId || targetTable.parentMenuId === 'root') {
+      targetTable.parentMenuId = 'forms-accordion';
+    }
   }
 
   // 汎用テーブル保存ヘルパー関数（カラム自動拡張・行追加/更新）
@@ -23819,87 +24327,106 @@ function handleFormSubmitMessage(event) {
   const targetRow = saveSubmissionRowToTable(targetTable);
   const effectiveTableName = targetTable ? targetTable.name : (effectiveFormTitle || '無題のフォーム');
 
+  // 🧪 テスト専用テーブルの場合は本番カラム差分解析を即時実行・メタデータ保存
+  if (isTestSubmission || targetTable.isTestTable) {
+    if (typeof analyzeFormColumnDiff === 'function') {
+      analyzeFormColumnDiff(targetTable, effectiveFormTitle, formDef, questionMetaList);
+    }
+  }
+
   // レコードを追加/更新し、LocalStorageへ永続化
-  localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
-  
-  // 編集監査ログへ記録
-  logCellEdit(targetTable.id, targetRowId, 'all_columns', 'none', JSON.stringify(data));
+  if (isTestSubmission || targetTable.isTestTable) {
+    originalSetItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+    if (targetTable && targetTable.id) {
+      originalSetItem(`synapse_table_${targetTable.id}`, JSON.stringify(targetTable));
+    }
+  } else {
+    localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+    if (targetTable && targetTable.id) {
+      localStorage.setItem(`synapse_table_${targetTable.id}`, JSON.stringify(targetTable));
+    }
+    // 編集監査ログへ記録
+    logCellEdit(targetTable.id, targetRowId, 'all_columns', 'none', JSON.stringify(data));
+  }
   console.log(`%c[Synapse Database]%c Saved row (ID: ${targetRowId}) to Dedicated Table "${effectiveTableName}":`, "color: #3b82f6; font-weight: bold;", "color: inherit;", targetRow);
 
   // 🌐 Supabaseクラウドへの自動永続化同期（synapse_storage & 物理テーブル）
-  try {
-    const sbUrl = localStorage.getItem(STORAGE_KEYS.SUPABASE_URL) || 'https://uefiuhywfsnrepiouofq.supabase.co';
-    const sbKey = localStorage.getItem(STORAGE_KEYS.SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
-    
-    // 1. synapse_custom_tables の保存
-    fetch(`${sbUrl}/rest/v1/synapse_storage`, {
-      method: 'POST',
-      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
-      body: JSON.stringify({ key: 'synapse_custom_tables', value: state.customTables, updated_at: new Date().toISOString() })
-    }).catch(e => console.warn('[Supabase Sync Tables]', e));
-
-    // 2. targetTable の詳細データの保存
-    if (targetTable && targetTable.id) {
+  // 🛡️ テスト送信・テスト専用テーブルは本番クラウド同期を完全に除外（書き込みゼロ保証）
+  if (!isTestSubmission && !targetTable.isTestTable) {
+    try {
+      const sbUrl = localStorage.getItem(STORAGE_KEYS.SUPABASE_URL) || 'https://uefiuhywfsnrepiouofq.supabase.co';
+      const sbKey = localStorage.getItem(STORAGE_KEYS.SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+      
+      // 1. synapse_custom_tables の保存
       fetch(`${sbUrl}/rest/v1/synapse_storage`, {
         method: 'POST',
         headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
-        body: JSON.stringify({ key: `synapse_table_${targetTable.id}`, value: targetTable, updated_at: new Date().toISOString() })
-      }).catch(e => console.warn('[Supabase Sync Table Detail]', e));
-    }
+        body: JSON.stringify({ key: 'synapse_custom_tables', value: state.customTables, updated_at: new Date().toISOString() })
+      }).catch(e => console.warn('[Supabase Sync Tables]', e));
 
-    // 3. Supabase物理テーブル（例: form_referral_agency_application）への直接INSERT
-    let pTableName = targetTable.physicalTableName || (formDef && formDef.physicalTableName) || (
-      (effectiveTableName.includes('紹介代理店') || effectiveTableName.includes('代理店'))
-        ? 'form_referral_agency_application'
-        : (effectiveTableName.includes('フィードバック') || effectiveTableName.includes('feedback'))
-          ? 'form_customer_feedback'
-          : (effectiveTableName.includes('管理者') || effectiveTableName.includes('アカウント'))
-            ? 'form_admin_account_creation'
-            : (() => {
-                const rawSlug = (targetTable.id || effectiveTableName || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
-                return rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
-              })()
-    );
-
-    const physRow = {
-      id: targetRowId,
-      master_id: targetRow.master_id || targetRow.mid || null,
-      form_title: effectiveTableName,
-      status: targetRow['ステータス'] || '回答完了',
-      registration_code: confirmedCode,
-      resume_url: targetRow['再開用URL'] || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    Object.keys(data).forEach(k => {
-      const safeK = k.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-      if (safeK && safeK !== 'id') {
-        physRow[safeK] = String(data[k]);
+      // 2. targetTable の詳細データの保存
+      if (targetTable && targetTable.id) {
+        fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+          method: 'POST',
+          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+          body: JSON.stringify({ key: `synapse_table_${targetTable.id}`, value: targetTable, updated_at: new Date().toISOString() })
+        }).catch(e => console.warn('[Supabase Sync Table Detail]', e));
       }
-    });
 
-    fetch(`${sbUrl}/rest/v1/${pTableName}`, {
-      method: 'POST',
-      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
-      body: JSON.stringify(physRow)
-    }).then(async res => {
-      if (res.ok) {
-        console.log(`[Supabase Physical Table] Persisted row to "${pTableName}".`);
-      } else {
-        // 旧テーブル名へのフォールバック
-        const fallbacks = ['form_referral_agency_application', 'form_yosandas_agency_application', 'form_yosandas'].filter(t => t !== pTableName);
-        for (const fb of fallbacks) {
-          const fbRes = await fetch(`${sbUrl}/rest/v1/${fb}`, {
-            method: 'POST',
-            headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
-            body: JSON.stringify(physRow)
-          }).catch(() => null);
-          if (fbRes && fbRes.ok) break;
+      // 3. Supabase物理テーブル（例: form_referral_agency_application）への直接INSERT
+      let pTableName = targetTable.physicalTableName || (formDef && formDef.physicalTableName) || (
+        (effectiveTableName.includes('紹介代理店') || effectiveTableName.includes('代理店'))
+          ? 'form_referral_agency_application'
+          : (effectiveTableName.includes('フィードバック') || effectiveTableName.includes('feedback'))
+            ? 'form_customer_feedback'
+            : (effectiveTableName.includes('管理者') || effectiveTableName.includes('アカウント'))
+              ? 'form_admin_account_creation'
+              : (() => {
+                  const rawSlug = (targetTable.id || effectiveTableName || 'form').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+                  return rawSlug.startsWith('form_') ? rawSlug : `form_${rawSlug}`;
+                })()
+      );
+
+      const physRow = {
+        id: targetRowId,
+        master_id: targetRow.master_id || targetRow.mid || null,
+        form_title: effectiveTableName,
+        status: targetRow['ステータス'] || '回答完了',
+        registration_code: confirmedCode,
+        resume_url: targetRow['再開用URL'] || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      Object.keys(data).forEach(k => {
+        const safeK = k.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        if (safeK && safeK !== 'id') {
+          physRow[safeK] = String(data[k]);
         }
-      }
-    }).catch(e => console.warn('[Supabase Physical Table Insert]', e));
-  } catch (syncErr) {
-    console.warn('[Supabase Auto Sync Error]', syncErr);
+      });
+
+      fetch(`${sbUrl}/rest/v1/${pTableName}`, {
+        method: 'POST',
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+        body: JSON.stringify(physRow)
+      }).then(async res => {
+        if (res.ok) {
+          console.log(`[Supabase Physical Table] Persisted row to "${pTableName}".`);
+        } else {
+          // 旧テーブル名へのフォールバック
+          const fallbacks = ['form_referral_agency_application', 'form_yosandas_agency_application', 'form_yosandas'].filter(t => t !== pTableName);
+          for (const fb of fallbacks) {
+            const fbRes = await fetch(`${sbUrl}/rest/v1/${fb}`, {
+              method: 'POST',
+              headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+              body: JSON.stringify(physRow)
+            }).catch(() => null);
+            if (fbRes && fbRes.ok) break;
+          }
+        }
+      }).catch(e => console.warn('[Supabase Physical Table Insert]', e));
+    } catch (syncErr) {
+      console.warn('[Supabase Auto Sync Error]', syncErr);
+    }
   }
 
   // もしカスタムテーブルが新設された場合は、サイドメニューを再描画する
@@ -23958,7 +24485,11 @@ function handleFormSubmitMessage(event) {
     }
   }
   targetRow[codeCol.id] = confirmedCode;
-  localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+  if (isTestSubmission || targetTable.isTestTable) {
+    originalSetItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+  } else {
+    localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
+  }
 
   // ----------------------------------------------------
   // 3. レスポンス送信と通知
@@ -23996,11 +24527,27 @@ function handleFormSubmitMessage(event) {
       showToast(`${isTestSubmission ? '【テスト】' : ''}フォーム「${formTitle}」の途中回答を受信し、回答ID [${confirmedCode}] を確定しました。`, isTestSubmission ? 'info' : 'success');
     } else {
       if (isTestSubmission) {
-        showToast(`【テスト】フォーム「${formTitle}」のテスト送信を受信し、隔離テーブル「${effectiveTableName}」へ保存しました。`, 'info');
+        showToast(`【テスト回答】「${formTitle}」のテスト回答を受信し、テスト専用テーブル「${effectiveTableName}」へ隔離保存しました。`, 'info');
       } else {
         showToast(`フォーム「${formTitle}」の回答を受信し、パートナーDBおよびCOSマスタへ保存しました。`, 'success');
       }
     }
+    if (isTestSubmission) {
+      if (typeof renderCustomTableList === 'function') renderCustomTableList();
+      if (typeof openTab === 'function') {
+        openTab(`custom-table-${targetTable.id}`, 'custom-table-screen', `📊 ${targetTable.name}`);
+      } else {
+        state.activeCustomTableId = targetTable.id;
+        state.currentView = 'custom-table-screen';
+      }
+      if (typeof renderCustomTable === 'function') {
+        renderCustomTable(targetTable.id);
+      }
+    }
+  }
+
+  if (isTestSubmission) {
+    setTimeout(() => { window.__isHandlingTestSubmission = false; }, 300);
   }
 }
 
