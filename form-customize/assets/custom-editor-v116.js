@@ -20074,7 +20074,6 @@
       _cloudSyncDebounceTimer = setTimeout(doSync, 1200);
     }
   }
-  }
 
   async function loadFormsFromCloud() {
     if (_isCloudSyncing) return;
