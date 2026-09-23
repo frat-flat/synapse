@@ -7450,5 +7450,192 @@ html, body {
   padding: 3px 8px !important;
 }
 
+/* =========================================================================
+   📊 統合テーブルプレビュー（ユーザー・アポイント・設問・システム統合）モーダルスタイル
+   ========================================================================= */
+.column-mapping-modal-overlay {
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
 
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
 
+.modal-tab-bar {
+  display: flex !important;
+  gap: 4px !important;
+  background: #f1f5f9 !important;
+  padding: 4px !important;
+  border-radius: 8px !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.modal-tab-btn {
+  padding: 6px 14px !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  border: none !important;
+  background: transparent !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  transition: all 0.15s ease !important;
+  user-select: none !important;
+}
+
+.modal-tab-btn:hover {
+  color: #0f172a !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+}
+
+.modal-tab-btn.active {
+  background: #ffffff !important;
+  color: #0284c7 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+  font-weight: 700 !important;
+}
+
+/* カテゴリバッジ */
+.badge-col-cat {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 2px 8px !important;
+  border-radius: 4px !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+}
+
+.badge-cat-user {
+  background: #e0f2fe !important;
+  color: #0284c7 !important;
+  border: 1px solid #bae6fd !important;
+}
+
+.badge-cat-appoint {
+  background: #f3e8ff !important;
+  color: #7e22ce !important;
+  border: 1px solid #e9d5ff !important;
+}
+
+.badge-cat-question {
+  background: #ecfdf5 !important;
+  color: #059669 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+
+.badge-cat-system {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+/* フィルターピル */
+.col-filter-pill {
+  padding: 4px 10px !important;
+  font-size: 0.74rem !important;
+  font-weight: 600 !important;
+  border-radius: 20px !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #ffffff !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  transition: all 0.15s ease !important;
+}
+
+.col-filter-pill:hover {
+  background: #f8fafc !important;
+  color: #1e293b !important;
+  border-color: #cbd5e1 !important;
+}
+
+.col-filter-pill.active {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border-color: #0284c7 !important;
+}
+
+/* スプレッドシート風グリッドテーブルプレビュー */
+.integrated-table-grid-wrap {
+  width: 100% !important;
+  overflow-x: auto !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+.integrated-table-grid {
+  width: 100% !important;
+  min-width: 1200px !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  font-size: 0.8rem !important;
+  text-align: left !important;
+}
+
+.integrated-table-grid thead th {
+  background: #f8fafc !important;
+  color: #334155 !important;
+  padding: 10px 14px !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+  border-right: 1px solid #e2e8f0 !important;
+  white-space: nowrap !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+}
+
+.integrated-table-grid thead th:last-child {
+  border-right: none !important;
+}
+
+.integrated-table-grid tbody tr {
+  transition: background 0.12s ease !important;
+}
+
+.integrated-table-grid tbody tr:nth-child(even) {
+  background: #fafbfc !important;
+}
+
+.integrated-table-grid tbody tr:hover {
+  background: #eff6ff !important;
+}
+
+.integrated-table-grid tbody td {
+  padding: 9px 14px !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-right: 1px solid #f1f5f9 !important;
+  color: #1e293b !important;
+  white-space: nowrap !important;
+  max-width: 260px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  vertical-align: middle !important;
+}
+
+.integrated-table-grid tbody td:last-child {
+  border-right: none !important;
+}
+
+.integrated-table-grid .col-header-meta {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+}
+
+.integrated-table-grid .col-header-key {
+  font-family: monospace !important;
+  font-size: 0.7rem !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+}

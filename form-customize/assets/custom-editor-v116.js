@@ -17917,66 +17917,69 @@
     const newTableId = (formDef.targetTableId && formDef.targetTableId !== 'dedicated' && formDef.targetTableId !== 'table_all_form_responses')
       ? formDef.targetTableId
       : `ctbl_${Date.now()}`;
-    const columns = [
-      { id: 'master_id', label: 'マスターID / コード', type: 'text', required: false },
-      { id: 'form_title', label: 'フォーム名', type: 'text', required: false }
-    ];
+    // 🌟 統合カラム定義（設問・ユーザー連携・アポイント連携・システム共通）からテーブルカラムを構築
+    const integratedCols = (typeof getIntegratedFormColumns === 'function') 
+      ? getIntegratedFormColumns(formDef) 
+      : [];
 
-    sections.forEach((sec) => {
-      (sec.questions || []).forEach(q => {
-        const colId = getEffectiveCleanDataKey(q);
-        const rawTitle = (q.title || q.dataKey || q.id || '').trim();
-        let colName = rawTitle;
-        if (q.groupTitle && !colName.startsWith(`[${q.groupTitle}]`)) {
-          colName = `[${q.groupTitle}] ${colName}`;
-        }
-        let colType = 'text';
-        if (q.type === 'date') colType = 'date';
-        else if (q.type === 'select' || q.type === 'radio') colType = 'select';
-        else if (q.type === 'number') colType = 'number';
+    let columns = [];
+    if (integratedCols.length > 0) {
+      columns = integratedCols.map(c => ({
+        id: c.key || c.id,
+        label: c.label || c.name,
+        name: c.label || c.name,
+        type: c.type === 'datetime' ? 'date' : (c.type === 'email' || c.type === 'url' || c.type === 'uuid' ? 'text' : c.type),
+        required: !!c.required,
+        category: c.category,
+        choices: c.choices
+      }));
+    } else {
+      columns = [
+        { id: 'master_id', label: 'マスターID / コード', type: 'text', required: false },
+        { id: 'form_title', label: 'フォーム名', type: 'text', required: false }
+      ];
 
-        // 🔍 同一のキー（dataKey/id）を持つカラムが既に存在するかチェック
-        const existingCol = columns.find(c => c.id === colId);
-        if (existingCol) {
-          // 同一キーの設問が存在する場合：別カラムを作らず1つのカラムに統合
-          // ラベルが異なる場合（例: 法人名 と 屋号）はスラッシュで繋いで「法人名 / 屋号」にする
-          if (colName && !existingCol.label.includes(colName)) {
-            existingCol.label = `${existingCol.label} / ${colName}`;
-            existingCol.name = existingCol.label;
+      sections.forEach((sec) => {
+        (sec.questions || []).forEach(q => {
+          const colId = getEffectiveCleanDataKey(q);
+          const rawTitle = (q.title || q.dataKey || q.id || '').trim();
+          let colName = rawTitle;
+          if (q.groupTitle && !colName.startsWith(`[${q.groupTitle}]`)) {
+            colName = `[${q.groupTitle}] ${colName}`;
           }
-          if (q.required) existingCol.required = true;
-          // choices のマージ
-          if (Array.isArray(q.options) && q.options.length > 0) {
-            if (!existingCol.choices) existingCol.choices = [];
-            const existingVals = new Set(existingCol.choices.map(c => typeof c === 'object' ? (c.label || c.value) : c));
-            q.options.forEach(opt => {
-              const val = typeof opt === 'object' ? (opt.label || opt.value) : opt;
-              if (val && !existingVals.has(val)) {
-                existingCol.choices.push({ value: val });
-                existingVals.add(val);
-              }
-            });
-          }
-          return; // 重複追加を防止
-        }
+          let colType = 'text';
+          if (q.type === 'date') colType = 'date';
+          else if (q.type === 'select' || q.type === 'radio') colType = 'select';
+          else if (q.type === 'number') colType = 'number';
 
-        columns.push({
-          id: colId,
-          label: colName,
-          name: colName,
-          type: colType,
-          required: q.required || false,
-          choices: q.options ? q.options.map(opt => ({ value: (typeof opt === 'object' ? (opt.label || opt.value) : opt) })) : undefined
+          const existingCol = columns.find(c => c.id === colId);
+          if (existingCol) {
+            if (colName && !existingCol.label.includes(colName)) {
+              existingCol.label = `${existingCol.label} / ${colName}`;
+              existingCol.name = existingCol.label;
+            }
+            if (q.required) existingCol.required = true;
+            return;
+          }
+
+          columns.push({
+            id: colId,
+            label: colName,
+            name: colName,
+            type: colType,
+            required: q.required || false,
+            choices: q.options ? q.options.map(opt => ({ value: (typeof opt === 'object' ? (opt.label || opt.value) : opt) })) : undefined
+          });
         });
       });
-    });
 
-    columns.push(
-      { id: 'status', label: 'ステータス', type: 'select', choices: [{ value: '回答完了', color: '#10b981' }, { value: '途中送信', color: '#f59e0b' }], required: false },
-      { id: 'registration_code', label: '回答ID', type: 'text', required: false },
-      { id: 'resume_url', label: '再開用URL', type: 'text', required: false },
-      { id: 'created_at', label: '送信日時', type: 'date', required: false }
-    );
+      columns.push(
+        { id: 'status', label: 'ステータス', type: 'select', choices: [{ value: '回答完了', color: '#10b981' }, { value: '途中送信', color: '#f59e0b' }], required: false },
+        { id: 'registration_code', label: '回答ID', type: 'text', required: false },
+        { id: 'resume_url', label: '再開用URL', type: 'text', required: false },
+        { id: 'created_at', label: '送信日時', type: 'date', required: false }
+      );
+    }
 
     const defaultWidths = {};
     columns.forEach(col => { defaultWidths[col.id] = 130; });
@@ -18230,54 +18233,71 @@
   async function updateDedicatedTableColumns(dedicatedTable, formDef) {
     if (!dedicatedTable || !formDef) return { updated: false, addedColumns: [] };
 
-    // 1. 最新のフォーム定義から、あるべき全カラム定義（expectedColumns）を生成
-    const expectedColumns = [
-      { id: 'master_id', label: 'マスターID / コード', type: 'text', required: false },
-      { id: 'form_title', label: 'フォーム名', type: 'text', required: false }
-    ];
+    // 1. 最新のフォーム定義から、あるべき統合全カラム定義（expectedColumns）を生成
+    let expectedColumns = [];
+    const integratedCols = (typeof getIntegratedFormColumns === 'function') 
+      ? getIntegratedFormColumns(formDef) 
+      : [];
 
-    const sections = (window.G && window.G.sections && window.G.sections.length > 0) ? window.G.sections : (formDef.sections || []);
-    sections.forEach((sec) => {
-      (sec.questions || []).forEach(q => {
-        if (!q) return;
-        const colId = getEffectiveCleanDataKey(q);
-        const rawTitle = (q.title || q.dataKey || q.id || '').trim();
-        let colName = rawTitle;
-        if (q.groupTitle && !colName.startsWith(`[${q.groupTitle}]`)) {
-          colName = `[${q.groupTitle}] ${colName}`;
-        }
-        let colType = 'text';
-        if (q.type === 'date') colType = 'date';
-        else if (q.type === 'select' || q.type === 'radio') colType = 'select';
-        else if (q.type === 'number') colType = 'number';
+    if (integratedCols.length > 0) {
+      expectedColumns = integratedCols.map(c => ({
+        id: c.key || c.id,
+        label: c.label || c.name,
+        name: c.label || c.name,
+        type: c.type === 'datetime' ? 'date' : (c.type === 'email' || c.type === 'url' || c.type === 'uuid' ? 'text' : c.type),
+        required: !!c.required,
+        category: c.category,
+        choices: c.choices
+      }));
+    } else {
+      expectedColumns = [
+        { id: 'master_id', label: 'マスターID / コード', type: 'text', required: false },
+        { id: 'form_title', label: 'フォーム名', type: 'text', required: false }
+      ];
 
-        const existingCol = expectedColumns.find(c => c.id === colId);
-        if (existingCol) {
-          if (colName && !existingCol.label.includes(colName)) {
-            existingCol.label = `${existingCol.label} / ${colName}`;
-            existingCol.name = existingCol.label;
+      const sections = (window.G && window.G.sections && window.G.sections.length > 0) ? window.G.sections : (formDef.sections || []);
+      sections.forEach((sec) => {
+        (sec.questions || []).forEach(q => {
+          if (!q) return;
+          const colId = getEffectiveCleanDataKey(q);
+          const rawTitle = (q.title || q.dataKey || q.id || '').trim();
+          let colName = rawTitle;
+          if (q.groupTitle && !colName.startsWith(`[${q.groupTitle}]`)) {
+            colName = `[${q.groupTitle}] ${colName}`;
           }
-          if (q.required) existingCol.required = true;
-          return;
-        }
+          let colType = 'text';
+          if (q.type === 'date') colType = 'date';
+          else if (q.type === 'select' || q.type === 'radio') colType = 'select';
+          else if (q.type === 'number') colType = 'number';
 
-        expectedColumns.push({
-          id: colId,
-          label: colName,
-          name: colName,
-          type: colType,
-          required: !!q.required,
-          choices: q.options ? q.options.map(opt => ({ value: (typeof opt === 'object' ? (opt.label || opt.value) : opt) })) : undefined
+          const existingCol = expectedColumns.find(c => c.id === colId);
+          if (existingCol) {
+            if (colName && !existingCol.label.includes(colName)) {
+              existingCol.label = `${existingCol.label} / ${colName}`;
+              existingCol.name = existingCol.label;
+            }
+            if (q.required) existingCol.required = true;
+            return;
+          }
+
+          expectedColumns.push({
+            id: colId,
+            label: colName,
+            name: colName,
+            type: colType,
+            required: !!q.required,
+            choices: q.options ? q.options.map(opt => ({ value: (typeof opt === 'object' ? (opt.label || opt.value) : opt) })) : undefined
+          });
         });
       });
-    });
 
-    expectedColumns.push(
-      { id: 'status', label: 'ステータス', type: 'select', choices: [{ value: '回答完了', color: '#10b981' }, { value: '途中送信', color: '#f59e0b' }], required: false },
-      { id: 'registration_code', label: '回答ID', type: 'text', required: false },
-      { id: 'resume_url', label: '再開用URL', type: 'text', required: false },
-      { id: 'created_at', label: '送信日時', type: 'date', required: false }
-    );
+      expectedColumns.push(
+        { id: 'status', label: 'ステータス', type: 'select', choices: [{ value: '回答完了', color: '#10b981' }, { value: '途中送信', color: '#f59e0b' }], required: false },
+        { id: 'registration_code', label: '回答ID', type: 'text', required: false },
+        { id: 'resume_url', label: '再開用URL', type: 'text', required: false },
+        { id: 'created_at', label: '送信日時', type: 'date', required: false }
+      );
+    }
 
     const oldCols = Array.isArray(dedicatedTable.columns) ? dedicatedTable.columns : [];
     const oldColIds = oldCols.map(c => c && c.id).filter(Boolean);
@@ -22797,86 +22817,56 @@
     const formTitle = (typeof getEffectiveFormTitle === 'function' ? getEffectiveFormTitle(formDef) : (formDef.title || formDef.name)) || 'フォーム';
     const sections = (window.G && window.G.sections && window.G.sections.length > 0) ? window.G.sections : (formDef.sections || []);
 
-    // 設問一覧を収集
-    const questionCols = [];
-    sections.forEach((sec, sIdx) => {
-      (sec.questions || []).forEach(q => {
-        if (!q) return;
-        const qTitle = (q.title || '').trim() || `設問_${questionCols.length + 1}`;
-        const pKey = typeof getEffectiveCleanDataKey === 'function' ? getEffectiveCleanDataKey(q) : (q.dataKey || `col_${questionCols.length + 1}`);
+    // 🌟 統合カラム一覧（設問・ユーザー連携・アポイント連携）を収集
+    const integratedCols = (typeof getIntegratedFormColumns === 'function')
+      ? getIntegratedFormColumns(formDef)
+      : [];
 
-        // 型や設問名に応じた代表的な入力例（サンプル値）
-        let sampleVal = '';
-        const titleLower = qTitle.toLowerCase();
-        const pKeyLower = pKey.toLowerCase();
+    let questionCols = [];
+    if (integratedCols.length > 0) {
+      integratedCols.forEach(col => {
+        // システムカラム（id, resume_url などCSV手入力が不要なものを除外）
+        if (col.key === 'id' || col.key === 'resume_url') return;
 
-        if (q.type === 'radio' || q.type === 'select') {
-          if (Array.isArray(q.options) && q.options.length > 0) {
-            const firstOpt = typeof q.options[0] === 'object' ? (q.options[0].label || q.options[0].text || q.options[0].value) : q.options[0];
-            sampleVal = firstOpt || '選択肢1';
-          } else {
-            sampleVal = '選択肢1';
-          }
-        } else if (q.type === 'checkbox') {
-          if (Array.isArray(q.options) && q.options.length > 0) {
-            const firstOpt = typeof q.options[0] === 'object' ? (q.options[0].label || q.options[0].text || q.options[0].value) : q.options[0];
-            sampleVal = firstOpt || '項目1';
-          } else {
-            sampleVal = '項目1';
-          }
-        } else if (q.type === 'date') {
-          sampleVal = '2026-04-01';
-        } else if (q.type === 'time') {
-          sampleVal = '09:00';
-        } else if (q.type === 'number') {
-          sampleVal = '1000';
-        } else if (titleLower.includes('メール') || pKeyLower.includes('email') || pKeyLower.includes('mail')) {
-          sampleVal = 'sample@example.com';
-        } else if (titleLower.includes('電話') || pKeyLower.includes('tel') || pKeyLower.includes('phone')) {
-          sampleVal = '03-1234-5678';
-        } else if (titleLower.includes('郵便番号') || pKeyLower.includes('zip')) {
-          sampleVal = '100-0001';
-        } else if (titleLower.includes('法人番号') || pKeyLower.includes('corp_num')) {
-          sampleVal = '1234567890123';
-        } else if (titleLower.includes('インボイス') || pKeyLower.includes('invoice')) {
-          sampleVal = 'T1234567890123';
-        } else if (titleLower.includes('支店') || pKeyLower.includes('branch')) {
-          sampleVal = '東京営業部';
-        } else if (titleLower.includes('口座番号') || pKeyLower.includes('account_number') || pKeyLower.includes('account_num') || (titleLower.includes('口座') && titleLower.includes('番号'))) {
-          sampleVal = '1234567';
-        } else if (titleLower.includes('口座種別') || pKeyLower.includes('account_type')) {
-          sampleVal = '普通';
-        } else if (titleLower.includes('口座名義') || pKeyLower.includes('account_holder')) {
-          sampleVal = 'ヤマダ タロウ';
-        } else if (titleLower.includes('銀行') || pKeyLower.includes('bank')) {
-          sampleVal = '三井住友銀行';
-        } else if ((titleLower.includes('法人') || titleLower.includes('会社')) && (titleLower.includes('カナ') || titleLower.includes('フリガナ'))) {
-          sampleVal = 'カブシキガイシャサンプル';
-        } else if (titleLower.includes('法人名') || titleLower.includes('会社名') || pKeyLower.includes('corp_name') || pKeyLower.includes('company')) {
-          sampleVal = '株式会社サンプル';
-        } else if (titleLower.includes('屋号')) {
-          sampleVal = 'サンプル商店';
-        } else if (titleLower.includes('フリガナ') || titleLower.includes('カナ')) {
-          sampleVal = 'ヤマダ タロウ';
-        } else if (titleLower.includes('代表者') || titleLower.includes('氏名') || titleLower.includes('名前') || pKeyLower.includes('rep_name') || pKeyLower.includes('user_name') || pKeyLower === 'name') {
-          sampleVal = '山田 太郎';
-        } else if (titleLower.includes('都道府県') || titleLower.includes('住所') || pKeyLower.includes('addr')) {
-          sampleVal = '東京都千代田区霞が関1-1-1';
-        } else if (q.placeholder && q.placeholder.trim()) {
-          sampleVal = q.placeholder.trim();
-        } else {
-          sampleVal = '例入力データ';
+        let hName = col.label;
+        if (col.category === 'user') {
+          hName = `[ユーザー] ${col.label}`;
+        } else if (col.category === 'appoint') {
+          hName = `[アポ] ${col.label}`;
+        } else if (col.category === 'system') {
+          hName = `[システム] ${col.label}`;
         }
-
+        
         questionCols.push({
-          title: qTitle,
-          dataKey: pKey,
-          groupTitle: q.groupTitle || null,
-          sectionTitle: sec.title || null,
-          sample: sampleVal
+          title: col.label,
+          dataKey: col.key || col.id,
+          headerName: `${hName} (${col.key || col.id})`,
+          sample: col.sampleVal || ''
         });
       });
-    });
+    } else {
+      sections.forEach((sec, sIdx) => {
+        (sec.questions || []).forEach(q => {
+          if (!q) return;
+          const qTitle = (q.title || '').trim() || `設問_${questionCols.length + 1}`;
+          const pKey = typeof getEffectiveCleanDataKey === 'function' ? getEffectiveCleanDataKey(q) : (q.dataKey || `col_${questionCols.length + 1}`);
+
+          let sampleVal = '例入力データ';
+          if (q.type === 'date') sampleVal = '2026-04-01';
+          else if (q.options && q.options.length > 0) {
+            const first = q.options[0];
+            sampleVal = typeof first === 'object' ? (first.label || first.value) : first;
+          }
+
+          questionCols.push({
+            title: qTitle,
+            dataKey: pKey,
+            headerName: `${qTitle} (${pKey})`,
+            sample: sampleVal
+          });
+        });
+      });
+    }
 
     if (questionCols.length === 0) {
       alert('フォームに設問が存在しないため、テンプレートを出力できません。');
@@ -22949,12 +22939,339 @@
   window.downloadFormBulkInputTemplate = downloadFormBulkInputTemplate;
 
   // ==========================================
-  // 📊 本番テーブル連携カラム確認＆保存先設定モーダル
+  // 📊 フォーム統合カラム（設問・ユーザー連携・アポイント連携・システム共通）抽出ヘルパー
+  // ==========================================
+  function getIntegratedFormColumns(formDef, options = {}) {
+    const curDef = formDef || window.G || window.L || {};
+    const sections = (window.G && window.G.sections && window.G.sections.length > 0) ? window.G.sections : (curDef.sections || []);
+    const formTitle = getEffectiveFormTitle(curDef);
+
+    // アポイント連携がこのフォームで有効かチェック
+    const isAppointEnabled = curDef.appointIntegration ? (curDef.appointIntegration.enabled === true) : false;
+    const appointFields = (curDef.appointIntegration && curDef.appointIntegration.fields) ? curDef.appointIntegration.fields : {
+      customerName: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true
+    };
+
+    const cols = [];
+
+    // --- 1. ⚙️ システム共通カラム (先頭) ---
+    cols.push(
+      {
+        id: 'master_id',
+        key: 'master_id',
+        label: 'マスターID / コード',
+        category: 'system',
+        catName: 'システム共通',
+        type: 'text',
+        required: false,
+        source: '顧客・マスタ紐付け',
+        sampleVal: 'MST_882910',
+        desc: '統合顧客ID・契約識別コード'
+      },
+      {
+        id: 'form_title',
+        key: 'form_title',
+        label: 'フォーム名',
+        category: 'system',
+        catName: 'システム共通',
+        type: 'text',
+        required: false,
+        source: 'フォーム基本情報',
+        sampleVal: formTitle,
+        desc: '送信されたフォームの名称'
+      }
+    );
+
+    // --- 2. 👤 ユーザー連携カラム (User Integration) ---
+    cols.push(
+      {
+        id: 'user_id',
+        key: 'user_id',
+        label: 'ユーザーID',
+        category: 'user',
+        catName: 'ユーザー連携',
+        type: 'text',
+        required: false,
+        source: 'ログイン / 回答者アカウント連携',
+        sampleVal: 'USR_94821',
+        desc: 'Synapse操作アカウントまたは顧客ユーザーID'
+      },
+      {
+        id: 'user_name',
+        key: 'user_name',
+        label: 'ユーザー名 / 担当者名',
+        category: 'user',
+        catName: 'ユーザー連携',
+        type: 'text',
+        required: false,
+        source: 'ログイン / 回答者アカウント連携',
+        sampleVal: '山田 太郎',
+        desc: '回答送信者または担当オペレーター氏名'
+      },
+      {
+        id: 'user_email',
+        key: 'user_email',
+        label: 'メールアドレス',
+        category: 'user',
+        catName: 'ユーザー連携',
+        type: 'email',
+        required: false,
+        source: 'ログイン / 回答者アカウント連携',
+        sampleVal: 'yamada@synapse-corp.jp',
+        desc: '回答者または送信通知先メールアドレス'
+      },
+      {
+        id: 'company_name',
+        key: 'company_name',
+        label: '企業名 / 屋号',
+        category: 'user',
+        catName: 'ユーザー連携',
+        type: 'text',
+        required: false,
+        source: 'ログイン / 回答者アカウント連携',
+        sampleVal: '株式会社シナプスパートナーズ',
+        desc: '回答者所属組織または顧客法人名'
+      }
+    );
+
+    // --- 3. 📅 アポイント連携カラム (Appointment Integration) ---
+    const appointDefList = [
+      { id: 'appoint_id', key: 'appoint_id', label: 'アポイントID', type: 'text', fieldKey: 'appointId', sampleVal: 'APT_20260930_01', desc: '予約・商談アポイントメントID' },
+      { id: 'appoint_date', key: 'appoint_date', label: 'アポイント日時', type: 'datetime', fieldKey: 'appointDate', sampleVal: '2026-09-30 14:00', desc: '商談・面談の予定日時' },
+      { id: 'customer_name', key: 'customer_name', label: 'お客様名 (アポ連携)', type: 'text', fieldKey: 'customerName', sampleVal: '佐藤 健一', desc: 'アポイント登録時の顧客氏名' },
+      { id: 'meeting_type', key: 'meeting_type', label: '面談形式', type: 'select', fieldKey: 'meetingType', sampleVal: 'オンライン (Zoom)', desc: '対面・オンライン等の商談形式' },
+      { id: 'source_category', key: 'source_category', label: '流入経路', type: 'select', fieldKey: 'sourceCategory', sampleVal: 'Web紹介・反響', desc: '反響・広告・紹介等のチャネル' },
+      { id: 'introducer', key: 'introducer', label: '紹介者 / 代理店', type: 'text', fieldKey: 'introducer', sampleVal: 'パートナー営業第1部', desc: '案件紹介元代理店または担当者' },
+      { id: 'appoint_staff', key: 'appoint_staff', label: 'アポイント担当者', type: 'text', fieldKey: 'appointStaff', sampleVal: '鈴木 一郎', desc: 'アポイント獲得・担当スタッフ' }
+    ];
+
+    appointDefList.forEach(item => {
+      const isFieldActive = isAppointEnabled && (appointFields[item.fieldKey] !== false);
+      cols.push({
+        id: item.id,
+        key: item.key,
+        label: item.label,
+        category: 'appoint',
+        catName: 'アポイント連携',
+        type: item.type,
+        required: false,
+        source: isAppointEnabled ? (isFieldActive ? 'アポイント連携 (有効 ✨)' : 'アポイント連携 (項目未選択)') : 'アポイント連携 (未有効化)',
+        isAppointActive: isFieldActive,
+        sampleVal: item.sampleVal,
+        desc: item.desc
+      });
+    });
+
+    // --- 4. 📝 フォーム設問カラム (Form Questions) ---
+    sections.forEach((sec, sIdx) => {
+      const secTitle = sec.title || `セクション ${sIdx + 1}`;
+      (sec.questions || []).forEach(q => {
+        if (!q) return;
+        const qTitle = (q.title || '(無題の設問)').trim();
+        const physicalKey = getEffectiveCleanDataKey(q);
+        const hasCustomKey = !!(q.dataKey && !/_\d{10,}$/.test(q.dataKey));
+        let typeLabel = q.type === 'text' ? 'テキスト' :
+                        q.type === 'radio' ? '単一選択 (ラジオ)' :
+                        q.type === 'checkbox' ? '複数選択 (チェック)' :
+                        q.type === 'select' ? 'プルダウン' :
+                        q.type === 'textarea' ? '複数行テキスト' :
+                        q.type === 'date' ? '日付' :
+                        q.type === 'number' ? '数値' : q.type;
+
+        // API自動補完バッジの判定
+        let apiDesc = 'フォーム入力';
+        if (q.validation && q.validation.category === 'api') {
+          if (q.validation.condition === 'corp_name') apiDesc = '国税庁法人番号API連携';
+          else if (q.validation.condition === 'invoice_number') apiDesc = '国税庁インボイス公表API連携';
+        } else if (q.dataKey === 'zip_code' || q.dataKey === 'main_zip' || q.dataKey === 'mail_zip' || qTitle.includes('郵便番号')) {
+          apiDesc = '郵便番号住所自動補完';
+        } else if (qTitle.includes('銀行') || q.dataKey === 'bank_name') {
+          apiDesc = '全銀協 金融機関API連携';
+        }
+
+        let sampleVal = '回答サンプル';
+        const tLower = qTitle.toLowerCase();
+        const pKeyLower = physicalKey.toLowerCase();
+        if (tLower.includes('法人番号') || pKeyLower.includes('corp_num')) sampleVal = '1234567890123';
+        else if (tLower.includes('インボイス') || pKeyLower.includes('invoice')) sampleVal = 'T1234567890123';
+        else if (tLower.includes('メール') || pKeyLower.includes('email')) sampleVal = 'contact@example.com';
+        else if (tLower.includes('電話') || pKeyLower.includes('tel') || pKeyLower.includes('phone')) sampleVal = '03-1234-5678';
+        else if (tLower.includes('郵便番号') || pKeyLower.includes('zip')) sampleVal = '100-0001';
+        else if (tLower.includes('住所') || pKeyLower.includes('addr')) sampleVal = '東京都千代田区千代田1-1-1';
+        else if (tLower.includes('銀行') || pKeyLower.includes('bank')) sampleVal = '三井住友銀行 本店営業部';
+        else if (tLower.includes('口座番号') || pKeyLower.includes('account')) sampleVal = '普通 1234567';
+        else if (tLower.includes('プラン') || pKeyLower.includes('plan')) sampleVal = 'スタンダードプラン';
+        else if (tLower.includes('金額') || pKeyLower.includes('amount') || pKeyLower.includes('price')) sampleVal = '50,000円';
+        else if (q.options && q.options.length > 0) {
+          const firstOpt = q.options[0];
+          sampleVal = typeof firstOpt === 'object' ? (firstOpt.label || firstOpt.value) : firstOpt;
+        } else if (q.placeholder && q.placeholder.trim()) {
+          sampleVal = q.placeholder.trim();
+        }
+
+        let displayLabel = qTitle;
+        if (q.groupTitle && !displayLabel.startsWith(`[${q.groupTitle}]`)) {
+          displayLabel = `[${q.groupTitle}] ${displayLabel}`;
+        }
+
+        // 同一キーの重複チェック
+        const dup = cols.find(c => c.category === 'question' && c.key === physicalKey);
+        if (dup) {
+          if (!dup.label.includes(displayLabel)) {
+            dup.label += ` / ${displayLabel}`;
+          }
+          if (q.required) dup.required = true;
+          return;
+        }
+
+        cols.push({
+          id: physicalKey,
+          key: physicalKey,
+          label: displayLabel,
+          category: 'question',
+          catName: '設問項目',
+          sectionTitle: secTitle,
+          type: typeLabel,
+          required: !!q.required,
+          source: `${secTitle} (${apiDesc})`,
+          apiDesc: apiDesc,
+          sampleVal: sampleVal,
+          hasCustomKey: hasCustomKey,
+          choices: q.options ? q.options.map(opt => ({ value: (typeof opt === 'object' ? (opt.label || opt.value) : opt) })) : undefined
+        });
+      });
+    });
+
+    // --- 5. ⚙️ システム状態カラム (末尾) ---
+    cols.push(
+      {
+        id: 'status',
+        key: 'status',
+        label: 'ステータス',
+        category: 'system',
+        catName: 'システム共通',
+        type: 'select',
+        required: false,
+        source: '送信状態判定',
+        sampleVal: '回答完了',
+        desc: '回答完了 / 途中送信 / 一時保存'
+      },
+      {
+        id: 'registration_code',
+        key: 'registration_code',
+        label: '回答ID / 登録コード',
+        category: 'system',
+        catName: 'システム共通',
+        type: 'text',
+        required: false,
+        source: 'システム自動採番',
+        sampleVal: 'REG_8492014',
+        desc: '回答者へ提示される受付ID'
+      },
+      {
+        id: 'resume_url',
+        key: 'resume_url',
+        label: '再開用URL',
+        category: 'system',
+        catName: 'システム共通',
+        type: 'url',
+        required: false,
+        source: '途中再開システム',
+        sampleVal: 'https://synapse-wayway.vercel.app/form-customize/view.html?res_id=row_8492',
+        desc: '途中送信時の中断・再開URL'
+      },
+      {
+        id: 'created_at',
+        key: 'created_at',
+        label: '送信日時 / 登録日時',
+        category: 'system',
+        catName: 'システム共通',
+        type: 'datetime',
+        required: false,
+        source: '送信タイムスタンプ',
+        sampleVal: '2026-09-24 11:20:45',
+        desc: 'フォーム送信完了日時'
+      }
+    );
+
+    return cols;
+  }
+  window.getIntegratedFormColumns = getIntegratedFormColumns;
+
+  // 📋 統合サンプルデータ生成ヘルパー
+  function generateIntegratedSampleRows(columns, formDef, count = 3) {
+    const userVariations = [
+      { name: '山田 太郎', email: 'yamada@synapse-corp.jp', corp: '株式会社シナプスパートナーズ', uid: 'USR_94821' },
+      { name: '高橋 美咲', email: 'takahashi@tech-next.jp', corp: 'テックネクスト合同会社', uid: 'USR_94822' },
+      { name: '渡辺 健二', email: 'watanabe@global-biz.co.jp', corp: 'グローバルビジネス株式会社', uid: 'USR_94823' }
+    ];
+
+    const appointVariations = [
+      { id: 'APT_20260930_01', date: '2026-09-30 14:00', cust: '佐藤 健一', meet: 'オンライン (Zoom)', src: 'Web紹介・反響', intro: 'パートナー営業第1部', staff: '鈴木 一郎' },
+      { id: 'APT_20261001_02', date: '2026-10-01 11:00', cust: '中村 誠', meet: '対面 (東京本社)', src: '自社セミナー', intro: 'セミナー推進課', staff: '佐々木 拓也' },
+      { id: 'APT_20261002_03', date: '2026-10-02 16:30', cust: '伊藤 亮介', meet: 'オンライン (Teams)', src: '代理店紹介', intro: 'アライアンス本部', staff: '田中 健太' }
+    ];
+
+    const statusVariations = [
+      { status: '回答完了', code: 'REG_8492014', date: '2026-09-24 10:15:30' },
+      { status: '回答完了', code: 'REG_8492015', date: '2026-09-24 11:40:12' },
+      { status: '途中送信', code: 'REG_8492016', date: '2026-09-24 13:05:00' }
+    ];
+
+    const rows = [];
+    for (let i = 0; i < count; i++) {
+      const uVar = userVariations[i % userVariations.length];
+      const aVar = appointVariations[i % appointVariations.length];
+      const sVar = statusVariations[i % statusVariations.length];
+      const row = { id: `sample_row_${i + 1}` };
+
+      columns.forEach(col => {
+        const k = col.key || col.id;
+        if (col.category === 'user') {
+          if (k === 'user_id') row[k] = uVar.uid;
+          else if (k === 'user_name') row[k] = uVar.name;
+          else if (k === 'user_email') row[k] = uVar.email;
+          else if (k === 'company_name') row[k] = uVar.corp;
+          else row[k] = col.sampleVal || '';
+        } else if (col.category === 'appoint') {
+          if (k === 'appoint_id') row[k] = aVar.id;
+          else if (k === 'appoint_date') row[k] = aVar.date;
+          else if (k === 'customer_name') row[k] = aVar.cust;
+          else if (k === 'meeting_type') row[k] = aVar.meet;
+          else if (k === 'source_category') row[k] = aVar.src;
+          else if (k === 'introducer') row[k] = aVar.intro;
+          else if (k === 'appoint_staff') row[k] = aVar.staff;
+          else row[k] = col.sampleVal || '';
+        } else if (col.category === 'system') {
+          if (k === 'master_id') row[k] = `MST_${882910 + i}`;
+          else if (k === 'form_title') row[k] = col.sampleVal || '';
+          else if (k === 'status') row[k] = sVar.status;
+          else if (k === 'registration_code') row[k] = sVar.code;
+          else if (k === 'created_at') row[k] = sVar.date;
+          else if (k === 'resume_url') row[k] = sVar.status === '途中送信' ? `https://synapse-wayway.vercel.app/form-customize/view.html?res_id=row_${8492 + i}` : '';
+          else row[k] = col.sampleVal || '';
+        } else {
+          // question
+          if (col.choices && col.choices.length > 0) {
+            const ch = col.choices[i % col.choices.length];
+            row[k] = typeof ch === 'object' ? (ch.label || ch.value) : ch;
+          } else {
+            row[k] = (i === 0) ? (col.sampleVal || '') : `${col.sampleVal || 'サンプル'} (例${i + 1})`;
+          }
+        }
+      });
+      rows.push(row);
+    }
+    return rows;
+  }
+  window.generateIntegratedSampleRows = generateIntegratedSampleRows;
+
+  // ==========================================
+  // 📊 本番テーブル連携・統合カラム確認＆プレビューモーダル
   // ==========================================
   async function openFormColumnMappingModal(targetFormDef = null) {
     const formDef = targetFormDef || window.G || window.L || {};
     const formTitle = getEffectiveFormTitle(formDef);
-    const sections = (window.G && window.G.sections && window.G.sections.length > 0) ? window.G.sections : (formDef.sections || []);
     const pTableName = getPhysicalTableNameForForm(formDef);
 
     let modal = document.getElementById('form-column-mapping-modal');
@@ -22962,7 +23279,7 @@
       modal = document.createElement('div');
       modal.id = 'form-column-mapping-modal';
       modal.className = 'column-mapping-modal-overlay';
-      modal.style.cssText = 'position: fixed; inset: 0; z-index: 100000; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 20px;';
+      modal.style.cssText = 'position: fixed; inset: 0; z-index: 100000; background: rgba(15, 23, 42, 0.68); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;';
       document.body.appendChild(modal);
     }
 
@@ -23011,76 +23328,145 @@
     const dedicatedColMap = new Map();
     dedicatedCols.forEach(c => { if (c && c.id) dedicatedColMap.set(c.id, c); });
 
-    let rowsHtml = '';
+    // 🌟 全統合カラムの取得
+    const allIntegratedCols = getIntegratedFormColumns(formDef);
+
+    // カウント集計
+    const totalCount = allIntegratedCols.length;
+    const qCount = allIntegratedCols.filter(c => c.category === 'question').length;
+    const uCount = allIntegratedCols.filter(c => c.category === 'user').length;
+    const aCount = allIntegratedCols.filter(c => c.category === 'appoint').length;
+    const sCount = allIntegratedCols.filter(c => c.category === 'system').length;
+
+    // アポイント連携がONか
+    const isAppointOn = formDef.appointIntegration ? (formDef.appointIntegration.enabled === true) : false;
+
+    // テーブル行HTMLの生成
     let colIndex = 1;
+    let rowsHtml = '';
 
-    sections.forEach((sec, sIdx) => {
-      const secTitle = sec.title || `セクション ${sIdx + 1}`;
-      (sec.questions || []).forEach(q => {
-        const qTitle = q.title || '(無題の設問)';
-        const physicalKey = getEffectiveCleanDataKey(q);
-        const hasCustomKey = !!(q.dataKey && !/_\d{10,}$/.test(q.dataKey));
-        const typeLabel = q.type === 'text' ? 'テキスト' :
-                          q.type === 'radio' ? '単一選択 (ラジオ)' :
-                          q.type === 'checkbox' ? '複数選択 (チェック)' :
-                          q.type === 'select' ? 'プルダウン' :
-                          q.type === 'textarea' ? '複数行テキスト' : q.type;
-
-        // API連携情報の抽出
-        let apiBadge = '<span style="color: #94a3b8;">-</span>';
-        if (q.validation && q.validation.category === 'api') {
-          if (q.validation.condition === 'corp_name') apiBadge = '<span style="background: #e0f2fe; color: #0284c7; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">国税庁法人番号API</span>';
-          else if (q.validation.condition === 'invoice_number') apiBadge = '<span style="background: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">国税庁インボイス公表API</span>';
-        } else if (q.dataKey === 'zip_code' || q.dataKey === 'main_zip' || q.dataKey === 'mail_zip' || qTitle.includes('郵便番号')) {
-          apiBadge = '<span style="background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">郵便番号住所自動補完</span>';
-        } else if (qTitle.includes('銀行') || q.dataKey === 'bank_name') {
-          apiBadge = '<span style="background: #f3e8ff; color: #7e22ce; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">全銀協 金融機関API</span>';
+    allIntegratedCols.forEach(col => {
+      const isPersistedInTable = dedicatedColMap.has(col.key) || dedicatedColMap.has(col.id);
+      let syncBadge = '';
+      if (col.category === 'system') {
+        syncBadge = '<span style="background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">⚙️ 自動付与</span>';
+      } else if (col.category === 'user') {
+        syncBadge = isPersistedInTable
+          ? '<span style="background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">✓ 同期済み</span>'
+          : '<span style="background: #e0f2fe; color: #0284c7; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">👤 自動連携</span>';
+      } else if (col.category === 'appoint') {
+        if (col.isAppointActive) {
+          syncBadge = '<span style="background: #f3e8ff; color: #7e22ce; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">📅 アポ連携ON</span>';
+        } else {
+          syncBadge = '<span style="background: #f1f5f9; color: #94a3b8; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem;">連携OFF</span>';
         }
+      } else {
+        syncBadge = isPersistedInTable
+          ? '<span style="background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">✓ 同期済み</span>'
+          : '<span style="background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">⏳ 未同期</span>';
+      }
 
-        const requiredBadge = q.required ? '<span style="color: #dc2626; font-weight: bold; margin-left: 2px;">*</span>' : '';
+      // カテゴリバッジ
+      let catBadge = '';
+      if (col.category === 'question') {
+        catBadge = '<span class="badge-col-cat badge-cat-question">📝 設問</span>';
+      } else if (col.category === 'user') {
+        catBadge = '<span class="badge-col-cat badge-cat-user">👤 ユーザー</span>';
+      } else if (col.category === 'appoint') {
+        catBadge = '<span class="badge-col-cat badge-cat-appoint">📅 アポ</span>';
+      } else {
+        catBadge = '<span class="badge-col-cat badge-cat-system">⚙️ システム</span>';
+      }
 
-        // 物理カラムの同期状態チェック
-        const isPersistedInTable = dedicatedColMap.has(physicalKey) || (q.dataKey && dedicatedColMap.has(q.dataKey));
-        const syncStatusBadge = isPersistedInTable
-          ? '<span style="background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; display: inline-flex; align-items: center; gap: 3px;">✓ 同期済み</span>'
-          : '<span style="background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; display: inline-flex; align-items: center; gap: 3px;">⏳ 未同期</span>';
+      const reqMark = col.required ? '<span style="color: #dc2626; font-weight: bold; margin-left: 2px;">*</span>' : '';
+      const keyBadge = col.hasCustomKey
+        ? `<span style="background: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; margin-left: 6px;">個別指定</span>`
+        : `<span style="background: #f1f5f9; color: #64748b; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 6px;">自動割当</span>`;
 
-        // 物理キー表示バッジ
-        const keyBadge = hasCustomKey
-          ? `<span style="background: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; margin-left: 6px;">個別指定</span>`
-          : `<span style="background: #f1f5f9; color: #64748b; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 6px;">自動割当</span>`;
-
-        rowsHtml += `
-          <tr style="border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; transition: background 0.15s;">
-            <td style="padding: 10px 12px; color: #64748b; font-family: monospace; text-align: center;">${colIndex++}</td>
-            <td style="padding: 10px 12px; color: #475569; font-weight: 500;">${escapeHtml(secTitle)}</td>
-            <td style="padding: 10px 12px; color: #1e293b; font-weight: 600;">${escapeHtml(qTitle)}${requiredBadge}</td>
-            <td style="padding: 10px 12px; color: #0284c7; font-weight: 700; font-family: monospace; font-size: 0.88rem;">
-              <span>${escapeHtml(physicalKey)}</span>${keyBadge}
-            </td>
-            <td style="padding: 10px 12px; color: #334155;">${escapeHtml(typeLabel)}</td>
-            <td style="padding: 10px 12px;">${apiBadge}</td>
-            <td style="padding: 10px 12px;">${syncStatusBadge}</td>
-          </tr>
-        `;
-      });
+      rowsHtml += `
+        <tr class="col-list-row" data-category="${col.category}" style="border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; transition: background 0.12s;">
+          <td style="padding: 9px 12px; color: #64748b; font-family: monospace; text-align: center;">${colIndex++}</td>
+          <td style="padding: 9px 12px;">${catBadge}</td>
+          <td style="padding: 9px 12px; color: #1e293b; font-weight: 600;">
+            ${escapeHtml(col.label)}${reqMark}
+            ${col.sectionTitle ? `<div style="font-size: 0.7rem; color: #64748b; font-weight: 400; margin-top: 1px;">(${escapeHtml(col.sectionTitle)})</div>` : ''}
+          </td>
+          <td style="padding: 9px 12px; color: #0284c7; font-weight: 700; font-family: monospace; font-size: 0.86rem;">
+            <span>${escapeHtml(col.key)}</span>${col.category === 'question' ? keyBadge : ''}
+          </td>
+          <td style="padding: 9px 12px; color: #334155;">${escapeHtml(col.type)}</td>
+          <td style="padding: 9px 12px; color: #475569; font-size: 0.76rem;">${escapeHtml(col.source || '-')}</td>
+          <td style="padding: 9px 12px;">${syncBadge}</td>
+        </tr>
+      `;
     });
 
-    // 専用テーブル作成が選択されているか（常時専用独立テーブル）
-    const isDedicated = true;
+    // 🌟 グリッドプレビュー用データの準備
+    let previewCols = allIntegratedCols;
+    let previewRows = [];
+    const hasRealRows = dedicatedTable && Array.isArray(dedicatedTable.rows) && dedicatedTable.rows.length > 0;
 
-    // 保存先に応じたステータスバッジとアクションボタンの決定
+    if (hasRealRows) {
+      previewRows = dedicatedTable.rows;
+    } else {
+      previewRows = generateIntegratedSampleRows(allIntegratedCols, formDef, 3);
+    }
+
+    // グリッドテーブルHTMLのレンダリング関数
+    function renderGridTableHtml(colsToRender, rowsToRender) {
+      let theadHtml = '<tr style="position: sticky; top: 0; z-index: 10;">';
+      theadHtml += '<th style="padding: 8px 10px; width: 45px; text-align: center; background: #f1f5f9; color: #475569;">#</th>';
+
+      colsToRender.forEach(c => {
+        let badgeClass = 'badge-cat-system';
+        let badgeIcon = '⚙️';
+        if (c.category === 'question') { badgeClass = 'badge-cat-question'; badgeIcon = '📝'; }
+        else if (c.category === 'user') { badgeClass = 'badge-cat-user'; badgeIcon = '👤'; }
+        else if (c.category === 'appoint') { badgeClass = 'badge-cat-appoint'; badgeIcon = '📅'; }
+
+        theadHtml += `
+          <th style="padding: 8px 12px; min-width: 140px;">
+            <div class="col-header-meta">
+              <span class="badge-col-cat ${badgeClass}" style="align-self: flex-start; margin-bottom: 2px;">${badgeIcon} ${escapeHtml(c.catName)}</span>
+              <span style="color: #0f172a; font-size: 0.82rem; font-weight: 700;">${escapeHtml(c.label)}</span>
+              <span class="col-header-key">${escapeHtml(c.key)}</span>
+            </div>
+          </th>
+        `;
+      });
+      theadHtml += '</tr>';
+
+      let tbodyHtml = '';
+      rowsToRender.forEach((r, rIdx) => {
+        tbodyHtml += `<tr style="transition: background 0.12s;">`;
+        tbodyHtml += `<td style="padding: 8px 10px; text-align: center; color: #64748b; font-family: monospace; background: #f8fafc; font-weight: 600;">${rIdx + 1}</td>`;
+        colsToRender.forEach(c => {
+          const val = r[c.key] !== undefined ? r[c.key] : (r[c.id] !== undefined ? r[c.id] : '');
+          tbodyHtml += `<td style="padding: 8px 12px;" title="${escapeHtml(String(val))}">${escapeHtml(String(val || ''))}</td>`;
+        });
+        tbodyHtml += `</tr>`;
+      });
+
+      return `
+        <table class="integrated-table-grid">
+          <thead>${theadHtml}</thead>
+          <tbody>${tbodyHtml}</tbody>
+        </table>
+      `;
+    }
+
+    // Dedicated Table 作成状態バッジ
     let statusBadgeHtml = '';
     let actionBtnHtml = '';
 
     if (!dedicatedTable) {
       statusBadgeHtml = `
-        <span style="background: #fef3c7; color: #b45309; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #fde68a; display: inline-flex; align-items: center; gap: 5px;">
+        <span style="background: #fef3c7; color: #b45309; font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #fde68a; display: inline-flex; align-items: center; gap: 5px;">
           <span>⚡</span> <span>専用テーブル未作成（本番送信時、または下のボタンから事前作成できます）</span>
         </span>
       `;
       actionBtnHtml = `
-        <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
           <button type="button" id="btn-download-col-modal-template" style="background: #f0fdf4; color: #166534; border: 1px solid #86efac; font-weight: 700; font-size: 0.82rem; padding: 7px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;" title="このフォームの設問に沿った回答入力用CSVテンプレートを出力します">
             <span>📥</span> <span>回答一括入力シート (CSV)</span>
           </button>
@@ -23092,17 +23478,17 @@
       `;
     } else {
       statusBadgeHtml = `
-        <span style="background: #dcfce7; color: #15803d; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #bbf7d0; display: inline-flex; align-items: center; gap: 5px;">
+        <span style="background: #dcfce7; color: #15803d; font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #bbf7d0; display: inline-flex; align-items: center; gap: 5px;">
           <span>✅</span> <span>専用テーブル作成済み（「${escapeHtml(dedicatedTable.name)}」/ ${dedicatedTable.rows ? dedicatedTable.rows.length : 0}件蓄積中 / 物理テーブル: ${dedicatedTable.physicalTableName || pTableName}）</span>
         </span>
       `;
       actionBtnHtml = `
-        <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
           <button type="button" id="btn-download-col-modal-template" style="background: #f0fdf4; color: #166534; border: 1px solid #86efac; font-weight: 700; font-size: 0.82rem; padding: 7px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;" title="このフォームの設問に沿った回答入力用CSVテンプレートを出力します">
             <span>📥</span> <span>回答一括入力シート (CSV)</span>
           </button>
           <button type="button" id="btn-create-supabase-table" style="background: #f8fafc; color: #0284c7; border: 1px solid #0284c7; font-weight: 700; font-size: 0.82rem; padding: 7px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;">
-            <span>🔄</span> <span>Supabase物理テーブルを再作成・同期</span>
+            <span>🔄</span> <span>Supabase物理テーブルを再同期</span>
           </button>
           <button type="button" id="btn-col-modal-ok" style="background: #0284c7; color: #fff; border: none; font-weight: 700; font-size: 0.85rem; padding: 7px 20px; border-radius: 6px; cursor: pointer;">閉じる</button>
         </div>
@@ -23110,91 +23496,203 @@
     }
 
     modal.innerHTML = `
-      <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 1020px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); overflow: hidden;">
-        <!-- ヘッダー -->
-        <div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; background: #f8fafc;">
+      <div style="background: #ffffff; border-radius: 12px; width: 100%; max-width: 1120px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden; border: 1px solid #cbd5e1;">
+        
+        <!-- モーダルヘッダー -->
+        <div style="padding: 14px 22px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; background: #f8fafc; flex-shrink: 0;">
           <div>
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
               <span style="font-size: 1.3rem;">📊</span>
-              <h2 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0;">専用テーブル連携・カラム設定</h2>
-              <span style="background: #0284c7; color: #fff; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">DB連携</span>
+              <h2 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0;">専用テーブル連携・統合カラム設定＆データプレビュー</h2>
+              <span style="background: #0284c7; color: #fff; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">DB統合連携</span>
+              ${isAppointOn ? '<span style="background: #f3e8ff; color: #7e22ce; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;">アポイント連携中 ✨</span>' : ''}
             </div>
-            <div style="font-size: 0.78rem; color: #64748b; margin-top: 4px;">
-              フォーム「<strong style="color: #0f172a;">${escapeHtml(formTitle)}</strong>」の回答データ蓄積設定と、Supabase物理テーブル（<code style="color: #0284c7; font-weight: 700;">${escapeHtml(pTableName)}</code>）のカラム構成です。
+            <div style="font-size: 0.76rem; color: #64748b; margin-top: 3px;">
+              フォーム「<strong style="color: #0f172a;">${escapeHtml(formTitle)}</strong>」の回答データ蓄積設定。設問項目だけでなく、ユーザー情報やアポイント連携によって蓄積される全カラムの統合定義とテーブル格納プレビューです。
             </div>
           </div>
-          <button type="button" id="btn-close-col-modal" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1;">&times;</button>
+          <button type="button" id="btn-close-col-modal" style="background: none; border: none; font-size: 1.5rem; color: #94a3b8; cursor: pointer; padding: 2px 8px; border-radius: 6px; line-height: 1; transition: color 0.15s;">&times;</button>
         </div>
 
-        <!-- 専用テーブル作成設定バー（上部バー） -->
-        <div style="padding: 12px 24px; background: ${isDedicated ? '#f0fdf4' : '#f8fafc'}; border-bottom: 1px solid ${isDedicated ? '#bbf7d0' : '#e2e8f0'}; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <label class="editor-toggle-switch" for="modal-create-dedicated-table" style="margin: 0; cursor: pointer;">
-              <input type="checkbox" id="modal-create-dedicated-table" ${isDedicated ? 'checked' : ''} />
-              <span class="editor-toggle-slider"></span>
-            </label>
-            <label for="modal-create-dedicated-table" style="font-size: 0.85rem; font-weight: 700; color: #0f172a; margin: 0; cursor: pointer;">
-              このフォーム専用のテーブルを作成する
-            </label>
+        <!-- サブバー: タブ切り替え ＆ 専用テーブルトグル ＆ ステータス -->
+        <div style="padding: 10px 22px; background: #ffffff; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; flex-shrink: 0;">
+          <!-- タブナビゲーション -->
+          <div class="modal-tab-bar">
+            <button type="button" id="tab-btn-col-list" class="modal-tab-btn active">
+              <span>📑 カラム構成一覧</span>
+              <span style="background: rgba(0,0,0,0.06); padding: 1px 6px; border-radius: 10px; font-size: 0.72rem;">${totalCount}</span>
+            </button>
+            <button type="button" id="tab-btn-grid-preview" class="modal-tab-btn">
+              <span>👀 統合データプレビュー (スプレッドシート)</span>
+            </button>
           </div>
-          <div>
+
+          <!-- 右側: 専用テーブル作成トグル ＆ ステータス -->
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <input type="checkbox" id="modal-create-dedicated-table" checked style="width: 15px; height: 15px; cursor: pointer;" />
+              <label for="modal-create-dedicated-table" style="font-size: 0.8rem; font-weight: 700; color: #0f172a; margin: 0; cursor: pointer;">
+                専用テーブルを作成する
+              </label>
+            </div>
             ${statusBadgeHtml}
           </div>
         </div>
 
-        <!-- テーブル本体スクロールエリア -->
-        <div style="flex: 1; overflow-y: auto; padding: 0 24px 20px 24px;">
-          <table style="width: 100%; border-collapse: collapse; margin-top: 16px; text-align: left;">
-            <thead>
-              <tr style="background: #f1f5f9; color: #475569; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #cbd5e1; position: sticky; top: 0; z-index: 10;">
-                <th style="padding: 10px 12px; width: 45px; text-align: center;">#</th>
-                <th style="padding: 10px 12px;">セクション</th>
-                <th style="padding: 10px 12px;">設問タイトル</th>
-                <th style="padding: 10px 12px; color: #0284c7;">Supabase物理カラム名 (dataKey)</th>
-                <th style="padding: 10px 12px;">型 / 入力形式</th>
-                <th style="padding: 10px 12px;">API連携 / 自動補完</th>
-                <th style="padding: 10px 12px; color: #15803d;">Supabase同期状況</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
+        <!-- ================= タブ1: カラム構成一覧 ================= -->
+        <div id="panel-tab-col-list" style="flex: 1 1 auto; overflow-y: auto; padding: 14px 22px; display: flex; flex-direction: column;">
+          
+          <!-- フィルターピルバー -->
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span style="font-size: 0.74rem; font-weight: 600; color: #64748b; margin-right: 4px;">絞り込み:</span>
+              <button type="button" class="col-filter-pill active" data-filter="all">すべて (${totalCount})</button>
+              <button type="button" class="col-filter-pill" data-filter="question">📝 設問項目 (${qCount})</button>
+              <button type="button" class="col-filter-pill" data-filter="user">👤 ユーザー連携 (${uCount})</button>
+              <button type="button" class="col-filter-pill" data-filter="appoint">📅 アポイント連携 (${aCount})</button>
+              <button type="button" class="col-filter-pill" data-filter="system">⚙️ システム共通 (${sCount})</button>
+            </div>
+            <div style="font-size: 0.74rem; color: #64748b;">
+              Supabase物理テーブル: <code style="color: #0284c7; font-weight: 700;">${escapeHtml(pTableName)}</code>
+            </div>
+          </div>
 
-          <!-- 自動付与システム共通カラムの明示 -->
-          <div style="margin-top: 20px; padding: 12px 16px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px;">
-            <div style="font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-              <span>⚙️</span> システム自動付与カラム（全テーブル共通で記録）
-            </div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">id (UUID)</span>
-              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">master_id (text)</span>
-              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">form_title (text)</span>
-              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">status (text)</span>
-              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">registration_code (text)</span>
-              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">resume_url (text)</span>
-              <span style="background: #fff; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; color: #475569; font-family: monospace;">created_at (timestamp)</span>
-            </div>
+          <!-- カラム一覧テーブル -->
+          <div style="border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; background: #ffffff;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+              <thead>
+                <tr style="background: #f8fafc; color: #475569; font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #cbd5e1; position: sticky; top: 0; z-index: 10;">
+                  <th style="padding: 9px 12px; width: 45px; text-align: center;">#</th>
+                  <th style="padding: 9px 12px; width: 110px;">種別</th>
+                  <th style="padding: 9px 12px;">カラム名 / 設問タイトル</th>
+                  <th style="padding: 9px 12px; color: #0284c7;">Supabase物理カラム名 (dataKey)</th>
+                  <th style="padding: 9px 12px; width: 110px;">データ型</th>
+                  <th style="padding: 9px 12px;">連携元 / API補完</th>
+                  <th style="padding: 9px 12px; width: 120px;">同期・連携状況</th>
+                </tr>
+              </thead>
+              <tbody id="col-list-table-body">
+                ${rowsHtml}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <!-- フッター -->
-        <div style="padding: 14px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; align-items: center; justify-content: space-between;">
-          <div style="font-size: 0.78rem; color: #64748b; display: flex; align-items: center; gap: 6px;">
+        <!-- ================= タブ2: 統合データプレビュー（スプレッドシート風） ================= -->
+        <div id="panel-tab-grid-preview" style="flex: 1 1 auto; overflow-y: auto; padding: 14px 22px; display: none; flex-direction: column;">
+          
+          <!-- プレビューコントロールバー -->
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              ${hasRealRows 
+                ? `<span style="background: #dcfce7; color: #15803d; font-size: 0.76rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #bbf7d0;">✅ 専用テーブル内の蓄積データ（全${previewRows.length}件）を表示中</span>`
+                : `<span style="background: #e0f2fe; color: #0284c7; font-size: 0.76rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid #bae6fd;">💡 連携稼働時のテーブル格納イメージ（サンプルデータ3件をプレビュー中）</span>`
+              }
+              <span style="font-size: 0.74rem; color: #64748b;">横スクロールで全カラムを確認できます</span>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <label style="display: flex; align-items: center; gap: 5px; font-size: 0.75rem; font-weight: 600; color: #334155; cursor: pointer; user-select: none;">
+                <input type="checkbox" id="chk-grid-include-appoint" checked style="cursor: pointer;" />
+                <span>アポイント連携カラムを表示</span>
+              </label>
+              <button type="button" id="btn-grid-regen-sample" class="btn btn-sm" style="font-size: 0.72rem; padding: 3px 10px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: #334155;">
+                <span>🔄</span> <span>サンプル再生成</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- スプレッドシート型グリッドコンテナ -->
+          <div class="integrated-table-grid-wrap" id="integrated-grid-container" style="flex: 1 1 auto; max-height: calc(90vh - 220px); overflow: auto;">
+            ${renderGridTableHtml(previewCols, previewRows)}
+          </div>
+        </div>
+
+        <!-- モーダルフッター -->
+        <div style="padding: 12px 22px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; flex-wrap: wrap; gap: 10px;">
+          <div style="font-size: 0.76rem; color: #64748b; display: flex; align-items: center; gap: 6px;">
             <span>💡</span>
-            <span>各設問の設定ドロワー「データベース連携・カラム統一」で指定した物理キー名がそのままSupabaseカラムになります。</span>
+            <span>設問回答に加え、ユーザー・アポイント連携カラムが同一レコード内に自動格納され、Supabase物理テーブルで一元管理されます。</span>
           </div>
           ${actionBtnHtml}
         </div>
       </div>
     `;
 
-    // 閉じるイベント
+    // 閉じるイベントハンドラ
     const closeHandler = () => {
       modal.remove();
     };
     modal.querySelector('#btn-close-col-modal').onclick = closeHandler;
     modal.querySelector('#btn-col-modal-ok').onclick = closeHandler;
+
+    // タブ切り替え処理
+    const tabBtnColList = modal.querySelector('#tab-btn-col-list');
+    const tabBtnGridPreview = modal.querySelector('#tab-btn-grid-preview');
+    const panelColList = modal.querySelector('#panel-tab-col-list');
+    const panelGridPreview = modal.querySelector('#panel-tab-grid-preview');
+
+    tabBtnColList.onclick = () => {
+      tabBtnColList.classList.add('active');
+      tabBtnGridPreview.classList.remove('active');
+      panelColList.style.display = 'flex';
+      panelGridPreview.style.display = 'none';
+    };
+
+    tabBtnGridPreview.onclick = () => {
+      tabBtnGridPreview.classList.add('active');
+      tabBtnColList.classList.remove('active');
+      panelColList.style.display = 'none';
+      panelGridPreview.style.display = 'flex';
+    };
+
+    // フィルターピル処理
+    const filterPills = modal.querySelectorAll('.col-filter-pill');
+    const rows = modal.querySelectorAll('.col-list-row');
+    filterPills.forEach(pill => {
+      pill.onclick = () => {
+        filterPills.forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        const filter = pill.dataset.filter;
+
+        rows.forEach(r => {
+          if (filter === 'all' || r.dataset.category === filter) {
+            r.style.display = '';
+          } else {
+            r.style.display = 'none';
+          }
+        });
+      };
+    });
+
+    // グリッドプレビューのコントロール
+    const gridContainer = modal.querySelector('#integrated-grid-container');
+    const chkAppoint = modal.querySelector('#chk-grid-include-appoint');
+    const btnRegen = modal.querySelector('#btn-grid-regen-sample');
+
+    function updateGridDisplay() {
+      let filteredCols = allIntegratedCols;
+      if (chkAppoint && !chkAppoint.checked) {
+        filteredCols = allIntegratedCols.filter(c => c.category !== 'appoint');
+      }
+      gridContainer.innerHTML = renderGridTableHtml(filteredCols, previewRows);
+    }
+
+    if (chkAppoint) {
+      chkAppoint.onchange = () => {
+        updateGridDisplay();
+      };
+    }
+
+    if (btnRegen) {
+      btnRegen.onclick = () => {
+        previewRows = generateIntegratedSampleRows(allIntegratedCols, formDef, 3);
+        updateGridDisplay();
+        if (typeof showToast === 'function') {
+          showToast('サンプルデータを再生成しました', 'info');
+        }
+      };
+    }
 
     // 📥 回答一括入力シート (CSV) ダウンロードイベント
     const dlTemplateBtn = modal.querySelector('#btn-download-col-modal-template');
@@ -23262,7 +23760,7 @@
           syncGlobalTargetTableSelect(newTable ? newTable.id : true);
           if (typeof updatePublishSyncUI === 'function') updatePublishSyncUI();
 
-          alert(`✅ テーブル「${formTitle}」の同期が完了しました！\n\n・Supabase物理テーブル: ${newTable ? (newTable.physicalTableName || getPhysicalTableNameForForm(formDef)) : ''}\n・定義済みカラム数: ${newTable && newTable.columns ? newTable.columns.length : 0}件\n・すべての物理キー（dataKey）がSupabaseへ反映されました。`);
+          alert(`✅ テーブル「${formTitle}」の同期が完了しました！\n\n・Supabase物理テーブル: ${newTable ? (newTable.physicalTableName || getPhysicalTableNameForForm(formDef)) : ''}\n・定義済みカラム数: ${newTable && newTable.columns ? newTable.columns.length : 0}件\n・すべての物理キー（設問・ユーザー・アポイント連携）がSupabaseへ反映されました。`);
         } catch(err) {
           console.error('Failed to create table:', err);
           alert(`テーブル同期に失敗しました: ${err.message}`);
@@ -23274,6 +23772,7 @@
     modal.onclick = (e) => { if (e.target === modal) closeHandler(); };
   }
   window.openFormColumnMappingModal = openFormColumnMappingModal;
+
 
   // フォーム全体設定の保存先テーブルUIと同期するヘルパー
   function syncGlobalTargetTableSelect(forcedVal) {
