@@ -2992,13 +2992,62 @@
       }
     } catch(e) {}
 
+    // 🚀 現在のDOM入力値（セクションタイトル・質問タイトル・選択肢・分岐）を window.G に直接即時同期
+    const syncCurrentDomToFormData = () => {
+      try {
+        if (!window.G || !Array.isArray(window.G.sections)) return;
+        if (window.r !== null && window.r !== undefined && window.G.sections[window.r]) {
+          const curSec = window.G.sections[window.r];
+          const secTitleInput = document.getElementById('editor-section-title');
+          if (secTitleInput && typeof secTitleInput.value === 'string') {
+            curSec.title = secTitleInput.value;
+          }
+          const secDescInput = document.getElementById('editor-section-desc');
+          if (secDescInput && typeof secDescInput.value === 'string') {
+            curSec.description = secDescInput.value;
+          }
+          const secNextSelect = document.getElementById('editor-section-next');
+          if (secNextSelect && secNextSelect.value) {
+            curSec.nextAction = secNextSelect.value;
+          }
+
+          // 各質問カードの最新入力値を同期
+          const qCards = document.querySelectorAll('#questions-container .question-card');
+          qCards.forEach((card, qIdx) => {
+            const q = (curSec.questions || [])[qIdx];
+            if (!q) return;
+
+            const titleInput = card.querySelector('input[type="text"][placeholder*="タイトル"], .question-title-input');
+            if (titleInput && typeof titleInput.value === 'string') {
+              q.title = titleInput.value;
+            }
+
+            // 選択肢のラベルと分岐先の同期
+            const optInputs = card.querySelectorAll('input[type="text"][placeholder*="選択肢"]');
+            const optSelects = card.querySelectorAll('select.option-branch-select, select.option-transition-select');
+            optInputs.forEach((optInp, optIdx) => {
+              if (q.options && q.options[optIdx]) {
+                q.options[optIdx].label = optInp.value;
+                if (optSelects[optIdx] && optSelects[optIdx].value) {
+                  q.options[optIdx].nextAction = optSelects[optIdx].value;
+                }
+              }
+            });
+          });
+        }
+      } catch (err) {
+        console.warn('[Flowmap] syncCurrentDomToFormData error:', err);
+      }
+    };
+
     const renderFlowmap = () => {
+      syncCurrentDomToFormData();
       if (window.archifyRenderer && window.G) {
         if (typeof sanitizeFormBranchingLogic === 'function') {
           sanitizeFormBranchingLogic(window.G);
         }
         window.archifyRenderer.render(window.G);
-        if (window.r && typeof window.archifyRenderer.highlightSection === 'function') {
+        if (window.r !== null && window.r !== undefined && typeof window.archifyRenderer.highlightSection === 'function') {
           window.archifyRenderer.highlightSection(window.r);
         }
       }
@@ -3243,50 +3292,148 @@
       });
     }
 
+    // ⚡ フローマップ超高速・リアルタイム同期エンジン
     let renderDebounceTimer = null;
-    const debouncedRenderFlowmap = (delay = 80) => {
+    const debouncedRenderFlowmap = (delay = 15) => {
       clearTimeout(renderDebounceTimer);
-      renderDebounceTimer = setTimeout(renderFlowmap, delay);
+      if (delay <= 0) {
+        renderFlowmap();
+      } else {
+        renderDebounceTimer = setTimeout(renderFlowmap, delay);
+      }
     };
 
-    // 分岐ドロップダウン変更・入力変更時にフローマップをリアルタイム更新
+    // 質問項目・セクション設定に関連する要素かどうかの判定
+    const isQuestionOrSectionTarget = (target) => {
+      if (!target) return false;
+      return !!(
+        target.id === 'editor-section-next' ||
+        target.id === 'editor-section-title' ||
+        target.id === 'editor-section-desc' ||
+        target.classList.contains('question-branch-select') ||
+        target.classList.contains('option-next-select') ||
+        target.classList.contains('option-branch-select') ||
+        target.classList.contains('option-transition-select') ||
+        target.classList.contains('q-branch-select') ||
+        target.classList.contains('branch-select') ||
+        target.closest('#questions-container') ||
+        target.closest('.question-card') ||
+        target.closest('.editor-question-group') ||
+        target.closest('#active-section-editor') ||
+        target.closest('.section-meta-edit') ||
+        target.closest('#overview-sections-pane') ||
+        target.closest('.questions-header') ||
+        target.closest('.questions-list')
+      );
+    };
+
+    // 🔄 手動「最新化 / フローマップ更新」ボタンのハンドラー
+    const setupFlowRefreshButtons = () => {
+      const handleRefresh = (btn, label = 'フローマップ') => {
+        if (!btn) return;
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const icon = btn.querySelector('.refresh-spin-icon');
+          if (icon) {
+            icon.style.display = 'inline-block';
+            icon.style.transition = 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)';
+            icon.style.transform = 'rotate(360deg)';
+            setTimeout(() => {
+              icon.style.transition = 'none';
+              icon.style.transform = 'rotate(0deg)';
+            }, 460);
+          }
+
+          // 即座にフローマップを完全再描画
+          renderFlowmap();
+
+          // ユーザーへのフィードバック（トースト通知）
+          if (typeof showGlobalToast === 'function') {
+            showGlobalToast('✨ フローマップを最新に更新しました！');
+          }
+        });
+      };
+
+      handleRefresh(document.getElementById('btn-flow-refresh'), 'フローマップ');
+      handleRefresh(document.getElementById('btn-sync-flowmap-from-questions'), '質問設定');
+    };
+    setupFlowRefreshButtons();
+
+    // 1. 分岐先変更・セレクト・チェック・ラジオ変更時は 0ms（瞬時）でフローマップ更新
     document.addEventListener('change', (e) => {
-      const target = e.target;
-      if (!target) return;
-      if (target.id === 'editor-section-next' || 
-          target.classList.contains('question-branch-select') ||
-          target.classList.contains('option-next-select') ||
-          target.closest('.question-item') ||
-          target.closest('.section-meta-edit')) {
-        debouncedRenderFlowmap(50);
+      if (isQuestionOrSectionTarget(e.target)) {
+        debouncedRenderFlowmap(0);
       }
-    });
+    }, true);
 
+    // 2. 質問タイトル・説明・選択肢テキスト等の文字入力時は 25ms で極めて滑らかに即時更新
     document.addEventListener('input', (e) => {
-      const target = e.target;
-      if (!target) return;
-      if (target.closest('.question-item') || target.closest('.section-meta-edit') || target.id === 'form-title-input') {
-        debouncedRenderFlowmap(200);
+      if (isQuestionOrSectionTarget(e.target)) {
+        debouncedRenderFlowmap(25);
       }
-    });
+    }, true);
 
-    // セクション編集DOMの変更（質問の追加・削除・並び替えなど）を監視して自動同期
-    if (sectionsPane && window.MutationObserver) {
-      const secObserver = new MutationObserver((mutations) => {
-        // 余計な属性変更ループを防ぐため、子ノード変更のみを対象
-        const hasChildChanges = mutations.some(m => m.type === 'childList');
-        if (hasChildChanges) {
-          debouncedRenderFlowmap(150);
+    // 3. 入力フィールドからフォーカスが外れた時（確定時）も即時同期
+    document.addEventListener('blur', (e) => {
+      if (isQuestionOrSectionTarget(e.target)) {
+        debouncedRenderFlowmap(0);
+      }
+    }, true);
+
+    // 4. ドラッグ＆ドロップによる質問並び替え完了時の即時同期
+    document.addEventListener('dragend', (e) => {
+      if (isQuestionOrSectionTarget(e.target)) {
+        debouncedRenderFlowmap(10);
+      }
+    }, true);
+    document.addEventListener('drop', (e) => {
+      if (isQuestionOrSectionTarget(e.target)) {
+        debouncedRenderFlowmap(10);
+      }
+    }, true);
+
+    // 5. 質問追加・削除・DOM変更の監視（questions-container & active-section-editor）
+    if (window.MutationObserver) {
+      const qObserver = new MutationObserver((mutations) => {
+        const hasRelevantChanges = mutations.some(m => m.type === 'childList');
+        if (hasRelevantChanges) {
+          debouncedRenderFlowmap(10);
         }
       });
-      secObserver.observe(sectionsPane, { childList: true, subtree: true });
+
+      const observeContainer = (elId) => {
+        const el = document.getElementById(elId);
+        if (el) {
+          qObserver.observe(el, { childList: true, subtree: true });
+        }
+      };
+
+      observeContainer('questions-container');
+      observeContainer('active-section-editor');
+      observeContainer('overview-sections-pane');
     }
 
-    // 質問項目やセクションカードをクリックしたときに、フローマップ側の該当ルートを自動ハイライト
+    // 6. 質問項目やセクションカードをクリックしたときに、フローマップ側の該当ルートを自動ハイライト
     document.addEventListener('click', (e) => {
-      const qItem = e.target.closest('.question-item');
-      if (qItem && window.archifyRenderer) {
-        const qId = qItem.dataset.questionId || qItem.id;
+      const qCard = e.target.closest('.question-card, .question-item, .editor-question-group');
+      if (qCard && window.archifyRenderer) {
+        // カードからquestion IDを抽出
+        let qId = qCard.dataset.questionId || qCard.dataset.id || qCard.id;
+        if (!qId) {
+          const idInput = qCard.querySelector('[name*="question_id"], [data-qid]');
+          if (idInput) qId = idInput.value || idInput.dataset.qid;
+        }
+        if (!qId && window.G && window.r !== null && window.r !== undefined) {
+          // セクション内の質問インデックスから割り出し
+          const cards = Array.from(document.querySelectorAll('#questions-container .question-card'));
+          const idx = cards.indexOf(qCard);
+          const curSec = (window.G.sections || [])[window.r];
+          if (curSec && curSec.questions && curSec.questions[idx]) {
+            qId = curSec.questions[idx].id;
+          }
+        }
         if (qId) {
           window.archifyRenderer.highlightRouteForNode(qId);
         }
@@ -3304,7 +3451,7 @@
           const res = origX.apply(this, args);
           setTimeout(() => {
             if (window.refreshFlowmap) window.refreshFlowmap();
-          }, 100);
+          }, 30);
           return res;
         };
         window.X._archifyHooked = true;

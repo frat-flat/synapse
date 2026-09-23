@@ -1263,7 +1263,10 @@
 
               <div class="questions-header">
                 <h3>質問項目</h3>
-                <div class="editor-question-actions" style="display: flex; gap: 10px; align-items: center;">
+                <div class="editor-question-actions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                  <button type="button" id="btn-sync-flowmap-from-questions" class="btn btn-sm" style="font-size: 0.75rem; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 4px; cursor: pointer; transition: all 0.15s ease;" title="質問設定の最新状態をフローマップに即時反映">
+                    <span class="refresh-spin-icon">🔄</span> フローマップへ反映
+                  </button>
                   <select id="select-preset-question" class="form-control" style="width: auto; font-size: 0.8rem; height: 32px; padding: 4px 8px; background-color: var(--color-bg-input);">
                     <option value="">-- プリセットから追加 --</option>
                     <option value="company">法人名（会社名）</option>
@@ -1300,6 +1303,9 @@
                   <span style="font-weight: 700; font-size: 0.85rem; color: #1e293b;">🔀 フローマップ</span>
                 </div>
                 <div class="flowmap-controls">
+                  <button type="button" id="btn-flow-refresh" class="btn-flow-tool btn-flow-refresh" title="質問設定の最新内容をフローマップに即時反映" style="background: #ecfdf5 !important; color: #047857 !important; border-color: #a7f3d0 !important; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                    <span class="refresh-spin-icon">🔄</span> 最新化
+                  </button>
                   <button type="button" id="btn-flow-guide" class="btn-flow-tool btn-flow-guide" title="枠や矢印の凡例・見方ガイド" style="background: #eef2ff !important; color: #4338ca !important; border-color: #c7d2fe !important;">📖 見方ガイド</button>
                   <button type="button" id="btn-flow-fit" class="btn-flow-tool" title="全体を表示">🔍 全体表示</button>
                   <button type="button" id="btn-flow-zoom-in" class="btn-flow-tool" title="拡大">＋</button>

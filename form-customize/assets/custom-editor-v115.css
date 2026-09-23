@@ -7307,3 +7307,39 @@ html, body {
   text-align: left !important;
 }
 
+/* 🔄 フローマップ最新化・即時同期ボタン */
+.btn-flow-refresh {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #a7f3d0 !important;
+  font-weight: 700 !important;
+  transition: all 0.2s ease !important;
+}
+
+.btn-flow-refresh:hover {
+  background: #d1fae5 !important;
+  color: #065f46 !important;
+  border-color: #6ee7b7 !important;
+  box-shadow: 0 1px 3px rgba(4, 120, 87, 0.15) !important;
+}
+
+.btn-flow-refresh:active {
+  transform: scale(0.96) !important;
+}
+
+#btn-sync-flowmap-from-questions:hover {
+  background: #d1fae5 !important;
+  color: #065f46 !important;
+  border-color: #6ee7b7 !important;
+}
+
+#btn-sync-flowmap-from-questions:active {
+  transform: scale(0.96) !important;
+}
+
+.refresh-spin-icon {
+  display: inline-block;
+  transform-origin: center center;
+}
+
+
