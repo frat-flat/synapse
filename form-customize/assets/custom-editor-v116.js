@@ -24754,7 +24754,10 @@
       statusBadge.style.background = '#e0f2fe';
       statusBadge.style.color = '#0284c7';
     }
-    if (refreshBtn) refreshBtn.disabled = true;
+    if (refreshBtn) {
+      refreshBtn.disabled = true;
+      refreshBtn.innerHTML = '<span>⏳</span> 分析中...';
+    }
     if (submitBtn) submitBtn.disabled = true;
 
     const formSummary = collectFormSummary();
@@ -24797,7 +24800,10 @@
       statusBadge.style.background = '';
       statusBadge.style.color = '';
     }
-    if (refreshBtn) refreshBtn.disabled = false;
+    if (refreshBtn) {
+      refreshBtn.disabled = false;
+      refreshBtn.innerHTML = '<span>🔄</span> 再診断';
+    }
     if (submitBtn) submitBtn.disabled = false;
     isGlobalAiDiagnosing = false;
   }
