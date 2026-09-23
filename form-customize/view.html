@@ -4550,6 +4550,12 @@
         // 住所以外（代表者・担当者・請求先・口座等）のあらゆるビジネス項目を正確に判別
         // ==========================================
         const FIELD_SEMANTICS = {
+          // 会社名・法人名・屋号（最優先で判定し、住所や氏名への誤判定を遮断）
+          COMPANY: {
+            priority: 2,
+            matches: (title, key) => /(会社名|法人名|屋号|商号|企業名|組織名|事業者名)/i.test(title) ||
+                                     /(company|corp|trade_name|trade_kana|org_name|^company$|^corp$)/i.test(key)
+          },
           // 口座名義人（カナ・漢字）
           ACCOUNT_HOLDER: {
             priority: 5,
@@ -4585,7 +4591,7 @@
             priority: 20,
             matches: (title, key) => {
               if (/(カナ|フリガナ|ふりがな|かな)/i.test(title) || /(kana|furigana)/i.test(key)) return false;
-              if (/(会社名|法人名|屋号|銀行名|金融機関|支店)/i.test(title) || /(company|corp|bank|branch)/i.test(key)) return false;
+              if (/(会社名|法人名|屋号|商号|銀行名|金融機関|支店)/i.test(title) || /(company|corp|bank|branch)/i.test(key)) return false;
               return /(氏名|お名前|名前|担当者名|代表者名|代表者|役員名|姓名|フルネーム)/i.test(title) ||
                      /(rep_name|repname|contact_name|pic_name|user_name|full_name|^name$|_name$)/i.test(key);
             }
@@ -4605,11 +4611,16 @@
                      /(tel|phone|mobile|fax)/i.test(key);
             }
           },
-          // メールアドレス
+          // メールアドレス（※郵送先 mail_zip 等の住所系キーや、郵便関連のタイトルを確実に除外）
           EMAIL: {
             priority: 50,
-            matches: (title, key) => /(メール|Mail|mail|アドレス|E-mail|email)/i.test(title) ||
-                                     /(mail|email)/i.test(key)
+            matches: (title, key) => {
+              if (/(郵便|郵送|メール便)/.test(title)) return false;
+              if (/(zip|pref|city|street|building|address)/i.test(key)) return false;
+              if (/(郵便|都道府県|市区町村|町名|番地|建物|住所)/.test(title)) return false;
+              return /(メールアドレス|メール|E-mail|email)/i.test(title) ||
+                     /(^email$|^e_mail$|^mail$|email_address|mail_addr$)/i.test(key);
+            }
           },
           // 生年月日・設立日
           BIRTHDATE: {
@@ -4632,24 +4643,20 @@
             priority: 90,
             matches: (title, key) => /(市区町村|市町村|市区郡|郡)/i.test(title) || /(city|ward)/i.test(key)
           },
-          // 町名・番地（※口座番号・電話番号の「号」は絶対に除外）
+          // 町名・番地（※屋号・商号・口座番号等の「号」は絶対に除外）
           STREET: {
             priority: 100,
             matches: (title, key) => {
-              if (/(番号|口座|電話)/.test(title)) return false;
-              return /(町名|番地|丁目|番地等)/i.test(title) || (title.includes('号') && !title.includes('番号')) ||
+              if (/(屋号|商号|番号|口座|電話|信号|記号)/.test(title)) return false;
+              if (/(建物|マンション|アパート|ビル|部屋|号室)/.test(title)) return false;
+              return /(町名|番地|丁目|番地等|番地・号|番地号)/i.test(title) ||
                      /(street|address1|address_line|line1)/i.test(key);
             }
           },
           // 建物名・部屋番号
           BUILDING: {
             priority: 110,
-            matches: (title, key) => /(建物|マンション|アパート|ビル|部屋|号室|住所2)/i.test(title) || /(building|room|bldg|address2|line2)/i.test(key)
-          },
-          // 会社名・法人名・屋号
-          COMPANY: {
-            priority: 120,
-            matches: (title, key) => /(会社名|法人名|屋号|商号|企業名|組織名)/i.test(title) || /(company|corp|trade_name|org)/i.test(key)
+            matches: (title, key) => /(建物名|建物|マンション|アパート|ビル|部屋|号室|住所2)/i.test(title) || /(building|room|bldg|address2|line2)/i.test(key)
           },
           // インボイス登録番号
           INVOICE: {
@@ -4658,12 +4665,14 @@
           }
         };
 
+        const SORTED_SEMANTICS_ENTRIES = Object.entries(FIELD_SEMANTICS).sort((a, b) => (a[1].priority || 100) - (b[1].priority || 100));
+
         function detectFieldSemanticType(q) {
           if (!q) return null;
           const title = (q.title || '').trim();
           const key = (q.dataKey || '').trim().toLowerCase();
 
-          for (const [typeKey, def] of Object.entries(FIELD_SEMANTICS)) {
+          for (const [typeKey, def] of SORTED_SEMANTICS_ENTRIES) {
             if (def.matches(title, key)) {
               return typeKey;
             }
@@ -5012,8 +5021,13 @@
           const questionsToInspect = targetQuestions.concat(sourceQuestions);
 
           questionsToInspect.forEach(tq => {
-            const val = formValues[tq.id];
+            let val = formValues[tq.id];
+            if (val === undefined || val === null) return;
+            val = String(val).trim();
             if (!val) return;
+            // 🛡️ ハイフン単体（屋号等の未入力自動補填値）はサマリー値として採用しない
+            if (val === '-') return;
+
             const sType = detectFieldSemanticType(tq);
             if (sType && !valBySem[sType]) {
               valBySem[sType] = val;
@@ -5029,7 +5043,9 @@
 
           // パターン1: 住所系グループ（郵便番号、都道府県、市区町村、町名など）
           if (valBySem.ZIP || valBySem.PREF || valBySem.CITY || valBySem.STREET) {
-            displayPreview = `${valBySem.ZIP ? '〒' + valBySem.ZIP + ' ' : ''}${valBySem.PREF || ''}${valBySem.CITY || ''}${valBySem.STREET || ''}${valBySem.BUILDING ? ' ' + valBySem.BUILDING : ''}`.trim();
+            const streetClean = (valBySem.STREET && valBySem.STREET !== '-') ? valBySem.STREET : '';
+            const bldClean = (valBySem.BUILDING && valBySem.BUILDING !== '-') ? valBySem.BUILDING : '';
+            displayPreview = `${valBySem.ZIP ? '〒' + valBySem.ZIP + ' ' : ''}${valBySem.PREF || ''}${valBySem.CITY || ''}${streetClean}${bldClean ? ' ' + bldClean : ''}`.trim();
             shortPreview = `${valBySem.ZIP ? '〒' + valBySem.ZIP + ' ' : ''}${valBySem.PREF || ''}${valBySem.CITY || ''}...`;
           }
           // パターン2: 人物・代表者・担当者系グループ（氏名漢字、氏名カナ、役職、TEL、メールなど）
