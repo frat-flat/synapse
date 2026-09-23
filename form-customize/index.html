@@ -416,19 +416,32 @@
                 <div id="form-overview-editor" class="overview-editor-container">
 
               <div class="form-title-desc-card">
-                <!-- 簡易版 / プロ版 モード切り替えスイッチ -->
-                <div class="mode-toggle-container" style="margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border);">
-                  <div style="display: flex; flex-direction: column; gap: 2px;">
-                    <span style="font-weight: 600; font-size: 0.95rem; color: var(--color-text);">エディターモード設定</span>
-                    <span style="font-size: 0.75rem; color: var(--color-text-muted);">機能のシンプルさを切り替えます</span>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <div class="mode-switch-buttons" style="display: flex; background: rgba(0,0,0,0.15); padding: 3px; border-radius: 6px; border: 1px solid var(--color-border);">
-                      <button type="button" id="btn-mode-simple" class="mode-switch-btn active" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s;">簡易版</button>
-                      <button type="button" id="btn-mode-pro" class="mode-switch-btn" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s;">プロ版 💎</button>
+                <!-- 簡易版 / プロ版 モード切り替え & 設問プロ最適化ツールバー -->
+                <div class="mode-toggle-container" style="margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 16px; background: #ffffff; border: 1px solid var(--color-border); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 34px; height: 34px; border-radius: 8px; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); display: flex; align-items: center; justify-content: center; color: #2563eb; font-size: 1.05rem; flex-shrink: 0; border: 1px solid #bfdbfe;">
+                      ⚙️
                     </div>
-                    <button type="button" id="btn-upgrade-to-pro" class="btn btn-sm btn-upgrade-pro" style="background: linear-gradient(135deg, #1d4ed8, #2563eb); color: #ffffff; font-weight: 700; font-size: 0.78rem; border-radius: 6px; padding: 6px 14px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(37,99,235,0.3); transition: all 0.2s;" title="簡易版で作成した設問をもとに、過去の全最適化指示（教科書）を一括適用してプロ仕様へ自動昇華します">
-                      <span>💎</span> <span>プロ版へアップグレード</span>
+                    <div style="display: flex; flex-direction: column; gap: 1px;">
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-weight: 700; font-size: 0.88rem; color: var(--color-text); letter-spacing: -0.01em;">エディターモード設定</span>
+                        <span style="font-size: 0.68rem; padding: 1px 6px; border-radius: 4px; background: #f1f5f9; color: #475569; font-weight: 600;">表示切替</span>
+                      </div>
+                      <span style="font-size: 0.72rem; color: var(--color-text-muted);">入力のシンプルさを切り替え、設問に合わせて最適化できます</span>
+                    </div>
+                  </div>
+
+                  <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                    <!-- スタイリッシュ セグメントコントロール -->
+                    <div class="mode-switch-buttons" style="display: inline-flex; align-items: center; background: #f1f5f9; padding: 3px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                      <button type="button" id="btn-mode-simple" class="mode-switch-btn active" style="padding: 5px 12px; font-size: 0.78rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s; white-space: nowrap;">簡易版</button>
+                      <button type="button" id="btn-mode-pro" class="mode-switch-btn" style="padding: 5px 12px; font-size: 0.78rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;"><span>プロ版</span><span style="font-size: 0.75rem;">💎</span></button>
+                    </div>
+
+                    <!-- 設問適応型 プロ仕様最適化ボタン -->
+                    <button type="button" id="btn-upgrade-to-pro" class="btn btn-sm btn-upgrade-pro" style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); color: #ffffff; font-weight: 700; font-size: 0.78rem; border-radius: 8px; height: 32px; padding: 0 14px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25); transition: all 0.2s ease; white-space: nowrap; flex-shrink: 0;" title="現在の設問内容（住所・口座・インボイス・メール等）を自動判定し、該当する教科書プロ仕様のみをスマート適用します">
+                      <span style="font-size: 0.85rem;">✨</span>
+                      <span>設問に合わせてプロ最適化</span>
                     </button>
                   </div>
                 </div>

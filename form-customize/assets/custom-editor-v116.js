@@ -26120,22 +26120,46 @@
     }
   }
 
-  // 3. 💎 教科書ナレッジに基づくプロ版アップグレード本体
+  // 3. 💎 教科書ナレッジに基づくプロ版設問適応型最適化エンジン
   async function executeUpgradeToPro() {
     const formDef = window.G || window.n || window.L;
     if (!formDef) return;
 
-    const upgradesSummary = [];
+    const allQuestions = (formDef.sections || []).flatMap(s => s.questions || []);
+    const formTitle = String((typeof getEffectiveFormTitle === 'function') ? getEffectiveFormTitle(formDef) : (formDef.title || '')).trim();
 
-    // ① 設問ごとのスマート補完・正規表現・API連携の適用
+    // 設問ジャンルの検知フラグ
+    let hasZip = false;
+    let hasAddress = false;
+    let hasPhone = false;
+    let hasEmail = false;
+    let hasInvoice = false;
+    let hasBankAccount = false;
+    let hasBankHolder = false;
+    let hasCorporateBranch = false;
+    let hasPersonalBranch = false;
+    let hasAppointmentIntent = false;
+
+    // セクション構造の検査
+    (formDef.sections || []).forEach(sec => {
+      const st = String(sec.title || '');
+      if (st.includes('法人')) hasCorporateBranch = true;
+      if (st.includes('個人') && !st.includes('法人')) hasPersonalBranch = true;
+    });
+
+    // 設問の走査＆該当するプロルールのみ適用
     let upgradedQuestionsCount = 0;
+    const appliedItems = [];
+    const skippedItems = [];
+
     (formDef.sections || []).forEach(sec => {
       (sec.questions || []).forEach(q => {
         const title = String(q.title || '').trim();
         const key = String(q.dataKey || q.id || '').toLowerCase();
 
         // 📮 郵便番号
-        if (title.includes('郵便番号') || key.includes('zip')) {
+        if (title.includes('郵便番号') || key.includes('zip') || title.includes('〒')) {
+          hasZip = true;
           q.dataKey = 'zip_code';
           q.type = 'text';
           q.inputmode = 'numeric';
@@ -26145,12 +26169,14 @@
         }
         // 🏠 住所
         else if (title.includes('住所') || title.includes('所在地') || key.includes('address')) {
+          hasAddress = true;
           q.type = 'text';
           q.placeholder = '例: 東京都渋谷区道玄坂1-2-3 ○○ビル5F';
           upgradedQuestionsCount++;
         }
         // 📞 電話番号
         else if (title.includes('電話番号') || title.includes('TEL') || key.includes('phone') || key.includes('tel')) {
+          hasPhone = true;
           q.dataKey = 'phone_number';
           q.type = 'tel';
           q.inputmode = 'tel';
@@ -26160,6 +26186,7 @@
         }
         // 📧 メールアドレス
         else if (title.includes('メール') || title.includes('アドレス') || key.includes('email') || key.includes('mail')) {
+          hasEmail = true;
           q.dataKey = 'email';
           q.type = 'email';
           q.inputmode = 'email';
@@ -26168,7 +26195,8 @@
           upgradedQuestionsCount++;
         }
         // 📄 インボイス番号
-        else if (title.includes('インボイス') || key.includes('invoice')) {
+        else if (title.includes('インボイス') || key.includes('invoice') || title.includes('登録番号')) {
+          hasInvoice = true;
           q.dataKey = 'invoice_number';
           q.type = 'text';
           q.placeholder = '例: T1234567890123';
@@ -26177,6 +26205,7 @@
         }
         // 🏦 銀行口座 - 口座番号
         else if (title.includes('口座番号') || key.includes('account_number')) {
+          hasBankAccount = true;
           q.dataKey = 'account_number';
           q.type = 'text';
           q.inputmode = 'numeric';
@@ -26186,44 +26215,109 @@
         }
         // 🏦 銀行口座 - 名義カナ
         else if (title.includes('名義') || title.includes('メイギ') || key.includes('holder')) {
+          hasBankHolder = true;
           q.dataKey = 'account_holder_kana';
           q.type = 'text';
           q.placeholder = '例: ヤマダ タロウ';
           q.validation = { type: 'regex', pattern: '^[ァ-ヶー\\s]+$', message: '全角カタカナで入力してください' };
           upgradedQuestionsCount++;
         }
+        // 📅 アポ・日程希望
+        else if (title.includes('予約') || title.includes('日程') || title.includes('面談') || title.includes('日時') || key.includes('appoint')) {
+          hasAppointmentIntent = true;
+        }
       });
     });
+
+    // 1. 設問正規表現・入力モードの判定
     if (upgradedQuestionsCount > 0) {
-      upgradesSummary.push(`📮 設問スマート検証: 郵便番号・電話・メール・銀行口座・インボイスなど${upgradedQuestionsCount}件に厳格な正規表現と入力支援を適用`);
+      const detectedFields = [
+        hasZip && '郵便番号',
+        hasAddress && '住所',
+        hasPhone && '電話',
+        hasEmail && 'メール',
+        (hasBankAccount || hasBankHolder) && '銀行口座',
+        hasInvoice && 'インボイス'
+      ].filter(Boolean);
+      appliedItems.push({
+        title: `📮 設問スマート検証（${upgradedQuestionsCount}件）`,
+        desc: `フォーム内の [${detectedFields.join('・')}] を検知し、厳格な正規表現と入力支援属性を適用しました`
+      });
+    }
+    if (!hasBankAccount && !hasBankHolder) {
+      skippedItems.push({
+        title: '🏦 銀行口座の検証ルール',
+        desc: 'このフォームには口座情報の設問がないため、金融ルールは適用しませんでした'
+      });
+    }
+    if (!hasInvoice) {
+      skippedItems.push({
+        title: '📄 インボイス（適格請求書）ルール',
+        desc: 'このフォームにはインボイスの設問がないため、登録番号検証は適用しませんでした'
+      });
     }
 
-    // ② 高信頼デザイン・タイトルのプロ最適化
+    // 2. 高信頼デザイン & 事前アラートの適応判定
     if (!formDef.appearance) formDef.appearance = {};
-    formDef.appearance.primaryColor = '#1a73e8';
-    formDef.appearance.backgroundColor = '#f8fafc';
+    if (!formDef.appearance.primaryColor) formDef.appearance.primaryColor = '#1a73e8';
+    if (!formDef.appearance.backgroundColor) formDef.appearance.backgroundColor = '#f8fafc';
     if (!formDef.announcement) formDef.announcement = {};
+
+    // 設問数に応じた目安時間計算
+    const qCount = allQuestions.length;
+    let durText = '目安 3〜5分';
+    if (qCount <= 5) durText = '目安 1〜2分';
+    else if (qCount > 15) durText = '目安 5〜10分';
     formDef.announcement.showDuration = true;
-    formDef.announcement.durationText = '目安 3〜5分';
-    formDef.announcement.showAlertBox = true;
-    formDef.announcement.alertBoxText = '※ お手続きの途中で「インボイス登録番号（お持ちの方のみ）」および「報酬受取用の口座情報」の入力が必要となります。事前にお手元にご用意の上、ご入力をお願いいたします。';
+    formDef.announcement.durationText = durText;
     formDef.progressIndicator = 'both';
 
-    const pColor = document.getElementById('editor-pro-color-primary');
-    if (pColor) pColor.value = '#1a73e8';
-    const bColor = document.getElementById('editor-pro-color-bg');
-    if (bColor) bColor.value = '#f8fafc';
-    const showDur = document.getElementById('editor-pro-show-duration');
-    if (showDur) showDur.checked = true;
-    const durTxt = document.getElementById('editor-pro-duration-text');
-    if (durTxt) durTxt.value = '目安 3〜5分';
-    const showAlt = document.getElementById('editor-pro-show-alert');
-    if (showAlt) showAlt.checked = true;
-    const altTxt = document.getElementById('editor-pro-alert-text');
-    if (altTxt) altTxt.value = formDef.announcement.alertBoxText;
-    upgradesSummary.push('🎨 高信頼デザイン: トラストネイビー配色、所要時間目安（3〜5分）、離脱防止アラートを一括適用');
+    // 事前アラートボックス（金融・インボイスの有無に合わせて動的生成）
+    if (hasInvoice && (hasBankAccount || hasBankHolder)) {
+      formDef.announcement.showAlertBox = true;
+      formDef.announcement.alertBoxText = '※ お手続きの途中で「インボイス登録番号（お持ちの方のみ）」および「報酬受取用の口座情報」の入力が必要となります。事前にお手元にご用意の上、ご入力をお願いいたします。';
+      appliedItems.push({
+        title: '🎨 高信頼デザイン & 金融事前準備アラート',
+        desc: `所要時間（${durText}）および、口座・インボイス準備を促す離脱防止アラートを適用しました`
+      });
+    } else if (hasBankAccount || hasBankHolder) {
+      formDef.announcement.showAlertBox = true;
+      formDef.announcement.alertBoxText = '※ お手続きの途中で「報酬受取用の口座情報」の入力が必要となります。事前にお手元にご用意の上、ご入力をお願いいたします。';
+      appliedItems.push({
+        title: '🎨 高信頼デザイン & 口座事前準備アラート',
+        desc: `所要時間（${durText}）および、受取口座の事前準備案内を適用しました`
+      });
+    } else if (hasInvoice) {
+      formDef.announcement.showAlertBox = true;
+      formDef.announcement.alertBoxText = '※ お手続きの途中で「インボイス登録番号（お持ちの方のみ）」の入力が必要となります。';
+      appliedItems.push({
+        title: '🎨 高信頼デザイン & インボイス事前案内',
+        desc: `所要時間（${durText}）およびインボイス登録番号の事前案内を適用しました`
+      });
+    } else {
+      // 口座もインボイスもないフォーム（問い合わせ等）には金融アラートを無理に出さない！
+      formDef.announcement.showAlertBox = false;
+      appliedItems.push({
+        title: '🎨 高信頼デザイン最適化',
+        desc: `設問数（${qCount}問）に合わせた所要時間（${durText}）およびプロ用レイアウトを適用しました`
+      });
+      skippedItems.push({
+        title: '⚠️ 金融・インボイス事前アラート',
+        desc: '口座・インボイスの入力が不要なフォームのため、アラートボックスを非表示に維持しました'
+      });
+    }
 
-    // ③ 専用テーブルの物理作成・スキーマ整合（実体バインド）
+    // UI入力反映
+    const durTxtEl = document.getElementById('editor-pro-duration-text');
+    if (durTxtEl) durTxtEl.value = durText;
+    const showDurEl = document.getElementById('editor-pro-show-duration');
+    if (showDurEl) showDurEl.checked = true;
+    const showAltEl = document.getElementById('editor-pro-show-alert');
+    if (showAltEl) showAltEl.checked = formDef.announcement.showAlertBox;
+    const altTxtEl = document.getElementById('editor-pro-alert-text');
+    if (altTxtEl) altTxtEl.value = formDef.announcement.alertBoxText || '';
+
+    // 3. 専用テーブルの物理作成・スキーマ整合（実体バインド）
     formDef.createDedicatedTable = true;
     formDef.targetTableType = 'dedicated';
     formDef.targetTableId = 'dedicated';
@@ -26236,32 +26330,72 @@
       console.warn('[UpgradeToPro] Table creation error:', err);
     }
     const pTableName = dedicatedTable ? (dedicatedTable.physicalTableName || formDef.physicalTableName) : ((typeof getPhysicalTableNameForForm === 'function') ? getPhysicalTableNameForForm(formDef) : 'form_dedicated');
-    upgradesSummary.push(`📊 専用物理テーブル: Supabase上に「${pTableName}」を物理バインドし全カラムのスキーマ整合性を完了`);
+    appliedItems.push({
+      title: '📊 専用物理テーブルの自動作成・バインド',
+      desc: `Supabase上に「${pTableName}」を物理バインドし、本フォームに存在する${qCount}設問のカラム整合性を完了しました`
+    });
 
-    // ④ Synapseエコシステム連携（アポ・ユーザー・マスタID）
+    // 4. Synapseエコシステム連携（アポ・ユーザー・マスタID）
     if (!formDef.userIntegration) formDef.userIntegration = { enabled: true, fields: { userId: true, userName: true, userEmail: false, companyName: false } };
     formDef.userIntegration.enabled = true;
-    if (!formDef.appointIntegration) formDef.appointIntegration = { enabled: true, fields: { appointId: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true, customerName: false, appointStaff: false } };
-    formDef.appointIntegration.enabled = true;
     if (!formDef.systemIntegration) formDef.systemIntegration = { enabled: true, fields: { masterId: true, formTitle: true, status: true, registrationCode: true, resumeUrl: true, createdAt: true } };
     formDef.systemIntegration.enabled = true;
+
+    if (hasAppointmentIntent || formTitle.includes('予約') || formTitle.includes('面談') || formTitle.includes('相談') || formTitle.includes('申込')) {
+      if (!formDef.appointIntegration) formDef.appointIntegration = { enabled: true, fields: { appointId: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true, customerName: false, appointStaff: false } };
+      formDef.appointIntegration.enabled = true;
+      appliedItems.push({
+        title: '🔗 Synapse連携: 顧客管理・アポ管理・マスタID',
+        desc: 'マスタID（MST_xxxxxx）発行追跡およびアポイント管理連携をバインドしました'
+      });
+    } else {
+      if (formDef.appointIntegration) formDef.appointIntegration.enabled = false;
+      appliedItems.push({
+        title: '🔗 Synapse連携: 顧客カルテ・マスタID',
+        desc: 'マスタID（MST_xxxxxx）発行追跡およびCRM顧客カルテ連携をバインドしました'
+      });
+      skippedItems.push({
+        title: '📅 アポイント管理連携',
+        desc: '日程・予約の設問がないため、アポイント管理の連携はスキップしました'
+      });
+    }
     if (typeof syncUserIntegrationToStorage === 'function') syncUserIntegrationToStorage(formDef);
     if (typeof syncAppointIntegrationToStorage === 'function') syncAppointIntegrationToStorage(formDef);
     if (typeof syncSystemIntegrationToStorage === 'function') syncSystemIntegrationToStorage(formDef);
-    upgradesSummary.push('🔗 Synapse連携: ユーザー管理・アポ連携・マスタID（MST_xxxxxx）発行追跡を完全包含');
 
-    // ⑤ 自動返信・控えメールの自動生成
-    if (!formDef.autoReplyEmail) {
-      formDef.autoReplyEmail = generateDefaultAutoReplyEmail(formDef);
+    // 5. 自動返信・控えメールの自動生成
+    if (hasEmail) {
+      if (!formDef.autoReplyEmail) {
+        formDef.autoReplyEmail = generateDefaultAutoReplyEmail(formDef);
+      }
+      formDef.autoReplyEmail.enabled = true;
+      setupAutoReplyEmailUI();
+      appliedItems.push({
+        title: '✉️ 自動返信・回答控えメールの自動設定',
+        desc: 'メール設問と連動し、受付番号（REG_xxxxxx）と全入力控えを含む送信テンプレートを生成しました'
+      });
+    } else {
+      if (formDef.autoReplyEmail) formDef.autoReplyEmail.enabled = false;
+      skippedItems.push({
+        title: '✉️ 自動返信メール機能',
+        desc: 'フォーム内にメールアドレスの入力設問がないため、自動返信機能はスキップしました'
+      });
     }
-    formDef.autoReplyEmail.enabled = true;
-    setupAutoReplyEmailUI();
-    upgradesSummary.push('✉️ 自動返信・控えメール: 受付番号（REG_xxxxxx）および入力内容控えを自動生成・設定');
 
-    // ⑥ 並列セクション（法人/個人）の同一ステップ化
-    upgradesSummary.push('🔀 並列セクション最適化: 法人／個人事業主を同一ステップ（セクション 2 / 4）として連動');
+    // 6. 並列セクション（法人/個人）の同一ステップ化
+    if (hasCorporateBranch && hasPersonalBranch) {
+      appliedItems.push({
+        title: '🔀 並列セクション進捗最適化',
+        desc: '法人／個人事業主の分岐セクションを検知し、同一ステップ（セクション 2 / 4）として連動しました'
+      });
+    } else {
+      skippedItems.push({
+        title: '🔀 並列セクションステップ化',
+        desc: '並列分岐セクションが存在しないため、通常のステップ進行を維持しました'
+      });
+    }
 
-    // ⑦ プロ版モードへ切り替え
+    // 7. プロ版モードへの切り替え
     if (typeof window.setEditorMode === 'function') {
       window.setEditorMode('pro');
     }
@@ -26277,42 +26411,78 @@
     if (typeof renderLivePreview === 'function') renderLivePreview();
     if (typeof window.S === 'function') window.S(true);
 
-    // 完了サマリーモーダルの表示
-    showProUpgradeSummaryModal(upgradesSummary);
+    // 完了サマリーモーダルの表示（適用項目＆スキップ項目を明示）
+    showProUpgradeSummaryModal(appliedItems, skippedItems);
   }
 
-  // 4. 💎 プロ版アップグレード完了サマリーモーダル
-  function showProUpgradeSummaryModal(summaryList) {
+  // 4. 💎 プロ版アップグレード完了サマリーモーダル（設問適応型）
+  function showProUpgradeSummaryModal(appliedItems, skippedItems) {
     const existing = document.getElementById('pro-upgrade-summary-modal');
     if (existing) existing.remove();
 
     const overlay = document.createElement('div');
     overlay.id = 'pro-upgrade-summary-modal';
-    overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 9999999; opacity: 0; transition: opacity 0.2s ease-out; padding: 16px;';
+    overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15, 23, 42, 0.72); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 9999999; opacity: 0; transition: opacity 0.2s ease-out; padding: 16px;';
 
     const card = document.createElement('div');
-    card.style.cssText = 'background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 16px; padding: 26px; width: 100%; max-width: 520px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); transform: scale(0.95); transition: transform 0.2s ease-out; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
+    card.style.cssText = 'background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 18px; padding: 26px; width: 100%; max-width: 560px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6); transform: scale(0.95); transition: transform 0.2s ease-out; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
 
-    const itemsHtml = summaryList.map(item => `
-      <div style="display: flex; align-items: flex-start; gap: 10px; font-size: 0.84rem; line-height: 1.5; color: #cbd5e1; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
-        <span style="color: #10b981; font-weight: 700; font-size: 1rem; flex-shrink: 0;">✓</span>
-        <span>${item}</span>
+    const appliedHtml = (appliedItems || []).map(item => `
+      <div style="display: flex; align-items: flex-start; gap: 10px; font-size: 0.82rem; line-height: 1.5; color: #cbd5e1; background: rgba(16, 185, 129, 0.06); padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(16, 185, 129, 0.18);">
+        <span style="color: #10b981; font-weight: 700; font-size: 0.95rem; flex-shrink: 0; margin-top: 1px;">✓</span>
+        <div>
+          <div style="font-weight: 700; color: #f1f5f9; font-size: 0.84rem;">${typeof item === 'string' ? item : item.title}</div>
+          ${item.desc ? `<div style="color: #94a3b8; font-size: 0.76rem; margin-top: 2px;">${item.desc}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+
+    const skippedHtml = (skippedItems || []).map(item => `
+      <div style="display: flex; align-items: flex-start; gap: 10px; font-size: 0.8rem; line-height: 1.4; color: #94a3b8; background: rgba(255, 255, 255, 0.02); padding: 7px 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+        <span style="color: #64748b; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; margin-top: 1px;">–</span>
+        <div>
+          <div style="font-weight: 600; color: #cbd5e1; font-size: 0.78rem;">${typeof item === 'string' ? item : item.title} <span style="font-size: 0.7rem; color: #64748b; font-weight: normal;">（設問対象外のためスキップ）</span></div>
+          ${item.desc ? `<div style="color: #64748b; font-size: 0.74rem;">${item.desc}</div>` : ''}
+        </div>
       </div>
     `).join('');
 
     card.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-        <span style="font-size: 1.8rem; background: linear-gradient(135deg, #3b82f6, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">💎</span>
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(99,102,241,0.2) 100%); border: 1px solid rgba(59,130,246,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+          ✨
+        </div>
         <div>
-          <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: #f8fafc;">プロ版アップグレード完了！</h3>
-          <span style="font-size: 0.76rem; color: #94a3b8;">Synapse標準教科書（過去の最適化指示）を一括適用しました</span>
+          <h3 style="margin: 0; font-size: 1.18rem; font-weight: 700; color: #f8fafc; letter-spacing: -0.01em;">設問適応型 プロ仕様最適化が完了しました</h3>
+          <span style="font-size: 0.76rem; color: #94a3b8;">フォームの用途・設問構造を自動分析し、該当する教科書ナレッジのみを選択適用しました</span>
         </div>
       </div>
-      <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; max-height: 50vh; overflow-y: auto; padding-right: 4px;">
-        ${itemsHtml}
+
+      <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; max-height: 52vh; overflow-y: auto; padding-right: 4px;">
+        <div>
+          <div style="font-size: 0.74rem; font-weight: 700; color: #34d399; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 5px;">
+            <span>●</span> <span>適用されたプロ仕様（${(appliedItems || []).length}件）</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            ${appliedHtml}
+          </div>
+        </div>
+
+        ${skippedHtml ? `
+        <div>
+          <div style="font-size: 0.74rem; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 5px;">
+            <span>○</span> <span>用途に合わせて除外・スキップされたルール（${(skippedItems || []).length}件）</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            ${skippedHtml}
+          </div>
+        </div>
+        ` : ''}
       </div>
-      <div style="display: flex; justify-content: flex-end;">
-        <button id="btn-close-pro-upgrade-modal" style="background: linear-gradient(135deg, #2563eb, #1d4ed8); border: none; color: #ffffff; padding: 10px 24px; border-radius: 8px; font-size: 0.88rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.4); transition: all 0.15s;">編集を続ける ✨</button>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08);">
+        <span style="font-size: 0.74rem; color: #64748b;">※ エディタ側でいつでも個別設定を微調整可能です</span>
+        <button id="btn-close-pro-upgrade-modal" style="background: linear-gradient(135deg, #4f46e5, #3b82f6); border: none; color: #ffffff; padding: 9px 22px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(79,70,229,0.35); transition: all 0.15s;">編集を続ける ✨</button>
       </div>
     `;
 
