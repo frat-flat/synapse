@@ -4058,12 +4058,66 @@
             clearOppositeBranchValues('法人');
           }
 
+          // 📊 並列セクション対応：論理ステップ番号および実質ステップ総数の動的計算
+          function getLogicalSectionProgress(secIdx, allSecs, curSec, fValues) {
+            if (!allSecs || allSecs.length === 0) return { stepNum: 1, totalSteps: 1, progress: 100, text: '' };
+            const cur = curSec || allSecs[secIdx] || {};
+            const curTitle = String(cur.title || '');
+
+            // 1. 回答値または現在セクションからユーザー属性（法人 or 個人）を判定
+            let userAudience = 'common';
+            if (curTitle.includes('法人')) {
+              userAudience = 'corp';
+            } else if (curTitle.includes('個人') && !curTitle.includes('法人')) {
+              userAudience = 'personal';
+            } else if (fValues) {
+              for (const val of Object.values(fValues)) {
+                if (typeof val === 'string') {
+                  if (val.includes('法人')) { userAudience = 'corp'; break; }
+                  if (val.includes('個人') && !val.includes('法人')) { userAudience = 'personal'; break; }
+                }
+              }
+            }
+
+            // 2. このユーザー属性にとって実際に通過する「有効アクティブルート」を抽出
+            const activePath = allSecs.filter(s => {
+              const t = String(s.title || '');
+              const isCorp = t.includes('法人');
+              const isPersonal = t.includes('個人') && !t.includes('法人');
+              if (userAudience === 'corp') return !isPersonal;
+              if (userAudience === 'personal') return !isCorp;
+              // 共通（未選択等）: 個人をスキップ対象と見なして実質ステップ数を算出
+              return !isPersonal;
+            });
+
+            const totalSteps = activePath.length > 0 ? activePath.length : allSecs.length;
+            let stepIdx = activePath.findIndex(s => s.id === cur.id);
+
+            // もし除外されたセクション自身を表示中の場合、並列相手のステップ位置と同一にする
+            if (stepIdx === -1) {
+              const counterpart = allSecs.find(s => s && s.id !== cur.id && (
+                (curTitle.includes('個人') && String(s.title || '').includes('法人')) ||
+                (curTitle.includes('法人') && String(s.title || '').includes('個人'))
+              ));
+              if (counterpart) {
+                stepIdx = activePath.findIndex(s => s.id === counterpart.id);
+              }
+              if (stepIdx === -1) stepIdx = 0;
+            }
+
+            const stepNum = stepIdx + 1;
+            const progress = Math.round((stepNum / totalSteps) * 100);
+            const text = `セクション ${stepNum} / ${totalSteps} : ${curTitle}`;
+
+            return { stepNum, totalSteps, progress, text };
+          }
+
           // 進捗バー更新（複数セクションある場合のみ表示）
           if (sections.length > 1) {
             progressContainerEl.style.display = 'flex';
-            const progress = Math.round(((sectionIndex + 1) / sections.length) * 100);
-            progressBarFillEl.style.width = `${progress}%`;
-            progressTextEl.textContent = `セクション ${sectionIndex + 1} / ${sections.length} : ${section.title || ''}`;
+            const logicalProg = getLogicalSectionProgress(sectionIndex, sections, section, formValues);
+            progressBarFillEl.style.width = `${logicalProg.progress}%`;
+            progressTextEl.textContent = logicalProg.text;
           } else {
             progressContainerEl.style.display = 'none';
           }

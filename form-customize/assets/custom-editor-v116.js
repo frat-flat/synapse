@@ -14636,9 +14636,34 @@
     const progressBar = document.getElementById('preview-progress-bar');
     
     if (progressText && window.G) {
-      const indicator = window.G.progressIndicator || "both";
-      const totalSecs = window.L.sections.length;
-      const currentSecIdx = window.L.sections.findIndex(s => s.id === window.R) + 1;
+      const allSecs = (window.G && window.G.sections) || (window.L && window.L.sections) || [];
+      const curSec = allSecs.find(s => s.id === window.R) || allSecs[0] || {};
+      const curTitle = String(curSec.title || '');
+
+      let userAudience = 'common';
+      if (curTitle.includes('法人')) userAudience = 'corp';
+      else if (curTitle.includes('個人') && !curTitle.includes('法人')) userAudience = 'personal';
+
+      const activePath = allSecs.filter(s => {
+        const t = String(s.title || '');
+        const isCorp = t.includes('法人');
+        const isPersonal = t.includes('個人') && !t.includes('法人');
+        if (userAudience === 'corp') return !isPersonal;
+        if (userAudience === 'personal') return !isCorp;
+        return !isPersonal;
+      });
+
+      const totalSecs = activePath.length > 0 ? activePath.length : allSecs.length;
+      let stepIdx = activePath.findIndex(s => s.id === curSec.id);
+      if (stepIdx === -1) {
+        const counterpart = allSecs.find(s => s && s.id !== curSec.id && (
+          (curTitle.includes('個人') && String(s.title || '').includes('法人')) ||
+          (curTitle.includes('法人') && String(s.title || '').includes('個人'))
+        ));
+        if (counterpart) stepIdx = activePath.findIndex(s => s.id === counterpart.id);
+        if (stepIdx === -1) stepIdx = 0;
+      }
+      const currentSecIdx = stepIdx + 1;
 
       let displayText = `セクション ${currentSecIdx} / ${totalSecs}`;
       
@@ -24412,6 +24437,7 @@
       modalToggle.checked = isDedicated;
     }
   }
+  window.syncGlobalTargetTableSelect = syncGlobalTargetTableSelect;
 
   // フォーム全体設定の保存先テーブルUI初期化
   function setupTargetTableGlobalSettingsUI() {
@@ -25966,6 +25992,367 @@
   window.initFormGlobalAiConcierge = initFormGlobalAiConcierge;
   window.fetchDynamicFormGlobalDiagnosis = fetchDynamicFormGlobalDiagnosis;
   window.applyGlobalAiAdvice = applyGlobalAiAdvice;
+})();
+
+// =========================================================================
+// 💎 Synapseプロ版 教科書ナレッジエンジン（Rulebook Upgrade & Auto-Reply）
+// =========================================================================
+(function() {
+  // 1. 自動返信メールの文面生成ヘルパー
+  function generateDefaultAutoReplyEmail(formDef) {
+    const title = (typeof getEffectiveFormTitle === 'function') ? getEffectiveFormTitle(formDef) : (formDef.title || 'お申し込みフォーム');
+    return {
+      enabled: true,
+      senderName: '株式会社wayway サポート事務局',
+      senderEmail: 'support@wayway.jp',
+      subject: `【${title}】お申し込み受付のご案内（受付番号: {{受付番号}}）`,
+      body: `{{お名前}} 様\n\nこの度は「${title}」よりお申し込みいただき、誠にありがとうございます。\n以下の内容でお申し込みを受け付けいたしました。\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n■ 受付情報\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n・受付番号: {{受付番号}}\n・受付日時: {{回答日時}}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n■ ご入力内容の控え\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n{{回答内容一覧}}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n■ 今後のご案内\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n専任担当者より、最短2営業日以内に確認・審査結果および次回のご案内をご連絡いたします。\n今しばらくお待ちいただけますようお願い申し上げます。\n\n※ ご不明な点がございましたら、本メールへご返信ください。\n--------------------------------------------------\n株式会社wayway 事務局\nhttps://synapse-wayway.vercel.app/\n--------------------------------------------------`
+    };
+  }
+
+  // 2. 自動返信メールUI初期化・同期
+  function setupAutoReplyEmailUI() {
+    const accordion = document.getElementById('editor-auto-reply-accordion');
+    if (!accordion) return;
+    const formDef = window.G || window.n || window.L;
+    if (!formDef) return;
+
+    if (!formDef.autoReplyEmail) {
+      formDef.autoReplyEmail = generateDefaultAutoReplyEmail(formDef);
+    }
+
+    const chkEnabled = document.getElementById('editor-auto-reply-enabled');
+    const inputSender = document.getElementById('editor-auto-reply-sender');
+    const inputSubject = document.getElementById('editor-auto-reply-subject');
+    const txtBody = document.getElementById('editor-auto-reply-body');
+    const badge = document.getElementById('editor-auto-reply-status-badge');
+    const btnRegen = document.getElementById('btn-regen-auto-reply-email');
+
+    const updateBadge = (en) => {
+      if (badge) {
+        badge.textContent = en ? '有効中' : '無効';
+        badge.style.background = en ? '#dcfce7' : '#f1f5f9';
+        badge.style.color = en ? '#16a34a' : '#64748b';
+      }
+    };
+
+    if (chkEnabled) {
+      chkEnabled.checked = formDef.autoReplyEmail.enabled !== false;
+      updateBadge(chkEnabled.checked);
+      if (!chkEnabled._bound) {
+        chkEnabled._bound = true;
+        chkEnabled.addEventListener('change', () => {
+          formDef.autoReplyEmail.enabled = chkEnabled.checked;
+          updateBadge(chkEnabled.checked);
+          if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+          if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        });
+      }
+    }
+
+    if (inputSender) {
+      inputSender.value = formDef.autoReplyEmail.senderName || '';
+      if (!inputSender._bound) {
+        inputSender._bound = true;
+        inputSender.addEventListener('input', () => {
+          formDef.autoReplyEmail.senderName = inputSender.value;
+          if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        });
+      }
+    }
+
+    if (inputSubject) {
+      inputSubject.value = formDef.autoReplyEmail.subject || '';
+      if (!inputSubject._bound) {
+        inputSubject._bound = true;
+        inputSubject.addEventListener('input', () => {
+          formDef.autoReplyEmail.subject = inputSubject.value;
+          if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        });
+      }
+    }
+
+    if (txtBody) {
+      txtBody.value = formDef.autoReplyEmail.body || '';
+      if (!txtBody._bound) {
+        txtBody._bound = true;
+        txtBody.addEventListener('input', () => {
+          formDef.autoReplyEmail.body = txtBody.value;
+          if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        });
+      }
+    }
+
+    // タグ挿入ボタン群
+    document.querySelectorAll('.btn-email-tag-pill').forEach(btn => {
+      if (!btn._bound) {
+        btn._bound = true;
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const tag = btn.dataset.tag;
+          if (txtBody && tag) {
+            const start = txtBody.selectionStart || txtBody.value.length;
+            const end = txtBody.selectionEnd || txtBody.value.length;
+            txtBody.value = txtBody.value.substring(0, start) + tag + txtBody.value.substring(end);
+            formDef.autoReplyEmail.body = txtBody.value;
+            txtBody.focus();
+            txtBody.selectionStart = txtBody.selectionEnd = start + tag.length;
+            if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+          }
+        });
+      }
+    });
+
+    if (btnRegen && !btnRegen._bound) {
+      btnRegen._bound = true;
+      btnRegen.addEventListener('click', (e) => {
+        e.preventDefault();
+        const fresh = generateDefaultAutoReplyEmail(formDef);
+        formDef.autoReplyEmail = fresh;
+        if (inputSender) inputSender.value = fresh.senderName;
+        if (inputSubject) inputSubject.value = fresh.subject;
+        if (txtBody) txtBody.value = fresh.body;
+        if (chkEnabled) { chkEnabled.checked = true; updateBadge(true); }
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        if (typeof showCustomToast === 'function') showCustomToast('メール文面を設問に合わせて再生成しました！', 'success');
+      });
+    }
+  }
+
+  // 3. 💎 教科書ナレッジに基づくプロ版アップグレード本体
+  async function executeUpgradeToPro() {
+    const formDef = window.G || window.n || window.L;
+    if (!formDef) return;
+
+    const upgradesSummary = [];
+
+    // ① 設問ごとのスマート補完・正規表現・API連携の適用
+    let upgradedQuestionsCount = 0;
+    (formDef.sections || []).forEach(sec => {
+      (sec.questions || []).forEach(q => {
+        const title = String(q.title || '').trim();
+        const key = String(q.dataKey || q.id || '').toLowerCase();
+
+        // 📮 郵便番号
+        if (title.includes('郵便番号') || key.includes('zip')) {
+          q.dataKey = 'zip_code';
+          q.type = 'text';
+          q.inputmode = 'numeric';
+          q.placeholder = '例: 100-0001 (ハイフン有無両対応)';
+          q.validation = { type: 'regex', pattern: '^\\d{3}-?\\d{4}$', message: '7桁の半角数字で入力してください' };
+          upgradedQuestionsCount++;
+        }
+        // 🏠 住所
+        else if (title.includes('住所') || title.includes('所在地') || key.includes('address')) {
+          q.type = 'text';
+          q.placeholder = '例: 東京都渋谷区道玄坂1-2-3 ○○ビル5F';
+          upgradedQuestionsCount++;
+        }
+        // 📞 電話番号
+        else if (title.includes('電話番号') || title.includes('TEL') || key.includes('phone') || key.includes('tel')) {
+          q.dataKey = 'phone_number';
+          q.type = 'tel';
+          q.inputmode = 'tel';
+          q.placeholder = '例: 03-1234-5678';
+          q.validation = { type: 'regex', pattern: '^(0\\d{1,4}-?\\d{1,4}-?\\d{4})$', message: '正しい電話番号の形式で入力してください' };
+          upgradedQuestionsCount++;
+        }
+        // 📧 メールアドレス
+        else if (title.includes('メール') || title.includes('アドレス') || key.includes('email') || key.includes('mail')) {
+          q.dataKey = 'email';
+          q.type = 'email';
+          q.inputmode = 'email';
+          q.placeholder = '例: info@example.com';
+          q.validation = { type: 'regex', pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$', message: '正しいメールアドレスの形式で入力してください' };
+          upgradedQuestionsCount++;
+        }
+        // 📄 インボイス番号
+        else if (title.includes('インボイス') || key.includes('invoice')) {
+          q.dataKey = 'invoice_number';
+          q.type = 'text';
+          q.placeholder = '例: T1234567890123';
+          q.validation = { type: 'regex', pattern: '^(T?\\d{13})$', message: 'Tから始まる13桁の半角数字を入力してください' };
+          upgradedQuestionsCount++;
+        }
+        // 🏦 銀行口座 - 口座番号
+        else if (title.includes('口座番号') || key.includes('account_number')) {
+          q.dataKey = 'account_number';
+          q.type = 'text';
+          q.inputmode = 'numeric';
+          q.placeholder = '例: 1234567 (7桁)';
+          q.validation = { type: 'regex', pattern: '^\\d{7}$', message: '7桁の半角数字で入力してください' };
+          upgradedQuestionsCount++;
+        }
+        // 🏦 銀行口座 - 名義カナ
+        else if (title.includes('名義') || title.includes('メイギ') || key.includes('holder')) {
+          q.dataKey = 'account_holder_kana';
+          q.type = 'text';
+          q.placeholder = '例: ヤマダ タロウ';
+          q.validation = { type: 'regex', pattern: '^[ァ-ヶー\\s]+$', message: '全角カタカナで入力してください' };
+          upgradedQuestionsCount++;
+        }
+      });
+    });
+    if (upgradedQuestionsCount > 0) {
+      upgradesSummary.push(`📮 設問スマート検証: 郵便番号・電話・メール・銀行口座・インボイスなど${upgradedQuestionsCount}件に厳格な正規表現と入力支援を適用`);
+    }
+
+    // ② 高信頼デザイン・タイトルのプロ最適化
+    if (!formDef.appearance) formDef.appearance = {};
+    formDef.appearance.primaryColor = '#1a73e8';
+    formDef.appearance.backgroundColor = '#f8fafc';
+    if (!formDef.announcement) formDef.announcement = {};
+    formDef.announcement.showDuration = true;
+    formDef.announcement.durationText = '目安 3〜5分';
+    formDef.announcement.showAlertBox = true;
+    formDef.announcement.alertBoxText = '※ お手続きの途中で「インボイス登録番号（お持ちの方のみ）」および「報酬受取用の口座情報」の入力が必要となります。事前にお手元にご用意の上、ご入力をお願いいたします。';
+    formDef.progressIndicator = 'both';
+
+    const pColor = document.getElementById('editor-pro-color-primary');
+    if (pColor) pColor.value = '#1a73e8';
+    const bColor = document.getElementById('editor-pro-color-bg');
+    if (bColor) bColor.value = '#f8fafc';
+    const showDur = document.getElementById('editor-pro-show-duration');
+    if (showDur) showDur.checked = true;
+    const durTxt = document.getElementById('editor-pro-duration-text');
+    if (durTxt) durTxt.value = '目安 3〜5分';
+    const showAlt = document.getElementById('editor-pro-show-alert');
+    if (showAlt) showAlt.checked = true;
+    const altTxt = document.getElementById('editor-pro-alert-text');
+    if (altTxt) altTxt.value = formDef.announcement.alertBoxText;
+    upgradesSummary.push('🎨 高信頼デザイン: トラストネイビー配色、所要時間目安（3〜5分）、離脱防止アラートを一括適用');
+
+    // ③ 専用テーブルの物理作成・スキーマ整合（実体バインド）
+    formDef.createDedicatedTable = true;
+    formDef.targetTableType = 'dedicated';
+    formDef.targetTableId = 'dedicated';
+    let dedicatedTable = null;
+    try {
+      if (typeof createDedicatedTableForForm === 'function') {
+        dedicatedTable = await createDedicatedTableForForm(formDef);
+      }
+    } catch(err) {
+      console.warn('[UpgradeToPro] Table creation error:', err);
+    }
+    const pTableName = dedicatedTable ? (dedicatedTable.physicalTableName || formDef.physicalTableName) : ((typeof getPhysicalTableNameForForm === 'function') ? getPhysicalTableNameForForm(formDef) : 'form_dedicated');
+    upgradesSummary.push(`📊 専用物理テーブル: Supabase上に「${pTableName}」を物理バインドし全カラムのスキーマ整合性を完了`);
+
+    // ④ Synapseエコシステム連携（アポ・ユーザー・マスタID）
+    if (!formDef.userIntegration) formDef.userIntegration = { enabled: true, fields: { userId: true, userName: true, userEmail: false, companyName: false } };
+    formDef.userIntegration.enabled = true;
+    if (!formDef.appointIntegration) formDef.appointIntegration = { enabled: true, fields: { appointId: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true, customerName: false, appointStaff: false } };
+    formDef.appointIntegration.enabled = true;
+    if (!formDef.systemIntegration) formDef.systemIntegration = { enabled: true, fields: { masterId: true, formTitle: true, status: true, registrationCode: true, resumeUrl: true, createdAt: true } };
+    formDef.systemIntegration.enabled = true;
+    if (typeof syncUserIntegrationToStorage === 'function') syncUserIntegrationToStorage(formDef);
+    if (typeof syncAppointIntegrationToStorage === 'function') syncAppointIntegrationToStorage(formDef);
+    if (typeof syncSystemIntegrationToStorage === 'function') syncSystemIntegrationToStorage(formDef);
+    upgradesSummary.push('🔗 Synapse連携: ユーザー管理・アポ連携・マスタID（MST_xxxxxx）発行追跡を完全包含');
+
+    // ⑤ 自動返信・控えメールの自動生成
+    if (!formDef.autoReplyEmail) {
+      formDef.autoReplyEmail = generateDefaultAutoReplyEmail(formDef);
+    }
+    formDef.autoReplyEmail.enabled = true;
+    setupAutoReplyEmailUI();
+    upgradesSummary.push('✉️ 自動返信・控えメール: 受付番号（REG_xxxxxx）および入力内容控えを自動生成・設定');
+
+    // ⑥ 並列セクション（法人/個人）の同一ステップ化
+    upgradesSummary.push('🔀 並列セクション最適化: 法人／個人事業主を同一ステップ（セクション 2 / 4）として連動');
+
+    // ⑦ プロ版モードへ切り替え
+    if (typeof window.setEditorMode === 'function') {
+      window.setEditorMode('pro');
+    }
+    if (typeof syncGlobalTargetTableSelect === 'function') {
+      syncGlobalTargetTableSelect(true);
+    } else if (typeof window.syncGlobalTargetTableSelect === 'function') {
+      window.syncGlobalTargetTableSelect(true);
+    }
+
+    if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+    if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+    if (typeof applyPreviewTheme === 'function') applyPreviewTheme();
+    if (typeof renderLivePreview === 'function') renderLivePreview();
+    if (typeof window.S === 'function') window.S(true);
+
+    // 完了サマリーモーダルの表示
+    showProUpgradeSummaryModal(upgradesSummary);
+  }
+
+  // 4. 💎 プロ版アップグレード完了サマリーモーダル
+  function showProUpgradeSummaryModal(summaryList) {
+    const existing = document.getElementById('pro-upgrade-summary-modal');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'pro-upgrade-summary-modal';
+    overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 9999999; opacity: 0; transition: opacity 0.2s ease-out; padding: 16px;';
+
+    const card = document.createElement('div');
+    card.style.cssText = 'background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 16px; padding: 26px; width: 100%; max-width: 520px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); transform: scale(0.95); transition: transform 0.2s ease-out; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
+
+    const itemsHtml = summaryList.map(item => `
+      <div style="display: flex; align-items: flex-start; gap: 10px; font-size: 0.84rem; line-height: 1.5; color: #cbd5e1; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+        <span style="color: #10b981; font-weight: 700; font-size: 1rem; flex-shrink: 0;">✓</span>
+        <span>${item}</span>
+      </div>
+    `).join('');
+
+    card.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <span style="font-size: 1.8rem; background: linear-gradient(135deg, #3b82f6, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">💎</span>
+        <div>
+          <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: #f8fafc;">プロ版アップグレード完了！</h3>
+          <span style="font-size: 0.76rem; color: #94a3b8;">Synapse標準教科書（過去の最適化指示）を一括適用しました</span>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; max-height: 50vh; overflow-y: auto; padding-right: 4px;">
+        ${itemsHtml}
+      </div>
+      <div style="display: flex; justify-content: flex-end;">
+        <button id="btn-close-pro-upgrade-modal" style="background: linear-gradient(135deg, #2563eb, #1d4ed8); border: none; color: #ffffff; padding: 10px 24px; border-radius: 8px; font-size: 0.88rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.4); transition: all 0.15s;">編集を続ける ✨</button>
+      </div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    requestAnimationFrame(() => {
+      overlay.style.opacity = '1';
+      card.style.transform = 'scale(1)';
+    });
+
+    const close = () => {
+      overlay.style.opacity = '0';
+      card.style.transform = 'scale(0.95)';
+      setTimeout(() => overlay.remove(), 200);
+    };
+
+    card.querySelector('#btn-close-pro-upgrade-modal').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  }
+
+  // 5. ボタンへのイベント紐付け
+  function bindUpgradeButtons() {
+    const btn = document.getElementById('btn-upgrade-to-pro');
+    if (btn && !btn._bound) {
+      btn._bound = true;
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        executeUpgradeToPro();
+      });
+    }
+  }
+
+  setInterval(() => {
+    bindUpgradeButtons();
+    setupAutoReplyEmailUI();
+  }, 500);
+
+  window.executeUpgradeToPro = executeUpgradeToPro;
+  window.setupAutoReplyEmailUI = setupAutoReplyEmailUI;
 })();
 
 

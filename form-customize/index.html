@@ -422,9 +422,14 @@
                     <span style="font-weight: 600; font-size: 0.95rem; color: var(--color-text);">エディターモード設定</span>
                     <span style="font-size: 0.75rem; color: var(--color-text-muted);">機能のシンプルさを切り替えます</span>
                   </div>
-                  <div class="mode-switch-buttons" style="display: flex; background: rgba(0,0,0,0.15); padding: 3px; border-radius: 6px; border: 1px solid var(--color-border);">
-                    <button type="button" id="btn-mode-simple" class="mode-switch-btn active" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s;">簡易版</button>
-                    <button type="button" id="btn-mode-pro" class="mode-switch-btn" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s;">プロ版 💎</button>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="mode-switch-buttons" style="display: flex; background: rgba(0,0,0,0.15); padding: 3px; border-radius: 6px; border: 1px solid var(--color-border);">
+                      <button type="button" id="btn-mode-simple" class="mode-switch-btn active" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s;">簡易版</button>
+                      <button type="button" id="btn-mode-pro" class="mode-switch-btn" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s;">プロ版 💎</button>
+                    </div>
+                    <button type="button" id="btn-upgrade-to-pro" class="btn btn-sm btn-upgrade-pro" style="background: linear-gradient(135deg, #1d4ed8, #2563eb); color: #ffffff; font-weight: 700; font-size: 0.78rem; border-radius: 6px; padding: 6px 14px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(37,99,235,0.3); transition: all 0.2s;" title="簡易版で作成した設問をもとに、過去の全最適化指示（教科書）を一括適用してプロ仕様へ自動昇華します">
+                      <span>💎</span> <span>プロ版へアップグレード</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1139,6 +1144,59 @@
                             <textarea id="editor-pro-alert-text" class="form-control form-control-sm" rows="1" style="margin: 0; padding: 3px 6px; font-size: 0.72rem;" placeholder="例: 全項目をご入力ください..."></textarea>
                           </div>
                         </div>
+                      </div>
+                    </div>
+                  </details>
+
+                  <!-- ✉️ 自動返信メール設定（折りたたみアコーディオン） -->
+                  <details class="title-details-accordion" id="editor-auto-reply-accordion" style="margin-top: 6px;">
+                    <summary class="title-details-summary" style="padding: 6px 8px; border-radius: 4px; background: rgba(0,0,0,0.02);">
+                      <div class="title-details-summary-left">
+                        <span style="font-size: 0.85rem;">✉️</span>
+                        <span style="font-weight: 600; font-size: 0.78rem; color: var(--color-text);">自動返信メール・控え送信</span>
+                        <span class="pro-badge-mini" style="font-size: 0.65rem; background: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 4px; font-weight: 700;">プロ版 💎</span>
+                      </div>
+                      <div class="title-details-summary-right" style="display: flex; align-items: center; gap: 6px;">
+                        <span id="editor-auto-reply-status-badge" style="font-size: 0.7rem; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 1px 6px; border-radius: 4px;">有効中</span>
+                        <span class="title-details-arrow" style="font-size: 0.75rem; color: var(--color-text-muted);">▼</span>
+                      </div>
+                    </summary>
+                    <div style="padding: 10px 8px 6px; display: flex; flex-direction: column; gap: 8px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; font-weight: 600; cursor: pointer; margin: 0;">
+                          <input type="checkbox" id="editor-auto-reply-enabled" checked style="width: 14px; height: 14px; cursor: pointer;" />
+                          <span>回答完了時にメール控えを自動送信する</span>
+                        </label>
+                        <button type="button" id="btn-regen-auto-reply-email" class="btn btn-sm" style="font-size: 0.72rem; padding: 3px 8px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; color: #0284c7; font-weight: 700;">
+                          <span>✨</span> <span>AIで文面再生成</span>
+                        </button>
+                      </div>
+                      <!-- 送信元表示名 -->
+                      <div class="form-group" style="margin: 0;">
+                        <label for="editor-auto-reply-sender" style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 2px;">送信元表示名</label>
+                        <input type="text" id="editor-auto-reply-sender" class="form-control form-control-sm" style="font-size: 0.76rem; height: 30px;" placeholder="例: 株式会社wayway サポート事務局" />
+                      </div>
+                      <!-- 件名 -->
+                      <div class="form-group" style="margin: 0;">
+                        <label for="editor-auto-reply-subject" style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 2px;">メール件名</label>
+                        <input type="text" id="editor-auto-reply-subject" class="form-control form-control-sm" style="font-size: 0.76rem; height: 30px;" placeholder="例: 【{{フォームタイトル}}】お申し込み受付のご案内" />
+                      </div>
+                      <!-- タグ挿入バー -->
+                      <div>
+                        <div style="font-size: 0.7rem; color: #64748b; margin-bottom: 3px; font-weight: 600;">クリックで本文にタグを挿入:</div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 4px;" id="auto-reply-tag-pills">
+                          <button type="button" class="btn-email-tag-pill" data-tag="{{お名前}}" style="font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer;">+ 氏名</button>
+                          <button type="button" class="btn-email-tag-pill" data-tag="{{会社名}}" style="font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer;">+ 会社名</button>
+                          <button type="button" class="btn-email-tag-pill" data-tag="{{受付番号}}" style="font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer;">+ 受付番号</button>
+                          <button type="button" class="btn-email-tag-pill" data-tag="{{回答日時}}" style="font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer;">+ 回答日時</button>
+                          <button type="button" class="btn-email-tag-pill" data-tag="{{回答内容一覧}}" style="font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #bae6fd; background: #f0f9ff; color: #0284c7; font-weight: 700; cursor: pointer;">+ 全回答控え</button>
+                          <button type="button" class="btn-email-tag-pill" data-tag="{{再開URL}}" style="font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer;">+ 再開URL</button>
+                        </div>
+                      </div>
+                      <!-- メール本文 -->
+                      <div class="form-group" style="margin: 0;">
+                        <label for="editor-auto-reply-body" style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600; margin-bottom: 2px;">メール本文</label>
+                        <textarea id="editor-auto-reply-body" class="form-control form-control-sm" rows="5" style="font-size: 0.74rem; line-height: 1.4; font-family: monospace; resize: vertical;"></textarea>
                       </div>
                     </div>
                   </details>
