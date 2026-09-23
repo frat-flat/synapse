@@ -3231,8 +3231,10 @@
                 if (srcGroupId && q.groupId !== srcGroupId) return;
                 // 2. 法人名がグループ外の場合、グループ内の住所項目には補完しない！
                 if (!srcGroupId && q.groupId) return;
-                // 3. 「前述と同じ」が設定されている項目で、同上チェックがOFFの場合は絶対に補完しない！
-                if (q.sameAsAbove && q.sameAsAbove.enabled && !isGroupSameAsAboveActive(q.groupId) && !isQuestionSameAsAboveActive(q)) {
+                // 3. 同上（住民票住所と同じ等）が有効で、かつ現在同上チェックがON（アクティブ）の場合、
+                // 上部からの同期値が優先されるため、法人APIによる直接上書きはスキップする
+                const isSameActive = (q.groupId && isGroupSameAsAboveActive(q.groupId)) || isQuestionSameAsAboveActive(q);
+                if (isSameActive) {
                   return;
                 }
               }
@@ -3352,34 +3354,32 @@
 
               // 6. 都道府県欄（セレクトまたはテキスト）
               if (q.dataKey === 'pref' || qTitle.includes('都道府県')) {
-                if (parsedAddr.pref) {
-                  formValues[q.id] = parsedAddr.pref;
-                  const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
-                  if (card) {
-                    const selectEl = card.querySelector('select.form-control');
-                    const inputEl = card.querySelector('input.form-control');
-                    if (selectEl) {
-                      selectEl.value = parsedAddr.pref;
-                      clearError(q.id);
-                    } else if (inputEl) {
-                      inputEl.value = parsedAddr.pref;
-                      clearError(q.id);
-                    }
+                const newPref = parsedAddr.pref || '';
+                formValues[q.id] = newPref;
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const selectEl = card.querySelector('select.form-control');
+                  const inputEl = card.querySelector('input.form-control');
+                  if (selectEl) {
+                    selectEl.value = newPref;
+                    clearError(q.id);
+                  } else if (inputEl) {
+                    inputEl.value = newPref;
+                    clearError(q.id);
                   }
                 }
               }
 
               // 7. 市区町村欄
               if (q.dataKey === 'city' || qTitle.includes('市区町村') || (qTitle.includes('市') && qTitle.includes('区') && !qTitle.includes('番地'))) {
-                if (parsedAddr.city) {
-                  formValues[q.id] = parsedAddr.city;
-                  const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
-                  if (card) {
-                    const inputEl = card.querySelector('input.form-control');
-                    if (inputEl) {
-                      inputEl.value = parsedAddr.city;
-                      clearError(q.id);
-                    }
+                const newCity = parsedAddr.city || '';
+                formValues[q.id] = newCity;
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const inputEl = card.querySelector('input.form-control');
+                  if (inputEl) {
+                    inputEl.value = newCity;
+                    clearError(q.id);
                   }
                 }
               }
@@ -3387,15 +3387,14 @@
               // 8. 町名・番地欄（建物名を含まない枠）
               const isStreetOnly = (q.dataKey === 'street') || ((qTitle.includes('町名') || qTitle.includes('番地') || qTitle.includes('丁目')) && !qTitle.includes('建物'));
               if (isStreetOnly) {
-                if (parsedAddr.street) {
-                  formValues[q.id] = parsedAddr.street;
-                  const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
-                  if (card) {
-                    const inputEl = card.querySelector('input.form-control');
-                    if (inputEl) {
-                      inputEl.value = parsedAddr.street;
-                      clearError(q.id);
-                    }
+                const newStreet = parsedAddr.street || '';
+                formValues[q.id] = newStreet;
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const inputEl = card.querySelector('input.form-control');
+                  if (inputEl) {
+                    inputEl.value = newStreet;
+                    clearError(q.id);
                   }
                 }
               }
@@ -3483,35 +3482,52 @@
               }
 
               const qTitle = q.title || '';
-              // 都道府県
-              if (qTitle.includes('都道府県') && addr.pref) {
-                formValues[q.id] = addr.pref;
+              // 都道府県（書き換え時も確実に新しい都道府県へ連動上書き）
+              if (qTitle.includes('都道府県')) {
+                const newPref = addr.pref || '';
+                formValues[q.id] = newPref;
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
                 if (card) {
                   const sel = card.querySelector('select');
                   const inp = card.querySelector('input');
-                  if (sel) { sel.value = addr.pref; clearError(q.id); }
-                  else if (inp) { inp.value = addr.pref; clearError(q.id); }
+                  if (sel) { sel.value = newPref; clearError(q.id); }
+                  else if (inp) { inp.value = newPref; clearError(q.id); }
                 }
               }
-              // 市区町村
-              if ((qTitle.includes('市区町村') || (qTitle.includes('市') && qTitle.includes('区') && !qTitle.includes('番地'))) && addr.city) {
-                formValues[q.id] = addr.city;
+              // 市区町村（書き換え時も確実に新しい市区町村へ連動上書き）
+              if (qTitle.includes('市区町村') || (qTitle.includes('市') && qTitle.includes('区') && !qTitle.includes('番地'))) {
+                const newCity = addr.city || '';
+                formValues[q.id] = newCity;
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
                 if (card) {
                   const inp = card.querySelector('input');
-                  if (inp) { inp.value = addr.city; clearError(q.id); }
+                  if (inp) { inp.value = newCity; clearError(q.id); }
                 }
               }
-              // 町名・番地
-              const isStreetField = qTitle.includes('町名') || qTitle.includes('番地');
-              if (isStreetField && addr.street) {
+              // 町名・番地（※以前の入力値があっても、郵便番号書き直し時に確実に新しい町名番地へ連動上書き）
+              const isStreetField = (qTitle.includes('町名') || qTitle.includes('番地')) && !qTitle.includes('建物') && !qTitle.includes('部屋番号');
+              if (isStreetField) {
+                const newStreet = addr.street || '';
+                formValues[q.id] = newStreet;
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
                 if (card) {
                   const inp = card.querySelector('input');
-                  if (inp && (!inp.value || inp.value === addr.street)) {
-                    inp.value = addr.street;
-                    formValues[q.id] = addr.street;
+                  if (inp) {
+                    inp.value = newStreet;
+                    clearError(q.id);
+                  }
+                }
+              }
+              // 旧来の複合住所枠（都道府県＋市区町村＋町名番地が1枠の場合）
+              const isLegacyFullAddress = qTitle.includes('住所') && !qTitle.includes('メール') && !qTitle.includes('都道府県') && !qTitle.includes('市区町村') && !qTitle.includes('郵便') && !qTitle.includes('建物') && !qTitle.includes('部屋番号');
+              if (isLegacyFullAddress) {
+                const fullCombined = `${addr.pref || ''}${addr.city || ''}${addr.street || ''}`.trim();
+                formValues[q.id] = fullCombined;
+                const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+                if (card) {
+                  const inp = card.querySelector('input') || card.querySelector('textarea');
+                  if (inp) {
+                    inp.value = fullCombined;
                     clearError(q.id);
                   }
                 }

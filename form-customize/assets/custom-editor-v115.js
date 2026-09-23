@@ -9293,13 +9293,13 @@
         const title = (card.querySelector('.preview-q-title') || card.querySelector('h3'))?.textContent || "";
         
         if (title.includes('都道府県')) {
-          input.value = addr.pref;
+          input.value = addr.pref || '';
           triggerInputChange(input);
         } else if (title.includes('市区町村')) {
-          input.value = addr.city;
+          input.value = addr.city || '';
           triggerInputChange(input);
         } else if (!title.includes('建物') && !title.includes('部屋番号') && (title.includes('町名') || title.includes('番地') || title.includes('住所'))) {
-          input.value = addr.street;
+          input.value = addr.street || '';
           triggerInputChange(input);
         }
       });
@@ -10239,28 +10239,29 @@
         }
 
         // ⑤ 都道府県（セレクトまたはテキスト）
-        if (title.includes('都道府県') && parsedAddr.pref) {
+        if (title.includes('都道府県')) {
+          const prefVal = parsedAddr.pref || '';
           if (selectEl) {
-            selectEl.value = parsedAddr.pref;
+            selectEl.value = prefVal;
             triggerInputChange(selectEl);
           } else if (inputEl) {
-            inputEl.value = parsedAddr.pref;
+            inputEl.value = prefVal;
             triggerInputChange(inputEl);
           }
           clearIntegrityError(c);
         }
 
         // ⑥ 市区町村
-        if ((title.includes('市区町村') || (title.includes('市') && title.includes('区') && !title.includes('番地'))) && parsedAddr.city && inputEl) {
-          inputEl.value = parsedAddr.city;
+        if ((title.includes('市区町村') || (title.includes('市') && title.includes('区') && !title.includes('番地'))) && inputEl) {
+          inputEl.value = parsedAddr.city || '';
           clearIntegrityError(c);
           triggerInputChange(inputEl);
         }
 
         // ⑦ 町名・番地（建物名を含まない枠）
         const isStreetOnly = (title.includes('町名') || title.includes('番地') || title.includes('丁目')) && !title.includes('建物') && !title.includes('部屋番号');
-        if (isStreetOnly && parsedAddr.street && inputEl) {
-          inputEl.value = parsedAddr.street;
+        if (isStreetOnly && inputEl) {
+          inputEl.value = parsedAddr.street || '';
           clearIntegrityError(c);
           triggerInputChange(inputEl);
         }
