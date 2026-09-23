@@ -2031,11 +2031,187 @@ function updateLocalPartyIdStatus(partyId, newStatus, additionalData = {}) {
 }
 
 // === Party ID 管理画面のロジック ===
+function getPartyIdStatusInfo(item, now = new Date()) {
+  const createdDate = new Date(item.created_at || item.reset_at || now);
+  const createdDiffDays = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
+  const isManualReset = !!item.reset_at;
+  const isAutoReset = !item.reset_at && createdDiffDays >= 365 * 3;
+
+  if (item.status === 'temporary') {
+    return {
+      key: 'temporary',
+      label: '仮発行 (temporary)',
+      badgeHtml: `<span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">仮発行 (temporary)</span>`,
+      isResettable: true
+    };
+  }
+
+  if (item.status === 'active') {
+    const isConnectedToContract = 
+      (state.apContracts?.some(ap => ap.customerPersonalityId === item.party_id)) ||
+      (state.joContracts?.some(jo => jo.customerPersonalityId === item.party_id));
+    
+    if (isConnectedToContract) {
+      return {
+        key: 'active',
+        label: 'Party ID昇格 (active)',
+        badgeHtml: `<span style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">Party ID昇格 (active)</span>`,
+        isResettable: false
+      };
+    } else {
+      return {
+        key: 'registered',
+        label: 'アポイント登録完了 (registered)',
+        badgeHtml: `<span style="background: rgba(13, 148, 136, 0.1); color: #0d9488; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">アポイント登録完了 (registered)</span>`,
+        isResettable: false
+      };
+    }
+  }
+
+  if (item.status === 'reusable') {
+    if (isManualReset || isAutoReset) {
+      let remainingDays = 0;
+      if (isManualReset) {
+        const resetDiffDays = Math.floor((now - new Date(item.reset_at)) / (1000 * 60 * 60 * 24));
+        remainingDays = (365 * 3) - resetDiffDays;
+      } else {
+        remainingDays = (365 * 6) - createdDiffDays;
+      }
+      return {
+        key: 'cooling',
+        label: '冷却中 (cooling)',
+        badgeHtml: `<span style="background: rgba(107, 114, 128, 0.1); color: #6b7280; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">冷却中 (${remainingDays}日後再利用可)</span>`,
+        isResettable: true
+      };
+    } else {
+      return {
+        key: 'discarded',
+        label: 'アポイント発行後破棄 (discarded)',
+        badgeHtml: `<span style="background: rgba(239, 68, 68, 0.08); color: #ef4444; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">アポイント発行後破棄</span>`,
+        isResettable: true
+      };
+    }
+  }
+
+  return {
+    key: 'unknown',
+    label: item.status || '不明',
+    badgeHtml: `<span style="background: rgba(107, 114, 128, 0.1); color: #6b7280; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">${item.status || '不明'}</span>`,
+    isResettable: false
+  };
+}
+
+function getSelectedPartyIdStatuses() {
+  const cbs = Array.from(document.querySelectorAll('.party-id-status-cb:checked'));
+  return cbs.map(cb => cb.value);
+}
+
+function updatePartyIdStatusDropdownLabel() {
+  const labelEl = document.getElementById('party-id-status-dropdown-label');
+  if (!labelEl) return;
+  const allCbs = Array.from(document.querySelectorAll('.party-id-status-cb'));
+  const checkedCbs = allCbs.filter(cb => cb.checked);
+  
+  const statusNameMap = {
+    temporary: '仮発行',
+    registered: 'アポ登録済',
+    active: 'Party ID昇格',
+    discarded: '破棄',
+    cooling: '冷却中'
+  };
+
+  if (checkedCbs.length === allCbs.length) {
+    labelEl.textContent = `すべて (${allCbs.length})`;
+  } else if (checkedCbs.length === 0) {
+    labelEl.textContent = '選択なし (0)';
+  } else if (checkedCbs.length <= 2) {
+    const names = checkedCbs.map(cb => statusNameMap[cb.value] || cb.value);
+    labelEl.textContent = `${names.join(', ')} (${checkedCbs.length})`;
+  } else {
+    const firstTwo = checkedCbs.slice(0, 2).map(cb => statusNameMap[cb.value] || cb.value);
+    labelEl.textContent = `${firstTwo.join(', ')} +${checkedCbs.length - 2} (${checkedCbs.length})`;
+  }
+}
+
+function updatePartyIdSelectionDisplay(tableBody) {
+  const countBadge = document.getElementById('party-id-selected-count-badge');
+  const countText = document.getElementById('party-id-selected-count-text');
+  const countDot = document.getElementById('party-id-selected-count-dot');
+  const selectAllCheckbox = document.getElementById('party-id-select-all');
+  const bulkResetBtn = document.getElementById('btn-bulk-reset-party-ids');
+
+  const allRowCbs = tableBody ? Array.from(tableBody.querySelectorAll('.party-id-row-checkbox')) : [];
+  const checkedCbs = allRowCbs.filter(cb => cb.checked);
+  const selectedCount = checkedCbs.length;
+  const totalCount = allRowCbs.length;
+
+  if (countText) {
+    countText.textContent = `${selectedCount}件を選択中`;
+  }
+  if (countBadge && countDot) {
+    if (selectedCount > 0) {
+      countBadge.style.background = 'rgba(59, 130, 246, 0.12)';
+      countBadge.style.color = 'var(--primary)';
+      countBadge.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+      countBadge.style.fontWeight = '700';
+      countDot.style.background = 'var(--primary)';
+    } else {
+      countBadge.style.background = 'var(--bg-surface)';
+      countBadge.style.color = 'var(--text-muted)';
+      countBadge.style.borderColor = 'var(--border-color)';
+      countBadge.style.fontWeight = '500';
+      countDot.style.background = '#94a3b8';
+    }
+  }
+
+  if (selectAllCheckbox) {
+    if (totalCount > 0 && selectedCount === totalCount) {
+      selectAllCheckbox.checked = true;
+      selectAllCheckbox.indeterminate = false;
+    } else if (selectedCount > 0) {
+      selectAllCheckbox.checked = false;
+      selectAllCheckbox.indeterminate = true;
+    } else {
+      selectAllCheckbox.checked = false;
+      selectAllCheckbox.indeterminate = false;
+    }
+  }
+
+  if (bulkResetBtn) {
+    const resettableCheckedCbs = checkedCbs.filter(cb => cb.getAttribute('data-resettable') === 'true');
+    const resettableCount = resettableCheckedCbs.length;
+
+    if (selectedCount > 0) {
+      if (resettableCount > 0) {
+        bulkResetBtn.disabled = false;
+        bulkResetBtn.style.opacity = '1';
+        bulkResetBtn.style.cursor = 'pointer';
+        if (resettableCount === selectedCount) {
+          bulkResetBtn.innerHTML = `🔄 選択した ${resettableCount}件のIDを一括リセット`;
+        } else {
+          bulkResetBtn.innerHTML = `🔄 選択中のリセット対象 ${resettableCount}件を一括リセット`;
+        }
+      } else {
+        bulkResetBtn.disabled = true;
+        bulkResetBtn.style.opacity = '0.5';
+        bulkResetBtn.style.cursor = 'not-allowed';
+        bulkResetBtn.innerHTML = `🔄 選択したIDを一括リセット (対象外)`;
+      }
+    } else {
+      bulkResetBtn.disabled = true;
+      bulkResetBtn.style.opacity = '0.5';
+      bulkResetBtn.style.cursor = 'not-allowed';
+      bulkResetBtn.innerHTML = `🔄 選択したIDを一括リセット`;
+    }
+  }
+}
+
 async function loadPartyIds() {
   const tableBody = document.getElementById('party-id-list-table-body');
   if (!tableBody) return;
 
-  tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="spinner"></i> データを読み込み中...</td></tr>`;
+  tableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="spinner"></i> データを読み込み中...</td></tr>`;
+  updatePartyIdSelectionDisplay(null);
 
   let partyIds = [];
   let isFallback = false;
@@ -2102,12 +2278,15 @@ async function loadPartyIds() {
     const emptyMsg = isFallback 
       ? `発行済みのParty IDはありません。<br><span style="font-size: 0.72rem; color: var(--text-muted);">(※パートナーDBの接続エラー: ${fallbackMessage})</span>`
       : '発行済みのParty IDはありません。';
-    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">${emptyMsg}</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">${emptyMsg}</td></tr>`;
+    updatePartyIdSelectionDisplay(tableBody);
     return;
   }
 
   // クライアントサイドでのフィルタリングの適用
-  const filterStatus = document.getElementById('party-id-filter-status')?.value || '';
+  const selectedStatuses = getSelectedPartyIdStatuses();
+  updatePartyIdStatusDropdownLabel();
+
   const filterPeriod = document.getElementById('party-id-filter-period')?.value || '';
   const filterSearch = document.getElementById('party-id-filter-search')?.value.trim().toLowerCase() || '';
 
@@ -2129,28 +2308,14 @@ async function loadPartyIds() {
       }
     }
 
-    // ステータスフィルター
-    if (filterStatus) {
-      if (filterStatus === 'temporary') {
-        if (item.status !== 'temporary') return false;
-      } else if (filterStatus === 'registered' || filterStatus === 'active') {
-        if (item.status !== 'active') return false;
-        const isConnected = 
-          (state.apContracts?.some(ap => ap.customerPersonalityId === item.party_id)) ||
-          (state.joContracts?.some(jo => jo.customerPersonalityId === item.party_id));
-        if (filterStatus === 'registered' && isConnected) return false;
-        if (filterStatus === 'active' && !isConnected) return false;
-      } else if (filterStatus === 'discarded') {
-        const createdDate = new Date(item.created_at || item.reset_at || now);
-        const createdDiffDays = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
-        const isDiscarded = item.status === 'reusable' && !item.reset_at && createdDiffDays < 365 * 3;
-        if (!isDiscarded) return false;
-      } else if (filterStatus === 'cooling') {
-        const createdDate = new Date(item.created_at || item.reset_at || now);
-        const createdDiffDays = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
-        const isCooling = item.status === 'reusable' && (!!item.reset_at || createdDiffDays >= 365 * 3);
-        if (!isCooling) return false;
-      }
+    const statusInfo = getPartyIdStatusInfo(item, now);
+
+    // ステータスフィルター（複数選択）
+    if (selectedStatuses.length === 0) {
+      return false; // 1つも選択されていない場合は表示しない
+    }
+    if (!selectedStatuses.includes(statusInfo.key)) {
+      return false;
     }
 
     // 期間フィルター
@@ -2183,6 +2348,7 @@ async function loadPartyIds() {
 
   if (filtered.length === 0) {
     tableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">該当するデータがありません。</td></tr>`;
+    updatePartyIdSelectionDisplay(tableBody);
     return;
   }
 
@@ -2192,42 +2358,7 @@ async function loadPartyIds() {
     const tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid var(--border-color)';
     
-    // ステータスバッジ
-    let statusBadge = '';
-    const createdDate = new Date(item.created_at || item.reset_at || now);
-    const createdDiffDays = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
-    const isManualReset = !!item.reset_at;
-    const isAutoReset = !item.reset_at && createdDiffDays >= 365 * 3;
-
-    if (item.status === 'active') {
-      // 契約データ（apContracts, joContracts）に紐付いてParty IDとして昇格されているかチェック
-      const isConnectedToContract = 
-        (state.apContracts?.some(ap => ap.customerPersonalityId === item.party_id)) ||
-        (state.joContracts?.some(jo => jo.customerPersonalityId === item.party_id));
-      
-      if (isConnectedToContract) {
-        statusBadge = `<span style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">Party ID昇格 (active)</span>`;
-      } else {
-        statusBadge = `<span style="background: rgba(13, 148, 136, 0.1); color: #0d9488; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">アポイント登録完了 (registered)</span>`;
-      }
-    } else if (item.status === 'temporary') {
-      statusBadge = `<span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">仮発行 (temporary)</span>`;
-    } else if (item.status === 'reusable') {
-      if (isManualReset || isAutoReset) {
-        // ⑤ 破棄からリセット（冷却中）: 手動リセット後、または自動で3年経過して冷却ロックが開始された状態
-        let remainingDays = 0;
-        if (isManualReset) {
-          const resetDiffDays = Math.floor((now - new Date(item.reset_at)) / (1000 * 60 * 60 * 24));
-          remainingDays = (365 * 3) - resetDiffDays;
-        } else {
-          remainingDays = (365 * 6) - createdDiffDays;
-        }
-        statusBadge = `<span style="background: rgba(107, 114, 128, 0.1); color: #6b7280; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">冷却中 (${remainingDays}日後再利用可)</span>`;
-      } else {
-        // ④ アポイント発行後破棄: 冷却前の状態、破棄されただけの状態
-        statusBadge = `<span style="background: rgba(239, 68, 68, 0.08); color: #ef4444; padding: 0.15rem 0.4rem; border-radius: var(--radius-xs); font-weight: 600; font-size: 0.72rem;">アポイント発行後破棄</span>`;
-      }
-    }
+    const statusInfo = getPartyIdStatusInfo(item, now);
 
     // 日時フォーマット
     const formatDate = (isoString) => {
@@ -2236,22 +2367,16 @@ async function loadPartyIds() {
       return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
     };
 
-    // 操作ボタン (仮発行 temporary または ④アポイント発行後破棄 状態だけを手動リセット可能にする)
+    // 操作ボタン (リセット可能ならリセットボタン、不可なら対象外)
     let actionBtn = '';
-    const isResettable = item.status === 'temporary' || (item.status === 'reusable' && !isManualReset && !isAutoReset);
-    if (isResettable) {
+    if (statusInfo.isResettable) {
       actionBtn = `<button class="btn btn-sm btn-danger btn-reset-party-id" data-id="${item.party_id}" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600;">🔄 リセット</button>`;
     } else {
-      actionBtn = `<button class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; opacity: 0.4; cursor: not-allowed;" disabled>対象外</button>`;
+      actionBtn = `<button class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; opacity: 0.4; cursor: not-allowed;" disabled title="契約中のためリセット不可">対象外</button>`;
     }
 
-    // チェックボックス表示 (リセット可能な状態のみ選択可能、他はdisabled)
-    let checkboxHtml = '';
-    if (isResettable) {
-      checkboxHtml = `<input type="checkbox" class="party-id-row-checkbox" data-id="${item.party_id}" style="cursor: pointer;">`;
-    } else {
-      checkboxHtml = `<input type="checkbox" style="opacity: 0.2; cursor: not-allowed;" disabled>`;
-    }
+    // チェックボックス表示 (どのステータスであっても必ず選択可能)
+    const checkboxHtml = `<input type="checkbox" class="party-id-row-checkbox" data-id="${item.party_id}" data-status="${statusInfo.key}" data-resettable="${statusInfo.isResettable ? 'true' : 'false'}" style="cursor: pointer;">`;
 
     let errorBadge = '';
     if (item.isLocalOnly) {
@@ -2263,7 +2388,7 @@ async function loadPartyIds() {
       <td style="padding: 0.75rem 1rem; font-weight: 600; font-family: monospace; font-size: 0.85rem; color: var(--text-primary);">${item.party_id}${errorBadge}</td>
       <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">${item.seq_value || '-'}</td>
       <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">${item.source || '-'}</td>
-      <td style="padding: 0.75rem 1rem;">${statusBadge}</td>
+      <td style="padding: 0.75rem 1rem;">${statusInfo.badgeHtml}</td>
       <td style="padding: 0.75rem 1rem; color: var(--text-muted);">${formatDate(item.status === 'reusable' ? item.reset_at : item.created_at)}</td>
       <td style="padding: 0.75rem 1rem; color: var(--text-muted);">${formatDate(item.activated_at)}</td>
       <td style="padding: 0.75rem 1rem; text-align: center;">${actionBtn}</td>
@@ -2280,56 +2405,39 @@ async function loadPartyIds() {
     });
   });
 
-  // チェックボックスと一括リセットの制御イベント
+  // 全選択チェックボックスの制御イベント
   const selectAllCheckbox = document.getElementById('party-id-select-all');
-  const bulkResetBtn = document.getElementById('btn-bulk-reset-party-ids');
-  const rowCheckboxes = tableBody.querySelectorAll('.party-id-row-checkbox');
-
-  const updateBulkResetButtonState = () => {
-    if (!bulkResetBtn) return;
-    const checkedIds = Array.from(tableBody.querySelectorAll('.party-id-row-checkbox:checked')).map(cb => cb.getAttribute('data-id'));
-    
-    if (checkedIds.length > 0) {
-      bulkResetBtn.disabled = false;
-      bulkResetBtn.style.opacity = '1';
-      bulkResetBtn.style.cursor = 'pointer';
-      bulkResetBtn.innerHTML = `🔄 選択した ${checkedIds.length}件のIDを一括リセット`;
-    } else {
-      bulkResetBtn.disabled = true;
-      bulkResetBtn.style.opacity = '0.5';
-      bulkResetBtn.style.cursor = 'not-allowed';
-      bulkResetBtn.innerHTML = `🔄 選択した破棄IDを一括リセット`;
-    }
-  };
-
   if (selectAllCheckbox) {
-    selectAllCheckbox.checked = false; // 再描画時はクリア
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = false;
     selectAllCheckbox.onchange = (e) => {
       const checked = e.target.checked;
+      const rowCheckboxes = tableBody.querySelectorAll('.party-id-row-checkbox');
       rowCheckboxes.forEach(cb => {
-        if (!cb.disabled) cb.checked = checked;
+        cb.checked = checked;
       });
-      updateBulkResetButtonState();
+      updatePartyIdSelectionDisplay(tableBody);
     };
   }
 
-  rowCheckboxes.forEach(cb => {
+  // 個別チェックボックスの制御イベント
+  tableBody.querySelectorAll('.party-id-row-checkbox').forEach(cb => {
     cb.onchange = () => {
-      if (selectAllCheckbox) {
-        const enabledCbs = Array.from(rowCheckboxes).filter(c => !c.disabled);
-        const checkedCbs = enabledCbs.filter(c => c.checked);
-        selectAllCheckbox.checked = enabledCbs.length > 0 && enabledCbs.length === checkedCbs.length;
-      }
-      updateBulkResetButtonState();
+      updatePartyIdSelectionDisplay(tableBody);
     };
   });
 
-  // 初期値の同期
-  updateBulkResetButtonState();
+  // 初期値の同期（「0件を選択中」）
+  updatePartyIdSelectionDisplay(tableBody);
 
+  // 一括リセットボタンのクリックイベント
+  const bulkResetBtn = document.getElementById('btn-bulk-reset-party-ids');
   if (bulkResetBtn) {
     bulkResetBtn.onclick = async () => {
-      const checkedIds = Array.from(tableBody.querySelectorAll('.party-id-row-checkbox:checked')).map(cb => cb.getAttribute('data-id'));
+      const checkedResettableCbs = Array.from(tableBody.querySelectorAll('.party-id-row-checkbox:checked'))
+        .filter(cb => cb.getAttribute('data-resettable') === 'true');
+      const checkedIds = checkedResettableCbs.map(cb => cb.getAttribute('data-id'));
+      
       if (checkedIds.length === 0) return;
 
       const isConfirmed = confirm(`警告: 選択した ${checkedIds.length}件の Party ID を一括で再利用可能（リセット）にします。\nこれらのIDは本日から「さらに3年間」経過するまで再発行はされません。\n実行してよろしいですか？`);
@@ -16758,9 +16866,64 @@ function setupEventListeners() {
     refreshPartyIdsBtn.addEventListener('click', () => loadPartyIds());
   }
 
-  const partyIdFilterStatus = document.getElementById('party-id-filter-status');
-  if (partyIdFilterStatus) {
-    partyIdFilterStatus.addEventListener('change', () => loadPartyIds());
+  // ステータスマルチセレクトドロップダウンの制御
+  const statusDropdownBtn = document.getElementById('party-id-status-dropdown-btn');
+  const statusDropdownMenu = document.getElementById('party-id-status-dropdown-menu');
+  const statusDropdownArrow = document.getElementById('party-id-status-dropdown-arrow');
+
+  if (statusDropdownBtn && statusDropdownMenu) {
+    statusDropdownBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = statusDropdownMenu.style.display === 'block';
+      statusDropdownMenu.style.display = isOpen ? 'none' : 'block';
+      if (statusDropdownArrow) {
+        statusDropdownArrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+      }
+    });
+
+    // ドロップダウンメニュー内でのクリック時は閉じない
+    statusDropdownMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    // 画面外クリックで閉じる
+    document.addEventListener('click', (e) => {
+      if (!statusDropdownMenu.contains(e.target) && e.target !== statusDropdownBtn) {
+        statusDropdownMenu.style.display = 'none';
+        if (statusDropdownArrow) {
+          statusDropdownArrow.style.transform = 'rotate(0deg)';
+        }
+      }
+    });
+
+    // 各ステータスチェックボックス変更時
+    document.querySelectorAll('.party-id-status-cb').forEach(cb => {
+      cb.addEventListener('change', () => {
+        loadPartyIds();
+      });
+    });
+
+    // 全選択ボタン
+    const selectAllStatusBtn = document.getElementById('party-id-status-select-all-btn');
+    if (selectAllStatusBtn) {
+      selectAllStatusBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        document.querySelectorAll('.party-id-status-cb').forEach(cb => cb.checked = true);
+        loadPartyIds();
+      });
+    }
+
+    // 全解除ボタン
+    const clearAllStatusBtn = document.getElementById('party-id-status-clear-all-btn');
+    if (clearAllStatusBtn) {
+      clearAllStatusBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        document.querySelectorAll('.party-id-status-cb').forEach(cb => cb.checked = false);
+        loadPartyIds();
+      });
+    }
   }
 
   const partyIdFilterPeriod = document.getElementById('party-id-filter-period');
