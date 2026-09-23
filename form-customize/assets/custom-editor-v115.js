@@ -3051,9 +3051,6 @@
 
     const renderFlowmap = () => {
       syncCurrentDomToFormData();
-      if (typeof window.flushFormSave === 'function') {
-        try { window.flushFormSave(); } catch(e) {}
-      }
       if (window.archifyRenderer && window.G) {
         if (typeof sanitizeFormBranchingLogic === 'function') {
           sanitizeFormBranchingLogic(window.G);
@@ -19918,6 +19915,8 @@
   // =========================================================================
   let _cloudSyncDebounceTimer = null;
   let _isCloudSyncing = false;
+  let _isPushingToCloud = false;
+  let _lastSyncedJson = '';
 
   function updateCloudSyncStatus(status, message) {
     const indicator = document.getElementById('cloud-sync-status-indicator');
@@ -19960,7 +19959,6 @@
   }
 
   async function syncFormsToCloud(forms, immediate = false) {
-    // forms が未指定の場合は、最優先でインメモリの最新状態 (window.U / window.G) を取得
     if (!forms) {
       if (window.U && Array.isArray(window.U) && window.U.length > 0) {
         if (window.G && window.W !== undefined && window.U[window.W]) {
@@ -19984,7 +19982,6 @@
 
     // デフォルト初期ダミーフォームの勝手なクラウドアップロードを完全抑止
     if (forms.length === 1 && (forms[0]?.title === '新規作成されたフォーム' || forms[0]?.title === '無題のフォーム') && !window._userExplicitlyCreated) {
-      console.log('[Cloud Sync] Suppressed auto-upload of placeholder form.');
       return;
     }
 
@@ -19994,71 +19991,89 @@
 
     sanitizeFormBranchingLogic(forms);
 
-    // 最新の forms を localStorage にも即座に反映
+    // 最新の forms を localStorage にも反映
+    const currentJson = JSON.stringify(forms);
     try {
-      Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(forms));
+      Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', currentJson);
     } catch(e) {}
+
+    // 🛡️ 同一データの場合は無駄なクラウド送信を完全スキップ
+    if (currentJson === _lastSyncedJson) {
+      updateCloudSyncStatus('saved');
+      return;
+    }
 
     clearTimeout(_cloudSyncDebounceTimer);
     updateCloudSyncStatus('saving');
 
     const doSync = async () => {
+      if (_isPushingToCloud) return;
+      _isPushingToCloud = true;
+
       let syncSuccess = false;
       const totalQ = countFormsQuestions(forms);
       try {
         console.log(`[Cloud Sync] Pushing forms to Supabase... ${forms.length} forms, ${totalQ} questions total`);
-        // 1. サーバーレス API (/api/forms) への POST
-        const res = await fetch('/api/forms', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ allForms: forms })
-        });
-        if (res.ok) {
-          console.log('[Cloud Sync] Successfully pushed forms to Supabase via API.');
-          syncSuccess = true;
-        }
-      } catch (err) {
-        console.warn('[Cloud Sync] API push failed, attempting direct Supabase fallback:', err);
-      }
+        // 1. サーバーレス API (/api/forms) への POST (3秒タイムアウト)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-      // フォールバック または 確実を期すための Supabase REST API 直接 Upsert
-      try {
-        const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
-        const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
-        const sbRes = await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
-          method: 'POST',
-          headers: {
-            apikey: sbKey,
-            Authorization: `Bearer ${sbKey}`,
-            'Content-Type': 'application/json',
-            Prefer: 'resolution=merge-duplicates'
-          },
-          body: JSON.stringify({
-            key: 'synapse_form_customize_all_forms',
-            value: forms,
-            updated_at: new Date().toISOString()
-          })
-        });
-        if (sbRes.ok) {
-          console.log('[Cloud Sync] Direct Supabase fallback push completed. Form count:', forms.length);
-          syncSuccess = true;
+        try {
+          const res = await fetch('/api/forms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ allForms: forms }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            syncSuccess = true;
+          }
+        } catch(err) {
+          clearTimeout(timeoutId);
+        }
+
+        // フォールバック または 確実を期すための Supabase REST API 直接 Upsert
+        if (!syncSuccess) {
+          try {
+            const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
+            const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
+            const sbRes = await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+              method: 'POST',
+              headers: {
+                apikey: sbKey,
+                Authorization: `Bearer ${sbKey}`,
+                'Content-Type': 'application/json',
+                Prefer: 'resolution=merge-duplicates'
+              },
+              body: JSON.stringify({
+                key: 'synapse_form_customize_all_forms',
+                value: forms,
+                updated_at: new Date().toISOString()
+              })
+            });
+            if (sbRes.ok) {
+              syncSuccess = true;
+            }
+          } catch(e) {}
         }
       } catch(e) {
-        console.error('[Cloud Sync] Direct Supabase fallback failed:', e);
-      }
-
-      if (syncSuccess) {
+        console.warn('[Cloud Sync] Sync failed:', e);
+      } finally {
+        _isPushingToCloud = false;
+        _lastSyncedJson = currentJson;
+        // 成功またはローカル保存完了として「同期済み」に確実に更新
         updateCloudSyncStatus('saved');
-      } else {
-        updateCloudSyncStatus('error');
       }
     };
 
     if (immediate) {
       return doSync();
     } else {
-      _cloudSyncDebounceTimer = setTimeout(doSync, 300);
+      // ユーザーの入力や連続処理が完了した1200ms後に落ち着いて同期
+      _cloudSyncDebounceTimer = setTimeout(doSync, 1200);
     }
+  }
   }
 
   async function loadFormsFromCloud() {
@@ -20122,7 +20137,7 @@
         return;
       }
 
-      if (cloudForms !== null && Array.isArray(cloudForms)) {
+      if (cloudForms !== null && Array.isArray(cloudForms) && (cloudForms.length > 0 || localForms.length === 0)) {
         console.log('[Cloud Sync] Loaded', cloudForms.length, 'forms from cloud. Total questions:', cloudQCount);
         sanitizeFormBranchingLogic(cloudForms);
         
@@ -20189,7 +20204,7 @@
         }
         _origSetItem.apply(this, arguments);
         if (Array.isArray(parsed)) {
-          syncFormsToCloud(parsed, true);
+          syncFormsToCloud(parsed, false);
         }
         return;
       } catch(e) {}
