@@ -2123,6 +2123,7 @@
       if (e.target === overlay) close(false);
     });
   }
+  window.showSystemConfirmModal = showSystemConfirmModal;
 
   // カスタムトースト表示関数 (未定義エラー解消 & UX向上)
   function showCustomToast(message, type = 'success') {
@@ -22904,28 +22905,71 @@
     // イベントリスナーのバインド（未バインド時のみ）
     if (!enabledToggle.dataset.bound) {
       enabledToggle.dataset.bound = 'true';
-      enabledToggle.addEventListener('change', (e) => {
+
+      // ⚠️ 連携解除確認モーダル付きの安全なトグルハンドラ
+      enabledToggle.addEventListener('click', (e) => {
         const curDef = window.G || window.n || window.L || {};
         if (!curDef.appointIntegration) curDef.appointIntegration = { enabled: false, fields: {} };
-        
-        // ⚠️ 連携解除防止ガード: トグルをOFFにしようとした際、安全確認ダイアログを表示
-        if (!e.target.checked) {
-          const confirmed = window.confirm('⚠️ アポイント連携を解除しますか？\n\n解除すると、アポイント詳細画面からこのフォームが発行できなくなります。\n本当に連携を解除しますか？');
-          if (!confirmed) {
-            e.preventDefault();
-            e.target.checked = true;
-            return;
+
+        const wasEnabled = curDef.appointIntegration.enabled === true;
+
+        if (wasEnabled) {
+          // ONからOFFへの操作：ブラウザのデフォルト切り替えを一旦キャンセル！
+          e.preventDefault();
+
+          // システム確認モーダルを直接呼び出す
+          const modalFn = (typeof window.showSystemConfirmModal === 'function') ? window.showSystemConfirmModal : (typeof showSystemConfirmModal === 'function' ? showSystemConfirmModal : null);
+          const confirmMsg = '⚠️ アポイント連携を解除しますか？\n\n解除すると、アポイント詳細画面からこのフォームが発行できなくなります。\n本当に連携を解除しますか？';
+
+          const handleConfirmed = (confirmed) => {
+            if (confirmed) {
+              // 「実行する」が押された！
+              enabledToggle.checked = false;
+              curDef.appointIntegration.enabled = false;
+              detailsPanel.style.display = 'none';
+              enabledToggle.dataset.lastFormKey = `${curDef.id || ''}_false`;
+
+              syncAppointIntegrationToStorage(curDef);
+              if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+              if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+              if (typeof window.S === 'function') window.S();
+              if (typeof showCustomToast === 'function') {
+                showCustomToast('アポイント連携を解除しました。', 'info');
+              }
+            } else {
+              // キャンセル：何もしない（checked は ON のまま維持）
+              enabledToggle.checked = true;
+            }
+          };
+
+          if (modalFn) {
+            modalFn(confirmMsg, handleConfirmed);
+          } else {
+            const ok = window.confirm(confirmMsg);
+            handleConfirmed(ok);
+          }
+        } else {
+          // OFFからONへの操作：確認なしで直ちにON
+          enabledToggle.checked = true;
+          curDef.appointIntegration.enabled = true;
+          detailsPanel.style.display = 'flex';
+          enabledToggle.dataset.lastFormKey = `${curDef.id || ''}_true`;
+
+          syncAppointIntegrationToStorage(curDef);
+          if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+          if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+          if (typeof window.S === 'function') window.S();
+          if (typeof showCustomToast === 'function') {
+            showCustomToast('アポイント連携を有効にしました。', 'success');
           }
         }
+      });
 
-        curDef.appointIntegration.enabled = e.target.checked;
-        detailsPanel.style.display = e.target.checked ? 'flex' : 'none';
-        enabledToggle.dataset.lastFormKey = `${curDef.id || ''}_${curDef.appointIntegration.enabled}`;
-
-        syncAppointIntegrationToStorage(curDef);
-        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
-        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
-        if (typeof window.S === 'function') window.S();
+      enabledToggle.addEventListener('change', (e) => {
+        const curDef = window.G || window.n || window.L || {};
+        if (curDef.appointIntegration) {
+          enabledToggle.checked = !!curDef.appointIntegration.enabled;
+        }
       });
 
       APPOINT_FIELD_KEYS.forEach(key => {
