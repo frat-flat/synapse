@@ -23429,8 +23429,19 @@
     const sCount = allIntegratedCols.filter(c => c.category === 'system').length;
     const linkedCount = allIntegratedCols.filter(c => c.isSynapseActive !== false).length;
 
-    // アポイント連携がONか
+    // 各連携カテゴリの連携件数と有効状態
+    const uLinkedCount = allIntegratedCols.filter(c => c.category === 'user' && c.isSynapseActive !== false).length;
+    const aLinkedCount = allIntegratedCols.filter(c => c.category === 'appoint' && c.isSynapseActive !== false).length;
+    const sLinkedCount = allIntegratedCols.filter(c => c.category === 'system' && c.isSynapseActive !== false).length;
+
+    const isUserOn = formDef.userIntegration ? (formDef.userIntegration.enabled !== false) : true;
+    const userFields = (formDef.userIntegration && formDef.userIntegration.fields) || { userId: true, userName: true, userEmail: false, companyName: false };
+
     const isAppointOn = formDef.appointIntegration ? (formDef.appointIntegration.enabled === true) : false;
+    const appointFields = (formDef.appointIntegration && formDef.appointIntegration.fields) || { appointId: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true, customerName: false, appointStaff: false };
+
+    const isSystemOn = formDef.systemIntegration ? (formDef.systemIntegration.enabled !== false) : true;
+    const systemFields = (formDef.systemIntegration && formDef.systemIntegration.fields) || { masterId: true, formTitle: true, status: true, registrationCode: true, resumeUrl: true, createdAt: true };
 
     // テーブル行HTMLおよび詳細説明カードHTMLの生成
     let colIndex = 1;
@@ -23718,8 +23729,109 @@
         <!-- ================= タブ1: カラム構成一覧 ================= -->
         <div id="panel-tab-col-list" style="flex: 1 1 auto; overflow-y: auto; padding: 14px 22px; display: flex; flex-direction: column;">
           
+          <!-- ⚙️ 各連携カテゴリの詳細設定（全体有効化・一括設定アコーディオン） -->
+          <details class="modal-integration-settings-accordion" id="modal-integration-settings-accordion" style="flex-shrink: 0; margin-bottom: 14px; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <summary style="padding: 10px 14px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: #f8fafc; user-select: none;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1rem;">⚙️</span>
+                <span style="font-size: 0.84rem; font-weight: 700; color: #0f172a;">連携カテゴリの有効化・一括設定</span>
+                <span style="font-size: 0.72rem; color: #64748b;">（ユーザー情報連携・アポイント連携・システム共通項目の設定を展開）</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 0.7rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; ${isUserOn ? 'background: rgba(2,132,199,0.1); color: #0284c7;' : 'background: #f1f5f9; color: #64748b;'}">👤 ユーザー: ${isUserOn ? `連携中 (${uLinkedCount}/${uCount})` : '未連携'}</span>
+                <span style="font-size: 0.7rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; ${isAppointOn ? 'background: rgba(126,34,206,0.1); color: #7e22ce;' : 'background: #f1f5f9; color: #64748b;'}">📅 アポ: ${isAppointOn ? `連携中 (${aLinkedCount}/${aCount})` : '未連携'}</span>
+                <span style="font-size: 0.7rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; ${isSystemOn ? 'background: rgba(100,116,139,0.1); color: #475569;' : 'background: #f1f5f9; color: #64748b;'}">⚙️ システム: ${isSystemOn ? `連携中 (${sLinkedCount}/${sCount})` : '未連携'}</span>
+                <span style="font-size: 0.75rem; color: #64748b; margin-left: 4px;">▼</span>
+              </div>
+            </summary>
+            <div style="padding: 12px 14px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+              <!-- 👤 ユーザー連携カード -->
+              <div class="modal-integration-card" data-category="user" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 6px; border-bottom: 1px solid #f1f5f9;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 1rem;">👤</span>
+                    <strong style="font-size: 0.8rem; color: #0f172a;">ユーザー情報連携</strong>
+                  </div>
+                  <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; margin: 0; font-size: 0.75rem; font-weight: 700; color: #0284c7;">
+                    <input type="checkbox" id="modal-card-user-enabled" ${isUserOn ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px;" /> 有効にする
+                  </label>
+                </div>
+                <p style="font-size: 0.7rem; color: #64748b; margin: 0; line-height: 1.35;">
+                  ログイン中のアカウント情報（担当者ID・氏名等）を回答データへ自動記録します。
+                </p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                  <span style="font-size: 0.72rem; color: #475569; font-weight: 700;">Synapse連携項目:</span>
+                  <a href="javascript:void(0)" id="btn-modal-card-user-toggle-all" style="font-size: 0.7rem; color: #0284c7; text-decoration: none; font-weight: 600;">すべて切替</a>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; font-size: 0.74rem;">
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="user" data-field-key="userId" ${userFields.userId ? 'checked' : ''} /> 🆔 ユーザーID</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="user" data-field-key="userName" ${userFields.userName ? 'checked' : ''} /> 👤 ユーザー名</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="user" data-field-key="userEmail" ${userFields.userEmail ? 'checked' : ''} /> ✉️ メールアドレス</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="user" data-field-key="companyName" ${userFields.companyName ? 'checked' : ''} /> 🏢 企業名 / 屋号</label>
+                </div>
+              </div>
+
+              <!-- 📅 アポイント連携カード -->
+              <div class="modal-integration-card" data-category="appoint" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 6px; border-bottom: 1px solid #f1f5f9;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 1rem;">📅</span>
+                    <strong style="font-size: 0.8rem; color: #0f172a;">アポイント連携</strong>
+                  </div>
+                  <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; margin: 0; font-size: 0.75rem; font-weight: 700; color: #7e22ce;">
+                    <input type="checkbox" id="modal-card-appoint-enabled" ${isAppointOn ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px;" /> 有効にする
+                  </label>
+                </div>
+                <p style="font-size: 0.7rem; color: #64748b; margin: 0; line-height: 1.35;">
+                  アポイント詳細画面の「フォーム発行」から直接連携発行できるようにします。
+                </p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                  <span style="font-size: 0.72rem; color: #475569; font-weight: 700;">Synapse連携項目:</span>
+                  <a href="javascript:void(0)" id="btn-modal-card-appoint-toggle-all" style="font-size: 0.7rem; color: #7e22ce; text-decoration: none; font-weight: 600;">すべて切替</a>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; font-size: 0.74rem;">
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="appointId" ${appointFields.appointId ? 'checked' : ''} /> 🔖 アポID</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="appointDate" ${appointFields.appointDate ? 'checked' : ''} /> 📅 アポ日時</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="meetingType" ${appointFields.meetingType ? 'checked' : ''} /> 🌐 面談形式</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="sourceCategory" ${appointFields.sourceCategory ? 'checked' : ''} /> 🏷️ 流入経路</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="introducer" ${appointFields.introducer ? 'checked' : ''} /> 👥 紹介者/代理店</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="customerName" ${appointFields.customerName ? 'checked' : ''} /> 🏢 顧客名</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="appointStaff" ${appointFields.appointStaff ? 'checked' : ''} /> 👤 アポ担当者</label>
+                </div>
+              </div>
+
+              <!-- ⚙️ システム項目連携カード -->
+              <div class="modal-integration-card" data-category="system" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: justify; display: flex; justify-content: space-between; align-items: center; padding-bottom: 6px; border-bottom: 1px solid #f1f5f9;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 1rem;">⚙️</span>
+                    <strong style="font-size: 0.8rem; color: #0f172a;">システム項目連携</strong>
+                  </div>
+                  <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; margin: 0; font-size: 0.75rem; font-weight: 700; color: #475569;">
+                    <input type="checkbox" id="modal-card-system-enabled" ${isSystemOn ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px;" /> 有効にする
+                  </label>
+                </div>
+                <p style="font-size: 0.7rem; color: #64748b; margin: 0; line-height: 1.35;">
+                  回答送信時にシステムが自動付与する共通メタデータ（マスタID、状態等）の設定です。
+                </p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                  <span style="font-size: 0.72rem; color: #475569; font-weight: 700;">Synapse連携項目:</span>
+                  <a href="javascript:void(0)" id="btn-modal-card-system-toggle-all" style="font-size: 0.7rem; color: #475569; text-decoration: none; font-weight: 600;">すべて切替</a>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; font-size: 0.74rem;">
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="system" data-field-key="masterId" ${systemFields.masterId ? 'checked' : ''} /> 🔑 マスターID</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="system" data-field-key="formTitle" ${systemFields.formTitle ? 'checked' : ''} /> 📝 フォーム名</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="system" data-field-key="status" ${systemFields.status ? 'checked' : ''} /> 📊 回答状態</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="system" data-field-key="registrationCode" ${systemFields.registrationCode ? 'checked' : ''} /> 🏷️ 回答ID</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="system" data-field-key="resumeUrl" ${systemFields.resumeUrl ? 'checked' : ''} /> 🔗 再開用URL</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="system" data-field-key="createdAt" ${systemFields.createdAt ? 'checked' : ''} /> ⏱️ 送信日時</label>
+                </div>
+              </div>
+            </div>
+          </details>
+
           <!-- フィルターピルバー -->
-          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+          <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
               <span style="font-size: 0.74rem; font-weight: 600; color: #64748b; margin-right: 4px;">絞り込み:</span>
               <button type="button" class="col-filter-pill active" data-filter="all">すべて (${totalCount})</button>
@@ -23734,7 +23846,7 @@
           </div>
 
           <!-- カラム一覧テーブル -->
-          <div style="border: 1px solid #cbd5e1; border-radius: 8px; overflow-x: auto; background: #ffffff;">
+          <div style="flex-shrink: 0; border: 1px solid #cbd5e1; border-radius: 8px; overflow-x: auto; background: #ffffff;">
             <table style="width: 100%; min-width: 1000px; table-layout: fixed; border-collapse: collapse; text-align: left;">
               <colgroup>
                 <col style="width: 40px;" />
@@ -23975,7 +24087,170 @@
       });
     }
 
-    // 🔗 モーダル内の各カラム「Synapse連携」トグル切り替えイベント
+    // 🌟 モーダル再描画時（タブ状態・アコーディオン開閉状態保持）
+    function refreshModalKeepState() {
+      const activeTab = tabBtnColDesc && tabBtnColDesc.classList.contains('active') ? 'desc' : (tabBtnGridPreview.classList.contains('active') ? 'grid' : 'list');
+      const accordion = modal.querySelector('#modal-integration-settings-accordion');
+      const wasAccordionOpen = accordion ? accordion.open : false;
+
+      openFormColumnMappingModal(formDef).then(() => {
+        const m = document.getElementById('form-column-mapping-modal');
+        if (m) {
+          const btn = activeTab === 'desc' ? m.querySelector('#tab-btn-col-desc') : (activeTab === 'grid' ? m.querySelector('#tab-btn-grid-preview') : m.querySelector('#tab-btn-col-list'));
+          if (btn) btn.click();
+          const newAccordion = m.querySelector('#modal-integration-settings-accordion');
+          if (newAccordion) newAccordion.open = wasAccordionOpen;
+        }
+      });
+    }
+
+    // 👤 モーダル内: ユーザー連携 有効化トグル
+    const cardUserEnabled = modal.querySelector('#modal-card-user-enabled');
+    if (cardUserEnabled) {
+      cardUserEnabled.addEventListener('change', (e) => {
+        if (!formDef.userIntegration) formDef.userIntegration = { enabled: true, fields: {} };
+        formDef.userIntegration.enabled = e.target.checked;
+        syncUserIntegrationToStorage(formDef);
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        if (typeof window.S === 'function') window.S();
+        refreshModalKeepState();
+      });
+    }
+
+    // 📅 モーダル内: アポイント連携 有効化トグル
+    const cardAppointEnabled = modal.querySelector('#modal-card-appoint-enabled');
+    if (cardAppointEnabled) {
+      cardAppointEnabled.addEventListener('click', (e) => {
+        if (!formDef.appointIntegration) formDef.appointIntegration = { enabled: false, fields: {} };
+        const wasEnabled = formDef.appointIntegration.enabled === true;
+
+        if (wasEnabled) {
+          e.preventDefault();
+          const modalFn = (typeof window.showSystemConfirmModal === 'function') ? window.showSystemConfirmModal : (typeof showSystemConfirmModal === 'function' ? showSystemConfirmModal : null);
+          const confirmMsg = '⚠️ アポイント連携を解除しますか？\n\n解除すると、アポイント詳細画面からこのフォームが発行できなくなります。\n本当に連携を解除しますか？';
+          const handleConfirmed = (confirmed) => {
+            if (confirmed) {
+              formDef.appointIntegration.enabled = false;
+              syncAppointIntegrationToStorage(formDef);
+              if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+              if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+              if (typeof window.S === 'function') window.S();
+              refreshModalKeepState();
+            }
+          };
+          if (modalFn) {
+            modalFn(confirmMsg, handleConfirmed);
+          } else {
+            const ok = window.confirm(confirmMsg);
+            handleConfirmed(ok);
+          }
+        } else {
+          formDef.appointIntegration.enabled = true;
+          syncAppointIntegrationToStorage(formDef);
+          if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+          if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+          if (typeof window.S === 'function') window.S();
+          refreshModalKeepState();
+        }
+      });
+    }
+
+    // ⚙️ モーダル内: システム項目連携 有効化トグル
+    const cardSystemEnabled = modal.querySelector('#modal-card-system-enabled');
+    if (cardSystemEnabled) {
+      cardSystemEnabled.addEventListener('change', (e) => {
+        if (!formDef.systemIntegration) formDef.systemIntegration = { enabled: true, fields: {} };
+        formDef.systemIntegration.enabled = e.target.checked;
+        syncSystemIntegrationToStorage(formDef);
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        if (typeof window.S === 'function') window.S();
+        refreshModalKeepState();
+      });
+    }
+
+    // 📋 モーダル内: 設定カード内の個別フィールドトグル
+    modal.querySelectorAll('.modal-card-field-toggle').forEach(chk => {
+      chk.addEventListener('change', (e) => {
+        const cat = chk.dataset.category;
+        const fKey = chk.dataset.fieldKey;
+        const checked = e.target.checked;
+
+        if (cat === 'user') {
+          if (!formDef.userIntegration) formDef.userIntegration = { enabled: true, fields: {} };
+          if (!formDef.userIntegration.fields) formDef.userIntegration.fields = {};
+          formDef.userIntegration.fields[fKey] = checked;
+          syncUserIntegrationToStorage(formDef);
+        } else if (cat === 'appoint') {
+          if (!formDef.appointIntegration) formDef.appointIntegration = { enabled: true, fields: {} };
+          if (!formDef.appointIntegration.fields) formDef.appointIntegration.fields = {};
+          formDef.appointIntegration.fields[fKey] = checked;
+          syncAppointIntegrationToStorage(formDef);
+        } else if (cat === 'system') {
+          if (!formDef.systemIntegration) formDef.systemIntegration = { enabled: true, fields: {} };
+          if (!formDef.systemIntegration.fields) formDef.systemIntegration.fields = {};
+          formDef.systemIntegration.fields[fKey] = checked;
+          syncSystemIntegrationToStorage(formDef);
+        }
+
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        if (typeof window.S === 'function') window.S();
+        refreshModalKeepState();
+      });
+    });
+
+    // 🔄 モーダル内: 各カテゴリのすべて切替
+    const btnUserToggleAll = modal.querySelector('#btn-modal-card-user-toggle-all');
+    if (btnUserToggleAll) {
+      btnUserToggleAll.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!formDef.userIntegration) formDef.userIntegration = { enabled: true, fields: {} };
+        if (!formDef.userIntegration.fields) formDef.userIntegration.fields = {};
+        const anyChecked = USER_FIELD_KEYS.some(k => formDef.userIntegration.fields[k] === true);
+        USER_FIELD_KEYS.forEach(k => { formDef.userIntegration.fields[k] = !anyChecked; });
+        syncUserIntegrationToStorage(formDef);
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        if (typeof window.S === 'function') window.S();
+        refreshModalKeepState();
+      });
+    }
+
+    const btnAppointToggleAll = modal.querySelector('#btn-modal-card-appoint-toggle-all');
+    if (btnAppointToggleAll) {
+      btnAppointToggleAll.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!formDef.appointIntegration) formDef.appointIntegration = { enabled: true, fields: {} };
+        if (!formDef.appointIntegration.fields) formDef.appointIntegration.fields = {};
+        const anyChecked = APPOINT_FIELD_KEYS.some(k => formDef.appointIntegration.fields[k] === true);
+        APPOINT_FIELD_KEYS.forEach(k => { formDef.appointIntegration.fields[k] = !anyChecked; });
+        syncAppointIntegrationToStorage(formDef);
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        if (typeof window.S === 'function') window.S();
+        refreshModalKeepState();
+      });
+    }
+
+    const btnSystemToggleAll = modal.querySelector('#btn-modal-card-system-toggle-all');
+    if (btnSystemToggleAll) {
+      btnSystemToggleAll.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!formDef.systemIntegration) formDef.systemIntegration = { enabled: true, fields: {} };
+        if (!formDef.systemIntegration.fields) formDef.systemIntegration.fields = {};
+        const anyChecked = SYSTEM_FIELD_KEYS.some(k => formDef.systemIntegration.fields[k] !== false);
+        SYSTEM_FIELD_KEYS.forEach(k => { formDef.systemIntegration.fields[k] = !anyChecked; });
+        syncSystemIntegrationToStorage(formDef);
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        if (typeof window.S === 'function') window.S();
+        refreshModalKeepState();
+      });
+    }
+
+    // 🔗 モーダル内の各カラム行「Synapse連携」トグル切り替えイベント
     modal.querySelectorAll('.modal-col-link-toggle').forEach(chk => {
       chk.addEventListener('change', (e) => {
         const cat = chk.dataset.category;
@@ -24003,14 +24278,7 @@
         if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
         if (typeof window.S === 'function') window.S();
 
-        const activeTab = tabBtnColDesc && tabBtnColDesc.classList.contains('active') ? 'desc' : (tabBtnGridPreview.classList.contains('active') ? 'grid' : 'list');
-        openFormColumnMappingModal(formDef).then(() => {
-          const m = document.getElementById('form-column-mapping-modal');
-          if (m) {
-            const btn = activeTab === 'desc' ? m.querySelector('#tab-btn-col-desc') : (activeTab === 'grid' ? m.querySelector('#tab-btn-grid-preview') : m.querySelector('#tab-btn-col-list'));
-            if (btn) btn.click();
-          }
-        });
+        refreshModalKeepState();
       });
     });
 
@@ -24717,6 +24985,79 @@
     }
   }
   setInterval(setupHeaderColumnPreviewButton, 500);
+
+  // 📊 エディタ概要画面のカラム設定カード＆リアルタイムバッジ更新
+  function setupOverviewColumnMappingCard() {
+    const cardBtn = document.getElementById('btn-open-column-mapping-from-card');
+    if (cardBtn && !cardBtn.dataset.bound) {
+      cardBtn.dataset.bound = 'true';
+      cardBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        let targetForm = window.G || window.n || window.L;
+        if (typeof getCurrentFormObject === 'function') {
+          const cur = getCurrentFormObject();
+          if (cur && cur.formObj) targetForm = cur.formObj;
+        }
+        openFormColumnMappingModal(targetForm);
+      });
+    }
+
+    const formDef = window.G || window.n || window.L;
+    if (!formDef) return;
+
+    // 👤 ユーザー情報連携バッジ
+    const userBadge = document.getElementById('overview-badge-user-status');
+    if (userBadge) {
+      const isUserOn = formDef.userIntegration ? (formDef.userIntegration.enabled !== false) : true;
+      const userFields = (formDef.userIntegration && formDef.userIntegration.fields) || { userId: true, userName: true };
+      const count = USER_FIELD_KEYS.filter(k => userFields && userFields[k] === true).length;
+      if (isUserOn) {
+        userBadge.textContent = `👤 ユーザー情報: 連携中 (${count}項目)`;
+        userBadge.style.background = 'rgba(2, 132, 199, 0.1)';
+        userBadge.style.color = '#0284c7';
+      } else {
+        userBadge.textContent = '👤 ユーザー情報: 未連携';
+        userBadge.style.background = '#f1f5f9';
+        userBadge.style.color = '#64748b';
+      }
+    }
+
+    // 📅 アポイント連携バッジ
+    const appointBadge = document.getElementById('overview-badge-appoint-status');
+    if (appointBadge) {
+      const isAppointOn = formDef.appointIntegration ? (formDef.appointIntegration.enabled === true) : false;
+      const appointFields = (formDef.appointIntegration && formDef.appointIntegration.fields) || {};
+      const count = APPOINT_FIELD_KEYS.filter(k => appointFields && appointFields[k] === true).length;
+      if (isAppointOn) {
+        appointBadge.textContent = `📅 アポイント: 連携中 (${count}項目)`;
+        appointBadge.style.background = 'rgba(126, 34, 206, 0.1)';
+        appointBadge.style.color = '#7e22ce';
+      } else {
+        appointBadge.textContent = '📅 アポイント: 未連携';
+        appointBadge.style.background = '#f1f5f9';
+        appointBadge.style.color = '#64748b';
+      }
+    }
+
+    // ⚙️ システム管理バッジ
+    const sysBadge = document.getElementById('overview-badge-system-status');
+    if (sysBadge) {
+      const isSysOn = formDef.systemIntegration ? (formDef.systemIntegration.enabled !== false) : true;
+      const sysFields = (formDef.systemIntegration && formDef.systemIntegration.fields) || {};
+      const count = SYSTEM_FIELD_KEYS.filter(k => sysFields && sysFields[k] !== false).length;
+      if (isSysOn) {
+        sysBadge.textContent = `⚙️ システム管理: 連携中 (${count}項目)`;
+        sysBadge.style.background = 'rgba(100, 116, 139, 0.1)';
+        sysBadge.style.color = '#475569';
+      } else {
+        sysBadge.textContent = '⚙️ システム管理: 未連携';
+        sysBadge.style.background = '#f1f5f9';
+        sysBadge.style.color = '#64748b';
+      }
+    }
+  }
+  setInterval(setupOverviewColumnMappingCard, 500);
 
   // 変更の永続化とライブ同期
   function persistDrawerChanges() {
