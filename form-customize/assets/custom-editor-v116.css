@@ -7639,3 +7639,158 @@ html, body {
   color: #64748b !important;
   font-weight: 500 !important;
 }
+
+/* =========================================================================
+   📖 カラム詳細説明一覧（データディクショナリ）スタイル
+   ========================================================================= */
+.col-desc-cards-container {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+.col-desc-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  padding: 14px 18px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  transition: all 0.15s ease !important;
+  display: flex;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+.col-desc-card.is-hidden {
+  display: none !important;
+}
+
+.col-desc-card:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+  transform: translateY(-1px) !important;
+}
+
+.col-desc-card-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  padding-bottom: 8px !important;
+}
+
+.col-desc-card-title-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+
+.col-desc-index-badge {
+  font-family: monospace !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  color: #64748b !important;
+  background: #f1f5f9 !important;
+  padding: 2px 7px !important;
+  border-radius: 4px !important;
+}
+
+.col-desc-card-title {
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+}
+
+.col-desc-card-key {
+  font-family: monospace !important;
+  font-size: 0.82rem !important;
+  color: #0284c7 !important;
+  background: #f0f9ff !important;
+  border: 1px solid #bae6fd !important;
+  padding: 2px 8px !important;
+  border-radius: 5px !important;
+  font-weight: 600 !important;
+}
+
+.col-desc-card-badges {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-wrap: wrap !important;
+}
+
+.col-desc-card-body {
+  font-size: 0.85rem !important;
+  line-height: 1.6 !important;
+  color: #334155 !important;
+  background: #fafbfc !important;
+  border: 1px solid #f1f5f9 !important;
+  border-radius: 6px !important;
+  padding: 10px 14px !important;
+}
+
+.col-desc-card-body strong {
+  color: #0f172a !important;
+}
+
+.col-desc-card-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  font-size: 0.76rem !important;
+  color: #64748b !important;
+  padding-top: 4px !important;
+}
+
+.col-desc-sample-box {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  padding: 3px 10px !important;
+  border-radius: 5px !important;
+  font-family: monospace !important;
+  color: #0f172a !important;
+  max-width: 450px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.col-desc-search-box {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.col-desc-search-box input {
+  padding: 5px 12px 5px 30px !important;
+  font-size: 0.76rem !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  outline: none !important;
+  background: #ffffff !important;
+  color: #1e293b !important;
+  width: 240px !important;
+  transition: all 0.15s !important;
+}
+
+.col-desc-search-box input:focus {
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15) !important;
+  width: 280px !important;
+}
+
+.col-desc-search-box span.search-icon {
+  position: absolute !important;
+  left: 9px !important;
+  font-size: 0.75rem !important;
+  color: #94a3b8 !important;
+  pointer-events: none !important;
+}

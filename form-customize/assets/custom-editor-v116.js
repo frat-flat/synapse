@@ -22966,7 +22966,7 @@
         required: false,
         source: '顧客・マスタ紐付け',
         sampleVal: 'MST_882910',
-        desc: '統合顧客ID・契約識別コード'
+        desc: '統合顧客ID・契約識別コード。他システムや外部CRM、マスタデータとの突合・紐付けを行うためのプライマリ管理キー。'
       },
       {
         id: 'form_title',
@@ -22978,7 +22978,7 @@
         required: false,
         source: 'フォーム基本情報',
         sampleVal: formTitle,
-        desc: '送信されたフォームの名称'
+        desc: '送信されたフォームの正式名称。どのフォーム・施策から回答が登録されたかを特定し、集計・分析に使用。'
       }
     );
 
@@ -22994,7 +22994,7 @@
         required: false,
         source: 'ログイン / 回答者アカウント連携',
         sampleVal: 'USR_94821',
-        desc: 'Synapse操作アカウントまたは顧客ユーザーID'
+        desc: 'Synapseログイン中のアカウントID、または回答者ポータルにログインしているユーザー固有の識別ID。'
       },
       {
         id: 'user_name',
@@ -23006,7 +23006,7 @@
         required: false,
         source: 'ログイン / 回答者アカウント連携',
         sampleVal: '山田 太郎',
-        desc: '回答送信者または担当オペレーター氏名'
+        desc: 'フォーム回答を送信した担当者・ユーザーの氏名（または代理入力オペレーターの氏名）。'
       },
       {
         id: 'user_email',
@@ -23018,7 +23018,7 @@
         required: false,
         source: 'ログイン / 回答者アカウント連携',
         sampleVal: 'yamada@synapse-corp.jp',
-        desc: '回答者または送信通知先メールアドレス'
+        desc: '回答者の連絡先メールアドレス。送信完了通知や自動返信メール、後続連絡の宛先として使用。'
       },
       {
         id: 'company_name',
@@ -23030,19 +23030,19 @@
         required: false,
         source: 'ログイン / 回答者アカウント連携',
         sampleVal: '株式会社シナプスパートナーズ',
-        desc: '回答者所属組織または顧客法人名'
+        desc: '回答者が所属する法人組織名・屋号。BtoB取引マスタの企業単位集計・紐付けに使用。'
       }
     );
 
     // --- 3. 📅 アポイント連携カラム (Appointment Integration) ---
     const appointDefList = [
-      { id: 'appoint_id', key: 'appoint_id', label: 'アポイントID', type: 'text', fieldKey: 'appointId', sampleVal: 'APT_20260930_01', desc: '予約・商談アポイントメントID' },
-      { id: 'appoint_date', key: 'appoint_date', label: 'アポイント日時', type: 'datetime', fieldKey: 'appointDate', sampleVal: '2026-09-30 14:00', desc: '商談・面談の予定日時' },
-      { id: 'customer_name', key: 'customer_name', label: 'お客様名 (アポ連携)', type: 'text', fieldKey: 'customerName', sampleVal: '佐藤 健一', desc: 'アポイント登録時の顧客氏名' },
-      { id: 'meeting_type', key: 'meeting_type', label: '面談形式', type: 'select', fieldKey: 'meetingType', sampleVal: 'オンライン (Zoom)', desc: '対面・オンライン等の商談形式' },
-      { id: 'source_category', key: 'source_category', label: '流入経路', type: 'select', fieldKey: 'sourceCategory', sampleVal: 'Web紹介・反響', desc: '反響・広告・紹介等のチャネル' },
-      { id: 'introducer', key: 'introducer', label: '紹介者 / 代理店', type: 'text', fieldKey: 'introducer', sampleVal: 'パートナー営業第1部', desc: '案件紹介元代理店または担当者' },
-      { id: 'appoint_staff', key: 'appoint_staff', label: 'アポイント担当者', type: 'text', fieldKey: 'appointStaff', sampleVal: '鈴木 一郎', desc: 'アポイント獲得・担当スタッフ' }
+      { id: 'appoint_id', key: 'appoint_id', label: 'アポイントID', type: 'text', fieldKey: 'appointId', sampleVal: 'APT_20260930_01', desc: '予約システムや日程調整ツールで発行されたアポイントメントID。面談・商談レコードとの突合キー。' },
+      { id: 'appoint_date', key: 'appoint_date', label: 'アポイント日時', type: 'datetime', fieldKey: 'appointDate', sampleVal: '2026-09-30 14:00', desc: '予約された面談・商談の予定日時（YYYY-MM-DD HH:MM形式）。リマインドやスケジュール連動に使用。' },
+      { id: 'customer_name', key: 'customer_name', label: 'お客様名 (アポ連携)', type: 'text', fieldKey: 'customerName', sampleVal: '佐藤 健一', desc: 'アポイント予約時に登録された見込み顧客・面談参加者の氏名。' },
+      { id: 'meeting_type', key: 'meeting_type', label: '面談形式', type: 'select', fieldKey: 'meetingType', sampleVal: 'オンライン (Zoom)', desc: '商談の開催形式（オンライン(Zoom/Meet)、来社、訪問など）。' },
+      { id: 'source_category', key: 'source_category', label: '流入経路', type: 'select', fieldKey: 'sourceCategory', sampleVal: 'Web紹介・反響', desc: '顧客の流入経路・発生チャネル（Web反響、広告、紹介など）。マーケティング効果測定に使用。' },
+      { id: 'introducer', key: 'introducer', label: '紹介者 / 代理店', type: 'text', fieldKey: 'introducer', sampleVal: 'パートナー営業第1部', desc: '案件を紹介した代理店、取次パートナー、または紹介元担当者の名称。紹介報酬・連携追跡に使用。' },
+      { id: 'appoint_staff', key: 'appoint_staff', label: 'アポイント担当者', type: 'text', fieldKey: 'appointStaff', sampleVal: '鈴木 一郎', desc: 'アポイントを獲得したインサイドセールス、または当日担当する営業スタッフ氏名。' }
     ];
 
     appointDefList.forEach(item => {
@@ -23114,6 +23114,32 @@
           displayLabel = `[${q.groupTitle}] ${displayLabel}`;
         }
 
+        // 具体的な説明文（desc）の生成
+        let qDesc = `セクション「${secTitle}」の設問項目。`;
+        if (q.description && q.description.trim()) {
+          qDesc += `【説明: ${q.description.trim()}】 `;
+        }
+        if (apiDesc.includes('API')) {
+          qDesc += `【${apiDesc}】により、入力値が外部機関データとリアルタイム照合・自動補完されて蓄積されます。`;
+        } else if (apiDesc.includes('自動補完')) {
+          qDesc += `【${apiDesc}】により、郵便番号から該当住所が自動補完されて蓄積されます。`;
+        } else if (q.options && q.options.length > 0) {
+          const optLabels = q.options.map(o => (typeof o === 'object' ? (o.label || o.value) : o)).slice(0, 5).join('、');
+          const moreText = q.options.length > 5 ? ` 等 全${q.options.length}択` : '';
+          qDesc += `選択肢（${optLabels}${moreText}）から回答者が選択した値が蓄積されます。`;
+        } else if (q.type === 'textarea') {
+          qDesc += `回答者が入力した複数行のテキスト内容がそのまま蓄積されます。`;
+        } else if (q.type === 'date') {
+          qDesc += `回答者が指定した日付データ（YYYY-MM-DD形式）が蓄積されます。`;
+        } else if (q.type === 'number') {
+          qDesc += `回答者が入力した数値データが蓄積されます。`;
+        } else {
+          qDesc += `回答者がフォームに入力したテキスト値がそのまま蓄積されます。`;
+        }
+        if (q.required) {
+          qDesc += ` （※送信必須項目）`;
+        }
+
         // 同一キーの重複チェック
         const dup = cols.find(c => c.category === 'question' && c.key === physicalKey);
         if (dup) {
@@ -23136,6 +23162,7 @@
           source: `${secTitle} (${apiDesc})`,
           apiDesc: apiDesc,
           sampleVal: sampleVal,
+          desc: qDesc,
           hasCustomKey: hasCustomKey,
           choices: q.options ? q.options.map(opt => ({ value: (typeof opt === 'object' ? (opt.label || opt.value) : opt) })) : undefined
         });
@@ -23154,7 +23181,7 @@
         required: false,
         source: '送信状態判定',
         sampleVal: '回答完了',
-        desc: '回答完了 / 途中送信 / 一時保存'
+        desc: '回答の進行・処理ステータス（「回答完了」「途中送信」「一時保存」など）。受付後の進捗管理や後続フォローの分岐フラグとして使用。'
       },
       {
         id: 'registration_code',
@@ -23166,7 +23193,7 @@
         required: false,
         source: 'システム自動採番',
         sampleVal: 'REG_8492014',
-        desc: '回答者へ提示される受付ID'
+        desc: '回答ID / 登録受付コード。フォーム送信完了時にシステムから自動発行されるユニークな受付番号。回答者への照会キー。'
       },
       {
         id: 'resume_url',
@@ -23178,7 +23205,7 @@
         required: false,
         source: '途中再開システム',
         sampleVal: 'https://synapse-wayway.vercel.app/form-customize/view.html?res_id=row_8492',
-        desc: '途中送信時の中断・再開URL'
+        desc: '中断・再開用URL。マルチステップフォームの中断時に、入力途中の状態から再開するための専用アクセスURL（有効期限付き）。'
       },
       {
         id: 'created_at',
@@ -23190,7 +23217,7 @@
         required: false,
         source: '送信タイムスタンプ',
         sampleVal: '2026-09-24 11:20:45',
-        desc: 'フォーム送信完了日時'
+        desc: 'フォーム送信・登録完了日時。回答データがSupabaseデータベースへ確定保存された正確な日時（JSTタイムスタンプ）。'
       }
     );
 
@@ -23341,9 +23368,11 @@
     // アポイント連携がONか
     const isAppointOn = formDef.appointIntegration ? (formDef.appointIntegration.enabled === true) : false;
 
-    // テーブル行HTMLの生成
+    // テーブル行HTMLおよび詳細説明カードHTMLの生成
     let colIndex = 1;
     let rowsHtml = '';
+    let descIndex = 1;
+    let descCardsHtml = '';
 
     allIntegratedCols.forEach(col => {
       const isPersistedInTable = dedicatedColMap.has(col.key) || dedicatedColMap.has(col.id);
@@ -23379,25 +23408,82 @@
       }
 
       const reqMark = col.required ? '<span style="color: #dc2626; font-weight: bold; margin-left: 2px;">*</span>' : '';
+      const reqBadge = col.required
+        ? '<span style="background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; padding: 1px 7px; border-radius: 4px; font-size: 0.7rem; font-weight: 700;">必須</span>'
+        : '<span style="background: #f1f5f9; color: #64748b; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem;">任意</span>';
+      const typeBadge = `<span style="background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; padding: 1px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">型: ${escapeHtml(col.type)}</span>`;
+
       const keyBadge = col.hasCustomKey
         ? `<span style="background: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; margin-left: 6px;">個別指定</span>`
         : `<span style="background: #f1f5f9; color: #64748b; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 6px;">自動割当</span>`;
 
+      // 1. テーブル行HTML
       rowsHtml += `
         <tr class="col-list-row" data-category="${col.category}" style="border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; transition: background 0.12s;">
           <td style="padding: 9px 12px; color: #64748b; font-family: monospace; text-align: center;">${colIndex++}</td>
           <td style="padding: 9px 12px;">${catBadge}</td>
-          <td style="padding: 9px 12px; color: #1e293b; font-weight: 600;">
-            ${escapeHtml(col.label)}${reqMark}
-            ${col.sectionTitle ? `<div style="font-size: 0.7rem; color: #64748b; font-weight: 400; margin-top: 1px;">(${escapeHtml(col.sectionTitle)})</div>` : ''}
+          <td style="padding: 9px 12px; color: #1e293b; font-weight: 600; min-width: 220px;">
+            <div style="display: flex; align-items: center; gap: 4px;">
+              ${escapeHtml(col.label)}${reqMark}
+              ${col.sectionTitle ? `<span style="font-size: 0.7rem; color: #64748b; font-weight: 400;">(${escapeHtml(col.sectionTitle)})</span>` : ''}
+            </div>
+            ${col.desc ? `<div style="font-size: 0.72rem; color: #475569; font-weight: 400; margin-top: 3px; line-height: 1.35; background: #f8fafc; border-left: 2px solid #0284c7; padding: 2px 6px; border-radius: 0 4px 4px 0;">💡 ${escapeHtml(col.desc)}</div>` : ''}
           </td>
           <td style="padding: 9px 12px; color: #0284c7; font-weight: 700; font-family: monospace; font-size: 0.86rem;">
             <span>${escapeHtml(col.key)}</span>${col.category === 'question' ? keyBadge : ''}
           </td>
-          <td style="padding: 9px 12px; color: #334155;">${escapeHtml(col.type)}</td>
-          <td style="padding: 9px 12px; color: #475569; font-size: 0.76rem;">${escapeHtml(col.source || '-')}</td>
-          <td style="padding: 9px 12px;">${syncBadge}</td>
+          <td style="padding: 9px 12px; color: #334155; white-space: nowrap;">${escapeHtml(col.type)}</td>
+          <td style="padding: 9px 12px; color: #475569; font-size: 0.76rem; min-width: 130px;">${escapeHtml(col.source || '-')}</td>
+          <td style="padding: 9px 12px; white-space: nowrap; text-align: center;">${syncBadge}</td>
         </tr>
+      `;
+
+      // 2. 詳細説明カードHTML
+      let choicesHtml = '';
+      if (col.choices && col.choices.length > 0) {
+        const choiceTags = col.choices.slice(0, 6).map(c => `<span style="background: #f1f5f9; border: 1px solid #e2e8f0; padding: 1px 6px; border-radius: 3px; font-size: 0.72rem; color: #475569;">${escapeHtml(c.value)}</span>`).join(' ');
+        const moreChoices = col.choices.length > 6 ? `<span style="font-size: 0.72rem; color: #94a3b8;">他 ${col.choices.length - 6} 件</span>` : '';
+        choicesHtml = `<div style="margin-top: 6px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;"><span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">選択肢候補:</span> ${choiceTags} ${moreChoices}</div>`;
+      }
+
+      const searchTerms = `${col.label} ${col.key} ${col.desc || ''} ${col.source || ''} ${col.catName || ''}`.toLowerCase();
+
+      descCardsHtml += `
+        <div class="col-desc-card" data-category="${col.category}" data-search="${escapeHtml(searchTerms)}">
+          <div class="col-desc-card-header">
+            <div class="col-desc-card-title-group">
+              <span class="col-desc-index-badge">#${descIndex++}</span>
+              ${catBadge}
+              <span class="col-desc-card-title">${escapeHtml(col.label)}</span>
+              <span class="col-desc-card-key">${escapeHtml(col.key)}</span>
+              ${col.sectionTitle ? `<span style="font-size: 0.74rem; color: #64748b;">(${escapeHtml(col.sectionTitle)})</span>` : ''}
+            </div>
+            <div class="col-desc-card-badges">
+              ${typeBadge}
+              ${reqBadge}
+              ${syncBadge}
+            </div>
+          </div>
+          <div class="col-desc-card-body">
+            <div style="display: flex; gap: 8px; align-items: flex-start;">
+              <span style="font-size: 1.1rem; line-height: 1.2;">💡</span>
+              <div style="flex: 1;">
+                <strong>用途・格納内容:</strong> ${escapeHtml(col.desc || '用途説明はありません')}
+                ${choicesHtml}
+              </div>
+            </div>
+          </div>
+          <div class="col-desc-card-footer">
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span style="font-weight: 600;">🔗 取得元 / 連携トリガー:</span>
+              <span style="color: #334155;">${escapeHtml(col.source || '-')}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span style="font-weight: 600;">📝 格納データ例:</span>
+              <span class="col-desc-sample-box">${escapeHtml(col.sampleVal || '-')}</span>
+            </div>
+          </div>
+        </div>
       `;
     });
 
@@ -23522,6 +23608,10 @@
               <span>📑 カラム構成一覧</span>
               <span style="background: rgba(0,0,0,0.06); padding: 1px 6px; border-radius: 10px; font-size: 0.72rem;">${totalCount}</span>
             </button>
+            <button type="button" id="tab-btn-col-desc" class="modal-tab-btn">
+              <span>📖 各カラムの具体的説明一覧</span>
+              <span style="background: rgba(2,132,199,0.12); color: #0284c7; padding: 1px 6px; border-radius: 10px; font-size: 0.72rem; font-weight: 700;">${totalCount}</span>
+            </button>
             <button type="button" id="tab-btn-grid-preview" class="modal-tab-btn">
               <span>👀 統合データプレビュー (スプレッドシート)</span>
             </button>
@@ -23558,17 +23648,26 @@
           </div>
 
           <!-- カラム一覧テーブル -->
-          <div style="border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; background: #ffffff;">
-            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+          <div style="border: 1px solid #cbd5e1; border-radius: 8px; overflow-x: auto; background: #ffffff;">
+            <table style="width: 100%; min-width: 1000px; table-layout: fixed; border-collapse: collapse; text-align: left;">
+              <colgroup>
+                <col style="width: 45px;" />
+                <col style="width: 85px;" />
+                <col style="width: 360px;" />
+                <col style="width: 165px;" />
+                <col style="width: 75px;" />
+                <col style="width: 165px;" />
+                <col style="width: 105px;" />
+              </colgroup>
               <thead>
                 <tr style="background: #f8fafc; color: #475569; font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #cbd5e1; position: sticky; top: 0; z-index: 10;">
-                  <th style="padding: 9px 12px; width: 45px; text-align: center;">#</th>
-                  <th style="padding: 9px 12px; width: 110px;">種別</th>
-                  <th style="padding: 9px 12px;">カラム名 / 設問タイトル</th>
-                  <th style="padding: 9px 12px; color: #0284c7;">Supabase物理カラム名 (dataKey)</th>
-                  <th style="padding: 9px 12px; width: 110px;">データ型</th>
-                  <th style="padding: 9px 12px;">連携元 / API補完</th>
-                  <th style="padding: 9px 12px; width: 120px;">同期・連携状況</th>
+                  <th style="padding: 9px 10px; text-align: center; white-space: nowrap;">#</th>
+                  <th style="padding: 9px 10px; white-space: nowrap;">種別</th>
+                  <th style="padding: 9px 12px; white-space: nowrap;">カラム名 / 設問タイトル</th>
+                  <th style="padding: 9px 10px; color: #0284c7; white-space: nowrap;">Supabase物理カラム名</th>
+                  <th style="padding: 9px 10px; white-space: nowrap;">データ型</th>
+                  <th style="padding: 9px 10px; white-space: nowrap;">連携元 / API補完</th>
+                  <th style="padding: 9px 10px; text-align: center; white-space: nowrap;">同期状況</th>
                 </tr>
               </thead>
               <tbody id="col-list-table-body">
@@ -23578,7 +23677,35 @@
           </div>
         </div>
 
-        <!-- ================= タブ2: 統合データプレビュー（スプレッドシート風） ================= -->
+        <!-- ================= タブ2: 各カラムの具体的説明一覧（データディクショナリ） ================= -->
+        <div id="panel-tab-col-desc" style="flex: 1 1 auto; overflow-y: auto; padding: 14px 22px; display: none; flex-direction: column;">
+          
+          <!-- フィルターピルバー ＆ リアルタイム検索 -->
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span style="font-size: 0.74rem; font-weight: 700; color: #475569; margin-right: 4px;">カテゴリ絞り込み:</span>
+              <button type="button" class="col-filter-pill desc-filter-pill active" data-filter="all">すべて (${totalCount})</button>
+              <button type="button" class="col-filter-pill desc-filter-pill" data-filter="question">📝 設問項目 (${qCount})</button>
+              <button type="button" class="col-filter-pill desc-filter-pill" data-filter="user">👤 ユーザー連携 (${uCount})</button>
+              <button type="button" class="col-filter-pill desc-filter-pill" data-filter="appoint">📅 アポイント連携 (${aCount})</button>
+              <button type="button" class="col-filter-pill desc-filter-pill" data-filter="system">⚙️ システム共通 (${sCount})</button>
+            </div>
+            <div class="col-desc-search-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="input-col-desc-search" placeholder="カラム名・キー・説明から検索..." />
+            </div>
+          </div>
+
+          <!-- 説明カード一覧コンテナ -->
+          <div class="col-desc-cards-container" id="col-desc-cards-wrap" style="flex: 1 1 auto; overflow-y: auto; padding-right: 4px;">
+            ${descCardsHtml}
+          </div>
+          <div id="col-desc-empty-msg" style="display: none; padding: 40px 20px; text-align: center; color: #94a3b8; font-size: 0.85rem;">
+            🔍 一致するカラム説明が見つかりませんでした
+          </div>
+        </div>
+
+        <!-- ================= タブ3: 統合データプレビュー（スプレッドシート風） ================= -->
         <div id="panel-tab-grid-preview" style="flex: 1 1 auto; overflow-y: auto; padding: 14px 22px; display: none; flex-direction: column;">
           
           <!-- プレビューコントロールバー -->
@@ -23628,26 +23755,28 @@
 
     // タブ切り替え処理
     const tabBtnColList = modal.querySelector('#tab-btn-col-list');
+    const tabBtnColDesc = modal.querySelector('#tab-btn-col-desc');
     const tabBtnGridPreview = modal.querySelector('#tab-btn-grid-preview');
     const panelColList = modal.querySelector('#panel-tab-col-list');
+    const panelColDesc = modal.querySelector('#panel-tab-col-desc');
     const panelGridPreview = modal.querySelector('#panel-tab-grid-preview');
 
-    tabBtnColList.onclick = () => {
-      tabBtnColList.classList.add('active');
-      tabBtnGridPreview.classList.remove('active');
-      panelColList.style.display = 'flex';
-      panelGridPreview.style.display = 'none';
-    };
+    function switchModalTab(target) {
+      tabBtnColList.classList.toggle('active', target === 'list');
+      if (tabBtnColDesc) tabBtnColDesc.classList.toggle('active', target === 'desc');
+      tabBtnGridPreview.classList.toggle('active', target === 'grid');
 
-    tabBtnGridPreview.onclick = () => {
-      tabBtnGridPreview.classList.add('active');
-      tabBtnColList.classList.remove('active');
-      panelColList.style.display = 'none';
-      panelGridPreview.style.display = 'flex';
-    };
+      panelColList.style.display = target === 'list' ? 'flex' : 'none';
+      if (panelColDesc) panelColDesc.style.display = target === 'desc' ? 'flex' : 'none';
+      panelGridPreview.style.display = target === 'grid' ? 'flex' : 'none';
+    }
 
-    // フィルターピル処理
-    const filterPills = modal.querySelectorAll('.col-filter-pill');
+    tabBtnColList.onclick = () => switchModalTab('list');
+    if (tabBtnColDesc) tabBtnColDesc.onclick = () => switchModalTab('desc');
+    tabBtnGridPreview.onclick = () => switchModalTab('grid');
+
+    // フィルターピル処理（タブ1: カラム構成一覧）
+    const filterPills = modal.querySelectorAll('.col-filter-pill:not(.desc-filter-pill)');
     const rows = modal.querySelectorAll('.col-list-row');
     filterPills.forEach(pill => {
       pill.onclick = () => {
@@ -23664,6 +23793,50 @@
         });
       };
     });
+
+    // フィルターピル ＆ リアルタイム検索処理（タブ2: 各カラムの具体的説明一覧）
+    const descFilterPills = modal.querySelectorAll('.desc-filter-pill');
+    const descCards = modal.querySelectorAll('.col-desc-card');
+    const descSearchInput = modal.querySelector('#input-col-desc-search');
+    const descEmptyMsg = modal.querySelector('#col-desc-empty-msg');
+    let currentDescFilter = 'all';
+
+    function filterDescCards() {
+      const query = descSearchInput ? descSearchInput.value.trim().toLowerCase() : '';
+      let visibleCount = 0;
+
+      descCards.forEach(card => {
+        const cat = card.dataset.category;
+        const searchTarget = card.dataset.search || '';
+        const matchCat = (currentDescFilter === 'all' || cat === currentDescFilter);
+        const matchQuery = !query || searchTarget.includes(query);
+
+        const isMatch = matchCat && matchQuery;
+        card.classList.toggle('is-hidden', !isMatch);
+        if (isMatch) {
+          visibleCount++;
+        }
+      });
+
+      if (descEmptyMsg) {
+        descEmptyMsg.style.display = visibleCount === 0 ? 'block' : 'none';
+      }
+    }
+
+    descFilterPills.forEach(pill => {
+      pill.onclick = () => {
+        descFilterPills.forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        currentDescFilter = pill.dataset.filter;
+        filterDescCards();
+      };
+    });
+
+    if (descSearchInput) {
+      descSearchInput.addEventListener('input', () => {
+        filterDescCards();
+      });
+    }
 
     // グリッドプレビューのコントロール
     const gridContainer = modal.querySelector('#integrated-grid-container');
