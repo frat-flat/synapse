@@ -23594,5 +23594,536 @@
   }, true);
 })();
 
+// =========================================================================
+// ✨ Gemini フォーム全体AIアシスタント（トータルプロデュース・最適化）
+// =========================================================================
+(function() {
+  let isGlobalAiDiagnosing = false;
+
+  // ローカルルールベースのおすすめ全体設定生成（オフライン/キー未設定時フォールバック）
+  function generateLocalGlobalAdvice(summary, userPrompt) {
+    const qTitles = [];
+    let hasRecruit = false;
+    let hasSurvey = false;
+    let hasSeminar = false;
+    let hasCompany = false;
+
+    if (summary && Array.isArray(summary.sections)) {
+      summary.sections.forEach(s => {
+        (s.questions || []).forEach(q => {
+          const t = (q.title || '').toLowerCase();
+          qTitles.push(q.title || '');
+          if (/採用|応募|エントリー|履歴書|職歴|学歴|志望動機/.test(t)) hasRecruit = true;
+          if (/満足度|アンケート|評価|感想|ご意見/.test(t)) hasSurvey = true;
+          if (/セミナー|ウェビナー|説明会|イベント|参加/.test(t)) hasSeminar = true;
+          if (/会社|法人|貴社|御社|屋号|代表者|事業/.test(t)) hasCompany = true;
+        });
+      });
+    }
+
+    const currentTitle = (summary && summary.title) || '';
+    const promptText = (userPrompt || '').toLowerCase();
+
+    if (/採用|応募|求人/.test(promptText)) hasRecruit = true;
+    if (/アンケート|満足度/.test(promptText)) hasSurvey = true;
+    if (/セミナー|説明会/.test(promptText)) hasSeminar = true;
+    if (/法人|b2b|ビジネス|企業/.test(promptText)) hasCompany = true;
+
+    let advice = {
+      recommendationTitle: "🏢 B2B向け高信頼フォーム構成（AIトータルプロデュース）",
+      explanation: "設問構成と利用目的に合わせた高品質な設定案を考案しました。回答者の離脱を防ぎ、信頼感を醸成します。",
+      title: (currentTitle && currentTitle !== '無題のフォーム' && currentTitle !== '新しいフォーム') ? currentTitle : "【公式】法人様向け 導入相談・お問い合わせフォーム",
+      subtitle: "最短3分で入力完了 / 専任スタッフが迅速にご案内いたします",
+      description: "製品・サービスの導入検討や御見積のご依頼、各種ご相談を承っております。\n以下のフォームに必要事項をご記入の上、お気軽にご送信ください。担当者より迅速にご連絡差し上げます。",
+      theme: {
+        primaryColor: "#1a73e8",
+        backgroundColor: "#f8fafc",
+        colorLabel: "信頼感と気品あるロイヤルブルー & クリーンホワイト"
+      },
+      estimatedTime: "目安 3〜5分",
+      alertText: "※ ご入力いただいたご連絡先宛に、担当者より1営業日以内にご連絡差し上げます。",
+      items: [
+        "タイトル・説明文: 目的を明快に伝え、離脱を防ぐ丁寧な導入文に最適化",
+        "配色: 信頼感を醸成する「ロイヤルブルー」を適用",
+        "所要時間・注意事項: 設問内容から算出した適切な目安と事前案内を提示"
+      ]
+    };
+
+    if (hasRecruit) {
+      advice.recommendationTitle = "🎓 採用エントリー・選考アンケート最適化（AIプロデュース）";
+      advice.explanation = "求職者が安心して熱意を伝えられる、清潔感と親しみやすさのある構成を考案しました。";
+      advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "【公式】採用エントリー・事前アンケートフォーム";
+      advice.subtitle = "あなたの可能性をお聞かせください / 応募受付中";
+      advice.description = "弊社の採用情報にご関心をお寄せいただき、誠にありがとうございます。\n以下の各項目をご入力の上、送信してください。ご提出いただいた内容は選考の参考とさせていただきます。";
+      advice.theme = {
+        primaryColor: "#0284c7",
+        backgroundColor: "#f8fafc",
+        colorLabel: "爽やかで誠実なスカイブルー & クリーンホワイト"
+      };
+      advice.estimatedTime = "目安 3〜5分";
+      advice.alertText = "※ 職務経歴や志望動機等の入力項目がございます。送信前に今一度内容をご確認ください。";
+      advice.items = [
+        "タイトル・説明文: 応募者の安心感を高め、熱意を引き出す丁寧なトーン",
+        "配色: 誠実さと若々しさを表現する「スカイブルー」",
+        "案内文: 選考プロセスを安心して進められるガイダンス"
+      ];
+    } else if (hasSeminar) {
+      advice.recommendationTitle = "📅 セミナー・イベント参加受付最適化（AIプロデュース）";
+      advice.explanation = "申込の心理的ハードルを下げ、当日参加率を最大化する案内構成を考案しました。";
+      advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "セミナー・オンライン説明会 参加申込受付フォーム";
+      advice.subtitle = "定員になり次第締切 / 参加無料・オンライン開催";
+      advice.description = "当セミナーへの参加お申し込みフォームです。\n必要事項をご入力の上、送信してください。お申し込み完了後、登録メールアドレス宛に参加URLをお送りいたします。";
+      advice.theme = {
+        primaryColor: "#0f766e",
+        backgroundColor: "#f0fdf4",
+        colorLabel: "知性的で安心感のあるティールグリーン & ソフトホワイト"
+      };
+      advice.estimatedTime = "目安 2〜3分";
+      advice.alertText = "※ 参加URLの自動送信用として、お間違いのないメールアドレスをご入力ください。";
+      advice.items = [
+        "タイトル・説明文: 参加ハードルを下げ、参加案内を明確化",
+        "配色: 集中力と安心感を高める「ティールグリーン」",
+        "案内文: 参加URLの送付について事前に周知"
+      ];
+    } else if (hasSurvey) {
+      advice.recommendationTitle = "📊 顧客満足度・アンケート最適化（AIプロデュース）";
+      advice.explanation = "回答への心理的負担を和らげ、率直なフィードバックが集まりやすい親しみやすい構成です。";
+      advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "サービスご利用・ご満足度アンケート";
+      advice.subtitle = "1〜2分で回答完了 / サービス向上のためご協力をお願いいたします";
+      advice.description = "いつもサービスをご利用いただき誠にありがとうございます。\n今後のより良いサービス改善・機能向上のため、率直なご意見・ご感想をお聞かせいただけますと幸いです。";
+      advice.theme = {
+        primaryColor: "#ea580c",
+        backgroundColor: "#fdfbf7",
+        colorLabel: "親しみやすく回答しやすいウォームオレンジ & アイボリー"
+      };
+      advice.estimatedTime = "目安 1〜3分";
+      advice.alertText = "※ ご回答いただいた内容は統計的に処理され、サービス改善以外の目的には使用いたしません。";
+      advice.items = [
+        "タイトル・説明文: 回答者の負担を減らし、感謝を伝えるトーン",
+        "配色: 親近感と温かみを与える「ウォームオレンジ」",
+        "プライバシー: データの取扱いに関する安心感を明記"
+      ];
+    }
+
+    if (/明るく|親しみ|カジュアル/.test(promptText)) {
+      advice.theme.primaryColor = "#ea580c";
+      advice.theme.backgroundColor = "#fffbeb";
+      advice.theme.colorLabel = "明るく親しみやすいビタミンオレンジ & ソフトクリーム";
+    } else if (/厳格|高級|シック|黒|士業/.test(promptText)) {
+      advice.theme.primaryColor = "#1e293b";
+      advice.theme.backgroundColor = "#f8fafc";
+      advice.theme.colorLabel = "重厚で格調高いディープスレート & クリーンホワイト";
+    } else if (/緑|エコ|自然|安心/.test(promptText)) {
+      advice.theme.primaryColor = "#16a34a";
+      advice.theme.backgroundColor = "#f0fdf4";
+      advice.theme.colorLabel = "自然と健康をイメージするフォレストグリーン & ペールミント";
+    }
+
+    return advice;
+  }
+
+  // フォーム全体の構造サマリーを収集
+  function collectFormSummary() {
+    const summary = {
+      title: (window.G && window.G.title) || (document.getElementById('editor-form-title') && document.getElementById('editor-form-title').value) || '',
+      description: (window.G && window.G.description) || (document.getElementById('editor-form-desc') && document.getElementById('editor-form-desc').value) || '',
+      sections: []
+    };
+
+    if (window.G && Array.isArray(window.G.sections)) {
+      summary.sections = window.G.sections.map(s => ({
+        id: s.id,
+        title: s.title || '',
+        description: s.description || '',
+        questions: (s.questions || []).map(q => ({
+          id: q.id,
+          title: q.title || '',
+          type: q.type || 'text',
+          required: !!q.required
+        }))
+      }));
+    } else {
+      document.querySelectorAll('.question-card').forEach(card => {
+        const titleEl = card.querySelector('.question-title-input') || card.querySelector('input[type="text"]');
+        const qTitle = titleEl ? titleEl.value : '';
+        if (summary.sections.length === 0) summary.sections.push({ title: 'メインセクション', questions: [] });
+        summary.sections[0].questions.push({ title: qTitle, type: 'text' });
+      });
+    }
+
+    return summary;
+  }
+
+  // AI診断結果のUIレンダリング
+  function renderGlobalAiAdvice(advice) {
+    window._currentGlobalAiAdvice = advice;
+
+    const recTitle = document.getElementById('global-ai-rec-title');
+    const recDesc = document.getElementById('global-ai-rec-desc');
+    const fieldTitle = document.getElementById('global-ai-field-title');
+    const fieldSubtitle = document.getElementById('global-ai-field-subtitle');
+    const fieldDesc = document.getElementById('global-ai-field-desc');
+    const themeLabel = document.getElementById('global-ai-theme-label');
+    const colorPrimaryDot = document.getElementById('global-ai-color-primary-dot');
+    const colorBgDot = document.getElementById('global-ai-color-bg-dot');
+    const fieldTime = document.getElementById('global-ai-field-time');
+    const fieldAlert = document.getElementById('global-ai-field-alert');
+    const recItems = document.getElementById('global-ai-rec-items');
+
+    if (recTitle) recTitle.textContent = advice.recommendationTitle || '🏢 フォーム全体のおすすめ最適化構成';
+    if (recDesc) recDesc.textContent = advice.explanation || '設問構成と利用目的に合わせた高品質な設定案を考案しました。';
+    if (fieldTitle) fieldTitle.textContent = advice.title || '-';
+    if (fieldSubtitle) fieldSubtitle.textContent = advice.subtitle || '-';
+    if (fieldDesc) fieldDesc.textContent = advice.description || '-';
+
+    if (advice.theme) {
+      if (themeLabel) themeLabel.textContent = advice.theme.colorLabel || `${advice.theme.primaryColor} / ${advice.theme.backgroundColor}`;
+      if (colorPrimaryDot) colorPrimaryDot.style.background = advice.theme.primaryColor || '#1a73e8';
+      if (colorBgDot) colorBgDot.style.background = advice.theme.backgroundColor || '#f8fafc';
+    }
+
+    if (fieldTime) fieldTime.textContent = `所要時間: ${advice.estimatedTime || '未設定'}`;
+    if (fieldAlert) fieldAlert.textContent = advice.alertText || '特になし';
+
+    if (recItems) {
+      recItems.innerHTML = '';
+      if (Array.isArray(advice.items) && advice.items.length > 0) {
+        advice.items.forEach(item => {
+          const li = document.createElement('li');
+          li.textContent = item;
+          recItems.appendChild(li);
+        });
+      }
+    }
+  }
+
+  // トースト通知の表示
+  function showGlobalToast(message, type = 'success') {
+    let toast = document.getElementById('global-ai-floating-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'global-ai-floating-toast';
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 100001;
+        padding: 12px 18px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(12px);
+      `;
+      document.body.appendChild(toast);
+    }
+    toast.style.background = (type === 'success') ? '#10b981' : '#2563eb';
+    toast.style.color = '#ffffff';
+    toast.innerHTML = `<span>✨</span><span>${message}</span>`;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(12px)';
+    }, 3200);
+  }
+
+  // おすすめ全体設定を一括適用
+  function applyGlobalAiAdvice(advice) {
+    advice = advice || window._currentGlobalAiAdvice;
+    if (!advice) return;
+
+    // 1. タイトル入力欄の更新
+    const titleEl = document.getElementById('editor-form-title');
+    if (titleEl && advice.title) {
+      titleEl.value = advice.title;
+      titleEl.dispatchEvent(new Event('input', { bubbles: true }));
+      titleEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    const proTitleEl = document.getElementById('editor-pro-title');
+    if (proTitleEl && advice.title) {
+      proTitleEl.value = advice.title;
+      proTitleEl.dispatchEvent(new Event('input', { bubbles: true }));
+      proTitleEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // 2. 説明文入力欄の更新
+    const descEl = document.getElementById('editor-form-desc');
+    if (descEl && advice.description) {
+      descEl.value = advice.description;
+      descEl.dispatchEvent(new Event('input', { bubbles: true }));
+      descEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    const proDescEl = document.getElementById('editor-pro-disclaimer');
+    if (proDescEl && advice.description) {
+      proDescEl.value = advice.description;
+      proDescEl.dispatchEvent(new Event('input', { bubbles: true }));
+      proDescEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // 3. サブタイトルの更新
+    const proSubtitleEl = document.getElementById('editor-pro-subtitle');
+    if (proSubtitleEl && advice.subtitle) {
+      proSubtitleEl.value = advice.subtitle;
+      proSubtitleEl.dispatchEvent(new Event('input', { bubbles: true }));
+      proSubtitleEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // 4. テーマカラーの更新
+    if (advice.theme) {
+      const colorPrimaryEl = document.getElementById('editor-pro-color-primary');
+      if (colorPrimaryEl && advice.theme.primaryColor) {
+        colorPrimaryEl.value = advice.theme.primaryColor;
+        colorPrimaryEl.dispatchEvent(new Event('input', { bubbles: true }));
+        colorPrimaryEl.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      const colorBgEl = document.getElementById('editor-pro-color-bg');
+      if (colorBgEl && advice.theme.backgroundColor) {
+        colorBgEl.value = advice.theme.backgroundColor;
+        colorBgEl.dispatchEvent(new Event('input', { bubbles: true }));
+        colorBgEl.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+
+    // 5. 所要時間の更新
+    if (advice.estimatedTime) {
+      const showDurationCheck = document.getElementById('editor-pro-show-duration');
+      if (showDurationCheck) {
+        showDurationCheck.checked = true;
+        showDurationCheck.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      const durationInput = document.getElementById('editor-pro-duration-text');
+      if (durationInput) {
+        durationInput.value = advice.estimatedTime;
+        durationInput.dispatchEvent(new Event('input', { bubbles: true }));
+        durationInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      const durationGroup = document.getElementById('pro-duration-input-group');
+      if (durationGroup) durationGroup.style.display = 'flex';
+    }
+
+    // 6. 注意事項アラートの更新
+    if (advice.alertText) {
+      const showAlertCheck = document.getElementById('editor-pro-show-alert');
+      if (showAlertCheck) {
+        showAlertCheck.checked = true;
+        showAlertCheck.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      const alertInput = document.getElementById('editor-pro-alert-text');
+      if (alertInput) {
+        alertInput.value = advice.alertText;
+        alertInput.dispatchEvent(new Event('input', { bubbles: true }));
+        alertInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      const alertGroup = document.getElementById('pro-alert-input-group');
+      if (alertGroup) alertGroup.style.display = 'flex';
+    }
+
+    // 7. window.G への確実なデータ保存
+    if (window.G) {
+      if (advice.title) window.G.title = advice.title;
+      if (advice.description) window.G.description = advice.description;
+      if (advice.subtitle) window.G.subtitle = advice.subtitle;
+      if (!window.G.header) window.G.header = {};
+      if (advice.title) window.G.header.title = advice.title;
+      if (advice.subtitle) window.G.header.subtitle = advice.subtitle;
+      if (advice.description) window.G.header.disclaimer = advice.description;
+
+      if (!window.G.appearance) window.G.appearance = {};
+      if (advice.theme) {
+        if (advice.theme.primaryColor) window.G.appearance.primaryColor = advice.theme.primaryColor;
+        if (advice.theme.backgroundColor) window.G.appearance.backgroundColor = advice.theme.backgroundColor;
+      }
+      if (!window.G.announcement) window.G.announcement = {};
+      if (advice.estimatedTime) {
+        window.G.announcement.showDuration = true;
+        window.G.announcement.durationText = advice.estimatedTime;
+        window.G.estimatedTime = advice.estimatedTime;
+      }
+      if (advice.alertText) {
+        window.G.announcement.showAlertBox = true;
+        window.G.announcement.alertBoxText = advice.alertText;
+        window.G.alertText = advice.alertText;
+      }
+    }
+
+    // 8. フォーム一覧やストア同期
+    if (window.U && window.W && window.U[window.W]) {
+      const cur = window.U[window.W];
+      if (advice.title) cur.title = advice.title;
+      if (advice.description) cur.description = advice.description;
+      if (advice.subtitle) cur.subtitle = advice.subtitle;
+      if (!cur.appearance) cur.appearance = {};
+      if (advice.theme) {
+        if (advice.theme.primaryColor) cur.appearance.primaryColor = advice.theme.primaryColor;
+        if (advice.theme.backgroundColor) cur.appearance.backgroundColor = advice.theme.backgroundColor;
+      }
+      if (!cur.announcement) cur.announcement = {};
+      if (advice.estimatedTime) {
+        cur.announcement.showDuration = true;
+        cur.announcement.durationText = advice.estimatedTime;
+        cur.estimatedTime = advice.estimatedTime;
+      }
+      if (advice.alertText) {
+        cur.announcement.showAlertBox = true;
+        cur.announcement.alertBoxText = advice.alertText;
+        cur.alertText = advice.alertText;
+      }
+    }
+
+    // 9. プレビューの再描画と保存
+    if (typeof applyPreviewTheme === 'function') applyPreviewTheme();
+    if (typeof renderLivePreview === 'function') renderLivePreview();
+    if (typeof window.S === 'function') window.S(true);
+    if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+
+    showGlobalToast('⚡ おすすめ設定（タイトル・説明文・配色・所要時間等）を一括適用しました！');
+  }
+
+  // 動的AI診断・プロデュースの実行
+  async function fetchDynamicFormGlobalDiagnosis(promptMessage = '') {
+    if (isGlobalAiDiagnosing) return;
+    isGlobalAiDiagnosing = true;
+
+    const statusBadge = document.getElementById('global-ai-status-badge');
+    const refreshBtn = document.getElementById('btn-refresh-global-ai');
+    const submitBtn = document.getElementById('btn-submit-global-ai-prompt');
+
+    if (statusBadge) {
+      statusBadge.textContent = '⏳ Gemini が全体最適化を分析中...';
+      statusBadge.style.background = '#e0f2fe';
+      statusBadge.style.color = '#0284c7';
+    }
+    if (refreshBtn) refreshBtn.disabled = true;
+    if (submitBtn) submitBtn.disabled = true;
+
+    const formSummary = collectFormSummary();
+    let advice = null;
+
+    try {
+      const apiKey = localStorage.getItem('synapse_gemini_api_key') || '';
+      const res = await fetch('/api/regex-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'form_global_concierge',
+          message: promptMessage,
+          apiKey: apiKey,
+          formSummary: formSummary
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.globalAdvice) {
+          advice = data.globalAdvice;
+        } else if (data && data.explanation) {
+          advice = data;
+        }
+      }
+    } catch (err) {
+      console.warn('[FormGlobalAI] API request failed, fallback to local rule-based advice:', err);
+    }
+
+    // API未取得または失敗時は高品質ローカルルールベース診断をフォールバック使用
+    if (!advice) {
+      advice = generateLocalGlobalAdvice(formSummary, promptMessage);
+    }
+
+    renderGlobalAiAdvice(advice);
+
+    if (statusBadge) {
+      statusBadge.textContent = '✨ リアルタイム全体診断';
+      statusBadge.style.background = '';
+      statusBadge.style.color = '';
+    }
+    if (refreshBtn) refreshBtn.disabled = false;
+    if (submitBtn) submitBtn.disabled = false;
+    isGlobalAiDiagnosing = false;
+  }
+
+  // 初期化関数
+  function initFormGlobalAiConcierge() {
+    const panel = document.getElementById('form-global-gemini-panel');
+    if (!panel) return;
+    if (window._formGlobalAiInitialized) return;
+    window._formGlobalAiInitialized = true;
+
+    // 「🔄 再診断」ボタン
+    const refreshBtn = document.getElementById('btn-refresh-global-ai');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        fetchDynamicFormGlobalDiagnosis();
+      });
+    }
+
+    // 「💬 自由指示・相談」ボタン
+    const togglePromptBtn = document.getElementById('btn-toggle-global-ai-prompt');
+    const promptContainer = document.getElementById('global-ai-prompt-container');
+    const promptInput = document.getElementById('global-ai-prompt-input');
+
+    if (togglePromptBtn && promptContainer) {
+      togglePromptBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const isHidden = (promptContainer.style.display === 'none');
+        promptContainer.style.display = isHidden ? 'block' : 'none';
+        if (isHidden && promptInput) promptInput.focus();
+      });
+    }
+
+    // 「生成 ✨」ボタン
+    const submitBtn = document.getElementById('btn-submit-global-ai-prompt');
+    if (submitBtn) {
+      submitBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const text = promptInput ? promptInput.value.trim() : '';
+        fetchDynamicFormGlobalDiagnosis(text);
+      });
+    }
+
+    // 「⚡ おすすめ設定を一括適用」ボタン
+    const applyBtn = document.getElementById('btn-apply-global-ai-all');
+    if (applyBtn) {
+      applyBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        applyGlobalAiAdvice();
+      });
+    }
+
+    // 初期化時に初期診断を実行
+    setTimeout(function() {
+      fetchDynamicFormGlobalDiagnosis();
+    }, 400);
+  }
+
+  // DOMContentLoaded または 即時初期化
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFormGlobalAiConcierge);
+  } else {
+    initFormGlobalAiConcierge();
+  }
+
+  // タブ切り替え時やフォーム選択時にもパネルがあれば確実に初期化
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.nav-item') || e.target.closest('.gf-list-row')) {
+      setTimeout(initFormGlobalAiConcierge, 150);
+    }
+  });
+
+  window.initFormGlobalAiConcierge = initFormGlobalAiConcierge;
+  window.fetchDynamicFormGlobalDiagnosis = fetchDynamicFormGlobalDiagnosis;
+  window.applyGlobalAiAdvice = applyGlobalAiAdvice;
+})();
+
+
 
 

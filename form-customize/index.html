@@ -435,6 +435,99 @@
                   </div>
                 </div>
 
+                <!-- ✨ Gemini フォーム全体AIアシスタント（フォーム全体の構成・デザイン・文面をトータルプロデュース） -->
+                <div id="form-global-gemini-panel" class="global-ai-assistant-card" style="margin-bottom: 1.2rem; background: linear-gradient(135deg, rgba(26, 115, 232, 0.05) 0%, rgba(147, 51, 234, 0.06) 100%); border: 1.5px solid rgba(26, 115, 232, 0.25); border-radius: 10px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="font-size: 1.25rem;">✨</span>
+                      <div>
+                        <div style="font-weight: 700; font-size: 0.92rem; color: var(--color-text, #1e293b); display: flex; align-items: center; gap: 6px;">
+                          <span>Gemini フォーム全体AIアシスタント</span>
+                          <span class="ai-sparkle-badge global-ai-badge" id="global-ai-status-badge">✨ リアルタイム全体診断</span>
+                        </div>
+                        <div style="font-size: 0.72rem; color: var(--color-text-muted, #64748b); margin-top: 1px;">
+                          設問構成をGeminiが総合分析し、タイトル・説明文・配色・所要時間等をトータルプロデュースします
+                        </div>
+                      </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <button type="button" id="btn-refresh-global-ai" class="btn btn-sm" style="background: var(--color-bg-card, #fff); border: 1px solid var(--color-border, #cbd5e1); font-size: 0.72rem; padding: 4px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; color: var(--color-text, #334155); font-weight: 600;" title="現在の設問構成から最新の推奨設定を再診断">
+                        <span>🔄</span> 再診断
+                      </button>
+                      <button type="button" id="btn-toggle-global-ai-prompt" class="btn btn-sm" style="background: var(--color-bg-card, #fff); border: 1px solid var(--color-border, #cbd5e1); font-size: 0.72rem; padding: 4px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; color: var(--color-text, #334155); font-weight: 600;">
+                        <span>💬</span> 自由指示・相談
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 自由要望プロンプト入力エリア（折りたたみ/展開） -->
+                  <div id="global-ai-prompt-container" style="display: none; margin-bottom: 12px; background: var(--color-bg-card, #fff); border: 1px solid var(--color-border, #e2e8f0); border-radius: 8px; padding: 10px 12px;">
+                    <label for="global-ai-prompt-input" style="font-size: 0.74rem; font-weight: 600; color: var(--color-text-muted, #475569); margin-bottom: 4px; display: block;">
+                      💬 AIへの要望・指示（どんなフォームにしたいか）
+                    </label>
+                    <div style="display: flex; gap: 8px; align-items: flex-start;">
+                      <textarea id="global-ai-prompt-input" class="form-control" rows="2" placeholder="例: 「採用応募者向けに明るく親しみやすいトーンにして」「士業・B2B向けに信頼感ある厳格な配色と丁寧な案内にして」" style="font-size: 0.8rem; resize: vertical; min-height: 48px; border-radius: 6px;"></textarea>
+                      <button type="button" id="btn-submit-global-ai-prompt" class="btn btn-primary btn-sm" style="height: 48px; padding: 0 16px; font-weight: 700; font-size: 0.8rem; white-space: nowrap; border-radius: 6px;">
+                        生成 ✨
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- AI診断結果・おすすめ全体設定ボックス -->
+                  <div id="global-ai-recommendation-box" style="background: var(--color-bg-card, #ffffff); border: 1px solid var(--color-border, #e2e8f0); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; border-bottom: 1px solid var(--color-border-subtle, #f1f5f9); padding-bottom: 8px;">
+                      <div>
+                        <div id="global-ai-rec-title" style="font-weight: 700; font-size: 0.88rem; color: var(--color-text, #0f172a);">
+                          🏢 フォーム全体のおすすめ最適化構成
+                        </div>
+                        <div id="global-ai-rec-desc" style="font-size: 0.75rem; color: var(--color-text-muted, #475569); margin-top: 2px;">
+                          設問構成と利用目的に合わせた高品質な設定案を考案しました。
+                        </div>
+                      </div>
+                      <button type="button" id="btn-apply-global-ai-all" class="btn btn-primary btn-sm" style="font-size: 0.78rem; font-weight: 700; padding: 6px 14px; border-radius: 6px; white-space: nowrap; box-shadow: 0 2px 4px rgba(26, 115, 232, 0.2); display: flex; align-items: center; gap: 5px;">
+                        <span>⚡</span> おすすめ設定を一括適用
+                      </button>
+                    </div>
+
+                    <!-- 提案内容グリッド -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.78rem;">
+                      <div style="background: var(--color-bg-subtle, #f8fafc); border: 1px solid var(--color-border-subtle, #f1f5f9); border-radius: 6px; padding: 8px 10px;">
+                        <span style="font-size: 0.7rem; color: var(--color-text-muted, #64748b); font-weight: 600; display: block;">📝 推奨タイトル</span>
+                        <strong id="global-ai-field-title" style="color: var(--color-text, #0f172a); font-size: 0.82rem; word-break: break-all;">-</strong>
+                      </div>
+                      <div style="background: var(--color-bg-subtle, #f8fafc); border: 1px solid var(--color-border-subtle, #f1f5f9); border-radius: 6px; padding: 8px 10px;">
+                        <span style="font-size: 0.7rem; color: var(--color-text-muted, #64748b); font-weight: 600; display: block;">✏️ 推奨サブタイトル (キャッチ)</span>
+                        <span id="global-ai-field-subtitle" style="color: var(--color-text, #334155); font-size: 0.8rem; word-break: break-all;">-</span>
+                      </div>
+                      <div style="background: var(--color-bg-subtle, #f8fafc); border: 1px solid var(--color-border-subtle, #f1f5f9); border-radius: 6px; padding: 8px 10px; grid-column: span 2;">
+                        <span style="font-size: 0.7rem; color: var(--color-text-muted, #64748b); font-weight: 600; display: block;">📋 推奨説明文（離脱防止・案内）</span>
+                        <div id="global-ai-field-desc" style="color: var(--color-text, #334155); font-size: 0.76rem; line-height: 1.5; margin-top: 2px; white-space: pre-wrap;">-</div>
+                      </div>
+                      <div style="background: var(--color-bg-subtle, #f8fafc); border: 1px solid var(--color-border-subtle, #f1f5f9); border-radius: 6px; padding: 8px 10px;">
+                        <span style="font-size: 0.7rem; color: var(--color-text-muted, #64748b); font-weight: 600; display: block;">🎨 推奨テーマ配色</span>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                          <div id="global-ai-theme-preview" style="display: flex; gap: 4px; align-items: center;">
+                            <span id="global-ai-color-primary-dot" style="display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.15); background: #1a73e8;"></span>
+                            <span id="global-ai-color-bg-dot" style="display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.15); background: #f8fafc;"></span>
+                          </div>
+                          <span id="global-ai-theme-label" style="font-weight: 600; color: var(--color-text, #1e293b); font-size: 0.76rem;">-</span>
+                        </div>
+                      </div>
+                      <div style="background: var(--color-bg-subtle, #f8fafc); border: 1px solid var(--color-border-subtle, #f1f5f9); border-radius: 6px; padding: 8px 10px;">
+                        <span style="font-size: 0.7rem; color: var(--color-text-muted, #64748b); font-weight: 600; display: block;">🕒 所要時間 ＆ 注意事項アラート</span>
+                        <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 2px;">
+                          <span id="global-ai-field-time" style="font-weight: 600; color: #0284c7; font-size: 0.76rem;">所要時間 目安 -</span>
+                          <span id="global-ai-field-alert" style="color: #b45309; font-size: 0.72rem; word-break: break-all;">-</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- AI提案ポイント解説リスト -->
+                    <ul id="global-ai-rec-items" style="margin: 0; padding-left: 18px; font-size: 0.74rem; color: var(--color-text-muted, #475569); line-height: 1.5;">
+                    </ul>
+                  </div>
+                </div>
+
                 <!-- フォーム基本情報設定（タイトル・説明文・専用テーブル：常時表示の必須コア情報） -->
                 <div class="settings-card-basic" style="display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 6px; border: 1px solid var(--color-border); background: rgba(0,0,0,0.05); margin-bottom: 12px;">
                   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">

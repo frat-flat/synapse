@@ -44,7 +44,7 @@ module.exports = async (req, res) => {
         ? body.userKey.trim()
         : '';
 
-    if (mode !== 'diagnose_question') {
+    if (mode !== 'diagnose_question' && mode !== 'form_global_concierge') {
       if (!message || message.length === 0) {
         return res.status(400).json({
           success: false,
@@ -72,6 +72,17 @@ module.exports = async (req, res) => {
     const apiKey = envKey || (clientApiKey ? clientApiKey : null);
 
     if (!apiKey) {
+      if (mode === 'form_global_concierge') {
+        const fallbackAdvice = generateFallbackGlobalAdvice(body.formSummary, message);
+        return res.status(200).json({
+          success: true,
+          isConfigured: false,
+          model: 'local-fallback',
+          globalAdvice: fallbackAdvice,
+          advice: fallbackAdvice
+        });
+      }
+
       return res.status(200).json({
         success: false,
         isConfigured: false,
@@ -85,12 +96,82 @@ module.exports = async (req, res) => {
     const contents = [];
 
     // モード判定:
-    // A. mode === 'diagnose_question' -> 質問のリアルタイム診断（おすすめ設定JSON返却）
-    // B. mode === 'consult_question' || mode === 'chat' || questionがある || prompt形式の相談 -> Synapse専属AIコンシェルジュ
-    // C. それ以外（mode === 'regex' など） -> GoogleスプレッドシートRE2正規表現アシスタント
-    const isConsultMode = mode === 'consult_question' || mode === 'chat' || (mode !== 'diagnose_question' && (question || typeof body.prompt === 'string' || !/正規表現/.test(message)));
+    // A. mode === 'form_global_concierge' -> フォーム全体設定のトータルプロデュース・最適化
+    // B. mode === 'diagnose_question' -> 質問のリアルタイム診断（おすすめ設定JSON返却）
+    // C. mode === 'consult_question' || mode === 'chat' || questionがある || prompt形式の相談 -> Synapse専属AIコンシェルジュ
+    // D. それ以外（mode === 'regex' など） -> GoogleスプレッドシートRE2正規表現アシスタント
+    const isConsultMode = (mode === 'consult_question' || mode === 'chat' || (mode !== 'diagnose_question' && (question || typeof body.prompt === 'string' || !/正規表現/.test(message)))) && mode !== 'form_global_concierge';
 
-    if (mode === 'diagnose_question') {
+    if (mode === 'form_global_concierge') {
+      systemInstructionText = `
+あなたはWebフォーム構築基盤「Synapse（シナプス）」の専属チーフ・フォームデザイナー＆AIアーキテクトです。
+フォーム作成者から提供される「フォームの設問構成」「現在のタイトル・説明文」「任意の自由要望プロンプト」を多角的に分析し、
+回答者の離脱を最小限に抑え、信頼感と回答完了率を最大化する【フォームの全体設定】（タイトル、説明文、サブタイトル、テーマカラー、所要時間目安、注意事項アラート等）をトータルプロデュースしてください。
+
+【デザイン・設計ルール】
+1. タイトル (title):
+   - 簡潔で目的が一目で伝わり、公式感・信頼感のある日本語表記（20文字前後目安）。
+2. 説明文 (description):
+   - 回答者に向けた丁寧な案内文。目的、入力の所要時間、必要な事前準備、安心感を与える文言を含める。改行を活用して読みやすく構成（100〜250文字）。
+3. サブタイトル・キャッチコピー (subtitle):
+   - フォーム上部に小さく添える魅力的なキャッチ（例: "最短3分で完了 / 法人・個人事業主様向けお申込手続き"、"24時間受付 / 専任スタッフが翌営業日以内にご連絡"）。
+4. おすすめテーマカラー (theme):
+   - フォームの用途（ビジネス・B2B、採用、セミナー、顧客アンケート、医療・士業、クリエイティブ等）に最適な配色ペアを決定。
+   - primaryColor: ボタンやヘッダーアクセントの主色（16進数カラーコード、例: #1a73e8, #0f766e, #4338ca, #ea580c, #0284c7 などコントラストの高い美しい色）。
+   - backgroundColor: フォーム全体の背景色（白または微細なニュアンス色、例: #f8fafc, #f0fdf4, #fdfbf7, #f1f5f9 等）。
+   - colorLabel: その配色の印象・名称（例: "ビジネス・ロイヤルブルー & クリーンホワイト"）。
+5. 所要時間目安 (estimatedTime):
+   - 設問数やセクション数から推定される無理のない回答時間（例: "目安 3〜5分"、"目安 5〜8分"）。
+6. 注意事項アラート文 (alertText):
+   - 回答者が事前に知っておくべき重要事項（例: "※ インボイス登録番号や口座情報の入力箇所がございますので、お手元にお控えをご用意ください。"）。
+7. 出力は必ず以下のJSONフォーマットのみ（マークダウンのコードブロックなし、生のJSON文字列のみ）:
+{
+  "recommendationTitle": "短く魅力的な提案タイトル（適切な絵文字付き、例: 🏢 B2B向け高信頼フォーム構成（AIトータルプロデュース））",
+  "explanation": "なぜこの設定・配色・構成を推奨するかの解説（1〜2文）",
+  "title": "推奨フォームタイトル",
+  "description": "推奨フォーム説明文",
+  "subtitle": "推奨サブタイトル",
+  "theme": {
+    "primaryColor": "#1a73e8",
+    "backgroundColor": "#f8fafc",
+    "colorLabel": "信頼のビジネスブルー & クリーンホワイト"
+  },
+  "estimatedTime": "目安 3〜5分",
+  "alertText": "推奨注意事項アラート文",
+  "items": [
+    "タイトル・説明文: 目的を明快に伝え、離脱を防ぐ丁寧な文脈に最適化",
+    "配色: 信頼感を醸成する「ビジネスブルー」を適用",
+    "所要時間・注意事項: 設問内容から算出した適切な目安と事前案内を提示"
+  ]
+}
+`.trim();
+
+      const formSummary = body.formSummary || {};
+      const userReq = message ? `\n【作成者からの個別要望・プロンプト】\n${message}\n` : '';
+
+      let structureText = `
+【現在のフォーム構成】
+- 現在のタイトル: ${formSummary.title || '（無題のフォーム）'}
+- 現在の説明文: ${formSummary.description || '（なし）'}
+- セクション数: ${Array.isArray(formSummary.sections) ? formSummary.sections.length : 0}
+- 全設問一覧:
+`.trim();
+
+      if (Array.isArray(formSummary.sections)) {
+        formSummary.sections.forEach((sec, sIdx) => {
+          structureText += `\n[セクション ${sIdx + 1}: ${sec.title || '無題'}]`;
+          (sec.questions || []).forEach(q => {
+            structureText += `\n  - ${q.title || '設問'} (${q.type || 'text'})`;
+          });
+        });
+      }
+
+      contents.push({
+        role: 'user',
+        parts: [{ text: `${structureText}${userReq}\n\n上記フォームに最も適した全体設定をプロデュースし、指定JSON形式で出力してください。` }]
+      });
+
+    } else if (mode === 'diagnose_question') {
       systemInstructionText = `
 あなたはWebフォーム構築基盤「Synapse（シナプス）」の専属AIアーキテクトです。
 フォーム作成者が作成・設定中の「質問項目」を分析し、最適な「データベース出力列名（カラムの統一）」「回答の入力規則（バリデーション）」「回答控えメール」の設計案を動的に考案してください。
@@ -360,6 +441,16 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
       }
     }
 
+    if (mode === 'form_global_concierge') {
+      return res.status(200).json({
+        success: true,
+        isConfigured: true,
+        model: successfulModel,
+        globalAdvice: parsedResult,
+        advice: parsedResult
+      });
+    }
+
     if (mode === 'diagnose_question') {
       return res.status(200).json({
         success: true,
@@ -392,3 +483,115 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
     });
   }
 };
+
+function generateFallbackGlobalAdvice(summary, userPrompt) {
+  const currentTitle = (summary && summary.title) || '';
+  const promptText = (userPrompt || '').toLowerCase();
+  let hasRecruit = /採用|応募|求人|エントリー|履歴書|職歴|学歴|志望動機/.test(promptText);
+  let hasSurvey = /アンケート|満足度|評価|感想|ご意見/.test(promptText);
+  let hasSeminar = /セミナー|説明会|ウェビナー|イベント|参加/.test(promptText);
+
+  if (summary && Array.isArray(summary.sections)) {
+    summary.sections.forEach(s => {
+      (s.questions || []).forEach(q => {
+        const t = (q.title || '').toLowerCase();
+        if (/採用|応募|エントリー|履歴書|職歴|学歴|志望動機/.test(t)) hasRecruit = true;
+        if (/満足度|アンケート|評価|感想|ご意見/.test(t)) hasSurvey = true;
+        if (/セミナー|ウェビナー|説明会|イベント|参加/.test(t)) hasSeminar = true;
+      });
+    });
+  }
+
+  let advice = {
+    recommendationTitle: "🏢 B2B向け高信頼フォーム構成（AIトータルプロデュース）",
+    explanation: "設問構成と利用目的に合わせた高品質な設定案を考案しました。回答者の離脱を防ぎ、信頼感を醸成します。",
+    title: (currentTitle && currentTitle !== '無題のフォーム' && currentTitle !== '新しいフォーム') ? currentTitle : "【公式】法人様向け 導入相談・お問い合わせフォーム",
+    subtitle: "最短3分で入力完了 / 専任スタッフが迅速にご案内いたします",
+    description: "製品・サービスの導入検討や御見積のご依頼、各種ご相談を承っております。\n以下のフォームに必要事項をご記入の上、お気軽にご送信ください。担当者より迅速にご連絡差し上げます。",
+    theme: {
+      primaryColor: "#1a73e8",
+      backgroundColor: "#f8fafc",
+      colorLabel: "信頼感と気品あるロイヤルブルー & クリーンホワイト"
+    },
+    estimatedTime: "目安 3〜5分",
+    alertText: "※ ご入力いただいたご連絡先宛に、担当者より1営業日以内にご連絡差し上げます。",
+    items: [
+      "タイトル・説明文: 目的を明快に伝え、離脱を防ぐ丁寧な導入文に最適化",
+      "配色: 信頼感を醸成する「ロイヤルブルー」を適用",
+      "所要時間・注意事項: 設問内容から算出した適切な目安と事前案内を提示"
+    ]
+  };
+
+  if (hasRecruit) {
+    advice.recommendationTitle = "🎓 採用エントリー・選考アンケート最適化（AIプロデュース）";
+    advice.explanation = "求職者が安心して熱意を伝えられる、清潔感と親しみやすさのある構成を考案しました。";
+    advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "【公式】採用エントリー・事前アンケートフォーム";
+    advice.subtitle = "あなたの可能性をお聞かせください / 応募受付中";
+    advice.description = "弊社の採用情報にご関心をお寄せいただき、誠にありがとうございます。\n以下の各項目をご入力の上、送信してください。ご提出いただいた内容は選考の参考とさせていただきます。";
+    advice.theme = {
+      primaryColor: "#0284c7",
+      backgroundColor: "#f8fafc",
+      colorLabel: "爽やかで誠実なスカイブルー & クリーンホワイト"
+    };
+    advice.estimatedTime = "目安 3〜5分";
+    advice.alertText = "※ 職務経歴や志望動機等の入力項目がございます。送信前に今一度内容をご確認ください。";
+    advice.items = [
+      "タイトル・説明文: 応募者の安心感を高め、熱意を引き出す丁寧なトーン",
+      "配色: 誠実さと若々しさを表現する「スカイブルー」",
+      "案内文: 選考プロセスを安心して進められるガイダンス"
+    ];
+  } else if (hasSeminar) {
+    advice.recommendationTitle = "📅 セミナー・イベント参加受付最適化（AIプロデュース）";
+    advice.explanation = "申込の心理的ハードルを下げ、当日参加率を最大化する案内構成を考案しました。";
+    advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "セミナー・オンライン説明会 参加申込受付フォーム";
+    advice.subtitle = "定員になり次第締切 / 参加無料・オンライン開催";
+    advice.description = "当セミナーへの参加お申し込みフォームです。\n必要事項をご入力の上、送信してください。お申し込み完了後、登録メールアドレス宛に参加URLをお送りいたします。";
+    advice.theme = {
+      primaryColor: "#0f766e",
+      backgroundColor: "#f0fdf4",
+      colorLabel: "知性的で安心感のあるティールグリーン & ソフトホワイト"
+    };
+    advice.estimatedTime = "目安 2〜3分";
+    advice.alertText = "※ 参加URLの自動送信用として、お間違いのないメールアドレスをご入力ください。";
+    advice.items = [
+      "タイトル・説明文: 参加ハードルを下げ、参加案内を明確化",
+      "配色: 集中力と安心感を高める「ティールグリーン」",
+      "案内文: 参加URLの送付について事前に周知"
+    ];
+  } else if (hasSurvey) {
+    advice.recommendationTitle = "📊 顧客満足度・アンケート最適化（AIプロデュース）";
+    advice.explanation = "回答への心理的負担を和らげ、率直なフィードバックが集まりやすい親しみやすい構成です。";
+    advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "サービスご利用・ご満足度アンケート";
+    advice.subtitle = "1〜2分で回答完了 / サービス向上のためご協力をお願いいたします";
+    advice.description = "いつもサービスをご利用いただき誠にありがとうございます。\n今後のより良いサービス改善・機能向上のため、率直なご意見・ご感想をお聞かせいただけますと幸いです。";
+    advice.theme = {
+      primaryColor: "#ea580c",
+      backgroundColor: "#fdfbf7",
+      colorLabel: "親しみやすく回答しやすいウォームオレンジ & アイボリー"
+    };
+    advice.estimatedTime = "目安 1〜3分";
+    advice.alertText = "※ ご回答いただいた内容は統計的に処理され、サービス改善以外の目的には使用いたしません。";
+    advice.items = [
+      "タイトル・説明文: 回答者の負担を減らし、感謝を伝えるトーン",
+      "配色: 親近感と温かみを与える「ウォームオレンジ」",
+      "プライバシー: データの取扱いに関する安心感を明記"
+    ];
+  }
+
+  if (/明るく|親しみ|カジュアル/.test(promptText)) {
+    advice.theme.primaryColor = "#ea580c";
+    advice.theme.backgroundColor = "#fffbeb";
+    advice.theme.colorLabel = "明るく親しみやすいビタミンオレンジ & ソフトクリーム";
+  } else if (/厳格|高級|シック|黒|士業/.test(promptText)) {
+    advice.theme.primaryColor = "#1e293b";
+    advice.theme.backgroundColor = "#f8fafc";
+    advice.theme.colorLabel = "重厚で格調高いディープスレート & クリーンホワイト";
+  } else if (/緑|エコ|自然|安心/.test(promptText)) {
+    advice.theme.primaryColor = "#16a34a";
+    advice.theme.backgroundColor = "#f0fdf4";
+    advice.theme.colorLabel = "自然と健康をイメージするフォレストグリーン & ペールミント";
+  }
+
+  return advice;
+}
+
