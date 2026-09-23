@@ -12865,8 +12865,315 @@
     });
   }
 
+  // ==========================================================================
+  // 🚀 統合版「質問を追加」ポップオーバーメニューシステム
+  // ==========================================================================
+  const ADD_QUESTION_MENU_DATA = [
+    {
+      category: "📝 基本の入力形式（空の質問）",
+      items: [
+        { id: "empty_text", type: "empty", qType: "text", name: "記述式 (短文)", desc: "氏名や件名などの1行テキスト入力欄", icon: "✏️", badge: "基本", badgeType: "" },
+        { id: "empty_paragraph", type: "empty", qType: "paragraph", name: "記述式 (長文)", desc: "ご意見やお問合せ内容などの複数行テキスト入力欄", icon: "📄", badge: "長文", badgeType: "" },
+        { id: "empty_radio", type: "empty", qType: "radio", name: "単一選択 (ラジオボタン)", desc: "候補の中から1つだけ選ぶ選択肢", icon: "🔘", badge: "単一選択", badgeType: "" },
+        { id: "empty_checkbox", type: "empty", qType: "checkbox", name: "複数選択 (チェックボックス)", desc: "複数選べるチェックボックス選択肢", icon: "☑️", badge: "複数選択", badgeType: "" },
+        { id: "empty_select", type: "empty", qType: "select", name: "ドロップダウン (プルダウン)", desc: "リストから1つ選ぶ省スペースな選択肢", icon: "🔽", badge: "リスト", badgeType: "" },
+        { id: "empty_date", type: "empty", qType: "date", name: "日付選択", desc: "カレンダーから年月日を指定する入力欄", icon: "📅", badge: "日付", badgeType: "" },
+        { id: "empty_file", type: "empty", qType: "file", name: "ファイル添付", desc: "書類・画像・写真などのファイル添付欄", icon: "📎", badge: "ファイル", badgeType: "" }
+      ]
+    },
+    {
+      category: "⭐ よく使われる定番項目（入力規則つき）",
+      items: [
+        { id: "preset_name", type: "preset", key: "name", name: "氏名", desc: "お名前入力欄（必須・フルネーム案内つき）", icon: "👤", badge: "定番", badgeType: "badge-smart" },
+        { id: "preset_company", type: "preset", key: "company", name: "法人名・屋号", desc: "会社名または屋号（未入力時は自動ハイフン補填）", icon: "🏢", badge: "ビジネス", badgeType: "badge-smart" },
+        { id: "preset_email", type: "preset", key: "email", name: "メールアドレス", desc: "連絡先メール（形式チェックバリデーションつき）", icon: "✉️", badge: "定番", badgeType: "badge-smart" },
+        { id: "preset_email_autoreply", type: "preset", key: "email_autoreply", name: "メールアドレス（回答控え自動送信）", desc: "送信完了時に回答内容の控えメールを自動配信", icon: "📨", badge: "自動返信", badgeType: "badge-smart" },
+        { id: "preset_tel", type: "preset", key: "tel", name: "電話番号", desc: "固定・携帯電話共通（ハイフン形式チェックつき）", icon: "📞", badge: "定番", badgeType: "badge-smart" },
+        { id: "preset_pro_address", type: "preset", key: "pro_address", name: "郵便番号・住所セット", desc: "郵便番号から住所を自動補完する連携セット", icon: "📮", badge: "住所補完", badgeType: "badge-smart" },
+        { id: "preset_birthdate", type: "preset", key: "birthdate", name: "生年月日", desc: "西暦年月日（1990/01/01形式チェックつき）", icon: "🎂", badge: "定番", badgeType: "badge-smart" }
+      ]
+    },
+    {
+      category: "💼 ビジネス・専用プロ項目",
+      items: [
+        { id: "preset_pro_bank", type: "preset", key: "pro_bank", name: "銀行口座情報セット", desc: "銀行名・支店名・口座種別・口座番号の自動照合セット", icon: "🏦", badge: "API連携", badgeType: "badge-pro" },
+        { id: "preset_pro_corp_info", type: "preset", key: "pro_corp_info", name: "法人情報一括セット", desc: "法人名・代表者・所在地・インボイス等の一式", icon: "🏢", badge: "プロ一括", badgeType: "badge-pro" },
+        { id: "preset_pro_individual_info", type: "preset", key: "pro_individual_info", name: "個人事業主情報一括セット", desc: "屋号・氏名・住所・税務区分・インボイスの一式", icon: "👤", badge: "プロ一括", badgeType: "badge-pro" },
+        { id: "preset_pro_branch_hybrid", type: "preset", key: "pro_branch_hybrid", name: "法人・個人 自動分岐セット", desc: "回答に応じて法人項目／個人項目を自動切り替え", icon: "🔀", badge: "自動分岐", badgeType: "badge-pro" },
+        { id: "preset_invoice", type: "preset", key: "invoice", name: "インボイス登録番号", desc: "T+13桁 国税庁適格請求書発行事業者API連携", icon: "🧾", badge: "国税庁API", badgeType: "badge-pro" },
+        { id: "preset_pro_password", type: "preset", key: "pro_password", name: "パスワード（確認用付き）", desc: "確認再入力・目のマーク同期・マスク表示機能つき", icon: "🔒", badge: "安全入力", badgeType: "badge-pro" }
+      ]
+    },
+    {
+      category: "📁 レイアウト・グループ",
+      items: [
+        { id: "action_group", type: "group", key: "group", name: "質問グループ枠", desc: "複数の質問をひとまとまりの枠として整理", icon: "📁", badge: "枠組み", badgeType: "" }
+      ]
+    }
+  ];
+
+  function getActiveFormSection() {
+    return (window.n && window.n.sections ? window.n.sections.find(s => s.id === window.r) : null) || (window.n && window.n.sections && window.n.sections[0]);
+  }
+
+  function handleAddQuestionItemClick(item) {
+    const sec = getActiveFormSection();
+    if (!sec) {
+      if (window.showSectionToast) window.showSectionToast('セクションを選択してください');
+      return;
+    }
+    window.r = sec.id;
+    sec.questions = sec.questions || [];
+
+    if (item.type === 'empty') {
+      const newQ = {
+        id: `q_${Date.now()}`,
+        type: item.qType,
+        title: '',
+        description: '',
+        required: false,
+        validation: null,
+        options: ['radio', 'checkbox', 'select'].includes(item.qType) ? [{ label: '選択肢 1' }] : []
+      };
+      sec.questions.push(newQ);
+      if (window.S) window.S(true);
+      if (window.x) window.x();
+      if (window.renderLivePreview) window.renderLivePreview();
+      if (window.showSectionToast) window.showSectionToast(`「${item.name}」を追加しました`);
+    } else if (item.type === 'preset') {
+      const val = item.key;
+      const baseTime = Date.now();
+      if (val.startsWith('pro_') || val === 'email_autoreply') {
+        if (typeof executeApplyPreset === 'function') {
+          executeApplyPreset(val, sec, baseTime);
+        } else if (typeof window.executeApplyPreset === 'function') {
+          window.executeApplyPreset(val, sec, baseTime);
+        }
+      } else {
+        // 標準プリセット（re[val]）
+        const a = window.re && window.re[val];
+        if (a) {
+          const isBlankInitial = q => (q.title === '質問 1' || q.title === '' || !q.title) && q.type === 'text' && (q.description === '説明（任意）' || q.description === '' || !q.description) && !q.required && !q.validation;
+          const newQ = {
+            id: `q_${Date.now()}`,
+            type: a.type,
+            title: a.title,
+            description: a.description,
+            required: a.required,
+            validation: a.validation ? JSON.parse(JSON.stringify(a.validation)) : null,
+            options: a.options ? JSON.parse(JSON.stringify(a.options)) : []
+          };
+          if (sec.questions.length === 1 && isBlankInitial(sec.questions[0])) {
+            newQ.id = sec.questions[0].id;
+            sec.questions[0] = newQ;
+          } else {
+            sec.questions.push(newQ);
+          }
+          if (window.S) window.S(true);
+          if (window.x) window.x();
+          if (window.renderLivePreview) window.renderLivePreview();
+          if (window.showSectionToast) window.showSectionToast(`「${item.name}」を追加しました`);
+
+          if (['zip', 'address', 'prefecture'].includes(val)) {
+            setTimeout(() => {
+              if (typeof detectAddressGroupIssues === 'function' && typeof showAddressGroupWarningModal === 'function') {
+                const issues = detectAddressGroupIssues();
+                if (issues.length > 0) showAddressGroupWarningModal(issues);
+              }
+            }, 200);
+          }
+        }
+      }
+    } else if (item.type === 'group') {
+      const title = prompt('新しいグループ名を入力してください（例: 住所、緊急連絡先、口座情報）:', '新規グループ');
+      if (title && title.trim()) {
+        const groupTitle = title.trim();
+        const groupId = 'grp_' + Date.now();
+        const newQ = {
+          id: 'q_' + Date.now(),
+          type: 'text',
+          title: `質問 ${sec.questions.length + 1}`,
+          description: '',
+          required: false,
+          validation: null,
+          options: [],
+          groupId: groupId,
+          groupTitle: groupTitle
+        };
+        sec.questions.push(newQ);
+        if (window.S) window.S(true);
+        if (window.le) window.le(sec);
+        if (window.x) window.x();
+        if (window.renderLivePreview) window.renderLivePreview();
+        if (window.showSectionToast) window.showSectionToast(`グループ「${groupTitle}」を作成しました`);
+      }
+    }
+  }
+
+  function escapeAddQHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function renderAddQuestionPopoverContent(container, filterText = '') {
+    const qText = (filterText || '').trim().toLowerCase();
+    let html = `
+      <div class="add-q-search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-muted, #94a3b8); flex-shrink: 0;">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="input-search-add-q" placeholder="質問の種類を検索... (例: 氏名, 口座, 選択)" value="${escapeAddQHtml(filterText)}">
+      </div>
+      <div class="add-q-scroll-area">
+    `;
+
+    let totalMatches = 0;
+    ADD_QUESTION_MENU_DATA.forEach(cat => {
+      const matchedItems = cat.items.filter(item => {
+        if (!qText) return true;
+        return (item.name && item.name.toLowerCase().includes(qText)) ||
+               (item.desc && item.desc.toLowerCase().includes(qText)) ||
+               (item.badge && item.badge.toLowerCase().includes(qText));
+      });
+
+      if (matchedItems.length > 0) {
+        totalMatches += matchedItems.length;
+        html += `
+          <div class="add-q-category">
+            <div class="add-q-category-title">${cat.category}</div>
+            <div class="add-q-list">
+        `;
+        matchedItems.forEach(item => {
+          html += `
+            <div class="add-q-item" data-item-id="${item.id}" title="${escapeAddQHtml(item.desc)}">
+              <div class="add-q-icon">${item.icon}</div>
+              <div class="add-q-info">
+                <div class="add-q-row-top">
+                  <span class="add-q-name">${escapeAddQHtml(item.name)}</span>
+                  ${item.badge ? `<span class="add-q-badge ${item.badgeType || ''}">${escapeAddQHtml(item.badge)}</span>` : ''}
+                </div>
+                <div class="add-q-desc">${escapeAddQHtml(item.desc)}</div>
+              </div>
+            </div>
+          `;
+        });
+        html += `</div></div>`;
+      }
+    });
+
+    if (totalMatches === 0) {
+      html += `
+        <div style="padding: 30px 16px; text-align: center; color: var(--color-text-muted, #64748b); font-size: 0.85rem;">
+          一致する質問項目が見つかりませんでした
+        </div>
+      `;
+    }
+
+    html += `</div>`;
+    container.innerHTML = html;
+
+    // 検索入力イベント
+    const searchInput = container.querySelector('#input-search-add-q');
+    if (searchInput) {
+      if (filterText) {
+        searchInput.focus();
+        searchInput.setSelectionRange(filterText.length, filterText.length);
+      }
+      searchInput.addEventListener('input', (e) => {
+        renderAddQuestionPopoverContent(container, e.target.value);
+      });
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeAddQuestionPopover();
+        }
+      });
+    }
+
+    // アイテムクリックイベント
+    container.querySelectorAll('.add-q-item').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const itemId = el.dataset.itemId;
+        let foundItem = null;
+        for (const cat of ADD_QUESTION_MENU_DATA) {
+          foundItem = cat.items.find(i => i.id === itemId);
+          if (foundItem) break;
+        }
+        if (foundItem) {
+          closeAddQuestionPopover();
+          handleAddQuestionItemClick(foundItem);
+        }
+      });
+    });
+  }
+
+  function closeAddQuestionPopover() {
+    const popover = document.getElementById('add-question-popover-menu');
+    const btn = document.getElementById('btn-add-question-menu');
+    if (popover) popover.style.display = 'none';
+    if (btn) btn.classList.remove('open');
+  }
+
+  function setupAddQuestionMenu() {
+    const btn = document.getElementById('btn-add-question-menu');
+    const popover = document.getElementById('add-question-popover-menu');
+    if (!btn || !popover) return;
+
+    if (btn._hasSetupAddQMenu) return;
+    btn._hasSetupAddQMenu = true;
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const isOpen = popover.style.display === 'flex';
+      if (isOpen) {
+        closeAddQuestionPopover();
+      } else {
+        renderAddQuestionPopoverContent(popover, '');
+        // ボタンの位置に応じて上下の展開方向を自動調整
+        const rect = btn.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        if (spaceBelow < 420 && rect.top > 380) {
+          popover.style.top = 'auto';
+          popover.style.bottom = 'calc(100% + 6px)';
+        } else {
+          popover.style.top = 'calc(100% + 6px)';
+          popover.style.bottom = 'auto';
+        }
+        popover.style.display = 'flex';
+        btn.classList.add('open');
+        const input = popover.querySelector('#input-search-add-q');
+        if (input) setTimeout(() => input.focus(), 50);
+      }
+    });
+
+    // 画面外クリックで閉じる
+    document.addEventListener('click', (e) => {
+      if (!btn.contains(e.target) && !popover.contains(e.target)) {
+        closeAddQuestionPopover();
+      }
+    });
+
+    // Escキーで閉じる
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeAddQuestionPopover();
+      }
+    });
+  }
+  window.setupAddQuestionMenu = setupAddQuestionMenu;
+
   function injectQuestionGroupSystem(sec) {
     setupBtnAddGroup();
+    setupAddQuestionMenu();
 
     const container = document.getElementById('questions-container');
     if (!container || !window.n || !window.n.sections) return;
@@ -14260,6 +14567,7 @@
 
   function setupEditorRenderHooks() {
     setupBtnAddGroup();
+    setupAddQuestionMenu();
 
     const originalLe = window.le;
     if (originalLe) {

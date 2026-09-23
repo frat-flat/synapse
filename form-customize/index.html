@@ -1302,7 +1302,8 @@
                     </svg>
                     <span>更新</span>
                   </button>
-                  <select id="select-preset-question" class="form-control" style="width: auto; font-size: 0.8rem; height: 32px; padding: 4px 8px; background-color: var(--color-bg-input);">
+                  <!-- 既存のプリセット選択肢と個別ボタン（後方互換性維持のため非表示で保持） -->
+                  <select id="select-preset-question" class="form-control" style="display: none !important;">
                     <option value="">-- プリセットから追加 --</option>
                     <option value="company">法人名（会社名）</option>
                     <option value="name">氏名</option>
@@ -1316,8 +1317,24 @@
                     <option value="prefecture">都道府県</option>
                     <option value="password">パスワード（確認用付き）</option>
                   </select>
-                  <button id="btn-add-question" class="btn btn-secondary btn-sm">＋ 質問を追加</button>
-                  <button id="btn-add-group" class="btn btn-secondary btn-sm" type="button" style="display: inline-flex; align-items: center; gap: 4px;">📁 グループを追加</button>
+                  <button id="btn-add-question" class="btn btn-secondary btn-sm" style="display: none !important;">＋ 質問を追加</button>
+                  <button id="btn-add-group" class="btn btn-secondary btn-sm" type="button" style="display: none !important;">📁 グループを追加</button>
+
+                  <!-- 🚀 新しい統合版「質問を追加」ドロップダウンボタン -->
+                  <div class="add-question-menu-wrapper" style="position: relative; display: inline-block;">
+                    <button type="button" id="btn-add-question-menu" class="btn btn-primary btn-sm btn-add-question-unified" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; padding: 6px 14px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer;" title="クリックして追加する設問の種類を選択">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                      <span>質問を追加</span>
+                      <svg class="chevron-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 2px; transition: transform 0.2s ease;">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    </button>
+                    <!-- ポップオーバーメニューコンテナ -->
+                    <div id="add-question-popover-menu" class="add-question-popover-menu" style="display: none;"></div>
+                  </div>
                 </div>
               </div>
 

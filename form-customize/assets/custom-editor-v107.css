@@ -7291,3 +7291,258 @@ html, body {
   display: none !important;
 }
 
+/* ==========================================================================
+   🚀 統合版「質問を追加」ボタングループ & ポップオーバーメニュー
+   ========================================================================== */
+.add-question-menu-wrapper {
+  position: relative;
+  display: inline-block;
+  z-index: 60;
+}
+
+.btn-add-question-unified {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 600 !important;
+  font-size: 0.82rem !important;
+  padding: 6px 14px !important;
+  border-radius: 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25) !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  user-select: none !important;
+}
+
+.btn-add-question-unified:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af) !important;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35) !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn-add-question-unified:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2) !important;
+}
+
+.btn-add-question-unified.open .chevron-arrow {
+  transform: rotate(180deg) !important;
+}
+
+/* ポップオーバー本体 */
+.add-question-popover-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 460px;
+  max-width: 90vw;
+  max-height: 520px;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 12px 36px -4px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: addQPopoverFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes addQPopoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 検索ヘッダー */
+.add-q-search-box {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-bg-subtle, #f8fafc);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.add-q-search-box input {
+  flex: 1;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  background: var(--color-bg-card, #ffffff);
+  color: var(--color-text, #1e293b);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.add-q-search-box input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+/* スクロールコンテンツ領域 */
+.add-q-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px 14px;
+}
+
+.add-q-scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.add-q-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.5);
+  border-radius: 3px;
+}
+
+.add-q-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}
+
+/* カテゴリー区切り */
+.add-q-category {
+  margin-bottom: 8px;
+}
+
+.add-q-category-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text-muted, #64748b);
+  padding: 6px 6px 3px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  letter-spacing: 0.02em;
+}
+
+/* 各質問項目行 */
+.add-q-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  user-select: none;
+  border: 1px solid transparent;
+}
+
+.add-q-item:hover {
+  background: var(--color-bg-subtle, #f1f5f9);
+  border-color: rgba(37, 99, 235, 0.12);
+  transform: translateX(2px);
+}
+
+.add-q-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  background: var(--color-bg-subtle, #f8fafc);
+  border: 1px solid var(--color-border, #e2e8f0);
+  flex-shrink: 0;
+}
+
+.add-q-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.add-q-row-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.add-q-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text, #1e293b);
+  white-space: nowrap;
+}
+
+.add-q-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  line-height: 1.3;
+}
+
+.add-q-badge.badge-smart {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.add-q-badge.badge-pro {
+  background: rgba(147, 51, 234, 0.1);
+  color: #7c3aed;
+}
+
+.add-q-desc {
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #64748b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ダークモード対応 */
+body.dark-mode .add-question-popover-menu,
+[data-theme="dark"] .add-question-popover-menu {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 12px 36px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+body.dark-mode .add-q-search-box,
+[data-theme="dark"] .add-q-search-box {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+body.dark-mode .add-q-search-box input,
+[data-theme="dark"] .add-q-search-box input {
+  background: #1e293b !important;
+  border-color: #475569 !important;
+  color: #f8fafc !important;
+}
+
+body.dark-mode .add-q-item:hover,
+[data-theme="dark"] .add-q-item:hover {
+  background: #334155 !important;
+  border-color: rgba(96, 165, 250, 0.25) !important;
+}
+
+body.dark-mode .add-q-icon,
+[data-theme="dark"] .add-q-icon {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+body.dark-mode .add-q-name,
+[data-theme="dark"] .add-q-name {
+  color: #f1f5f9 !important;
+}
+
+
