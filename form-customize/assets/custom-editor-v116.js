@@ -13121,6 +13121,40 @@
     if (btn) btn.classList.remove('open');
   }
 
+  function positionAddQuestionPopover(btn, popover) {
+    if (!popover || !btn) return;
+    if (!popover.parentElement || popover.parentElement !== document.body) {
+      document.body.appendChild(popover);
+    }
+    const rect = btn.getBoundingClientRect();
+    const popoverWidth = 330;
+    const popoverHeight = 380;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // 水平位置：ボタンの左端を基本とし、画面右端を超えるなら右揃え
+    let left = rect.left;
+    if (left + popoverWidth > viewportWidth - 16) {
+      left = Math.max(16, rect.right - popoverWidth);
+    }
+    left = Math.max(16, left);
+
+    // 垂直位置：下に十分なスペースがあれば下、なければ上に展開
+    const spaceBelow = viewportHeight - rect.bottom;
+    let top;
+    if (spaceBelow < popoverHeight && rect.top > popoverHeight) {
+      top = Math.max(12, rect.top - popoverHeight - 6);
+    } else {
+      top = Math.min(viewportHeight - popoverHeight - 12, rect.bottom + 6);
+    }
+
+    popover.style.position = 'fixed';
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+    popover.style.width = `${popoverWidth}px`;
+    popover.style.zIndex = '999999';
+  }
+
   function setupAddQuestionMenu() {
     const btn = document.getElementById('btn-add-question-menu');
     const popover = document.getElementById('add-question-popover-menu');
@@ -13138,16 +13172,7 @@
         closeAddQuestionPopover();
       } else {
         renderAddQuestionPopoverContent(popover, '');
-        // ボタンの位置に応じて上下の展開方向を自動調整
-        const rect = btn.getBoundingClientRect();
-        const spaceBelow = window.innerHeight - rect.bottom;
-        if (spaceBelow < 420 && rect.top > 380) {
-          popover.style.top = 'auto';
-          popover.style.bottom = 'calc(100% + 6px)';
-        } else {
-          popover.style.top = 'calc(100% + 6px)';
-          popover.style.bottom = 'auto';
-        }
+        positionAddQuestionPopover(btn, popover);
         popover.style.display = 'flex';
         btn.classList.add('open');
         const input = popover.querySelector('#input-search-add-q');
@@ -13168,6 +13193,20 @@
         closeAddQuestionPopover();
       }
     });
+
+    // リサイズ時に位置追従
+    window.addEventListener('resize', () => {
+      if (popover.style.display === 'flex') {
+        positionAddQuestionPopover(btn, popover);
+      }
+    });
+
+    // コンテナスクロール時に自然に閉じる
+    window.addEventListener('scroll', () => {
+      if (popover.style.display === 'flex') {
+        closeAddQuestionPopover();
+      }
+    }, true);
   }
   window.setupAddQuestionMenu = setupAddQuestionMenu;
 
