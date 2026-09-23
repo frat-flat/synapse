@@ -885,6 +885,13 @@ function sanitizeAndUnifyTableColumns(tbl) {
       return;
     }
 
+    // 🏷️ 「確定登録コード」「登録コード」を「回答ID」へ名称統一
+    const rawLabel = (c.label || c.name || '').trim();
+    if (rawLabel === '確定登録コード' || rawLabel === '登録コード' || c.id === 'registration_code') {
+      c.label = '回答ID';
+      c.name = '回答ID';
+    }
+
     if (seenKeys.has(effectiveKey)) {
       hasDuplicates = true;
       const exist = seenKeys.get(effectiveKey);
@@ -23858,7 +23865,7 @@ function handleFormSubmitMessage(event) {
     });
   }
 
-  // 登録コード（partnerIdまたは一般登録コード）を決定
+  // 回答ID（partnerIdまたは一般回答ID）を決定
   if (!targetRow.partnerId && !targetRow.registrationCode) {
     targetRow.registrationCode = 'REG' + Math.floor(10000000 + Math.random() * 90000000).toString().substring(0, 8);
   } else if (targetRow.partnerId) {
@@ -23866,18 +23873,24 @@ function handleFormSubmitMessage(event) {
   }
   const confirmedCode = targetRow.partnerId || targetRow.registrationCode || targetRowId;
 
-  // カスタムテーブルの登録コードカラムにも反映して永続化
-  let codeCol = targetTable.columns.find(c => c.name === '登録コード' || c.label === '登録コード');
+  // カスタムテーブルの回答ID（旧: 登録コード / 確定登録コード）カラムにも反映して永続化
+  let codeCol = targetTable.columns.find(c => c.name === '回答ID' || c.label === '回答ID' || c.name === '登録コード' || c.label === '登録コード' || c.name === '確定登録コード' || c.label === '確定登録コード' || c.id === 'registration_code');
   if (!codeCol) {
     codeCol = {
       id: 'col_regcode_' + Math.random().toString(36).substr(2, 6),
-      label: '登録コード',
-      name: '登録コード',
+      label: '回答ID',
+      name: '回答ID',
       type: 'text'
     };
     targetTable.columns.push(codeCol);
     if (targetTable.visibleColumns) targetTable.visibleColumns.push(codeCol.id);
     if (targetTable.columnWidths) targetTable.columnWidths[codeCol.id] = 120;
+  } else {
+    // 既存カラムの表示名を「回答ID」に正規化
+    if (codeCol.label === '登録コード' || codeCol.label === '確定登録コード') {
+      codeCol.label = '回答ID';
+      codeCol.name = '回答ID';
+    }
   }
   targetRow[codeCol.id] = confirmedCode;
   localStorage.setItem(STORAGE_KEYS.CUSTOM_TABLES, JSON.stringify(state.customTables));
@@ -23915,7 +23928,7 @@ function handleFormSubmitMessage(event) {
       }, '*');
     }
     if (isPartialSubmit) {
-      showToast(`${isTestSubmission ? '【テスト】' : ''}フォーム「${formTitle}」の途中回答を受信し、登録コード [${confirmedCode}] を確定しました。`, isTestSubmission ? 'info' : 'success');
+      showToast(`${isTestSubmission ? '【テスト】' : ''}フォーム「${formTitle}」の途中回答を受信し、回答ID [${confirmedCode}] を確定しました。`, isTestSubmission ? 'info' : 'success');
     } else {
       if (isTestSubmission) {
         showToast(`【テスト】フォーム「${formTitle}」のテスト送信を受信し、隔離テーブル「${effectiveTableName}」へ保存しました。`, 'info');
@@ -53286,6 +53299,48 @@ function openAppointIssueModal() {
     }
   }
 
+  // 📋 アポイント引継ぎ設定の復元（前回保存値、または全選択）
+  try {
+    const savedConfig = JSON.parse(localStorage.getItem('synapse_appoint_inherit_config') || 'null');
+    const fields = [
+      { id: 'appoint-inherit-customer-name', key: 'customerName' },
+      { id: 'appoint-inherit-appoint-date', key: 'appointDate' },
+      { id: 'appoint-inherit-meeting-type', key: 'meetingType' },
+      { id: 'appoint-inherit-issuer', key: 'issuer' },
+      { id: 'appoint-inherit-introducer', key: 'introducer' },
+      { id: 'appoint-inherit-memo', key: 'memo' }
+    ];
+    fields.forEach(f => {
+      const el = document.getElementById(f.id);
+      if (el) {
+        if (savedConfig && typeof savedConfig[f.key] === 'boolean') {
+          el.checked = savedConfig[f.key];
+        } else {
+          el.checked = true;
+        }
+      }
+    });
+  } catch(e) {}
+
+  // すべて切替リンクのイベントバインド
+  const toggleAllBtn = document.getElementById('btn-appoint-inherit-toggle-all');
+  if (toggleAllBtn && !toggleAllBtn.dataset.bound) {
+    toggleAllBtn.dataset.bound = 'true';
+    toggleAllBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const cbs = [
+        'appoint-inherit-customer-name',
+        'appoint-inherit-appoint-date',
+        'appoint-inherit-meeting-type',
+        'appoint-inherit-issuer',
+        'appoint-inherit-introducer',
+        'appoint-inherit-memo'
+      ].map(id => document.getElementById(id)).filter(Boolean);
+      const anyChecked = cbs.some(cb => cb.checked);
+      cbs.forEach(cb => { cb.checked = !anyChecked; });
+    });
+  }
+
   if (modal) {
     modal.style.display = 'flex';
     modal.classList.add('active');
@@ -53473,6 +53528,45 @@ function issueAppointForm(formId) {
   const introducerName = document.getElementById('appoint-hidden-introducer-name')?.value || data.introducerName || '';
   const introducerType = document.getElementById('appoint-hidden-introducer-type')?.value || data.introducerType || '';
 
+  // 📋 アポイント引継ぎ項目の選択状態を取得＆次回記憶
+  const inheritConfig = {
+    customerName: document.getElementById('appoint-inherit-customer-name') ? document.getElementById('appoint-inherit-customer-name').checked : true,
+    appointDate: document.getElementById('appoint-inherit-appoint-date') ? document.getElementById('appoint-inherit-appoint-date').checked : true,
+    meetingType: document.getElementById('appoint-inherit-meeting-type') ? document.getElementById('appoint-inherit-meeting-type').checked : true,
+    issuer: document.getElementById('appoint-inherit-issuer') ? document.getElementById('appoint-inherit-issuer').checked : true,
+    introducer: document.getElementById('appoint-inherit-introducer') ? document.getElementById('appoint-inherit-introducer').checked : true,
+    memo: document.getElementById('appoint-inherit-memo') ? document.getElementById('appoint-inherit-memo').checked : true
+  };
+  try {
+    localStorage.setItem('synapse_appoint_inherit_config', JSON.stringify(inheritConfig));
+  } catch(e) {}
+
+  // アポイント情報スナップショット（appointSnapshot）の構築
+  const appointSnapshot = {};
+  if (inheritConfig.customerName && (data.customerName || data.name)) {
+    appointSnapshot.customerName = data.customerName || data.name;
+  }
+  if (inheritConfig.appointDate && (data.date || data.appointDate)) {
+    appointSnapshot.appointDate = data.date || data.appointDate;
+    appointSnapshot.date = data.date || data.appointDate;
+  }
+  if (inheritConfig.meetingType) {
+    const mType = data.meetingType || (data.onlineCategory ? `オンライン (${data.onlineCategory})` : '');
+    if (mType) appointSnapshot.meetingType = mType;
+  }
+  if (inheritConfig.issuer && issuerName) {
+    appointSnapshot.issuerName = issuerName;
+  }
+  if (inheritConfig.introducer && (introducerName || data.introducerName)) {
+    appointSnapshot.introducerName = introducerName || data.introducerName;
+  }
+  if (inheritConfig.memo && (data.memo || data.notes)) {
+    appointSnapshot.memo = data.memo || data.notes;
+  }
+  if (data.id) {
+    appointSnapshot.appointId = data.id;
+  }
+
   // 🔑 推測不可能な英数字ハッシュ（セキュアトークン）を生成
   const token = generateFormSecureToken(20);
   const origin = window.location.origin || '';
@@ -53491,6 +53585,7 @@ function issueAppointForm(formId) {
     introducerId: introducerId,
     introducerName: introducerName,
     introducerType: introducerType,
+    appointSnapshot: appointSnapshot,
     status: 'pending',
     issuedAt: new Date().toISOString(),
     submittedAt: null,

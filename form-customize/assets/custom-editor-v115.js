@@ -6820,7 +6820,7 @@
                   <div style="font-size: 0.92rem; font-weight: 700; color: #1d4ed8;">ここまでの内容で途中送信する</div>
                 </div>
                 <div style="font-size: 0.78rem; color: #4b5563; line-height: 1.5; margin-bottom: 14px;">
-                  手元に書類や情報がない場合におすすめです。これまでの回答を保存し、<strong>8桁の確定登録コード</strong>と<strong>後からいつでも再開できる専用URL</strong>を発行します。
+                  手元に書類や情報がない場合におすすめです。これまでの回答を保存し、<strong>8桁の回答ID</strong>と<strong>後からいつでも再開できる専用URL</strong>を発行します。
                 </div>
               </div>
               <button type="button" class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 0.85rem; font-weight: 700; padding: 9px; background: #2563eb !important; border-color: #2563eb !important; cursor: pointer;">
@@ -6996,7 +6996,7 @@
                 <span class="step-icon">💾</span>
                 <div class="step-content">
                   <div class="step-title">ここまでの内容で途中送信</div>
-                  <div class="step-desc">選択肢2を選び、「途中送信してリンクを発行する」を押します。これまでの入力内容がサーバーへ安全に保存され、確定登録コード（例: 46297844）が発行されます。</div>
+                  <div class="step-desc">選択肢2を選び、「途中送信してリンクを発行する」を押します。これまでの入力内容がサーバーへ安全に保存され、回答ID（例: 46297844）が発行されます。</div>
                 </div>
               </div>
               <div class="guide-step-connector">▼</div>
@@ -7748,8 +7748,8 @@
     const resumeUrl = info.resumeUrl || (window.currentResumeRowId ? getCleanViewResumeUrl(window.currentResumeRowId, info.nextSectionId) : '');
 
     if (isPartial) {
-      if (titleEl) titleEl.textContent = '途中送信が完了し、登録コードが確定しました！';
-      if (descEl) descEl.textContent = '入力内容を保存し、登録コードを発行しました。続きのセクションは後からでもご回答いただけます。';
+      if (titleEl) titleEl.textContent = '途中送信が完了し、回答IDが発行されました！';
+      if (descEl) descEl.textContent = '入力内容を保存し、回答IDを発行しました。続きのセクションは後からでもご回答いただけます。';
       if (resetBtn) resetBtn.textContent = '最初から回答する';
 
       const infoArea = document.createElement('div');
@@ -7767,7 +7767,7 @@
 
         infoArea.innerHTML = `
         <div style="background: rgba(49, 130, 206, 0.08); border: 1.5px solid #3182ce; border-radius: 8px; padding: 16px; text-align: center;">
-          <div style="font-size: 0.85rem; font-weight: 700; color: #2b6cb0; margin-bottom: 6px;">【 確定登録コード 】</div>
+          <div style="font-size: 0.85rem; font-weight: 700; color: #2b6cb0; margin-bottom: 6px;">【 回答ID 】</div>
           <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 4px;">
             <span id="confirmed-code-display" style="font-size: 1.6rem; font-weight: 800; letter-spacing: 2px; color: #2b6cb0; font-family: monospace;">${escapeHtml(confirmedCode || '発行済')}</span>
             <button type="button" id="btn-copy-code" class="btn btn-sm btn-primary" style="font-size: 0.75rem; padding: 4px 10px; cursor: pointer;">📋 コピー</button>
@@ -7866,7 +7866,7 @@
         const infoArea = document.createElement('div');
         infoArea.id = 'partial-submit-info-area';
         infoArea.style.cssText = 'margin: 16px 0; background: rgba(56, 161, 105, 0.1); border: 1px solid #38a169; border-radius: 8px; padding: 12px; font-size: 0.85rem; color: #276749; font-weight: 600; text-align: center;';
-        infoArea.innerHTML = `【 確定登録コード 】 <span style="font-size: 1.1rem; font-family: monospace; letter-spacing: 1px; font-weight: 800;">${escapeHtml(confirmedCode)}</span>`;
+        infoArea.innerHTML = `【 回答ID 】 <span style="font-size: 1.1rem; font-family: monospace; letter-spacing: 1px; font-weight: 800;">${escapeHtml(confirmedCode)}</span>`;
         const debugBox = successCard.querySelector('.submitted-data-box');
         if (debugBox) {
           debugBox.parentElement.insertBefore(infoArea, debugBox);
@@ -7896,9 +7896,9 @@
     banner.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px;">
         <span style="font-size: 1.1rem;">ℹ️</span>
-        <span>確定登録コード: <strong style="font-family: monospace; letter-spacing: 1.5px; font-size: 0.95rem; color: #285e61;">${escapeHtml(code)}</strong> の続きから回答しています</span>
+        <span>回答ID: <strong style="font-family: monospace; letter-spacing: 1.5px; font-size: 0.95rem; color: #285e61;">${escapeHtml(code)}</strong> の続きから回答しています</span>
       </div>
-      <span style="font-size: 0.7rem; background: #38b2ac; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 700;">コード確定済</span>
+      <span style="font-size: 0.7rem; background: #38b2ac; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 700;">回答ID確定済</span>
     `;
     banner.style.display = 'flex';
   }
@@ -12096,7 +12096,7 @@
       partialSubmitHint = document.createElement('div');
       partialSubmitHint.className = 'partial-submit-hint-box';
       partialSubmitHint.style.cssText = 'display: none; margin-top: 8px; margin-bottom: 8px; padding: 10px 12px; background: rgba(49, 130, 206, 0.08); border: 1px solid #3182ce; border-radius: 6px; font-size: 0.75rem; color: #2b6cb0; line-height: 1.4;';
-      partialSubmitHint.innerHTML = '<strong>💡 途中送信（コード確定＆続きリンク発行）</strong><br>このセクション完了時に親DBへ本登録して登録コード（8桁）を正式確定します。送信完了画面には確定コードと続き用URLが発行され、後から続きを入力しても同一レコードへ上書き・マージされます。';
+      partialSubmitHint.innerHTML = '<strong>💡 途中送信（回答ID発行＆続きリンク発行）</strong><br>このセクション完了時に親DBへ本登録して回答ID（8桁）を正式発行します。送信完了画面には回答IDと続き用URLが発行され、後から続きを入力しても同一レコードへ上書き・マージされます。';
       nextSelect.parentElement.insertAdjacentElement('afterend', partialSubmitHint);
     }
     if (partialSubmitHint && nextSelect) {
@@ -17348,7 +17348,7 @@
 
     columns.push(
       { id: 'status', label: 'ステータス', type: 'select', choices: [{ value: '回答完了', color: '#10b981' }, { value: '途中送信', color: '#f59e0b' }], required: false },
-      { id: 'registration_code', label: '確定登録コード', type: 'text', required: false },
+      { id: 'registration_code', label: '回答ID', type: 'text', required: false },
       { id: 'resume_url', label: '再開用URL', type: 'text', required: false },
       { id: 'created_at', label: '送信日時', type: 'date', required: false }
     );
@@ -17649,7 +17649,7 @@
 
     expectedColumns.push(
       { id: 'status', label: 'ステータス', type: 'select', choices: [{ value: '回答完了', color: '#10b981' }, { value: '途中送信', color: '#f59e0b' }], required: false },
-      { id: 'registration_code', label: '確定登録コード', type: 'text', required: false },
+      { id: 'registration_code', label: '回答ID', type: 'text', required: false },
       { id: 'resume_url', label: '再開用URL', type: 'text', required: false },
       { id: 'created_at', label: '送信日時', type: 'date', required: false }
     );

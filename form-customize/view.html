@@ -1780,6 +1780,7 @@
               if (tokenInfo.issuerName) window.FORM_ISSUER_NAME = tokenInfo.issuerName;
               if (tokenInfo.introducerId) window.FORM_INTRODUCER_ID = tokenInfo.introducerId;
               if (tokenInfo.introducerName) window.FORM_INTRODUCER_NAME = tokenInfo.introducerName;
+              if (tokenInfo.appointSnapshot) window.FORM_APPOINT_SNAPSHOT = tokenInfo.appointSnapshot;
             }
           }
 
@@ -2119,6 +2120,32 @@
               }
             } catch(e) {
               console.warn('[View MasterID Prefill] Error:', e);
+            }
+          }
+
+          // 📋 アポイント引継ぎスナップショットからの自動プレフィル
+          if (window.FORM_APPOINT_SNAPSHOT) {
+            try {
+              const snap = window.FORM_APPOINT_SNAPSHOT;
+              let prefilledAppointCount = 0;
+              formDefinition.sections.forEach(s => {
+                (s.questions || []).forEach(q => {
+                  if (formValues[q.id] !== undefined && formValues[q.id] !== '') return;
+                  const t = (q.title || q.label || q.dataKey || '').toLowerCase();
+                  if (snap.customerName && (t.includes('法人名') || t.includes('会社名') || t.includes('屋号') || t.includes('企業名') || t.includes('顧客名') || t.includes('商号'))) {
+                    applyValueToQuestion(q, snap.customerName);
+                    prefilledAppointCount++;
+                  } else if ((snap.appointDate || snap.date) && (t.includes('アポイント日') || t.includes('面談日') || t.includes('商談日') || t.includes('面談日時'))) {
+                    applyValueToQuestion(q, snap.appointDate || snap.date);
+                    prefilledAppointCount++;
+                  }
+                });
+              });
+              if (prefilledAppointCount > 0) {
+                console.log(`[Appoint Inherit] Prefilled ${prefilledAppointCount} fields from appointment snapshot.`);
+              }
+            } catch(e) {
+              console.warn('[View Appoint Prefill] Error:', e);
             }
           }
 
@@ -4165,9 +4192,9 @@
           banner.innerHTML = `
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 1.1rem;">ℹ️</span>
-              <span>確定登録コード: <strong style="font-family: monospace; letter-spacing: 1.5px; font-size: 0.95rem; color: #285e61;">${escapeHtml(code)}</strong> の続きから回答しています</span>
+              <span>回答ID: <strong style="font-family: monospace; letter-spacing: 1.5px; font-size: 0.95rem; color: #285e61;">${escapeHtml(code)}</strong> の続きから回答しています</span>
             </div>
-            <span style="font-size: 0.72rem; background: #38b2ac; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 700;">コード確定済</span>
+            <span style="font-size: 0.72rem; background: #38b2ac; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 700;">回答ID確定済</span>
           `;
           banner.style.display = 'flex';
         }
@@ -7229,7 +7256,7 @@
                         <div style="font-size: 0.95rem; font-weight: 700; color: #1d4ed8;">ここまでの内容で途中送信する</div>
                       </div>
                       <div style="font-size: 0.78rem; color: #4b5563; line-height: 1.5; margin-bottom: 14px;">
-                        手元に書類や情報がない場合におすすめです。これまでの回答を安全に保存し、<strong>8桁の確定登録コード</strong>と<strong>後からいつでも再開できる専用URL</strong>を発行します。
+                        手元に書類や情報がない場合におすすめです。これまでの回答を安全に保存し、<strong>8桁の回答ID</strong>と<strong>後からいつでも再開できる専用URL</strong>を発行します。
                       </div>
                     </div>
                     <button type="button" class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 0.85rem; font-weight: 700; padding: 10px; background: #2563eb !important; border-color: #2563eb !important; cursor: pointer;">
@@ -7530,6 +7557,33 @@
             submitData['token'] = window.FORM_TOKEN;
           }
 
+          // 📋 アポイント引継ぎスナップショット情報の回答データへの自動マージ
+          if (window.FORM_APPOINT_SNAPSHOT) {
+            const snap = window.FORM_APPOINT_SNAPSHOT;
+            if (snap.appointId) {
+              submitData['[アポ] アポイントID'] = snap.appointId;
+              submitData['appoint_id'] = snap.appointId;
+            }
+            if (snap.customerName) {
+              submitData['[アポ] 顧客名'] = snap.customerName;
+            }
+            if (snap.appointDate || snap.date) {
+              submitData['[アポ] アポイント日時'] = snap.appointDate || snap.date;
+            }
+            if (snap.meetingType) {
+              submitData['[アポ] 面談形式'] = snap.meetingType;
+            }
+            if (snap.issuerName) {
+              submitData['[アポ] 発行担当者'] = snap.issuerName;
+            }
+            if (snap.introducerName) {
+              submitData['[アポ] 紹介者'] = snap.introducerName;
+            }
+            if (snap.memo) {
+              submitData['[アポ] 商談メモ'] = snap.memo;
+            }
+          }
+
           // フォーム発行ユーザーID（アポインター / 担当者ID）の紐づけ
           let currentIssuerId = window.FORM_ISSUER_ID;
           let currentIssuerName = '';
@@ -7751,10 +7805,10 @@
           const successTitle = document.getElementById('success-title');
           const successDesc = document.getElementById('success-desc');
           if (isPartial) {
-            if (successTitle) successTitle.textContent = window.IS_TEST_ENV ? '【テスト】途中送信が完了し、登録コードが確定しました！' : '途中送信が完了し、登録コードが確定しました！';
+            if (successTitle) successTitle.textContent = window.IS_TEST_ENV ? '【テスト】途中送信が完了し、回答IDが発行されました！' : '途中送信が完了し、回答IDが発行されました！';
             if (successDesc) successDesc.innerHTML = `
               <div style="margin: 16px 0; background: rgba(49, 130, 206, 0.08); border: 1.5px solid #3182ce; border-radius: 8px; padding: 16px; text-align: center;">
-                <div style="font-size: 0.85rem; font-weight: 700; color: #2b6cb0; margin-bottom: 6px;">【 確定登録コード 】</div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: #2b6cb0; margin-bottom: 6px;">【 回答ID 】</div>
                 <div style="font-size: 1.6rem; font-weight: 800; letter-spacing: 2px; color: #2b6cb0; font-family: monospace;">${escapeHtml(confirmedCode)}</div>
                 <div style="font-size: 0.75rem; color: #4a5568; margin-top: 4px;">入力内容が一時保存されました。続きのセクションは後からでもご回答いただけます。</div>
               </div>
@@ -7804,6 +7858,11 @@
               if (window.IS_TEST_ENV) {
                 successDesc.innerHTML = `
                   <p>テスト送信が正常に完了しました。</p>
+                  <div style="margin: 14px auto; background: rgba(49, 130, 206, 0.08); border: 1.5px solid #3182ce; border-radius: 8px; padding: 12px 16px; text-align: center; max-width: 360px;">
+                    <div style="font-size: 0.8rem; font-weight: 700; color: #2b6cb0; margin-bottom: 4px;">【 回答ID 】</div>
+                    <div style="font-size: 1.4rem; font-weight: 800; letter-spacing: 2px; color: #2b6cb0; font-family: monospace;">${escapeHtml(confirmedCode)}</div>
+                    <div style="font-size: 0.72rem; color: #4a5568; margin-top: 2px;">（テスト回答ID）</div>
+                  </div>
                   <div style="margin-top: 14px; padding: 12px 16px; background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 8px; font-size: 0.82rem; color: #92400e; font-weight: 600; text-align: left; display: flex; align-items: flex-start; gap: 10px;">
                     <span style="font-size: 1.2rem;">🛡️</span>
                     <div>
@@ -7813,7 +7872,14 @@
                   </div>
                 `;
               } else {
-                successDesc.textContent = 'ご回答ありがとうございました。内容は正常に記録されました。';
+                successDesc.innerHTML = `
+                  <p>ご回答ありがとうございました。内容は正常に記録されました。</p>
+                  <div style="margin: 16px auto; background: #f0fdf4; border: 1.5px solid #22c55e; border-radius: 8px; padding: 14px 18px; text-align: center; max-width: 360px;">
+                    <div style="font-size: 0.82rem; font-weight: 700; color: #15803d; margin-bottom: 4px;">【 回答ID 】</div>
+                    <div style="font-size: 1.5rem; font-weight: 800; letter-spacing: 2px; color: #166534; font-family: monospace;">${escapeHtml(confirmedCode)}</div>
+                    <div style="font-size: 0.72rem; color: #4b5563; margin-top: 4px;">この回答の受付番号です。お問い合わせの際にお控えください。</div>
+                  </div>
+                `;
               }
             }
           }
@@ -8110,7 +8176,7 @@
                   </div>
                   <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.76rem; color: #64748b;">
                     <span style="background: #fff; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px;"><strong>ステータス</strong> (回答完了 / 途中送信)</span>
-                    <span style="background: #fff; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px;"><strong>登録コード</strong> (8桁確定ID)</span>
+                    <span style="background: #fff; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px;"><strong>回答ID</strong> (8桁確定ID)</span>
                     <span style="background: #fff; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px;"><strong>再開用URL</strong> (途中再開リンク)</span>
                     <span style="background: #fff; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px;"><strong>送信日時</strong> (タイムスタンプ)</span>
                   </div>
