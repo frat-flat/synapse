@@ -435,49 +435,7 @@
                   </div>
                 </div>
 
-                <!-- 1. 会社ロゴ設定 (プロ版限定, プレビュー1段目) -->
-                <div class="form-group pro-only-field" id="pro-logo-container" style="display: none; margin-bottom: 12px; border: 1px solid var(--color-border); padding: 12px; border-radius: 6px; background: rgba(0,0,0,0.02);">
-                  <label style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 700; color: var(--color-text-muted); margin-bottom: 8px;">
-                    <span>🏢 会社ロゴ設定</span>
-                    <span style="font-size: 0.65rem; background: rgba(0, 86, 179, 0.1); color: #0056b3; padding: 1px 4px; border-radius: 3px; font-weight: 700;">プロ版 💎</span>
-                  </label>
-                  
-                  <!-- ロゴタイプ選択 (テキスト / 画像) -->
-                  <div style="display: flex; gap: 15px; margin-bottom: 8px; font-size: 0.75rem;">
-                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; margin: 0;">
-                      <input type="radio" name="editor-logo-type" id="logo-type-text" value="text" checked style="width: 14px; height: 14px; cursor: pointer;" /> テキストロゴ
-                    </label>
-                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; margin: 0;">
-                      <input type="radio" name="editor-logo-type" id="logo-type-image" value="image" style="width: 14px; height: 14px; cursor: pointer;" /> 画像ロゴ
-                    </label>
-                  </div>
-
-                  <!-- ロゴ表示位置選択 (最上部 / 最下部) -->
-                  <div style="display: flex; gap: 15px; margin-bottom: 10px; font-size: 0.75rem;">
-                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; margin: 0;">
-                      <input type="radio" name="editor-logo-position" id="logo-pos-top" value="top" checked style="width: 14px; height: 14px; cursor: pointer;" /> 最上部に表示
-                    </label>
-                    <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; margin: 0;">
-                      <input type="radio" name="editor-logo-position" id="logo-pos-bottom" value="bottom" style="width: 14px; height: 14px; cursor: pointer;" /> 最下部に表示
-                    </label>
-                  </div>
-
-                  <!-- ロゴ入力：テキスト用 -->
-                  <div id="logo-input-text-group" class="form-group" style="margin-bottom: 0;">
-                    <input type="text" id="editor-pro-logo" class="form-control form-control-sm" placeholder="例: 株式会社wayway" />
-                  </div>
-
-                  <!-- ロゴ入力：画像用 (アップロード/URL) -->
-                  <div id="logo-input-image-group" class="form-group" style="display: none; margin-bottom: 0;">
-                    <div style="display: flex; gap: 6px; align-items: center;">
-                      <input type="text" id="editor-pro-logo-image-url" class="form-control form-control-sm" style="flex: 2; height: 30px; font-size: 0.75rem;" placeholder="https://example.com/logo.png" />
-                      <input type="file" id="editor-pro-logo-image-file" style="display: none;" accept="image/*" />
-                      <button type="button" class="btn btn-sm btn-secondary" id="btn-pro-logo-image-upload" style="flex: 1; font-size: 0.7rem; height: 30px; padding: 0 6px; white-space: nowrap;">選択...</button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- フォーム基本情報設定（タイトル・サブタイトル・説明文） -->
+                <!-- フォーム基本情報設定（タイトル・説明文・専用テーブル：常時表示の必須コア情報） -->
                 <div class="settings-card-basic" style="display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 6px; border: 1px solid var(--color-border); background: rgba(0,0,0,0.05); margin-bottom: 12px;">
                   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                     <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">📝 フォーム基本情報</span>
@@ -506,25 +464,7 @@
                     <input type="text" id="editor-form-title" class="form-control title-input" placeholder="フォームのタイトルを入力..." />
                   </div>
 
-                  <!-- 2. サブタイトル (プロ版限定) -->
-                  <div class="form-group pro-only-field" id="pro-subtitle-container" style="display: none; margin: 0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; margin-top: 2px;">
-                      <label for="editor-pro-subtitle" style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--color-text-muted); margin: 0;">
-                        <span>✏️ サブタイトル</span>
-                        <span style="font-size: 0.65rem; background: rgba(0, 86, 179, 0.1); color: #0056b3; padding: 1px 4px; border-radius: 3px; font-weight: 700;">プロ版 💎</span>
-                      </label>
-                      <div style="display: flex; align-items: center; gap: 4px;">
-                        <span style="font-size: 0.68rem; color: var(--color-text-muted);">表示位置:</span>
-                        <select id="editor-subtitle-position" class="form-control form-control-sm" style="width: auto; height: 24px; font-size: 0.7rem; padding: 0 4px; cursor: pointer;">
-                          <option value="below" selected>タイトルの下（標準）</option>
-                          <option value="above">タイトルの上（キャッチ）</option>
-                        </select>
-                      </div>
-                    </div>
-                    <input type="text" id="editor-pro-subtitle" class="form-control form-control-sm" placeholder="例: 運営代行 お申し込みフォーム" />
-                  </div>
-
-                  <!-- 3. フォームの説明 -->
+                  <!-- 2. フォームの説明 -->
                   <div class="form-group" style="margin: 0;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; margin-top: 2px;">
                       <label for="editor-form-desc" style="font-size: 0.75rem; color: var(--color-text-muted); margin: 0;">フォームの説明</label>
@@ -786,9 +726,9 @@
                   </details>
 
                   <!-- 4. 管理者専用ロック -->
-                  <div class="form-group" id="editor-lock-container" style="margin-top: 4px; display: none; align-items: center; gap: 8px;">
-                    <input type="checkbox" id="editor-form-lock" style="width: 16px; height: 16px; cursor: pointer;" />
-                    <label for="editor-form-lock" style="margin: 0; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; color: var(--color-danger);">
+                  <div class="form-group" id="editor-lock-container" style="margin-top: 8px; display: none; flex-direction: row !important; align-items: center; justify-content: flex-start; gap: 6px;">
+                    <input type="checkbox" id="editor-form-lock" style="width: 15px; height: 15px; cursor: pointer; margin: 0;" />
+                    <label for="editor-form-lock" style="margin: 0; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; font-size: 0.75rem; color: var(--color-danger);">
                       <span>🔒 管理者専用ロック (管理者のみ閲覧・編集可能)</span>
                     </label>
                   </div>
@@ -856,270 +796,335 @@
                 <!-- 重複するロゴチェックボックスを非表示化 (JSエラー防止用の非表示インプット) -->
                 <input type="checkbox" id="editor-form-show-logo" style="display: none;" />
 
-                <!-- プロ版専用：高度なカスタマイズパネル（初期状態は非表示） -->
-                <div id="pro-settings-panel" class="pro-features-container" style="display: none; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--color-border); flex-direction: column; gap: 1.25rem;">
-                  <h4 style="font-size: 0.9rem; font-weight: 700; color: var(--color-primary); margin-bottom: 0.25rem; display: flex; align-items: center; gap: 6px;">💎 プロ版限定カスタマイズ設定</h4>
+                <!-- プロ版専用：高度なカスタマイズパネル（カテゴリ別アコーディオン） -->
+                <div id="pro-settings-panel" class="pro-features-container" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--color-border); flex-direction: column; gap: 10px;">
+                  <div style="font-size: 0.8rem; font-weight: 700; color: var(--color-text-muted); margin-bottom: 2px; display: flex; align-items: center; gap: 6px;">
+                    <span>💎 プロ版 カスタマイズ設定（詳細カテゴリ）</span>
+                  </div>
                   
-                  <!-- ヘッダー情報 -->
-                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
-                      <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">🏢 ヘッダー画像設定</span>
-                      <div style="display: flex; align-items: center; gap: 8px; margin: 0;">
-                        <label class="editor-toggle-switch" for="editor-pro-use-header-image" style="margin: 0; cursor: pointer;">
-                          <input type="checkbox" id="editor-pro-use-header-image" />
-                          <span class="editor-toggle-slider"></span>
-                        </label>
-                        <label for="editor-pro-use-header-image" style="font-size: 0.8rem; font-weight: 600; color: var(--color-text); cursor: pointer; margin: 0; user-select: none;">挿入する</label>
+                  <!-- 【カテゴリ1】🏢 ブランド・ロゴ・ヘッダー画像設定 -->
+                  <details class="title-details-accordion" id="accordion-pro-branding" style="margin-bottom: 4px;">
+                    <summary class="title-details-summary" style="padding: 9px 12px !important;">
+                      <div class="title-details-summary-left">
+                        <span class="title-details-summary-icon">🏢</span>
+                        <span class="title-details-summary-text">ブランド・会社ロゴ・ヘッダー画像</span>
+                        <span class="title-details-badge" style="background: rgba(0, 86, 179, 0.1); color: #0056b3;">プロ版 💎</span>
                       </div>
-                    </div>
-                    
-                    <!-- 内部的な値同期およびJSエラー防止用の非表示インプット -->
-                    <input type="text" id="editor-pro-title" style="display: none;" />
-                    <textarea id="editor-pro-disclaimer" style="display: none;"></textarea>
+                      <span class="title-details-arrow">▼</span>
+                    </summary>
+                    <div class="title-details-content" style="padding: 12px; background: rgba(0,0,0,0.02); display: flex; flex-direction: column; gap: 12px;">
+                      <!-- 1. サブタイトル -->
+                      <div class="form-group" id="pro-subtitle-container" style="margin: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                          <label for="editor-pro-subtitle" style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600; margin: 0;">✏️ サブタイトル（キャッチコピー）</label>
+                          <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="font-size: 0.68rem; color: var(--color-text-muted);">表示位置:</span>
+                            <select id="editor-subtitle-position" class="form-control form-control-sm" style="width: auto; height: 24px; font-size: 0.7rem; padding: 0 4px; cursor: pointer;">
+                              <option value="below" selected>タイトルの下（標準）</option>
+                              <option value="above">タイトルの上（キャッチ）</option>
+                            </select>
+                          </div>
+                        </div>
+                        <input type="text" id="editor-pro-subtitle" class="form-control form-control-sm" placeholder="例: 運営代行 お申し込みフォーム" />
+                      </div>
 
-                    <div id="pro-header-image-edit-group" style="display: none; flex-direction: column; gap: 10px;">
-                      <div class="form-group" style="margin-top: 2px;">
-                        <label style="font-size: 0.75rem; color: var(--color-text-muted);">ヘッダー画像 (アップロードまたはURL)</label>
-                        <div style="display: flex; gap: 8px; align-items: center;">
-                          <input type="text" id="editor-pro-header-image-url" class="form-control form-control-sm" style="flex: 2; height: 30px; font-size: 0.75rem;" placeholder="https://example.com/image.jpg またはローカルパス" />
-                          <input type="file" id="editor-pro-header-image-file" style="display: none;" accept="image/*" />
-                          <button type="button" class="btn btn-sm btn-secondary" id="btn-pro-header-image-upload" style="flex: 1; font-size: 0.7rem; height: 30px; padding: 2px 8px; white-space: nowrap;">画像を選択...</button>
+                      <!-- 2. 会社ロゴ設定 -->
+                      <div class="form-group" id="pro-logo-container" style="margin: 0; border: 1px solid var(--color-border); padding: 10px 12px; border-radius: 6px; background: var(--color-bg-card, #fff);">
+                        <label style="font-size: 0.75rem; font-weight: 700; color: var(--color-text); margin-bottom: 8px; display: block;">
+                          🏢 会社ロゴ表示
+                        </label>
+                        <div style="display: flex; gap: 15px; margin-bottom: 8px; font-size: 0.75rem;">
+                          <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; margin: 0;">
+                            <input type="radio" name="editor-logo-type" id="logo-type-text" value="text" checked style="width: 14px; height: 14px; cursor: pointer;" /> テキストロゴ
+                          </label>
+                          <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; margin: 0;">
+                            <input type="radio" name="editor-logo-type" id="logo-type-image" value="image" style="width: 14px; height: 14px; cursor: pointer;" /> 画像ロゴ
+                          </label>
                         </div>
-                        
-                        <!-- ヘッダー用ドラッグ＆ドロップおよびレパートリー履歴 -->
-                        <div id="header-image-dropzone" class="editor-dropzone">
-                          📂 ここにヘッダー用画像をドラッグ＆ドロップ
+                        <div style="display: flex; gap: 15px; margin-bottom: 8px; font-size: 0.75rem;">
+                          <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; margin: 0;">
+                            <input type="radio" name="editor-logo-position" id="logo-pos-top" value="top" checked style="width: 14px; height: 14px; cursor: pointer;" /> 最上部に表示
+                          </label>
+                          <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; margin: 0;">
+                            <input type="radio" name="editor-logo-position" id="logo-pos-bottom" value="bottom" style="width: 14px; height: 14px; cursor: pointer;" /> 最下部に表示
+                          </label>
                         </div>
-                        
-                        <div id="header-library-container" class="image-library-container" style="display: none;">
-                          <span class="image-library-title">📁 保存されたヘッダー画像レパートリー</span>
-                          <div id="header-library-gallery" class="image-library-gallery"></div>
+                        <div id="logo-input-text-group" class="form-group" style="margin-bottom: 0;">
+                          <input type="text" id="editor-pro-logo" class="form-control form-control-sm" placeholder="例: 株式会社wayway" />
                         </div>
-                      </div>
-                      <!-- 画像の拡大・縮小 (ズーム) -->
-                      <div class="form-group" style="margin-top: 2px; margin-bottom: 2px;">
-                        <label style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; display: block;">🔍 画像の拡大・縮小 (ズーム)</label>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                          <input type="range" id="editor-pro-header-image-scale" min="30" max="300" value="100" style="flex: 1; height: 18px; cursor: pointer;" />
-                          <div style="display: flex; align-items: center; gap: 2px; flex-shrink: 0;">
-                            <input type="number" id="editor-pro-header-image-scale-num" min="30" max="300" value="100" class="form-control form-control-sm" style="width: 48px; height: 22px; font-size: 0.7rem; text-align: center; padding: 0 2px;" />
-                            <span style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600;">%</span>
+                        <div id="logo-input-image-group" class="form-group" style="display: none; margin-bottom: 0;">
+                          <div style="display: flex; gap: 6px; align-items: center;">
+                            <input type="text" id="editor-pro-logo-image-url" class="form-control form-control-sm" style="flex: 2; height: 30px; font-size: 0.75rem;" placeholder="https://example.com/logo.png" />
+                            <input type="file" id="editor-pro-logo-image-file" style="display: none;" accept="image/*" />
+                            <button type="button" class="btn btn-sm btn-secondary" id="btn-pro-logo-image-upload" style="flex: 1; font-size: 0.7rem; height: 30px; padding: 0 6px; white-space: nowrap;">選択...</button>
                           </div>
                         </div>
                       </div>
 
-                      <!-- 縦横位置調整 (コンパクト2カラムフレックス配置) -->
-                      <div style="display: flex; gap: 12px; margin-top: 2px; margin-bottom: 2px;">
-                        <!-- 縦方向 -->
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                          <label style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; display: block;">↕️ 表示位置 (縦方向)</label>
-                          <div style="display: flex; align-items: center; gap: 6px;">
-                            <input type="range" id="editor-pro-header-image-position" min="0" max="100" value="50" style="flex: 1; height: 18px; cursor: pointer;" />
-                            <div style="display: flex; align-items: center; gap: 2px; flex-shrink: 0;">
-                              <input type="number" id="editor-pro-header-image-position-num" min="0" max="100" value="50" class="form-control form-control-sm" style="width: 40px; height: 22px; font-size: 0.7rem; text-align: center; padding: 0 2px;" />
-                              <span style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600;">%</span>
+                      <!-- 3. ヘッダー画像設定 -->
+                      <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; background: var(--color-bg-card, #fff); border-radius: 6px; border: 1px solid var(--color-border); margin: 0;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
+                          <span style="font-size: 0.78rem; font-weight: 600; color: var(--color-text);">🖼️ ヘッダー画像</span>
+                          <div style="display: flex; align-items: center; gap: 8px; margin: 0;">
+                            <label class="editor-toggle-switch" for="editor-pro-use-header-image" style="margin: 0; cursor: pointer;">
+                              <input type="checkbox" id="editor-pro-use-header-image" />
+                              <span class="editor-toggle-slider"></span>
+                            </label>
+                            <label for="editor-pro-use-header-image" style="font-size: 0.78rem; font-weight: 600; color: var(--color-text); cursor: pointer; margin: 0; user-select: none;">挿入する</label>
+                          </div>
+                        </div>
+                        
+                        <input type="text" id="editor-pro-title" style="display: none;" />
+                        <textarea id="editor-pro-disclaimer" style="display: none;"></textarea>
+
+                        <div id="pro-header-image-edit-group" style="display: none; flex-direction: column; gap: 10px;">
+                          <div class="form-group" style="margin-top: 2px;">
+                            <label style="font-size: 0.75rem; color: var(--color-text-muted);">ヘッダー画像 (アップロードまたはURL)</label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                              <input type="text" id="editor-pro-header-image-url" class="form-control form-control-sm" style="flex: 2; height: 30px; font-size: 0.75rem;" placeholder="https://example.com/image.jpg またはローカルパス" />
+                              <input type="file" id="editor-pro-header-image-file" style="display: none;" accept="image/*" />
+                              <button type="button" class="btn btn-sm btn-secondary" id="btn-pro-header-image-upload" style="flex: 1; font-size: 0.7rem; height: 30px; padding: 2px 8px; white-space: nowrap;">画像を選択...</button>
+                            </div>
+                            <div id="header-image-dropzone" class="editor-dropzone">
+                              📂 ここにヘッダー用画像をドラッグ＆ドロップ
+                            </div>
+                            <div id="header-library-container" class="image-library-container" style="display: none;">
+                              <span class="image-library-title">📁 保存されたヘッダー画像レパートリー</span>
+                              <div id="header-library-gallery" class="image-library-gallery"></div>
+                            </div>
+                          </div>
+                          <!-- ズーム & 位置調整 -->
+                          <div class="form-group" style="margin-top: 2px; margin-bottom: 2px;">
+                            <label style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; display: block;">🔍 画像の拡大・縮小 (ズーム)</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                              <input type="range" id="editor-pro-header-image-scale" min="30" max="300" value="100" style="flex: 1; height: 18px; cursor: pointer;" />
+                              <div style="display: flex; align-items: center; gap: 2px; flex-shrink: 0;">
+                                <input type="number" id="editor-pro-header-image-scale-num" min="30" max="300" value="100" class="form-control form-control-sm" style="width: 48px; height: 22px; font-size: 0.7rem; text-align: center; padding: 0 2px;" />
+                                <span style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600;">%</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div style="display: flex; gap: 12px; margin-top: 2px; margin-bottom: 2px;">
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                              <label style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; display: block;">↕️ 表示位置 (縦方向)</label>
+                              <div style="display: flex; align-items: center; gap: 6px;">
+                                <input type="range" id="editor-pro-header-image-position" min="0" max="100" value="50" style="flex: 1; height: 18px; cursor: pointer;" />
+                                <div style="display: flex; align-items: center; gap: 2px; flex-shrink: 0;">
+                                  <input type="number" id="editor-pro-header-image-position-num" min="0" max="100" value="50" class="form-control form-control-sm" style="width: 40px; height: 22px; font-size: 0.7rem; text-align: center; padding: 0 2px;" />
+                                  <span style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600;">%</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                              <label style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; display: block;">↔️ 表示位置 (横方向)</label>
+                              <div style="display: flex; align-items: center; gap: 6px;">
+                                <input type="range" id="editor-pro-header-image-position-x" min="0" max="100" value="50" style="flex: 1; height: 18px; cursor: pointer;" />
+                                <div style="display: flex; align-items: center; gap: 2px; flex-shrink: 0;">
+                                  <input type="number" id="editor-pro-header-image-position-x-num" min="0" max="100" value="50" class="form-control form-control-sm" style="width: 40px; height: 22px; font-size: 0.7rem; text-align: center; padding: 0 2px;" />
+                                  <span style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600;">%</span>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
-                        
-                        <!-- 横方向 -->
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                          <label style="font-size: 0.7rem; color: var(--color-text-muted); margin-bottom: 2px; display: block;">↔️ 表示位置 (横方向)</label>
-                          <div style="display: flex; align-items: center; gap: 6px;">
-                            <input type="range" id="editor-pro-header-image-position-x" min="0" max="100" value="50" style="flex: 1; height: 18px; cursor: pointer;" />
-                            <div style="display: flex; align-items: center; gap: 2px; flex-shrink: 0;">
-                              <input type="number" id="editor-pro-header-image-position-x-num" min="0" max="100" value="50" class="form-control form-control-sm" style="width: 40px; height: 22px; font-size: 0.7rem; text-align: center; padding: 0 2px;" />
-                              <span style="font-size: 0.7rem; color: var(--color-text-muted); font-weight: 600;">%</span>
+                      </div>
+                    </div>
+                  </details>
+
+                  <!-- 【カテゴリ2】🎨 デザイン・テーマカラー・文字サイズ設定 -->
+                  <details class="title-details-accordion" id="accordion-pro-theme" style="margin-bottom: 4px;">
+                    <summary class="title-details-summary" style="padding: 9px 12px !important;">
+                      <div class="title-details-summary-left">
+                        <span class="title-details-summary-icon">🎨</span>
+                        <span class="title-details-summary-text">デザイン・テーマカラー・文字サイズ</span>
+                        <span class="title-details-badge" style="background: rgba(0, 86, 179, 0.1); color: #0056b3;">プロ版 💎</span>
+                      </div>
+                      <span class="title-details-arrow">▼</span>
+                    </summary>
+                    <div class="title-details-content" style="padding: 12px; background: rgba(0,0,0,0.02); display: flex; flex-direction: column; gap: 12px;">
+                      <!-- 1. おすすめ2色テーマカラー選択 -->
+                      <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; background: var(--color-bg-card, #fff); border-radius: 6px; border: 1px solid var(--color-border); margin: 0;">
+                        <span style="font-size: 0.78rem; font-weight: 600; color: var(--color-text);">🎨 おすすめ2色テーマカラー</span>
+                        <div id="pro-color-presets" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                        <div class="form-group-row" style="display: flex; gap: 10px; align-items: center;">
+                          <div class="form-group" style="flex: 2; margin: 0;">
+                            <label style="font-size: 0.72rem; color: var(--color-text-muted);">背景色の濃淡（明度・彩度）のコントラスト微調整</label>
+                            <input type="range" id="editor-pro-contrast" min="50" max="150" value="100" style="width: 100%;" />
+                          </div>
+                          <div class="form-group" style="flex: 1; display: flex; gap: 8px; margin: 0;">
+                            <div>
+                              <label style="font-size: 0.68rem; color: var(--color-text-muted); display: block;">テーマ色</label>
+                              <input type="color" id="editor-pro-color-primary" style="width: 38px; height: 28px; border: 1px solid var(--color-border); border-radius: 4px; padding: 0; cursor: pointer;" />
+                            </div>
+                            <div>
+                              <label style="font-size: 0.68rem; color: var(--color-text-muted); display: block;">背景色</label>
+                              <input type="color" id="editor-pro-color-bg" style="width: 38px; height: 28px; border: 1px solid var(--color-border); border-radius: 4px; padding: 0; cursor: pointer;" />
                             </div>
                           </div>
                         </div>
                       </div>
-                      <span style="font-size: 0.6rem; color: var(--color-text-muted); display: block; margin-top: 2px;">※ 数値の直接入力またはスライダー操作で、画像の位置や拡大率を微調整できます。</span>
-                    </div>
-                  </div>
 
-                  <!-- レイアウト・進捗表示 -->
-                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
-                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">📖 表示レイアウト ＆ 進捗インジケーター</span>
-                    <div class="form-group-row" style="display: flex; gap: 10px;">
-                      <div class="form-group flex-1">
-                        <label style="font-size: 0.75rem; color: var(--color-text-muted);">表示レイアウト</label>
-                        <select id="editor-pro-display-mode" class="form-control form-control-sm">
-                          <option value="scroll">1ページ縦並びスクロール方式</option>
-                          <option value="multistep">ページめくり（マルチステップ）方式</option>
-                        </select>
-                      </div>
-                      <div class="form-group flex-1" id="pro-progress-indicator-group">
-                        <label style="font-size: 0.75rem; color: var(--color-text-muted);">進捗の表示方法</label>
-                        <select id="editor-pro-progress-indicator" class="form-control form-control-sm">
-                          <option value="percentage">パーセンテージ表記 (50%完了)</option>
-                          <option value="page_number">ページ数表記 (Page 2 / 5)</option>
-                          <option value="section_title">セクション名表記 (現在の入力: 〇〇)</option>
-                          <option value="both">複合表示 (パーセント + ページ数)</option>
-                          <option value="none">非表示</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- 文字サイズ調整 -->
-                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
-                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">📐 各要素の文字サイズ調整</span>
-                    <div class="form-group-column" style="display: flex; flex-direction: column; gap: 12px;">
-
-                      <!-- 大タイトルサイズ -->
-                      <div class="form-group" style="display: flex; flex-direction: column; gap: 4px; margin: 0;">
-                        <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">大タイトルサイズ</label>
-                        <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
-                          <select id="editor-pro-size-title" class="form-control form-control-sm" style="flex: 1; max-width: 150px; cursor: pointer;">
-                            <option value="small">S (小)</option>
-                            <option value="medium">M (中)</option>
-                            <option value="large" selected>L (大)</option>
-                            <option value="custom">カスタム</option>
-                          </select>
-                          <div id="editor-pro-size-title-custom-container" style="display: none; align-items: center; gap: 4px; flex: 1;">
-                            <input type="number" id="editor-pro-size-title-custom-val" class="form-control form-control-sm" style="width: 80px; height: 32px;" min="10" max="100" value="28" />
-                            <span style="font-size: 0.75rem; color: var(--color-text-muted);">px</span>
+                      <!-- 2. 背景画像の着せ替えデコレーション -->
+                      <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--color-bg-card, #fff); border-radius: 6px; border: 1px solid var(--color-border); margin: 0;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; width: 100%;">
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                            <label class="editor-toggle-switch" for="editor-pro-use-bg-image" style="margin: 0; cursor: pointer;">
+                              <input type="checkbox" id="editor-pro-use-bg-image" />
+                              <span class="editor-toggle-slider"></span>
+                            </label>
+                            <label for="editor-pro-use-bg-image" style="font-size: 0.78rem; font-weight: 600; color: var(--color-text); cursor: pointer; margin: 0; user-select: none;">🖼️ 背景画像を着せ替える</label>
+                          </div>
+                          <div id="pro-bg-theme-select-group" style="display: none; align-items: center; gap: 6px; flex: 1; min-width: 160px; margin: 0;">
+                            <select id="editor-pro-bg-theme-select" class="form-control form-control-sm" style="margin: 0; height: 32px !important; padding: 2px 6px !important; font-size: 0.75rem !important; cursor: pointer;">
+                              <option value="">-- 未選択 --</option>
+                              <option value="spring">🌸 春 (桜の舞うピンク)</option>
+                              <option value="summer">🌻 夏 (ひまわりと爽やかな青)</option>
+                              <option value="autumn">🍁 秋 (もみじ深まるオレンジ)</option>
+                              <option value="winter">❄️ 冬 (雪のきらめくブルー)</option>
+                              <option value="sunset">🌇 日没 (エモーショナルな夕焼け)</option>
+                              <option value="sunrise">🌅 朝日 (清々しい朝 of 光)</option>
+                              <option value="space">🌌 宇宙 (神秘の星屑ダーク)</option>
+                              <option value="green">🍃 緑地帯 (安らぐ新緑グリーン)</option>
+                              <option value="it">💻 IT (サイバーネオングリッド)</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div id="pro-bg-custom-group" style="display: none; flex-direction: column; gap: 6px; width: 100%; border-top: 1px dashed rgba(0,0,0,0.08); padding-top: 8px; margin-top: 4px;">
+                          <input type="file" id="editor-pro-bg-image-file" style="display: none;" accept="image/*" />
+                          <div id="bg-image-dropzone" class="editor-dropzone">
+                            📂 ここにカスタム背景画像をドラッグ＆ドロップ（またはクリック）
+                          </div>
+                          <div id="bg-library-container" class="image-library-container" style="display: none;">
+                            <span class="image-library-title">📁 保存された背景画像レパートリー</span>
+                            <div id="bg-library-gallery" class="image-library-gallery"></div>
                           </div>
                         </div>
                       </div>
 
-                      <!-- セクション見出し -->
-                      <div class="form-group" style="display: flex; flex-direction: column; gap: 4px; margin: 0;">
-                        <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">セクション見出し</label>
-                        <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
-                          <select id="editor-pro-size-section" class="form-control form-control-sm" style="flex: 1; max-width: 150px; cursor: pointer;">
-                            <option value="small">S (小)</option>
-                            <option value="medium" selected>M (中)</option>
-                            <option value="large">L (大)</option>
-                            <option value="custom">カスタム</option>
-                          </select>
-                          <div id="editor-pro-size-section-custom-container" style="display: none; align-items: center; gap: 4px; flex: 1;">
-                            <input type="number" id="editor-pro-size-section-custom-val" class="form-control form-control-sm" style="width: 80px; height: 32px;" min="10" max="100" value="20" />
-                            <span style="font-size: 0.75rem; color: var(--color-text-muted);">px</span>
+                      <!-- 3. 文字サイズ調整 -->
+                      <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; background: var(--color-bg-card, #fff); border-radius: 6px; border: 1px solid var(--color-border); margin: 0;">
+                        <span style="font-size: 0.78rem; font-weight: 600; color: var(--color-text);">📐 各要素の文字サイズ調整</span>
+                        <div class="form-group-column" style="display: flex; flex-direction: column; gap: 10px;">
+                          <!-- 大タイトル -->
+                          <div class="form-group" style="display: flex; justify-content: space-between; align-items: center; margin: 0;">
+                            <label style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600; margin: 0;">大タイトル</label>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                              <select id="editor-pro-size-title" class="form-control form-control-sm" style="width: 100px; height: 26px; font-size: 0.7rem; cursor: pointer;">
+                                <option value="small">S (小)</option>
+                                <option value="medium">M (中)</option>
+                                <option value="large" selected>L (大)</option>
+                                <option value="custom">カスタム</option>
+                              </select>
+                              <div id="editor-pro-size-title-custom-container" style="display: none; align-items: center; gap: 2px;">
+                                <input type="number" id="editor-pro-size-title-custom-val" class="form-control form-control-sm" style="width: 50px; height: 26px; font-size: 0.7rem;" min="10" max="100" value="28" />
+                                <span style="font-size: 0.68rem; color: var(--color-text-muted);">px</span>
+                              </div>
+                            </div>
+                          </div>
+                          <!-- セクション見出し -->
+                          <div class="form-group" style="display: flex; justify-content: space-between; align-items: center; margin: 0;">
+                            <label style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600; margin: 0;">セクション見出し</label>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                              <select id="editor-pro-size-section" class="form-control form-control-sm" style="width: 100px; height: 26px; font-size: 0.7rem; cursor: pointer;">
+                                <option value="small">S (小)</option>
+                                <option value="medium" selected>M (中)</option>
+                                <option value="large">L (大)</option>
+                                <option value="custom">カスタム</option>
+                              </select>
+                              <div id="editor-pro-size-section-custom-container" style="display: none; align-items: center; gap: 2px;">
+                                <input type="number" id="editor-pro-size-section-custom-val" class="form-control form-control-sm" style="width: 50px; height: 26px; font-size: 0.7rem;" min="10" max="100" value="20" />
+                                <span style="font-size: 0.68rem; color: var(--color-text-muted);">px</span>
+                              </div>
+                            </div>
+                          </div>
+                          <!-- 質問項目ラベル -->
+                          <div class="form-group" style="display: flex; justify-content: space-between; align-items: center; margin: 0;">
+                            <label style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600; margin: 0;">質問項目ラベル</label>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                              <select id="editor-pro-size-label" class="form-control form-control-sm" style="width: 100px; height: 26px; font-size: 0.7rem; cursor: pointer;">
+                                <option value="small">S (小)</option>
+                                <option value="medium" selected>M (中)</option>
+                                <option value="large">L (大)</option>
+                                <option value="custom">カスタム</option>
+                              </select>
+                              <div id="editor-pro-size-label-custom-container" style="display: none; align-items: center; gap: 2px;">
+                                <input type="number" id="editor-pro-size-label-custom-val" class="form-control form-control-sm" style="width: 50px; height: 26px; font-size: 0.7rem;" min="10" max="100" value="16" />
+                                <span style="font-size: 0.68rem; color: var(--color-text-muted);">px</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </details>
+
+                  <!-- 【カテゴリ3】📖 画面レイアウト・進捗・所要時間案内設定 -->
+                  <details class="title-details-accordion" id="accordion-pro-layout" style="margin-bottom: 4px;">
+                    <summary class="title-details-summary" style="padding: 9px 12px !important;">
+                      <div class="title-details-summary-left">
+                        <span class="title-details-summary-icon">📖</span>
+                        <span class="title-details-summary-text">画面レイアウト・進捗・所要時間案内</span>
+                        <span class="title-details-badge" style="background: rgba(0, 86, 179, 0.1); color: #0056b3;">プロ版 💎</span>
+                      </div>
+                      <span class="title-details-arrow">▼</span>
+                    </summary>
+                    <div class="title-details-content" style="padding: 12px; background: rgba(0,0,0,0.02); display: flex; flex-direction: column; gap: 12px;">
+                      <!-- 1. レイアウト・進捗表示 -->
+                      <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; background: var(--color-bg-card, #fff); border-radius: 6px; border: 1px solid var(--color-border); margin: 0;">
+                        <span style="font-size: 0.78rem; font-weight: 600; color: var(--color-text);">📖 表示レイアウト ＆ 進捗インジケーター</span>
+                        <div class="form-group-row" style="display: flex; gap: 10px;">
+                          <div class="form-group flex-1" style="margin: 0;">
+                            <label style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600;">表示レイアウト</label>
+                            <select id="editor-pro-display-mode" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; cursor: pointer;">
+                              <option value="scroll">1ページ縦並びスクロール方式</option>
+                              <option value="multistep">ページめくり（マルチステップ）方式</option>
+                            </select>
+                          </div>
+                          <div class="form-group flex-1" id="pro-progress-indicator-group" style="margin: 0;">
+                            <label style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 600;">進捗の表示方法</label>
+                            <select id="editor-pro-progress-indicator" class="form-control form-control-sm" style="height: 28px; font-size: 0.72rem; cursor: pointer;">
+                              <option value="percentage">パーセンテージ表記 (50%完了)</option>
+                              <option value="page_number">ページ数表記 (Page 2 / 5)</option>
+                              <option value="section_title">セクション名表記 (現在の入力: 〇〇)</option>
+                              <option value="both">複合表示 (パーセント + ページ数)</option>
+                              <option value="none">非表示</option>
+                            </select>
                           </div>
                         </div>
                       </div>
 
-                      <!-- 質問項目ラベル -->
-                      <div class="form-group" style="display: flex; flex-direction: column; gap: 4px; margin: 0;">
-                        <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">質問項目ラベル</label>
-                        <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
-                          <select id="editor-pro-size-label" class="form-control form-control-sm" style="flex: 1; max-width: 150px; cursor: pointer;">
-                            <option value="small">S (小)</option>
-                            <option value="medium" selected>M (中)</option>
-                            <option value="large">L (大)</option>
-                            <option value="custom">カスタム</option>
-                          </select>
-                          <div id="editor-pro-size-label-custom-container" style="display: none; align-items: center; gap: 4px; flex: 1;">
-                            <input type="number" id="editor-pro-size-label-custom-val" class="form-control form-control-sm" style="width: 80px; height: 32px;" min="10" max="100" value="16" />
-                            <span style="font-size: 0.75rem; color: var(--color-text-muted);">px</span>
+                      <!-- 2. アラート ＆ 所要時間設定 -->
+                      <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; background: var(--color-bg-card, #fff); border-radius: 6px; border: 1px solid var(--color-border); margin: 0;">
+                        <!-- 所要時間設定 -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                            <label class="editor-toggle-switch" for="editor-pro-show-duration" style="margin: 0; cursor: pointer;">
+                              <input type="checkbox" id="editor-pro-show-duration" />
+                              <span class="editor-toggle-slider"></span>
+                            </label>
+                            <label for="editor-pro-show-duration" style="font-size: 0.78rem; font-weight: 600; color: var(--color-text); cursor: pointer; margin: 0; user-select: none;">🕒 所要時間目安を表示</label>
+                          </div>
+                          <div id="pro-duration-input-group" style="display: none; flex: 1; min-width: 160px; margin: 0;">
+                            <input type="text" id="editor-pro-duration-text" class="form-control form-control-sm" style="margin: 0; height: 28px; font-size: 0.72rem;" placeholder="例: 所要時間 目安5~10分" />
+                          </div>
+                        </div>
+                        
+                        <!-- 注意事項アラートボックス設定 -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; border-top: 1px dashed rgba(0,0,0,0.08); padding-top: 8px;">
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                            <label class="editor-toggle-switch" for="editor-pro-show-alert" style="margin: 0; cursor: pointer;">
+                              <input type="checkbox" id="editor-pro-show-alert" />
+                              <span class="editor-toggle-slider"></span>
+                            </label>
+                            <label for="editor-pro-show-alert" style="font-size: 0.78rem; font-weight: 600; color: var(--color-text); cursor: pointer; margin: 0; user-select: none;">⚠️ 注意事項アラートを表示</label>
+                          </div>
+                          <div id="pro-alert-input-group" style="display: none; flex: 1; min-width: 160px; margin: 0;">
+                            <textarea id="editor-pro-alert-text" class="form-control form-control-sm" rows="1" style="margin: 0; padding: 3px 6px; font-size: 0.72rem;" placeholder="例: 全項目をご入力ください..."></textarea>
                           </div>
                         </div>
                       </div>
-
                     </div>
-                  </div>
-
-                  <!-- 2色カラーセット ＆ 濃淡コントラスト -->
-                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
-                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">🎨 おすすめ2色テーマカラー選択</span>
-                    <div id="pro-color-presets" style="display: flex; flex-wrap: wrap; gap: 6px;">
-                      <!-- JSでプリセットのチップが動的生成されます -->
-                    </div>
-                    <div class="form-group-row" style="display: flex; gap: 10px; align-items: center;">
-                      <div class="form-group" style="flex: 2;">
-                        <label style="font-size: 0.75rem; color: var(--color-text-muted);">背景色の濃淡（明度・彩度）のコントラスト微調整</label>
-                        <input type="range" id="editor-pro-contrast" min="50" max="150" value="100" style="width: 100%;" />
-                      </div>
-                      <div class="form-group" style="flex: 1; display: flex; gap: 8px;">
-                        <div>
-                          <label style="font-size: 0.70rem; color: var(--color-text-muted); display: block;">テーマ色</label>
-                          <input type="color" id="editor-pro-color-primary" style="width: 40px; height: 30px; border: 1px solid var(--color-border); border-radius: 4px; padding: 0; cursor: pointer;" />
-                        </div>
-                        <div>
-                          <label style="font-size: 0.70rem; color: var(--color-text-muted); display: block;">背景色</label>
-                          <input type="color" id="editor-pro-color-bg" style="width: 40px; height: 30px; border: 1px solid var(--color-border); border-radius: 4px; padding: 0; cursor: pointer;" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-
-
-                  <!-- 背景画像の着せ替えデコレーション -->
-                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; width: 100%;">
-                      <div style="display: flex; align-items: center; gap: 8px;">
-                        <label class="editor-toggle-switch" for="editor-pro-use-bg-image" style="margin: 0; cursor: pointer;">
-                          <input type="checkbox" id="editor-pro-use-bg-image" />
-                          <span class="editor-toggle-slider"></span>
-                        </label>
-                        <label for="editor-pro-use-bg-image" style="font-size: 0.8rem; font-weight: 600; color: var(--color-text); cursor: pointer; margin: 0; user-select: none;">🖼️ 背景画像を挿入する</label>
-                      </div>
-                      
-                      <div id="pro-bg-theme-select-group" style="display: none; align-items: center; gap: 6px; flex: 1; min-width: 160px; margin: 0;">
-                        <select id="editor-pro-bg-theme-select" class="form-control form-control-sm" style="margin: 0; height: 34px !important; padding: 4px 8px !important; line-height: 1.5 !important; font-size: 0.8rem !important; cursor: pointer;">
-                          <option value="">-- 未選択 --</option>
-                          <option value="spring">🌸 春 (桜の舞うピンク)</option>
-                          <option value="summer">🌻 夏 (ひまわりと爽やかな青)</option>
-                          <option value="autumn">🍁 秋 (もみじ深まるオレンジ)</option>
-                          <option value="winter">❄️ 冬 (雪のきらめくブルー)</option>
-                          <option value="sunset">🌇 日没 (エモーショナルな夕焼け)</option>
-                          <option value="sunrise">🌅 朝日 (清々しい朝 of 光)</option>
-                          <option value="space">🌌 宇宙 (神秘の星屑ダーク)</option>
-                          <option value="green">🍃 緑地帯 (安らぐ新緑グリーン)</option>
-                          <option value="it">💻 IT (サイバーネオングリッド)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <!-- 背景用ドラッグ＆ドロップおよびレパートリー履歴（ONの時のみ展開） -->
-                    <div id="pro-bg-custom-group" style="display: none; flex-direction: column; gap: 6px; width: 100%; border-top: 1px dashed rgba(0,0,0,0.08); padding-top: 8px; margin-top: 4px;">
-                      <!-- 非表示ファイル選択要素 -->
-                      <input type="file" id="editor-pro-bg-image-file" style="display: none;" accept="image/*" />
-                      <div id="bg-image-dropzone" class="editor-dropzone">
-                        📂 ここにカスタム背景画像をドラッグ＆ドロップ（またはクリック）
-                      </div>
-                      
-                      <div id="bg-library-container" class="image-library-container" style="display: none;">
-                        <span class="image-library-title">📁 保存された背景画像レパートリー</span>
-                        <div id="bg-library-gallery" class="image-library-gallery"></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- アラート ＆ 所要時間設定 -->
-                  <div class="settings-card-pro" style="display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px solid var(--color-border);">
-                    <!-- 所要時間設定 -->
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
-                      <div style="display: flex; align-items: center; gap: 8px;">
-                        <label class="editor-toggle-switch" for="editor-pro-show-duration" style="margin: 0; cursor: pointer;">
-                          <input type="checkbox" id="editor-pro-show-duration" />
-                          <span class="editor-toggle-slider"></span>
-                        </label>
-                        <label for="editor-pro-show-duration" style="font-size: 0.8rem; font-weight: 600; color: var(--color-text); cursor: pointer; margin: 0; user-select: none;">🕒 所要時間目安を表示</label>
-                      </div>
-                      <div id="pro-duration-input-group" style="display: none; flex: 1; min-width: 160px; margin: 0;">
-                        <input type="text" id="editor-pro-duration-text" class="form-control form-control-sm" style="margin: 0; height: 30px; font-size: 0.75rem;" placeholder="例: 所要時間 目安5~10分" />
-                      </div>
-                    </div>
-                    
-                    <!-- 注意事項アラートボックス設定 -->
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; border-top: 1px dashed rgba(0,0,0,0.08); padding-top: 8px;">
-                      <div style="display: flex; align-items: center; gap: 8px;">
-                        <label class="editor-toggle-switch" for="editor-pro-show-alert" style="margin: 0; cursor: pointer;">
-                          <input type="checkbox" id="editor-pro-show-alert" />
-                          <span class="editor-toggle-slider"></span>
-                        </label>
-                        <label for="editor-pro-show-alert" style="font-size: 0.8rem; font-weight: 600; color: var(--color-text); cursor: pointer; margin: 0; user-select: none;">⚠️ 注意事項アラートを表示</label>
-                      </div>
-                      <div id="pro-alert-input-group" style="display: none; flex: 1; min-width: 160px; margin: 0;">
-                        <textarea id="editor-pro-alert-text" class="form-control form-control-sm" rows="1" style="margin: 0; padding: 4px 8px; font-size: 0.75rem;" placeholder="例: 全項目をご入力ください..."></textarea>
-                      </div>
-                    </div>
-                  </div>
-
+                  </details>
                 </div>
               </div>
 
