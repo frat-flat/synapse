@@ -22880,12 +22880,35 @@
       }
     }
 
+    function updateAppointStatusBadge(isEnabled) {
+      const badge = document.getElementById('editor-appoint-status-badge');
+      if (!badge) return;
+      badge.style.display = 'inline-block';
+      if (isEnabled) {
+        badge.textContent = '連携中 ✨';
+        badge.style.background = '#e0f2fe';
+        badge.style.color = '#0284c7';
+      } else {
+        badge.textContent = '未連携';
+        badge.style.background = '#f1f5f9';
+        badge.style.color = '#64748b';
+      }
+    }
+
     // フォームが切り替わった場合、または未同期の場合にUIへ反映
     const currentFormKey = `${formId}_${formDef.appointIntegration.enabled}`;
     if (enabledToggle.dataset.lastFormKey !== currentFormKey) {
       enabledToggle.dataset.lastFormKey = currentFormKey;
       enabledToggle.checked = !!formDef.appointIntegration.enabled;
       detailsPanel.style.display = enabledToggle.checked ? 'flex' : 'none';
+      updateAppointStatusBadge(enabledToggle.checked);
+
+      const accordion = document.getElementById('editor-appoint-accordion');
+      if (accordion && accordion.dataset.lastFormKey !== currentFormKey) {
+        accordion.dataset.lastFormKey = currentFormKey;
+        // ユーザー指示に基づき、フォーム切替時はデフォルトで閉じた状態にする
+        accordion.open = false;
+      }
 
       APPOINT_FIELD_KEYS.forEach(key => {
         const cb = document.getElementById(`editor-appoint-field-${key}`);
@@ -22920,6 +22943,7 @@
               enabledToggle.checked = false;
               curDef.appointIntegration.enabled = false;
               detailsPanel.style.display = 'none';
+              updateAppointStatusBadge(false);
               enabledToggle.dataset.lastFormKey = `${curDef.id || ''}_false`;
 
               syncAppointIntegrationToStorage(curDef);
@@ -22932,6 +22956,7 @@
             } else {
               // キャンセル：何もしない（checked は ON のまま維持）
               enabledToggle.checked = true;
+              updateAppointStatusBadge(true);
             }
           };
 
@@ -22946,6 +22971,7 @@
           enabledToggle.checked = true;
           curDef.appointIntegration.enabled = true;
           detailsPanel.style.display = 'flex';
+          updateAppointStatusBadge(true);
           enabledToggle.dataset.lastFormKey = `${curDef.id || ''}_true`;
 
           syncAppointIntegrationToStorage(curDef);
