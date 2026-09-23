@@ -24199,16 +24199,38 @@
 
   // 初期化関数
   function initFormGlobalAiConcierge() {
+    const accordion = document.getElementById('global-ai-accordion');
     const panel = document.getElementById('form-global-gemini-panel');
-    if (!panel) return;
+    if (!accordion && !panel) return;
     if (window._formGlobalAiInitialized) return;
     window._formGlobalAiInitialized = true;
+
+    // 呼び出しボタン（基本情報ヘッダー「✨ AI最適化を呼び出す」）
+    const triggerBtn = document.getElementById('btn-trigger-global-ai');
+    if (triggerBtn && accordion) {
+      triggerBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        accordion.open = true;
+        accordion.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    }
+
+    // サマリー内のクイック一括適用ボタン
+    const quickApplyBtn = document.getElementById('btn-quick-apply-global-ai');
+    if (quickApplyBtn) {
+      quickApplyBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        applyGlobalAiAdvice();
+      });
+    }
 
     // 「🔄 再診断」ボタン
     const refreshBtn = document.getElementById('btn-refresh-global-ai');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', function(e) {
         e.preventDefault();
+        e.stopPropagation();
         fetchDynamicFormGlobalDiagnosis();
       });
     }
@@ -24221,6 +24243,8 @@
     if (togglePromptBtn && promptContainer) {
       togglePromptBtn.addEventListener('click', function(e) {
         e.preventDefault();
+        e.stopPropagation();
+        if (accordion) accordion.open = true;
         const isHidden = (promptContainer.style.display === 'none');
         promptContainer.style.display = isHidden ? 'block' : 'none';
         if (isHidden && promptInput) promptInput.focus();
