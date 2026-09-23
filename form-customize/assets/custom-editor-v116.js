@@ -22949,7 +22949,7 @@
     // アポイント連携がこのフォームで有効かチェック
     const isAppointEnabled = curDef.appointIntegration ? (curDef.appointIntegration.enabled === true) : false;
     const appointFields = (curDef.appointIntegration && curDef.appointIntegration.fields) ? curDef.appointIntegration.fields : {
-      customerName: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true
+      appointDate: true, meetingType: true, sourceCategory: true, introducer: true
     };
 
     const cols = [];
@@ -22983,6 +22983,7 @@
     );
 
     // --- 2. 👤 ユーザー連携カラム (User Integration) ---
+    // ※ ユーザー指示に基づき、メールアドレスおよび企業名/屋号は削除（ユーザーIDとユーザー名/担当者名のみ取得）
     cols.push(
       {
         id: 'user_id',
@@ -23007,42 +23008,17 @@
         source: 'ログイン / 回答者アカウント連携',
         sampleVal: '山田 太郎',
         desc: 'フォーム回答を送信した担当者・ユーザーの氏名（または代理入力オペレーターの氏名）。'
-      },
-      {
-        id: 'user_email',
-        key: 'user_email',
-        label: 'メールアドレス',
-        category: 'user',
-        catName: 'ユーザー連携',
-        type: 'email',
-        required: false,
-        source: 'ログイン / 回答者アカウント連携',
-        sampleVal: 'yamada@synapse-corp.jp',
-        desc: '回答者の連絡先メールアドレス。送信完了通知や自動返信メール、後続連絡の宛先として使用。'
-      },
-      {
-        id: 'company_name',
-        key: 'company_name',
-        label: '企業名 / 屋号',
-        category: 'user',
-        catName: 'ユーザー連携',
-        type: 'text',
-        required: false,
-        source: 'ログイン / 回答者アカウント連携',
-        sampleVal: '株式会社シナプスパートナーズ',
-        desc: '回答者が所属する法人組織名・屋号。BtoB取引マスタの企業単位集計・紐付けに使用。'
       }
     );
 
     // --- 3. 📅 アポイント連携カラム (Appointment Integration) ---
+    // ※ ユーザー指示に基づき、お客様名およびアポイント担当者は削除（ユーザーIDから読み取れるため不要）
     const appointDefList = [
       { id: 'appoint_id', key: 'appoint_id', label: 'アポイントID', type: 'text', fieldKey: 'appointId', sampleVal: 'APT_20260930_01', desc: '予約システムや日程調整ツールで発行されたアポイントメントID。面談・商談レコードとの突合キー。' },
       { id: 'appoint_date', key: 'appoint_date', label: 'アポイント日時', type: 'datetime', fieldKey: 'appointDate', sampleVal: '2026-09-30 14:00', desc: '予約された面談・商談の予定日時（YYYY-MM-DD HH:MM形式）。リマインドやスケジュール連動に使用。' },
-      { id: 'customer_name', key: 'customer_name', label: 'お客様名 (アポ連携)', type: 'text', fieldKey: 'customerName', sampleVal: '佐藤 健一', desc: 'アポイント予約時に登録された見込み顧客・面談参加者の氏名。' },
       { id: 'meeting_type', key: 'meeting_type', label: '面談形式', type: 'select', fieldKey: 'meetingType', sampleVal: 'オンライン (Zoom)', desc: '商談の開催形式（オンライン(Zoom/Meet)、来社、訪問など）。' },
       { id: 'source_category', key: 'source_category', label: '流入経路', type: 'select', fieldKey: 'sourceCategory', sampleVal: 'Web紹介・反響', desc: '顧客の流入経路・発生チャネル（Web反響、広告、紹介など）。マーケティング効果測定に使用。' },
-      { id: 'introducer', key: 'introducer', label: '紹介者 / 代理店', type: 'text', fieldKey: 'introducer', sampleVal: 'パートナー営業第1部', desc: '案件を紹介した代理店、取次パートナー、または紹介元担当者の名称。紹介報酬・連携追跡に使用。' },
-      { id: 'appoint_staff', key: 'appoint_staff', label: 'アポイント担当者', type: 'text', fieldKey: 'appointStaff', sampleVal: '鈴木 一郎', desc: 'アポイントを獲得したインサイドセールス、または当日担当する営業スタッフ氏名。' }
+      { id: 'introducer', key: 'introducer', label: '紹介者 / 代理店', type: 'text', fieldKey: 'introducer', sampleVal: 'パートナー営業第1部', desc: '案件を紹介した代理店、取次パートナー、または紹介元担当者の名称。紹介報酬・連携追跡に使用。' }
     ];
 
     appointDefList.forEach(item => {
@@ -23228,15 +23204,15 @@
   // 📋 統合サンプルデータ生成ヘルパー
   function generateIntegratedSampleRows(columns, formDef, count = 3) {
     const userVariations = [
-      { name: '山田 太郎', email: 'yamada@synapse-corp.jp', corp: '株式会社シナプスパートナーズ', uid: 'USR_94821' },
-      { name: '高橋 美咲', email: 'takahashi@tech-next.jp', corp: 'テックネクスト合同会社', uid: 'USR_94822' },
-      { name: '渡辺 健二', email: 'watanabe@global-biz.co.jp', corp: 'グローバルビジネス株式会社', uid: 'USR_94823' }
+      { name: '山田 太郎', uid: 'USR_94821' },
+      { name: '高橋 美咲', uid: 'USR_94822' },
+      { name: '渡辺 健二', uid: 'USR_94823' }
     ];
 
     const appointVariations = [
-      { id: 'APT_20260930_01', date: '2026-09-30 14:00', cust: '佐藤 健一', meet: 'オンライン (Zoom)', src: 'Web紹介・反響', intro: 'パートナー営業第1部', staff: '鈴木 一郎' },
-      { id: 'APT_20261001_02', date: '2026-10-01 11:00', cust: '中村 誠', meet: '対面 (東京本社)', src: '自社セミナー', intro: 'セミナー推進課', staff: '佐々木 拓也' },
-      { id: 'APT_20261002_03', date: '2026-10-02 16:30', cust: '伊藤 亮介', meet: 'オンライン (Teams)', src: '代理店紹介', intro: 'アライアンス本部', staff: '田中 健太' }
+      { id: 'APT_20260930_01', date: '2026-09-30 14:00', meet: 'オンライン (Zoom)', src: 'Web紹介・反響', intro: 'パートナー営業第1部' },
+      { id: 'APT_20261001_02', date: '2026-10-01 11:00', meet: '対面 (東京本社)', src: '自社セミナー', intro: 'セミナー推進課' },
+      { id: 'APT_20261002_03', date: '2026-10-02 16:30', meet: 'オンライン (Teams)', src: '代理店紹介', intro: 'アライアンス本部' }
     ];
 
     const statusVariations = [
@@ -23257,17 +23233,13 @@
         if (col.category === 'user') {
           if (k === 'user_id') row[k] = uVar.uid;
           else if (k === 'user_name') row[k] = uVar.name;
-          else if (k === 'user_email') row[k] = uVar.email;
-          else if (k === 'company_name') row[k] = uVar.corp;
           else row[k] = col.sampleVal || '';
         } else if (col.category === 'appoint') {
           if (k === 'appoint_id') row[k] = aVar.id;
           else if (k === 'appoint_date') row[k] = aVar.date;
-          else if (k === 'customer_name') row[k] = aVar.cust;
           else if (k === 'meeting_type') row[k] = aVar.meet;
           else if (k === 'source_category') row[k] = aVar.src;
           else if (k === 'introducer') row[k] = aVar.intro;
-          else if (k === 'appoint_staff') row[k] = aVar.staff;
           else row[k] = col.sampleVal || '';
         } else if (col.category === 'system') {
           if (k === 'master_id') row[k] = `MST_${882910 + i}`;
@@ -24040,7 +24012,7 @@
   setInterval(setupTargetTableGlobalSettingsUI, 500);
 
   // 📅 アポイント連携設定のUI初期化＆データ同期ヘルパー
-  const APPOINT_FIELD_KEYS = ['customerName', 'appointDate', 'meetingType', 'sourceCategory', 'introducer'];
+  const APPOINT_FIELD_KEYS = ['appointDate', 'meetingType', 'sourceCategory', 'introducer'];
 
   // フォームエディタでアポイント連携設定が変更された際、form_customize_all_forms へ即時同期保存するヘルパー
   function syncAppointIntegrationToStorage(curDef) {
@@ -24085,7 +24057,6 @@
       formDef.appointIntegration = {
         enabled: isPresetAppointForm,
         fields: {
-          customerName: true,
           appointDate: true,
           meetingType: true,
           sourceCategory: true,
@@ -24094,7 +24065,6 @@
       };
     } else if (!formDef.appointIntegration.fields) {
       formDef.appointIntegration.fields = {
-        customerName: true,
         appointDate: true,
         meetingType: true,
         sourceCategory: true,
