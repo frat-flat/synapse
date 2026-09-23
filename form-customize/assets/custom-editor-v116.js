@@ -24358,12 +24358,6 @@
     if (globalSelect) {
       globalSelect.value = 'dedicated';
     }
-
-    if (card) {
-      card.style.background = 'transparent';
-      card.style.border = 'none';
-      card.style.padding = '0';
-    }
   }
 
   // フォーム全体設定の保存先テーブルUI初期化
@@ -24988,19 +24982,28 @@
 
   // 📊 エディタ概要画面のカラム設定カード＆リアルタイムバッジ更新
   function setupOverviewColumnMappingCard() {
+    const triggerModal = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      let targetForm = window.G || window.n || window.L;
+      if (typeof getCurrentFormObject === 'function') {
+        const cur = getCurrentFormObject();
+        if (cur && cur.formObj) targetForm = cur.formObj;
+      }
+      openFormColumnMappingModal(targetForm);
+    };
+
     const cardBtn = document.getElementById('btn-open-column-mapping-from-card');
     if (cardBtn && !cardBtn.dataset.bound) {
       cardBtn.dataset.bound = 'true';
-      cardBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        let targetForm = window.G || window.n || window.L;
-        if (typeof getCurrentFormObject === 'function') {
-          const cur = getCurrentFormObject();
-          if (cur && cur.formObj) targetForm = cur.formObj;
-        }
-        openFormColumnMappingModal(targetForm);
-      });
+      cardBtn.addEventListener('click', triggerModal);
+    }
+    const settingsBtn = document.getElementById('btn-open-col-modal-from-settings');
+    if (settingsBtn && !settingsBtn.dataset.boundModal) {
+      settingsBtn.dataset.boundModal = 'true';
+      settingsBtn.addEventListener('click', triggerModal);
     }
 
     const formDef = window.G || window.n || window.L;
@@ -25009,6 +25012,11 @@
     // 👤 ユーザー情報連携バッジ
     const userBadge = document.getElementById('overview-badge-user-status');
     if (userBadge) {
+      if (!userBadge.dataset.bound) {
+        userBadge.dataset.bound = 'true';
+        userBadge.style.cursor = 'pointer';
+        userBadge.addEventListener('click', triggerModal);
+      }
       const isUserOn = formDef.userIntegration ? (formDef.userIntegration.enabled !== false) : true;
       const userFields = (formDef.userIntegration && formDef.userIntegration.fields) || { userId: true, userName: true };
       const count = USER_FIELD_KEYS.filter(k => userFields && userFields[k] === true).length;
@@ -25026,6 +25034,11 @@
     // 📅 アポイント連携バッジ
     const appointBadge = document.getElementById('overview-badge-appoint-status');
     if (appointBadge) {
+      if (!appointBadge.dataset.bound) {
+        appointBadge.dataset.bound = 'true';
+        appointBadge.style.cursor = 'pointer';
+        appointBadge.addEventListener('click', triggerModal);
+      }
       const isAppointOn = formDef.appointIntegration ? (formDef.appointIntegration.enabled === true) : false;
       const appointFields = (formDef.appointIntegration && formDef.appointIntegration.fields) || {};
       const count = APPOINT_FIELD_KEYS.filter(k => appointFields && appointFields[k] === true).length;
@@ -25043,6 +25056,11 @@
     // ⚙️ システム管理バッジ
     const sysBadge = document.getElementById('overview-badge-system-status');
     if (sysBadge) {
+      if (!sysBadge.dataset.bound) {
+        sysBadge.dataset.bound = 'true';
+        sysBadge.style.cursor = 'pointer';
+        sysBadge.addEventListener('click', triggerModal);
+      }
       const isSysOn = formDef.systemIntegration ? (formDef.systemIntegration.enabled !== false) : true;
       const sysFields = (formDef.systemIntegration && formDef.systemIntegration.fields) || {};
       const count = SYSTEM_FIELD_KEYS.filter(k => sysFields && sysFields[k] !== false).length;

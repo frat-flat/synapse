@@ -528,26 +528,11 @@
                   </div>
                 </details>
 
-                <!-- フォーム基本情報設定（タイトル・説明文・専用テーブル：常時表示の必須コア情報） -->
+                <!-- フォーム基本情報設定（タイトル・説明文・専用テーブル連携：常時表示の必須コア情報） -->
                 <div class="settings-card-basic" style="display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 6px; border: 1px solid var(--color-border); background: rgba(0,0,0,0.05); margin-bottom: 12px;">
                   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                      <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">📝 フォーム基本情報</span>
-                    </div>
-                    <!-- 📊 専用テーブル作成設定（上部に小さくチェックボックスで配置） -->
-                    <div id="editor-target-table-card" style="display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; background: transparent; border: none;">
-                      <label for="editor-create-dedicated-table" style="display: flex; align-items: center; gap: 5px; font-size: 0.74rem; font-weight: 600; color: var(--color-text); cursor: pointer; margin: 0; user-select: none;">
-                        <input type="checkbox" id="editor-create-dedicated-table" style="width: 14px; height: 14px; cursor: pointer;" checked />
-                        <span>専用テーブルを作成する</span>
-                      </label>
-                      <button type="button" id="btn-open-col-modal-from-settings" class="btn btn-sm" style="font-size: 0.68rem; padding: 2px 7px; background: rgba(0,0,0,0.05); color: var(--color-text-muted); border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer; font-weight: 500;">
-                        ⚙️ カラム詳細
-                      </button>
-                      <!-- 旧互換用の非表示セレクト -->
-                      <select id="editor-target-table-select" style="display: none;">
-                        <option value="dedicated" selected>専用テーブル</option>
-                      </select>
-                      <div id="target-table-status-desc" style="display: none;"></div>
+                      <span style="font-size: 0.82rem; font-weight: 700; color: var(--color-text);">📝 フォーム基本情報</span>
                     </div>
                   </div>
                   
@@ -567,6 +552,37 @@
                     </div>
                     <textarea id="editor-form-desc" class="form-control desc-input" placeholder="フォームの説明を入力..." rows="2" style="resize: vertical; min-height: 48px; line-height: 1.5; font-family: inherit; font-size: 0.85rem; padding: 6px 8px; border-radius: 4px;"></textarea>
                     <span class="link-hint-text" style="font-size: 0.72rem; color: var(--color-text-muted); display: block; margin-top: 3px;">💡 文字をリンクにするには <code>[表示したい文字](URL)</code> と書くか、右上の「🔗 リンクを挿入」ボタンをご利用ください</span>
+                  </div>
+
+                  <!-- 3. 専用テーブル作成・カラム連携設定（同一枠内に完全集約） -->
+                  <div id="editor-target-table-card" style="margin-top: 4px; padding: 10px 12px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                      <label for="editor-create-dedicated-table" style="display: flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 700; color: var(--color-text); cursor: pointer; margin: 0; user-select: none;">
+                        <input type="checkbox" id="editor-create-dedicated-table" style="width: 15px; height: 15px; cursor: pointer;" checked />
+                        <span>📊 専用テーブルを作成・カラム連携する</span>
+                      </label>
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <button type="button" id="btn-open-col-modal-from-settings" class="btn btn-primary btn-sm" style="font-size: 0.74rem; font-weight: 700; padding: 4px 12px; border-radius: 5px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; box-shadow: 0 1px 2px rgba(2,132,199,0.25);">
+                          <span>⚙️</span> <span>カラム設定を開く</span>
+                        </button>
+                        <button type="button" id="btn-open-column-mapping-from-card" style="display: none;"></button>
+                      </div>
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--color-text-muted); line-height: 1.4;">
+                      Supabaseへ回答データを完全保存し、Synapse管理画面へ連携する項目（ユーザー／アポ／システム）を選択設定できます。
+                    </div>
+                    <!-- 現在の連携ステータスバッジ一覧 -->
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.72rem; padding-top: 6px; border-top: 1px solid #f1f5f9;">
+                      <span style="color: var(--color-text-muted); font-size: 0.7rem; font-weight: 600;">連携状況:</span>
+                      <span id="overview-badge-user-status" style="background: rgba(2, 132, 199, 0.1); color: #0284c7; padding: 2px 7px; border-radius: 4px; font-weight: 700; cursor: pointer;" title="クリックして連携カラムを設定">👤 ユーザー情報: 連携中 (2項目)</span>
+                      <span id="overview-badge-appoint-status" style="background: #f1f5f9; color: #64748b; padding: 2px 7px; border-radius: 4px; font-weight: 600; cursor: pointer;" title="クリックして連携カラムを設定">📅 アポイント: 未連携</span>
+                      <span id="overview-badge-system-status" style="background: rgba(100, 116, 139, 0.1); color: #475569; padding: 2px 7px; border-radius: 4px; font-weight: 600; cursor: pointer;" title="クリックして連携カラムを設定">⚙️ システム管理: 6項目</span>
+                    </div>
+                    <!-- 旧互換用の非表示セレクト -->
+                    <select id="editor-target-table-select" style="display: none;">
+                      <option value="dedicated" selected>専用テーブル</option>
+                    </select>
+                    <div id="target-table-status-desc" style="display: none;"></div>
                   </div>
 
                   <!-- 🎨 タイトルの詳細設定（折りたたみアコーディオン） -->
@@ -826,31 +842,6 @@
                     <label for="editor-form-lock" style="margin: 0; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 500; font-size: 0.75rem; color: var(--color-danger);">
                       <span>🔒 管理者専用ロック (管理者のみ閲覧・編集可能)</span>
                     </label>
-                  </div>
-                </div>
-
-                <!-- 📊 専用テーブル連携・統合カラム設定（モーダル呼出カード） -->
-                <div class="overview-column-settings-card" id="overview-column-settings-card" style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); display: flex; flex-direction: column; gap: 10px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                      <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(2, 132, 199, 0.1); color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-                        📊
-                      </div>
-                      <div>
-                        <div style="font-weight: 700; font-size: 0.88rem; color: #0f172a;">専用テーブル連携・カラム設定</div>
-                        <div style="font-size: 0.73rem; color: #64748b; margin-top: 1px;">ユーザー情報連携・アポイント連携・システム共通項目の連携ON/OFFやカラム構造を管理します。</div>
-                      </div>
-                    </div>
-                    <button type="button" id="btn-open-column-mapping-from-card" class="btn btn-primary btn-sm" style="font-size: 0.8rem; font-weight: 700; padding: 7px 16px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 1px 3px rgba(2,132,199,0.3);">
-                      <span>⚙️</span> <span>カラム設定を開く</span>
-                    </button>
-                  </div>
-                  <!-- 現在の連携ステータスバッジ一覧 -->
-                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid #f1f5f9; font-size: 0.74rem;">
-                    <span style="color: #64748b; font-weight: 600;">現在の連携状況:</span>
-                    <span id="overview-badge-user-status" style="background: rgba(2, 132, 199, 0.1); color: #0284c7; padding: 2px 8px; border-radius: 4px; font-weight: 700;">👤 ユーザー情報: 連携中 (2項目)</span>
-                    <span id="overview-badge-appoint-status" style="background: #f1f5f9; color: #64748b; padding: 2px 8px; border-radius: 4px; font-weight: 600;">📅 アポイント: 未連携</span>
-                    <span id="overview-badge-system-status" style="background: rgba(100, 116, 139, 0.1); color: #475569; padding: 2px 8px; border-radius: 4px; font-weight: 600;">⚙️ システム管理: 6項目</span>
                   </div>
                 </div>
 
