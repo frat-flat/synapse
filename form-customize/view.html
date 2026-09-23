@@ -1296,28 +1296,26 @@
     <!-- バリデーション通知トースト -->
     <div id="validation-toast" class="validation-toast">⚠️ 未入力の必須項目があります</div>
 
-    <!-- 町名・番地（住所）確認モーダル -->
+    <!-- 町名・番地（住所）確認モーダル（複数箇所の住所にも完全対応） -->
     <div id="street-confirm-modal" class="street-confirm-modal-backdrop" style="display: none;">
-      <div class="street-confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="street-confirm-title">
+      <div class="street-confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="street-confirm-title" style="max-width: 520px; width: 92%;">
         <div class="street-confirm-modal-header">
           <div class="street-confirm-icon-badge">📍</div>
           <div>
             <h3 id="street-confirm-title" class="street-confirm-modal-title">町名・番地の入力確認</h3>
           </div>
         </div>
-        <div class="street-confirm-modal-body">
+        <div class="street-confirm-modal-body" style="max-height: 65vh; overflow-y: auto;">
           <div class="street-confirm-alert-box">
             <span style="font-size: 1.15rem; line-height: 1; flex-shrink: 0;">⚠️</span>
             <div id="street-confirm-alert-text">
               自動補完された住所の末尾に、必ず<strong>【番地・号（数字）】</strong>を追記してください。
             </div>
           </div>
-          <div class="street-confirm-current-display">
-            <div id="street-confirm-address-context" style="display: none; font-size: 0.8rem; color: #64748b; margin-bottom: 6px;"></div>
-            <div class="street-confirm-current-label">現在の入力内容</div>
-            <div id="street-confirm-current-val" class="street-confirm-current-value"></div>
+          <!-- 住所確認カード一覧コンテナ（単一・複数住所両対応） -->
+          <div id="street-confirm-items-container" style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px;">
+            <!-- 動的に各住所の確認カードが挿入されます -->
           </div>
-          <div id="street-confirm-status" class="street-confirm-status-notice"></div>
         </div>
         <div class="street-confirm-modal-footer">
           <button type="button" id="btn-street-modal-cancel" class="btn-street-cancel">✏️ 戻って追記・修正</button>
@@ -7355,15 +7353,23 @@
         }
 
         // ==========================================
-        // 7. 町名・番地（住所）入力確認モーダル制御
+        // 7. 町名・番地（住所）入力確認モーダル制御（複数箇所の住所にも完全対応）
         // ==========================================
         let activeStreetConfirmCallback = null;
 
-        function findStreetQuestionInSection(section) {
-          if (!section || !section.questions) return null;
-          return section.questions.find(q => {
+        // セクション内のすべての町名・番地（住所）質問を全件抽出（非表示項目を除く）
+        function findAllStreetQuestionsInSection(section) {
+          if (!section || !section.questions) return [];
+          return section.questions.filter(q => {
             if (!q) return false;
             if (q.confirmBanchiOnNext === false) return false;
+
+            // スキップロジックで非表示になっている項目は除外
+            const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
+            if (card && (card.classList.contains('hidden-by-skip') || card.style.display === 'none')) {
+              return false;
+            }
+
             const t = (q.title || '').trim();
             const d = (q.description || '').trim();
             const k = (q.dataKey || '').trim();
@@ -7378,13 +7384,12 @@
         }
 
         function checkAndConfirmStreetAddress(section, isSubmit, onProceed) {
-          const streetQ = findStreetQuestionInSection(section);
-          if (!streetQ) {
+          const streetQuestions = findAllStreetQuestionsInSection(section);
+          if (!streetQuestions || streetQuestions.length === 0) {
             onProceed();
             return;
           }
 
-          const streetVal = (formValues[streetQ.id] || '').trim();
           const modalEl = document.getElementById('street-confirm-modal');
           if (!modalEl) {
             onProceed();
@@ -7392,54 +7397,95 @@
           }
 
           const alertTextEl = document.getElementById('street-confirm-alert-text');
-          const addrContextEl = document.getElementById('street-confirm-address-context');
-          const currentValEl = document.getElementById('street-confirm-current-val');
-          const statusEl = document.getElementById('street-confirm-status');
+          const itemsContainer = document.getElementById('street-confirm-items-container');
           const btnProceed = document.getElementById('btn-street-modal-proceed');
           const btnCancel = document.getElementById('btn-street-modal-cancel');
 
+          if (!itemsContainer) {
+            onProceed();
+            return;
+          }
+
+          itemsContainer.innerHTML = '';
+
+          let anyMissingBanchi = false;
+          let firstFaultyQId = null;
+
+          streetQuestions.forEach(streetQ => {
+            const streetVal = (formValues[streetQ.id] || '').trim();
+
+            // 都道府県・市区町村の取得（同一グループ最優先、なければセクション内）
+            let prefQ = null;
+            let cityQ = null;
+            if (streetQ.groupId) {
+              prefQ = (section.questions || []).find(q => q.groupId === streetQ.groupId && (q.dataKey === 'pref' || (q.title && q.title.includes('都道府県'))));
+              cityQ = (section.questions || []).find(q => q.groupId === streetQ.groupId && (q.dataKey === 'city' || (q.title && (q.title.includes('市区町村') || q.title.includes('市町村')))));
+            }
+            if (!prefQ) prefQ = (section.questions || []).find(q => q.dataKey === 'pref' || (q.title && q.title.includes('都道府県')));
+            if (!cityQ) cityQ = (section.questions || []).find(q => q.dataKey === 'city' || (q.title && (q.title.includes('市区町村') || q.title.includes('市町村'))));
+
+            const prefVal = prefQ ? (formValues[prefQ.id] || '') : '';
+            const cityVal = cityQ ? (formValues[cityQ.id] || '') : '';
+
+            // グループタイトルやラベルの取得
+            const grpTitle = streetQ.groupTitle || (streetQ.groupId ? '住所グループ' : (streetQ.title || 'ご住所'));
+            const isSameAsAbove = streetQ.groupId && typeof isGroupSameAsAboveActive === 'function' && isGroupSameAsAboveActive(streetQ.groupId);
+
+            // 数字（半角・全角）や漢数字の有無、末尾キーワード判定
+            const hasDigits = /[\d０-９]/.test(streetVal);
+            const hasKanjiNum = /[一二三四五六七八九十]/.test(streetVal);
+            const endsWithTown = /(?:丁目|町|大字|字|通|区|市)$/.test(streetVal.replace(/[\s　]+$/, ''));
+            const isMissingBanchi = (!hasDigits && !hasKanjiNum) || endsWithTown || !streetVal;
+
+            if (isMissingBanchi) {
+              anyMissingBanchi = true;
+              if (!firstFaultyQId) firstFaultyQId = streetQ.id;
+            } else if (!firstFaultyQId) {
+              firstFaultyQId = streetQ.id;
+            }
+
+            // 各住所カードDOMを生成
+            const itemCard = document.createElement('div');
+            itemCard.className = 'street-confirm-current-display';
+            itemCard.style.cssText = 'background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 12px 14px;';
+
+            let groupBadgeHtml = '';
+            if (streetQuestions.length > 1 || streetQ.groupId) {
+              groupBadgeHtml = `
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                  <span style="font-size: 0.85rem; font-weight: 700; color: #1e293b;">🏠 ${escapeHtml(grpTitle)}</span>
+                  ${isSameAsAbove ? '<span style="font-size: 0.75rem; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: 600;">📋 同期中</span>' : ''}
+                </div>
+              `;
+            }
+
+            let addrContextHtml = '';
+            if (prefVal || cityVal) {
+              addrContextHtml = `<div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">📍 ${escapeHtml(prefVal)} ${escapeHtml(cityVal)}</div>`;
+            }
+
+            const statusClass = isMissingBanchi ? 'street-confirm-status-notice street-confirm-status-warning' : 'street-confirm-status-notice street-confirm-status-ok';
+            const statusNoticeHtml = isMissingBanchi
+              ? `<div class="${statusClass}" style="margin-top: 8px; padding: 6px 10px; font-size: 0.78rem;"><span>⚠️</span> <span>番地・号（数字）がまだ入力されていない可能性があります。</span></div>`
+              : `<div class="${statusClass}" style="margin-top: 8px; padding: 6px 10px; font-size: 0.78rem;"><span>✓</span> <span>番地・号（数字）が正しく入力されているかご確認ください。</span></div>`;
+
+            itemCard.innerHTML = `
+              ${groupBadgeHtml}
+              ${addrContextHtml}
+              <div class="street-confirm-current-label" style="font-size: 0.72rem; margin-bottom: 4px;">現在の入力内容</div>
+              <div class="street-confirm-current-value" style="font-size: 1.05rem; font-weight: 700; color: #0f172a;">${escapeHtml(streetVal || '（未入力）')}</div>
+              ${statusNoticeHtml}
+            `;
+
+            itemsContainer.appendChild(itemCard);
+          });
+
           // 説明文・ガイダンスの反映
           if (alertTextEl) {
-            const desc = (streetQ.description || '').trim();
-            if (desc) {
-              alertTextEl.innerHTML = escapeHtml(desc).replace(/【(.*?)】/g, '<strong>【$1】</strong>');
-            } else {
+            if (anyMissingBanchi) {
               alertTextEl.innerHTML = '自動補完された住所の末尾に、必ず<strong>【番地・号（数字）】</strong>を追記してください。';
-            }
-          }
-
-          // 都道府県・市区町村の取得
-          const prefQ = (section.questions || []).find(q => q.dataKey === 'pref' || (q.title && q.title.includes('都道府県')));
-          const cityQ = (section.questions || []).find(q => q.dataKey === 'city' || (q.title && (q.title.includes('市区町村') || q.title.includes('市町村'))));
-          const prefVal = prefQ ? (formValues[prefQ.id] || '') : '';
-          const cityVal = cityQ ? (formValues[cityQ.id] || '') : '';
-
-          if (addrContextEl) {
-            if (prefVal || cityVal) {
-              addrContextEl.style.display = 'block';
-              addrContextEl.textContent = `📍 ${prefVal} ${cityVal}`.trim();
             } else {
-              addrContextEl.style.display = 'none';
-            }
-          }
-
-          if (currentValEl) {
-            currentValEl.textContent = streetVal || '（未入力）';
-          }
-
-          // 数字（半角・全角）や末尾キーワード判定
-          const hasDigits = /[\d０-９]/.test(streetVal);
-          const hasKanjiNum = /[一二三四五六七八九十]/.test(streetVal);
-          const endsWithTown = /(?:丁目|町|大字|字|通|区|市)$/.test(streetVal.replace(/[\s　]+$/, ''));
-          const isMissingBanchi = (!hasDigits && !hasKanjiNum) || endsWithTown || !streetVal;
-
-          if (statusEl) {
-            if (isMissingBanchi) {
-              statusEl.className = 'street-confirm-status-notice street-confirm-status-warning';
-              statusEl.innerHTML = '<span>⚠️</span> <span>番地・号（数字）がまだ入力されていない可能性があります。</span>';
-            } else {
-              statusEl.className = 'street-confirm-status-notice street-confirm-status-ok';
-              statusEl.innerHTML = '<span>✓</span> <span>番地・号（数字）が正しく入力されているかご確認ください。</span>';
+              alertTextEl.innerHTML = '入力された住所の<strong>【番地・号（数字）】</strong>が正しく入力されているかご確認ください。';
             }
           }
 
@@ -7461,22 +7507,25 @@
           // キャンセル時の処理（戻って修正）
           btnCancel.onclick = () => {
             hideStreetConfirmModal();
-            const card = document.querySelector(`.question-card[data-question-id="${streetQ.id}"]`);
-            const inputEl = card ? card.querySelector('input[type="text"], textarea') : null;
-            if (inputEl) {
-              inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              setTimeout(() => {
-                inputEl.focus();
-                try {
-                  const len = inputEl.value.length;
-                  inputEl.setSelectionRange(len, len);
-                } catch(e) {}
-                if (card) {
-                  card.classList.remove('street-focus-highlight');
-                  void card.offsetWidth;
-                  card.classList.add('street-focus-highlight');
-                }
-              }, 250);
+            const targetQId = firstFaultyQId || (streetQuestions[0] ? streetQuestions[0].id : null);
+            if (targetQId) {
+              const card = document.querySelector(`.question-card[data-question-id="${targetQId}"]`);
+              const inputEl = card ? card.querySelector('input[type="text"], textarea') : null;
+              if (inputEl) {
+                inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => {
+                  inputEl.focus();
+                  try {
+                    const len = inputEl.value.length;
+                    inputEl.setSelectionRange(len, len);
+                  } catch(e) {}
+                  if (card) {
+                    card.classList.remove('street-focus-highlight');
+                    void card.offsetWidth;
+                    card.classList.add('street-focus-highlight');
+                  }
+                }, 250);
+              }
             }
           };
 
