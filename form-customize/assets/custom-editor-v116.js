@@ -22945,20 +22945,34 @@
     const curDef = formDef || window.G || window.L || {};
     const sections = (window.G && window.G.sections && window.G.sections.length > 0) ? window.G.sections : (curDef.sections || []);
     const formTitle = getEffectiveFormTitle(curDef);
+    const includeAllCandidates = !!options.includeAllCandidates;
 
-    // アポイント連携がこのフォームで有効かチェック
+    // --- ⚙️ システム項目連携設定 ---
+    const isSystemEnabled = curDef.systemIntegration ? (curDef.systemIntegration.enabled !== false) : true;
+    const systemFields = (curDef.systemIntegration && curDef.systemIntegration.fields) ? curDef.systemIntegration.fields : {
+      masterId: true, formTitle: true, status: true, registrationCode: true, resumeUrl: true, createdAt: true
+    };
+
+    // --- 👤 ユーザー情報連携設定 ---
+    const isUserEnabled = curDef.userIntegration ? (curDef.userIntegration.enabled !== false) : true;
+    const userFields = (curDef.userIntegration && curDef.userIntegration.fields) ? curDef.userIntegration.fields : {
+      userId: true, userName: true, userEmail: false, companyName: false
+    };
+
+    // --- 📅 アポイント連携設定 ---
     const isAppointEnabled = curDef.appointIntegration ? (curDef.appointIntegration.enabled === true) : false;
     const appointFields = (curDef.appointIntegration && curDef.appointIntegration.fields) ? curDef.appointIntegration.fields : {
-      appointDate: true, meetingType: true, sourceCategory: true, introducer: true
+      appointId: true, appointDate: true, meetingType: true, sourceCategory: true, introducer: true, customerName: false, appointStaff: false
     };
 
     const cols = [];
 
-    // --- 1. ⚙️ システム共通カラム (先頭) ---
-    cols.push(
+    // --- 1. ⚙️ システム共通カラム (先頭: master_id, form_title) ---
+    const systemHeaderDefs = [
       {
         id: 'master_id',
         key: 'master_id',
+        fieldKey: 'masterId',
         label: 'マスターID / コード',
         category: 'system',
         catName: 'システム共通',
@@ -22971,6 +22985,7 @@
       {
         id: 'form_title',
         key: 'form_title',
+        fieldKey: 'formTitle',
         label: 'フォーム名',
         category: 'system',
         catName: 'システム共通',
@@ -22980,14 +22995,26 @@
         sampleVal: formTitle,
         desc: '送信されたフォームの正式名称。どのフォーム・施策から回答が登録されたかを特定し、集計・分析に使用。'
       }
-    );
+    ];
+
+    systemHeaderDefs.forEach(item => {
+      const isFieldActive = isSystemEnabled && (systemFields[item.fieldKey] !== false);
+      if (includeAllCandidates || isFieldActive) {
+        cols.push({
+          ...item,
+          isSynapseActive: isFieldActive,
+          source: isSystemEnabled ? (isFieldActive ? item.source : `${item.source} (未連携)`) : 'システム連携 (OFF)'
+        });
+      }
+    });
 
     // --- 2. 👤 ユーザー連携カラム (User Integration) ---
-    // ※ ユーザー指示に基づき、メールアドレスおよび企業名/屋号は削除（ユーザーIDとユーザー名/担当者名のみ取得）
-    cols.push(
+    // ※ Supabase側には全項目を保持し、Synapse連携は個別選択式（デフォルト: ユーザーID/担当者名 ON、メール/企業名 OFF）
+    const userDefList = [
       {
         id: 'user_id',
         key: 'user_id',
+        fieldKey: 'userId',
         label: 'ユーザーID',
         category: 'user',
         catName: 'ユーザー連携',
@@ -23000,6 +23027,7 @@
       {
         id: 'user_name',
         key: 'user_name',
+        fieldKey: 'userName',
         label: 'ユーザー名 / 担当者名',
         category: 'user',
         catName: 'ユーザー連携',
@@ -23008,34 +23036,77 @@
         source: 'ログイン / 回答者アカウント連携',
         sampleVal: '山田 太郎',
         desc: 'フォーム回答を送信した担当者・ユーザーの氏名（または代理入力オペレーターの氏名）。'
+      },
+      {
+        id: 'user_email',
+        key: 'user_email',
+        fieldKey: 'userEmail',
+        label: 'メールアドレス',
+        category: 'user',
+        catName: 'ユーザー連携',
+        type: 'email',
+        required: false,
+        source: 'ログイン / 回答者アカウント連携',
+        sampleVal: 'yamada@synapse-corp.jp',
+        desc: '回答者の連絡先メールアドレス。送信完了通知や自動返信メール、後続連絡の宛先として使用。'
+      },
+      {
+        id: 'company_name',
+        key: 'company_name',
+        fieldKey: 'companyName',
+        label: '企業名 / 屋号',
+        category: 'user',
+        catName: 'ユーザー連携',
+        type: 'text',
+        required: false,
+        source: 'ログイン / 回答者アカウント連携',
+        sampleVal: '株式会社シナプスパートナーズ',
+        desc: '回答者が所属する法人組織名・屋号。BtoB取引マスタの企業単位集計・紐付けに使用。'
       }
-    );
+    ];
+
+    userDefList.forEach(item => {
+      const isFieldActive = isUserEnabled && (userFields[item.fieldKey] === true);
+      if (includeAllCandidates || isFieldActive) {
+        cols.push({
+          ...item,
+          isSynapseActive: isFieldActive,
+          source: isUserEnabled ? (isFieldActive ? 'ユーザー連携 (有効 ✨)' : 'ユーザー連携 (未選択)') : 'ユーザー連携 (未有効化)'
+        });
+      }
+    });
 
     // --- 3. 📅 アポイント連携カラム (Appointment Integration) ---
-    // ※ ユーザー指示に基づき、お客様名およびアポイント担当者は削除（ユーザーIDから読み取れるため不要）
+    // ※ Supabase側には全項目を保持し、Synapse連携は個別選択式（顧客名・アポ担当者も選択可能）
     const appointDefList = [
-      { id: 'appoint_id', key: 'appoint_id', label: 'アポイントID', type: 'text', fieldKey: 'appointId', sampleVal: 'APT_20260930_01', desc: '予約システムや日程調整ツールで発行されたアポイントメントID。面談・商談レコードとの突合キー。' },
-      { id: 'appoint_date', key: 'appoint_date', label: 'アポイント日時', type: 'datetime', fieldKey: 'appointDate', sampleVal: '2026-09-30 14:00', desc: '予約された面談・商談の予定日時（YYYY-MM-DD HH:MM形式）。リマインドやスケジュール連動に使用。' },
-      { id: 'meeting_type', key: 'meeting_type', label: '面談形式', type: 'select', fieldKey: 'meetingType', sampleVal: 'オンライン (Zoom)', desc: '商談の開催形式（オンライン(Zoom/Meet)、来社、訪問など）。' },
-      { id: 'source_category', key: 'source_category', label: '流入経路', type: 'select', fieldKey: 'sourceCategory', sampleVal: 'Web紹介・反響', desc: '顧客の流入経路・発生チャネル（Web反響、広告、紹介など）。マーケティング効果測定に使用。' },
-      { id: 'introducer', key: 'introducer', label: '紹介者 / 代理店', type: 'text', fieldKey: 'introducer', sampleVal: 'パートナー営業第1部', desc: '案件を紹介した代理店、取次パートナー、または紹介元担当者の名称。紹介報酬・連携追跡に使用。' }
+      { id: 'appoint_id', key: 'appoint_id', fieldKey: 'appointId', label: 'アポイントID', type: 'text', sampleVal: 'APT_20260930_01', desc: '予約システムや日程調整ツールで発行されたアポイントメントID。面談・商談レコードとの突合キー。' },
+      { id: 'appoint_date', key: 'appoint_date', fieldKey: 'appointDate', label: 'アポイント日時', type: 'datetime', sampleVal: '2026-09-30 14:00', desc: '予約された面談・商談の予定日時（YYYY-MM-DD HH:MM形式）。リマインドやスケジュール連動に使用。' },
+      { id: 'meeting_type', key: 'meeting_type', fieldKey: 'meetingType', label: '面談形式', type: 'select', sampleVal: 'オンライン (Zoom)', desc: '商談の開催形式（オンライン(Zoom/Meet)、来社、訪問など）。' },
+      { id: 'source_category', key: 'source_category', fieldKey: 'sourceCategory', label: '流入経路', type: 'select', sampleVal: 'Web紹介・反響', desc: '顧客の流入経路・発生チャネル（Web反響、広告、紹介など）。マーケティング効果測定に使用。' },
+      { id: 'introducer', key: 'introducer', fieldKey: 'introducer', label: '紹介者 / 代理店', type: 'text', sampleVal: 'パートナー営業第1部', desc: '案件を紹介した代理店、取次パートナー、または紹介元担当者の名称。紹介報酬・連携追跡に使用。' },
+      { id: 'customer_name', key: 'customer_name', fieldKey: 'customerName', label: 'お客様名 (アポ連携)', type: 'text', sampleVal: '佐藤 健一', desc: 'アポイント予約時に登録された見込み顧客・面談参加者の氏名。' },
+      { id: 'appoint_staff', key: 'appoint_staff', fieldKey: 'appointStaff', label: 'アポイント担当者', type: 'text', sampleVal: '鈴木 一郎', desc: 'アポイントを獲得したインサイドセールス、または当日担当する営業スタッフ氏名。' }
     ];
 
     appointDefList.forEach(item => {
-      const isFieldActive = isAppointEnabled && (appointFields[item.fieldKey] !== false);
-      cols.push({
-        id: item.id,
-        key: item.key,
-        label: item.label,
-        category: 'appoint',
-        catName: 'アポイント連携',
-        type: item.type,
-        required: false,
-        source: isAppointEnabled ? (isFieldActive ? 'アポイント連携 (有効 ✨)' : 'アポイント連携 (項目未選択)') : 'アポイント連携 (未有効化)',
-        isAppointActive: isFieldActive,
-        sampleVal: item.sampleVal,
-        desc: item.desc
-      });
+      const isFieldActive = isAppointEnabled && (appointFields[item.fieldKey] === true);
+      if (includeAllCandidates || isFieldActive) {
+        cols.push({
+          id: item.id,
+          key: item.key,
+          fieldKey: item.fieldKey,
+          label: item.label,
+          category: 'appoint',
+          catName: 'アポイント連携',
+          type: item.type,
+          required: false,
+          source: isAppointEnabled ? (isFieldActive ? 'アポイント連携 (有効 ✨)' : 'アポイント連携 (未選択)') : 'アポイント連携 (未有効化)',
+          isAppointActive: isFieldActive,
+          isSynapseActive: isFieldActive,
+          sampleVal: item.sampleVal,
+          desc: item.desc
+        });
+      }
     });
 
     // --- 4. 📝 フォーム設問カラム (Form Questions) ---
@@ -23140,16 +23211,18 @@
           sampleVal: sampleVal,
           desc: qDesc,
           hasCustomKey: hasCustomKey,
+          isSynapseActive: true,
           choices: q.options ? q.options.map(opt => ({ value: (typeof opt === 'object' ? (opt.label || opt.value) : opt) })) : undefined
         });
       });
     });
 
     // --- 5. ⚙️ システム状態カラム (末尾) ---
-    cols.push(
+    const systemFooterDefs = [
       {
         id: 'status',
         key: 'status',
+        fieldKey: 'status',
         label: 'ステータス',
         category: 'system',
         catName: 'システム共通',
@@ -23162,6 +23235,7 @@
       {
         id: 'registration_code',
         key: 'registration_code',
+        fieldKey: 'registrationCode',
         label: '回答ID / 登録コード',
         category: 'system',
         catName: 'システム共通',
@@ -23174,6 +23248,7 @@
       {
         id: 'resume_url',
         key: 'resume_url',
+        fieldKey: 'resumeUrl',
         label: '再開用URL',
         category: 'system',
         catName: 'システム共通',
@@ -23186,6 +23261,7 @@
       {
         id: 'created_at',
         key: 'created_at',
+        fieldKey: 'createdAt',
         label: '送信日時 / 登録日時',
         category: 'system',
         catName: 'システム共通',
@@ -23195,7 +23271,18 @@
         sampleVal: '2026-09-24 11:20:45',
         desc: 'フォーム送信・登録完了日時。回答データがSupabaseデータベースへ確定保存された正確な日時（JSTタイムスタンプ）。'
       }
-    );
+    ];
+
+    systemFooterDefs.forEach(item => {
+      const isFieldActive = isSystemEnabled && (systemFields[item.fieldKey] !== false);
+      if (includeAllCandidates || isFieldActive) {
+        cols.push({
+          ...item,
+          isSynapseActive: isFieldActive,
+          source: isSystemEnabled ? (isFieldActive ? item.source : `${item.source} (未連携)`) : 'システム連携 (OFF)'
+        });
+      }
+    });
 
     return cols;
   }
@@ -23204,15 +23291,15 @@
   // 📋 統合サンプルデータ生成ヘルパー
   function generateIntegratedSampleRows(columns, formDef, count = 3) {
     const userVariations = [
-      { name: '山田 太郎', uid: 'USR_94821' },
-      { name: '高橋 美咲', uid: 'USR_94822' },
-      { name: '渡辺 健二', uid: 'USR_94823' }
+      { name: '山田 太郎', email: 'yamada@synapse-corp.jp', corp: '株式会社シナプスパートナーズ', uid: 'USR_94821' },
+      { name: '高橋 美咲', email: 'takahashi@tech-next.jp', corp: 'テックネクスト合同会社', uid: 'USR_94822' },
+      { name: '渡辺 健二', email: 'watanabe@global-biz.co.jp', corp: 'グローバルビジネス株式会社', uid: 'USR_94823' }
     ];
 
     const appointVariations = [
-      { id: 'APT_20260930_01', date: '2026-09-30 14:00', meet: 'オンライン (Zoom)', src: 'Web紹介・反響', intro: 'パートナー営業第1部' },
-      { id: 'APT_20261001_02', date: '2026-10-01 11:00', meet: '対面 (東京本社)', src: '自社セミナー', intro: 'セミナー推進課' },
-      { id: 'APT_20261002_03', date: '2026-10-02 16:30', meet: 'オンライン (Teams)', src: '代理店紹介', intro: 'アライアンス本部' }
+      { id: 'APT_20260930_01', date: '2026-09-30 14:00', cust: '佐藤 健一', meet: 'オンライン (Zoom)', src: 'Web紹介・反響', intro: 'パートナー営業第1部', staff: '鈴木 一郎' },
+      { id: 'APT_20261001_02', date: '2026-10-01 11:00', cust: '中村 誠', meet: '対面 (東京本社)', src: '自社セミナー', intro: 'セミナー推進課', staff: '佐々木 拓也' },
+      { id: 'APT_20261002_03', date: '2026-10-02 16:30', cust: '伊藤 亮介', meet: 'オンライン (Teams)', src: '代理店紹介', intro: 'アライアンス本部', staff: '田中 健太' }
     ];
 
     const statusVariations = [
@@ -23233,6 +23320,8 @@
         if (col.category === 'user') {
           if (k === 'user_id') row[k] = uVar.uid;
           else if (k === 'user_name') row[k] = uVar.name;
+          else if (k === 'user_email') row[k] = uVar.email;
+          else if (k === 'company_name') row[k] = uVar.corp;
           else row[k] = col.sampleVal || '';
         } else if (col.category === 'appoint') {
           if (k === 'appoint_id') row[k] = aVar.id;
@@ -23240,6 +23329,8 @@
           else if (k === 'meeting_type') row[k] = aVar.meet;
           else if (k === 'source_category') row[k] = aVar.src;
           else if (k === 'introducer') row[k] = aVar.intro;
+          else if (k === 'customer_name') row[k] = aVar.cust;
+          else if (k === 'appoint_staff') row[k] = aVar.staff;
           else row[k] = col.sampleVal || '';
         } else if (col.category === 'system') {
           if (k === 'master_id') row[k] = `MST_${882910 + i}`;
@@ -23327,8 +23418,8 @@
     const dedicatedColMap = new Map();
     dedicatedCols.forEach(c => { if (c && c.id) dedicatedColMap.set(c.id, c); });
 
-    // 🌟 全統合カラムの取得
-    const allIntegratedCols = getIntegratedFormColumns(formDef);
+    // 🌟 全統合カラム（Supabase候補全件）の取得
+    const allIntegratedCols = getIntegratedFormColumns(formDef, { includeAllCandidates: true });
 
     // カウント集計
     const totalCount = allIntegratedCols.length;
@@ -23336,6 +23427,7 @@
     const uCount = allIntegratedCols.filter(c => c.category === 'user').length;
     const aCount = allIntegratedCols.filter(c => c.category === 'appoint').length;
     const sCount = allIntegratedCols.filter(c => c.category === 'system').length;
+    const linkedCount = allIntegratedCols.filter(c => c.isSynapseActive !== false).length;
 
     // アポイント連携がONか
     const isAppointOn = formDef.appointIntegration ? (formDef.appointIntegration.enabled === true) : false;
@@ -23379,6 +23471,20 @@
         catBadge = '<span class="badge-col-cat badge-cat-system">⚙️ システム</span>';
       }
 
+      // Synapse連携トグルHTML
+      let linkToggleHtml = '';
+      if (col.category === 'question') {
+        linkToggleHtml = '<span style="background: #e0f2fe; color: #0284c7; padding: 2px 7px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; white-space: nowrap;">✓ 必須</span>';
+      } else {
+        const isChecked = col.isSynapseActive === true;
+        linkToggleHtml = `
+          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; margin: 0; font-size: 0.72rem; font-weight: 700; color: ${isChecked ? '#0284c7' : '#94a3b8'};">
+            <input type="checkbox" class="modal-col-link-toggle" data-category="${col.category}" data-field-key="${col.fieldKey}" ${isChecked ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px;" />
+            <span>${isChecked ? 'ON' : 'OFF'}</span>
+          </label>
+        `;
+      }
+
       const reqMark = col.required ? '<span style="color: #dc2626; font-weight: bold; margin-left: 2px;">*</span>' : '';
       const reqBadge = col.required
         ? '<span style="background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; padding: 1px 7px; border-radius: 4px; font-size: 0.7rem; font-weight: 700;">必須</span>'
@@ -23389,24 +23495,31 @@
         ? `<span style="background: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; margin-left: 6px;">個別指定</span>`
         : `<span style="background: #f1f5f9; color: #64748b; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 6px;">自動割当</span>`;
 
+      const linkBadge = col.category === 'question'
+        ? '<span style="background: #e0f2fe; color: #0284c7; padding: 2px 7px; border-radius: 4px; font-size: 0.7rem; font-weight: 700;">設問必須</span>'
+        : (col.isSynapseActive
+            ? '<span style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; padding: 2px 7px; border-radius: 4px; font-size: 0.7rem; font-weight: 700;">⚡ Synapse連携中</span>'
+            : '<span style="background: #f1f5f9; color: #94a3b8; border: 1px solid #e2e8f0; padding: 2px 7px; border-radius: 4px; font-size: 0.7rem;">⚪ Supabase保持のみ</span>');
+
       // 1. テーブル行HTML
       rowsHtml += `
-        <tr class="col-list-row" data-category="${col.category}" style="border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; transition: background 0.12s;">
-          <td style="padding: 9px 12px; color: #64748b; font-family: monospace; text-align: center;">${colIndex++}</td>
-          <td style="padding: 9px 12px;">${catBadge}</td>
+        <tr class="col-list-row ${col.isSynapseActive ? 'is-linked' : 'is-unlinked'}" data-category="${col.category}" style="border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; transition: background 0.12s; ${col.isSynapseActive ? '' : 'opacity: 0.68; background: #fbfbfc;'}">
+          <td style="padding: 9px 8px; color: #64748b; font-family: monospace; text-align: center;">${colIndex++}</td>
+          <td style="padding: 9px 8px;">${catBadge}</td>
+          <td style="padding: 9px 8px; text-align: center;">${linkToggleHtml}</td>
           <td style="padding: 9px 12px; color: #1e293b; font-weight: 600; min-width: 220px;">
             <div style="display: flex; align-items: center; gap: 4px;">
               ${escapeHtml(col.label)}${reqMark}
               ${col.sectionTitle ? `<span style="font-size: 0.7rem; color: #64748b; font-weight: 400;">(${escapeHtml(col.sectionTitle)})</span>` : ''}
             </div>
-            ${col.desc ? `<div style="font-size: 0.72rem; color: #475569; font-weight: 400; margin-top: 3px; line-height: 1.35; background: #f8fafc; border-left: 2px solid #0284c7; padding: 2px 6px; border-radius: 0 4px 4px 0;">💡 ${escapeHtml(col.desc)}</div>` : ''}
+            ${col.desc ? `<div style="font-size: 0.72rem; color: #475569; font-weight: 400; margin-top: 3px; line-height: 1.35; background: #f8fafc; border-left: 2px solid ${col.isSynapseActive ? '#0284c7' : '#94a3b8'}; padding: 2px 6px; border-radius: 0 4px 4px 0;">💡 ${escapeHtml(col.desc)}</div>` : ''}
           </td>
           <td style="padding: 9px 12px; color: #0284c7; font-weight: 700; font-family: monospace; font-size: 0.86rem;">
             <span>${escapeHtml(col.key)}</span>${col.category === 'question' ? keyBadge : ''}
           </td>
-          <td style="padding: 9px 12px; color: #334155; white-space: nowrap;">${escapeHtml(col.type)}</td>
-          <td style="padding: 9px 12px; color: #475569; font-size: 0.76rem; min-width: 130px;">${escapeHtml(col.source || '-')}</td>
-          <td style="padding: 9px 12px; white-space: nowrap; text-align: center;">${syncBadge}</td>
+          <td style="padding: 9px 10px; color: #334155; white-space: nowrap;">${escapeHtml(col.type)}</td>
+          <td style="padding: 9px 10px; color: #475569; font-size: 0.76rem; min-width: 120px;">${escapeHtml(col.source || '-')}</td>
+          <td style="padding: 9px 8px; white-space: nowrap; text-align: center;">${syncBadge}</td>
         </tr>
       `;
 
@@ -23421,7 +23534,7 @@
       const searchTerms = `${col.label} ${col.key} ${col.desc || ''} ${col.source || ''} ${col.catName || ''}`.toLowerCase();
 
       descCardsHtml += `
-        <div class="col-desc-card" data-category="${col.category}" data-search="${escapeHtml(searchTerms)}">
+        <div class="col-desc-card ${col.isSynapseActive ? '' : 'is-unlinked'}" data-category="${col.category}" data-search="${escapeHtml(searchTerms)}" style="${col.isSynapseActive ? '' : 'opacity: 0.72; border-style: dashed;'}">
           <div class="col-desc-card-header">
             <div class="col-desc-card-title-group">
               <span class="col-desc-index-badge">#${descIndex++}</span>
@@ -23431,6 +23544,7 @@
               ${col.sectionTitle ? `<span style="font-size: 0.74rem; color: #64748b;">(${escapeHtml(col.sectionTitle)})</span>` : ''}
             </div>
             <div class="col-desc-card-badges">
+              ${linkBadge}
               ${typeBadge}
               ${reqBadge}
               ${syncBadge}
@@ -23459,15 +23573,15 @@
       `;
     });
 
-    // 🌟 グリッドプレビュー用データの準備
-    let previewCols = allIntegratedCols;
+    // 🌟 グリッドプレビュー用データの準備（Synapse連携中のカラムのみ表示）
+    const previewCols = allIntegratedCols.filter(c => c.isSynapseActive !== false);
     let previewRows = [];
     const hasRealRows = dedicatedTable && Array.isArray(dedicatedTable.rows) && dedicatedTable.rows.length > 0;
 
     if (hasRealRows) {
       previewRows = dedicatedTable.rows;
     } else {
-      previewRows = generateIntegratedSampleRows(allIntegratedCols, formDef, 3);
+      previewRows = generateIntegratedSampleRows(previewCols, formDef, 3);
     }
 
     // グリッドテーブルHTMLのレンダリング関数
@@ -23578,11 +23692,11 @@
           <div class="modal-tab-bar">
             <button type="button" id="tab-btn-col-list" class="modal-tab-btn active">
               <span>📑 カラム構成一覧</span>
-              <span style="background: rgba(0,0,0,0.06); padding: 1px 6px; border-radius: 10px; font-size: 0.72rem;">${totalCount}</span>
+              <span style="background: rgba(2,132,199,0.12); color: #0284c7; padding: 1px 6px; border-radius: 10px; font-size: 0.72rem; font-weight: 700;">連携中: ${linkedCount} / 全${totalCount}</span>
             </button>
             <button type="button" id="tab-btn-col-desc" class="modal-tab-btn">
               <span>📖 各カラムの具体的説明一覧</span>
-              <span style="background: rgba(2,132,199,0.12); color: #0284c7; padding: 1px 6px; border-radius: 10px; font-size: 0.72rem; font-weight: 700;">${totalCount}</span>
+              <span style="background: rgba(0,0,0,0.06); padding: 1px 6px; border-radius: 10px; font-size: 0.72rem;">全${totalCount}件</span>
             </button>
             <button type="button" id="tab-btn-grid-preview" class="modal-tab-btn">
               <span>👀 統合データプレビュー (スプレッドシート)</span>
@@ -23623,23 +23737,25 @@
           <div style="border: 1px solid #cbd5e1; border-radius: 8px; overflow-x: auto; background: #ffffff;">
             <table style="width: 100%; min-width: 1000px; table-layout: fixed; border-collapse: collapse; text-align: left;">
               <colgroup>
-                <col style="width: 45px;" />
-                <col style="width: 85px;" />
-                <col style="width: 360px;" />
-                <col style="width: 165px;" />
+                <col style="width: 40px;" />
                 <col style="width: 75px;" />
-                <col style="width: 165px;" />
-                <col style="width: 105px;" />
+                <col style="width: 80px;" />
+                <col style="width: 320px;" />
+                <col style="width: 155px;" />
+                <col style="width: 75px;" />
+                <col style="width: 155px;" />
+                <col style="width: 100px;" />
               </colgroup>
               <thead>
                 <tr style="background: #f8fafc; color: #475569; font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #cbd5e1; position: sticky; top: 0; z-index: 10;">
-                  <th style="padding: 9px 10px; text-align: center; white-space: nowrap;">#</th>
-                  <th style="padding: 9px 10px; white-space: nowrap;">種別</th>
+                  <th style="padding: 9px 8px; text-align: center; white-space: nowrap;">#</th>
+                  <th style="padding: 9px 8px; white-space: nowrap;">種別</th>
+                  <th style="padding: 9px 8px; text-align: center; color: #0284c7; white-space: nowrap;">Synapse連携</th>
                   <th style="padding: 9px 12px; white-space: nowrap;">カラム名 / 設問タイトル</th>
                   <th style="padding: 9px 10px; color: #0284c7; white-space: nowrap;">Supabase物理カラム名</th>
                   <th style="padding: 9px 10px; white-space: nowrap;">データ型</th>
                   <th style="padding: 9px 10px; white-space: nowrap;">連携元 / API補完</th>
-                  <th style="padding: 9px 10px; text-align: center; white-space: nowrap;">同期状況</th>
+                  <th style="padding: 9px 8px; text-align: center; white-space: nowrap;">同期状況</th>
                 </tr>
               </thead>
               <tbody id="col-list-table-body">
@@ -23859,6 +23975,45 @@
       });
     }
 
+    // 🔗 モーダル内の各カラム「Synapse連携」トグル切り替えイベント
+    modal.querySelectorAll('.modal-col-link-toggle').forEach(chk => {
+      chk.addEventListener('change', (e) => {
+        const cat = chk.dataset.category;
+        const fKey = chk.dataset.fieldKey;
+        const checked = e.target.checked;
+
+        if (cat === 'user') {
+          if (!formDef.userIntegration) formDef.userIntegration = { enabled: true, fields: {} };
+          if (!formDef.userIntegration.fields) formDef.userIntegration.fields = {};
+          formDef.userIntegration.fields[fKey] = checked;
+          syncUserIntegrationToStorage(formDef);
+        } else if (cat === 'appoint') {
+          if (!formDef.appointIntegration) formDef.appointIntegration = { enabled: true, fields: {} };
+          if (!formDef.appointIntegration.fields) formDef.appointIntegration.fields = {};
+          formDef.appointIntegration.fields[fKey] = checked;
+          syncAppointIntegrationToStorage(formDef);
+        } else if (cat === 'system') {
+          if (!formDef.systemIntegration) formDef.systemIntegration = { enabled: true, fields: {} };
+          if (!formDef.systemIntegration.fields) formDef.systemIntegration.fields = {};
+          formDef.systemIntegration.fields[fKey] = checked;
+          syncSystemIntegrationToStorage(formDef);
+        }
+
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        if (typeof window.S === 'function') window.S();
+
+        const activeTab = tabBtnColDesc && tabBtnColDesc.classList.contains('active') ? 'desc' : (tabBtnGridPreview.classList.contains('active') ? 'grid' : 'list');
+        openFormColumnMappingModal(formDef).then(() => {
+          const m = document.getElementById('form-column-mapping-modal');
+          if (m) {
+            const btn = activeTab === 'desc' ? m.querySelector('#tab-btn-col-desc') : (activeTab === 'grid' ? m.querySelector('#tab-btn-grid-preview') : m.querySelector('#tab-btn-col-list'));
+            if (btn) btn.click();
+          }
+        });
+      });
+    });
+
     // ⚡ Supabase上にこのフォーム専用独立テーブルを事前作成・再同期するイベント
     const createBtn = modal.querySelector('#btn-create-supabase-table');
     if (createBtn) {
@@ -24011,8 +24166,43 @@
   }
   setInterval(setupTargetTableGlobalSettingsUI, 500);
 
-  // 📅 アポイント連携設定のUI初期化＆データ同期ヘルパー
-  const APPOINT_FIELD_KEYS = ['appointDate', 'meetingType', 'sourceCategory', 'introducer'];
+  // =======================================================
+  // 🔗 各カテゴリ連携設定（ユーザー連携 / アポ連携 / システム項目連携）
+  // =======================================================
+
+  // 👤 ユーザー情報連携設定のフィールドキー定義
+  const USER_FIELD_KEYS = ['userId', 'userName', 'userEmail', 'companyName'];
+
+  // 📅 アポイント連携設定のフィールドキー定義
+  const APPOINT_FIELD_KEYS = ['appointId', 'appointDate', 'meetingType', 'sourceCategory', 'introducer', 'customerName', 'appointStaff'];
+
+  // ⚙️ システム項目連携設定のフィールドキー定義
+  const SYSTEM_FIELD_KEYS = ['masterId', 'formTitle', 'status', 'registrationCode', 'resumeUrl', 'createdAt'];
+
+  // フォームエディタでユーザー連携設定が変更された際、form_customize_all_forms へ即時同期保存するヘルパー
+  function syncUserIntegrationToStorage(curDef) {
+    if (!curDef) return;
+    try {
+      const allFormsRaw = localStorage.getItem('form_customize_all_forms');
+      if (allFormsRaw) {
+        const allForms = JSON.parse(allFormsRaw);
+        if (Array.isArray(allForms)) {
+          let updated = false;
+          allForms.forEach(f => {
+            if (f && (f.id === curDef.id || (curDef.title && f.title === curDef.title))) {
+              f.userIntegration = JSON.parse(JSON.stringify(curDef.userIntegration));
+              updated = true;
+            }
+          });
+          if (updated) {
+            localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('[syncUserIntegrationToStorage] Error:', e);
+    }
+  }
 
   // フォームエディタでアポイント連携設定が変更された際、form_customize_all_forms へ即時同期保存するヘルパー
   function syncAppointIntegrationToStorage(curDef) {
@@ -24039,6 +24229,153 @@
     }
   }
 
+  // フォームエディタでシステム項目連携設定が変更された際、form_customize_all_forms へ即時同期保存するヘルパー
+  function syncSystemIntegrationToStorage(curDef) {
+    if (!curDef) return;
+    try {
+      const allFormsRaw = localStorage.getItem('form_customize_all_forms');
+      if (allFormsRaw) {
+        const allForms = JSON.parse(allFormsRaw);
+        if (Array.isArray(allForms)) {
+          let updated = false;
+          allForms.forEach(f => {
+            if (f && (f.id === curDef.id || (curDef.title && f.title === curDef.title))) {
+              f.systemIntegration = JSON.parse(JSON.stringify(curDef.systemIntegration));
+              updated = true;
+            }
+          });
+          if (updated) {
+            localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('[syncSystemIntegrationToStorage] Error:', e);
+    }
+  }
+
+  // 👤 ユーザー情報連携設定のUI初期化＆同期
+  function setupUserIntegrationSettingsUI() {
+    const enabledToggle = document.getElementById('editor-user-integration-enabled');
+    const detailsPanel = document.getElementById('editor-user-integration-details');
+    const toggleAllBtn = document.getElementById('btn-editor-user-toggle-all');
+    if (!enabledToggle || !detailsPanel) return;
+
+    const formDef = window.G || window.n || window.L;
+    if (!formDef) return;
+
+    const formId = formDef.id || '';
+
+    if (!formDef.userIntegration) {
+      formDef.userIntegration = {
+        enabled: true,
+        fields: {
+          userId: true,
+          userName: true,
+          userEmail: false,
+          companyName: false
+        }
+      };
+    } else if (!formDef.userIntegration.fields) {
+      formDef.userIntegration.fields = {
+        userId: true,
+        userName: true,
+        userEmail: false,
+        companyName: false
+      };
+    }
+
+    function updateUserStatusBadge(isEnabled, fields) {
+      const badge = document.getElementById('editor-user-status-badge');
+      if (!badge) return;
+      badge.style.display = 'inline-block';
+      if (isEnabled) {
+        const count = USER_FIELD_KEYS.filter(k => fields && fields[k] === true).length;
+        badge.textContent = `連携中 (${count}項目)`;
+        badge.style.background = '#e0f2fe';
+        badge.style.color = '#0284c7';
+      } else {
+        badge.textContent = '未連携';
+        badge.style.background = '#f1f5f9';
+        badge.style.color = '#64748b';
+      }
+    }
+
+    const currentFormKey = `${formId}_${formDef.userIntegration.enabled}_${JSON.stringify(formDef.userIntegration.fields)}`;
+    if (enabledToggle.dataset.lastFormKey !== currentFormKey) {
+      enabledToggle.dataset.lastFormKey = currentFormKey;
+      enabledToggle.checked = formDef.userIntegration.enabled !== false;
+      detailsPanel.style.display = enabledToggle.checked ? 'flex' : 'none';
+      updateUserStatusBadge(enabledToggle.checked, formDef.userIntegration.fields);
+
+      USER_FIELD_KEYS.forEach(key => {
+        const cb = document.getElementById(`editor-user-field-${key}`);
+        if (cb) {
+          cb.checked = formDef.userIntegration.fields[key] === true;
+        }
+      });
+    }
+
+    if (!enabledToggle.dataset.bound) {
+      enabledToggle.dataset.bound = 'true';
+      enabledToggle.addEventListener('change', (e) => {
+        const curDef = window.G || window.n || window.L || {};
+        if (!curDef.userIntegration) curDef.userIntegration = { enabled: true, fields: {} };
+        curDef.userIntegration.enabled = e.target.checked;
+        detailsPanel.style.display = e.target.checked ? 'flex' : 'none';
+        updateUserStatusBadge(e.target.checked, curDef.userIntegration.fields);
+        syncUserIntegrationToStorage(curDef);
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        if (typeof window.S === 'function') window.S();
+      });
+
+      USER_FIELD_KEYS.forEach(key => {
+        const cb = document.getElementById(`editor-user-field-${key}`);
+        if (cb && !cb.dataset.bound) {
+          cb.dataset.bound = 'true';
+          cb.addEventListener('change', (e) => {
+            const curDef = window.G || window.n || window.L || {};
+            if (!curDef.userIntegration) curDef.userIntegration = { enabled: true, fields: {} };
+            if (!curDef.userIntegration.fields) curDef.userIntegration.fields = {};
+            curDef.userIntegration.fields[key] = e.target.checked;
+            updateUserStatusBadge(curDef.userIntegration.enabled !== false, curDef.userIntegration.fields);
+            syncUserIntegrationToStorage(curDef);
+            if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+            if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+            if (typeof window.S === 'function') window.S();
+          });
+        }
+      });
+
+      if (toggleAllBtn && !toggleAllBtn.dataset.bound) {
+        toggleAllBtn.dataset.bound = 'true';
+        toggleAllBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const curDef = window.G || window.n || window.L || {};
+          if (!curDef.userIntegration) curDef.userIntegration = { enabled: true, fields: {} };
+          if (!curDef.userIntegration.fields) curDef.userIntegration.fields = {};
+
+          const cbs = USER_FIELD_KEYS.map(k => document.getElementById(`editor-user-field-${k}`)).filter(Boolean);
+          const anyChecked = cbs.some(cb => cb.checked);
+          cbs.forEach(cb => {
+            cb.checked = !anyChecked;
+            const k = cb.id.replace('editor-user-field-', '');
+            curDef.userIntegration.fields[k] = !anyChecked;
+          });
+
+          updateUserStatusBadge(curDef.userIntegration.enabled !== false, curDef.userIntegration.fields);
+          syncUserIntegrationToStorage(curDef);
+          if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+          if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+          if (typeof window.S === 'function') window.S();
+        });
+      }
+    }
+  }
+  setInterval(setupUserIntegrationSettingsUI, 500);
+
+  // 📅 アポイント連携設定のUI初期化＆同期
   function setupAppointIntegrationSettingsUI() {
     const enabledToggle = document.getElementById('editor-appoint-integration-enabled');
     const detailsPanel = document.getElementById('editor-appoint-integration-details');
@@ -24057,21 +24394,29 @@
       formDef.appointIntegration = {
         enabled: isPresetAppointForm,
         fields: {
+          appointId: true,
           appointDate: true,
           meetingType: true,
           sourceCategory: true,
-          introducer: true
+          introducer: true,
+          customerName: false,
+          appointStaff: false
         }
       };
     } else if (!formDef.appointIntegration.fields) {
       formDef.appointIntegration.fields = {
+        appointId: true,
         appointDate: true,
         meetingType: true,
         sourceCategory: true,
-        introducer: true
+        introducer: true,
+        customerName: false,
+        appointStaff: false
       };
     } else {
-      // 互換性フォールバック
+      if (formDef.appointIntegration.fields.appointId === undefined) formDef.appointIntegration.fields.appointId = true;
+      if (formDef.appointIntegration.fields.customerName === undefined) formDef.appointIntegration.fields.customerName = false;
+      if (formDef.appointIntegration.fields.appointStaff === undefined) formDef.appointIntegration.fields.appointStaff = false;
       if (formDef.appointIntegration.fields.introducer === undefined && formDef.appointIntegration.fields.introducerName !== undefined) {
         formDef.appointIntegration.fields.introducer = formDef.appointIntegration.fields.introducerName;
       }
@@ -24080,14 +24425,15 @@
       }
     }
 
-    function updateAppointStatusBadge(isEnabled) {
+    function updateAppointStatusBadge(isEnabled, fields) {
       const badge = document.getElementById('editor-appoint-status-badge');
       if (!badge) return;
       badge.style.display = 'inline-block';
       if (isEnabled) {
-        badge.textContent = '連携中 ✨';
-        badge.style.background = '#e0f2fe';
-        badge.style.color = '#0284c7';
+        const count = APPOINT_FIELD_KEYS.filter(k => fields && fields[k] === true).length;
+        badge.textContent = `連携中 (${count}項目)`;
+        badge.style.background = '#f3e8ff';
+        badge.style.color = '#7e22ce';
       } else {
         badge.textContent = '未連携';
         badge.style.background = '#f1f5f9';
@@ -24095,34 +24441,30 @@
       }
     }
 
-    // フォームが切り替わった場合、または未同期の場合にUIへ反映
-    const currentFormKey = `${formId}_${formDef.appointIntegration.enabled}`;
+    const currentFormKey = `${formId}_${formDef.appointIntegration.enabled}_${JSON.stringify(formDef.appointIntegration.fields)}`;
     if (enabledToggle.dataset.lastFormKey !== currentFormKey) {
       enabledToggle.dataset.lastFormKey = currentFormKey;
       enabledToggle.checked = !!formDef.appointIntegration.enabled;
       detailsPanel.style.display = enabledToggle.checked ? 'flex' : 'none';
-      updateAppointStatusBadge(enabledToggle.checked);
+      updateAppointStatusBadge(enabledToggle.checked, formDef.appointIntegration.fields);
 
       const accordion = document.getElementById('editor-appoint-accordion');
       if (accordion && accordion.dataset.lastFormKey !== currentFormKey) {
         accordion.dataset.lastFormKey = currentFormKey;
-        // ユーザー指示に基づき、フォーム切替時はデフォルトで閉じた状態にする
         accordion.open = false;
       }
 
       APPOINT_FIELD_KEYS.forEach(key => {
         const cb = document.getElementById(`editor-appoint-field-${key}`);
         if (cb) {
-          cb.checked = formDef.appointIntegration.fields[key] !== false;
+          cb.checked = formDef.appointIntegration.fields[key] === true;
         }
       });
     }
 
-    // イベントリスナーのバインド（未バインド時のみ）
     if (!enabledToggle.dataset.bound) {
       enabledToggle.dataset.bound = 'true';
 
-      // ⚠️ 連携解除確認モーダル付きの安全なトグルハンドラ
       enabledToggle.addEventListener('click', (e) => {
         const curDef = window.G || window.n || window.L || {};
         if (!curDef.appointIntegration) curDef.appointIntegration = { enabled: false, fields: {} };
@@ -24130,20 +24472,17 @@
         const wasEnabled = curDef.appointIntegration.enabled === true;
 
         if (wasEnabled) {
-          // ONからOFFへの操作：ブラウザのデフォルト切り替えを一旦キャンセル！
           e.preventDefault();
 
-          // システム確認モーダルを直接呼び出す
           const modalFn = (typeof window.showSystemConfirmModal === 'function') ? window.showSystemConfirmModal : (typeof showSystemConfirmModal === 'function' ? showSystemConfirmModal : null);
           const confirmMsg = '⚠️ アポイント連携を解除しますか？\n\n解除すると、アポイント詳細画面からこのフォームが発行できなくなります。\n本当に連携を解除しますか？';
 
           const handleConfirmed = (confirmed) => {
             if (confirmed) {
-              // 「実行する」が押された！
               enabledToggle.checked = false;
               curDef.appointIntegration.enabled = false;
               detailsPanel.style.display = 'none';
-              updateAppointStatusBadge(false);
+              updateAppointStatusBadge(false, curDef.appointIntegration.fields);
               enabledToggle.dataset.lastFormKey = `${curDef.id || ''}_false`;
 
               syncAppointIntegrationToStorage(curDef);
@@ -24154,9 +24493,8 @@
                 showCustomToast('アポイント連携を解除しました。', 'info');
               }
             } else {
-              // キャンセル：何もしない（checked は ON のまま維持）
               enabledToggle.checked = true;
-              updateAppointStatusBadge(true);
+              updateAppointStatusBadge(true, curDef.appointIntegration.fields);
             }
           };
 
@@ -24167,11 +24505,10 @@
             handleConfirmed(ok);
           }
         } else {
-          // OFFからONへの操作：確認なしで直ちにON
           enabledToggle.checked = true;
           curDef.appointIntegration.enabled = true;
           detailsPanel.style.display = 'flex';
-          updateAppointStatusBadge(true);
+          updateAppointStatusBadge(true, curDef.appointIntegration.fields);
           enabledToggle.dataset.lastFormKey = `${curDef.id || ''}_true`;
 
           syncAppointIntegrationToStorage(curDef);
@@ -24200,6 +24537,7 @@
             if (!curDef.appointIntegration) curDef.appointIntegration = { enabled: true, fields: {} };
             if (!curDef.appointIntegration.fields) curDef.appointIntegration.fields = {};
             curDef.appointIntegration.fields[key] = e.target.checked;
+            updateAppointStatusBadge(curDef.appointIntegration.enabled === true, curDef.appointIntegration.fields);
 
             syncAppointIntegrationToStorage(curDef);
             if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
@@ -24225,6 +24563,7 @@
             curDef.appointIntegration.fields[k] = !anyChecked;
           });
 
+          updateAppointStatusBadge(curDef.appointIntegration.enabled === true, curDef.appointIntegration.fields);
           syncAppointIntegrationToStorage(curDef);
           if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
           if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
@@ -24234,6 +24573,131 @@
     }
   }
   setInterval(setupAppointIntegrationSettingsUI, 500);
+
+  // ⚙️ システム項目連携設定のUI初期化＆同期
+  function setupSystemIntegrationSettingsUI() {
+    const enabledToggle = document.getElementById('editor-system-integration-enabled');
+    const detailsPanel = document.getElementById('editor-system-integration-details');
+    const toggleAllBtn = document.getElementById('btn-editor-system-toggle-all');
+    if (!enabledToggle || !detailsPanel) return;
+
+    const formDef = window.G || window.n || window.L;
+    if (!formDef) return;
+
+    const formId = formDef.id || '';
+
+    if (!formDef.systemIntegration) {
+      formDef.systemIntegration = {
+        enabled: true,
+        fields: {
+          masterId: true,
+          formTitle: true,
+          status: true,
+          registrationCode: true,
+          resumeUrl: true,
+          createdAt: true
+        }
+      };
+    } else if (!formDef.systemIntegration.fields) {
+      formDef.systemIntegration.fields = {
+        masterId: true,
+        formTitle: true,
+        status: true,
+        registrationCode: true,
+        resumeUrl: true,
+        createdAt: true
+      };
+    }
+
+    function updateSystemStatusBadge(isEnabled, fields) {
+      const badge = document.getElementById('editor-system-status-badge');
+      if (!badge) return;
+      badge.style.display = 'inline-block';
+      if (isEnabled) {
+        const count = SYSTEM_FIELD_KEYS.filter(k => fields && fields[k] !== false).length;
+        badge.textContent = `連携中 (${count}項目)`;
+        badge.style.background = '#f1f5f9';
+        badge.style.color = '#475569';
+      } else {
+        badge.textContent = '未連携';
+        badge.style.background = '#f1f5f9';
+        badge.style.color = '#64748b';
+      }
+    }
+
+    const currentFormKey = `${formId}_${formDef.systemIntegration.enabled}_${JSON.stringify(formDef.systemIntegration.fields)}`;
+    if (enabledToggle.dataset.lastFormKey !== currentFormKey) {
+      enabledToggle.dataset.lastFormKey = currentFormKey;
+      enabledToggle.checked = formDef.systemIntegration.enabled !== false;
+      detailsPanel.style.display = enabledToggle.checked ? 'flex' : 'none';
+      updateSystemStatusBadge(enabledToggle.checked, formDef.systemIntegration.fields);
+
+      SYSTEM_FIELD_KEYS.forEach(key => {
+        const cb = document.getElementById(`editor-system-field-${key}`);
+        if (cb) {
+          cb.checked = formDef.systemIntegration.fields[key] !== false;
+        }
+      });
+    }
+
+    if (!enabledToggle.dataset.bound) {
+      enabledToggle.dataset.bound = 'true';
+      enabledToggle.addEventListener('change', (e) => {
+        const curDef = window.G || window.n || window.L || {};
+        if (!curDef.systemIntegration) curDef.systemIntegration = { enabled: true, fields: {} };
+        curDef.systemIntegration.enabled = e.target.checked;
+        detailsPanel.style.display = e.target.checked ? 'flex' : 'none';
+        updateSystemStatusBadge(e.target.checked, curDef.systemIntegration.fields);
+        syncSystemIntegrationToStorage(curDef);
+        if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+        if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+        if (typeof window.S === 'function') window.S();
+      });
+
+      SYSTEM_FIELD_KEYS.forEach(key => {
+        const cb = document.getElementById(`editor-system-field-${key}`);
+        if (cb && !cb.dataset.bound) {
+          cb.dataset.bound = 'true';
+          cb.addEventListener('change', (e) => {
+            const curDef = window.G || window.n || window.L || {};
+            if (!curDef.systemIntegration) curDef.systemIntegration = { enabled: true, fields: {} };
+            if (!curDef.systemIntegration.fields) curDef.systemIntegration.fields = {};
+            curDef.systemIntegration.fields[key] = e.target.checked;
+            updateSystemStatusBadge(curDef.systemIntegration.enabled !== false, curDef.systemIntegration.fields);
+            syncSystemIntegrationToStorage(curDef);
+            if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+            if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+            if (typeof window.S === 'function') window.S();
+          });
+        }
+      });
+
+      if (toggleAllBtn && !toggleAllBtn.dataset.bound) {
+        toggleAllBtn.dataset.bound = 'true';
+        toggleAllBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const curDef = window.G || window.n || window.L || {};
+          if (!curDef.systemIntegration) curDef.systemIntegration = { enabled: true, fields: {} };
+          if (!curDef.systemIntegration.fields) curDef.systemIntegration.fields = {};
+
+          const cbs = SYSTEM_FIELD_KEYS.map(k => document.getElementById(`editor-system-field-${k}`)).filter(Boolean);
+          const anyChecked = cbs.some(cb => cb.checked);
+          cbs.forEach(cb => {
+            cb.checked = !anyChecked;
+            const k = cb.id.replace('editor-system-field-', '');
+            curDef.systemIntegration.fields[k] = !anyChecked;
+          });
+
+          updateSystemStatusBadge(curDef.systemIntegration.enabled !== false, curDef.systemIntegration.fields);
+          syncSystemIntegrationToStorage(curDef);
+          if (typeof persistDrawerChanges === 'function') persistDrawerChanges();
+          if (typeof saveAndSyncMindmapData === 'function') saveAndSyncMindmapData();
+          if (typeof window.S === 'function') window.S();
+        });
+      }
+    }
+  }
+  setInterval(setupSystemIntegrationSettingsUI, 500);
 
   // ヘッダーボタンの初期化
   function setupHeaderColumnPreviewButton() {
