@@ -12870,31 +12870,25 @@
   // ==========================================================================
   const ADD_QUESTION_MENU_DATA = [
     {
-      category: "📝 基本の入力形式（空の質問）",
+      category: "✏️ 質問の追加",
       items: [
-        { id: "empty_text", type: "empty", qType: "text", name: "記述式 (短文)", desc: "氏名や件名などの1行テキスト入力欄", icon: "✏️", badge: "基本", badgeType: "" },
-        { id: "empty_paragraph", type: "empty", qType: "paragraph", name: "記述式 (長文)", desc: "ご意見やお問合せ内容などの複数行テキスト入力欄", icon: "📄", badge: "長文", badgeType: "" },
-        { id: "empty_radio", type: "empty", qType: "radio", name: "単一選択 (ラジオボタン)", desc: "候補の中から1つだけ選ぶ選択肢", icon: "🔘", badge: "単一選択", badgeType: "" },
-        { id: "empty_checkbox", type: "empty", qType: "checkbox", name: "複数選択 (チェックボックス)", desc: "複数選べるチェックボックス選択肢", icon: "☑️", badge: "複数選択", badgeType: "" },
-        { id: "empty_select", type: "empty", qType: "select", name: "ドロップダウン (プルダウン)", desc: "リストから1つ選ぶ省スペースな選択肢", icon: "🔽", badge: "リスト", badgeType: "" },
-        { id: "empty_date", type: "empty", qType: "date", name: "日付選択", desc: "カレンダーから年月日を指定する入力欄", icon: "📅", badge: "日付", badgeType: "" },
-        { id: "empty_file", type: "empty", qType: "file", name: "ファイル添付", desc: "書類・画像・写真などのファイル添付欄", icon: "📎", badge: "ファイル", badgeType: "" }
+        { id: "empty_text", type: "empty", qType: "text", name: "通常の質問（空の入力欄）", desc: "回答形式は追加後にカード内で自由に設定できます", icon: "✏️", badge: "新規", badgeType: "" }
       ]
     },
     {
-      category: "⭐ よく使われる定番項目（入力規則つき）",
+      category: "⭐ よく使われる定番項目（入力規則・正規表現つき）",
       items: [
         { id: "preset_name", type: "preset", key: "name", name: "氏名", desc: "お名前入力欄（必須・フルネーム案内つき）", icon: "👤", badge: "定番", badgeType: "badge-smart" },
         { id: "preset_company", type: "preset", key: "company", name: "法人名・屋号", desc: "会社名または屋号（未入力時は自動ハイフン補填）", icon: "🏢", badge: "ビジネス", badgeType: "badge-smart" },
-        { id: "preset_email", type: "preset", key: "email", name: "メールアドレス", desc: "連絡先メール（形式チェックバリデーションつき）", icon: "✉️", badge: "定番", badgeType: "badge-smart" },
+        { id: "preset_email", type: "preset", key: "email", name: "メールアドレス", desc: "連絡先メール（メールアドレス形式チェックつき）", icon: "✉️", badge: "定番", badgeType: "badge-smart" },
         { id: "preset_email_autoreply", type: "preset", key: "email_autoreply", name: "メールアドレス（回答控え自動送信）", desc: "送信完了時に回答内容の控えメールを自動配信", icon: "📨", badge: "自動返信", badgeType: "badge-smart" },
-        { id: "preset_tel", type: "preset", key: "tel", name: "電話番号", desc: "固定・携帯電話共通（ハイフン形式チェックつき）", icon: "📞", badge: "定番", badgeType: "badge-smart" },
+        { id: "preset_tel", type: "preset", key: "tel", name: "電話番号", desc: "固定・携帯電話共通（電話番号形式チェックつき）", icon: "📞", badge: "定番", badgeType: "badge-smart" },
         { id: "preset_pro_address", type: "preset", key: "pro_address", name: "郵便番号・住所セット", desc: "郵便番号から住所を自動補完する連携セット", icon: "📮", badge: "住所補完", badgeType: "badge-smart" },
-        { id: "preset_birthdate", type: "preset", key: "birthdate", name: "生年月日", desc: "西暦年月日（1990/01/01形式チェックつき）", icon: "🎂", badge: "定番", badgeType: "badge-smart" }
+        { id: "preset_birthdate", type: "preset", key: "birthdate", name: "生年月日", desc: "西暦年月日（YYYY/MM/DD形式チェックつき）", icon: "🎂", badge: "定番", badgeType: "badge-smart" }
       ]
     },
     {
-      category: "💼 ビジネス・専用プロ項目",
+      category: "💼 ビジネス・専用プロ項目（API連携・一括セット）",
       items: [
         { id: "preset_pro_bank", type: "preset", key: "pro_bank", name: "銀行口座情報セット", desc: "銀行名・支店名・口座種別・口座番号の自動照合セット", icon: "🏦", badge: "API連携", badgeType: "badge-pro" },
         { id: "preset_pro_corp_info", type: "preset", key: "pro_corp_info", name: "法人情報一括セット", desc: "法人名・代表者・所在地・インボイス等の一式", icon: "🏢", badge: "プロ一括", badgeType: "badge-pro" },
@@ -13028,7 +13022,7 @@
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
-        <input type="text" id="input-search-add-q" placeholder="質問の種類を検索... (例: 氏名, 口座, 選択)" value="${escapeAddQHtml(filterText)}">
+        <input type="text" id="input-search-add-q" placeholder="質問・プリセットを検索... (例: 氏名, 口座, 住所)" value="${escapeAddQHtml(filterText)}">
       </div>
       <div class="add-q-scroll-area">
     `;
@@ -13180,6 +13174,11 @@
       }
     });
 
+    // ポップオーバー内部のホイールスクロールが背景に伝播して閉じるのを防ぐ
+    popover.addEventListener('wheel', (e) => {
+      e.stopPropagation();
+    }, { passive: true });
+
     // 画面外クリックで閉じる
     document.addEventListener('click', (e) => {
       if (!btn.contains(e.target) && !popover.contains(e.target)) {
@@ -13201,11 +13200,11 @@
       }
     });
 
-    // コンテナスクロール時に自然に閉じる
-    window.addEventListener('scroll', () => {
-      if (popover.style.display === 'flex') {
-        closeAddQuestionPopover();
-      }
+    // 画面スクロール時に閉じる（ただしポップオーバー自身の内部スクロール時は絶対に閉じない）
+    window.addEventListener('scroll', (e) => {
+      if (popover.style.display !== 'flex') return;
+      if (e.target && (popover === e.target || popover.contains(e.target))) return;
+      closeAddQuestionPopover();
     }, true);
   }
   window.setupAddQuestionMenu = setupAddQuestionMenu;

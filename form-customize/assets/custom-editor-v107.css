@@ -7394,6 +7394,8 @@ html, body {
 .add-q-scroll-area {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 6px 8px 10px;
 }
 
