@@ -19378,15 +19378,27 @@
   function updateCloudSyncStatus(status, message) {
     const indicator = document.getElementById('cloud-sync-status-indicator');
     if (!indicator) return;
+    const icon = document.getElementById('cloud-sync-icon');
+    const text = document.getElementById('cloud-sync-text');
+
     if (status === 'saving') {
-      indicator.innerHTML = '<span style="display:inline-block; animation:spin 1s linear infinite;">⏳</span> クラウド保存中...';
-      indicator.style.color = '#e37400';
+      if (icon) icon.innerHTML = '<span style="display:inline-block; animation:spin 1s linear infinite;">🔄</span>';
+      if (text) text.textContent = '同期中...';
+      indicator.style.color = 'var(--text-secondary, #5f6368)';
+      indicator.style.background = 'var(--bg-surface-elevated, #f8f9fa)';
+      indicator.style.borderColor = 'var(--color-border, #dadce0)';
     } else if (status === 'saved') {
-      indicator.innerHTML = '<span>☁️</span> クラウド保存済';
-      indicator.style.color = '#137333';
+      if (icon) icon.textContent = '🟢';
+      if (text) text.textContent = '同期済み';
+      indicator.style.color = 'var(--text-secondary, #5f6368)';
+      indicator.style.background = 'var(--bg-surface-elevated, #f8f9fa)';
+      indicator.style.borderColor = 'var(--color-border, #dadce0)';
     } else if (status === 'error') {
-      indicator.innerHTML = '<span>⚠️</span> 保存エラー';
-      indicator.style.color = '#d93025';
+      if (icon) icon.textContent = '⚠️';
+      if (text) text.textContent = '同期エラー';
+      indicator.style.color = '#b91c1c';
+      indicator.style.background = '#fee2e2';
+      indicator.style.borderColor = '#ef4444';
     }
   }
 
@@ -19641,54 +19653,35 @@
     _origSetItem.apply(this, arguments);
   };
 
-  // ☁️ エディタヘッダーへのクラウド保存ボタン＆ステータス表示のマウント
+  // ☁️ 共通ヘッダー端（ロゴ・タイトル横）へのクラウド同期ステータスバッジのマウント
   function mountCloudSyncHeaderControls() {
-    const headerActions = document.querySelector('.header-actions');
-    if (!headerActions) return;
-    if (document.getElementById('cloud-sync-container')) return;
+    // 既存の旧手動ボタンコンテナがあれば確実に削除
+    const oldContainer = document.getElementById('cloud-sync-container');
+    if (oldContainer) oldContainer.remove();
 
-    const container = document.createElement('div');
-    container.id = 'cloud-sync-container';
-    container.style.cssText = 'display: inline-flex; align-items: center; margin-right: 12px; gap: 8px;';
+    if (document.getElementById('cloud-sync-status-indicator')) return;
 
-    const indicator = document.createElement('span');
+    const headerLogo = document.querySelector('.header-logo');
+    if (!headerLogo) return;
+
+    const indicator = document.createElement('div');
     indicator.id = 'cloud-sync-status-indicator';
-    indicator.style.cssText = 'font-size: 0.8rem; color: #137333; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;';
-    indicator.innerHTML = '<span>☁️</span> クラウド保存済';
+    indicator.title = 'クラウド（Supabase）自動同期ステータス';
+    indicator.style.cssText = 'display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.45rem; border-radius: 4px; border: 1px solid var(--color-border, #dadce0); background: var(--bg-surface-elevated, #f8f9fa); color: var(--text-secondary, #5f6368); transition: all 0.2s; user-select: none; margin-left: 8px; vertical-align: middle; flex-shrink: 0;';
 
-    const syncBtn = document.createElement('button');
-    syncBtn.id = 'btn-manual-cloud-sync';
-    syncBtn.type = 'button';
-    syncBtn.className = 'btn btn-secondary';
-    syncBtn.title = '現在の編集内容をSupabaseクラウドへ強制保存します';
-    syncBtn.style.cssText = 'padding: 5px 10px; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; border-radius: 6px; border: 1px solid var(--color-border, #dadce0); background: var(--color-bg-card, #fff); color: var(--color-text, #202124);';
-    syncBtn.innerHTML = '<span>☁️</span> クラウド保存';
+    const iconSpan = document.createElement('span');
+    iconSpan.id = 'cloud-sync-icon';
+    iconSpan.style.cssText = 'font-size: 0.75rem; line-height: 1;';
+    iconSpan.textContent = '🟢';
 
-    syncBtn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      syncBtn.disabled = true;
-      syncBtn.style.opacity = '0.6';
-      updateCloudSyncStatus('saving');
-      try {
-        if (typeof window.syncFormsToCloud === 'function') {
-          await window.syncFormsToCloud(null, true);
-        }
-        updateCloudSyncStatus('saved');
-        if (typeof window.showToastNotification === 'function') {
-          window.showToastNotification('クラウドへの即時保存が完了しました');
-        }
-      } catch (err) {
-        updateCloudSyncStatus('error');
-        alert('クラウド保存に失敗しました: ' + (err.message || err));
-      } finally {
-        syncBtn.disabled = false;
-        syncBtn.style.opacity = '1';
-      }
-    });
+    const textSpan = document.createElement('span');
+    textSpan.id = 'cloud-sync-text';
+    textSpan.textContent = '同期済み';
 
-    container.appendChild(indicator);
-    container.appendChild(syncBtn);
-    headerActions.insertBefore(container, headerActions.firstChild);
+    indicator.appendChild(iconSpan);
+    indicator.appendChild(textSpan);
+
+    headerLogo.appendChild(indicator);
   }
 
   // 起動時の初期同期とボタンマウント
