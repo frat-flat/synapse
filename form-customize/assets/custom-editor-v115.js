@@ -2987,8 +2987,10 @@
     try {
       isSplitMode = localStorage.getItem('form_customize_split_mode') === 'true';
       const savedPair = localStorage.getItem('form_customize_split_pair');
-      if (savedPair && ['section_flowmap', 'global_flowmap', 'global_section'].includes(savedPair)) {
+      if (savedPair && ['section_flowmap', 'global_flowmap'].includes(savedPair)) {
         currentSplitPair = savedPair;
+      } else {
+        currentSplitPair = 'section_flowmap';
       }
     } catch(e) {}
 
@@ -3115,13 +3117,9 @@
         // スマホライブプレビューは完全非表示
         if (livePreviewPane) livePreviewPane.style.setProperty('display', 'none', 'important');
 
-        // 右ペイン: フローマップを表示（global_sectionペア時以外）
-        if (currentSplitPair === 'global_section' && !isEditingSection) {
-          flowmapContainer.style.setProperty('display', 'none', 'important');
-        } else {
-          flowmapContainer.style.setProperty('display', 'flex', 'important');
-          flowmapContainer.classList.remove('full-tab-mode');
-        }
+        // 右ペイン: フローマップを常時表示
+        flowmapContainer.style.setProperty('display', 'flex', 'important');
+        flowmapContainer.classList.remove('full-tab-mode');
 
         if (isEditingSection) {
           // 🚀 【ユーザー最重要要望】実際の質問項目の設定画面 ＋ フローマップ
@@ -3148,11 +3146,6 @@
             // セクション構成一覧 ＋ フローマップ
             setTabStyle(btnSection);
             globalCard.style.display = 'none';
-            sectionsPane.style.display = 'block';
-          } else if (currentSplitPair === 'global_section') {
-            // 全体設定 ＋ セクション構成一覧
-            setTabStyle(btnGlobal);
-            globalCard.style.display = 'block';
             sectionsPane.style.display = 'block';
           } else {
             // 全体設定 ＋ フローマップ
@@ -3442,6 +3435,102 @@
         }
       }
     });
+
+    // ↔️ 2画面表示時のリサイザー（ドラッグ調整バー）の初期化
+    const initSplitResizer = () => {
+      const resizer = document.getElementById('editor-split-resizer');
+      const workspace = document.getElementById('editor-workspace-body');
+      if (!resizer || !workspace) return;
+      if (resizer._initialized) return;
+      resizer._initialized = true;
+
+      // 保存された幅比率の適用（デフォルトは 50% 等幅）
+      const applyRatio = (ratio) => {
+        if (typeof ratio === 'number' && ratio >= 0.2 && ratio <= 0.8) {
+          workspace.style.setProperty('--split-left-width', `${(ratio * 100).toFixed(2)}%`);
+        } else {
+          workspace.style.setProperty('--split-left-width', 'calc(50% - 5px)');
+        }
+      };
+
+      try {
+        const savedRatio = parseFloat(localStorage.getItem('form_customize_split_ratio'));
+        if (!isNaN(savedRatio) && savedRatio >= 0.2 && savedRatio <= 0.8) {
+          applyRatio(savedRatio);
+        } else {
+          applyRatio(0.5);
+        }
+      } catch (e) {
+        applyRatio(0.5);
+      }
+
+      let isDragging = false;
+      let startX = 0;
+      let startLeftWidth = 0;
+      let totalWidth = 0;
+
+      resizer.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isDragging = true;
+        resizer.classList.add('is-dragging');
+        document.body.classList.add('is-resizing');
+
+        const wsRect = workspace.getBoundingClientRect();
+        totalWidth = wsRect.width;
+        startX = e.clientX;
+
+        // 左ペインの現在幅を取得
+        const leftPane = workspace.querySelector('#form-overview-editor:not([style*="display: none"]), #active-section-editor:not([style*="display: none"])');
+        startLeftWidth = leftPane ? leftPane.getBoundingClientRect().width : totalWidth * 0.5;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging || totalWidth <= 0) return;
+        const deltaX = e.clientX - startX;
+        let newWidth = startLeftWidth + deltaX;
+        let ratio = newWidth / totalWidth;
+        ratio = Math.max(0.2, Math.min(0.8, ratio));
+        workspace.style.setProperty('--split-left-width', `${(ratio * 100).toFixed(2)}%`);
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        resizer.classList.remove('is-dragging');
+        document.body.classList.remove('is-resizing');
+
+        // 比率をlocalStorageに保存
+        const curVal = workspace.style.getPropertyValue('--split-left-width');
+        if (curVal) {
+          const num = parseFloat(curVal) / 100;
+          if (!isNaN(num)) {
+            try { localStorage.setItem('form_customize_split_ratio', num.toString()); } catch (e) {}
+          }
+        }
+
+        // フローマップ表示を枠に合わせてリフィット
+        if (window.archifyRenderer && typeof window.archifyRenderer.fitView === 'function') {
+          setTimeout(() => window.archifyRenderer.fitView(), 50);
+        }
+      });
+
+      // 🌟 ダブルクリックで瞬時に「50% : 50%（等幅・平等）」にリセット！
+      resizer.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        applyRatio(0.5);
+        try { localStorage.setItem('form_customize_split_ratio', '0.5'); } catch (e) {}
+        if (window.archifyRenderer && typeof window.archifyRenderer.fitView === 'function') {
+          setTimeout(() => window.archifyRenderer.fitView(), 50);
+        }
+        if (typeof showGlobalToast === 'function') {
+          showGlobalToast('↔️ 画面の幅を50%:50%（等幅）にリセットしました');
+        }
+      });
+    };
+
+    initSplitResizer();
 
     // 初期状態の反映
     updateViews();

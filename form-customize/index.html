@@ -405,13 +405,6 @@
                           <div class="split-pair-desc">基本情報・モード設定と分岐フローを並べて編集</div>
                         </div>
                       </label>
-                      <label class="split-pair-option" data-pair="global_section">
-                        <input type="radio" name="split-pair-radio" value="global_section" />
-                        <div class="split-pair-option-text">
-                          <div class="split-pair-title">⚙️ 全体設定 ＋ 📋 セクション構成</div>
-                          <div class="split-pair-desc">全体設定とセクション構成一覧を同時に確認</div>
-                        </div>
-                      </label>
                     </div>
                   </div>
                 </div>
@@ -454,9 +447,6 @@
                       <span class="ai-sparkle-badge global-ai-badge" id="global-ai-status-badge">リアルタイム全体診断</span>
                     </div>
                     <div class="global-ai-summary-actions">
-                      <button type="button" id="btn-quick-apply-global-ai" class="btn btn-primary btn-sm" title="AI推奨設定（タイトル・説明文・配色・所要時間等）を即時反映">
-                        <span>⚡</span> おすすめ一括適用
-                      </button>
                       <button type="button" id="btn-refresh-global-ai" class="btn btn-sm" style="background: #ffffff; border: 1px solid var(--color-border, #cbd5e1); color: var(--color-text, #334155); font-weight: 600;" title="最新の設問構成から推奨設定を再診断">
                         <span>🔄</span> 再診断
                       </button>
@@ -544,12 +534,6 @@
                   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <span style="font-size: 0.8rem; font-weight: 600; color: var(--color-text);">📝 フォーム基本情報</span>
-                      <button type="button" id="btn-trigger-global-ai" class="btn btn-sm" style="font-size: 0.72rem; padding: 2px 8px; background: linear-gradient(135deg, rgba(26, 115, 232, 0.08) 0%, rgba(147, 51, 234, 0.1) 100%); color: #1a73e8; border: 1px solid rgba(26, 115, 232, 0.3); border-radius: 4px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;" title="Gemini全体AIアシスタントを展開して最適化提案を表示">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
-                          <path d="M12 24C12 17.373 6.627 12 0 12C6.627 12 12 6.627 12 0C12 6.627 17.373 12 24 12C17.373 12 12 17.373 12 24Z" fill="url(#gemini-official-grad)"/>
-                        </svg>
-                        <span>AI最適化を呼び出す</span>
-                      </button>
                     </div>
                     <!-- 📊 専用テーブル作成設定（上部に小さくチェックボックスで配置） -->
                     <div id="editor-target-table-card" style="display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; background: transparent; border: none;">
@@ -1316,6 +1300,11 @@
                 <button id="btn-back-to-overview" class="btn btn-secondary">← 全体概要に戻る</button>
                 <button id="btn-delete-section" class="btn btn-danger">このセクションを削除</button>
               </div>
+            </div>
+
+            <!-- ↔️ 2画面表示時の幅調整スプリッター（ドラッグで左右幅調整、ダブルクリックで50:50にリセット） -->
+            <div id="editor-split-resizer" class="editor-split-resizer" title="ドラッグして左右の幅を調整（ダブルクリックで等幅にリセット）">
+              <div class="resizer-handle-line"></div>
             </div>
 
             <!-- C. 【Archifyフローマップ画面】（スプリット表示時またはフローマップ単独表示時） -->

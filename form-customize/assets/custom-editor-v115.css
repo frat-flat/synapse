@@ -6374,28 +6374,83 @@ body.split-active .editor-live-preview-pane,
   pointer-events: none !important;
 }
 
-/* 🌟 スプリットモード時：左ペイン（セクション質問項目設定 または 全体設定） */
-.editor-workspace-body.split-mode-active > .section-editor-card,
-.editor-workspace-body.split-mode-active > .overview-editor-container {
-  flex: 1 1 50% !important;
-  width: 50% !important;
-  max-width: 50% !important;
-  min-width: 420px !important;
+/* 🌟 スプリットモード時：リサイザーバー（境界のドラッグ調整バー） */
+.editor-split-resizer {
+  display: none !important;
+  width: 10px !important;
+  min-width: 10px !important;
+  max-width: 10px !important;
+  cursor: col-resize !important;
+  position: relative !important;
+  user-select: none !important;
+  z-index: 50 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 -3px !important;
+  background: transparent !important;
+  transition: background 0.15s ease !important;
+}
+
+.editor-workspace-body.split-mode-active > .editor-split-resizer {
+  display: flex !important;
+}
+
+.editor-split-resizer:hover,
+.editor-split-resizer.is-dragging {
+  background: rgba(37, 99, 235, 0.08) !important;
+}
+
+.resizer-handle-line {
+  width: 3px !important;
+  height: 38px !important;
+  background: #cbd5e1 !important;
+  border-radius: 3px !important;
+  transition: all 0.15s ease !important;
+}
+
+.editor-split-resizer:hover .resizer-handle-line,
+.editor-split-resizer.is-dragging .resizer-handle-line {
+  background: #2563eb !important;
+  height: 58px !important;
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.4) !important;
+}
+
+body.is-resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+body.is-resizing iframe,
+body.is-resizing svg,
+body.is-resizing canvas {
+  pointer-events: none !important;
+}
+
+/* 🌟 スプリットモード時：左ペイン（セクション質問項目設定 または 全体設定）平等幅50% */
+.editor-workspace-body.split-mode-active > #form-overview-editor,
+.editor-workspace-body.split-mode-active > .overview-editor-container,
+.editor-workspace-body.split-mode-active > #active-section-editor,
+.editor-workspace-body.split-mode-active > .section-editor-card {
+  flex: 0 0 var(--split-left-width, calc(50% - 5px)) !important;
+  width: var(--split-left-width, calc(50% - 5px)) !important;
+  max-width: var(--split-left-width, calc(50% - 5px)) !important;
+  min-width: 280px !important;
   height: 100% !important;
   max-height: calc(100vh - 145px) !important;
   overflow-y: auto !important;
-  padding-right: 14px !important;
+  padding-right: 12px !important;
   border-right: 1px solid var(--color-border, #e2e8f0) !important;
   box-sizing: border-box !important;
 }
 
-/* 🌟 スプリットモード時：右ペイン（フローマップ） */
+/* 🌟 スプリットモード時：右ペイン（フローマップ）平等幅50% */
+.editor-workspace-body.split-mode-active > #overview-flowmap-container,
 .editor-workspace-body.split-mode-active > .overview-flowmap-pane {
   display: flex !important;
-  flex: 1 1 50% !important;
-  width: 50% !important;
-  max-width: 50% !important;
-  min-width: 420px !important;
+  flex: 1 1 0% !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: 280px !important;
   height: 100% !important;
   min-height: calc(100vh - 145px) !important;
   max-height: calc(100vh - 145px) !important;
@@ -6405,31 +6460,6 @@ body.split-active .editor-live-preview-pane,
   border-radius: 8px !important;
   box-shadow: 0 2px 4px rgba(0,0,0,0.04) !important;
   box-sizing: border-box !important;
-}
-
-/* global_section ペア時（全体設定＋セクション構成） */
-.editor-workspace-body.split-mode-active[data-split-pair="global_section"] > .overview-editor-container {
-  flex: 1 1 100% !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  border-right: none !important;
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 16px !important;
-}
-
-.editor-workspace-body.split-mode-active[data-split-pair="global_section"] .form-title-desc-card {
-  grid-column: 1 !important;
-  min-width: 0 !important;
-  overflow-y: auto !important;
-  height: 100% !important;
-}
-
-.editor-workspace-body.split-mode-active[data-split-pair="global_section"] #overview-sections-pane {
-  grid-column: 2 !important;
-  min-width: 0 !important;
-  overflow-y: auto !important;
-  height: 100% !important;
 }
 
 /* セクション一覧カードの崩れ防止 */
