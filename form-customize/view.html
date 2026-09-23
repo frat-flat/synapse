@@ -2305,6 +2305,43 @@
           return { street: raw, building: '' };
         }
 
+        // 📮 郵便番号（全角・ハイフンなし等）を「3桁-4桁（半角ハイフン）」に自動正規化
+        function formatZipCode(val) {
+          if (!val) return '';
+          const clean = String(val)
+            .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+            .replace(/[^\d]/g, '');
+          if (clean.length === 7) {
+            return `${clean.substring(0, 3)}-${clean.substring(3)}`;
+          }
+          return val;
+        }
+
+        // 🏠 住所の数字およびハイフンを法人登記API標準の全角に自動統一
+        // 法人住所APIは必ず全角となるため、手入力住所も数字（０-９）およびハイフン（－）を全角統一
+        function normalizeAddressToFullWidth(str) {
+          if (!str || typeof str !== 'string') return str || '';
+          let res = str;
+          // 1. 半角数字 0-9 を 全角数字 ０-９ に変換
+          res = res.replace(/[0-9]/g, s => String.fromCharCode(s.charCodeAt(0) + 0xFEE0));
+          // 2. 半角ハイフンや各種ダッシュ記号を全角ハイフン「－」(U+FF0D) に統一
+          res = res.replace(/[\u002D\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFF70]/g, '－');
+          // 3. 数字に挟まれた全角長音「ー」(U+30FC) もハイフン誤入力として「－」に変換
+          res = res.replace(/([０-９])ー([０-９])/g, '$1－$2');
+          return res;
+        }
+
+        // 住所関連質問（町名番地・建物名・住所全体など）の判定
+        function isAddressFieldQuestion(q) {
+          if (!q) return false;
+          const k = (q.dataKey || '').trim();
+          const t = (q.title || '').trim();
+          if (k === 'street' || k === 'building' || k === 'address' || k.includes('street') || k.includes('addr')) return true;
+          if (t.includes('郵便番号') || t.includes('都道府県') || t.includes('市区町村') || t.includes('メール')) return false;
+          if (t.includes('町名') || t.includes('番地') || t.includes('丁目') || t.includes('建物') || t.includes('マンション') || t.includes('ビル') || t.includes('号室') || t.includes('部屋') || t.includes('住所') || t.includes('所在地')) return true;
+          return false;
+        }
+
         // 📮 郵便番号（7桁）から住所をリアルタイム照会（ZipCloud API連携＋内蔵キャッシュ）
         const zipCache = {
           "1500002": { pref: "東京都", city: "渋谷区", street: "渋谷" },
@@ -2319,7 +2356,9 @@
 
         async function lookupAddressFromZip(zipCode) {
           if (!zipCode) return null;
-          const cleanZip = zipCode.replace(/[^\d]/g, '');
+          const cleanZip = String(zipCode)
+            .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+            .replace(/[^\d]/g, '');
           if (cleanZip.length !== 7) return null;
 
           if (zipCache[cleanZip]) {
@@ -3502,10 +3541,10 @@
                   if (inp) { inp.value = newCity; clearError(q.id); }
                 }
               }
-              // 町名・番地（※以前の入力値があっても、郵便番号書き直し時に確実に新しい町名番地へ連動上書き）
+              // 町名・番地（※以前の入力値があっても、郵便番号書き直し時に確実に新しい町名番地へ連動上書き、数字・ハイフンは全角統一）
               const isStreetField = (qTitle.includes('町名') || qTitle.includes('番地')) && !qTitle.includes('建物') && !qTitle.includes('部屋番号');
               if (isStreetField) {
-                const newStreet = addr.street || '';
+                const newStreet = normalizeAddressToFullWidth(addr.street || '');
                 formValues[q.id] = newStreet;
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
                 if (card) {
@@ -3516,10 +3555,10 @@
                   }
                 }
               }
-              // 旧来の複合住所枠（都道府県＋市区町村＋町名番地が1枠の場合）
+              // 旧来の複合住所枠（都道府県＋市区町村＋町名番地が1枠の場合、数字・ハイフンは全角統一）
               const isLegacyFullAddress = qTitle.includes('住所') && !qTitle.includes('メール') && !qTitle.includes('都道府県') && !qTitle.includes('市区町村') && !qTitle.includes('郵便') && !qTitle.includes('建物') && !qTitle.includes('部屋番号');
               if (isLegacyFullAddress) {
-                const fullCombined = `${addr.pref || ''}${addr.city || ''}${addr.street || ''}`.trim();
+                const fullCombined = normalizeAddressToFullWidth(`${addr.pref || ''}${addr.city || ''}${addr.street || ''}`.trim());
                 formValues[q.id] = fullCombined;
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
                 if (card) {
@@ -3532,6 +3571,19 @@
               }
             });
           });
+
+          // 📮 呼び出し元の郵便番号欄の入力値も確実に「3桁-4桁」に自動整形
+          if (sourceZipQId && formValues[sourceZipQId]) {
+            const formattedZip = formatZipCode(formValues[sourceZipQId]);
+            if (formattedZip !== formValues[sourceZipQId]) {
+              formValues[sourceZipQId] = formattedZip;
+              const zipCard = document.querySelector(`.question-card[data-question-id="${sourceZipQId}"]`);
+              if (zipCard) {
+                const zipInp = zipCard.querySelector('input');
+                if (zipInp) zipInp.value = formattedZip;
+              }
+            }
+          }
 
           // 🛡️ 同上データ同期: 自動補完された住所情報を同上項目へ即時反映
           ensureAllSameAsAboveValuesSynced();
@@ -6513,7 +6565,8 @@
               // 金融機関コード・支店番号・郵便番号・口座番号・口座名義（カナ）の自動逆引き・補完ハンドラ
               const isBankCode = q.title && (q.title.includes('金融機関コード') || (q.title.includes('銀行') && q.title.includes('コード')));
               const isBranchCode = q.title && (q.title.includes('支店番号') || q.title.includes('支店コード') || (q.title.includes('店舗コード') || (q.title.includes('支店') && q.title.includes('番号'))));
-              const isZipCode = (apiConfig && apiConfig.isZip) || (q.title && (q.title.includes('郵便番号') || q.title.toLowerCase().includes('zip')));
+              const isZipCode = (apiConfig && apiConfig.isZip) || (q.title && (q.title.includes('郵便番号') || q.title.toLowerCase().includes('zip'))) || (q.dataKey === 'zip_code');
+              const isAddressField = isAddressFieldQuestion(q);
               const isAccountHolderKana = isAccountHolderKanaField(q);
               const isAcctNum = (q.dataKey === 'account_number') || (q.title && (q.title.includes('口座番号') || (!q.title.includes('名義') && !q.title.includes('種別') && !q.title.includes('区分') && q.title.includes('口座'))));
 
@@ -6543,6 +6596,32 @@
                 });
                 input.addEventListener('blur', () => {
                   handleAccountHolderKana(true);
+                });
+              }
+
+              // 📮 郵便番号（フォーカスアウト時に3桁-4桁へ自動修正）
+              if (isZipCode) {
+                input.addEventListener('blur', () => {
+                  const formatted = formatZipCode(input.value);
+                  if (formatted && formatted !== input.value) {
+                    input.value = formatted;
+                    formValues[q.id] = formatted;
+                    clearError(q.id);
+                    syncAllSameAsAboveForSource(q.id);
+                  }
+                });
+              }
+
+              // 🏠 住所関連項目（フォーカスアウト時に数字・ハイフンを法人API標準の全角へ自動統一）
+              if (isAddressField) {
+                input.addEventListener('blur', () => {
+                  const normalized = normalizeAddressToFullWidth(input.value);
+                  if (normalized && normalized !== input.value) {
+                    input.value = normalized;
+                    formValues[q.id] = normalized;
+                    clearError(q.id);
+                    syncAllSameAsAboveForSource(q.id);
+                  }
                 });
               }
 
@@ -6620,13 +6699,20 @@
                     }).catch(() => {});
                   }
                 } else if (isZipCode) {
-                  const cleanZip = curVal.replace(/[^\d]/g, '');
+                  const cleanZip = curVal
+                    .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+                    .replace(/[^\d]/g, '');
                   if (cleanZip.length === 7) {
                     clearTimeout(zipLookupTimer);
                     zipLookupTimer = setTimeout(async () => {
                       const addr = await lookupAddressFromZip(cleanZip);
                       if (addr) {
                         autoFillAddressFromZipInView(addr, q.id);
+                        // 📮 入力欄の郵便番号も「3桁-4桁」に即時自動整形
+                        const formatted = `${cleanZip.substring(0, 3)}-${cleanZip.substring(3)}`;
+                        input.value = formatted;
+                        formValues[q.id] = formatted;
+                        syncAllSameAsAboveForSource(q.id);
                       }
                     }, 100);
                   }
@@ -6641,11 +6727,23 @@
             textarea.className = 'form-control';
             textarea.placeholder = '回答を入力...';
             textarea.value = val || '';
+            const isAddressField = isAddressFieldQuestion(q);
             textarea.addEventListener('input', (e) => {
               formValues[q.id] = e.target.value;
               clearError(q.id);
               syncAllSameAsAboveForSource(q.id);
             });
+            if (isAddressField) {
+              textarea.addEventListener('blur', () => {
+                const normalized = normalizeAddressToFullWidth(textarea.value);
+                if (normalized && normalized !== textarea.value) {
+                  textarea.value = normalized;
+                  formValues[q.id] = normalized;
+                  clearError(q.id);
+                  syncAllSameAsAboveForSource(q.id);
+                }
+              });
+            }
             container.appendChild(textarea);
           } else if (['radio', 'checkbox'].includes(q.type)) {
             const list = document.createElement('div');
@@ -7054,6 +7152,32 @@
                       testVal = testVal.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/[^\d]/g, '');
                     }
 
+                    // 📮 郵便番号（ハイフンなし7桁・全角数字も3桁-4桁へ正規化して検証）
+                    const isZip = (q.dataKey === 'zip_code') || (q.title && (q.title.includes('郵便番号') || q.title.toLowerCase().includes('zip'))) || (v.presetKey === 'zip');
+                    if (isZip) {
+                      const cleanZip = testVal
+                        .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+                        .replace(/[^\d]/g, '');
+                      if (cleanZip.length === 7) {
+                        const fmt = `${cleanZip.substring(0, 3)}-${cleanZip.substring(3)}`;
+                        testVal = fmt;
+                        formValues[q.id] = fmt;
+                        const inp = card.querySelector('input');
+                        if (inp) inp.value = fmt;
+                      }
+                    }
+
+                    // 🏠 住所関連項目は数字・ハイフンを全角統一
+                    if (isAddressFieldQuestion(q) && typeof testVal === 'string' && testVal.trim()) {
+                      const norm = normalizeAddressToFullWidth(testVal);
+                      if (norm !== testVal) {
+                        testVal = norm;
+                        formValues[q.id] = norm;
+                        const inp = card.querySelector('input, textarea');
+                        if (inp) inp.value = norm;
+                      }
+                    }
+
                     let regexPattern = v.value;
                     // 口座番号における6〜7桁対応（エスケープ崩れや既存の7桁固定設定も含めて完全に堅牢化）
                     if (isAcctNum) {
@@ -7081,8 +7205,16 @@
                       rulePassed = /^T\d{13}$/.test(cleanInv) && (CORP_DATABASE.some(c => ('T' + c.num) === cleanInv) || isValidInvoiceCheckDigit(cleanInv));
                     }
                   } else if (v.condition === 'zip_code' || v.condition === 'zip') {
-                    const cleanZip = val.replace(/[^\d]/g, '');
+                    const cleanZip = val
+                      .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+                      .replace(/[^\d]/g, '');
                     rulePassed = cleanZip.length === 7;
+                    if (rulePassed) {
+                      const fmt = formatZipCode(val);
+                      formValues[q.id] = fmt;
+                      const inp = card.querySelector('input');
+                      if (inp) inp.value = fmt;
+                    }
                   } else if (v.condition === 'bank_name') {
                     rulePassed = val.trim().length > 0;
                   } else if (v.condition === 'branch_name') {
@@ -7408,6 +7540,22 @@
 
           itemsContainer.innerHTML = '';
 
+          // 🏠 モーダル確認前に、セクション内の町名・番地および住所項目の数字・ハイフンを全角統一
+          streetQuestions.forEach(streetQ => {
+            const rawVal = formValues[streetQ.id];
+            if (typeof rawVal === 'string' && rawVal) {
+              const norm = normalizeAddressToFullWidth(rawVal);
+              if (norm !== rawVal) {
+                formValues[streetQ.id] = norm;
+                const card = document.querySelector(`.question-card[data-question-id="${streetQ.id}"]`);
+                if (card) {
+                  const inp = card.querySelector('input, textarea');
+                  if (inp) inp.value = norm;
+                }
+              }
+            }
+          });
+
           let anyMissingBanchi = false;
           let firstFaultyQId = null;
 
@@ -7611,6 +7759,23 @@
         function submitForm(forcePartial = null) {
           // 🛡️ 同上データ保存絶対保証: 送信直前に同上項目の値を100%確実に解決・セット
           ensureAllSameAsAboveValuesSynced();
+
+          // 📮 郵便番号（3桁-4桁統一）および 🏠 住所（数字・ハイフン全角統一）の最終正規化
+          formDefinition.sections.forEach(s => {
+            (s.questions || []).forEach(q => {
+              const val = formValues[q.id];
+              if (typeof val === 'string' && val.trim()) {
+                const isZip = (q.dataKey === 'zip_code') || (q.title && (q.title.includes('郵便番号') || q.title.toLowerCase().includes('zip')));
+                if (isZip) {
+                  const fmt = formatZipCode(val);
+                  formValues[q.id] = fmt;
+                } else if (isAddressFieldQuestion(q)) {
+                  const norm = normalizeAddressToFullWidth(val);
+                  formValues[q.id] = norm;
+                }
+              }
+            });
+          });
 
           const section = formDefinition.sections.find(s => s.id === currentSectionId);
           const nextAction = section ? getSectionNextAction(section) : 'submit';
