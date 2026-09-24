@@ -46,7 +46,7 @@
     if (t.includes('代表者') || t.includes('氏名') || t.includes('ご担当者') || t.includes('担当者名') || t.includes('お名前') || t.includes('名前') || t.includes('name')) return 'representative_name';
 
     // 3. 企業・事業者情報
-    if (t.includes('法人名') || t.includes('会社名') || t.includes('企業名') || t.includes('商号') || t.includes('屋号') || t.includes('法人') || t.includes('会社')) return 'company_name';
+    if (t.includes('法人名') || t.includes('会社名') || t.includes('企業名') || t.includes('商号') || t.includes('屋号') || t.includes('法人') || t.includes('会社')) return 'business_name';
     if (t.includes('事業者区分') || t.includes('事業形態') || t.includes('法人・個人') || t.includes('区分')) return 'business_type';
     if (t.includes('業種') || t.includes('事業内容') || t.includes('業務内容') || t.includes('business')) return 'business_category';
     if (t.includes('役職') || t.includes('肩書') || t.includes('position')) return 'position';
@@ -625,7 +625,7 @@
           description: "法人の基本情報および代表者情報をご入力ください。",
           nextAction: "submit",
           questions: [
-            { id: "q_hc_corp_name", type: "text", title: "法人名", description: "法人名を入力して候補から選択してください（国税庁法人番号API照会）", required: true, dataKey: "company_name", validation: { category: "api", condition: "corp_name", errorMessage: "実在する法人名を入力または選択してください。" }, options: [] },
+            { id: "q_hc_corp_name", type: "text", title: "法人名", description: "法人名を入力して候補から選択してください（国税庁法人番号API照会）", required: true, dataKey: "business_name", validation: { category: "api", condition: "corp_name", errorMessage: "実在する法人名を入力または選択してください。" }, options: [] },
             { id: "q_hc_corp_kana", type: "text", title: "法人名（カナ）", description: "全角カタカナで入力してください。法人名検索から自動反映されます。", required: true, dataKey: "company_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "company_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
             { id: "q_hc_zip", type: "text", title: "郵便番号", description: "法人選択または7桁入力で住所を自動補完します（3桁-4桁へ自動整形）", required: true, dataKey: "zip_code", validation: { category: "regex", condition: "matches", value: "^[0-9]{3}-?[0-9]{4}$", presetKey: "zip", errorMessage: "郵便番号を7桁で入力してください。" }, options: [] },
             { id: "q_hc_pref", type: "select", title: "都道府県", description: "本店所在地の都道府県を選択してください", required: true, dataKey: "pref", options: JAPAN_PREFECTURES.map(p => ({ label: p })) },
@@ -648,7 +648,7 @@
           questions: [
             { id: "q_hi_rep_name", type: "text", title: "氏名（代表者名）", description: "氏名（漢字）を入力してください（例: 山田 太郎）", required: true, dataKey: "representative_name", options: [] },
             { id: "q_hi_rep_kana", type: "text", title: "氏名（カナ）", description: "氏名のフリガナを全角カタカナで入力してください", required: true, dataKey: "representative_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "representative_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
-            { id: "q_hi_trade_name", type: "text", title: "屋号", description: "屋号をお持ちの場合のみ入力してください（屋号がない場合は空欄のままで進めます）", required: false, dataKey: "company_name", options: [] },
+            { id: "q_hi_trade_name", type: "text", title: "屋号", description: "屋号をお持ちの場合のみ入力してください（屋号がない場合は空欄のままで進めます）", required: false, dataKey: "business_name", options: [] },
             { id: "q_hi_trade_kana", type: "text", title: "屋号（カナ）", description: "※屋号を入力された場合は、屋号のフリガナ（全角カタカナ）も必ず入力してください。", required: false, dataKey: "company_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "company_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
             { id: "q_hi_zip", type: "text", title: "郵便番号", description: "7桁の数字を入力すると住所を自動補完し、3桁-4桁へ自動整形されます（例: 150-0041）", required: true, dataKey: "zip_code", validation: { category: "regex", condition: "matches", value: "^[0-9]{3}-?[0-9]{4}$", presetKey: "zip", errorMessage: "郵便番号を7桁で入力してください。" }, options: [] },
             { id: "q_hi_pref", type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, dataKey: "pref", options: JAPAN_PREFECTURES.map(p => ({ label: p })) },
@@ -2898,7 +2898,7 @@
     // ① 最優先（Single Source of Truth）: 作成者が設定した「回答の入力規則（検証）」
     if (qDef.validation && qDef.validation.category === 'api' && qDef.validation.condition) {
       const cond = qDef.validation.condition;
-      const isCorpMatch = cond === 'corp_name' || cond === 'company_name';
+      const isCorpMatch = cond === 'corp_name' || cond === 'business_name' || cond === 'company_name';
       const isZipMatch = cond === 'zip_code' || cond === 'zip';
       return {
         isApi: true,
@@ -2925,7 +2925,7 @@
       const isKana = qDef.title && (qDef.title.includes('カナ') || qDef.title.includes('フリガナ') || qDef.title.includes('ふりがな'));
       const isPureTrade = qDef.title && qDef.title.trim() === '屋号';
 
-      if (!isKana && qDef.dataKey === 'company_name' && !isPureTrade) {
+      if (!isKana && (qDef.dataKey === 'business_name' || qDef.dataKey === 'company_name') && !isPureTrade) {
         return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: false, label: '国税庁法人番号API連携', source: 'dataKey' };
       }
 
@@ -10440,6 +10440,7 @@
             input.dataset.suppressSearch = "1";
             input.value = item.name;
             curPanel.style.display = 'none';
+            activeApiMetadata.business_name = item.name;
             activeApiMetadata.company_name = item.name;
             activeApiMetadata.corporate_number = item.num;
             activeApiMetadata.establishmentDate = item.estDate || item.regDate || "2020-01-01";
@@ -11464,7 +11465,7 @@
               baseData.cancellationDate = activeApiMetadata.cancellationDate;
             }
           }
-          if (activeApiMetadata.company_name) {
+          if (activeApiMetadata.business_name || activeApiMetadata.company_name) {
             baseData.establishmentDate = baseData.establishmentDate || activeApiMetadata.establishmentDate || null;
           }
           jsonPre.textContent = JSON.stringify(baseData, null, 2);
@@ -11486,7 +11487,7 @@
           required: true,
           groupId: corpGrpId,
           groupTitle: corpGrpTitle,
-          dataKey: "company_name",
+          dataKey: "business_name",
           validation: {
             category: "api",
             condition: "corp_name",
@@ -11729,7 +11730,7 @@
           required: false,
           groupId: indivGrpId,
           groupTitle: indivGrpTitle,
-          dataKey: "company_name",
+          dataKey: "business_name",
           options: []
         },
         {
@@ -12003,7 +12004,7 @@
             required: true,
             groupId: corpGrpId,
             groupTitle: corpGrpTitle,
-            dataKey: "company_name",
+            dataKey: "business_name",
             validation: {
               category: "api",
               condition: "corp_name",
@@ -13068,7 +13069,7 @@
       category: "⭐ よく使われる定番項目（入力規則・正規表現つき）",
       items: [
         { id: "preset_name", type: "preset", key: "name", dataKey: "representative_name", name: "氏名", desc: "お名前入力欄（必須・フルネーム案内つき）", icon: "👤", badge: "定番", badgeType: "badge-smart" },
-        { id: "preset_company", type: "preset", key: "company", dataKey: "company_name", name: "法人名・屋号", desc: "会社名または屋号（未入力時は自動ハイフン補填）", icon: "🏢", badge: "ビジネス", badgeType: "badge-smart" },
+        { id: "preset_company", type: "preset", key: "company", dataKey: "business_name", name: "法人名・屋号", desc: "会社名または屋号（未入力時は自動ハイフン補填）", icon: "🏢", badge: "ビジネス", badgeType: "badge-smart" },
         { id: "preset_email", type: "preset", key: "email", dataKey: "email", name: "メールアドレス", desc: "連絡先メール（メールアドレス形式チェックつき）", icon: "✉️", badge: "定番", badgeType: "badge-smart" },
         { id: "preset_email_autoreply", type: "preset", key: "email_autoreply", dataKey: "email", name: "メールアドレス（回答控え自動送信）", desc: "送信完了時に回答内容の控えメールを自動配信", icon: "📨", badge: "自動返信", badgeType: "badge-smart" },
         { id: "preset_tel", type: "preset", key: "tel", dataKey: "tel", name: "電話番号", desc: "固定・携帯電話共通（電話番号形式チェックつき）", icon: "📞", badge: "定番", badgeType: "badge-smart" },
@@ -13080,7 +13081,7 @@
       category: "💼 ビジネス・専用プロ項目（API連携・一括セット）",
       items: [
         { id: "preset_pro_bank", type: "preset", key: "pro_bank", dataKey: "bank_name", name: "銀行口座情報セット", desc: "銀行名・支店名・口座種別・口座番号の自動照合セット", icon: "🏦", badge: "API連携", badgeType: "badge-pro" },
-        { id: "preset_pro_corp_info", type: "preset", key: "pro_corp_info", dataKey: "company_name", name: "法人情報一括セット", desc: "法人名・代表者・所在地・インボイス等の一式", icon: "🏢", badge: "プロ一括", badgeType: "badge-pro" },
+        { id: "preset_pro_corp_info", type: "preset", key: "pro_corp_info", dataKey: "business_name", name: "法人情報一括セット", desc: "法人名・代表者・所在地・インボイス等の一式", icon: "🏢", badge: "プロ一括", badgeType: "badge-pro" },
         { id: "preset_pro_individual_info", type: "preset", key: "pro_individual_info", dataKey: "representative_name", name: "個人事業主情報一括セット", desc: "屋号・氏名・住所・税務区分・インボイスの一式", icon: "👤", badge: "プロ一括", badgeType: "badge-pro" },
         { id: "preset_pro_branch_hybrid", type: "preset", key: "pro_branch_hybrid", dataKey: "applicant_type", name: "法人・個人 自動分岐セット", desc: "回答に応じて法人項目／個人項目を自動切り替え", icon: "🔀", badge: "自動分岐", badgeType: "badge-pro" },
         { id: "preset_invoice", type: "preset", key: "invoice", dataKey: "invoice_number", name: "インボイス登録番号", desc: "T+13桁 国税庁適格請求書発行事業者API連携", icon: "🧾", badge: "国税庁API", badgeType: "badge-pro" },
@@ -17464,7 +17465,7 @@
       }
     }
     if (window.re.name) window.re.name.dataKey = 'representative_name';
-    if (window.re.company) window.re.company.dataKey = 'company_name';
+    if (window.re.company) window.re.company.dataKey = 'business_name';
     if (window.re.email) window.re.email.dataKey = 'email';
     if (window.re.zip) window.re.zip.dataKey = 'zip_code';
     if (window.re.address) window.re.address.dataKey = 'street';
@@ -20724,6 +20725,10 @@
                   q.description = '西暦表記で記載してください（例: 1996/03/14）';
                 }
               }
+              // 🏢 法人名・屋号のdataKeyを company_name から business_name に自動マイグレーション
+              if (q.dataKey === 'company_name') {
+                q.dataKey = 'business_name';
+              }
             });
           }
         });
@@ -22131,9 +22136,9 @@
     if (lower.includes('法人名') || lower.includes('会社名') || lower.includes('企業名') || lower.includes('商号')) {
       return {
         type: 'corp_name',
-        recommendationTitle: '🏛️ 法人名検索（国税庁API連携 & company_name列統合）',
-        explanation: '国税庁法人番号APIによるリアルタイム検索と、DB列「company_name」への統一をおすすめします。',
-        dataKey: 'company_name',
+        recommendationTitle: '🏛️ 法人名検索（国税庁API連携 & business_name列統合）',
+        explanation: '国税庁法人番号APIによるリアルタイム検索と、DB列「business_name」への統一をおすすめします。',
+        dataKey: 'business_name',
         unifyColumn: true,
         validation: {
           category: 'api',
@@ -22144,7 +22149,7 @@
         },
         autoReply: false,
         items: [
-          'データベース出力列名: <strong>company_name</strong> に統一',
+          'データベース出力列名: <strong>business_name</strong> に統一',
           '入力規則: <strong>API連携 ➔ 国税庁法人番号API</strong>',
           'エラー表示: 実在する法人名を選択してください'
         ]
@@ -22155,13 +22160,13 @@
     if (lower.includes('屋号')) {
       const hasCorp = allQuestions.some(oq => (oq.title || '').includes('法人名') || (oq.title || '').includes('会社名'));
       const exp = hasCorp 
-        ? '別セクションの「法人名」と同一の列名「company_name」に一本化し、屋号がない場合の自動ハイフン補填を設定することを推奨します。'
-        : '個人事業主の屋号として未入力時の自動ハイフン補填を有効化し、列名「company_name」に統一することをおすすめします。';
+        ? '別セクションの「法人名」と同一の列名「business_name」に一本化し、屋号がない場合の自動ハイフン補填を設定することを推奨します。'
+        : '個人事業主の屋号として未入力時の自動ハイフン補填を有効化し、列名「business_name」に統一することをおすすめします。';
       return {
         type: 'trade_name',
-        recommendationTitle: '🏢 屋号（法人名と同一列 company_name に一本化）',
+        recommendationTitle: '🏢 屋号（法人名と同一列 business_name に一本化）',
         explanation: exp,
-        dataKey: 'company_name',
+        dataKey: 'business_name',
         unifyColumn: true,
         validation: {
           category: 'text',
@@ -22172,7 +22177,7 @@
         },
         autoReply: false,
         items: [
-          'データベース出力列名: <strong>company_name</strong> に統一（法人名と合流）',
+          'データベース出力列名: <strong>business_name</strong> に統一（法人名と合流）',
           '入力規則: <strong>未入力時は自動で半角ハイフン補填（屋号なし対応）</strong>'
         ]
       };
@@ -22388,7 +22393,7 @@
             <select id="drawer-column-select" class="form-control form-control-sm">
               <option value="representative_name">👤 代表者名・氏名 (representative_name)</option>
               <option value="representative_kana">👤 代表者カナ・氏名カナ (representative_kana)</option>
-              <option value="company_name">🏢 法人名・屋号 (company_name)</option>
+              <option value="business_name">🏢 法人名・屋号 (business_name)</option>
               <option value="company_kana">🏢 法人名カナ・屋号カナ (company_kana)</option>
               <option value="birthdate">🎂 生年月日 (birthdate)</option>
               <option value="email">✉️ メールアドレス (email)</option>
@@ -22414,12 +22419,12 @@
             </select>
 
             <div id="drawer-custom-key-wrap" style="margin-top: 8px; display: none;">
-              <input type="text" id="drawer-column-key-input" class="form-control form-control-sm" placeholder="半角英数字（例: company_name）" />
+              <input type="text" id="drawer-column-key-input" class="form-control form-control-sm" placeholder="半角英数字（例: business_name）" />
               <div id="drawer-custom-key-warn" class="drawer-help-text" style="color: #ef4444; font-size: 11px; margin-top: 4px; display: none;">※ 数字のみやタイムスタンプはキーとして使用できません。英文字で入力してください。</div>
             </div>
 
             <div class="drawer-chips-wrap" style="margin-top: 8px;">
-              <span class="drawer-chip" data-key="company_name">🏢 法人名・屋号</span>
+              <span class="drawer-chip" data-key="business_name">🏢 法人名・屋号</span>
               <span class="drawer-chip" data-key="representative_name">👤 代表者・氏名</span>
               <span class="drawer-chip" data-key="birthdate">🎂 生年月日</span>
               <span class="drawer-chip" data-key="email">✉️ メール</span>
@@ -23546,6 +23551,12 @@
     const unifiedBox = document.getElementById('drawer-column-unified-box');
     const customKeyInput = document.getElementById('drawer-column-key-input');
 
+    // 🚀 company_name は business_name へ自動マイグレーション
+    if (q.dataKey === 'company_name') {
+      q.dataKey = 'business_name';
+      persistDrawerChanges();
+    }
+
     // 🚀 不正なキー（タイムスタンプ・数字列等）が残っていたら即座に正常化
     if (q.dataKey && isGarbageDataKey(q.dataKey)) {
       q.dataKey = suggestDefaultDataKey(q.title, q.id);
@@ -24048,8 +24059,8 @@
         desc: '回答者の連絡先メールアドレス。送信完了通知や自動返信メール、後続連絡の宛先として使用。'
       },
       {
-        id: 'company_name',
-        key: 'company_name',
+        id: 'business_name',
+        key: 'business_name',
         fieldKey: 'companyName',
         label: '企業名 / 屋号',
         category: 'user',
@@ -24318,7 +24329,7 @@
           if (k === 'user_id') row[k] = uVar.uid;
           else if (k === 'user_name') row[k] = uVar.name;
           else if (k === 'user_email') row[k] = uVar.email;
-          else if (k === 'company_name') row[k] = uVar.corp;
+          else if (k === 'business_name' || k === 'company_name') row[k] = uVar.corp;
           else row[k] = col.sampleVal || '';
         } else if (col.category === 'appoint') {
           if (k === 'appoint_id') row[k] = aVar.id;

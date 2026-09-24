@@ -1363,7 +1363,7 @@
 
           // 3. 会社・法人・屋号
           if (t.includes('法人名（カナ）') || t.includes('会社名（カナ）') || t.includes('屋号（カナ）') || t.includes('法人名カナ') || t.includes('会社名カナ') || t.includes('屋号カナ')) return 'company_kana';
-          if (t.includes('法人名') || t.includes('会社名') || t.includes('屋号') || t.includes('企業名') || t.includes('商号') || t.includes('company') || t.includes('corp')) return 'company_name';
+          if (t.includes('法人名') || t.includes('会社名') || t.includes('屋号') || t.includes('企業名') || t.includes('商号') || t.includes('business') || t.includes('company') || t.includes('corp')) return 'business_name';
           if (t.includes('事業者区分') || t.includes('申請区分') || t.includes('事業形態') || t.includes('法人区分') || t.includes('契約種別') || t.includes('区分') || t.includes('applicant_type')) return 'applicant_type';
 
           // 4. 税務・インボイス
@@ -1582,7 +1582,7 @@
                     title: '会社名 / 屋号',
                     type: 'text',
                     required: true,
-                    dataKey: 'company_name',
+                    dataKey: 'business_name',
                     placeholder: '例: 合同会社frat flat'
                   },
                   {
@@ -1649,7 +1649,7 @@
                     title: '会社名 / 屋号',
                     type: 'text',
                     required: true,
-                    dataKey: 'company_name',
+                    dataKey: 'business_name',
                     placeholder: '例: 合同会社frat flat'
                   },
                   {
@@ -1703,8 +1703,8 @@
           const key = (q.dataKey || q.title || '').toLowerCase().replace(/[\s_\-]/g, '');
           const title = (q.title || '').toLowerCase();
 
-          if (key.includes('company') || key.includes('corp') || title.includes('会社名') || title.includes('屋号') || title.includes('貴社名') || title.includes('法人名')) {
-            return 'company_name';
+          if (key.includes('business') || key.includes('company') || key.includes('corp') || title.includes('会社名') || title.includes('屋号') || title.includes('貴社名') || title.includes('法人名')) {
+            return 'business_name';
           }
           if (key.includes('rep') || key.includes('name') || title.includes('代表者') || title.includes('ご担当者') || title.includes('氏名') || title.includes('お名前')) {
             return 'rep_name';
@@ -2057,6 +2057,18 @@
 
           // フォーム名の設定
           document.title = formDefinition.title ? `${formDefinition.title} - フォーム回答` : 'フォーム回答';
+
+          // 🏢 法人名・屋号のdataKeyを company_name から business_name に自動マイグレーション
+          if (formDefinition && Array.isArray(formDefinition.sections)) {
+            formDefinition.sections.forEach(s => {
+              (s.questions || []).forEach(q => {
+                if (q && q.dataKey === 'company_name') {
+                  q.dataKey = 'business_name';
+                }
+              });
+            });
+          }
+
           window.formDefinition = formDefinition;
           window.formValues = formValues;
           window.applyValueToQuestion = applyValueToQuestion;
@@ -3315,7 +3327,7 @@
               isApi: true,
               category: 'api',
               condition: cond,
-              isCorp: cond === 'corp_name' || cond === 'company_name',
+              isCorp: cond === 'corp_name' || cond === 'business_name' || cond === 'company_name',
               isInvoice: cond === 'invoice_number',
               isZip: isZipMatch,
               isBank: cond === 'bank_name',
@@ -3327,7 +3339,7 @@
             const isKana = q.title && (q.title.includes('カナ') || q.title.includes('フリガナ') || q.title.includes('ふりがな'));
             const isPureTrade = q.title && q.title.trim() === '屋号';
 
-            if (!isKana && q.dataKey === 'company_name' && !isPureTrade) {
+            if (!isKana && (q.dataKey === 'business_name' || q.dataKey === 'company_name') && !isPureTrade) {
               return { isApi: true, category: 'api', condition: 'corp_name', isCorp: true, isInvoice: false, isZip: false, isBank: false, isBranch: false, isBranchCode: false };
             }
 
@@ -3411,7 +3423,7 @@
               }
 
               // 0. 法人名欄
-              const isCorpNameField = (q.dataKey === 'company_name') || ((qTitle.includes('法人名') || qTitle.includes('会社名') || qTitle.includes('貴社名') || qTitle.includes('御社名') || qTitle.includes('企業名') || qTitle.includes('商号')) && !qTitle.includes('カナ') && !qTitle.includes('フリガナ') && !qTitle.includes('ふりがな') && qTitle.trim() !== '屋号');
+              const isCorpNameField = (q.dataKey === 'business_name' || q.dataKey === 'company_name') || ((qTitle.includes('法人名') || qTitle.includes('会社名') || qTitle.includes('貴社名') || qTitle.includes('御社名') || qTitle.includes('企業名') || qTitle.includes('商号')) && !qTitle.includes('カナ') && !qTitle.includes('フリガナ') && !qTitle.includes('ふりがな') && qTitle.trim() !== '屋号');
               if (isCorpNameField && item.name) {
                 formValues[q.id] = item.name.trim();
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
@@ -3972,6 +3984,17 @@
           sectionHistory = [];
           visitedSections = new Set();
           currentSectionId = formDefinition.sections[0].id;
+
+          // 🏢 法人名・屋号のdataKeyを company_name から business_name に自動マイグレーション
+          if (formDefinition && Array.isArray(formDefinition.sections)) {
+            formDefinition.sections.forEach(s => {
+              (s.questions || []).forEach(q => {
+                if (q && q.dataKey === 'company_name') {
+                  q.dataKey = 'business_name';
+                }
+              });
+            });
+          }
 
           // 法人名・屋号の質問に対する案内文＆自動ハイフン補填ルールの自動適用
           formDefinition.sections.forEach(s => {
@@ -7405,7 +7428,7 @@
             const isTradeKanaField = (q.dataKey === 'company_kana' && (q.title || '').includes('屋号')) ||
                                      ((q.title || '').includes('屋号') && ((q.title || '').includes('カナ') || (q.title || '').includes('フリガナ')));
             if (isTradeKanaField) {
-              const tradeQ = (section.questions || []).find(cq => (cq.dataKey === 'company_name' && (cq.title || '').includes('屋号')) ||
+              const tradeQ = (section.questions || []).find(cq => ((cq.dataKey === 'business_name' || cq.dataKey === 'company_name') && (cq.title || '').includes('屋号')) ||
                                                                   ((cq.title || '').includes('屋号') && !(cq.title || '').includes('カナ') && !(cq.title || '').includes('フリガナ')));
               const tradeVal = tradeQ && formValues[tradeQ.id] ? String(formValues[tradeQ.id]).trim() : '';
               const isTradeEntered = tradeVal !== '' && tradeVal !== '-';
@@ -7427,7 +7450,7 @@
             const isCorpKanaField = (q.dataKey === 'company_kana' && !(q.title || '').includes('屋号')) ||
                                     (!isTradeKanaField && q.title && (q.title.includes('法人名') && (q.title.includes('カナ') || q.title.includes('フリガナ'))));
             if (isCorpKanaField) {
-              const corpQ = (section.questions || []).find(cq => (cq.dataKey === 'company_name' && !(cq.title || '').includes('屋号')) ||
+              const corpQ = (section.questions || []).find(cq => ((cq.dataKey === 'business_name' || cq.dataKey === 'company_name') && !(cq.title || '').includes('屋号')) ||
                                                                  (cq.title && cq.title.includes('法人名') && !cq.title.includes('カナ') && !cq.title.includes('フリガナ')));
               const corpVal = corpQ && formValues[corpQ.id] ? String(formValues[corpQ.id]).trim() : '';
               const isCorpEntered = corpVal !== '' && corpVal !== '-';
@@ -8215,6 +8238,13 @@
               }
             });
           });
+
+          // 🏢 business_name / company_name の相互ミラーリング（外部Webhook・DB連携との完全後方互換）
+          if (submitData['business_name'] !== undefined && submitData['company_name'] === undefined) {
+            submitData['company_name'] = submitData['business_name'];
+          } else if (submitData['company_name'] !== undefined && submitData['business_name'] === undefined) {
+            submitData['business_name'] = submitData['company_name'];
+          }
 
           if (window.FORM_MASTER_ID) {
             submitData['master_id'] = window.FORM_MASTER_ID;
