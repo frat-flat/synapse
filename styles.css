@@ -9737,6 +9737,19 @@ body.login-active #login-notification-modal {
   cursor: grabbing;
 }
 
+/* 未統合フォーム確認モーダル＆ログイン通知モーダル */
+#modal-unmerged-form-confirm.modal-overlay.active,
+#modal-unmerged-login-notice.modal-overlay.active {
+  display: flex !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+#modal-unmerged-form-confirm.modal-overlay.active .modal-box,
+#modal-unmerged-login-notice.modal-overlay.active .modal-box {
+  transform: scale(1) !important;
+  opacity: 1 !important;
+}
+
 
 
 

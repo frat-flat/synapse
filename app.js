@@ -16854,6 +16854,10 @@ window.mergeFormToProductionFromParent = mergeFormToProductionFromParent;
 
 // 3. タブ削除やログアウト時の「本番環境へ統合しますか？」モーダル表示
 function promptUnmergedFormConfirm(unmergedForms, onProceed, onCancel) {
+  // アカウントポップアップが開いていれば閉じる
+  const userPopover = document.getElementById('user-profile-popover');
+  if (userPopover) userPopover.style.display = 'none';
+
   const modal = document.getElementById('modal-unmerged-form-confirm');
   if (!modal) {
     const titles = unmergedForms.map(f => f.title || '無題のフォーム').join('、');
@@ -16878,7 +16882,10 @@ function promptUnmergedFormConfirm(unmergedForms, onProceed, onCancel) {
   const btnCancel = document.getElementById('btn-unmerged-confirm-cancel');
 
   const closeModal = () => {
+    modal.classList.remove('active');
     modal.style.display = 'none';
+    modal.style.opacity = '0';
+    modal.style.pointerEvents = 'none';
   };
 
   if (btnMerge) {
@@ -16914,6 +16921,9 @@ function promptUnmergedFormConfirm(unmergedForms, onProceed, onCancel) {
   }
 
   modal.style.display = 'flex';
+  modal.classList.add('active');
+  modal.style.opacity = '1';
+  modal.style.pointerEvents = 'auto';
 }
 window.promptUnmergedFormConfirm = promptUnmergedFormConfirm;
 
@@ -16954,7 +16964,10 @@ function checkAndShowUnmergedFormsLoginNotice() {
     }
 
     const closeModal = () => {
+      modal.classList.remove('active');
       modal.style.display = 'none';
+      modal.style.opacity = '0';
+      modal.style.pointerEvents = 'none';
       localStorage.removeItem('synapse_unmerged_forms_notice');
     };
 
@@ -16995,6 +17008,9 @@ function checkAndShowUnmergedFormsLoginNotice() {
     // ログイン完了後に少し余白をおいてスムーズに表示
     setTimeout(() => {
       modal.style.display = 'flex';
+      modal.classList.add('active');
+      modal.style.opacity = '1';
+      modal.style.pointerEvents = 'auto';
     }, 500);
 
   } catch(e) {
@@ -17647,14 +17663,22 @@ function setupEventListeners() {
   // ログイン・ログアウト
   document.getElementById('login-form').addEventListener('submit', handleLogin);
   document.getElementById('logout-btn').addEventListener('click', () => {
-    const unmergedForms = (typeof getUnmergedForms === 'function') ? getUnmergedForms() : [];
-    if (unmergedForms.length > 0) {
-      promptUnmergedFormConfirm(
-        unmergedForms,
-        () => { handleLogout(); },
-        () => { /* キャンセル */ }
-      );
-    } else {
+    try {
+      const userPopover = document.getElementById('user-profile-popover');
+      if (userPopover) userPopover.style.display = 'none';
+
+      const unmergedForms = (typeof getUnmergedForms === 'function') ? getUnmergedForms() : [];
+      if (unmergedForms.length > 0) {
+        promptUnmergedFormConfirm(
+          unmergedForms,
+          () => { handleLogout(); },
+          () => { /* キャンセル */ }
+        );
+      } else {
+        handleLogout();
+      }
+    } catch (err) {
+      console.error('[Logout] Error checking unmerged forms, logging out directly:', err);
       handleLogout();
     }
   });
@@ -19294,51 +19318,46 @@ async function handleLogout() {
       state.currentUser.role === 'owner'
     );
     
-    if (isBypassOwner) {
-      state.currentUser = null;
-      state.mypageMemoInitialized = false;
-      activeMemoId = null;
-      localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
-      showLoginScreen(true);
-    } else if (supabaseClient) {
-      await supabaseClient.auth.signOut();
-      
-      // ログアウトが確実に伝播するようにローカル状態もクリア
-      state.currentUser = null;
-      state.mypageMemoInitialized = false;
-      activeMemoId = null;
-      localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
-      showLoginScreen(true);
-    } else {
-      state.currentUser = null;
-      state.mypageMemoInitialized = false;
-      activeMemoId = null;
-      localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
-      showLoginScreen(true);
-      showToast('ログアウトしました（ローカルのみ）。', 'success');
+    if (!isBypassOwner && supabaseClient && supabaseClient.auth) {
+      try {
+        await supabaseClient.auth.signOut();
+      } catch (authErr) {
+        console.warn("[Logout] Supabase signOut error (safely continuing):", authErr);
+      }
     }
   } catch (err) {
     console.error("Logout Handler Failure:", err);
+  } finally {
+    // 外部通信の成否に関わらず、ローカルセッション・ログイン状態は確実にリセット
+    state.currentUser = null;
+    state.mypageMemoInitialized = false;
+    activeMemoId = null;
+    localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
+    showLoginScreen(true);
+
+    // ポップアップを閉じる
+    const userPopover = document.getElementById('user-profile-popover');
+    if (userPopover) userPopover.style.display = 'none';
+    const settingsPopup = document.getElementById('sidebar-settings-popup');
+    if (settingsPopup) settingsPopup.style.display = 'none';
+
+    // デフォルト（未ログイン状態）のDB設定を再ロード
+    try {
+      initDatabase();
+      renderJoInfo();
+      renderJoColumnSelector();
+    } catch (dbErr) {
+      console.warn("[Logout] initDatabase error (ignored):", dbErr);
+    }
+    
+    // タブのクリーンアップ
+    state.tabs = [];
+    state.activeTabId = null;
+    const tabsOuter = document.getElementById('tabs-outer-wrapper');
+    if (tabsOuter) tabsOuter.style.display = 'none';
+    
+    showToast('ログアウトしました。', 'success');
   }
-
-  // ポップアップを閉じる
-  const userPopover = document.getElementById('user-profile-popover');
-  if (userPopover) userPopover.style.display = 'none';
-  const settingsPopup = document.getElementById('sidebar-settings-popup');
-  if (settingsPopup) settingsPopup.style.display = 'none';
-
-  // デフォルト（未ログイン状態）のDB設定を再ロード
-  initDatabase();
-  renderJoInfo();
-  renderJoColumnSelector();
-  
-  // タブのクリーンアップ
-  state.tabs = [];
-  state.activeTabId = null;
-  const tabsOuter = document.getElementById('tabs-outer-wrapper');
-  if (tabsOuter) tabsOuter.style.display = 'none';
-  
-  showToast('ログアウトしました。', 'success');
 }
 
 function applyTheme(theme) {
