@@ -20321,6 +20321,29 @@
   }
   window.cleanStrayTagsFromObject = cleanStrayTagsFromObject;
 
+  // 🛡️ 税務区分（ラジオ）とインボイス登録番号（記述式）のdataKey誤統合を自動修復・分離
+  function fixTaxStatusDataKeys(forms) {
+    if (!Array.isArray(forms)) return;
+    forms.forEach(f => {
+      if (f && Array.isArray(f.sections)) {
+        f.sections.forEach(s => {
+          if (s && Array.isArray(s.questions)) {
+            s.questions.forEach(q => {
+              if (!q) return;
+              const t = (q.title || '').trim();
+              if ((t.includes('税務') || t.includes('税務区分') || t.includes('登録状況')) && q.type === 'radio') {
+                if (q.dataKey !== 'tax_invoice_status') {
+                  q.dataKey = 'tax_invoice_status';
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+  window.fixTaxStatusDataKeys = fixTaxStatusDataKeys;
+
   // 🛡️ 入力欄やテキストエリアへの貼り付け等で混入した余計なHTMLタグを即座にサニタイズ
   document.addEventListener('input', (e) => {
     if (e.target && (e.target.id === 'editor-section-desc' || e.target.classList.contains('q-desc-input') || e.target.classList.contains('q-title-input'))) {
@@ -20411,6 +20434,7 @@
 
     sanitizeFormBranchingLogic(forms);
     cleanStrayTagsFromObject(forms);
+    fixTaxStatusDataKeys(forms);
 
     // 最新の forms を localStorage にも反映
     const currentJson = JSON.stringify(forms);
@@ -20541,10 +20565,12 @@
       if (Array.isArray(localForms)) {
         localForms = localForms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
         cleanStrayTagsFromObject(localForms);
+        fixTaxStatusDataKeys(localForms);
       }
       if (Array.isArray(cloudForms)) {
         cloudForms = cloudForms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
         cleanStrayTagsFromObject(cloudForms);
+        fixTaxStatusDataKeys(cloudForms);
       }
 
       const localQCount = countFormsQuestions(localForms);
@@ -20563,6 +20589,7 @@
         console.log('[Cloud Sync] Loaded', cloudForms.length, 'forms from cloud. Total questions:', cloudQCount);
         sanitizeFormBranchingLogic(cloudForms);
         cleanStrayTagsFromObject(cloudForms);
+        fixTaxStatusDataKeys(cloudForms);
         
         // クラウドの定義を正として localStorage および window.U へ同期
         Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(cloudForms));
@@ -26572,8 +26599,21 @@
           q.validation = { type: 'regex', pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$', message: '正しいメールアドレスの形式で入力してください' };
           upgradedQuestionsCount++;
         }
-        // 📄 インボイス番号
-        else if (title.includes('インボイス') || key.includes('invoice') || title.includes('登録番号')) {
+        // 🧾 税務区分・インボイス登録状況（ラジオ選択肢）
+        else if (title.includes('税務') || title.includes('登録状況') || key.includes('tax_invoice_status') || key.includes('tax_status')) {
+          q.dataKey = 'tax_invoice_status';
+          q.type = 'radio';
+          if (!q.options || q.options.length === 0) {
+            q.options = [
+              { label: '非課税事業者である。' },
+              { label: '課税事業者でインボイスは未登録である。' },
+              { label: 'インボイス登録事業者である。' }
+            ];
+          }
+          upgradedQuestionsCount++;
+        }
+        // 📄 インボイス登録番号（記述式・API照合・T+13桁）
+        else if ((title.includes('番号') || key.includes('invoice_num') || (title.includes('インボイス') && !title.includes('状況'))) && q.type !== 'radio') {
           hasInvoice = true;
           q.dataKey = 'invoice_number';
           q.type = 'text';
