@@ -3217,7 +3217,7 @@
           sanitizeFormBranchingLogic(window.G);
         }
         window.archifyRenderer.render(window.G);
-        if (window.r !== null && window.r !== undefined && typeof window.archifyRenderer.highlightSection === 'function') {
+        if (!window.archifyRenderer.userClearedHighlight && window.r !== null && window.r !== undefined && typeof window.archifyRenderer.highlightSection === 'function') {
           window.archifyRenderer.highlightSection(window.r);
         }
       }
@@ -3317,7 +3317,7 @@
         setTimeout(() => {
           if (window.archifyRenderer) {
             window.archifyRenderer.fitView();
-            if (isEditingSection && window.r) {
+            if (!window.archifyRenderer.userClearedHighlight && isEditingSection && window.r) {
               window.archifyRenderer.highlightSection(window.r);
             }
           }
@@ -3591,7 +3591,8 @@
           }
         }
         if (qId) {
-          window.archifyRenderer.highlightRouteForNode(qId, true);
+          window.archifyRenderer.userClearedHighlight = false;
+          window.archifyRenderer.highlightRouteForNode(qId, true, true);
         }
         return;
       }
@@ -3601,7 +3602,8 @@
       if (secItem && window.archifyRenderer.highlightSection) {
         const secId = secItem.dataset.sectionId || secItem.dataset.id;
         if (secId) {
-          window.archifyRenderer.highlightSection(secId);
+          window.archifyRenderer.userClearedHighlight = false;
+          window.archifyRenderer.highlightSection(secId, true);
         }
       }
     });

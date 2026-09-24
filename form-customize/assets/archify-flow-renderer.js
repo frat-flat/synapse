@@ -16,6 +16,7 @@
       this.graph = { nodes: [], edges: [], lanes: [] };
       this.selectedNodeId = null;
       this.highlightedRoute = { nodes: new Set(), edges: new Set() };
+      this.userClearedHighlight = false; // ✨ ユーザーによるハイライト明示的解除フラグ
       
       // ビューポート変換（パン・ズーム）
       this.scale = 1.0;
@@ -124,10 +125,10 @@
 
       // 背景クリックでハイライト解除（viewportおよびsvg直下の空クリックを確実に検知）
       const handleBgClick = (e) => {
-        if (e.target.closest('.archify-node-group') || e.target.closest('.archify-edge-group') || e.target.closest('.flowmap-floating-legend')) {
+        if (e.target.closest('.archify-node-group') || e.target.closest('.archify-edge-group') || e.target.closest('.flowmap-floating-legend') || e.target.closest('.flowmap-controls-group')) {
           return;
         }
-        this.clearHighlight();
+        this.clearHighlight(true);
       };
       viewport.addEventListener('click', handleBgClick);
       const svgEl = document.getElementById(this.svgId);
@@ -145,8 +146,13 @@
 
       const btnReset = document.getElementById('btn-flow-reset-route');
       if (btnReset) {
-        btnReset.addEventListener('click', () => {
-          this.clearHighlight();
+        btnReset.addEventListener('click', (e) => {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          this.userClearedHighlight = true;
+          this.clearHighlight(true);
           if (typeof window.showSectionToast === 'function') {
             window.showSectionToast('✨ ハイライトを解除しました');
           }
@@ -881,9 +887,11 @@
       if (this.translateX === 40 && this.translateY === 40) {
         setTimeout(() => this.fitView(), 60);
       } else {
-        // 再描画時に選択ノードのルートを再適用
-        if (this.selectedNodeId) {
+        // 再描画時に選択ノードのルートを再適用（ユーザーが解除していない場合のみ）
+        if (!this.userClearedHighlight && this.selectedNodeId) {
           this.highlightRouteForNode(this.selectedNodeId);
+        } else if (this.userClearedHighlight) {
+          this.clearHighlight(false);
         }
       }
     }
@@ -1004,7 +1012,8 @@
       // クリックで道筋（Route Probe）ハイライト & エディタ側設問カード連動
       g.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.highlightRouteForNode(node.id, false);
+        this.userClearedHighlight = false;
+        this.highlightRouteForNode(node.id, false, true);
         this.syncToEditorQuestion(node.id);
       });
 
@@ -1132,7 +1141,8 @@
       // クリックでエッジ関連ノードをハイライト
       g.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.highlightRouteForNode(edge.from);
+        this.userClearedHighlight = false;
+        this.highlightRouteForNode(edge.from, false, true);
       });
 
       return g;
@@ -1144,9 +1154,11 @@
     }
 
     // 🎯 ルート道筋（Route Probe）ハイライト（選択ノードと関連分岐・前後経路を明確に可視化）
-    highlightRouteForNode(nodeId, shouldPan = false) {
+    highlightRouteForNode(nodeId, shouldPan = false, force = false) {
+      if (this.userClearedHighlight && !force) return;
       if (!this.graph || !this.graph.nodes) return;
       this.selectedNodeId = nodeId;
+      this.userClearedHighlight = false;
 
       const targetNode = this.graph.nodes.find(n => n.id === nodeId);
       if (!targetNode) return;
@@ -1368,7 +1380,10 @@
     }
 
     // ✨ ハイライト全解除
-    clearHighlight() {
+    clearHighlight(markUserCleared = false) {
+      if (markUserCleared) {
+        this.userClearedHighlight = true;
+      }
       this.selectedNodeId = null;
       this.highlightedRoute = { nodes: new Set(), edges: new Set() };
 
@@ -1398,7 +1413,8 @@
     }
 
     // セクション指定のハイライト
-    highlightSection(sectionIndexOrId) {
+    highlightSection(sectionIndexOrId, force = false) {
+      if (this.userClearedHighlight && !force) return;
       if (!this.state || !this.state.sections) return;
       let sec = null;
       if (typeof sectionIndexOrId === 'number') {
@@ -1411,16 +1427,16 @@
         }
       }
       if (sec && sec.questions && sec.questions.length > 0) {
-        this.highlightRouteForNode(sec.questions[0].id);
+        this.highlightRouteForNode(sec.questions[0].id, false, force);
       } else if (sec) {
         const partialNode = this.graph.nodes.find(n => n.id === `partial_submit_${sec.id}`);
         if (partialNode) {
-          this.highlightRouteForNode(partialNode.id);
+          this.highlightRouteForNode(partialNode.id, false, force);
         } else {
-          this.clearHighlight();
+          this.clearHighlight(false);
         }
       } else {
-        this.clearHighlight();
+        this.clearHighlight(false);
       }
     }
   }
