@@ -864,6 +864,18 @@ let supabaseClient = null;
 let partnerSupabaseClient = null;
 let isSyncing = false;
 
+// 🛡️ 不正カラムキー（タイムスタンプ・数字列等）の完全検知ヘルパー
+function isGarbageColumnKey(key) {
+  if (!key || typeof key !== 'string') return true;
+  const k = key.trim();
+  if (!k) return true;
+  if (/^\d+$/.test(k)) return true;
+  if (/\d{8,}/.test(k)) return true;
+  if (/^(?:q|col|field|item)_\d+$/i.test(k)) return true;
+  return false;
+}
+window.isGarbageColumnKey = isGarbageColumnKey;
+
 // 🧹 カスタムテーブルのカラムキー統一・重複マージヘルパー
 function sanitizeAndUnifyTableColumns(tbl) {
   if (!tbl || !Array.isArray(tbl.columns) || tbl.columns.length === 0) return tbl;
@@ -872,9 +884,20 @@ function sanitizeAndUnifyTableColumns(tbl) {
   const seenKeys = new Map();
   let hasDuplicates = false;
 
-  tbl.columns.forEach(c => {
+  // 不正なタイムスタンプ・数字列カラムを完全除外
+  const validCols = tbl.columns.filter(c => {
+    if (!c) return false;
+    const rawLabel = (c.label || c.name || '').trim();
+    if (isGarbageColumnKey(rawLabel)) {
+      return false;
+    }
+    return true;
+  });
+
+  validCols.forEach(c => {
     if (!c) return;
-    const effectiveKey = (c.id || c.dataKey || '').trim();
+    const safeDataKey = (c.dataKey && !isGarbageColumnKey(c.dataKey)) ? c.dataKey : null;
+    const effectiveKey = (c.id || safeDataKey || '').trim();
     if (!effectiveKey) {
       cleanedCols.push(c);
       return;
@@ -909,10 +932,10 @@ function sanitizeAndUnifyTableColumns(tbl) {
         });
       }
     } else {
-      const copy = { ...c };
+      const copy = { ...c, dataKey: safeDataKey };
       seenKeys.set(effectiveKey, copy);
       if (c.id) seenKeys.set(c.id, copy);
-      if (c.dataKey) seenKeys.set(c.dataKey, copy);
+      if (safeDataKey) seenKeys.set(safeDataKey, copy);
       cleanedCols.push(copy);
     }
   });
@@ -24218,25 +24241,35 @@ function handleFormSubmitMessage(event) {
       const metaList = Array.isArray(qMeta) && qMeta.length > 0 ? qMeta : (Array.isArray(questionMetaList) ? questionMetaList : []);
       if (metaList.length > 0) {
         metaList.forEach(qm => {
-          if (qm && (qm.title || qm.dataKey)) {
-            allQuestions.push({
-              title: qm.title || qm.dataKey,
-              dataKey: qm.dataKey || '',
-              type: qm.type || 'text',
-              required: !!qm.required
-            });
+          if (qm) {
+            const rawKey = (qm.dataKey && !isGarbageColumnKey(qm.dataKey)) ? qm.dataKey : '';
+            const rawTitle = (qm.title && !isGarbageColumnKey(qm.title)) ? qm.title : '';
+            const colTitle = rawTitle || rawKey;
+            if (colTitle) {
+              allQuestions.push({
+                title: colTitle,
+                dataKey: rawKey,
+                type: qm.type || 'text',
+                required: !!qm.required
+              });
+            }
           }
         });
       } else if (fDef && Array.isArray(fDef.sections)) {
         fDef.sections.forEach(sec => {
           (sec.questions || []).forEach(q => {
-            if (q && (q.title || q.dataKey)) {
-              allQuestions.push({
-                title: q.title || q.dataKey,
-                dataKey: q.dataKey || '',
-                type: q.type || 'text',
-                required: !!q.required
-              });
+            if (q) {
+              const rawKey = (q.dataKey && !isGarbageColumnKey(q.dataKey)) ? q.dataKey : '';
+              const rawTitle = (q.title && !isGarbageColumnKey(q.title)) ? q.title : '';
+              const colTitle = rawTitle || rawKey;
+              if (colTitle) {
+                allQuestions.push({
+                  title: colTitle,
+                  dataKey: rawKey,
+                  type: q.type || 'text',
+                  required: !!q.required
+                });
+              }
             }
           });
         });
@@ -24244,7 +24277,7 @@ function handleFormSubmitMessage(event) {
 
       allQuestions.forEach(q => {
         const colName = (q.title || q.dataKey).trim();
-        if (colName && !seenColKeys.has(colName)) {
+        if (colName && !seenColKeys.has(colName) && !isGarbageColumnKey(colName)) {
           seenColKeys.add(colName);
           let colType = 'text';
           if (q.type === 'date') colType = 'date';
@@ -24255,7 +24288,7 @@ function handleFormSubmitMessage(event) {
             label: colName,
             name: colName,
             type: colType,
-            dataKey: q.dataKey || null,
+            dataKey: (q.dataKey && !isGarbageColumnKey(q.dataKey)) ? q.dataKey : null,
             required: !!q.required,
             width: 140
           });
@@ -24265,7 +24298,7 @@ function handleFormSubmitMessage(event) {
       // 3. 送信データ内に存在するが設問リストにない任意のキーも安全に追加
       if (submitValues) {
         Object.keys(submitValues).forEach(key => {
-          if (!seenColKeys.has(key)) {
+          if (!seenColKeys.has(key) && !isGarbageColumnKey(key)) {
             seenColKeys.add(key);
             cols.push({
               id: 'col_' + Math.random().toString(36).substr(2, 9),

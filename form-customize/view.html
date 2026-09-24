@@ -1327,6 +1327,71 @@
     <!-- フォームデータ復元 & 回答処理エンジン -->
     <script>
       (function() {
+        // 🛡️ 不正カラムキー（タイムスタンプ・数字列等）の完全検知ヘルパー
+        function isGarbageDataKey(key) {
+          if (!key || typeof key !== 'string') return true;
+          const k = key.trim();
+          if (!k) return true;
+          if (/^\d+$/.test(k)) return true;
+          if (/\d{8,}/.test(k)) return true;
+          if (/^(?:q|col|field|item)_\d+$/i.test(k)) return true;
+          return false;
+        }
+
+        // 🏷️ 設問タイトルから安全・標準的な dataKey を導出するスマートマッパー
+        function suggestDefaultDataKey(title, qId = '') {
+          const raw = (title || '').trim();
+          const t = raw.toLowerCase();
+
+          // 1. 氏名・代表者
+          if (t.includes('代表者名（カナ）') || t.includes('氏名（カナ）') || t.includes('氏名カナ') || t.includes('フリガナ') || t.includes('ふりがな')) {
+            if (t.includes('代表') || (!t.includes('法人') && !t.includes('会社') && !t.includes('屋号'))) {
+              return 'representative_kana';
+            }
+          }
+          if (t.includes('代表者名') || t.includes('代表') || t.includes('氏名') || t.includes('名前') || t.includes('フルネーム') || t.includes('ご担当者') || t.includes('担当者') || t.includes('name')) {
+            if (!t.includes('法人') && !t.includes('会社') && !t.includes('屋号')) {
+              return 'representative_name';
+            }
+          }
+
+          // 2. 連絡先
+          if (t.includes('生年月日') || t.includes('誕生日') || t.includes('生年') || t.includes('birthday') || t.includes('birthdate') || t.includes('birth')) return 'birthdate';
+          if (t.includes('メール') || t.includes('mail') || t.includes('email') || t.includes('e-mail')) return 'email';
+          if (t.includes('電話') || t.includes('tel') || t.includes('phone') || t.includes('携帯') || t.includes('連絡先')) return 'tel';
+          if (t.includes('パスワード') || t.includes('暗証番号') || t.includes('password') || t.includes('pass')) return 'password';
+
+          // 3. 会社・法人・屋号
+          if (t.includes('法人名（カナ）') || t.includes('会社名（カナ）') || t.includes('屋号（カナ）') || t.includes('法人名カナ') || t.includes('会社名カナ') || t.includes('屋号カナ')) return 'company_kana';
+          if (t.includes('法人名') || t.includes('会社名') || t.includes('屋号') || t.includes('企業名') || t.includes('商号') || t.includes('company') || t.includes('corp')) return 'company_name';
+          if (t.includes('事業者区分') || t.includes('申請区分') || t.includes('事業形態') || t.includes('法人区分') || t.includes('契約種別') || t.includes('区分') || t.includes('applicant_type')) return 'applicant_type';
+
+          // 4. 税務・インボイス
+          if (t.includes('税務区分') || t.includes('インボイス登録状況') || t.includes('課税事業者') || t.includes('税務') || t.includes('tax_invoice_status')) return 'tax_invoice_status';
+          if (t.includes('インボイス') || t.includes('登録番号') || t.includes('適格請求書') || t.includes('invoice')) return 'invoice_number';
+
+          // 5. 住所
+          if (t.includes('郵便番号') || t.includes('郵便') || t.includes('〒') || t.includes('zip')) return 'zip_code';
+          if (t.includes('都道府県') || t.includes('pref')) return 'pref';
+          if (t.includes('市区町村') || t.includes('市町村') || t.includes('city')) return 'city';
+          if (t.includes('町名') || t.includes('番地') || t.includes('住所') || t.includes('所在地') || t.includes('street') || t.includes('address')) return 'street';
+          if (t.includes('建物名') || t.includes('建物') || t.includes('マンション') || t.includes('ビル') || t.includes('部屋番号') || t.includes('部屋') || t.includes('building')) return 'building';
+
+          // 6. 銀行・口座
+          if (t.includes('金融機関コード') || t.includes('銀行コード') || t.includes('bank_code')) return 'bank_code';
+          if (t.includes('支店番号') || t.includes('支店コード') || t.includes('branch_code')) return 'branch_code';
+          if (t.includes('銀行名') || t.includes('金融機関名') || t.includes('銀行') || t.includes('信用金庫') || t.includes('bank')) return 'bank_name';
+          if (t.includes('支店名') || t.includes('出張所') || t.includes('支店') || t.includes('branch')) return 'branch_name';
+          if (t.includes('口座種別') || t.includes('預金種目') || t.includes('種別')) return 'account_type';
+          if (t.includes('口座番号') || t.includes('口座') || t.includes('account_number')) return 'account_number';
+          if (t.includes('口座名義') || t.includes('名義') || t.includes('名義人')) return 'account_holder_kana';
+
+          // 7. 備考
+          if (t.includes('備考') || t.includes('ご意見') || t.includes('ご要望') || t.includes('特記事項') || t.includes('メモ') || t.includes('連絡事項') || t.includes('ご質問') || t.includes('お問い合わせ') || t.includes('自由記入') || t.includes('note') || t.includes('memo')) return 'note';
+
+          return 'custom_field';
+        }
+
         // ==========================================
         // 1. データ復元用Codec（Deflate / Base64）
         // ==========================================
@@ -7868,9 +7933,9 @@
           formDefinition.sections.forEach(s => {
             (s.questions || []).forEach(q => {
               if (formValues[q.id] !== undefined && formValues[q.id] !== '') {
-                const key = q.dataKey || q.title || q.id;
-                submitData[key] = formValues[q.id];
-                if (q.title && q.title !== key) {
+                const effKey = (q.dataKey && !isGarbageDataKey(q.dataKey)) ? q.dataKey : (q.title || suggestDefaultDataKey(q.title, q.id));
+                submitData[effKey] = formValues[q.id];
+                if (q.title && q.title !== effKey && !isGarbageDataKey(q.title)) {
                   submitData[q.title] = formValues[q.id];
                 }
               }
@@ -8022,10 +8087,11 @@
           if (formDefinition && Array.isArray(formDefinition.sections)) {
             formDefinition.sections.forEach(s => {
               (s.questions || []).forEach(q => {
+                const safeKey = (q.dataKey && !isGarbageDataKey(q.dataKey)) ? q.dataKey : (q.title ? suggestDefaultDataKey(q.title, q.id) : '');
                 questionMeta.push({
                   id: q.id,
                   title: q.title || '',
-                  dataKey: q.dataKey || '',
+                  dataKey: safeKey,
                   type: q.type || 'text',
                   required: !!q.required,
                   sectionTitle: s.title || ''
@@ -8086,15 +8152,16 @@
               const seenColKeys = new Set(['ステータス', '送信種別', '回答日時 / 登録日時']);
               if (Array.isArray(questionMeta)) {
                 questionMeta.forEach(qm => {
-                  const qTitle = (qm.title || qm.dataKey || '').trim();
-                  if (qTitle && !seenColKeys.has(qTitle)) {
+                  const effectiveKey = (qm.dataKey && !isGarbageDataKey(qm.dataKey)) ? qm.dataKey : '';
+                  const qTitle = (qm.title || effectiveKey || '').trim();
+                  if (qTitle && !seenColKeys.has(qTitle) && !isGarbageDataKey(qTitle)) {
                     seenColKeys.add(qTitle);
-                    testCols.push({ id: 'col_' + Math.random().toString(36).substr(2, 9), label: qTitle, name: qTitle, type: qm.type || 'text', dataKey: qm.dataKey || null });
+                    testCols.push({ id: 'col_' + Math.random().toString(36).substr(2, 9), label: qTitle, name: qTitle, type: qm.type || 'text', dataKey: effectiveKey || null });
                   }
                 });
               }
               Object.keys(submitData).forEach(k => {
-                if (!seenColKeys.has(k)) {
+                if (!seenColKeys.has(k) && !isGarbageDataKey(k)) {
                   seenColKeys.add(k);
                   testCols.push({ id: 'col_' + Math.random().toString(36).substr(2, 9), label: k, name: k, type: 'text' });
                 }
@@ -8551,8 +8618,9 @@
             const secTitle = sec.title || `セクション ${sIdx + 1}`;
             (sec.questions || []).forEach(q => {
               const qTitle = q.title || '(無題の設問)';
-              const colName = q.title || q.dataKey || q.id;
-              const dataKey = q.dataKey || '-';
+              const safeKey = (q.dataKey && !isGarbageDataKey(q.dataKey)) ? q.dataKey : suggestDefaultDataKey(q.title, q.id);
+              const colName = q.title || safeKey;
+              const dataKey = safeKey || '-';
               const typeLabel = q.type === 'text' ? 'テキスト' :
                                 q.type === 'radio' ? '単一選択 (ラジオ)' :
                                 q.type === 'checkbox' ? '複数選択 (チェック)' :

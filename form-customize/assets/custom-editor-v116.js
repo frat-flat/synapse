@@ -11,7 +11,110 @@
 
 
 (function() {
-  // 🚀 起動時即時パージ: LocalStorage内の旧ダミーフォームを完全に根絶
+  // 🛡️ カラムキー（dataKey）の健全性判定: タイムスタンプや純粋な数字などのゴミキーを完全ブロック
+  function isGarbageDataKey(key) {
+    if (!key || typeof key !== 'string') return true;
+    const k = key.trim();
+    if (!k) return true;
+    // 純粋な数字のみ（例: 1790235914700, 12345）
+    if (/^\d+$/.test(k)) return true;
+    // 8桁以上の連続数字（タイムスタンプ等）を含む（例: q_1790235914700, col_1790235914700）
+    if (/\d{8,}/.test(k)) return true;
+    // システム内部ID形式（例: "q_123", "col_123", "field_123"）
+    if (/^(?:q|col|field)_\d+$/i.test(k)) return true;
+    return false;
+  }
+  window.isGarbageDataKey = isGarbageDataKey;
+
+  // 🏷️ 設問からスマートで意味のある物理カラムキー（dataKey）を網羅的に自動判定
+  function suggestDefaultDataKey(title, qId = '') {
+    const raw = (title || '').trim();
+    const t = raw.toLowerCase();
+    
+    // 1. カナ・フリガナ（口座名義・法人・代表者）
+    if (t.includes('口座名義') || t.includes('口座名義人') || t.includes('メイギ') || t.includes('めいぎ') || t.includes('名義カナ') || (t.includes('名義') && (t.includes('カナ') || t.includes('フリガナ')))) return 'account_holder_kana';
+    if (t.includes('法人名（カナ）') || t.includes('屋号（カナ）') || t.includes('会社名（カナ）') || t.includes('法人カナ') || t.includes('会社カナ') || t.includes('屋号カナ') || (t.includes('フリガナ') && (t.includes('法人') || t.includes('会社') || t.includes('屋号')))) return 'company_kana';
+    if (t.includes('代表者名（カナ）') || t.includes('代表者カナ') || t.includes('氏名カナ') || t.includes('名前カナ') || (t.includes('フリガナ') && (t.includes('代表') || t.includes('氏名') || t.includes('名前')))) return 'representative_kana';
+
+    // 2. 基本連絡先・代表情報
+    if (t.includes('メール') || t.includes('mail') || t.includes('アドレス')) return 'email';
+    if (t.includes('電話') || t.includes('tel') || t.includes('携帯') || t.includes('連絡先電話')) return 'tel';
+    if (t.includes('生年月日') || t.includes('誕生日') || t.includes('生年') || t.includes('生月日') || t.includes('birth')) return 'birthdate';
+    if (t.includes('性別') || t.includes('gender')) return 'gender';
+    if (t.includes('年齢') || t.includes('年代') || t.includes('age')) return 'age';
+    if (t.includes('パスワード') || t.includes('暗証番号') || t.includes('password')) return 'password';
+    if (t.includes('代表者') || t.includes('氏名') || t.includes('ご担当者') || t.includes('担当者名') || t.includes('お名前') || t.includes('名前') || t.includes('name')) return 'representative_name';
+
+    // 3. 企業・事業者情報
+    if (t.includes('法人名') || t.includes('会社名') || t.includes('企業名') || t.includes('商号') || t.includes('屋号') || t.includes('法人') || t.includes('会社')) return 'company_name';
+    if (t.includes('事業者区分') || t.includes('事業形態') || t.includes('法人・個人') || t.includes('区分')) return 'business_type';
+    if (t.includes('業種') || t.includes('事業内容') || t.includes('業務内容') || t.includes('business')) return 'business_category';
+    if (t.includes('役職') || t.includes('肩書') || t.includes('position')) return 'position';
+    if (t.includes('部署') || t.includes('所属') || t.includes('department')) return 'department';
+    if (t.includes('資本金') || t.includes('capital')) return 'capital';
+    if (t.includes('従業員') || t.includes('社員数') || t.includes('employee')) return 'employee_count';
+    if (t.includes('設立') || t.includes('創業') || t.includes('establish')) return 'established_date';
+    if (t.includes('ホームページ') || t.includes('ウェブサイト') || t.includes('url') || t.includes('site')) return 'website_url';
+
+    // 4. 税務・インボイス
+    if (t.includes('税務区分') || t.includes('インボイス登録状況') || t.includes('課税事業者') || t.includes('税務') || t.includes('tax_invoice_status')) return 'tax_invoice_status';
+    if (t.includes('インボイス') || t.includes('登録番号') || t.includes('適格請求書') || t.includes('invoice')) return 'invoice_number';
+    if (t.includes('法人番号') || t.includes('会社法人等番号') || t.includes('corp_number')) return 'corp_number';
+
+    // 5. 住所関連（郵送先 vs 本社・個人住所）
+    const isMailAddr = t.includes('郵送') || t.includes('送付先') || t.includes('配送先') || t.includes('連絡先住所');
+    if (isMailAddr) {
+      if (t.includes('郵便') || t.includes('〒') || t.includes('zip')) return 'mail_zip';
+      if (t.includes('都道府県') || t.includes('pref')) return 'mail_pref';
+      if (t.includes('市区町村') || t.includes('市町村') || t.includes('city')) return 'mail_city';
+      if (t.includes('町名') || t.includes('番地') || t.includes('住所') || t.includes('street')) return 'mail_street';
+      if (t.includes('建物') || t.includes('マンション') || t.includes('ビル') || t.includes('部屋') || t.includes('building')) return 'mail_building';
+    }
+    if (t.includes('郵便番号') || t.includes('郵便') || t.includes('〒') || t.includes('zip')) return 'zip_code';
+    if (t.includes('都道府県') || t.includes('pref')) return 'pref';
+    if (t.includes('市区町村') || t.includes('市町村') || t.includes('city')) return 'city';
+    if (t.includes('町名') || t.includes('番地') || t.includes('住所') || t.includes('所在地') || t.includes('street') || t.includes('address')) return 'street';
+    if (t.includes('建物名') || t.includes('建物') || t.includes('マンション') || t.includes('ビル') || t.includes('部屋番号') || t.includes('部屋') || t.includes('building')) return 'building';
+
+    // 6. 銀行・金融口座
+    if (t.includes('金融機関コード') || t.includes('銀行コード') || t.includes('bank_code')) return 'bank_code';
+    if (t.includes('支店番号') || t.includes('支店コード') || t.includes('branch_code')) return 'branch_code';
+    if (t.includes('銀行名') || t.includes('金融機関名') || t.includes('銀行') || t.includes('信用金庫') || t.includes('bank')) return 'bank_name';
+    if (t.includes('支店名') || t.includes('出張所') || t.includes('支店') || t.includes('branch')) return 'branch_name';
+    if (t.includes('口座種別') || t.includes('預金種目') || t.includes('種別')) return 'account_type';
+    if (t.includes('口座番号') || t.includes('口座') || t.includes('account_number')) return 'account_number';
+    if (t.includes('口座名義') || t.includes('名義') || t.includes('名義人')) return 'account_holder_kana';
+
+    // 7. 同意・確認事項
+    if (t.includes('活動に関する確認') || t.includes('活動確認') || t.includes('確認事項')) return 'activity_confirmation';
+    if (t.includes('契約への同意') || t.includes('規約への同意') || t.includes('利用規約') || t.includes('契約') || t.includes('同意')) return 'contract_agreement';
+    if (t.includes('反社会的勢力') || t.includes('反社')) return 'anti_social_declaration';
+    if (t.includes('個人情報') || t.includes('プライバシー') || t.includes('privacy')) return 'privacy_agreement';
+
+    // 8. アポイント・日程
+    if (t.includes('面談日時') || t.includes('希望日時') || t.includes('日程') || t.includes('アポイント') || t.includes('予約') || t.includes('面談')) return 'preferred_date';
+    if (t.includes('面談方法') || t.includes('面談形式') || t.includes('希望形式') || t.includes('オンライン')) return 'meeting_type';
+
+    // 9. 備考・フリー入力
+    if (t.includes('備考') || t.includes('ご意見') || t.includes('ご要望') || t.includes('特記事項') || t.includes('メモ') || t.includes('連絡事項') || t.includes('ご質問') || t.includes('お問い合わせ') || t.includes('自由記入') || t.includes('note') || t.includes('memo')) return 'note';
+
+    // 10. qIdからの英字抽出（数字は完全に除去し、タイムスタンプが紛れ込むのを100%防止）
+    if (qId && typeof qId === 'string') {
+      const clean = qId.replace(/^q_/, '').replace(/^col_/, '').replace(/\d+/g, '').replace(/[^a-zA-Z_]/g, '').replace(/^_+|_+$/g, '');
+      if (clean && clean.length >= 3 && clean !== 'field' && clean !== 'item') return clean.toLowerCase();
+    }
+
+    // 11. タイトルから安全な英字のみ抽出（数字オンリーやタイムスタンプは断固排除）
+    const alphaOnly = raw.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^_+|_+$/g, '').toLowerCase();
+    if (alphaOnly && !isGarbageDataKey(alphaOnly) && alphaOnly.length >= 3) {
+      return alphaOnly;
+    }
+
+    return 'custom_field';
+  }
+  window.suggestDefaultDataKey = suggestDefaultDataKey;
+
+  // 🚀 起動時即時パージ & 不正カラムキー（タイムスタンプ・数字列）の完全浄化
   (function purgeLegacyFormsImmediately() {
     try {
       const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
@@ -20,15 +123,45 @@
         let forms = JSON.parse(raw);
         if (Array.isArray(forms)) {
           const clean = forms.filter(f => f && !purgedKeywords.some(p => (f.title || '').includes(p)));
-          let slugUpdated = false;
+          let updated = false;
           clean.forEach((f, idx) => {
-            if (f && !f.slug) {
+            if (f && !f.slug && typeof generateSmartFormSlug === 'function') {
               f.slug = generateSmartFormSlug(f.title || '無題のフォーム', clean, f.id || `form_${idx}`);
-              slugUpdated = true;
+              updated = true;
+            }
+            if (f && Array.isArray(f.sections)) {
+              f.sections.forEach(sec => {
+                (sec.questions || []).forEach(q => {
+                  if (q && q.dataKey && isGarbageDataKey(q.dataKey)) {
+                    q.dataKey = suggestDefaultDataKey(q.title, q.id);
+                    updated = true;
+                  }
+                });
+              });
             }
           });
-          if (clean.length !== forms.length || slugUpdated) {
+          if (clean.length !== forms.length || updated) {
             Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(clean));
+          }
+        }
+      }
+
+      // 現在編集中のドラフト（synapse_form_data）も即時浄化
+      const curFormRaw = localStorage.getItem('synapse_form_data');
+      if (curFormRaw) {
+        const curForm = JSON.parse(curFormRaw);
+        if (curForm && Array.isArray(curForm.sections)) {
+          let curUpdated = false;
+          curForm.sections.forEach(sec => {
+            (sec.questions || []).forEach(q => {
+              if (q && q.dataKey && isGarbageDataKey(q.dataKey)) {
+                q.dataKey = suggestDefaultDataKey(q.title, q.id);
+                curUpdated = true;
+              }
+            });
+          });
+          if (curUpdated) {
+            Storage.prototype.setItem.call(localStorage, 'synapse_form_data', JSON.stringify(curForm));
           }
         }
       }
@@ -75,6 +208,7 @@
           title: "銀行名",
           description: "全銀協コードAPI連携対応",
           required: true,
+          dataKey: "bank_name",
           validation: {
             category: "api",
             condition: "bank_name",
@@ -84,6 +218,8 @@
           },
           options: []
         };
+      } else {
+        window.re.bank_name.dataKey = "bank_name";
       }
       if (!window.re.branch_name) {
         window.re.branch_name = {
@@ -91,6 +227,7 @@
           title: "支店名",
           description: "全銀協支店コードAPI連携対応",
           required: true,
+          dataKey: "branch_name",
           validation: {
             category: "api",
             condition: "branch_name",
@@ -100,6 +237,8 @@
           },
           options: []
         };
+      } else {
+        window.re.branch_name.dataKey = "branch_name";
       }
       if (!window.re.branch_code) {
         window.re.branch_code = {
@@ -107,6 +246,7 @@
           title: "支店番号",
           description: "全銀協支店番号API連携対応",
           required: true,
+          dataKey: "branch_code",
           validation: {
             category: "api",
             condition: "branch_code",
@@ -116,6 +256,8 @@
           },
           options: []
         };
+      } else {
+        window.re.branch_code.dataKey = "branch_code";
       }
       if (!window.re.bank_account) {
         window.re.bank_account = {
@@ -124,6 +266,7 @@
           description: "6〜7桁の半角数字で入力してください（例: 1234567）",
           placeholder: "0477651",
           required: true,
+          dataKey: "account_number",
           validation: {
             category: "regex",
             condition: "matches",
@@ -135,6 +278,7 @@
           options: []
         };
       } else {
+        window.re.bank_account.dataKey = "account_number";
         window.re.bank_account.description = "6〜7桁の半角数字で入力してください（例: 1234567）";
         window.re.bank_account.placeholder = "0477651";
         if (window.re.bank_account.validation) {
@@ -146,12 +290,18 @@
       if (window.re.pro_bank && Array.isArray(window.re.pro_bank.questions)) {
         window.re.pro_bank.questions.forEach(q => {
           if (q.title === '金融機関名' || q.title === '銀行名') {
+            q.dataKey = 'bank_name';
             q.validation = { category: "api", condition: "bank_name", errorMessage: "実在する金融機関名を入力または選択してください。" };
           } else if (q.title === '支店名') {
+            q.dataKey = 'branch_name';
             q.validation = { category: "api", condition: "branch_name", errorMessage: "実在する支店名を入力または選択してください。" };
           } else if (q.title === '支店番号' || q.title === '支店コード') {
+            q.dataKey = 'branch_code';
             q.validation = { category: "api", condition: "branch_code", errorMessage: "実在する3桁の支店番号を入力または選択してください。" };
+          } else if (q.title === '口座種別') {
+            q.dataKey = 'account_type';
           } else if (q.title === '口座番号') {
+            q.dataKey = 'account_number';
             q.description = "6〜7桁の半角数字で入力してください（例: 1234567）";
             q.placeholder = "0477651";
             q.validation = {
@@ -161,6 +311,8 @@
               value: "^[0-9]{6,7}$",
               errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
             };
+          } else if (q.title === '口座名義' || q.title === '口座名義（カナ）') {
+            q.dataKey = 'account_holder_kana';
           }
         });
       }
@@ -12059,6 +12211,7 @@
           title: "銀行名",
           description: "銀行名を入力または検索して選択してください。",
           required: true,
+          dataKey: "bank_name",
           validation: {
             category: "api",
             condition: "bank_name",
@@ -12068,6 +12221,8 @@
           },
           options: []
         };
+      } else {
+        window.re.bank_name.dataKey = "bank_name";
       }
       if (!window.re.branch_name) {
         window.re.branch_name = {
@@ -12075,6 +12230,7 @@
           title: "支店名",
           description: "支店名を入力または候補から選択してください。",
           required: true,
+          dataKey: "branch_name",
           validation: {
             category: "api",
             condition: "branch_name",
@@ -12084,6 +12240,8 @@
           },
           options: []
         };
+      } else {
+        window.re.branch_name.dataKey = "branch_name";
       }
       if (!window.re.bank_account) {
         window.re.bank_account = {
@@ -12092,6 +12250,7 @@
           description: "6〜7桁の半角数字で入力してください（例: 1234567）",
           placeholder: "0477651",
           required: true,
+          dataKey: "account_number",
           validation: {
             category: "regex",
             condition: "matches",
@@ -12102,14 +12261,21 @@
           },
           options: []
         };
+      } else {
+        window.re.bank_account.dataKey = "account_number";
       }
       if (window.re.pro_bank && Array.isArray(window.re.pro_bank.questions)) {
         window.re.pro_bank.questions.forEach(q => {
           if (q.title === '金融機関名' || q.title === '銀行名') {
+            q.dataKey = 'bank_name';
             q.validation = { category: "api", condition: "bank_name", errorMessage: "実在する金融機関名を入力または選択してください。" };
           } else if (q.title === '支店名') {
+            q.dataKey = 'branch_name';
             q.validation = { category: "api", condition: "branch_name", errorMessage: "実在する支店名を入力または選択してください。" };
+          } else if (q.title === '口座種別') {
+            q.dataKey = 'account_type';
           } else if (q.title === '口座番号') {
+            q.dataKey = 'account_number';
             q.description = "6〜7桁の半角数字で入力してください（例: 1234567）";
             q.placeholder = "0477651";
             q.validation = {
@@ -12119,6 +12285,8 @@
               value: "^[0-9]{6,7}$",
               errorMessage: "正しい口座番号（6〜7桁の半角数字）を入力してください。"
             };
+          } else if (q.title === '口座名義' || q.title === '口座名義（カナ）') {
+            q.dataKey = 'account_holder_kana';
           }
         });
       }
@@ -12887,24 +13055,24 @@
     {
       category: "⭐ よく使われる定番項目（入力規則・正規表現つき）",
       items: [
-        { id: "preset_name", type: "preset", key: "name", name: "氏名", desc: "お名前入力欄（必須・フルネーム案内つき）", icon: "👤", badge: "定番", badgeType: "badge-smart" },
-        { id: "preset_company", type: "preset", key: "company", name: "法人名・屋号", desc: "会社名または屋号（未入力時は自動ハイフン補填）", icon: "🏢", badge: "ビジネス", badgeType: "badge-smart" },
-        { id: "preset_email", type: "preset", key: "email", name: "メールアドレス", desc: "連絡先メール（メールアドレス形式チェックつき）", icon: "✉️", badge: "定番", badgeType: "badge-smart" },
-        { id: "preset_email_autoreply", type: "preset", key: "email_autoreply", name: "メールアドレス（回答控え自動送信）", desc: "送信完了時に回答内容の控えメールを自動配信", icon: "📨", badge: "自動返信", badgeType: "badge-smart" },
-        { id: "preset_tel", type: "preset", key: "tel", name: "電話番号", desc: "固定・携帯電話共通（電話番号形式チェックつき）", icon: "📞", badge: "定番", badgeType: "badge-smart" },
-        { id: "preset_pro_address", type: "preset", key: "pro_address", name: "郵便番号・住所セット", desc: "郵便番号から住所を自動補完する連携セット", icon: "📮", badge: "住所補完", badgeType: "badge-smart" },
-        { id: "preset_birthdate", type: "preset", key: "birthdate", name: "生年月日", desc: "西暦年月日（YYYY/MM/DD形式チェックつき）", icon: "🎂", badge: "定番", badgeType: "badge-smart" }
+        { id: "preset_name", type: "preset", key: "name", dataKey: "representative_name", name: "氏名", desc: "お名前入力欄（必須・フルネーム案内つき）", icon: "👤", badge: "定番", badgeType: "badge-smart" },
+        { id: "preset_company", type: "preset", key: "company", dataKey: "company_name", name: "法人名・屋号", desc: "会社名または屋号（未入力時は自動ハイフン補填）", icon: "🏢", badge: "ビジネス", badgeType: "badge-smart" },
+        { id: "preset_email", type: "preset", key: "email", dataKey: "email", name: "メールアドレス", desc: "連絡先メール（メールアドレス形式チェックつき）", icon: "✉️", badge: "定番", badgeType: "badge-smart" },
+        { id: "preset_email_autoreply", type: "preset", key: "email_autoreply", dataKey: "email", name: "メールアドレス（回答控え自動送信）", desc: "送信完了時に回答内容の控えメールを自動配信", icon: "📨", badge: "自動返信", badgeType: "badge-smart" },
+        { id: "preset_tel", type: "preset", key: "tel", dataKey: "tel", name: "電話番号", desc: "固定・携帯電話共通（電話番号形式チェックつき）", icon: "📞", badge: "定番", badgeType: "badge-smart" },
+        { id: "preset_pro_address", type: "preset", key: "pro_address", dataKey: "zip_code", name: "郵便番号・住所セット", desc: "郵便番号から住所を自動補完する連携セット", icon: "📮", badge: "住所補完", badgeType: "badge-smart" },
+        { id: "preset_birthdate", type: "preset", key: "birthdate", dataKey: "birthdate", name: "生年月日", desc: "西暦年月日（YYYY/MM/DD形式チェックつき）", icon: "🎂", badge: "定番", badgeType: "badge-smart" }
       ]
     },
     {
       category: "💼 ビジネス・専用プロ項目（API連携・一括セット）",
       items: [
-        { id: "preset_pro_bank", type: "preset", key: "pro_bank", name: "銀行口座情報セット", desc: "銀行名・支店名・口座種別・口座番号の自動照合セット", icon: "🏦", badge: "API連携", badgeType: "badge-pro" },
-        { id: "preset_pro_corp_info", type: "preset", key: "pro_corp_info", name: "法人情報一括セット", desc: "法人名・代表者・所在地・インボイス等の一式", icon: "🏢", badge: "プロ一括", badgeType: "badge-pro" },
-        { id: "preset_pro_individual_info", type: "preset", key: "pro_individual_info", name: "個人事業主情報一括セット", desc: "屋号・氏名・住所・税務区分・インボイスの一式", icon: "👤", badge: "プロ一括", badgeType: "badge-pro" },
-        { id: "preset_pro_branch_hybrid", type: "preset", key: "pro_branch_hybrid", name: "法人・個人 自動分岐セット", desc: "回答に応じて法人項目／個人項目を自動切り替え", icon: "🔀", badge: "自動分岐", badgeType: "badge-pro" },
-        { id: "preset_invoice", type: "preset", key: "invoice", name: "インボイス登録番号", desc: "T+13桁 国税庁適格請求書発行事業者API連携", icon: "🧾", badge: "国税庁API", badgeType: "badge-pro" },
-        { id: "preset_pro_password", type: "preset", key: "pro_password", name: "パスワード（確認用付き）", desc: "確認再入力・目のマーク同期・マスク表示機能つき", icon: "🔒", badge: "安全入力", badgeType: "badge-pro" }
+        { id: "preset_pro_bank", type: "preset", key: "pro_bank", dataKey: "bank_name", name: "銀行口座情報セット", desc: "銀行名・支店名・口座種別・口座番号の自動照合セット", icon: "🏦", badge: "API連携", badgeType: "badge-pro" },
+        { id: "preset_pro_corp_info", type: "preset", key: "pro_corp_info", dataKey: "company_name", name: "法人情報一括セット", desc: "法人名・代表者・所在地・インボイス等の一式", icon: "🏢", badge: "プロ一括", badgeType: "badge-pro" },
+        { id: "preset_pro_individual_info", type: "preset", key: "pro_individual_info", dataKey: "representative_name", name: "個人事業主情報一括セット", desc: "屋号・氏名・住所・税務区分・インボイスの一式", icon: "👤", badge: "プロ一括", badgeType: "badge-pro" },
+        { id: "preset_pro_branch_hybrid", type: "preset", key: "pro_branch_hybrid", dataKey: "applicant_type", name: "法人・個人 自動分岐セット", desc: "回答に応じて法人項目／個人項目を自動切り替え", icon: "🔀", badge: "自動分岐", badgeType: "badge-pro" },
+        { id: "preset_invoice", type: "preset", key: "invoice", dataKey: "invoice_number", name: "インボイス登録番号", desc: "T+13桁 国税庁適格請求書発行事業者API連携", icon: "🧾", badge: "国税庁API", badgeType: "badge-pro" },
+        { id: "preset_pro_password", type: "preset", key: "pro_password", dataKey: "password", name: "パスワード（確認用付き）", desc: "確認再入力・目のマーク同期・マスク表示機能つき", icon: "🔒", badge: "安全入力", badgeType: "badge-pro" }
       ]
     },
     {
@@ -12957,12 +13125,14 @@
         const a = window.re && window.re[val];
         if (a) {
           const isBlankInitial = q => (q.title === '質問 1' || q.title === '' || !q.title) && q.type === 'text' && (q.description === '説明（任意）' || q.description === '' || !q.description) && !q.required && !q.validation;
+          const assignedDataKey = a.dataKey || item.dataKey || (typeof suggestDefaultDataKey === 'function' ? suggestDefaultDataKey(a.title) : '');
           const newQ = {
             id: `q_${Date.now()}`,
             type: a.type,
             title: a.title,
             description: a.description,
             required: a.required,
+            dataKey: assignedDataKey,
             validation: a.validation ? JSON.parse(JSON.stringify(a.validation)) : null,
             options: a.options ? JSON.parse(JSON.stringify(a.options)) : []
           };
@@ -12998,6 +13168,7 @@
           title: `質問 ${sec.questions.length + 1}`,
           description: '',
           required: false,
+          dataKey: 'custom_field',
           validation: null,
           options: [],
           groupId: groupId,
@@ -13012,6 +13183,8 @@
       }
     }
   }
+  window.handleAddQuestionItemClick = handleAddQuestionItemClick;
+  window.ADD_QUESTION_MENU_DATA = ADD_QUESTION_MENU_DATA;
 
   function escapeAddQHtml(str) {
     if (str == null) return '';
@@ -17268,21 +17441,31 @@
     });
   }
 
-  // プリセット質問定義 (window.re) の電話番号、生年月日および口座番号
+  // プリセット質問定義 (window.re) の電話番号、生年月日、口座番号等のdataKey＆正規表現統一
   if (window.re) {
     if (window.re.tel) {
+      window.re.tel.dataKey = 'tel';
       window.re.tel.description = "ハイフンを含めて半角数字で入力してください。（例: 03-1234-5678 または 090-1234-5678）";
       if (window.re.tel.validation) {
         window.re.tel.validation.errorMessage = "ハイフンを含めて正しい電話番号の形式で入力してください。";
         window.re.tel.validation.presetKey = "tel_both";
       }
     }
+    if (window.re.name) window.re.name.dataKey = 'representative_name';
+    if (window.re.company) window.re.company.dataKey = 'company_name';
+    if (window.re.email) window.re.email.dataKey = 'email';
+    if (window.re.zip) window.re.zip.dataKey = 'zip_code';
+    if (window.re.address) window.re.address.dataKey = 'street';
+    if (window.re.prefecture) window.re.prefecture.dataKey = 'pref';
+    if (window.re.invoice) window.re.invoice.dataKey = 'invoice_number';
+
     if (!window.re.birthdate) {
       window.re.birthdate = {
         type: "text",
         title: "生年月日",
         description: "半角数字で入力してください。（例: 1990/01/01）",
         required: true,
+        dataKey: "birthdate",
         validation: {
           category: "regex",
           condition: "matches",
@@ -17293,6 +17476,8 @@
         },
         options: []
       };
+    } else {
+      window.re.birthdate.dataKey = 'birthdate';
     }
     if (!window.re.bank_account) {
       window.re.bank_account = {
@@ -17301,6 +17486,7 @@
         description: "6〜7桁の半角数字で入力してください（例: 1234567）",
         placeholder: "0477651",
         required: true,
+        dataKey: "account_number",
         validation: {
           category: "regex",
           condition: "matches",
@@ -17312,12 +17498,13 @@
         options: []
       };
     } else {
+      window.re.bank_account.dataKey = "account_number";
       window.re.bank_account.description = "6〜7桁の半角数字で入力してください（例: 1234567）";
       window.re.bank_account.placeholder = "0477651";
       if (window.re.bank_account.validation) {
         window.re.bank_account.validation.presetKey = "bank_account";
         window.re.bank_account.validation.value = "^[0-9]{6,7}$";
-        window.re.bank_account.validation.errorMessage = "正しい口座番号（6〜7桁の半角数字）を入力してください。"
+        window.re.bank_account.validation.errorMessage = "正しい口座番号（6〜7桁の半角数字）を入力してください。";
       }
     }
   }
@@ -22044,32 +22231,47 @@
           <div id="drawer-column-unified-box" style="display: none; margin-top: 10px;">
             <label class="drawer-field-label">共通カラム（列キー）の選択</label>
             <select id="drawer-column-select" class="form-control form-control-sm">
-              <option value="company_name">🏢 法人名・屋号 (company_name)</option>
-              <option value="company_kana">🏢 法人名カナ・屋号カナ (company_kana)</option>
               <option value="representative_name">👤 代表者名・氏名 (representative_name)</option>
               <option value="representative_kana">👤 代表者カナ・氏名カナ (representative_kana)</option>
+              <option value="company_name">🏢 法人名・屋号 (company_name)</option>
+              <option value="company_kana">🏢 法人名カナ・屋号カナ (company_kana)</option>
+              <option value="birthdate">🎂 生年月日 (birthdate)</option>
+              <option value="email">✉️ メールアドレス (email)</option>
+              <option value="tel">📞 電話番号 (tel)</option>
               <option value="zip_code">📮 郵便番号 (zip_code)</option>
               <option value="pref">📍 都道府県 (pref)</option>
               <option value="city">📍 市区町村 (city)</option>
               <option value="street">📍 町名・番地 (street)</option>
               <option value="building">📍 建物名・部屋番号 (building)</option>
-              <option value="email">✉️ メールアドレス (email)</option>
-              <option value="tel">📞 電話番号 (tel)</option>
+              <option value="bank_name">🏦 銀行名 (bank_name)</option>
+              <option value="branch_name">🏦 支店名 (branch_name)</option>
+              <option value="bank_code">🏦 金融機関コード (bank_code)</option>
+              <option value="branch_code">🏦 支店コード (branch_code)</option>
+              <option value="account_type">🏦 口座種別 (account_type)</option>
+              <option value="account_number">🏦 口座番号 (account_number)</option>
+              <option value="account_holder_kana">🏦 口座名義カナ (account_holder_kana)</option>
+              <option value="password">🔒 パスワード (password)</option>
               <option value="tax_invoice_status">🧾 税務区分・インボイス状況 (tax_invoice_status)</option>
               <option value="invoice_number">🧾 インボイス登録番号 (invoice_number)</option>
+              <option value="business_type">👔 事業者区分 (business_type)</option>
+              <option value="note">📝 備考・自由記入 (note)</option>
               <option value="__custom__">✏️ 自由入力（カスタムキー）</option>
             </select>
 
-            <div id="drawer-custom-key-wrap" style="margin-top: 8px;">
+            <div id="drawer-custom-key-wrap" style="margin-top: 8px; display: none;">
               <input type="text" id="drawer-column-key-input" class="form-control form-control-sm" placeholder="半角英数字（例: company_name）" />
+              <div id="drawer-custom-key-warn" class="drawer-help-text" style="color: #ef4444; font-size: 11px; margin-top: 4px; display: none;">※ 数字のみやタイムスタンプはキーとして使用できません。英文字で入力してください。</div>
             </div>
 
             <div class="drawer-chips-wrap" style="margin-top: 8px;">
               <span class="drawer-chip" data-key="company_name">🏢 法人名・屋号</span>
-              <span class="drawer-chip" data-key="street">📍 住所・番地</span>
               <span class="drawer-chip" data-key="representative_name">👤 代表者・氏名</span>
+              <span class="drawer-chip" data-key="birthdate">🎂 生年月日</span>
               <span class="drawer-chip" data-key="email">✉️ メール</span>
               <span class="drawer-chip" data-key="tel">📞 電話番号</span>
+              <span class="drawer-chip" data-key="street">📍 住所・番地</span>
+              <span class="drawer-chip" data-key="account_number">🏦 口座番号</span>
+              <span class="drawer-chip" data-key="invoice_number">🧾 インボイス</span>
             </div>
           </div>
         </div>
@@ -22323,11 +22525,14 @@
       if (!q) return;
       if (unifyToggle.checked) {
         unifiedBox.style.display = 'block';
-        if (!q.dataKey) {
+        if (!q.dataKey || isGarbageDataKey(q.dataKey)) {
           const defKey = suggestDefaultDataKey(q.title, q.id);
           q.dataKey = defKey;
           customKeyInput.value = defKey;
           syncColumnSelectWithKey(defKey);
+        } else {
+          customKeyInput.value = q.dataKey;
+          syncColumnSelectWithKey(q.dataKey);
         }
       } else {
         unifiedBox.style.display = 'none';
@@ -22340,9 +22545,15 @@
       const q = findQuestionDefById(_activeDrawerQuestionId);
       if (!q) return;
       const val = columnSelect.value;
+      const customWrap = drawer.querySelector('#drawer-custom-key-wrap');
+      const warnEl = drawer.querySelector('#drawer-custom-key-warn');
       if (val === '__custom__') {
+        if (customWrap) customWrap.style.display = 'block';
+        if (warnEl) warnEl.style.display = 'none';
         customKeyInput.focus();
       } else {
+        if (customWrap) customWrap.style.display = 'none';
+        if (warnEl) warnEl.style.display = 'none';
         q.dataKey = val;
         customKeyInput.value = val;
         persistDrawerChanges();
@@ -22352,8 +22563,15 @@
     customKeyInput.addEventListener('input', () => {
       const q = findQuestionDefById(_activeDrawerQuestionId);
       if (!q) return;
-      const val = customKeyInput.value.trim();
-      q.dataKey = val;
+      let val = customKeyInput.value.trim();
+      const warnEl = drawer.querySelector('#drawer-custom-key-warn');
+      if (isGarbageDataKey(val)) {
+        if (warnEl) warnEl.style.display = 'block';
+        q.dataKey = suggestDefaultDataKey(q.title, q.id);
+      } else {
+        if (warnEl) warnEl.style.display = 'none';
+        q.dataKey = val;
+      }
       syncColumnSelectWithKey(val);
       persistDrawerChanges();
     });
@@ -22881,87 +23099,30 @@
 
   function syncColumnSelectWithKey(key) {
     const columnSelect = document.getElementById('drawer-column-select');
+    const customWrap = document.getElementById('drawer-custom-key-wrap');
     if (!columnSelect) return;
     const hasOption = Array.from(columnSelect.options).some(o => o.value === key);
     if (hasOption) {
       columnSelect.value = key;
+      if (customWrap) customWrap.style.display = 'none';
     } else {
       columnSelect.value = '__custom__';
+      if (customWrap) customWrap.style.display = 'block';
     }
   }
 
-  // 🏷️ 設問からタイムスタンプ（数字13桁）を除去したスマートでシンプルな物理カラム名を生成
-  function suggestDefaultDataKey(title, qId = '') {
-    const t = (title || '').trim().toLowerCase();
-    
-    // 法人・事業者
-    if (t.includes('法人名（カナ）') || t.includes('屋号（カナ）') || t.includes('会社名（カナ）')) return 'company_kana';
-    if (t.includes('法人') || t.includes('会社') || t.includes('屋号')) return 'company_name';
-    if (t.includes('代表者名（カナ）')) return 'representative_kana';
-    if (t.includes('代表') || t.includes('氏名') || t.includes('名前')) return 'representative_name';
-    if (t.includes('メール') || t.includes('mail')) return 'email';
-    if (t.includes('事業者区分') || t.includes('区分')) return 'business_type';
-    if (t.includes('電話') || t.includes('tel')) return 'tel';
-    if (t.includes('税務') || t.includes('インボイス登録状況')) return 'tax_invoice_status';
-    if (t.includes('インボイス') || t.includes('登録番号')) return 'invoice_number';
-
-    // 郵送先住所
-    if (t.includes('郵送') || t.includes('送付先')) {
-      if (t.includes('郵便') || t.includes('〒')) return 'mail_zip';
-      if (t.includes('都道府県')) return 'mail_pref';
-      if (t.includes('市区町村')) return 'mail_city';
-      if (t.includes('町名') || t.includes('番地') || t.includes('住所')) return 'mail_street';
-      if (t.includes('建物') || t.includes('部屋')) return 'mail_building';
-    }
-
-    // 基本住所 (法人 / 個人事業主)
-    if (t.includes('郵便') || t.includes('〒')) return 'main_zip';
-    if (t.includes('都道府県')) return 'main_pref';
-    if (t.includes('市区町村')) return 'main_city';
-    if (t.includes('町名') || t.includes('番地') || t.includes('住所')) return 'main_street';
-    if (t.includes('建物') || t.includes('部屋')) return 'main_building';
-
-    // 銀行・口座情報
-    if (t.includes('金融機関コード') || t.includes('銀行コード')) return 'bank_code';
-    if (t.includes('銀行')) return 'bank_name';
-    if (t.includes('支店番号') || t.includes('支店コード')) return 'branch_code';
-    if (t.includes('支店')) return 'branch_name';
-    if (t.includes('口座種別')) return 'account_type';
-    if (t.includes('口座番号')) return 'account_number';
-    if (t.includes('口座名義') || t.includes('名義')) return 'account_holder';
-
-    // 同意事項
-    if (t.includes('活動に関する確認') || t.includes('確認事項')) return 'activity_confirmation';
-    if (t.includes('契約への同意') || t.includes('契約')) return 'contract_agreement';
-    if (t.includes('反社会的勢力') || t.includes('反社')) return 'anti_social_declaration';
-    if (t.includes('個人情報') || t.includes('プライバシー')) return 'privacy_agreement';
-
-    // qIdからクリーンな英文字を抽出（タイムスタンプ数字を除去）
-    if (qId) {
-      const clean = qId.replace(/^q_/, '').replace(/_\d{10,}$/, '').replace(/[^a-zA-Z0-9_]/g, '_');
-      if (clean && clean.length >= 3 && clean !== 'field') return clean;
-    }
-
-    return 'custom_field';
-  }
-  window.suggestDefaultDataKey = suggestDefaultDataKey;
-
+  // 🏷️ 設問からタイムスタンプ数字を完全に排除したスマートで安全な物理カラム名判定
   function getEffectiveCleanDataKey(q) {
-    if (!q) return 'item';
-    if (q.dataKey && q.dataKey.trim()) {
+    if (!q) return 'custom_field';
+    if (q.dataKey && typeof q.dataKey === 'string' && q.dataKey.trim()) {
       const k = q.dataKey.trim();
-      // 13桁タイムスタンプ数字が含まれている旧キーの場合はクリーンアップ
-      if (/_\d{10,}/.test(k) || /^col_q_/.test(k)) {
-        const cleaned = k.replace(/^col_/, '').replace(/^q_/, '').replace(/_\d{10,}$/, '');
-        if (cleaned && cleaned !== 'item') return cleaned;
-      } else {
+      if (!isGarbageDataKey(k)) {
         return k;
       }
     }
     const suggested = suggestDefaultDataKey(q.title, q.id);
-    if (suggested && suggested !== 'custom_field') return suggested;
-    const cleanId = (q.id || 'item').replace(/^col_/, '').replace(/^q_/, '').replace(/_\d{10,}$/, '').replace(/[^a-zA-Z0-9_]/g, '_');
-    return cleanId || 'item';
+    if (suggested && !isGarbageDataKey(suggested)) return suggested;
+    return 'custom_field';
   }
   window.getEffectiveCleanDataKey = getEffectiveCleanDataKey;
 
@@ -23160,6 +23321,13 @@
     const unifyToggle = document.getElementById('drawer-unify-column-toggle');
     const unifiedBox = document.getElementById('drawer-column-unified-box');
     const customKeyInput = document.getElementById('drawer-column-key-input');
+
+    // 🚀 不正なキー（タイムスタンプ・数字列等）が残っていたら即座に正常化
+    if (q.dataKey && isGarbageDataKey(q.dataKey)) {
+      q.dataKey = suggestDefaultDataKey(q.title, q.id);
+      persistDrawerChanges();
+    }
+
     unifyToggle.checked = !!q.dataKey;
     unifiedBox.style.display = q.dataKey ? 'block' : 'none';
     customKeyInput.value = q.dataKey || '';
@@ -23369,7 +23537,7 @@
     if (!q || !advice) return;
 
     // 1. カラム統一
-    if (advice.unifyColumn && advice.dataKey) {
+    if (advice.unifyColumn && advice.dataKey && !isGarbageDataKey(advice.dataKey)) {
       q.dataKey = advice.dataKey;
       const unifyToggle = document.getElementById('drawer-unify-column-toggle');
       const unifiedBox = document.getElementById('drawer-column-unified-box');
