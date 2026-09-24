@@ -20302,6 +20302,34 @@
   }
   window.sanitizeFormBranchingLogic = sanitizeFormBranchingLogic;
 
+  // 🛡️ コピペ等で混入した不要なHTMLゴミタグ（span, font, div, p等）を全フィールドから自動一掃・正規化
+  function cleanStrayTagsFromObject(obj) {
+    if (!obj || typeof obj !== 'object') return;
+    Object.keys(obj).forEach(key => {
+      if (typeof obj[key] === 'string') {
+        let s = obj[key];
+        s = s
+          .replace(/<span\b[^>]*?style="[^"]*?text-decoration:\s*[^;]*underline[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<u>$1</u>')
+          .replace(/<span\b[^>]*?style="[^"]*?font-weight:\s*[^;]*(?:bold|[6-9]00)[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<strong>$1</strong>')
+          .replace(/<span\b[^>]*?style="[^"]*?font-style:\s*italic[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<em>$1</em>')
+          .replace(/<\/?(?:span|font|div|p|header|section|article|bdo|bdi|label)\b[^>]*>/gi, '');
+        obj[key] = s;
+      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        cleanStrayTagsFromObject(obj[key]);
+      }
+    });
+  }
+  window.cleanStrayTagsFromObject = cleanStrayTagsFromObject;
+
+  // 🛡️ 入力欄やテキストエリアへの貼り付け等で混入した余計なHTMLタグを即座にサニタイズ
+  document.addEventListener('input', (e) => {
+    if (e.target && (e.target.id === 'editor-section-desc' || e.target.classList.contains('q-desc-input') || e.target.classList.contains('q-title-input'))) {
+      if (/<\/?(?:span|font|div|p)\b/i.test(e.target.value)) {
+        e.target.value = e.target.value.replace(/<\/?(?:span|font|div|p|header|section|article|bdo|bdi|label)\b[^>]*>/gi, '');
+      }
+    }
+  }, true);
+
   // =========================================================================
   // ☁️ クラウド（Supabase）自動同期モジュール (全ブラウザ・端末共有)
   // =========================================================================
@@ -20382,6 +20410,7 @@
     });
 
     sanitizeFormBranchingLogic(forms);
+    cleanStrayTagsFromObject(forms);
 
     // 最新の forms を localStorage にも反映
     const currentJson = JSON.stringify(forms);
@@ -20511,9 +20540,11 @@
       const purgedKeywords = ['お客様フィードバック', '管理者用のアカウント作成', '管理者権限のアカウント作成'];
       if (Array.isArray(localForms)) {
         localForms = localForms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
+        cleanStrayTagsFromObject(localForms);
       }
       if (Array.isArray(cloudForms)) {
         cloudForms = cloudForms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
+        cleanStrayTagsFromObject(cloudForms);
       }
 
       const localQCount = countFormsQuestions(localForms);
@@ -20531,6 +20562,7 @@
       if (cloudForms !== null && Array.isArray(cloudForms) && (cloudForms.length > 0 || localForms.length === 0)) {
         console.log('[Cloud Sync] Loaded', cloudForms.length, 'forms from cloud. Total questions:', cloudQCount);
         sanitizeFormBranchingLogic(cloudForms);
+        cleanStrayTagsFromObject(cloudForms);
         
         // クラウドの定義を正として localStorage および window.U へ同期
         Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(cloudForms));

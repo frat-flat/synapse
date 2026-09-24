@@ -1365,8 +1365,17 @@
         // リッチテキスト・書式・リンク化ヘルパー（太字・斜体・下線・Markdownリンク・生URL対応）
         function renderRichTextWithLinks(text) {
           if (!text) return '';
+
+          // 0. 不要なHTMLタグ（span, font, div, p 等）のクリーンアップ＆装飾の正規化
+          let cleaned = String(text);
+          cleaned = cleaned
+            .replace(/<span\b[^>]*?style="[^"]*?text-decoration:\s*[^;]*underline[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<u>$1</u>')
+            .replace(/<span\b[^>]*?style="[^"]*?font-weight:\s*[^;]*(?:bold|[6-9]00)[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<strong>$1</strong>')
+            .replace(/<span\b[^>]*?style="[^"]*?font-style:\s*italic[^"]*?"[^>]*?>(.*?)<\/span>/gi, '<em>$1</em>')
+            .replace(/<\/?(?:span|font|div|p|header|section|article|bdo|bdi|label)\b[^>]*>/gi, '');
+
           // 1. HTMLエスケープ（XSS対策）
-          let escaped = text
+          let escaped = cleaned
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
@@ -1381,6 +1390,9 @@
 
           // 斜体: <em>...</em>, <i>...</i>
           escaped = escaped.replace(/&lt;(em|i)\b.*?&gt;(.*?)&lt;\/\1&gt;/gi, '<em>$2</em>');
+
+          // 万が一残ったエスケープ済み span/font 等のゴミタグを除去
+          escaped = escaped.replace(/&lt;\/?(?:span|font|div|p)\b.*?&gt;/gi, '');
 
           // 3. 太字: **...**
           escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
