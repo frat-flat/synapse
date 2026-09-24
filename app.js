@@ -4579,7 +4579,7 @@ function ensureStandardTablesInState() {
     if (t.isCustomTable || (!t.isFormDedicatedTable && !(t.id && t.id.startsWith('table_form_')) && !t.formTitle)) {
       return true; // フォーム専用テーブル以外はそのまま保持
     }
-    const formKey = t.formId || t.sourceFormId || (t.formTitle && t.formTitle.trim()) || t.name;
+    const formKey = (t.isTestTable ? 'test_' : 'prod_') + (t.formId || t.sourceFormId || (t.formTitle && t.formTitle.trim()) || t.name);
     if (!formKey) return true;
     if (seenFormKeys.has(formKey)) {
       const existing = seenFormKeys.get(formKey);
@@ -18927,6 +18927,21 @@ function setupEventListeners() {
   // カスタムフォームの送信イベントを監視するメッセージリスナーを追加
   window.addEventListener('message', handleFormSubmitMessage);
 
+  // 🌐 別タブ（スタンドアローン）からのフォーム送信もリアルタイム受信する BroadcastChannel
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      const formBc = new BroadcastChannel('synapse_form_events');
+      formBc.onmessage = (e) => {
+        if (e && e.data) {
+          console.log('[Synapse BroadcastChannel] Received form submit event from another tab:', e.data);
+          handleFormSubmitMessage({ data: e.data, origin: window.location.origin });
+        }
+      };
+    } catch(bcErr) {
+      console.warn('[BroadcastChannel Init Error]', bcErr);
+    }
+  }
+
   // 🏷️ ドロップダウン設定サイドバーイベントの初期化
   setupValidationSidebarEvents();
 }
@@ -24182,18 +24197,109 @@ function handleFormSubmitMessage(event) {
       t && (t.id === testTableId || (t.isTestTable && (t.formId === formDef.id || t.sourceFormId === formDef.id || t.name === `🧪 [テスト] ${effectiveFormTitle}` || t.sourceProdFormTitle === effectiveFormTitle)))
     );
 
+    // 設問定義・questionMetaからテストテーブルのカラム一覧を完全構築するヘルパー
+    const buildTestColumns = (fDef, qMeta, submitValues) => {
+      const cols = [];
+      const seenColKeys = new Set();
+
+      // 1. システムメタデータ列を先頭に整然と配置
+      const sysCols = [
+        { id: 'col_status', label: 'ステータス', name: 'ステータス', type: 'text', width: 110 },
+        { id: 'col_submit_type', label: '送信種別', name: '送信種別', type: 'text', width: 140 },
+        { id: 'col_registered_at', label: '回答日時 / 登録日時', name: '回答日時 / 登録日時', type: 'text', width: 160 }
+      ];
+      sysCols.forEach(sc => {
+        cols.push(sc);
+        seenColKeys.add(sc.name);
+      });
+
+      // 2. 設問メタデータ（questionMeta）またはフォーム設問ツリーから全設問を順序どおり追加
+      const allQuestions = [];
+      const metaList = Array.isArray(qMeta) && qMeta.length > 0 ? qMeta : (Array.isArray(questionMetaList) ? questionMetaList : []);
+      if (metaList.length > 0) {
+        metaList.forEach(qm => {
+          if (qm && (qm.title || qm.dataKey)) {
+            allQuestions.push({
+              title: qm.title || qm.dataKey,
+              dataKey: qm.dataKey || '',
+              type: qm.type || 'text',
+              required: !!qm.required
+            });
+          }
+        });
+      } else if (fDef && Array.isArray(fDef.sections)) {
+        fDef.sections.forEach(sec => {
+          (sec.questions || []).forEach(q => {
+            if (q && (q.title || q.dataKey)) {
+              allQuestions.push({
+                title: q.title || q.dataKey,
+                dataKey: q.dataKey || '',
+                type: q.type || 'text',
+                required: !!q.required
+              });
+            }
+          });
+        });
+      }
+
+      allQuestions.forEach(q => {
+        const colName = (q.title || q.dataKey).trim();
+        if (colName && !seenColKeys.has(colName)) {
+          seenColKeys.add(colName);
+          let colType = 'text';
+          if (q.type === 'date') colType = 'date';
+          else if (q.type === 'select' || q.type === 'radio') colType = 'select';
+          else if (q.type === 'number') colType = 'number';
+          cols.push({
+            id: 'col_' + Math.random().toString(36).substr(2, 9),
+            label: colName,
+            name: colName,
+            type: colType,
+            dataKey: q.dataKey || null,
+            required: !!q.required,
+            width: 140
+          });
+        }
+      });
+
+      // 3. 送信データ内に存在するが設問リストにない任意のキーも安全に追加
+      if (submitValues) {
+        Object.keys(submitValues).forEach(key => {
+          if (!seenColKeys.has(key)) {
+            seenColKeys.add(key);
+            cols.push({
+              id: 'col_' + Math.random().toString(36).substr(2, 9),
+              label: key,
+              name: key,
+              type: 'text',
+              width: 130
+            });
+          }
+        });
+      }
+
+      // 4. 末尾システム列
+      ['再開用URL', '回答ID', 'master_id'].forEach(k => {
+        if (!seenColKeys.has(k)) {
+          seenColKeys.add(k);
+          cols.push({
+            id: 'col_' + Math.random().toString(36).substr(2, 9),
+            label: k,
+            name: k,
+            type: 'text',
+            width: 130
+          });
+        }
+      });
+
+      return cols;
+    };
+
     if (!targetTable) {
       isNewTableCreated = true;
-      const columns = Object.keys(data).map((key, idx) => ({
-        id: 'col_' + Math.random().toString(36).substr(2, 9),
-        label: key,
-        name: key,
-        type: 'text',
-        required: idx === 0
-      }));
-
+      const columns = buildTestColumns(formDef, event.data.questionMeta || questionMetaList, data);
       const defaultWidths = {};
-      columns.forEach(col => { defaultWidths[col.id] = 120; });
+      columns.forEach(col => { defaultWidths[col.id] = col.width || 130; });
 
       targetTable = {
         id: testTableId,
@@ -24224,6 +24330,32 @@ function handleFormSubmitMessage(event) {
       if (!targetTable.parentMenuId || targetTable.parentMenuId === 'root') {
         targetTable.parentMenuId = 'forms-accordion';
       }
+
+      // 🔄 最新の編集内容（最新ドラフト）に合わせてテストテーブルのカラム設定を完全追従・再構築
+      const latestExpectedCols = buildTestColumns(formDef, event.data.questionMeta || questionMetaList, data);
+      const existingColMap = new Map();
+      (targetTable.columns || []).forEach(c => {
+        if (c) existingColMap.set(c.name || c.label, c);
+      });
+      const mergedCols = latestExpectedCols.map(newCol => {
+        if (existingColMap.has(newCol.name)) {
+          const old = existingColMap.get(newCol.name);
+          return { ...newCol, id: old.id, type: newCol.type || old.type };
+        }
+        return newCol;
+      });
+      // 以前のテスト回答でデータが存在する古いカラムも消失させず末尾に保持
+      (targetTable.columns || []).forEach(oldCol => {
+        const oldName = oldCol.name || oldCol.label;
+        if (!mergedCols.some(mc => mc.name === oldName)) {
+          mergedCols.push(oldCol);
+        }
+      });
+      targetTable.columns = mergedCols;
+      targetTable.visibleColumns = mergedCols.map(c => c.id);
+      const colWidths = targetTable.columnWidths || {};
+      mergedCols.forEach(c => { if (!colWidths[c.id]) colWidths[c.id] = c.width || 130; });
+      targetTable.columnWidths = colWidths;
     }
   } else {
     // 本番用テーブルの特定・自動生成
@@ -24448,10 +24580,8 @@ function handleFormSubmitMessage(event) {
     }
   }
 
-  // もしカスタムテーブルが新設された場合は、サイドメニューを再描画する
-  if (isNewTableCreated) {
-    renderCustomTableList();
-  }
+  // フォームテーブル一覧およびサイドバー表示を最新状態に再描画
+  renderCustomTableList();
 
   // 現在表示中のカスタムテーブルがこのテーブルであれば、表示をリアルタイム更新する
   if (state.currentView === 'custom-table-screen' && state.activeCustomTableId === targetTable.id) {

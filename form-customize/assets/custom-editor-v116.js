@@ -20,7 +20,14 @@
         let forms = JSON.parse(raw);
         if (Array.isArray(forms)) {
           const clean = forms.filter(f => f && !purgedKeywords.some(p => (f.title || '').includes(p)));
-          if (clean.length !== forms.length) {
+          let slugUpdated = false;
+          clean.forEach((f, idx) => {
+            if (f && !f.slug) {
+              f.slug = generateSmartFormSlug(f.title || '無題のフォーム', clean, f.id || `form_${idx}`);
+              slugUpdated = true;
+            }
+          });
+          if (clean.length !== forms.length || slugUpdated) {
             Storage.prototype.setItem.call(localStorage, 'form_customize_all_forms', JSON.stringify(clean));
           }
         }
@@ -832,6 +839,7 @@
         saveRecentTemplate(template);
       }
 
+      defaultSchema.slug = generateSmartFormSlug(defaultSchema.title, allForms, defaultSchema.id);
       allForms.push(defaultSchema);
       localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
       
@@ -5240,6 +5248,7 @@
       const today = new Date();
       defaultSchema.lastModified = `${today.getHours().toString().padStart(2, '0')}:${today.getMinutes().toString().padStart(2, '0')}`;
 
+      defaultSchema.slug = generateSmartFormSlug(defaultSchema.title, allForms, defaultSchema.id);
       allForms.push(defaultSchema);
       localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
       
@@ -17905,6 +17914,76 @@
     }
   }
 
+  // 🔗 フォーム回収名目（タイトル）に応じたスマートURLスラッグ自動生成
+  function generateSmartFormSlug(title, existingForms, currentFormId) {
+    if (!title || typeof title !== 'string') title = 'form';
+    let clean = title
+      .replace(/【[^】]*】/g, '')
+      .replace(/\[[^\]]*\]/g, '')
+      .replace(/（[^）]*）/g, '')
+      .replace(/\([^)]*\)/g, '')
+      .replace(/株式会社wayway/g, '')
+      .replace(/株式会社\S+/g, '')
+      .trim();
+
+    const dictionary = [
+      { keys: ['紹介代理店', '代理店', 'エージェンシー'], slug: 'agency' },
+      { keys: ['パートナー', '提携'], slug: 'partner' },
+      { keys: ['ジョブオーダー', 'ジョブ', '発注', '案件'], slug: 'job-order' },
+      { keys: ['アンケート', 'ヒアリング', '質問'], slug: 'survey' },
+      { keys: ['フィードバック', 'ご意見', 'レビュー'], slug: 'feedback' },
+      { keys: ['問い合わせ', 'お問合せ', 'ご相談', '連絡'], slug: 'contact' },
+      { keys: ['申込', 'エントリー', '応募', '申請'], slug: 'application' },
+      { keys: ['登録', 'アカウント', '会員', 'オンボーディング'], slug: 'registration' },
+      { keys: ['見積', '試算', 'ヨサンダス'], slug: 'estimate' },
+      { keys: ['契約', '規約', '同意'], slug: 'contract' }
+    ];
+
+    const matchedParts = [];
+    dictionary.forEach(entry => {
+      if (entry.keys.some(k => clean.includes(k))) {
+        if (!matchedParts.includes(entry.slug)) {
+          matchedParts.push(entry.slug);
+        }
+      }
+    });
+
+    let baseSlug = '';
+    if (matchedParts.length > 0) {
+      baseSlug = matchedParts.join('-');
+    } else {
+      const asciiOnly = clean.replace(/[^a-zA-Z0-9\s_-]/g, '').trim().toLowerCase().replace(/[\s_]+/g, '-');
+      if (asciiOnly.length >= 3) {
+        baseSlug = asciiOnly;
+      } else {
+        const simpleHash = Math.abs(clean.split('').reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) | 0, 0)).toString(36).substr(0, 5);
+        baseSlug = `form-${simpleHash}`;
+      }
+    }
+
+    baseSlug = baseSlug.replace(/^-+|-+$/g, '').toLowerCase() || 'form';
+
+    let candidate = baseSlug;
+    let counter = 2;
+    const forms = Array.isArray(existingForms) ? existingForms : [];
+    while (forms.some(f => f && f.slug === candidate && f.id !== currentFormId)) {
+      candidate = `${baseSlug}-${counter}`;
+      counter++;
+    }
+    return candidate;
+  }
+  window.generateSmartFormSlug = generateSmartFormSlug;
+
+  function ensureFormSlug(formObj, formsList, formIdx) {
+    if (!formObj) return 'form';
+    if (!formObj.slug) {
+      const fid = formObj.id || `form_${formIdx}`;
+      formObj.slug = generateSmartFormSlug(formObj.title || '無題のフォーム', formsList, fid);
+    }
+    return formObj.slug;
+  }
+  window.ensureFormSlug = ensureFormSlug;
+
   function getPublicFormShareUrl(formIndex, shorten = true, env = 'production') {
     if (typeof window.flushFormSave === 'function') window.flushFormSave();
     const origin = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : '';
@@ -17928,19 +18007,24 @@
     const { formObj, idx } = getCurrentFormObject(formIndex);
     const formId = formObj && formObj.id ? formObj.id : `form_${idx}`;
     
+    // スラッグを解決（初回未設定時のみ自動初期採番し、以降はロック・固定化）
+    let allFormsForSlug = [];
+    try { allFormsForSlug = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]'); } catch(e) {}
+    const slug = (formObj && formObj.slug) ? formObj.slug : ensureFormSlug(formObj, allFormsForSlug, idx);
+
     // バックグラウンドでクラウド（Supabase）への保存・即時同期を実行
     try { syncFormsToCloud(null, true); } catch(e) {}
 
     const isTest = (env === 'test');
     const envParam = isTest ? (shorten ? '?env=test' : '&env=test') : '';
 
-    // 短縮URL (Google Forms短縮URL風: 例 https://synapse-wayway.vercel.app/f/0)
+    // 短縮URL (Google Forms風のスマート短縮URL: 例 https://synapse-wayway.vercel.app/f/agency-application)
     if (shorten) {
-      return `${origin}/f/${idx}${envParam}`;
+      return `${origin}/f/${slug}${envParam}`;
     }
 
-    // 完全URL (例: https://synapse-wayway.vercel.app/form-customize/view.html?id=form_0)
-    return `${origin}${viewPath}?id=${encodeURIComponent(formId)}&form_idx=${idx}${envParam}`;
+    // 完全URL (例: https://synapse-wayway.vercel.app/form-customize/view.html?id=agency-application)
+    return `${origin}${viewPath}?id=${encodeURIComponent(slug)}&form_idx=${idx}${envParam}`;
   }
 
   function showGlobalShareToast(msg) {
@@ -19378,6 +19462,14 @@
     const testStatusBadge = document.getElementById('share-test-status-badge');
     const testToolsArea = document.getElementById('share-test-tools-area');
     const clearTestBtn = document.getElementById('btn-clear-test-data');
+    const slugInput = document.getElementById('share-modal-slug-input');
+    const btnSaveSlug = document.getElementById('btn-save-slug');
+    const btnRegenerateSlug = document.getElementById('btn-regenerate-slug');
+
+    let allFormsForSlug = [];
+    try { allFormsForSlug = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]'); } catch(e) {}
+    const curSlug = (formObj && formObj.slug) ? formObj.slug : ensureFormSlug(formObj, allFormsForSlug, idx);
+    if (slugInput) slugInput.value = curSlug;
 
     // URL更新ヘルパー
     const refreshModalUrl = () => {
@@ -19385,7 +19477,63 @@
       const url = getPublicFormShareUrl(_currentShareModalFormIndex, isShorten, _currentShareModalEnv);
       if (inputEl) inputEl.value = url;
       updateShareModalOpenTabBtn(url);
+
+      const { formObj: curF } = getCurrentFormObject(_currentShareModalFormIndex);
+      if (slugInput && curF && document.activeElement !== slugInput) {
+        slugInput.value = curF.slug || '';
+      }
     };
+
+    // 🔗 URL識別名（スラッグ）保存ボタン
+    if (btnSaveSlug && !btnSaveSlug._hooked) {
+      btnSaveSlug._hooked = true;
+      btnSaveSlug.addEventListener('click', (e) => {
+        e.preventDefault();
+        const rawVal = slugInput ? slugInput.value.trim().toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '-') : '';
+        if (!rawVal) {
+          alert('URL識別名（スラッグ）を入力してください。');
+          return;
+        }
+        const { formObj: curF } = getCurrentFormObject(_currentShareModalFormIndex);
+        if (curF) {
+          curF.slug = rawVal;
+          let allForms = [];
+          try { allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]'); } catch(err) {}
+          if (allForms[_currentShareModalFormIndex]) {
+            allForms[_currentShareModalFormIndex].slug = rawVal;
+            localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+          }
+          if (window.G) window.G.slug = rawVal;
+          try { syncFormsToCloud(null, true); } catch(err) {}
+          refreshModalUrl();
+          showGlobalShareToast(`URL識別名を「/f/${rawVal}」に保存・更新しました！`);
+        }
+      });
+    }
+
+    // 🔄 タイトルからURL識別名再生成ボタン
+    if (btnRegenerateSlug && !btnRegenerateSlug._hooked) {
+      btnRegenerateSlug._hooked = true;
+      btnRegenerateSlug.addEventListener('click', (e) => {
+        e.preventDefault();
+        const { formObj: curF } = getCurrentFormObject(_currentShareModalFormIndex);
+        if (curF) {
+          let allForms = [];
+          try { allForms = JSON.parse(localStorage.getItem('form_customize_all_forms') || '[]'); } catch(err) {}
+          const newSlug = generateSmartFormSlug(curF.title || '無題のフォーム', allForms, curF.id);
+          curF.slug = newSlug;
+          if (slugInput) slugInput.value = newSlug;
+          if (allForms[_currentShareModalFormIndex]) {
+            allForms[_currentShareModalFormIndex].slug = newSlug;
+            localStorage.setItem('form_customize_all_forms', JSON.stringify(allForms));
+          }
+          if (window.G) window.G.slug = newSlug;
+          try { syncFormsToCloud(null, true); } catch(err) {}
+          refreshModalUrl();
+          showGlobalShareToast(`現在のタイトルに合わせて「/f/${newSlug}」を再生成しました！`);
+        }
+      });
+    }
 
     // タブ表示切り替えヘルパー
     const applyEnvTab = (env) => {
@@ -19455,10 +19603,17 @@
               formTitle: formTitle
             }, '*');
           }
-          // ローカルストレージのテストデータも消去
+          // ローカルストレージのテストデータおよびテスト専用テーブルを消去
           try {
             const testKey = `form_responses_test_${formObj.id || 'default'}`;
             localStorage.removeItem(testKey);
+            let customTables = JSON.parse(localStorage.getItem('synapse_custom_tables') || '[]');
+            const testTbl = customTables.find(t => t && t.isTestTable && (t.formId === formObj.id || t.name.includes(formTitle)));
+            if (testTbl) {
+              testTbl.rows = [];
+              localStorage.setItem('synapse_custom_tables', JSON.stringify(customTables));
+              localStorage.setItem(`synapse_table_${testTbl.id}`, JSON.stringify(testTbl));
+            }
           } catch(err) {}
           showGlobalShareToast('テスト送信データをリセットしました！');
         }

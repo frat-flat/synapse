@@ -1811,7 +1811,7 @@
             if (!Array.isArray(list) || list.length === 0) return null;
             let target = null;
             if (fid) {
-              target = list.find(f => f && (f.id === fid || f.formId === fid));
+              target = list.find(f => f && (f.slug === fid || f.customUrl === fid || f.id === fid || f.formId === fid));
               if (!target && typeof fid === 'string' && fid.startsWith('form_')) {
                 const subIdx = parseInt(fid.replace('form_', ''), 10);
                 if (!isNaN(subIdx) && list[subIdx]) target = list[subIdx];
@@ -7839,6 +7839,7 @@
         });
 
         function submitForm(forcePartial = null) {
+        window.submitForm = submitForm;
           // 🛡️ 同上データ保存絶対保証: 送信直前に同上項目の値を100%確実に解決・セット
           ensureAllSameAsAboveValuesSynced();
 
@@ -8033,27 +8034,118 @@
             });
           }
 
-          // 1. 親ウィンドウ (iframe) への postMessage 送信（常に各フォーム専用の独立テーブルへ送信）
+          const submitPayload = {
+            type: 'FORM_SUBMIT',
+            formTitle: effectiveFormTitle,
+            formId: formDefinition.id,
+            formDefinition: formDefinition,
+            questionMeta: questionMeta,
+            createDedicatedTable: true,
+            targetTableId: formDefinition.targetTableId || 'dedicated',
+            targetTableType: 'dedicated',
+            data: submitData,
+            isTemporary: false,
+            isPartialSubmit: isPartial,
+            rowId: rowId,
+            registrationCode: confirmedCode,
+            currentSectionId: currentSectionId,
+            nextSectionId: nextSecId,
+            env: window.IS_TEST_ENV ? 'test' : 'production',
+            branch: window.IS_TEST_ENV ? 'test' : 'main'
+          };
+
+          // 1-1. 親ウィンドウ (iframe) への postMessage 送信
           if (window.parent && window.parent !== window) {
-            window.parent.postMessage({
-              type: 'FORM_SUBMIT',
-              formTitle: effectiveFormTitle,
-              formId: formDefinition.id,
-              formDefinition: formDefinition,
-              questionMeta: questionMeta,
-              createDedicatedTable: true,
-              targetTableId: formDefinition.targetTableId || 'dedicated',
-              targetTableType: 'dedicated',
-              data: submitData,
-              isTemporary: false,
-              isPartialSubmit: isPartial,
-              rowId: rowId,
-              registrationCode: confirmedCode,
-              currentSectionId: currentSectionId,
-              nextSectionId: nextSecId,
-              env: window.IS_TEST_ENV ? 'test' : 'production',
-              branch: window.IS_TEST_ENV ? 'test' : 'main'
-            }, '*');
+            window.parent.postMessage(submitPayload, '*');
+          }
+          // 1-2. オープナー（別タブ元）への postMessage 送信
+          if (window.opener && !window.opener.closed) {
+            try { window.opener.postMessage(submitPayload, '*'); } catch(e) {}
+          }
+          // 1-3. 同一ブラウザの他タブ（Synapse本体画面）へ同報する BroadcastChannel
+          if (typeof BroadcastChannel !== 'undefined') {
+            try {
+              const bc = new BroadcastChannel('synapse_form_events');
+              bc.postMessage(submitPayload);
+            } catch(e) {}
+          }
+
+          // 1-4. テスト送信時：LocalStorage上のテスト専用テーブル（table_test_...）を直接生成・更新（オフライン・別タブ即時保証）
+          if (window.IS_TEST_ENV) {
+            try {
+              let curCustomTables = JSON.parse(localStorage.getItem('synapse_custom_tables') || '[]');
+              const testTblId = 'table_test_' + (formDefinition.id || 'default');
+              let tTable = curCustomTables.find(t => t && (t.id === testTblId || (t.isTestTable && t.formId === formDefinition.id)));
+
+              // 設問定義からカラム一覧を生成
+              const testCols = [
+                { id: 'col_status', label: 'ステータス', name: 'ステータス', type: 'text' },
+                { id: 'col_submit_type', label: '送信種別', name: '送信種別', type: 'text' },
+                { id: 'col_registered_at', label: '回答日時 / 登録日時', name: '回答日時 / 登録日時', type: 'text' }
+              ];
+              const seenColKeys = new Set(['ステータス', '送信種別', '回答日時 / 登録日時']);
+              if (Array.isArray(questionMeta)) {
+                questionMeta.forEach(qm => {
+                  const qTitle = (qm.title || qm.dataKey || '').trim();
+                  if (qTitle && !seenColKeys.has(qTitle)) {
+                    seenColKeys.add(qTitle);
+                    testCols.push({ id: 'col_' + Math.random().toString(36).substr(2, 9), label: qTitle, name: qTitle, type: qm.type || 'text', dataKey: qm.dataKey || null });
+                  }
+                });
+              }
+              Object.keys(submitData).forEach(k => {
+                if (!seenColKeys.has(k)) {
+                  seenColKeys.add(k);
+                  testCols.push({ id: 'col_' + Math.random().toString(36).substr(2, 9), label: k, name: k, type: 'text' });
+                }
+              });
+
+              if (!tTable) {
+                tTable = {
+                  id: testTblId,
+                  formId: formDefinition.id || null,
+                  sourceFormId: formDefinition.id || null,
+                  sourceProdFormTitle: effectiveFormTitle,
+                  name: `🧪 [テスト] ${effectiveFormTitle}`,
+                  formTitle: `🧪 [テスト] ${effectiveFormTitle}`,
+                  isTestTable: true,
+                  isFormDedicatedTable: true,
+                  parentMenuId: 'forms-accordion',
+                  columns: testCols,
+                  visibleColumns: testCols.map(c => c.id),
+                  rows: []
+                };
+                curCustomTables.push(tTable);
+              } else {
+                testCols.forEach(tc => {
+                  if (!tTable.columns.some(c => (c.name || c.label) === tc.name)) {
+                    tTable.columns.push(tc);
+                    if (tTable.visibleColumns) tTable.visibleColumns.push(tc.id);
+                  }
+                });
+              }
+
+              const newRow = {
+                id: rowId,
+                'ステータス': isPartial ? '途中送信（コード確定済）' : '回答完了',
+                '送信種別': '🧪 テスト送信 (test branch)',
+                '回答日時 / 登録日時': new Date().toLocaleString('ja-JP'),
+                ...submitData
+              };
+              if (!tTable.rows) tTable.rows = [];
+              const existRowIdx = tTable.rows.findIndex(r => r.id === rowId);
+              if (existRowIdx >= 0) {
+                tTable.rows[existRowIdx] = { ...tTable.rows[existRowIdx], ...newRow };
+              } else {
+                tTable.rows.unshift(newRow);
+              }
+
+              localStorage.setItem('synapse_custom_tables', JSON.stringify(curCustomTables));
+              localStorage.setItem(`synapse_table_${tTable.id}`, JSON.stringify(tTable));
+              localStorage.setItem('synapse_table_updated_event', Date.now().toString());
+            } catch(locErr) {
+              console.warn('[View TestTable Local Direct Save]', locErr);
+            }
           }
 
           // 🌐 Supabaseクラウド上の物理テーブル（例: form_yosandas）への自動直接書き込み
@@ -8222,8 +8314,8 @@
                   <div style="margin-top: 14px; padding: 12px 16px; background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 8px; font-size: 0.82rem; color: #92400e; font-weight: 600; text-align: left; display: flex; align-items: flex-start; gap: 10px;">
                     <span style="font-size: 1.2rem;">🛡️</span>
                     <div>
-                      <div style="font-weight: 700; color: #b45309; margin-bottom: 2px;">本番データ完全隔離保証 (test mode)</div>
-                      <div>テスト送信モードのため、データベース上の本番テーブル・テストテーブルへの書き込みは一切行われていません。本番データに影響を与えることなく安全に動作検証いただけます。</div>
+                      <div style="font-weight: 700; color: #b45309; margin-bottom: 2px;">本番データ完全隔離保護 (test mode)</div>
+                      <div>テスト送信された回答は「🧪 [テスト] フォーム名」専用テーブルへ記録されました。本番データベース（Supabase）は一切汚染されず安全に隔離されています。</div>
                     </div>
                   </div>
                 `;
@@ -8428,6 +8520,7 @@
           successCard.style.display = 'block';
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+        window.submitForm = submitForm;
 
         btnSubmitAnother.addEventListener('click', () => {
           successCard.style.display = 'none';

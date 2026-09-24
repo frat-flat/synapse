@@ -65,7 +65,7 @@ module.exports = async (req, res) => {
       // 特定フォームの抽出（id または form_idx）
       let targetForm = null;
       if (id) {
-        targetForm = allForms.find(f => f && (f.id === id || f.formId === id));
+        targetForm = allForms.find(f => f && (f.slug === id || f.customUrl === id || f.id === id || f.formId === id));
         if (!targetForm && typeof id === 'string' && id.startsWith('form_')) {
           const subIdx = parseInt(id.replace('form_', ''), 10);
           if (!isNaN(subIdx) && allForms[subIdx]) {
