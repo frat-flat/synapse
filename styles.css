@@ -3214,17 +3214,17 @@ body:not(.logged-in) .login-layout {
   box-shadow: var(--shadow-sm);
 }
 
-/* メインヘッダー自体の極限スリム化 (省スペース・コンパクト化: 縦幅を大幅圧縮) */
+/* メインヘッダー自体のサイズ調整 (上下幅を1.5倍に拡大し、視認性・押しやすさを向上) */
 .main-header {
-  padding: 0.08rem 0.5rem !important;
+  padding: 0.2rem 0.65rem !important;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-xs, 3px);
+  border-radius: var(--radius-sm, 4px);
   margin-top: 0 !important;
-  margin-bottom: 0.1rem !important;
-  height: 24px !important;
-  min-height: 24px !important;
-  max-height: 24px !important;
+  margin-bottom: 0.15rem !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
   position: relative;
   z-index: 100;
   overflow: visible !important;
@@ -3243,12 +3243,12 @@ body.logged-in .main-header {
   justify-content: space-between !important;
   width: 100% !important;
   height: 100% !important;
-  gap: 0.4rem !important;
+  gap: 0.5rem !important;
 }
 
 #main-header-title {
   font-weight: 700 !important;
-  font-size: 0.75rem !important;
+  font-size: 0.85rem !important;
   line-height: 1 !important;
   color: var(--text-primary);
 }
@@ -3256,13 +3256,13 @@ body.logged-in .main-header {
 #sync-status-indicator {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 0.2rem !important;
-  font-size: 0.62rem !important;
+  gap: 0.25rem !important;
+  font-size: 0.72rem !important;
   font-weight: 600 !important;
-  padding: 0 0.3rem !important;
-  height: 17px !important;
+  padding: 0 0.45rem !important;
+  height: 25px !important;
   line-height: 1 !important;
-  border-radius: 2px !important;
+  border-radius: var(--radius-sm, 3px) !important;
   border: 1px solid var(--border-color) !important;
   background: var(--bg-surface-elevated) !important;
   color: var(--text-secondary) !important;
@@ -3270,34 +3270,40 @@ body.logged-in .main-header {
 }
 
 #sync-status-icon {
-  font-size: 0.55rem !important;
+  font-size: 0.65rem !important;
   line-height: 1 !important;
 }
 
 #header-add-sticky-btn {
-  padding: 0 0.35rem !important;
-  font-size: 0.68rem !important;
+  padding: 0 0.6rem !important;
+  font-size: 0.82rem !important;
   font-weight: 600 !important;
-  height: 18px !important;
+  height: 27px !important;
   line-height: 1 !important;
   cursor: pointer !important;
-  border-radius: 2px !important;
+  border-radius: var(--radius-sm, 4px) !important;
   display: flex !important;
   align-items: center !important;
-  gap: 0.2rem !important;
+  gap: 0.35rem !important;
   box-sizing: border-box !important;
+}
+
+#header-add-sticky-btn svg {
+  width: 14px !important;
+  height: 14px !important;
+  display: block;
 }
 
 #header-notification-btn {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 22px !important;
-  height: 18px !important;
+  width: 28px !important;
+  height: 27px !important;
   line-height: 1 !important;
   background: var(--bg-surface-elevated) !important;
   border: 1px solid var(--border-color) !important;
-  border-radius: 2px !important;
+  border-radius: var(--radius-sm, 4px) !important;
   cursor: pointer !important;
   position: relative !important;
   box-sizing: border-box !important;
@@ -3310,6 +3316,8 @@ body.logged-in .main-header {
 }
 
 #header-notification-btn svg {
+  width: 16px !important;
+  height: 16px !important;
   color: var(--text-secondary) !important;
   transition: color 0.15s ease !important;
 }
@@ -3320,15 +3328,15 @@ body.logged-in .main-header {
 
 .notification-badge {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 14px;
-  height: 14px;
+  top: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
   padding: 0 3px;
-  border-radius: 7px;
+  border-radius: 7.5px;
   background: #ef4444;
   color: #ffffff;
-  font-size: 0.55rem;
+  font-size: 0.62rem;
   font-weight: 700;
   display: none;
   align-items: center;
@@ -3342,14 +3350,14 @@ body.logged-in .main-header {
 #header-user-profile-btn {
   display: flex !important;
   align-items: center !important;
-  gap: 0.25rem !important;
-  padding: 0 0.35rem !important;
-  height: 18px !important;
+  gap: 0.35rem !important;
+  padding: 0 0.6rem !important;
+  height: 27px !important;
   line-height: 1 !important;
   background: var(--bg-surface-elevated) !important;
   border: 1px solid var(--border-color) !important;
-  border-radius: 2px !important;
-  font-size: 0.68rem !important;
+  border-radius: var(--radius-sm, 4px) !important;
+  font-size: 0.82rem !important;
   font-weight: 600 !important;
   color: var(--text-primary) !important;
   cursor: pointer !important;
@@ -3357,14 +3365,14 @@ body.logged-in .main-header {
 }
 
 #logged-in-user-avatar {
-  width: 13px !important;
-  height: 13px !important;
-  font-size: 0.55rem !important;
+  width: 18px !important;
+  height: 18px !important;
+  font-size: 0.72rem !important;
   line-height: 1 !important;
 }
 
 #logged-in-user-name {
-  font-size: 0.68rem !important;
+  font-size: 0.82rem !important;
   line-height: 1 !important;
 }
 
