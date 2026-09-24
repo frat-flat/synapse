@@ -1362,7 +1362,7 @@
           if (t.includes('パスワード') || t.includes('暗証番号') || t.includes('password') || t.includes('pass')) return 'password';
 
           // 3. 会社・法人・屋号
-          if (t.includes('法人名（カナ）') || t.includes('会社名（カナ）') || t.includes('屋号（カナ）') || t.includes('法人名カナ') || t.includes('会社名カナ') || t.includes('屋号カナ')) return 'company_kana';
+          if (t.includes('法人名（カナ）') || t.includes('会社名（カナ）') || t.includes('屋号（カナ）') || t.includes('法人名カナ') || t.includes('会社名カナ') || t.includes('屋号カナ')) return 'business_kana';
           if (t.includes('法人名') || t.includes('会社名') || t.includes('屋号') || t.includes('企業名') || t.includes('商号') || t.includes('business') || t.includes('company') || t.includes('corp')) return 'business_name';
           if (t.includes('事業者区分') || t.includes('申請区分') || t.includes('事業形態') || t.includes('法人区分') || t.includes('契約種別') || t.includes('区分') || t.includes('applicant_type')) return 'applicant_type';
 
@@ -1703,6 +1703,9 @@
           const key = (q.dataKey || q.title || '').toLowerCase().replace(/[\s_\-]/g, '');
           const title = (q.title || '').toLowerCase();
 
+          if (key.includes('businesskana') || key.includes('companykana') || ((key.includes('business') || key.includes('company') || key.includes('corp') || title.includes('会社') || title.includes('屋号') || title.includes('法人')) && (key.includes('kana') || title.includes('カナ') || title.includes('フリガナ') || title.includes('ふりがな')))) {
+            return 'business_kana';
+          }
           if (key.includes('business') || key.includes('company') || key.includes('corp') || title.includes('会社名') || title.includes('屋号') || title.includes('貴社名') || title.includes('法人名')) {
             return 'business_name';
           }
@@ -2064,6 +2067,9 @@
               (s.questions || []).forEach(q => {
                 if (q && q.dataKey === 'company_name') {
                   q.dataKey = 'business_name';
+                }
+                if (q && q.dataKey === 'company_kana') {
+                  q.dataKey = 'business_kana';
                 }
               });
             });
@@ -3438,7 +3444,7 @@
 
               // 1. カナ欄: 法人名でカナが登録されている場合のみ自動で補完（※代表者カナ、および口座名義・名義人カナ・屋号は除外）
               const isExcludedKana = qTitle.includes('代表') || qTitle.includes('口座') || qTitle.includes('名義') || qTitle.includes('屋号');
-              const isCorpKana = (q.dataKey === 'company_kana') || ((qTitle.includes('カナ') || qTitle.includes('フリガナ') || qTitle.includes('ふりがな')) && !isExcludedKana);
+              const isCorpKana = (q.dataKey === 'business_kana' || q.dataKey === 'company_kana') || ((qTitle.includes('カナ') || qTitle.includes('フリガナ') || qTitle.includes('ふりがな')) && !isExcludedKana);
               if (q.type === 'text' && isCorpKana) {
                 const card = document.querySelector(`.question-card[data-question-id="${q.id}"]`);
                 const input = card ? (card.querySelector('input.form-control') || card.querySelector('input')) : null;
@@ -3991,6 +3997,9 @@
               (s.questions || []).forEach(q => {
                 if (q && q.dataKey === 'company_name') {
                   q.dataKey = 'business_name';
+                }
+                if (q && q.dataKey === 'company_kana') {
+                  q.dataKey = 'business_kana';
                 }
               });
             });
@@ -7425,7 +7434,7 @@
             }
 
             // 2-2. 屋号とカナの連動チェック（個人・個人事業主）
-            const isTradeKanaField = (q.dataKey === 'company_kana' && (q.title || '').includes('屋号')) ||
+            const isTradeKanaField = ((q.dataKey === 'business_kana' || q.dataKey === 'company_kana') && (q.title || '').includes('屋号')) ||
                                      ((q.title || '').includes('屋号') && ((q.title || '').includes('カナ') || (q.title || '').includes('フリガナ')));
             if (isTradeKanaField) {
               const tradeQ = (section.questions || []).find(cq => ((cq.dataKey === 'business_name' || cq.dataKey === 'company_name') && (cq.title || '').includes('屋号')) ||
@@ -7447,7 +7456,7 @@
             }
 
             // 2-3. 法人名カナ入力必須チェック
-            const isCorpKanaField = (q.dataKey === 'company_kana' && !(q.title || '').includes('屋号')) ||
+            const isCorpKanaField = ((q.dataKey === 'business_kana' || q.dataKey === 'company_kana') && !(q.title || '').includes('屋号')) ||
                                     (!isTradeKanaField && q.title && (q.title.includes('法人名') && (q.title.includes('カナ') || q.title.includes('フリガナ'))));
             if (isCorpKanaField) {
               const corpQ = (section.questions || []).find(cq => ((cq.dataKey === 'business_name' || cq.dataKey === 'company_name') && !(cq.title || '').includes('屋号')) ||
@@ -8244,6 +8253,13 @@
             submitData['company_name'] = submitData['business_name'];
           } else if (submitData['company_name'] !== undefined && submitData['business_name'] === undefined) {
             submitData['business_name'] = submitData['company_name'];
+          }
+
+          // 🏢 business_kana / company_kana の相互ミラーリング（外部Webhook・DB連携との完全後方互換）
+          if (submitData['business_kana'] !== undefined && submitData['company_kana'] === undefined) {
+            submitData['company_kana'] = submitData['business_kana'];
+          } else if (submitData['company_kana'] !== undefined && submitData['business_kana'] === undefined) {
+            submitData['business_kana'] = submitData['company_kana'];
           }
 
           if (window.FORM_MASTER_ID) {

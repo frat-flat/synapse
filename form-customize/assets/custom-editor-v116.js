@@ -33,7 +33,7 @@
     
     // 1. カナ・フリガナ（口座名義・法人・代表者）
     if (t.includes('口座名義') || t.includes('口座名義人') || t.includes('メイギ') || t.includes('めいぎ') || t.includes('名義カナ') || (t.includes('名義') && (t.includes('カナ') || t.includes('フリガナ')))) return 'account_holder_kana';
-    if (t.includes('法人名（カナ）') || t.includes('屋号（カナ）') || t.includes('会社名（カナ）') || t.includes('法人カナ') || t.includes('会社カナ') || t.includes('屋号カナ') || (t.includes('フリガナ') && (t.includes('法人') || t.includes('会社') || t.includes('屋号')))) return 'company_kana';
+    if (t.includes('法人名（カナ）') || t.includes('屋号（カナ）') || t.includes('会社名（カナ）') || t.includes('法人カナ') || t.includes('会社カナ') || t.includes('屋号カナ') || (t.includes('フリガナ') && (t.includes('法人') || t.includes('会社') || t.includes('屋号')))) return 'business_kana';
     if (t.includes('代表者名（カナ）') || t.includes('代表者カナ') || t.includes('氏名カナ') || t.includes('名前カナ') || (t.includes('フリガナ') && (t.includes('代表') || t.includes('氏名') || t.includes('名前')))) return 'representative_kana';
 
     // 2. 基本連絡先・代表情報
@@ -626,7 +626,7 @@
           nextAction: "submit",
           questions: [
             { id: "q_hc_corp_name", type: "text", title: "法人名", description: "法人名を入力して候補から選択してください（国税庁法人番号API照会）", required: true, dataKey: "business_name", validation: { category: "api", condition: "corp_name", errorMessage: "実在する法人名を入力または選択してください。" }, options: [] },
-            { id: "q_hc_corp_kana", type: "text", title: "法人名（カナ）", description: "全角カタカナで入力してください。法人名検索から自動反映されます。", required: true, dataKey: "company_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "company_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
+            { id: "q_hc_corp_kana", type: "text", title: "法人名（カナ）", description: "全角カタカナで入力してください。法人名検索から自動反映されます。", required: true, dataKey: "business_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "business_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
             { id: "q_hc_zip", type: "text", title: "郵便番号", description: "法人選択または7桁入力で住所を自動補完します（3桁-4桁へ自動整形）", required: true, dataKey: "zip_code", validation: { category: "regex", condition: "matches", value: "^[0-9]{3}-?[0-9]{4}$", presetKey: "zip", errorMessage: "郵便番号を7桁で入力してください。" }, options: [] },
             { id: "q_hc_pref", type: "select", title: "都道府県", description: "本店所在地の都道府県を選択してください", required: true, dataKey: "pref", options: JAPAN_PREFECTURES.map(p => ({ label: p })) },
             { id: "q_hc_city", type: "text", title: "市区町村", required: true, dataKey: "city", options: [] },
@@ -649,7 +649,7 @@
             { id: "q_hi_rep_name", type: "text", title: "氏名（代表者名）", description: "氏名（漢字）を入力してください（例: 山田 太郎）", required: true, dataKey: "representative_name", options: [] },
             { id: "q_hi_rep_kana", type: "text", title: "氏名（カナ）", description: "氏名のフリガナを全角カタカナで入力してください", required: true, dataKey: "representative_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "representative_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
             { id: "q_hi_trade_name", type: "text", title: "屋号", description: "屋号をお持ちの場合のみ入力してください（屋号がない場合は空欄のままで進めます）", required: false, dataKey: "business_name", options: [] },
-            { id: "q_hi_trade_kana", type: "text", title: "屋号（カナ）", description: "※屋号を入力された場合は、屋号のフリガナ（全角カタカナ）も必ず入力してください。", required: false, dataKey: "company_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "company_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
+            { id: "q_hi_trade_kana", type: "text", title: "屋号（カナ）", description: "※屋号を入力された場合は、屋号のフリガナ（全角カタカナ）も必ず入力してください。", required: false, dataKey: "business_kana", validation: { category: "regex", condition: "matches", value: "^[ァ-ヶｦ-ﾟー\\s　]+$", presetKey: "business_kana", errorMessage: "全角カタカナで入力してください。" }, options: [] },
             { id: "q_hi_zip", type: "text", title: "郵便番号", description: "7桁の数字を入力すると住所を自動補完し、3桁-4桁へ自動整形されます（例: 150-0041）", required: true, dataKey: "zip_code", validation: { category: "regex", condition: "matches", value: "^[0-9]{3}-?[0-9]{4}$", presetKey: "zip", errorMessage: "郵便番号を7桁で入力してください。" }, options: [] },
             { id: "q_hi_pref", type: "select", title: "都道府県", description: "お住まいの都道府県を選択してください", required: true, dataKey: "pref", options: JAPAN_PREFECTURES.map(p => ({ label: p })) },
             { id: "q_hi_city", type: "text", title: "市区町村", required: true, dataKey: "city", options: [] },
@@ -11505,12 +11505,12 @@
           required: true,
           groupId: corpGrpId,
           groupTitle: corpGrpTitle,
-          dataKey: "company_kana",
+          dataKey: "business_kana",
           validation: {
             category: "regex",
             condition: "matches",
             value: "^[ァ-ヶｦ-ﾟー\\s　]+$",
-            presetKey: "company_kana",
+            presetKey: "business_kana",
             value2: "",
             errorMessage: "全角カタカナで入力してください。"
           },
@@ -11741,12 +11741,12 @@
           required: false,
           groupId: indivGrpId,
           groupTitle: indivGrpTitle,
-          dataKey: "company_kana",
+          dataKey: "business_kana",
           validation: {
             category: "regex",
             condition: "matches",
             value: "^[ァ-ヶｦ-ﾟー\\s　]+$",
-            presetKey: "company_kana",
+            presetKey: "business_kana",
             value2: "",
             errorMessage: "全角カタカナで入力してください。"
           },
@@ -20729,6 +20729,13 @@
               if (q.dataKey === 'company_name') {
                 q.dataKey = 'business_name';
               }
+              // 🏢 法人名カナ・屋号カナのdataKeyを company_kana から business_kana に自動マイグレーション
+              if (q.dataKey === 'company_kana') {
+                q.dataKey = 'business_kana';
+              }
+              if (q.validation && q.validation.presetKey === 'company_kana') {
+                q.validation.presetKey = 'business_kana';
+              }
             });
           }
         });
@@ -22132,6 +22139,31 @@
       };
     }
 
+    // 1-2. 法人名カナ / 屋号カナ
+    if ((lower.includes('法人') || lower.includes('会社') || lower.includes('屋号') || lower.includes('企業')) && (lower.includes('カナ') || lower.includes('フリガナ') || lower.includes('ふりがな'))) {
+      return {
+        type: 'business_kana',
+        recommendationTitle: '🏢 法人名カナ・屋号カナ（全角カタカナ検証 & business_kana列統合）',
+        explanation: '法人名や屋号のフリガナとして全角カタカナ形式の検証を適用し、DB列「business_kana」への統一をおすすめします。',
+        dataKey: 'business_kana',
+        unifyColumn: true,
+        validation: {
+          category: 'regex',
+          condition: 'matches',
+          value: '^[ァ-ヶｦ-ﾟー\\s　]+$',
+          presetKey: 'business_kana',
+          value2: '',
+          errorMessage: '全角カタカナで入力してください。'
+        },
+        autoReply: false,
+        items: [
+          'データベース出力列名: <strong>business_kana</strong> に統一',
+          '入力規則: <strong>全角カタカナ入力チェック</strong>',
+          'エラー表示: 全角カタカナで入力してください。'
+        ]
+      };
+    }
+
     // 2. 法人名 / 会社名
     if (lower.includes('法人名') || lower.includes('会社名') || lower.includes('企業名') || lower.includes('商号')) {
       return {
@@ -22394,7 +22426,7 @@
               <option value="representative_name">👤 代表者名・氏名 (representative_name)</option>
               <option value="representative_kana">👤 代表者カナ・氏名カナ (representative_kana)</option>
               <option value="business_name">🏢 法人名・屋号 (business_name)</option>
-              <option value="company_kana">🏢 法人名カナ・屋号カナ (company_kana)</option>
+              <option value="business_kana">🏢 法人名カナ・屋号カナ (business_kana)</option>
               <option value="birthdate">🎂 生年月日 (birthdate)</option>
               <option value="email">✉️ メールアドレス (email)</option>
               <option value="tel">📞 電話番号 (tel)</option>
@@ -22425,6 +22457,7 @@
 
             <div class="drawer-chips-wrap" style="margin-top: 8px;">
               <span class="drawer-chip" data-key="business_name">🏢 法人名・屋号</span>
+              <span class="drawer-chip" data-key="business_kana">🏢 法人名カナ・屋号カナ</span>
               <span class="drawer-chip" data-key="representative_name">👤 代表者・氏名</span>
               <span class="drawer-chip" data-key="birthdate">🎂 生年月日</span>
               <span class="drawer-chip" data-key="email">✉️ メール</span>
@@ -23556,6 +23589,15 @@
       q.dataKey = 'business_name';
       persistDrawerChanges();
     }
+    // 🚀 company_kana は business_kana へ自動マイグレーション
+    if (q.dataKey === 'company_kana') {
+      q.dataKey = 'business_kana';
+      persistDrawerChanges();
+    }
+    if (q.validation && q.validation.presetKey === 'company_kana') {
+      q.validation.presetKey = 'business_kana';
+      persistDrawerChanges();
+    }
 
     // 🚀 不正なキー（タイムスタンプ・数字列等）が残っていたら即座に正常化
     if (q.dataKey && isGarbageDataKey(q.dataKey)) {
@@ -24330,6 +24372,7 @@
           else if (k === 'user_name') row[k] = uVar.name;
           else if (k === 'user_email') row[k] = uVar.email;
           else if (k === 'business_name' || k === 'company_name') row[k] = uVar.corp;
+          else if (k === 'business_kana' || k === 'company_kana') row[k] = 'カブシキガイシャシナプスパートナーズ';
           else row[k] = col.sampleVal || '';
         } else if (col.category === 'appoint') {
           if (k === 'appoint_id') row[k] = aVar.id;
