@@ -7126,6 +7126,97 @@
           });
         }
 
+        // 🛡️ バリデーションオブジェクトの相互変換・正規化（旧形式・プリセット・新形式を100%完全統一）
+        function normalizeValidation(v, q = null) {
+          if (!v) return null;
+          if (v.category && v.condition) {
+            return {
+              category: v.category,
+              condition: v.condition,
+              value: v.value || '',
+              value2: v.value2 || '',
+              presetKey: v.presetKey || 'custom',
+              errorMessage: v.errorMessage || v.message || ''
+            };
+          }
+          const title = (q && q.title) ? q.title.trim() : '';
+          const key = (q && q.dataKey) ? q.dataKey.trim() : '';
+          let pat = v.pattern || v.value || '';
+          let msg = v.errorMessage || v.message || '';
+          let pKey = v.presetKey || 'custom';
+          let cat = v.category || (v.type === 'regex' ? 'regex' : (v.type || 'text'));
+          let cond = v.condition || 'email';
+
+          if (pat.includes('@') || /メール|email|mail/i.test(title) || /email|mail/i.test(key)) {
+            cat = 'text';
+            cond = 'email';
+            pKey = 'email';
+            if (!msg) msg = '有効なメールアドレスを入力してください。';
+          } else if (pat.includes('http') || /url|ホームページ|ウェブサイト/i.test(title)) {
+            cat = 'text';
+            cond = 'url';
+            pKey = 'url';
+            if (!msg) msg = '有効なURLを入力してください。';
+          } else if (pat.includes('\\d{6,7}') || pat.includes('[0-9]{6,7}') || /口座番号/.test(title) || key === 'account_number') {
+            cat = 'regex';
+            cond = 'matches';
+            pKey = 'bank_account';
+            pat = '^[0-9]{6,7}$';
+            if (!msg) msg = '口座番号（6〜7桁の半角数字）を入力してください。';
+          } else if (pat.includes('ァ-ヶ') || /口座名義|名義/.test(title) || key === 'account_holder_kana') {
+            cat = 'regex';
+            cond = 'matches';
+            pKey = 'account_holder_kana';
+            pat = '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$';
+            if (!msg) msg = '口座名義はカナと（）.のみで入力してください。';
+          } else if (pat.includes('19|20') || /生年月日|誕生日|birth/i.test(title) || key === 'birthdate') {
+            cat = 'regex';
+            cond = 'matches';
+            pKey = 'birthdate';
+            pat = '^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$';
+            if (!msg) msg = '生年月日を入力してください（例: 1990/01/01）。';
+          } else if (pat.includes('\\d{3}') || /郵便番号|zip/i.test(title) || key.includes('zip')) {
+            cat = 'regex';
+            cond = 'matches';
+            pKey = 'zip';
+            pat = '^\\d{3}-\\d{4}$';
+            if (!msg) msg = '郵便番号を入力してください（例: 123-4567）。';
+          } else if (pat.includes('0\\d{1,4}') || /電話番号|tel|phone/i.test(title) || key.includes('tel') || key.includes('phone')) {
+            cat = 'regex';
+            cond = 'matches';
+            pKey = 'tel_both';
+            pat = '^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$';
+            if (!msg) msg = '電話番号の形式で入力してください（例: 03-1234-5678）。';
+          } else if ((pat.includes('T') && pat.includes('13')) || /インボイス|適格請求書/.test(title) || key.includes('invoice')) {
+            cat = 'api';
+            cond = 'invoice_number';
+            pKey = 'invoice';
+            if (!msg) msg = 'インボイス登録番号（Tで始まる13桁の数字）を入力してください。';
+          } else if (/法人名|会社名|商号/.test(title) && !/代表/.test(title)) {
+            cat = 'api';
+            cond = 'corp_name';
+            pKey = 'corp_name';
+            if (!msg) msg = '実在する法人名を入力または選択してください。';
+          } else if (cat === 'regex') {
+            cond = cond || 'matches';
+            if (!pat) pat = '.*';
+            if (!msg) msg = '入力値が正しくありません。';
+          } else {
+            cat = 'text';
+            cond = 'email';
+            if (!msg) msg = '有効なメールアドレスを入力してください。';
+          }
+
+          return {
+            category: cat,
+            condition: cond,
+            value: pat,
+            value2: '',
+            presetKey: pKey,
+            errorMessage: msg
+          };
+        }
+
         function validateCurrentSection() {
           const section = formDefinition.sections.find(s => s.id === currentSectionId);
           if (!section) return true;
@@ -7276,22 +7367,47 @@
               }
 
               if (q.validation) {
-                const v = q.validation;
+                const v = normalizeValidation(q.validation, q);
                 let rulePassed = true;
                 if (val.trim() === '-') {
                   rulePassed = true; // 自動補填された半角ハイフン「-」は全ルール通過
                 } else if (v.category === 'text') {
                   if (v.condition === 'email') {
-                    rulePassed = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+                    rulePassed = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
                   } else if (v.condition === 'url') {
-                    rulePassed = /^https?:\/\/[^\s]+$/.test(val);
+                    rulePassed = /^https?:\/\/[^\s]+$/.test(val.trim());
+                  } else if (v.condition === 'contains') {
+                    rulePassed = val.includes(v.value || '');
+                  } else if (v.condition === 'not_contains') {
+                    rulePassed = !val.includes(v.value || '');
                   } else if (v.condition === 'auto_hyphen') {
                     rulePassed = true; // 自動ハイフン補填規則は形式問わずパス
                   }
+                } else if (v.category === 'length') {
+                  const len = val.length;
+                  if (v.condition === 'max_length' && v.value) {
+                    rulePassed = len <= parseInt(v.value, 10);
+                  } else if (v.condition === 'min_length' && v.value) {
+                    rulePassed = len >= parseInt(v.value, 10);
+                  }
                 } else if (v.category === 'number') {
                   const num = Number(val);
-                  if (isNaN(num)) rulePassed = false;
-                } else if (v.category === 'regex' && v.value) {
+                  if (isNaN(num)) {
+                    rulePassed = false;
+                  } else if (v.condition === 'greater_than' && v.value !== '') {
+                    rulePassed = num > Number(v.value);
+                  } else if (v.condition === 'greater_than_or_equal' && v.value !== '') {
+                    rulePassed = num >= Number(v.value);
+                  } else if (v.condition === 'less_than' && v.value !== '') {
+                    rulePassed = num < Number(v.value);
+                  } else if (v.condition === 'less_than_or_equal' && v.value !== '') {
+                    rulePassed = num <= Number(v.value);
+                  } else if (v.condition === 'equal' && v.value !== '') {
+                    rulePassed = num === Number(v.value);
+                  } else if (v.condition === 'is_integer') {
+                    rulePassed = Number.isInteger(num);
+                  }
+                } else if (v.category === 'regex') {
                   try {
                     let testVal = typeof val === 'string' ? val.trim() : String(val || '');
                     const isAcctNum = (q.dataKey === 'account_number') || (q.title && (q.title.includes('口座番号') || (!q.title.includes('名義') && q.title.includes('口座'))));
@@ -7325,7 +7441,7 @@
                       }
                     }
 
-                    let regexPattern = v.value;
+                    let regexPattern = v.value || '.*';
                     // 口座番号における6〜7桁対応（エスケープ崩れや既存の7桁固定設定も含めて完全に堅牢化）
                     if (isAcctNum) {
                       regexPattern = '^[0-9]{6,7}$';
@@ -7337,7 +7453,8 @@
                     }
 
                     const reg = new RegExp(regexPattern);
-                    rulePassed = reg.test(testVal);
+                    const matched = reg.test(testVal);
+                    rulePassed = (v.condition === 'not_matches') ? !matched : matched;
                   } catch (e) {
                     console.error('Regex validation error:', e);
                   }

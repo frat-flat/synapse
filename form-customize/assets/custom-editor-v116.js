@@ -3569,27 +3569,39 @@
       observeContainer('overview-sections-pane');
     }
 
-    // 6. 質問項目やセクションカードをクリックしたときに、フローマップ側の該当ルートを自動ハイライト
+    // 6. 質問項目やセクションカードをクリックしたときに、フローマップ側の該当ルートを自動ハイライト＆パン
     document.addEventListener('click', (e) => {
-      const qCard = e.target.closest('.question-card, .question-item, .editor-question-group');
-      if (qCard && window.archifyRenderer) {
-        // カードからquestion IDを抽出
-        let qId = qCard.dataset.questionId || qCard.dataset.id || qCard.id;
+      if (!window.archifyRenderer) return;
+
+      // 質問カードまたはサイドバーの設問アイテム
+      const qCard = e.target.closest('.question-card, .question-item, .editor-question-group, .sidebar-q-item, .sidebar-question-item');
+      if (qCard) {
+        let qId = qCard.dataset.questionId || qCard.dataset.qid || qCard.dataset.id || qCard.id;
         if (!qId) {
           const idInput = qCard.querySelector('[name*="question_id"], [data-qid]');
           if (idInput) qId = idInput.value || idInput.dataset.qid;
         }
-        if (!qId && window.G && window.r !== null && window.r !== undefined) {
-          // セクション内の質問インデックスから割り出し
+        if (!qId && window.G) {
+          // 現在のセクション内のインデックスから特定
+          const curSec = (typeof findSectionByQuestionId === 'function') ? null : (Array.isArray(window.G.sections) ? window.G.sections[window.r] : null);
           const cards = Array.from(document.querySelectorAll('#questions-container .question-card'));
           const idx = cards.indexOf(qCard);
-          const curSec = (window.G.sections || [])[window.r];
           if (curSec && curSec.questions && curSec.questions[idx]) {
             qId = curSec.questions[idx].id;
           }
         }
         if (qId) {
-          window.archifyRenderer.highlightRouteForNode(qId);
+          window.archifyRenderer.highlightRouteForNode(qId, true);
+        }
+        return;
+      }
+
+      // セクションアイテム（サイドバーまたは全体構成一覧）
+      const secItem = e.target.closest('.section-item, .overview-section-card');
+      if (secItem && window.archifyRenderer.highlightSection) {
+        const secId = secItem.dataset.sectionId || secItem.dataset.id;
+        if (secId) {
+          window.archifyRenderer.highlightSection(secId);
         }
       }
     });
@@ -20686,6 +20698,25 @@
   }
   window.fixTaxStatusDataKeys = fixTaxStatusDataKeys;
 
+  // 🛡️ 全フォーム・全質問の入力規則を一括自動クレンジング・最新形式へ正規化
+  function normalizeAllFormsValidation(forms) {
+    if (!Array.isArray(forms)) return;
+    forms.forEach(f => {
+      if (f && Array.isArray(f.sections)) {
+        f.sections.forEach(s => {
+          if (s && Array.isArray(s.questions)) {
+            s.questions.forEach(q => {
+              if (q && q.validation) {
+                q.validation = normalizeValidation(q.validation, q);
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+  window.normalizeAllFormsValidation = normalizeAllFormsValidation;
+
   // 🛡️ 入力欄やテキストエリアへの貼り付け等で混入した余計なHTMLタグを即座にサニタイズ
   document.addEventListener('input', (e) => {
     if (e.target && (e.target.id === 'editor-section-desc' || e.target.classList.contains('q-desc-input') || e.target.classList.contains('q-title-input'))) {
@@ -20777,6 +20808,7 @@
     sanitizeFormBranchingLogic(forms);
     cleanStrayTagsFromObject(forms);
     fixTaxStatusDataKeys(forms);
+    normalizeAllFormsValidation(forms);
 
     // 最新の forms を localStorage にも反映
     const currentJson = JSON.stringify(forms);
@@ -20924,11 +20956,13 @@
         localForms = localForms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
         cleanStrayTagsFromObject(localForms);
         fixTaxStatusDataKeys(localForms);
+        normalizeAllFormsValidation(localForms);
       }
       if (Array.isArray(cloudForms)) {
         cloudForms = cloudForms.filter(f => !f || !purgedKeywords.some(p => (f.title || '').includes(p)));
         cleanStrayTagsFromObject(cloudForms);
         fixTaxStatusDataKeys(cloudForms);
+        normalizeAllFormsValidation(cloudForms);
       }
 
       const localQCount = countFormsQuestions(localForms);
@@ -20946,6 +20980,7 @@
       if (cloudForms !== null && Array.isArray(cloudForms) && (cloudForms.length > 0 || localForms.length === 0)) {
         console.log('[Cloud Sync] Loaded', cloudForms.length, 'forms from cloud. Total questions:', cloudQCount);
         sanitizeFormBranchingLogic(cloudForms);
+        normalizeAllFormsValidation(cloudForms);
         cleanStrayTagsFromObject(cloudForms);
         fixTaxStatusDataKeys(cloudForms);
         
@@ -21739,15 +21774,117 @@
     return { groups: [], questions: [] };
   }
 
-  // バリデーションの短縮ラベル取得
-  function getValidationShortLabel(v) {
+  // 🛡️ バリデーションオブジェクトの相互変換・正規化（旧形式・プリセット・新形式を100%完全統一）
+  function normalizeValidation(v, q = null) {
+    if (!v) return null;
+
+    // 既に category & condition を持つ完全形式
+    if (v.category && v.condition) {
+      return {
+        category: v.category,
+        condition: v.condition,
+        value: v.value || '',
+        value2: v.value2 || '',
+        presetKey: v.presetKey || 'custom',
+        errorMessage: v.errorMessage || v.message || ''
+      };
+    }
+
+    const title = (q && q.title) ? q.title.trim() : '';
+    const key = (q && q.dataKey) ? q.dataKey.trim() : '';
+    let pat = v.pattern || v.value || '';
+    let msg = v.errorMessage || v.message || '';
+    let pKey = v.presetKey || 'custom';
+    let cat = v.category || (v.type === 'regex' ? 'regex' : (v.type || 'text'));
+    let cond = v.condition || 'email';
+
+    // パターンや設問タイトルから正確なカテゴリと条件を推測・自動補正
+    if (pat.includes('@') || /メール|email|mail/i.test(title) || /email|mail/i.test(key)) {
+      cat = 'text';
+      cond = 'email';
+      pKey = 'email';
+      if (!msg) msg = '有効なメールアドレスを入力してください。';
+    } else if (pat.includes('http') || /url|ホームページ|ウェブサイト/i.test(title)) {
+      cat = 'text';
+      cond = 'url';
+      pKey = 'url';
+      if (!msg) msg = '有効なURLを入力してください。';
+    } else if (pat.includes('\\d{6,7}') || pat.includes('[0-9]{6,7}') || /口座番号/.test(title) || key === 'account_number') {
+      cat = 'regex';
+      cond = 'matches';
+      pKey = 'bank_account';
+      pat = '^[0-9]{6,7}$';
+      if (!msg) msg = '口座番号（6〜7桁の半角数字）を入力してください。';
+    } else if (pat.includes('ァ-ヶ') || /口座名義|名義/.test(title) || key === 'account_holder_kana') {
+      cat = 'regex';
+      cond = 'matches';
+      pKey = 'account_holder_kana';
+      pat = '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$';
+      if (!msg) msg = '口座名義はカナと（）.のみで入力してください。';
+    } else if (pat.includes('19|20') || /生年月日|誕生日|birth/i.test(title) || key === 'birthdate') {
+      cat = 'regex';
+      cond = 'matches';
+      pKey = 'birthdate';
+      pat = '^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$';
+      if (!msg) msg = '生年月日を入力してください（例: 1990/01/01）。';
+    } else if (pat.includes('\\d{3}') || /郵便番号|zip/i.test(title) || key.includes('zip')) {
+      cat = 'regex';
+      cond = 'matches';
+      pKey = 'zip';
+      pat = '^\\d{3}-\\d{4}$';
+      if (!msg) msg = '郵便番号を入力してください（例: 123-4567）。';
+    } else if (pat.includes('0\\d{1,4}') || /電話番号|tel|phone/i.test(title) || key.includes('tel') || key.includes('phone')) {
+      cat = 'regex';
+      cond = 'matches';
+      pKey = 'tel_both';
+      pat = '^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$';
+      if (!msg) msg = '電話番号の形式で入力してください（例: 03-1234-5678）。';
+    } else if ((pat.includes('T') && pat.includes('13')) || /インボイス|適格請求書/.test(title) || key.includes('invoice')) {
+      cat = 'api';
+      cond = 'invoice_number';
+      pKey = 'invoice';
+      if (!msg) msg = 'インボイス登録番号（Tで始まる13桁の数字）を入力してください。';
+    } else if (/法人名|会社名|商号/.test(title) && !/代表/.test(title)) {
+      cat = 'api';
+      cond = 'corp_name';
+      pKey = 'corp_name';
+      if (!msg) msg = '実在する法人名を入力または選択してください。';
+    } else if (cat === 'regex') {
+      cond = cond || 'matches';
+      if (!pat) pat = '.*';
+      if (!msg) msg = '入力値が正しくありません。';
+    } else {
+      cat = 'text';
+      cond = 'email';
+      if (!msg) msg = '有効なメールアドレスを入力してください。';
+    }
+
+    return {
+      category: cat,
+      condition: cond,
+      value: pat,
+      value2: '',
+      presetKey: pKey,
+      errorMessage: msg
+    };
+  }
+  window.normalizeValidation = normalizeValidation;
+
+  // バリデーションの短縮ラベル取得（具体的でわかりやすい表示を100%保証）
+  function getValidationShortLabel(v, q = null) {
     if (!v) return '';
-    const cat = v.category || '';
-    const cond = v.condition || '';
+    const norm = normalizeValidation(v, q);
+    if (!norm) return '';
+    const cat = norm.category || '';
+    const cond = norm.condition || '';
+    const pKey = norm.presetKey || '';
+
     if (cat === 'text') {
       if (cond === 'email') return 'メールアドレス';
       if (cond === 'url') return 'URL';
       if (cond === 'auto_hyphen') return '屋号ハイフン補填';
+      if (cond === 'contains') return '特定語句を含む';
+      if (cond === 'not_contains') return '特定語句を含まない';
       return 'テキスト';
     }
     if (cat === 'api') {
@@ -21756,13 +21893,16 @@
       if (cond === 'zip_code') return '郵便番号検索';
       if (cond === 'bank_name') return '全銀協銀行検索';
       if (cond === 'branch_name') return '全銀協支店検索';
+      if (cond === 'branch_code') return '全銀協支店番号';
       return 'API連携';
     }
     if (cat === 'regex') {
-      if (v.presetKey === 'tel_both' || cond === 'tel') return '電話番号';
-      if (v.presetKey === 'birthdate') return '生年月日';
-      if (v.presetKey === 'zip' || v.presetKey === 'zip_nohyphen') return '郵便番号';
-      if (v.presetKey === 'account_holder_kana') return '口座名義カナ';
+      if (pKey === 'tel_both' || cond === 'tel') return '電話番号';
+      if (pKey === 'birthdate') return '生年月日';
+      if (pKey === 'zip' || pKey === 'zip_nohyphen') return '郵便番号';
+      if (pKey === 'bank_account') return '口座番号';
+      if (pKey === 'account_holder_kana') return '口座名義カナ';
+      if (pKey === 'phone' || pKey === 'phone_nohyphen') return '携帯電話番号';
       return '正規表現';
     }
     if (cat === 'number') return '数値';
@@ -22607,27 +22747,9 @@
       if (valToggle.checked) {
         valFields.style.display = 'block';
         if (!q.validation) {
-          if (/口座番号/.test(q.title || '')) {
-            q.validation = {
-              category: 'regex',
-              condition: 'matches',
-              presetKey: 'bank_account',
-              value: '^[0-9]{6,7}$',
-              value2: '',
-              errorMessage: '正しい口座番号（6〜7桁の半角数字）を入力してください。'
-            };
-          } else if ((q.dataKey === 'account_holder_kana') || /口座名義|名義/.test(q.title || '')) {
-            q.validation = {
-              category: 'regex',
-              condition: 'matches',
-              presetKey: 'account_holder_kana',
-              value: '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$',
-              value2: '',
-              errorMessage: '口座名義はカナと（）.のみで入力してください。'
-            };
-          } else {
-            q.validation = { category: 'text', condition: 'email', value: '', value2: '', errorMessage: '有効なメールアドレスを入力してください。' };
-          }
+          q.validation = normalizeValidation({ type: 'regex' }, q);
+        } else {
+          q.validation = normalizeValidation(q.validation, q);
         }
         syncDrawerValidationInputs(q.validation);
       } else {
@@ -22641,13 +22763,17 @@
       const q = findQuestionDefById(_activeDrawerQuestionId);
       if (!q) return;
       const cat = valCatSelect.value;
-      let defErr = cat === 'number' ? '数値を入力してください。' : (cat === 'api' ? '実在する候補を選択してください。' : '入力値が正しくありません。');
-      const bObj = window.b && window.b[cat] ? window.b[cat] : null;
-      const firstCond = bObj ? Object.keys(bObj.conditions)[0] : 'email';
+      const def = (window.b && window.b[cat]) ? window.b[cat] : (BUILTIN_VALIDATION_DEF[cat] || BUILTIN_VALIDATION_DEF.text);
+      const firstCond = Object.keys(def.conditions)[0] || 'email';
 
+      let defErr = cat === 'number' ? '数値を入力してください。' : (cat === 'api' ? '実在する候補を選択してください。' : '入力値が正しくありません。');
       let presetKey = 'custom';
       let patVal = '';
-      if (cat === 'regex') {
+
+      if (cat === 'text') {
+        if (firstCond === 'email') defErr = '有効なメールアドレスを入力してください。';
+        else if (firstCond === 'url') defErr = '有効なURLを入力してください。';
+      } else if (cat === 'regex') {
         if (/口座番号/.test(q.title || '')) {
           presetKey = 'bank_account';
           patVal = '^[0-9]{6,7}$';
@@ -22656,14 +22782,17 @@
           presetKey = 'account_holder_kana';
           patVal = '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$';
           defErr = '口座名義はカナと（）.のみで入力してください。';
+        } else if (/生年月日/.test(q.title || '')) {
+          presetKey = 'birthdate';
+          patVal = '^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$';
+          defErr = '生年月日を入力してください（例: 1990/01/01）。';
         } else if (window.getAutoErrorMessageForQuestion) {
           const autoErr = window.getAutoErrorMessageForQuestion(q.title, { category: 'regex' });
           if (autoErr && autoErr !== '入力値が正しくありません。') defErr = autoErr;
         }
       }
 
-      q.validation = { category: cat, condition: firstCond, value: patVal, value2: '', errorMessage: defErr };
-      if (cat === 'regex') q.validation.presetKey = presetKey;
+      q.validation = { category: cat, condition: firstCond, value: patVal, value2: '', presetKey: presetKey, errorMessage: defErr };
 
       syncDrawerValidationConditionOptions(cat, firstCond);
       syncDrawerValidationPatternAndNotice(q.validation);
@@ -22677,7 +22806,12 @@
       q.validation.condition = valCondSelect.value;
       q.validation.value = '';
       q.validation.value2 = '';
-      if (q.validation.category === 'api') {
+      if (q.validation.category === 'text') {
+        if (q.validation.condition === 'email') q.validation.errorMessage = '有効なメールアドレスを入力してください。';
+        else if (q.validation.condition === 'url') q.validation.errorMessage = '有効なURLを入力してください。';
+        else if (q.validation.condition === 'auto_hyphen') q.validation.errorMessage = '';
+        valErrorInput.value = q.validation.errorMessage;
+      } else if (q.validation.category === 'api') {
         const c = q.validation.condition;
         q.validation.errorMessage = c === 'zip_code' ? '正しい郵便番号（7桁の半角数字）を入力してください。'
           : (c === 'invoice_number' ? '正しくインボイス登録番号（Tで始まる13桁の数字）を入力してください。'
@@ -23126,19 +23260,94 @@
   }
   window.getEffectiveCleanDataKey = getEffectiveCleanDataKey;
 
+  // 📚 内蔵バリデーション定義辞書（外部モジュールの読み込み状況に一切左右されず100%完全動作を保証）
+  const BUILTIN_VALIDATION_DEF = {
+    text: {
+      label: 'テキスト',
+      conditions: {
+        email: 'メールアドレス',
+        url: 'URL',
+        auto_hyphen: '入力時に自動で半角ハイフン付与（英数字）',
+        contains: 'を含む',
+        not_contains: 'を含まない'
+      }
+    },
+    regex: {
+      label: '正規表現',
+      conditions: {
+        matches: '一致する',
+        not_matches: '一致しない',
+        contains: 'を含む',
+        not_contains: 'を含まない'
+      }
+    },
+    number: {
+      label: '数値',
+      conditions: {
+        is_number: '数値である',
+        is_integer: '整数である',
+        greater_than: 'より大きい',
+        greater_than_or_equal: '以上',
+        less_than: 'より小さい',
+        less_than_or_equal: '以下',
+        equal: 'と等しい',
+        not_equal: 'と等しくない',
+        between: 'の間にある',
+        not_between: 'の間にない'
+      }
+    },
+    api: {
+      label: 'API連携',
+      conditions: {
+        corp_name: '法人名（国税庁法人番号API連携）',
+        invoice_number: 'インボイス登録番号（適格請求書発行事業者API連携）',
+        zip_code: '郵便番号（郵便番号住所検索API連携）',
+        bank_name: '銀行名（全銀協金融機関コードAPI連携）',
+        branch_name: '支店名（全銀協支店コード・支店番号API連携）',
+        branch_code: '支店番号（全銀協支店コードAPI連携）'
+      }
+    },
+    length: {
+      label: '文字数',
+      conditions: {
+        max_length: '最大文字数',
+        min_length: '最小文字数'
+      }
+    }
+  };
+  window.b = window.b || BUILTIN_VALIDATION_DEF;
+  if (!window.b.text) window.b.text = BUILTIN_VALIDATION_DEF.text;
+  if (!window.b.regex) window.b.regex = BUILTIN_VALIDATION_DEF.regex;
+  if (!window.b.number) window.b.number = BUILTIN_VALIDATION_DEF.number;
+  if (!window.b.api) window.b.api = BUILTIN_VALIDATION_DEF.api;
+  if (!window.b.length) window.b.length = BUILTIN_VALIDATION_DEF.length;
+
+  const BUILTIN_PRESET_REGEX = {
+    custom: { label: 'カスタム（直接入力）', pattern: '' },
+    zip: { label: '郵便番号 (例: 123-4567)', pattern: '^\\d{3}-\\d{4}$' },
+    zip_nohyphen: { label: '郵便番号（ハイフンなし） (例: 1234567)', pattern: '^\\d{7}$' },
+    tel_both: { label: '電話番号（固定・携帯 共通） (例: 03-1234-5678 / 090-1234-5678)', pattern: '^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$' },
+    phone: { label: '携帯電話のみ (例: 090-1234-5678)', pattern: '^(070|080|090)-\\d{4}-\\d{4}$' },
+    phone_nohyphen: { label: '携帯電話のみ（ハイフンなし） (例: 09012345678)', pattern: '^(070|080|090)\\d{8}$' },
+    birthdate: { label: '生年月日 (例: 1990/01/01)', pattern: '^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$' },
+    bank_account: { label: '口座番号 (6〜7桁)', pattern: '^[0-9]{6,7}$' },
+    account_holder_kana: { label: '口座名義（全角カナ・記号）', pattern: '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$' }
+  };
+  window.ie = window.ie || BUILTIN_PRESET_REGEX;
+
   function syncDrawerValidationConditionOptions(category, currentCondition) {
     const valCondSelect = document.getElementById('drawer-val-condition');
     if (!valCondSelect) return;
     valCondSelect.innerHTML = '';
-    const bObj = window.b && window.b[category] ? window.b[category] : null;
-    if (bObj && bObj.conditions) {
-      Object.keys(bObj.conditions).forEach(condKey => {
+    const def = (window.b && window.b[category]) ? window.b[category] : (BUILTIN_VALIDATION_DEF[category] || BUILTIN_VALIDATION_DEF.text);
+    if (def && def.conditions) {
+      Object.keys(def.conditions).forEach(condKey => {
         const opt = document.createElement('option');
         opt.value = condKey;
-        opt.textContent = bObj.conditions[condKey];
+        opt.textContent = def.conditions[condKey];
         valCondSelect.appendChild(opt);
       });
-      valCondSelect.value = currentCondition || Object.keys(bObj.conditions)[0];
+      valCondSelect.value = (currentCondition && def.conditions[currentCondition]) ? currentCondition : Object.keys(def.conditions)[0];
     }
   }
 
@@ -23159,14 +23368,13 @@
       patternRow.style.display = 'block';
       apiNotice.style.display = 'none';
       presetSelect.innerHTML = '';
-      if (window.ie) {
-        Object.keys(window.ie).forEach(k => {
-          const opt = document.createElement('option');
-          opt.value = k;
-          opt.textContent = window.ie[k].label;
-          presetSelect.appendChild(opt);
-        });
-      }
+      const presets = window.ie || BUILTIN_PRESET_REGEX;
+      Object.keys(presets).forEach(k => {
+        const opt = document.createElement('option');
+        opt.value = k;
+        opt.textContent = presets[k].label;
+        presetSelect.appendChild(opt);
+      });
       presetSelect.value = val.presetKey || 'custom';
       patternInput.value = val.value || '';
     } else if (val.category === 'api') {
@@ -23193,10 +23401,11 @@
     const valErrorInput = document.getElementById('drawer-val-error-msg');
     if (!valCatSelect || !val) return;
 
-    valCatSelect.value = val.category || 'text';
-    syncDrawerValidationConditionOptions(val.category, val.condition);
-    syncDrawerValidationPatternAndNotice(val);
-    valErrorInput.value = val.errorMessage || '';
+    const norm = normalizeValidation(val);
+    valCatSelect.value = norm.category || 'text';
+    syncDrawerValidationConditionOptions(norm.category, norm.condition);
+    syncDrawerValidationPatternAndNotice(norm);
+    valErrorInput.value = norm.errorMessage || '';
   }
 
   function renderAiRecommendationBox(advice) {
@@ -23333,9 +23542,12 @@
     customKeyInput.value = q.dataKey || '';
     syncColumnSelectWithKey(q.dataKey || '');
 
-    // バリデーション
+    // バリデーション（旧形式・プリセット・新形式を自動正規化）
     const valToggle = document.getElementById('drawer-validation-toggle');
     const valFields = document.getElementById('drawer-validation-fields');
+    if (q.validation) {
+      q.validation = normalizeValidation(q.validation, q);
+    }
     valToggle.checked = !!q.validation;
     valFields.style.display = q.validation ? 'block' : 'none';
     if (q.validation) {

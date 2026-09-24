@@ -6629,23 +6629,25 @@ body.is-resizing canvas {
 /* ルート道筋ハイライトエフェクト */
 .archify-node-group.is-dimmed,
 .archify-edge-group.is-dimmed {
-  opacity: 0.18 !important;
+  opacity: 0.12 !important;
   transition: opacity 0.25s ease !important;
 }
 
-.archify-node-group.is-active-route rect {
+.archify-node-group.is-active-route rect.archify-node-card-bg {
   stroke: #10b981 !important;
-  stroke-width: 2px !important;
+  stroke-width: 2.2px !important;
   filter: url(#glow-highlight) !important;
 }
 
-.archify-node-group.is-focused-node rect {
-  stroke: #3b82f6 !important;
-  stroke-width: 2.5px !important;
+.archify-node-group.is-focused-node rect.archify-node-card-bg {
+  stroke: #2563eb !important;
+  stroke-width: 2.8px !important;
+  filter: drop-shadow(0 0 8px rgba(37, 99, 235, 0.45)) !important;
 }
 
 .archify-edge-group.is-active-route path {
-  animation: archifyFlowDash 1s linear infinite !important;
+  stroke-dasharray: 6, 4 !important;
+  animation: archifyFlowDash 0.8s linear infinite !important;
 }
 
 @keyframes archifyFlowDash {

@@ -122,13 +122,16 @@
         this.applyTransform();
       }, { passive: false });
 
-      // 背景クリックでハイライト解除
-      viewport.addEventListener('click', (e) => {
-        if (e.target.closest('.archify-node-group') || e.target.closest('.archify-edge-group')) {
+      // 背景クリックでハイライト解除（viewportおよびsvg直下の空クリックを確実に検知）
+      const handleBgClick = (e) => {
+        if (e.target.closest('.archify-node-group') || e.target.closest('.archify-edge-group') || e.target.closest('.flowmap-floating-legend')) {
           return;
         }
         this.clearHighlight();
-      });
+      };
+      viewport.addEventListener('click', handleBgClick);
+      const svgEl = document.getElementById(this.svgId);
+      if (svgEl) svgEl.addEventListener('click', handleBgClick);
 
       // コントロールボタン
       const btnFit = document.getElementById('btn-flow-fit');
@@ -141,7 +144,14 @@
       if (btnZoomOut) btnZoomOut.addEventListener('click', () => this.zoom(0.8));
 
       const btnReset = document.getElementById('btn-flow-reset-route');
-      if (btnReset) btnReset.addEventListener('click', () => this.clearHighlight());
+      if (btnReset) {
+        btnReset.addEventListener('click', () => {
+          this.clearHighlight();
+          if (typeof window.showSectionToast === 'function') {
+            window.showSectionToast('✨ ハイライトを解除しました');
+          }
+        });
+      }
 
       // 📖 ガイドモーダルの開閉ハンドリング
       const guideModal = document.getElementById('modal-flowmap-guide');
@@ -941,6 +951,7 @@
 
       // 背景カード
       const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('class', 'archify-node-card-bg');
       rect.setAttribute('x', node.x);
       rect.setAttribute('y', node.y);
       rect.setAttribute('width', node.width);
@@ -954,6 +965,7 @@
 
       // 左端のアクセントバー
       const bar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      bar.setAttribute('class', 'archify-node-bar');
       bar.setAttribute('x', node.x);
       bar.setAttribute('y', node.y);
       bar.setAttribute('width', '5');
@@ -989,10 +1001,11 @@
         g.appendChild(sub);
       }
 
-      // クリックで道筋（Route Probe）ハイライト
+      // クリックで道筋（Route Probe）ハイライト & エディタ側設問カード連動
       g.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.highlightRouteForNode(node.id);
+        this.highlightRouteForNode(node.id, false);
+        this.syncToEditorQuestion(node.id);
       });
 
       return g;
@@ -1130,45 +1143,117 @@
       return str.length > max ? str.substring(0, max) + '…' : str;
     }
 
-    // ルート道筋（Route Probe）ハイライト
-    highlightRouteForNode(nodeId) {
+    // 🎯 ルート道筋（Route Probe）ハイライト（選択ノードと関連分岐・前後経路を明確に可視化）
+    highlightRouteForNode(nodeId, shouldPan = false) {
+      if (!this.graph || !this.graph.nodes) return;
       this.selectedNodeId = nodeId;
-      const reachableDownstream = new Set([nodeId]);
-      const reachableUpstream = new Set([nodeId]);
+
+      const targetNode = this.graph.nodes.find(n => n.id === nodeId);
+      if (!targetNode) return;
+
+      const activeNodes = new Set([nodeId]);
       const activeEdges = new Set();
 
-      // 1. 下流（Downstream: どこへ行くか）探索 (BFS)
-      const queueDown = [nodeId];
-      while (queueDown.length > 0) {
-        const curr = queueDown.shift();
-        this.graph.edges.forEach(edge => {
-          if (edge.from === curr) {
-            activeEdges.add(edge.id);
-            if (!reachableDownstream.has(edge.to)) {
-              reachableDownstream.add(edge.to);
-              queueDown.push(edge.to);
+      // 🔍 ノード種別に応じたスマート探索
+      if (targetNode.type === 'option') {
+        // --- A. 分岐選択肢ノードの場合 ---
+        // 1. 親の質問ノードと、親からこの選択肢への接続
+        this.graph.edges.forEach(e => {
+          if (e.to === nodeId && e.type === 'option-link') {
+            activeEdges.add(e.id);
+            activeNodes.add(e.from);
+          }
+        });
+
+        // 2. この選択肢からの分岐先エッジ（branch, subq-branch, option-partialなど）
+        this.graph.edges.forEach(e => {
+          if (e.from === nodeId) {
+            activeEdges.add(e.id);
+            activeNodes.add(e.to);
+
+            // 分岐先のセクションまたは設問群をハイライト
+            const destNode = this.graph.nodes.find(n => n.id === e.to);
+            if (destNode && destNode.sectionId) {
+              this.graph.nodes.forEach(sn => {
+                if (sn.sectionId === destNode.sectionId && (sn.type === 'question' || sn.type === 'partial_submit')) {
+                  activeNodes.add(sn.id);
+                }
+              });
+              this.graph.edges.forEach(se => {
+                if (activeNodes.has(se.from) && activeNodes.has(se.to) && se.type === 'sequence') {
+                  activeEdges.add(se.id);
+                }
+              });
             }
+          }
+        });
+
+      } else if (targetNode.type === 'question') {
+        // --- B. 質問ノードの場合 ---
+        // 1. 直前の流入元（直前ノード・セクション遷移など）
+        this.graph.edges.forEach(e => {
+          if (e.to === nodeId) {
+            activeEdges.add(e.id);
+            activeNodes.add(e.from);
+          }
+        });
+
+        // 2. 直後の流出先（直後ノード、または選択肢群）
+        this.graph.edges.forEach(e => {
+          if (e.from === nodeId) {
+            activeEdges.add(e.id);
+            activeNodes.add(e.to);
+
+            // 選択肢（option-link）なら、その選択肢が持つ分岐先もハイライト
+            if (e.type === 'option-link') {
+              this.graph.edges.forEach(oe => {
+                if (oe.from === e.to) {
+                  activeEdges.add(oe.id);
+                  activeNodes.add(oe.to);
+                }
+              });
+            }
+          }
+        });
+
+        // 3. 同一セクション内の主要な流れ（セクション内の文脈を明示）
+        if (targetNode.sectionId) {
+          this.graph.nodes.forEach(sn => {
+            if (sn.sectionId === targetNode.sectionId && (sn.type === 'question' || sn.type === 'partial_submit')) {
+              activeNodes.add(sn.id);
+            }
+          });
+          this.graph.edges.forEach(se => {
+            if (activeNodes.has(se.from) && activeNodes.has(se.to) && se.type === 'sequence') {
+              activeEdges.add(se.id);
+            }
+          });
+        }
+
+      } else if (targetNode.type === 'partial_submit') {
+        // --- C. 途中送信ノードの場合 ---
+        this.graph.edges.forEach(e => {
+          if (e.to === nodeId) {
+            activeEdges.add(e.id);
+            activeNodes.add(e.from);
+          }
+          if (e.from === nodeId) {
+            activeEdges.add(e.id);
+            activeNodes.add(e.to);
+          }
+        });
+
+      } else if (targetNode.type === 'submit') {
+        // --- D. ゴール（送信完了）ノードの場合 ---
+        this.graph.edges.forEach(e => {
+          if (e.to === nodeId) {
+            activeEdges.add(e.id);
+            activeNodes.add(e.from);
           }
         });
       }
 
-      // 2. 上流（Upstream: どこから来たか）探索 (BFS)
-      const queueUp = [nodeId];
-      while (queueUp.length > 0) {
-        const curr = queueUp.shift();
-        this.graph.edges.forEach(edge => {
-          if (edge.to === curr) {
-            activeEdges.add(edge.id);
-            if (!reachableUpstream.has(edge.from)) {
-              reachableUpstream.add(edge.from);
-              queueUp.push(edge.from);
-            }
-          }
-        });
-      }
-
-      const allActiveNodes = new Set([...reachableDownstream, ...reachableUpstream]);
-      this.highlightedRoute = { nodes: allActiveNodes, edges: activeEdges };
+      this.highlightedRoute = { nodes: activeNodes, edges: activeEdges };
 
       // DOMクラスの更新
       const svg = document.getElementById(this.svgId);
@@ -1179,7 +1264,7 @@
         const el = document.getElementById(`archify-node-${node.id}`);
         if (!el) return;
 
-        if (allActiveNodes.has(node.id)) {
+        if (activeNodes.has(node.id)) {
           el.classList.add('is-active-route');
           el.classList.remove('is-dimmed');
           if (node.id === nodeId) {
@@ -1222,9 +1307,67 @@
           }
         }
       });
+
+      // 必要に応じて対象ノードへ視点移動（パン）
+      if (shouldPan) {
+        this.panToNode(nodeId);
+      }
     }
 
-    // ハイライト全解除
+    // 🎥 指定ノードをフローマップ表示領域の中央へスムーズ移動
+    panToNode(nodeId) {
+      if (!this.graph || !this.graph.nodes) return;
+      const node = this.graph.nodes.find(n => n.id === nodeId);
+      if (!node) return;
+
+      const viewport = document.getElementById(this.containerId);
+      if (!viewport) return;
+      const vWidth = viewport.clientWidth || 800;
+      const vHeight = viewport.clientHeight || 600;
+
+      const nodeCenterX = node.x + node.width / 2;
+      const nodeCenterY = node.y + node.height / 2;
+
+      this.translateX = vWidth / 2 - nodeCenterX * this.scale;
+      this.translateY = vHeight / 2 - nodeCenterY * this.scale;
+      this.applyTransform();
+    }
+
+    // 🔄 フローマップでクリックされた設問をエディタ側でも連動スクロール＆強調
+    syncToEditorQuestion(nodeId) {
+      if (!nodeId) return;
+      let targetQId = nodeId;
+      if (nodeId.includes('_opt_')) {
+        targetQId = nodeId.split('_opt_')[0];
+      }
+
+      if (window.G && Array.isArray(window.G.sections)) {
+        for (let sIdx = 0; sIdx < window.G.sections.length; sIdx++) {
+          const sec = window.G.sections[sIdx];
+          const hasQ = (sec.questions || []).some(q => q.id === targetQId);
+          if (hasQ) {
+            if (window.r !== sIdx && typeof window.selectSectionForEditor === 'function') {
+              window.selectSectionForEditor(sIdx);
+            }
+            break;
+          }
+        }
+      }
+
+      setTimeout(() => {
+        const qCard = document.querySelector(`.question-card[data-question-id="${targetQId}"]`) ||
+                      document.getElementById(`question-card-${targetQId}`);
+        if (qCard) {
+          qCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          qCard.classList.remove('street-focus-highlight');
+          void qCard.offsetWidth;
+          qCard.classList.add('street-focus-highlight');
+          setTimeout(() => qCard.classList.remove('street-focus-highlight'), 1800);
+        }
+      }, 150);
+    }
+
+    // ✨ ハイライト全解除
     clearHighlight() {
       this.selectedNodeId = null;
       this.highlightedRoute = { nodes: new Set(), edges: new Set() };
