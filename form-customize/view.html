@@ -2419,6 +2419,63 @@
           return false;
         }
 
+        // 📞 電話番号（全角半角問わずハイフン・長音・空白を自動排除し、数字のみに一律統一）
+        function cleanPhoneNumber(val) {
+          if (!val) return '';
+          let str = String(val).trim();
+          if (str === '-') return str;
+          // 全角数字を半角数字に変換
+          str = str.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+          // 全角半角問わずハイフン、長音記号、ダッシュ、括弧、空白、+ を自動で一掃排除
+          str = str.replace(/[\u002D\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFF70\uFF0D\u30FC\s()（）+]/g, '');
+          return str;
+        }
+
+        // 🎂 生年月日（1996年3月14日、19960314、1996/3/14、1996-03-14等あらゆる形式を西暦1996/03/14に自動変換）
+        function formatBirthdateToSlash(val) {
+          if (!val) return '';
+          let str = String(val).trim();
+          if (!str || str === '-') return str;
+
+          // 1. 全角数字を半角数字に、全角記号を半角に正規化
+          str = str.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+          str = str.replace(/[\u002D\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFF70\uFF0D\u30FC]/g, '-');
+          str = str.replace(/[／]/g, '/').replace(/[．]/g, '.');
+
+          // 2. 「1996年3月14日」「1996/3/14」「1996-3-14」「1996.3.14」形式の処理
+          let match = str.match(/^(\d{4})[年/\-.]\s*(\d{1,2})[月/\-.]\s*(\d{1,2})[日]?$/);
+          if (match) {
+            const y = match[1];
+            const m = match[2].padStart(2, '0');
+            const d = match[3].padStart(2, '0');
+            return `${y}/${m}/${d}`;
+          }
+
+          // 3. 「19960314」（8桁連続数字）形式の処理
+          match = str.match(/^(\d{4})(\d{2})(\d{2})$/);
+          if (match) {
+            const y = match[1];
+            const m = match[2];
+            const d = match[3];
+            const numM = parseInt(m, 10);
+            const numD = parseInt(d, 10);
+            if (numM >= 1 && numM <= 12 && numD >= 1 && numD <= 31) {
+              return `${y}/${m}/${d}`;
+            }
+          }
+
+          // 4. 空白区切り「1996 3 14」
+          match = str.match(/^(\d{4})\s+(\d{1,2})\s+(\d{1,2})$/);
+          if (match) {
+            const y = match[1];
+            const m = match[2].padStart(2, '0');
+            const d = match[3].padStart(2, '0');
+            return `${y}/${m}/${d}`;
+          }
+
+          return str;
+        }
+
         // 📮 郵便番号（7桁）から住所をリアルタイム照会（ZipCloud API連携＋内蔵キャッシュ）
         const zipCache = {
           "1500002": { pref: "東京都", city: "渋谷区", street: "渋谷" },
@@ -3969,6 +4026,32 @@
                   q.validation.value = '^[0-9]{6,7}$';
                   q.validation.errorMessage = '正しい口座番号（6〜7桁の半角数字）を入力してください。';
                   q.validation.presetKey = 'bank_account';
+                }
+              }
+
+              // 📞 電話番号の案内文・バリデーションを一律ハイフンなし仕様に自動同期
+              const isTel = (q.type === 'tel') || (q.dataKey && (q.dataKey.includes('tel') || q.dataKey.includes('phone'))) || (q.title && /電話|tel|phone|携帯/i.test(q.title));
+              if (isTel) {
+                if (!q.description || /ハイフン/.test(q.description)) {
+                  q.description = 'ハイフンなしの半角数字でご入力ください（例: 09012345678）';
+                }
+                if (q.validation && q.validation.category === 'regex') {
+                  q.validation.value = '^0[0-9]{9,10}$';
+                  q.validation.errorMessage = '電話番号はハイフンなしの半角数字（10〜11桁）で入力してください（例: 09012345678）。';
+                  q.validation.presetKey = 'tel_both';
+                }
+              }
+
+              // 🎂 生年月日の案内文・バリデーションを西暦表記仕様に自動同期
+              const isBirth = (q.dataKey && (q.dataKey.includes('birth') || q.dataKey.includes('dob'))) || (q.title && /生年月日|誕生日|誕生|生年/i.test(q.title));
+              if (isBirth) {
+                if (!q.description || !q.description.includes('西暦')) {
+                  q.description = '西暦表記で記載してください（例: 1996/03/14）';
+                }
+                if (q.validation && q.validation.category === 'regex') {
+                  q.validation.value = '^(19|20)\\d{2}/(0[1-9]|1[0-2])/(0[1-9]|[12]\\d|3[01])$';
+                  q.validation.errorMessage = '有効な生年月日を西暦で入力してください（例: 1996/03/14）。';
+                  q.validation.presetKey = 'birthdate';
                 }
               }
             });
@@ -6709,13 +6792,15 @@
               input.placeholder = '回答を入力...';
               input.value = val || '';
 
-              // 金融機関コード・支店番号・郵便番号・口座番号・口座名義（カナ）の自動逆引き・補完ハンドラ
+              // 金融機関コード・支店番号・郵便番号・口座番号・口座名義（カナ）・電話番号・生年月日の自動逆引き・補完ハンドラ
               const isBankCode = q.title && (q.title.includes('金融機関コード') || (q.title.includes('銀行') && q.title.includes('コード')));
               const isBranchCode = q.title && (q.title.includes('支店番号') || q.title.includes('支店コード') || (q.title.includes('店舗コード') || (q.title.includes('支店') && q.title.includes('番号'))));
               const isZipCode = (apiConfig && apiConfig.isZip) || (q.title && (q.title.includes('郵便番号') || q.title.toLowerCase().includes('zip'))) || (q.dataKey === 'zip_code');
               const isAddressField = isAddressFieldQuestion(q);
               const isAccountHolderKana = isAccountHolderKanaField(q);
               const isAcctNum = (q.dataKey === 'account_number') || (q.title && (q.title.includes('口座番号') || (!q.title.includes('名義') && !q.title.includes('種別') && !q.title.includes('区分') && q.title.includes('口座'))));
+              const isTelField = (q.type === 'tel') || (q.dataKey && (q.dataKey.includes('tel') || q.dataKey.includes('phone'))) || (q.title && /電話|tel|phone|携帯/i.test(q.title));
+              const isBirthdateField = (q.dataKey && (q.dataKey.includes('birth') || q.dataKey.includes('dob'))) || (q.title && /生年月日|誕生日|誕生|生年/i.test(q.title));
 
               if (isBankCode) {
                 input.placeholder = '4桁の金融機関コード (例: 0005)';
@@ -6729,6 +6814,12 @@
               } else if (isAcctNum) {
                 input.placeholder = '例: 0477651 (6〜7桁の半角数字)';
                 input.maxLength = 7;
+              } else if (isTelField) {
+                input.placeholder = '例: 09012345678 (ハイフンなし)';
+                input.maxLength = 15;
+              } else if (isBirthdateField) {
+                input.placeholder = '例: 1996/03/14 (西暦)';
+                input.maxLength = 12;
               }
 
               // 口座名義（カナ）のIMEコンポジション状態の追跡（入力中の重複暴走を根絶）
@@ -6766,6 +6857,42 @@
                   if (normalized && normalized !== input.value) {
                     input.value = normalized;
                     formValues[q.id] = normalized;
+                    clearError(q.id);
+                    syncAllSameAsAboveForSource(q.id);
+                  }
+                });
+              }
+
+              // 📞 電話番号（全角半角問わずハイフンを自動排除し、数字のみに統一）
+              if (isTelField) {
+                input.addEventListener('input', (e) => {
+                  const cur = e.target.value;
+                  const cleaned = cleanPhoneNumber(cur);
+                  if (cleaned !== cur) {
+                    const start = e.target.selectionStart;
+                    e.target.value = cleaned;
+                    formValues[q.id] = cleaned;
+                    if (start !== null) e.target.setSelectionRange(cleaned.length, cleaned.length);
+                  }
+                });
+                input.addEventListener('blur', () => {
+                  const cleaned = cleanPhoneNumber(input.value);
+                  if (cleaned !== input.value) {
+                    input.value = cleaned;
+                    formValues[q.id] = cleaned;
+                    clearError(q.id);
+                    syncAllSameAsAboveForSource(q.id);
+                  }
+                });
+              }
+
+              // 🎂 生年月日（1996年3月14日、19960314、1996/3/14、1996-03-14等あらゆる形式を西暦1996/03/14に自動変換）
+              if (isBirthdateField) {
+                input.addEventListener('blur', () => {
+                  const formatted = formatBirthdateToSlash(input.value);
+                  if (formatted && formatted !== input.value) {
+                    input.value = formatted;
+                    formValues[q.id] = formatted;
                     clearError(q.id);
                     syncAllSameAsAboveForSource(q.id);
                   }
@@ -7173,20 +7300,20 @@
             cat = 'regex';
             cond = 'matches';
             pKey = 'birthdate';
-            pat = '^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$';
-            if (!msg) msg = '生年月日を入力してください（例: 1990/01/01）。';
+            pat = '^(19|20)\\d{2}/(0[1-9]|1[0-2])/(0[1-9]|[12]\\d|3[01])$';
+            if (!msg) msg = '有効な生年月日を西暦で入力してください（例: 1996/03/14）。';
           } else if (pat.includes('\\d{3}') || /郵便番号|zip/i.test(title) || key.includes('zip')) {
             cat = 'regex';
             cond = 'matches';
             pKey = 'zip';
             pat = '^\\d{3}-\\d{4}$';
             if (!msg) msg = '郵便番号を入力してください（例: 123-4567）。';
-          } else if (pat.includes('0\\d{1,4}') || /電話番号|tel|phone/i.test(title) || key.includes('tel') || key.includes('phone')) {
+          } else if (pat.includes('0\\d{1,4}') || pat.includes('0\\d{9,10}') || /電話番号|tel|phone/i.test(title) || key.includes('tel') || key.includes('phone')) {
             cat = 'regex';
             cond = 'matches';
             pKey = 'tel_both';
-            pat = '^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$';
-            if (!msg) msg = '電話番号の形式で入力してください（例: 03-1234-5678）。';
+            pat = '^0\\d{9,10}$';
+            if (!msg) msg = '電話番号はハイフンなしの半角数字（10〜11桁）で入力してください（例: 09012345678）。';
           } else if ((pat.includes('T') && pat.includes('13')) || /インボイス|適格請求書/.test(title) || key.includes('invoice')) {
             cat = 'api';
             cond = 'invoice_number';
@@ -7441,6 +7568,32 @@
                       }
                     }
 
+                    // 📞 電話番号は全角半角問わずハイフンを自動排除し、一律ハイフンなし10〜11桁数字で検証＆データ保存
+                    const isTel = (q.type === 'tel') || (q.dataKey && (q.dataKey.includes('tel') || q.dataKey.includes('phone'))) || (q.title && /電話|tel|phone|携帯/i.test(q.title)) || (v.presetKey && v.presetKey.includes('tel'));
+                    if (isTel) {
+                      const cleanPhone = cleanPhoneNumber(testVal);
+                      if (cleanPhone !== testVal) {
+                        testVal = cleanPhone;
+                        formValues[q.id] = cleanPhone;
+                        const inp = card.querySelector('input');
+                        if (inp) inp.value = cleanPhone;
+                      }
+                      regexPattern = '^0\\d{9,10}$';
+                    }
+
+                    // 🎂 生年月日は1996年3月14日、19960314、1996/3/14、1996-03-14等あらゆる形式を西暦1996/03/14に自動変換して検証＆データ保存
+                    const isBirth = (q.dataKey && (q.dataKey.includes('birth') || q.dataKey.includes('dob'))) || (q.title && /生年月日|誕生日|誕生|生年/i.test(q.title)) || (v.presetKey === 'birthdate');
+                    if (isBirth) {
+                      const fmtBirth = formatBirthdateToSlash(testVal);
+                      if (fmtBirth !== testVal) {
+                        testVal = fmtBirth;
+                        formValues[q.id] = fmtBirth;
+                        const inp = card.querySelector('input');
+                        if (inp) inp.value = fmtBirth;
+                      }
+                      regexPattern = '^(19|20)\\d{2}/(0[1-9]|1[0-2])/(0[1-9]|[12]\\d|3[01])$';
+                    }
+
                     let regexPattern = v.value || '.*';
                     // 口座番号における6〜7桁対応（エスケープ崩れや既存の7桁固定設定も含めて完全に堅牢化）
                     if (isAcctNum) {
@@ -7448,6 +7601,10 @@
                     } else if (isAccountHolderKana) {
                       // 口座名義（カナ）は法人略称 カ）、ド）、ユ）等のカッコやドット（.）を確実に許可
                       regexPattern = '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$';
+                    } else if (isTel) {
+                      regexPattern = '^0\\d{9,10}$';
+                    } else if (isBirth) {
+                      regexPattern = '^(19|20)\\d{2}/(0[1-9]|1[0-2])/(0[1-9]|[12]\\d|3[01])$';
                     } else if (regexPattern) {
                       regexPattern = regexPattern.replace(/\\\\/g, '\\');
                     }

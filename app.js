@@ -2920,15 +2920,19 @@ function updateSyncStatusUI() {
   const text = document.getElementById('sync-status-text');
   if (!indicator || !icon || !text) return;
 
+  // クリック可能であることを明示
+  indicator.style.cursor = 'pointer';
+  indicator.title = 'クリックしてクラウドと即時再同期・状態確認';
+
   const hasOfflineErrors = state.syncQueue.some(t => t.status === 'error');
   const isSyncingNow = state.syncQueue.some(t => t.status === 'pending');
 
   if (state.syncQueue.length === 0) {
     icon.textContent = '🟢';
     text.textContent = '同期済み';
-    indicator.style.background = 'var(--bg-surface-elevated)';
-    indicator.style.color = 'var(--text-secondary)';
-    indicator.style.borderColor = 'var(--border-color)';
+    indicator.style.background = 'var(--bg-surface-elevated, #f8f9fa)';
+    indicator.style.color = 'var(--text-secondary, #5f6368)';
+    indicator.style.borderColor = 'var(--border-color, #dadce0)';
   } else if (hasOfflineErrors) {
     icon.textContent = '☁️';
     text.textContent = `未同期の変更が ${state.syncQueue.length} 件あります (オフライン)`;
@@ -2938,9 +2942,49 @@ function updateSyncStatusUI() {
   } else if (isSyncingNow) {
     icon.textContent = '🔄';
     text.textContent = '同期中...';
-    indicator.style.background = 'var(--bg-surface-elevated)';
-    indicator.style.color = 'var(--text-secondary)';
-    indicator.style.borderColor = 'var(--border-color)';
+    indicator.style.background = 'var(--bg-surface-elevated, #f8f9fa)';
+    indicator.style.color = 'var(--text-secondary, #5f6368)';
+    indicator.style.borderColor = 'var(--border-color, #dadce0)';
+  }
+
+  // 初回クリックリスナーの登録（重複登録防止フラグつき）
+  if (!indicator.dataset.syncListenerAttached) {
+    indicator.dataset.syncListenerAttached = 'true';
+    indicator.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (state.syncQueue.length === 0) {
+        if (typeof showToast === 'function') {
+          showToast('🟢 クラウドと正常に同期されています。', 'info');
+        }
+        return;
+      }
+
+      if (typeof showToast === 'function') {
+        showToast(`🔄 保留中の ${state.syncQueue.length} 件の変更をクラウドへ再送信しています...`, 'info');
+      }
+
+      // エラー状態のタスクを pending に戻して再実行
+      state.syncQueue.forEach(t => t.status = 'pending');
+      updateSyncStatusUI();
+
+      const success = await processSyncQueue(true);
+      if (success) {
+        if (typeof showToast === 'function') {
+          showToast('✅ クラウドとの同期が完了しました。', 'success');
+        }
+      } else {
+        if (typeof showToast === 'function') {
+          showToast('⚠️ 一部のデータ同期に失敗しました。再試行するか、長期間残っている場合はキューをクリアしてください。', 'warning');
+        }
+        // 失敗し続ける古いタスクがある場合、クリアする確認ダイアログ
+        if (state.syncQueue.length > 0 && confirm(`未同期の変更（${state.syncQueue.length}件）を同期できませんでした。\n保留中の古い送信データをクリアして最新のクラウド状態に合わせますか？\n（※すでに保存されたデータは消えません）`)) {
+          clearSyncQueue();
+          if (typeof showToast === 'function') {
+            showToast('✨ 保留キューをクリアし、同期済み状態に更新しました。', 'success');
+          }
+        }
+      }
+    });
   }
 }
 
@@ -2949,45 +2993,98 @@ function saveSyncQueueToStorage() {
   originalSetItem('synapse_sync_queue', JSON.stringify(state.syncQueue));
 }
 
+// 保留キューの手動クリア
+function clearSyncQueue() {
+  state.syncQueue = [];
+  saveSyncQueueToStorage();
+  updateSyncStatusUI();
+}
+
 // 起動時等のキュー復旧
 function loadSyncQueueFromStorage() {
   const saved = localStorage.getItem('synapse_sync_queue');
   if (saved) {
     try {
-      state.syncQueue = JSON.parse(saved);
-      // 再起動時はステータスを待機状態に戻す
-      state.syncQueue.forEach(t => t.status = 'error');
+      let parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        // テストテーブルや破損した無効キーを自動パージ
+        state.syncQueue = parsed.filter(t => {
+          if (!t || !t.key) return false;
+          if (typeof t.key === 'string' && (t.key.includes('table_test_') || t.key.startsWith('synapse_table_table_test_'))) return false;
+          return true;
+        });
+        state.syncQueue.forEach(t => t.status = 'error');
+      } else {
+        state.syncQueue = [];
+      }
       updateSyncStatusUI();
+
+      // 起動直後に即座にバックグラウンド同期を試行（30秒放置を防止！）
+      setTimeout(() => {
+        if (state.syncQueue.length > 0 && typeof processSyncQueue === 'function') {
+          processSyncQueue();
+        }
+      }, 1000);
     } catch (e) {
       console.error("[Supabase] Failed to parse sync queue:", e);
+      state.syncQueue = [];
+      updateSyncStatusUI();
     }
+  } else {
+    state.syncQueue = [];
+    updateSyncStatusUI();
   }
 }
 
 // 送信待ちキューのバックグラウンド再送信処理
-async function processSyncQueue() {
-  if (state.syncQueue.length === 0 || !supabaseClient) return;
-
-  const failedTasks = state.syncQueue.filter(t => t.status === 'error');
-  if (failedTasks.length === 0) return;
-
-  console.log(`[Supabase] Retrying ${failedTasks.length} pending sync tasks...`);
-  
-  for (const task of failedTasks) {
-    await syncToSupabase(task.key, task.value);
+async function processSyncQueue(forceImmediate = false) {
+  if (state.syncQueue.length === 0) {
+    updateSyncStatusUI();
+    return true;
   }
+  if (!supabaseClient) {
+    console.warn('[Supabase] Client not ready for processSyncQueue.');
+    return false;
+  }
+
+  const pendingOrErrorTasks = state.syncQueue.filter(t => t.status === 'error' || t.status === 'pending');
+  if (pendingOrErrorTasks.length === 0) return true;
+
+  console.log(`[Supabase] Retrying ${pendingOrErrorTasks.length} pending sync tasks...`);
+  
+  let allSuccess = true;
+  for (const task of [...pendingOrErrorTasks]) {
+    try {
+      task.retryCount = (task.retryCount || 0) + 1;
+      await syncToSupabase(task.key, task.value);
+    } catch(err) {
+      console.error(`[Supabase] Task retry failed for key ${task.key}:`, err);
+      allSuccess = false;
+      // 5回以上失敗した孤立タスクは自動破棄してスタック防止
+      if (task.retryCount >= 5) {
+        console.warn(`[Supabase] Auto-purging stuck sync task after 5 failures: ${task.key}`);
+        state.syncQueue = state.syncQueue.filter(t => t.key !== task.key);
+        saveSyncQueueToStorage();
+      }
+    }
+  }
+
+  updateSyncStatusUI();
+  return state.syncQueue.length === 0;
 }
 
 // オンライン復帰時の自動イベントリスナー
 window.addEventListener('online', () => {
   console.log("[Network] Connection recovered. Triggering sync queue retry...");
-  processSyncQueue();
+  processSyncQueue(true);
 });
 
-// 定期タイマーによる再試行（30秒おき）
+// 定期タイマーによる再試行（15秒おきに短縮してより素早く同期）
 setInterval(() => {
-  processSyncQueue();
-}, 30000);
+  if (state.syncQueue.length > 0) {
+    processSyncQueue();
+  }
+}, 15000);
 
 // クラウド（Supabase）からユーザー個別設定を取得し、ローカルに適用する
 async function loadUserSettingsFromCloud() {

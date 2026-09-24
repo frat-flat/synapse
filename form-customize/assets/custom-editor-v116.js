@@ -20706,8 +20706,23 @@
         f.sections.forEach(s => {
           if (s && Array.isArray(s.questions)) {
             s.questions.forEach(q => {
-              if (q && q.validation) {
+              if (!q) return;
+              if (q.validation) {
                 q.validation = normalizeValidation(q.validation, q);
+              }
+              // 📞 電話番号は一律ハイフンなし案内
+              const isTel = (q.type === 'tel') || (q.dataKey && (q.dataKey.includes('tel') || q.dataKey.includes('phone'))) || (q.title && /電話|tel|phone|携帯/i.test(q.title));
+              if (isTel) {
+                if (!q.description || /ハイフン/.test(q.description)) {
+                  q.description = 'ハイフンなしの半角数字でご入力ください（例: 09012345678）';
+                }
+              }
+              // 🎂 生年月日は西暦表記案内
+              const isBirth = (q.dataKey && (q.dataKey.includes('birth') || q.dataKey.includes('dob'))) || (q.title && /生年月日|誕生日|誕生|生年/i.test(q.title));
+              if (isBirth) {
+                if (!q.description || !q.description.includes('西暦')) {
+                  q.description = '西暦表記で記載してください（例: 1996/03/14）';
+                }
               }
             });
           }
@@ -21825,20 +21840,20 @@
       cat = 'regex';
       cond = 'matches';
       pKey = 'birthdate';
-      pat = '^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$';
-      if (!msg) msg = '生年月日を入力してください（例: 1990/01/01）。';
+      pat = '^(19|20)\\d{2}/(0[1-9]|1[0-2])/(0[1-9]|[12]\\d|3[01])$';
+      if (!msg) msg = '有効な生年月日を西暦で入力してください（例: 1996/03/14）。';
     } else if (pat.includes('\\d{3}') || /郵便番号|zip/i.test(title) || key.includes('zip')) {
       cat = 'regex';
       cond = 'matches';
       pKey = 'zip';
       pat = '^\\d{3}-\\d{4}$';
       if (!msg) msg = '郵便番号を入力してください（例: 123-4567）。';
-    } else if (pat.includes('0\\d{1,4}') || /電話番号|tel|phone/i.test(title) || key.includes('tel') || key.includes('phone')) {
+    } else if (pat.includes('0\\d{1,4}') || pat.includes('0\\d{9,10}') || /電話番号|tel|phone/i.test(title) || key.includes('tel') || key.includes('phone')) {
       cat = 'regex';
       cond = 'matches';
       pKey = 'tel_both';
-      pat = '^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$';
-      if (!msg) msg = '電話番号の形式で入力してください（例: 03-1234-5678）。';
+      pat = '^0\\d{9,10}$';
+      if (!msg) msg = '電話番号はハイフンなしの半角数字（10〜11桁）で入力してください（例: 09012345678）。';
     } else if ((pat.includes('T') && pat.includes('13')) || /インボイス|適格請求書/.test(title) || key.includes('invoice')) {
       cat = 'api';
       cond = 'invoice_number';
@@ -23326,10 +23341,10 @@
     custom: { label: 'カスタム（直接入力）', pattern: '' },
     zip: { label: '郵便番号 (例: 123-4567)', pattern: '^\\d{3}-\\d{4}$' },
     zip_nohyphen: { label: '郵便番号（ハイフンなし） (例: 1234567)', pattern: '^\\d{7}$' },
-    tel_both: { label: '電話番号（固定・携帯 共通） (例: 03-1234-5678 / 090-1234-5678)', pattern: '^(0\\d{1,4}-\\d{1,4}-\\d{3,4})$' },
-    phone: { label: '携帯電話のみ (例: 090-1234-5678)', pattern: '^(070|080|090)-\\d{4}-\\d{4}$' },
-    phone_nohyphen: { label: '携帯電話のみ（ハイフンなし） (例: 09012345678)', pattern: '^(070|080|090)\\d{8}$' },
-    birthdate: { label: '生年月日 (例: 1990/01/01)', pattern: '^(19|20)\\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\\d|3[01])$' },
+    tel_both: { label: '電話番号（ハイフンなし 10〜11桁） (例: 09012345678)', pattern: '^0\\d{9,10}$' },
+    phone: { label: '携帯電話のみ（ハイフンなし 11桁） (例: 09012345678)', pattern: '^(070|080|090)\\d{8}$' },
+    phone_nohyphen: { label: '携帯電話のみ（ハイフンなし 11桁） (例: 09012345678)', pattern: '^(070|080|090)\\d{8}$' },
+    birthdate: { label: '生年月日（西暦 YYYY/MM/DD） (例: 1996/03/14)', pattern: '^(19|20)\\d{2}/(0[1-9]|1[0-2])/(0[1-9]|[12]\\d|3[01])$' },
     bank_account: { label: '口座番号 (6〜7桁)', pattern: '^[0-9]{6,7}$' },
     account_holder_kana: { label: '口座名義（全角カナ・記号）', pattern: '^[ァ-ヶｦ-ﾟー\\-‐―()（）.\\．\\・\\s　]+$' }
   };
