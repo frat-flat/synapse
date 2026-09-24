@@ -441,11 +441,39 @@
                 return false;
               });
 
+              // 同一セクション内にqに依存するサブ質問群が存在するかチェック
+              const hasSiblingSubQ = (sec.questions || []).some(otherQ => {
+                if (otherQ.id === q.id) return false;
+                const sl = otherQ.skipLogic;
+                return sl && sl.dependsOn === q.id;
+              });
+
+              // セクション内でqより後ろにある、qに依存していない最初の通常質問を検索
+              const qIdxInSec = (sec.questions || []).indexOf(q);
+              const nextNormalQ = (sec.questions || []).slice(qIdxInSec + 1).find(otherQ => {
+                if (!otherQ || otherQ.id === q.id) return false;
+                const sl = otherQ.skipLogic;
+                return !sl || sl.dependsOn !== q.id;
+              });
+
               let subText = '';
+              let resolvedTargetId = opt.nextSectionId;
               if (dependentSubQ) {
                 subText = `➔ 入力欄「${dependentSubQ.title}」へ`;
+                resolvedTargetId = dependentSubQ.id;
+              } else if (opt.nextSectionId === 'partial_submit') {
+                subText = '➔ 途中送信へ';
+                resolvedTargetId = `partial_submit_${sec.id}`;
+              } else if (opt.nextSectionId && opt.nextSectionId !== 'next' && opt.nextSectionId !== 'same') {
+                subText = '➔ ' + this.getBranchTargetLabel(opt.nextSectionId, sections, sec.id);
+                resolvedTargetId = opt.nextSectionId;
+              } else if (hasSiblingSubQ && nextNormalQ) {
+                // サブ質問をスキップして同セクション内の後続通常設問へ合流
+                subText = `➔ 入力欄「${nextNormalQ.title}」へ`;
+                resolvedTargetId = nextNormalQ.id;
               } else {
                 subText = '➔ ' + this.getBranchTargetLabel(opt.nextSectionId, sections, sec.id);
+                resolvedTargetId = opt.nextSectionId;
               }
 
               nodes.push({
@@ -460,7 +488,7 @@
                 y: curY,
                 width: nodeWidth - 20,
                 height: 44,
-                targetId: dependentSubQ ? dependentSubQ.id : opt.nextSectionId
+                targetId: resolvedTargetId
               });
 
               // 質問から選択肢への縦エッジ
@@ -693,6 +721,9 @@
 
             let targetId = opt.nextSectionId;
             let label = `「${opt.label}」選択時`;
+            let edgeType = 'branch';
+            let edgeColor = '#f97316';
+            let edgeOffset = 16;
 
             if (targetId === 'submit') {
               targetId = 'submit';
@@ -700,7 +731,7 @@
               targetId = getSectionTargetId(targetId);
             } else {
               // もし同セクション内に別の選択肢で出現する条件付き質問があり、
-              // かつこの選択肢ではそれがスキップされてセクション末尾に至る場合
+              // かつこの選択肢ではそれがスキップされる場合
               const hasSiblingSubQ = (sec.questions || []).some(otherQ => {
                 if (otherQ.id === q.id) return false;
                 const sl = otherQ.skipLogic;
@@ -708,25 +739,42 @@
               });
 
               if (hasSiblingSubQ) {
-                // セクションの次アクションへ直通
-                const act = sec.nextAction || 'next';
-                if (act === 'partial_submit') {
-                  targetId = `partial_submit_${sec.id}`;
-                } else if (act === 'next') {
-                  const nextSec = findNextEligibleSection(secIdx + 1, sec);
-                  targetId = nextSec ? getSectionTargetId(nextSec.id) : 'submit';
-                } else if (act === 'submit') {
-                  targetId = 'submit';
+                // セクション内でqより後ろにある、qに依存していない最初の通常質問を探す
+                const qIdxInSec = (sec.questions || []).indexOf(q);
+                const nextNormalQ = (sec.questions || []).slice(qIdxInSec + 1).find(otherQ => {
+                  if (!otherQ || otherQ.id === q.id) return false;
+                  const sl = otherQ.skipLogic;
+                  return !sl || sl.dependsOn !== q.id;
+                });
+
+                if (nextNormalQ) {
+                  // 🌟 汎用設計: 後続の通常質問へ直ちに合流する！
+                  targetId = nextNormalQ.id;
+                  edgeType = 'subq-skip';
+                  edgeColor = '#10b981';
+                  edgeOffset = 16 + (originalIdx % 3) * 10;
+                  label = `「${opt.label}」選択時（入力不要）`;
                 } else {
-                  const resolvedSec = sections.find(s => s.id === act);
-                  if (resolvedSec) {
-                    targetId = getSectionTargetId(resolvedSec.id);
-                  } else {
+                  // セクション内に後続質問が一切ない場合のみ、セクションの次アクションへ直通
+                  const act = sec.nextAction || 'next';
+                  if (act === 'partial_submit') {
+                    targetId = `partial_submit_${sec.id}`;
+                  } else if (act === 'next') {
                     const nextSec = findNextEligibleSection(secIdx + 1, sec);
                     targetId = nextSec ? getSectionTargetId(nextSec.id) : 'submit';
+                  } else if (act === 'submit') {
+                    targetId = 'submit';
+                  } else {
+                    const resolvedSec = sections.find(s => s.id === act);
+                    if (resolvedSec) {
+                      targetId = getSectionTargetId(resolvedSec.id);
+                    } else {
+                      const nextSec = findNextEligibleSection(secIdx + 1, sec);
+                      targetId = nextSec ? getSectionTargetId(nextSec.id) : 'submit';
+                    }
                   }
+                  label = `「${opt.label}」選択時（入力不要）`;
                 }
-                label = `「${opt.label}」選択時（入力不要）`;
               } else {
                 targetId = null;
               }
@@ -737,10 +785,11 @@
                 id: `edge-branch-${optId}`,
                 from: optId,
                 to: targetId,
-                type: 'branch',
+                type: edgeType,
+                offset: edgeOffset,
                 label: label,
                 dashed: true,
-                color: '#f97316'
+                color: edgeColor
               });
             }
           });
@@ -987,9 +1036,10 @@
         x2 = toNode.x + toNode.width;
         y2 = toNode.y + toNode.height / 2;
         pathD = `M ${x1} ${y1} H ${outX} V ${y2} H ${x2}`;
-      } else if (edge.type === 'subq-branch') {
-        // 同一セクション内の条件付き質問への分岐（右側を迂回して接続）
-        const outX = Math.max(fromNode.x + fromNode.width, toNode.x + toNode.width) + 16;
+      } else if (edge.type === 'subq-branch' || edge.type === 'subq-skip') {
+        // 同一セクション内の条件付き質問への分岐またはスキップ合流（右側を迂回して接続）
+        const offset = edge.offset || 16;
+        const outX = Math.max(fromNode.x + fromNode.width, toNode.x + toNode.width) + offset;
         x1 = fromNode.x + fromNode.width;
         y1 = fromNode.y + fromNode.height / 2;
         x2 = toNode.x + toNode.width;
@@ -1011,14 +1061,14 @@
       path.setAttribute('d', pathD);
       path.setAttribute('fill', 'none');
       path.setAttribute('stroke', edge.color || '#94a3b8');
-      path.setAttribute('stroke-width', edge.type === 'branch' ? '2' : '1.5');
+      path.setAttribute('stroke-width', (edge.type === 'branch' || edge.type === 'subq-skip' || edge.type === 'subq-branch') ? '2' : '1.5');
       if (edge.dashed) {
         path.setAttribute('stroke-dasharray', '5 4');
       }
 
       // マーカー
       let markerId = 'marker-arrow-default';
-      if (edge.type === 'subq-branch') markerId = 'marker-arrow-subq';
+      if (edge.type === 'subq-branch' || edge.type === 'subq-skip') markerId = 'marker-arrow-subq';
       else if (edge.type === 'branch') markerId = 'marker-arrow-branch';
       else if (edge.type === 'partial-submit' || edge.type === 'to-partial' || edge.type === 'option-partial') markerId = 'marker-arrow-partial';
       else if (edge.type === 'section-transition' || edge.type === 'start') markerId = 'marker-arrow-section';
@@ -1033,8 +1083,9 @@
         let textAnchor = 'middle';
         let labelColor = edge.type === 'branch' ? '#ea580c' : '#2563eb';
 
-        if (edge.type === 'subq-branch') {
-          const outX = Math.max(fromNode.x + fromNode.width, toNode.x + toNode.width) + 16;
+        if (edge.type === 'subq-branch' || edge.type === 'subq-skip') {
+          const offset = edge.offset || 16;
+          const outX = Math.max(fromNode.x + fromNode.width, toNode.x + toNode.width) + offset;
           midX = outX + 6;
           midY = (y1 + y2) / 2;
           textAnchor = 'start';
@@ -1163,7 +1214,7 @@
             path.setAttribute('stroke', edge.color || '#94a3b8');
             path.setAttribute('stroke-width', edge.type === 'branch' ? '2' : '1.5');
             let m = 'marker-arrow-default';
-            if (edge.type === 'subq-branch') m = 'marker-arrow-subq';
+            if (edge.type === 'subq-branch' || edge.type === 'subq-skip') m = 'marker-arrow-subq';
             else if (edge.type === 'branch') m = 'marker-arrow-branch';
             else if (edge.type === 'partial-submit' || edge.type === 'to-partial' || edge.type === 'option-partial') m = 'marker-arrow-partial';
             else if (edge.type === 'section-transition' || edge.type === 'start') m = 'marker-arrow-section';
@@ -1194,7 +1245,7 @@
           path.setAttribute('stroke', edge.color || '#94a3b8');
           path.setAttribute('stroke-width', edge.type === 'branch' ? '2' : '1.5');
           let m = 'marker-arrow-default';
-          if (edge.type === 'subq-branch') m = 'marker-arrow-subq';
+          if (edge.type === 'subq-branch' || edge.type === 'subq-skip') m = 'marker-arrow-subq';
           else if (edge.type === 'branch') m = 'marker-arrow-branch';
           else if (edge.type === 'partial-submit' || edge.type === 'to-partial' || edge.type === 'option-partial') m = 'marker-arrow-partial';
           else if (edge.type === 'section-transition' || edge.type === 'start') m = 'marker-arrow-section';
