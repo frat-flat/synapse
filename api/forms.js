@@ -157,22 +157,60 @@ module.exports = async (req, res) => {
         formsToSave = formsToSave.filter(f => f && !purgedKeywords.some(p => (f.title || '').includes(p)));
       }
 
-      // Supabase synapse_storage へ保存（Upsert）
-      const saveUrl = `${supabaseUrl}/rest/v1/synapse_storage`;
-      const saveRes = await fetch(saveUrl, {
-        method: 'POST',
+      // 🛡️ 税務区分（ラジオ）とインボイス番号のdataKey分離サニタイズ
+      if (Array.isArray(formsToSave)) {
+        formsToSave.forEach(f => {
+          if (f && Array.isArray(f.sections)) {
+            f.sections.forEach(s => {
+              if (s && Array.isArray(s.questions)) {
+                s.questions.forEach(q => {
+                  if (!q) return;
+                  const t = (q.title || '').trim();
+                  if ((t.includes('税務') || t.includes('税務区分') || t.includes('登録状況')) && q.type === 'radio') {
+                    q.dataKey = 'tax_invoice_status';
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+
+      // Supabase synapse_storage へ保存（PATCH優先、なければPOST）
+      const patchUrl = `${supabaseUrl}/rest/v1/synapse_storage?key=eq.${encodeURIComponent(STORAGE_KEY)}`;
+      let saveRes = await fetch(patchUrl, {
+        method: 'PATCH',
         headers: {
           apikey: supabaseAnonKey,
           Authorization: `Bearer ${supabaseAnonKey}`,
           'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates,return=representation'
+          Prefer: 'return=representation'
         },
         body: JSON.stringify({
-          key: STORAGE_KEY,
           value: formsToSave,
           updated_at: new Date().toISOString()
         })
       });
+
+      const patchData = saveRes.ok ? await saveRes.json() : null;
+      if (!patchData || patchData.length === 0) {
+        // PATCHで行が更新されなかった場合はPOSTで挿入
+        const postUrl = `${supabaseUrl}/rest/v1/synapse_storage`;
+        saveRes = await fetch(postUrl, {
+          method: 'POST',
+          headers: {
+            apikey: supabaseAnonKey,
+            Authorization: `Bearer ${supabaseAnonKey}`,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates,return=representation'
+          },
+          body: JSON.stringify({
+            key: STORAGE_KEY,
+            value: formsToSave,
+            updated_at: new Date().toISOString()
+          })
+        });
+      }
 
       if (!saveRes.ok) {
         const errText = await saveRes.text();

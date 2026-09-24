@@ -20478,25 +20478,41 @@
           clearTimeout(timeoutId);
         }
 
-        // フォールバック または 確実を期すための Supabase REST API 直接 Upsert
+        // フォールバック または 確実を期すための Supabase REST API 直接 PATCH / POST
         if (!syncSuccess) {
           try {
             const sbUrl = 'https://uefiuhywfsnrepiouofq.supabase.co';
             const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZml1aHl3ZnNucmVwaW91b2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMTMsImV4cCI6MjA5NjQ3OTExM30.jRluR2-bcMnKf7CSMRM4CtaRlHT4FrBkQWV_lVuWZxQ';
-            const sbRes = await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
-              method: 'POST',
+            let sbRes = await fetch(`${sbUrl}/rest/v1/synapse_storage?key=eq.synapse_form_customize_all_forms`, {
+              method: 'PATCH',
               headers: {
                 apikey: sbKey,
                 Authorization: `Bearer ${sbKey}`,
                 'Content-Type': 'application/json',
-                Prefer: 'resolution=merge-duplicates'
+                Prefer: 'return=representation'
               },
               body: JSON.stringify({
-                key: 'synapse_form_customize_all_forms',
                 value: forms,
                 updated_at: new Date().toISOString()
               })
             });
+            const patchData = sbRes.ok ? await sbRes.json() : null;
+            if (!patchData || patchData.length === 0) {
+              sbRes = await fetch(`${sbUrl}/rest/v1/synapse_storage`, {
+                method: 'POST',
+                headers: {
+                  apikey: sbKey,
+                  Authorization: `Bearer ${sbKey}`,
+                  'Content-Type': 'application/json',
+                  Prefer: 'resolution=merge-duplicates'
+                },
+                body: JSON.stringify({
+                  key: 'synapse_form_customize_all_forms',
+                  value: forms,
+                  updated_at: new Date().toISOString()
+                })
+              });
+            }
             if (sbRes.ok) {
               syncSuccess = true;
             }
