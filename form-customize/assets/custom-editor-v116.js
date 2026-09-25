@@ -27401,71 +27401,65 @@
       });
     }
 
-    // サマリー内のクイック一括適用ボタン
-    const quickApplyBtn = document.getElementById('btn-quick-apply-global-ai');
-    if (quickApplyBtn) {
-      quickApplyBtn.addEventListener('click', function(e) {
+    // イベント委譲により、エディタタブ切り替えやDOM再描画後も全ボタン操作を確実に捕捉
+    document.addEventListener('click', function(e) {
+      // 1. 「生成 ✨」ボタン
+      const submitBtn = e.target.closest('#btn-submit-global-ai-prompt');
+      if (submitBtn) {
         e.preventDefault();
         e.stopPropagation();
-        applyGlobalAiAdvice();
-      });
-    }
+        const input = document.getElementById('global-ai-prompt-input');
+        const text = input ? input.value.trim() : '';
+        fetchDynamicFormGlobalDiagnosis(text);
+        return;
+      }
 
-    // 「🔄 再診断」ボタン
-    const refreshBtn = document.getElementById('btn-refresh-global-ai');
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', function(e) {
+      // 2. 「🔄 再診断」ボタン
+      const refreshBtn = e.target.closest('#btn-refresh-global-ai');
+      if (refreshBtn) {
         e.preventDefault();
         e.stopPropagation();
         fetchDynamicFormGlobalDiagnosis();
-      });
-    }
+        return;
+      }
 
-    // 「💬 自由指示・相談」ボタン
-    const togglePromptBtn = document.getElementById('btn-toggle-global-ai-prompt');
-    const promptContainer = document.getElementById('global-ai-prompt-container');
-    const promptInput = document.getElementById('global-ai-prompt-input');
-
-    if (togglePromptBtn && promptContainer) {
-      togglePromptBtn.addEventListener('click', function(e) {
+      // 3. 「💬 自由指示・相談」ボタン
+      const togglePromptBtn = e.target.closest('#btn-toggle-global-ai-prompt');
+      if (togglePromptBtn) {
         e.preventDefault();
         e.stopPropagation();
-        if (accordion) accordion.open = true;
-        const isHidden = (promptContainer.style.display === 'none');
-        promptContainer.style.display = isHidden ? 'block' : 'none';
-        if (isHidden && promptInput) promptInput.focus();
-      });
-    }
+        const acc = document.getElementById('global-ai-accordion');
+        if (acc) acc.open = true;
+        const promptContainer = document.getElementById('global-ai-prompt-container');
+        const promptInput = document.getElementById('global-ai-prompt-input');
+        if (promptContainer) {
+          const isHidden = (promptContainer.style.display === 'none');
+          promptContainer.style.display = isHidden ? 'block' : 'none';
+          if (isHidden && promptInput) promptInput.focus();
+        }
+        return;
+      }
 
-    // 「生成 ✨」ボタン
-    const submitBtn = document.getElementById('btn-submit-global-ai-prompt');
-    if (submitBtn) {
-      submitBtn.addEventListener('click', function(e) {
+      // 4. 「⚡ おすすめ設定を一括適用」ボタン
+      const applyBtn = e.target.closest('#btn-apply-global-ai-all, #btn-quick-apply-global-ai');
+      if (applyBtn) {
         e.preventDefault();
-        const text = promptInput ? promptInput.value.trim() : '';
-        fetchDynamicFormGlobalDiagnosis(text);
-      });
-    }
+        e.stopPropagation();
+        applyGlobalAiAdvice();
+        return;
+      }
+    }, true);
 
     // テキストエリアで Ctrl+Enter / Meta+Enter で送信
-    if (promptInput) {
-      promptInput.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function(e) {
+      if (e.target && e.target.id === 'global-ai-prompt-input') {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
           e.preventDefault();
-          const text = promptInput.value.trim();
+          const text = e.target.value.trim();
           fetchDynamicFormGlobalDiagnosis(text);
         }
-      });
-    }
-
-    // 「⚡ おすすめ設定を一括適用」ボタン
-    const applyBtn = document.getElementById('btn-apply-global-ai-all');
-    if (applyBtn) {
-      applyBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        applyGlobalAiAdvice();
-      });
-    }
+      }
+    }, true);
 
     // 初期化時に初期診断を実行
     setTimeout(function() {
