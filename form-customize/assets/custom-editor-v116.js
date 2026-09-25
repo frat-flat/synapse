@@ -27273,9 +27273,30 @@
     showGlobalToast('⚡ おすすめ設定（タイトル・説明文・配色・所要時間等）を一括適用しました！');
   }
 
+  let activeDiagnosisController = null;
+
   // 動的AI診断・プロデュースの実行（タイムアウト制御付き）
   async function fetchDynamicFormGlobalDiagnosis(promptMessage = '') {
-    if (isGlobalAiDiagnosing) return;
+    // 入力欄にプロンプトがあれば自動取得
+    if (!promptMessage) {
+      const promptInput = document.getElementById('global-ai-prompt-input');
+      if (promptInput && promptInput.value.trim()) {
+        promptMessage = promptInput.value.trim();
+      }
+    }
+
+    if (isGlobalAiDiagnosing) {
+      if (promptMessage) {
+        // ユーザーからの指示がある場合は先行診断をキャンセルして割り込み実行
+        if (activeDiagnosisController) {
+          try { activeDiagnosisController.abort(); } catch (e) {}
+          activeDiagnosisController = null;
+        }
+        isGlobalAiDiagnosing = false;
+      } else {
+        return;
+      }
+    }
     isGlobalAiDiagnosing = true;
 
     const statusBadge = document.getElementById('global-ai-status-badge');
@@ -27301,6 +27322,7 @@
 
     // 7秒タイムアウト設定
     const controller = new AbortController();
+    activeDiagnosisController = controller;
     const timeoutId = setTimeout(() => controller.abort(), 7000);
 
     try {
@@ -27330,6 +27352,8 @@
     } catch (err) {
       clearTimeout(timeoutId);
       console.warn('[FormGlobalAI] API request failed or timed out, fallback to local rule-based advice:', err);
+    } finally {
+      activeDiagnosisController = null;
     }
 
     // API未取得または失敗時は高品質ローカルルールベース診断をフォールバック使用
