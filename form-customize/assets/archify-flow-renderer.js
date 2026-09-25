@@ -1166,101 +1166,36 @@
       const activeNodes = new Set([nodeId]);
       const activeEdges = new Set();
 
-      // 🔍 ノード種別に応じたスマート探索
-      if (targetNode.type === 'option') {
-        // --- A. 分岐選択肢ノードの場合 ---
-        // 1. 親の質問ノードと、親からこの選択肢への接続
-        this.graph.edges.forEach(e => {
-          if (e.to === nodeId && e.type === 'option-link') {
-            activeEdges.add(e.id);
-            activeNodes.add(e.from);
-          }
-        });
-
-        // 2. この選択肢からの分岐先エッジ（branch, subq-branch, option-partialなど）
-        this.graph.edges.forEach(e => {
-          if (e.from === nodeId) {
-            activeEdges.add(e.id);
-            activeNodes.add(e.to);
-
-            // 分岐先のセクションまたは設問群をハイライト
-            const destNode = this.graph.nodes.find(n => n.id === e.to);
-            if (destNode && destNode.sectionId) {
-              this.graph.nodes.forEach(sn => {
-                if (sn.sectionId === destNode.sectionId && (sn.type === 'question' || sn.type === 'partial_submit')) {
-                  activeNodes.add(sn.id);
-                }
-              });
-              this.graph.edges.forEach(se => {
-                if (activeNodes.has(se.from) && activeNodes.has(se.to) && se.type === 'sequence') {
-                  activeEdges.add(se.id);
-                }
-              });
+      // 1. 下流（Downstream: どこへ行くか）完全ルート探索 (BFS)
+      const queueDown = [nodeId];
+      const visitedDown = new Set([nodeId]);
+      while (queueDown.length > 0) {
+        const curr = queueDown.shift();
+        this.graph.edges.forEach(edge => {
+          if (edge.from === curr) {
+            activeEdges.add(edge.id);
+            if (!visitedDown.has(edge.to)) {
+              visitedDown.add(edge.to);
+              activeNodes.add(edge.to);
+              queueDown.push(edge.to);
             }
           }
         });
+      }
 
-      } else if (targetNode.type === 'question') {
-        // --- B. 質問ノードの場合 ---
-        // 1. 直前の流入元（直前ノード・セクション遷移など）
-        this.graph.edges.forEach(e => {
-          if (e.to === nodeId) {
-            activeEdges.add(e.id);
-            activeNodes.add(e.from);
-          }
-        });
-
-        // 2. 直後の流出先（直後ノード、または選択肢群）
-        this.graph.edges.forEach(e => {
-          if (e.from === nodeId) {
-            activeEdges.add(e.id);
-            activeNodes.add(e.to);
-
-            // 選択肢（option-link）なら、その選択肢が持つ分岐先もハイライト
-            if (e.type === 'option-link') {
-              this.graph.edges.forEach(oe => {
-                if (oe.from === e.to) {
-                  activeEdges.add(oe.id);
-                  activeNodes.add(oe.to);
-                }
-              });
+      // 2. 上流（Upstream: どこから来たか）完全ルート探索 (BFS)
+      const queueUp = [nodeId];
+      const visitedUp = new Set([nodeId]);
+      while (queueUp.length > 0) {
+        const curr = queueUp.shift();
+        this.graph.edges.forEach(edge => {
+          if (edge.to === curr) {
+            activeEdges.add(edge.id);
+            if (!visitedUp.has(edge.from)) {
+              visitedUp.add(edge.from);
+              activeNodes.add(edge.from);
+              queueUp.push(edge.from);
             }
-          }
-        });
-
-        // 3. 同一セクション内の主要な流れ（セクション内の文脈を明示）
-        if (targetNode.sectionId) {
-          this.graph.nodes.forEach(sn => {
-            if (sn.sectionId === targetNode.sectionId && (sn.type === 'question' || sn.type === 'partial_submit')) {
-              activeNodes.add(sn.id);
-            }
-          });
-          this.graph.edges.forEach(se => {
-            if (activeNodes.has(se.from) && activeNodes.has(se.to) && se.type === 'sequence') {
-              activeEdges.add(se.id);
-            }
-          });
-        }
-
-      } else if (targetNode.type === 'partial_submit') {
-        // --- C. 途中送信ノードの場合 ---
-        this.graph.edges.forEach(e => {
-          if (e.to === nodeId) {
-            activeEdges.add(e.id);
-            activeNodes.add(e.from);
-          }
-          if (e.from === nodeId) {
-            activeEdges.add(e.id);
-            activeNodes.add(e.to);
-          }
-        });
-
-      } else if (targetNode.type === 'submit') {
-        // --- D. ゴール（送信完了）ノードの場合 ---
-        this.graph.edges.forEach(e => {
-          if (e.to === nodeId) {
-            activeEdges.add(e.id);
-            activeNodes.add(e.from);
           }
         });
       }
