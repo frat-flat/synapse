@@ -1788,6 +1788,19 @@
             testBanner.style.display = isTestEnv ? 'block' : 'none';
           }
 
+          // 🔗 アポ連携・紹介者URLパラメータの即時グローバル展開
+          const earlyIntroId = search.get('introducer_id') || search.get('intro_id') || search.get('introducerId');
+          if (earlyIntroId) window.FORM_INTRODUCER_ID = earlyIntroId;
+
+          const earlyIntroBiz = search.get('introducer_business_name') || search.get('business_name') || search.get('introducer_name') || search.get('introducer');
+          if (earlyIntroBiz) {
+            window.FORM_INTRODUCER_BUSINESS_NAME = earlyIntroBiz;
+            window.FORM_INTRODUCER_NAME = earlyIntroBiz;
+          }
+
+          const earlyIntroRep = search.get('introducer_representative_name') || search.get('representative_name') || search.get('rep_name');
+          if (earlyIntroRep) window.FORM_INTRODUCER_REPRESENTATIVE_NAME = earlyIntroRep;
+
           const hash = window.location.hash || '';
 
           let dataParam = null;
@@ -1857,7 +1870,13 @@
               if (tokenInfo.issuerId) window.FORM_ISSUER_ID = tokenInfo.issuerId;
               if (tokenInfo.issuerName) window.FORM_ISSUER_NAME = tokenInfo.issuerName;
               if (tokenInfo.introducerId) window.FORM_INTRODUCER_ID = tokenInfo.introducerId;
-              if (tokenInfo.introducerName) window.FORM_INTRODUCER_NAME = tokenInfo.introducerName;
+              const effBiz = tokenInfo.introducerBusinessName || tokenInfo.introducerName || tokenInfo.business_name || '';
+              if (effBiz) {
+                window.FORM_INTRODUCER_BUSINESS_NAME = effBiz;
+                window.FORM_INTRODUCER_NAME = effBiz;
+              }
+              const effRep = tokenInfo.introducerRepresentativeName || tokenInfo.representative_name || '';
+              if (effRep) window.FORM_INTRODUCER_REPRESENTATIVE_NAME = effRep;
               if (tokenInfo.appointSnapshot) window.FORM_APPOINT_SNAPSHOT = tokenInfo.appointSnapshot;
             }
           }
@@ -2088,6 +2107,19 @@
           const issuerId = search.get('uid') || search.get('issuer_id') || search.get('issuer') || window.FORM_ISSUER_ID;
           window.FORM_ISSUER_ID = issuerId;
 
+          // アポ連携・紹介者URLパラメータの取得
+          const introducerIdParam = search.get('introducer_id') || search.get('intro_id') || search.get('introducerId');
+          if (introducerIdParam) window.FORM_INTRODUCER_ID = introducerIdParam;
+
+          const introducerBizParam = search.get('introducer_business_name') || search.get('business_name') || search.get('introducer_name') || search.get('introducer');
+          if (introducerBizParam) {
+            window.FORM_INTRODUCER_BUSINESS_NAME = introducerBizParam;
+            window.FORM_INTRODUCER_NAME = introducerBizParam;
+          }
+
+          const introducerRepParam = search.get('introducer_representative_name') || search.get('representative_name') || search.get('rep_name');
+          if (introducerRepParam) window.FORM_INTRODUCER_REPRESENTATIVE_NAME = introducerRepParam;
+
           if (masterId) {
             // クラウド（Supabase synapse_storage）から最新のリンク状態およびマスタプロファイルを非同期取得（別端末・別ブラウザ対応）
             try {
@@ -2123,6 +2155,17 @@
               }
               if (linkInfo && linkInfo.appointId && !window.FORM_APPOINT_ID) {
                 window.FORM_APPOINT_ID = linkInfo.appointId;
+              }
+              if (linkInfo && linkInfo.introducerId && !window.FORM_INTRODUCER_ID) {
+                window.FORM_INTRODUCER_ID = linkInfo.introducerId;
+              }
+              if (linkInfo && (linkInfo.introducerBusinessName || linkInfo.introducerName || linkInfo.business_name) && !window.FORM_INTRODUCER_BUSINESS_NAME) {
+                const bName = linkInfo.introducerBusinessName || linkInfo.introducerName || linkInfo.business_name;
+                window.FORM_INTRODUCER_BUSINESS_NAME = bName;
+                window.FORM_INTRODUCER_NAME = bName;
+              }
+              if (linkInfo && (linkInfo.introducerRepresentativeName || linkInfo.representative_name) && !window.FORM_INTRODUCER_REPRESENTATIVE_NAME) {
+                window.FORM_INTRODUCER_REPRESENTATIVE_NAME = linkInfo.introducerRepresentativeName || linkInfo.representative_name;
               }
 
               // ⚠️ 連携により無効化されたリンク（status === 'invalidated'）の場合 -> 無効化案内を表示して回答を遮断
@@ -8290,14 +8333,23 @@
             if (snap.sourceCategory) {
               submitData['[アポ] 流入詳細'] = snap.sourceCategory;
             }
-            // 3. 紹介者情報（本登録ID / 仮ID / 氏名）
+            // 3. 紹介者情報（マスタID / 仮ID / 屋号・法人名 / 代表者名）
             if (snap.introducerId) {
               submitData['[アポ] 紹介者ID'] = snap.introducerId;
               submitData['introducer_id'] = snap.introducerId;
             }
-            if (snap.introducerName) {
-              submitData['[アポ] 紹介者名'] = snap.introducerName;
-              submitData['introducer_name'] = snap.introducerName;
+            const snapBiz = snap.introducerBusinessName || snap.introducerName || snap.business_name;
+            if (snapBiz) {
+              submitData['[アポ] 紹介者屋号・法人名'] = snapBiz;
+              submitData['[アポ] 紹介者名'] = snapBiz;
+              submitData['introducer_business_name'] = snapBiz;
+              submitData['introducer'] = snapBiz;
+              submitData['introducer_name'] = snapBiz;
+            }
+            const snapRep = snap.introducerRepresentativeName || snap.representative_name;
+            if (snapRep) {
+              submitData['[アポ] 紹介者代表者名'] = snapRep;
+              submitData['introducer_representative_name'] = snapRep;
             }
             if (snap.memo) {
               submitData['[アポ] 商談メモ'] = snap.memo;
@@ -8324,22 +8376,38 @@
             if (currentIssuerId) submitData['issuer_id'] = currentIssuerId;
           }
 
-          // 紹介者ID（introducer_id / introducer_name）の紐づけ
+          // 紹介者情報（introducer_id / introducer_business_name / introducer_representative_name）の紐づけ
           let currentIntroducerId = window.FORM_INTRODUCER_ID;
-          let currentIntroducerName = '';
+          let currentIntroducerBusinessName = window.FORM_INTRODUCER_BUSINESS_NAME || window.FORM_INTRODUCER_NAME || '';
+          let currentIntroducerRepresentativeName = window.FORM_INTRODUCER_REPRESENTATIVE_NAME || '';
+
           if (window.FORM_MASTER_ID) {
             try {
               const allLinks = JSON.parse(localStorage.getItem('synapse_form_links') || '{}');
               const lk = allLinks[`${window.FORM_MASTER_ID}_${formDefinition.id}`] || window.FORM_TOKEN_INFO;
               if (lk) {
                 if (!currentIntroducerId && lk.introducerId) currentIntroducerId = lk.introducerId;
-                if (lk.introducerName) currentIntroducerName = lk.introducerName;
+                const lkBiz = lk.introducerBusinessName || lk.introducerName || lk.business_name;
+                if (!currentIntroducerBusinessName && lkBiz) currentIntroducerBusinessName = lkBiz;
+                const lkRep = lk.introducerRepresentativeName || lk.representative_name;
+                if (!currentIntroducerRepresentativeName && lkRep) currentIntroducerRepresentativeName = lkRep;
               }
             } catch(e) {}
           }
           if (currentIntroducerId) {
+            submitData['[アポ] 紹介者ID'] = currentIntroducerId;
             submitData['introducer_id'] = currentIntroducerId;
-            if (currentIntroducerName) submitData['introducer_name'] = currentIntroducerName;
+          }
+          if (currentIntroducerBusinessName) {
+            submitData['[アポ] 紹介者屋号・法人名'] = currentIntroducerBusinessName;
+            submitData['[アポ] 紹介者名'] = currentIntroducerBusinessName;
+            submitData['introducer_business_name'] = currentIntroducerBusinessName;
+            submitData['introducer'] = currentIntroducerBusinessName;
+            submitData['introducer_name'] = currentIntroducerBusinessName;
+          }
+          if (currentIntroducerRepresentativeName) {
+            submitData['[アポ] 紹介者代表者名'] = currentIntroducerRepresentativeName;
+            submitData['introducer_representative_name'] = currentIntroducerRepresentativeName;
           }
 
           // アポイントID（本登録後にParty IDとなるアポID）の記録

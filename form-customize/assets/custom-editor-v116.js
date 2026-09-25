@@ -85,11 +85,12 @@
     if (t.includes('口座番号') || t.includes('口座') || t.includes('account_number')) return 'account_number';
     if (t.includes('口座名義') || t.includes('名義') || t.includes('名義人')) return 'account_holder_kana';
 
-    // 7. 同意・確認事項
-    if (t.includes('活動に関する確認') || t.includes('活動確認') || t.includes('確認事項')) return 'activity_confirmation';
-    if (t.includes('契約への同意') || t.includes('規約への同意') || t.includes('利用規約') || t.includes('契約') || t.includes('同意')) return 'contract_agreement';
-    if (t.includes('反社会的勢力') || t.includes('反社')) return 'anti_social_declaration';
+    // 7. 同意・確認事項（※特定性の高い個人情報・反社等を契約・同意より先に判定）
     if (t.includes('個人情報') || t.includes('プライバシー') || t.includes('privacy')) return 'privacy_agreement';
+    if (t.includes('反社会的勢力') || t.includes('反社')) return 'anti_social_declaration';
+    if (t.includes('活動に関する確認') || t.includes('活動確認') || t.includes('確認事項')) return 'activity_confirmation';
+    if (t.includes('契約への同意') || t.includes('規約への同意') || t.includes('利用規約') || t.includes('契約') || t.includes('約款')) return 'contract_agreement';
+    if (t.includes('同意') || t.includes('承諾') || t.includes('確約')) return 'contract_agreement';
 
     // 8. アポイント・日程
     if (t.includes('面談日時') || t.includes('希望日時') || t.includes('日程') || t.includes('アポイント') || t.includes('予約') || t.includes('面談')) return 'preferred_date';
@@ -132,7 +133,12 @@
             if (f && Array.isArray(f.sections)) {
               f.sections.forEach(sec => {
                 (sec.questions || []).forEach(q => {
-                  if (q && q.dataKey && isGarbageDataKey(q.dataKey)) {
+                  if (!q) return;
+                  const qTLow = (q.title || '').toLowerCase();
+                  if ((qTLow.includes('個人情報') || qTLow.includes('プライバシー') || qTLow.includes('privacy')) && q.dataKey === 'contract_agreement') {
+                    q.dataKey = 'privacy_agreement';
+                    updated = true;
+                  } else if (q.dataKey && isGarbageDataKey(q.dataKey)) {
                     q.dataKey = suggestDefaultDataKey(q.title, q.id);
                     updated = true;
                   }
@@ -154,7 +160,12 @@
           let curUpdated = false;
           curForm.sections.forEach(sec => {
             (sec.questions || []).forEach(q => {
-              if (q && q.dataKey && isGarbageDataKey(q.dataKey)) {
+              if (!q) return;
+              const qTLow = (q.title || '').toLowerCase();
+              if ((qTLow.includes('個人情報') || qTLow.includes('プライバシー') || qTLow.includes('privacy')) && q.dataKey === 'contract_agreement') {
+                q.dataKey = 'privacy_agreement';
+                curUpdated = true;
+              } else if (q.dataKey && isGarbageDataKey(q.dataKey)) {
                 q.dataKey = suggestDefaultDataKey(q.title, q.id);
                 curUpdated = true;
               }
@@ -23303,6 +23314,11 @@
   // 🏷️ 設問からタイムスタンプ数字を完全に排除したスマートで安全な物理カラム名判定
   function getEffectiveCleanDataKey(q) {
     if (!q) return 'custom_field';
+    const qTLow = (q.title || '').toLowerCase();
+    if ((qTLow.includes('個人情報') || qTLow.includes('プライバシー') || qTLow.includes('privacy')) && q.dataKey === 'contract_agreement') {
+      q.dataKey = 'privacy_agreement';
+      return 'privacy_agreement';
+    }
     if (q.dataKey && typeof q.dataKey === 'string' && q.dataKey.trim()) {
       const k = q.dataKey.trim();
       if (!isGarbageDataKey(k)) {
@@ -24129,13 +24145,22 @@
     });
 
     // --- 3. 📅 アポイント連携カラム (Appointment Integration) ---
-    // ※ Supabase側には全項目を保持し、Synapse連携は個別選択式（顧客名・アポ担当者も選択可能）
+    // ※ 紹介者マスタID（仮ID）、紹介者屋号・法人名（business_name）、紹介者代表者名（representative_name）を含む全項目
+    // 既存設定との互換性補完
+    if (appointFields.introducer === true) {
+      if (appointFields.introducerId === undefined) appointFields.introducerId = true;
+      if (appointFields.introducerBusinessName === undefined) appointFields.introducerBusinessName = true;
+      if (appointFields.introducerRepresentativeName === undefined) appointFields.introducerRepresentativeName = true;
+    }
+
     const appointDefList = [
       { id: 'appoint_id', key: 'appoint_id', fieldKey: 'appointId', label: 'アポイントID', type: 'text', sampleVal: 'APT_20260930_01', desc: '予約システムや日程調整ツールで発行されたアポイントメントID。面談・商談レコードとの突合キー。' },
       { id: 'appoint_date', key: 'appoint_date', fieldKey: 'appointDate', label: 'アポイント日時', type: 'datetime', sampleVal: '2026-09-30 14:00', desc: '予約された面談・商談の予定日時（YYYY-MM-DD HH:MM形式）。リマインドやスケジュール連動に使用。' },
       { id: 'meeting_type', key: 'meeting_type', fieldKey: 'meetingType', label: '面談形式', type: 'select', sampleVal: 'オンライン (Zoom)', desc: '商談の開催形式（オンライン(Zoom/Meet)、来社、訪問など）。' },
       { id: 'source_category', key: 'source_category', fieldKey: 'sourceCategory', label: '流入経路', type: 'select', sampleVal: 'Web紹介・反響', desc: '顧客の流入経路・発生チャネル（Web反響、広告、紹介など）。マーケティング効果測定に使用。' },
-      { id: 'introducer', key: 'introducer', fieldKey: 'introducer', label: '紹介者 / 代理店', type: 'text', sampleVal: 'パートナー営業第1部', desc: '案件を紹介した代理店、取次パートナー、または紹介元担当者の名称。紹介報酬・連携追跡に使用。' },
+      { id: 'introducer_id', key: 'introducer_id', fieldKey: 'introducerId', label: '紹介者ID (マスタID / 仮ID)', type: 'text', sampleVal: 'PT94821', desc: '案件を紹介した代理店・取次パートナーのマスタID（本登録IDまたは仮ID）。紹介元テーブルや報酬管理とのリレーションキーに使用。' },
+      { id: 'introducer_business_name', key: 'introducer_business_name', fieldKey: 'introducerBusinessName', label: '紹介者 屋号・法人名', type: 'text', sampleVal: '株式会社シナプスパートナーズ', desc: '案件を紹介した代理店・取次パートナーの屋号または法人名（business_name）。紹介報酬・連携追跡に使用。' },
+      { id: 'introducer_representative_name', key: 'introducer_representative_name', fieldKey: 'introducerRepresentativeName', label: '紹介者 代表者名', type: 'text', sampleVal: '山田 太郎', desc: '案件を紹介した代理店・パートナーの代表者氏名（representative_name）。契約確認や照会に使用。' },
       { id: 'customer_name', key: 'customer_name', fieldKey: 'customerName', label: 'お客様名 (アポ連携)', type: 'text', sampleVal: '佐藤 健一', desc: 'アポイント予約時に登録された見込み顧客・面談参加者の氏名。' },
       { id: 'appoint_staff', key: 'appoint_staff', fieldKey: 'appointStaff', label: 'アポイント担当者', type: 'text', sampleVal: '鈴木 一郎', desc: 'アポイントを獲得したインサイドセールス、または当日担当する営業スタッフ氏名。' }
     ];
@@ -24349,9 +24374,9 @@
     ];
 
     const appointVariations = [
-      { id: 'APT_20260930_01', date: '2026-09-30 14:00', cust: '佐藤 健一', meet: 'オンライン (Zoom)', src: 'Web紹介・反響', intro: 'パートナー営業第1部', staff: '鈴木 一郎' },
-      { id: 'APT_20261001_02', date: '2026-10-01 11:00', cust: '中村 誠', meet: '対面 (東京本社)', src: '自社セミナー', intro: 'セミナー推進課', staff: '佐々木 拓也' },
-      { id: 'APT_20261002_03', date: '2026-10-02 16:30', cust: '伊藤 亮介', meet: 'オンライン (Teams)', src: '代理店紹介', intro: 'アライアンス本部', staff: '田中 健太' }
+      { id: 'APT_20260930_01', date: '2026-09-30 14:00', cust: '佐藤 健一', meet: 'オンライン (Zoom)', src: 'Web紹介・反響', introId: 'PT94821', introCorp: '株式会社シナプスパートナーズ', introRep: '山田 太郎', staff: '鈴木 一郎' },
+      { id: 'APT_20261001_02', date: '2026-10-01 11:00', cust: '中村 誠', meet: '対面 (東京本社)', src: '自社セミナー', introId: 'PT94822', introCorp: 'テックネクスト合同会社', introRep: '高橋 美咲', staff: '佐々木 拓也' },
+      { id: 'APT_20261002_03', date: '2026-10-02 16:30', cust: '伊藤 亮介', meet: 'オンライン (Teams)', src: '代理店紹介', introId: 'PT94823', introCorp: 'グローバルビジネス株式会社', introRep: '渡辺 健二', staff: '田中 健太' }
     ];
 
     const statusVariations = [
@@ -24381,7 +24406,9 @@
           else if (k === 'appoint_date') row[k] = aVar.date;
           else if (k === 'meeting_type') row[k] = aVar.meet;
           else if (k === 'source_category') row[k] = aVar.src;
-          else if (k === 'introducer') row[k] = aVar.intro;
+          else if (k === 'introducer_id') row[k] = aVar.introId;
+          else if (k === 'introducer_business_name' || k === 'introducer') row[k] = aVar.introCorp;
+          else if (k === 'introducer_representative_name') row[k] = aVar.introRep;
           else if (k === 'customer_name') row[k] = aVar.cust;
           else if (k === 'appoint_staff') row[k] = aVar.staff;
           else row[k] = col.sampleVal || '';
@@ -24848,7 +24875,9 @@
                   <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="appointDate" ${appointFields.appointDate ? 'checked' : ''} /> 📅 アポ日時</label>
                   <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="meetingType" ${appointFields.meetingType ? 'checked' : ''} /> 🌐 面談形式</label>
                   <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="sourceCategory" ${appointFields.sourceCategory ? 'checked' : ''} /> 🏷️ 流入経路</label>
-                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="introducer" ${appointFields.introducer ? 'checked' : ''} /> 👥 紹介者/代理店</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="introducerId" ${(appointFields.introducerId !== false && (appointFields.introducerId || appointFields.introducer)) ? 'checked' : ''} /> 🔑 紹介者マスタID</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="introducerBusinessName" ${(appointFields.introducerBusinessName !== false && (appointFields.introducerBusinessName || appointFields.introducer)) ? 'checked' : ''} /> 👥 紹介者 屋号・法人名</label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="introducerRepresentativeName" ${(appointFields.introducerRepresentativeName !== false && (appointFields.introducerRepresentativeName || appointFields.introducer)) ? 'checked' : ''} /> 👤 紹介者 代表者名</label>
                   <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="customerName" ${appointFields.customerName ? 'checked' : ''} /> 🏢 顧客名</label>
                   <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" class="modal-card-field-toggle" data-category="appoint" data-field-key="appointStaff" ${appointFields.appointStaff ? 'checked' : ''} /> 👤 アポ担当者</label>
                 </div>
@@ -25585,7 +25614,11 @@
   const USER_FIELD_KEYS = ['userId', 'userName', 'userEmail', 'companyName'];
 
   // 📅 アポイント連携設定のフィールドキー定義
-  const APPOINT_FIELD_KEYS = ['appointId', 'appointDate', 'meetingType', 'sourceCategory', 'introducer', 'customerName', 'appointStaff'];
+  const APPOINT_FIELD_KEYS = [
+    'appointId', 'appointDate', 'meetingType', 'sourceCategory',
+    'introducerId', 'introducerBusinessName', 'introducerRepresentativeName', 'introducer',
+    'customerName', 'appointStaff'
+  ];
 
   // ⚙️ システム項目連携設定のフィールドキー定義
   const SYSTEM_FIELD_KEYS = ['masterId', 'formTitle', 'status', 'registrationCode', 'resumeUrl', 'createdAt'];
@@ -25809,6 +25842,9 @@
           appointDate: true,
           meetingType: true,
           sourceCategory: true,
+          introducerId: true,
+          introducerBusinessName: true,
+          introducerRepresentativeName: true,
           introducer: true,
           customerName: false,
           appointStaff: false
@@ -25820,6 +25856,9 @@
         appointDate: true,
         meetingType: true,
         sourceCategory: true,
+        introducerId: true,
+        introducerBusinessName: true,
+        introducerRepresentativeName: true,
         introducer: true,
         customerName: false,
         appointStaff: false
@@ -25830,6 +25869,11 @@
       if (formDef.appointIntegration.fields.appointStaff === undefined) formDef.appointIntegration.fields.appointStaff = false;
       if (formDef.appointIntegration.fields.introducer === undefined && formDef.appointIntegration.fields.introducerName !== undefined) {
         formDef.appointIntegration.fields.introducer = formDef.appointIntegration.fields.introducerName;
+      }
+      if (formDef.appointIntegration.fields.introducer === true) {
+        if (formDef.appointIntegration.fields.introducerId === undefined) formDef.appointIntegration.fields.introducerId = true;
+        if (formDef.appointIntegration.fields.introducerBusinessName === undefined) formDef.appointIntegration.fields.introducerBusinessName = true;
+        if (formDef.appointIntegration.fields.introducerRepresentativeName === undefined) formDef.appointIntegration.fields.introducerRepresentativeName = true;
       }
       if (formDef.appointIntegration.fields.sourceCategory === undefined) {
         formDef.appointIntegration.fields.sourceCategory = true;

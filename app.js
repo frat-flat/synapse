@@ -54489,15 +54489,35 @@ function issueAppointForm(formId) {
     if (cat) appointSnapshot.sourceCategory = cat;
   }
 
-  // 3. 紹介者情報（本登録Party ID / 最新仮ID / 紹介者名）
+  // 3. 紹介者情報（本登録Party ID / 最新仮ID / 紹介者名 / 屋号・法人名 / 代表者名）
   // オフライン→営業選択時に入力・紐付けされた紹介者IDおよび氏名を記録
   if (flds.introducer !== false && flds.introducerName !== false) {
     const effIntroId = introducerId || data.introducerId || '';
-    const effIntroName = introducerName || data.introducerName || '';
+    let effIntroName = introducerName || data.introducerName || '';
     const effIntroType = introducerType || data.introducerType || '';
+    let effBusinessName = data.introducerBusinessName || '';
+    let effRepresentativeName = data.introducerRepresentativeName || '';
+
+    // パートナーマスタ（dbmakePartners 等）から屋号・代表者名を自動解決
+    if (effIntroId && (!effBusinessName || !effRepresentativeName)) {
+      try {
+        if (typeof loadDbmakePartners === 'function') loadDbmakePartners();
+        const pList = (typeof dbmakePartners !== 'undefined' && Array.isArray(dbmakePartners)) ? dbmakePartners : (JSON.parse(localStorage.getItem('synapse_dbmake_partners') || '[]'));
+        const matchedP = pList.find(p => p && (p.id === effIntroId || p.registeredName === effIntroName));
+        if (matchedP) {
+          if (!effBusinessName) effBusinessName = matchedP.registeredName || '';
+          if (!effRepresentativeName) effRepresentativeName = matchedP.representativeName || '';
+          if (!effIntroName && matchedP.registeredName) effIntroName = matchedP.registeredName;
+        }
+      } catch(e) {}
+    }
+    if (!effBusinessName && effIntroName) effBusinessName = effIntroName;
+
     if (effIntroId) appointSnapshot.introducerId = effIntroId;
     if (effIntroName) appointSnapshot.introducerName = effIntroName;
     if (effIntroType) appointSnapshot.introducerType = effIntroType;
+    if (effBusinessName) appointSnapshot.introducerBusinessName = effBusinessName;
+    if (effRepresentativeName) appointSnapshot.introducerRepresentativeName = effRepresentativeName;
   }
 
   if (data.id) {
@@ -54521,6 +54541,8 @@ function issueAppointForm(formId) {
     issuerName: issuerName,
     introducerId: introducerId,
     introducerName: introducerName,
+    introducerBusinessName: appointSnapshot.introducerBusinessName || introducerName,
+    introducerRepresentativeName: appointSnapshot.introducerRepresentativeName || '',
     introducerType: introducerType,
     appointSnapshot: appointSnapshot,
     status: 'pending',
