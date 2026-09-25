@@ -482,6 +482,14 @@
                       </div>
                     </div>
 
+                    <!-- AIからの回答・アドバイス欄（要望入力時または診断時に表示） -->
+                    <div id="global-ai-reply-container" style="display: none; margin-bottom: 12px; background: #f0f7ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px 14px;">
+                      <div style="font-weight: 700; font-size: 0.8rem; color: #0284c7; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                        <span>💬</span> AIからの回答・アドバイス
+                      </div>
+                      <div id="global-ai-reply-text" style="font-size: 0.82rem; color: #1e293b; line-height: 1.6; white-space: pre-wrap;">-</div>
+                    </div>
+
                     <!-- AI診断結果・おすすめ全体設定ボックス -->
                     <div id="global-ai-recommendation-box" style="background: var(--color-bg-card, #ffffff); border: 1px solid var(--color-border, #e2e8f0); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;">
                       <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid var(--color-border-subtle, #f1f5f9); padding-bottom: 8px;">
@@ -539,6 +547,21 @@
                       <!-- AI提案ポイント解説リスト -->
                       <ul id="global-ai-rec-items" style="margin: 0; padding-left: 18px; font-size: 0.74rem; color: var(--color-text-muted, #475569); line-height: 1.5;">
                       </ul>
+
+                      <!-- 💡 おすすめ設問・構成案エリア（ワンクリック追加） -->
+                      <div id="global-ai-suggested-questions-container" style="display: none; border-top: 1px solid var(--color-border-subtle, #f1f5f9); padding-top: 10px; margin-top: 4px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                          <div style="font-weight: 700; font-size: 0.8rem; color: var(--color-text, #0f172a); display: flex; align-items: center; gap: 6px;">
+                            <span>💡</span> このフォームにおすすめの設問構成案
+                          </div>
+                          <button type="button" id="btn-add-all-suggested-questions" class="btn btn-sm" style="font-size: 0.72rem; padding: 4px 10px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 5px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                            <span>＋</span> 全てフォームに追加
+                          </button>
+                        </div>
+                        <div id="global-ai-suggested-questions-list" style="display: flex; flex-direction: column; gap: 8px;">
+                          <!-- JSから動的に生成 -->
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </details>

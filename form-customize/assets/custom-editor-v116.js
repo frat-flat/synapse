@@ -26518,6 +26518,7 @@
     let hasSurvey = false;
     let hasSeminar = false;
     let hasCompany = false;
+    let hasInvoice = false;
 
     if (summary && Array.isArray(summary.sections)) {
       summary.sections.forEach(s => {
@@ -26528,6 +26529,7 @@
           if (/満足度|アンケート|評価|感想|ご意見/.test(t)) hasSurvey = true;
           if (/セミナー|ウェビナー|説明会|イベント|参加/.test(t)) hasSeminar = true;
           if (/会社|法人|貴社|御社|屋号|代表者|事業/.test(t)) hasCompany = true;
+          if (/インボイス|適格請求書|登録番号|税務|消費税|免税|課税/.test(t)) hasInvoice = true;
         });
       });
     }
@@ -26535,12 +26537,14 @@
     const currentTitle = (summary && summary.title) || '';
     const promptText = (userPrompt || '').toLowerCase();
 
+    if (/インボイス|適格請求書|登録番号|税務|消費税|免税|課税/.test(promptText)) hasInvoice = true;
     if (/採用|応募|求人/.test(promptText)) hasRecruit = true;
     if (/アンケート|満足度/.test(promptText)) hasSurvey = true;
     if (/セミナー|説明会/.test(promptText)) hasSeminar = true;
     if (/法人|b2b|ビジネス|企業/.test(promptText)) hasCompany = true;
 
     let advice = {
+      aiReply: userPrompt ? `ご要望「${userPrompt}」を踏まえ、回答者の離脱を最小限に抑えつつ高信頼な回答データを収集できる最適なフォーム設定とおすすめ設問構成案を考案いたしました。` : "設問構成と目的に合わせた最適なフォーム全体設定と構成案を考案いたしました。以下の推奨設定やおすすめ設問をご確認ください。",
       recommendationTitle: "🏢 B2B向け高信頼フォーム構成（AIトータルプロデュース）",
       explanation: "設問構成と利用目的に合わせた高品質な設定案を考案しました。回答者の離脱を防ぎ、信頼感を醸成します。",
       title: (currentTitle && currentTitle !== '無題のフォーム' && currentTitle !== '新しいフォーム') ? currentTitle : "【公式】法人様向け 導入相談・お問い合わせフォーム",
@@ -26557,10 +26561,95 @@
         "タイトル・説明文: 目的を明快に伝え、離脱を防ぐ丁寧な導入文に最適化",
         "配色: 信頼感を醸成する「ロイヤルブルー」を適用",
         "所要時間・注意事項: 設問内容から算出した適切な目安と事前案内を提示"
+      ],
+      suggestedQuestions: [
+        {
+          title: "会社名・法人名（屋号）",
+          type: "text",
+          required: true,
+          description: "正式な会社名または屋号をご記入ください。",
+          dataKey: "company_name"
+        },
+        {
+          title: "ご担当者様 氏名",
+          type: "text",
+          required: true,
+          description: "氏名（漢字）をご入力ください。",
+          dataKey: "representative_name"
+        },
+        {
+          title: "ご連絡先メールアドレス",
+          type: "text",
+          required: true,
+          description: "確認メールおよび回答控えをお送りいたします。",
+          dataKey: "email"
+        },
+        {
+          title: "お問い合わせ・ご相談種別",
+          type: "radio",
+          required: true,
+          description: "ご相談の内容に最も近い項目を選択してください。",
+          options: ["サービス導入のご相談", "資料請求・お見積り", "事業連携・パートナーシップ", "その他"]
+        }
       ]
     };
 
-    if (hasRecruit) {
+    if (hasInvoice) {
+      advice.aiReply = userPrompt
+        ? `ご要望「${userPrompt}」に基づき、インボイス制度（適格請求書等保存方式）に対応した事業者登録確認フォームの構成案を作成しました。登録状況の判定（登録済・申請中・免税）、Tから始まる13桁の登録番号の回収、正式事業者名、および税務・個人情報取扱い同意までスムーズに完了できる導線をご提案します。`
+        : "インボイス制度（適格請求書等保存方式）に対応した事業者登録確認フォームの構成案を作成しました。登録状況の判定、Tから始まる13桁の登録番号の回収、正式事業者名、税務・個人情報取扱い同意までスムーズに完了できる導線をご提案します。";
+      advice.recommendationTitle = "💼 インボイス登録状況・適格請求書発行事業者 確認フォーム最適化（AIプロデュース）";
+      advice.explanation = "課税・免税事業者の適切な分岐、13桁の登録番号の正確な回収、および税務・法令遵守に関する同意を確実に取得できる高信頼設計です。";
+      advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "インボイス制度対応 適格請求書発行事業者 登録確認フォーム";
+      advice.subtitle = "適格請求書発行事業者の登録状況確認および事業者番号のご提出手続き";
+      advice.description = "いつもお取引いただき誠にありがとうございます。\nインボイス制度の導入に伴い、貴社の適格請求書発行事業者としての登録状況および登録番号の確認を実施しております。\nお手数をおかけいたしますが、以下の項目をご確認・ご入力の上、ご提出くださいますようお願い申し上げます。";
+      advice.theme = {
+        primaryColor: "#0f766e",
+        backgroundColor: "#f8fafc",
+        colorLabel: "信頼感と厳格さを兼ね備えたエグゼクティブ・ティール & クリーンホワイト"
+      };
+      advice.estimatedTime = "目安 2〜3分";
+      advice.alertText = "※ 適格請求書発行事業者の「登録通知書」または国税庁公表サイトの登録番号（T+13桁）をお手元にご準備ください。";
+      advice.items = [
+        "タイトル・説明文: 目的（インボイス制度対応の登録情報回収）を明確にし、安心感を醸成",
+        "配色: 法令・税務・B2B手続きにふさわしい誠実なエグゼクティブティール",
+        "事前準備案内: 登録通知書（T+13桁）の準備を促すアラートを設置",
+        "設問構成: 登録状況の分岐、13桁の番号入力、個人情報・税務情報の取扱い同意項目を推奨"
+      ];
+      advice.suggestedQuestions = [
+        {
+          title: "適格請求書発行事業者（インボイス発行事業者）の登録状況",
+          type: "radio",
+          required: true,
+          description: "貴社の現在のインボイス登録状況をご選択ください。",
+          options: ["登録済み（登録番号あり）", "申請中（番号未着）", "免税事業者（未登録・登録予定なし）"]
+        },
+        {
+          title: "インボイス登録番号（T＋13桁の半角数字）",
+          type: "text",
+          required: true,
+          description: "国税庁から通知された適格請求書発行事業者の登録番号を入力してください。（例: T1234567890123）",
+          dataKey: "invoice_number"
+        },
+        {
+          title: "事業者名（屋号または法人名）",
+          type: "text",
+          required: true,
+          description: "登録通知書に記載されている正式名称をご記入ください。",
+          dataKey: "company_name"
+        },
+        {
+          title: "個人情報保護方針および税務情報の取扱いへの同意",
+          type: "checkbox",
+          required: true,
+          description: "ご入力いただいた事業者情報および登録番号は、適格請求書発行事業者公表システムとの照合および仕入税額控除の確認目的のみに使用いたします。",
+          options: ["プライバシーポリシーおよび税務情報の取扱いに同意する"]
+        }
+      ];
+    } else if (hasRecruit) {
+      advice.aiReply = userPrompt
+        ? `ご要望「${userPrompt}」に基づき、採用エントリー・応募者向けのフォーム構成案を作成しました。応募者の安心感を高め、熱意を引き出す丁寧なトーンと、スムーズな入力導線をご提案します。`
+        : "採用エントリー・応募者向けのフォーム構成案を作成しました。応募者の安心感を高め、熱意を引き出す丁寧なトーンと、スムーズな入力導線をご提案します。";
       advice.recommendationTitle = "🎓 採用エントリー・選考アンケート最適化（AIプロデュース）";
       advice.explanation = "求職者が安心して熱意を伝えられる、清潔感と親しみやすさのある構成を考案しました。";
       advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "【公式】採用エントリー・事前アンケートフォーム";
@@ -26578,7 +26667,38 @@
         "配色: 誠実さと若々しさを表現する「スカイブルー」",
         "案内文: 選考プロセスを安心して進められるガイダンス"
       ];
+      advice.suggestedQuestions = [
+        {
+          title: "お名前（漢字フルネーム）",
+          type: "text",
+          required: true,
+          description: "例: 山田 太郎",
+          dataKey: "representative_name"
+        },
+        {
+          title: "メールアドレス",
+          type: "text",
+          required: true,
+          description: "選考結果のご連絡先をご入力ください。",
+          dataKey: "email"
+        },
+        {
+          title: "希望職種・ポジション",
+          type: "radio",
+          required: true,
+          options: ["エンジニア / 開発", "営業 / フィールドセールス", "マーケティング / 企画", "バックオフィス / 事務"]
+        },
+        {
+          title: "志望動機・自己PR",
+          type: "textarea",
+          required: true,
+          description: "これまでのご経験や弊社で挑戦したいことをご自由にご記入ください。"
+        }
+      ];
     } else if (hasSeminar) {
+      advice.aiReply = userPrompt
+        ? `ご要望「${userPrompt}」に基づき、セミナー・説明会参加受付向けのフォーム構成案を作成しました。参加への心理的ハードルを下げ、当日参加URLの送付案内を明快にする導線をご提案します。`
+        : "セミナー・説明会参加受付向けのフォーム構成案を作成しました。参加への心理的ハードルを下げ、当日参加URLの送付案内を明快にする導線をご提案します。";
       advice.recommendationTitle = "📅 セミナー・イベント参加受付最適化（AIプロデュース）";
       advice.explanation = "申込の心理的ハードルを下げ、当日参加率を最大化する案内構成を考案しました。";
       advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "セミナー・オンライン説明会 参加申込受付フォーム";
@@ -26596,7 +26716,38 @@
         "配色: 集中力と安心感を高める「ティールグリーン」",
         "案内文: 参加URLの送付について事前に周知"
       ];
+      advice.suggestedQuestions = [
+        {
+          title: "お名前",
+          type: "text",
+          required: true,
+          description: "参加者様のお名前をご入力ください。",
+          dataKey: "representative_name"
+        },
+        {
+          title: "メールアドレス（参加URL送信用）",
+          type: "text",
+          required: true,
+          description: "Zoom等の参加リンクをお届けいたします。",
+          dataKey: "email"
+        },
+        {
+          title: "ご希望の参加日程",
+          type: "radio",
+          required: true,
+          options: ["第1回: 10月15日(火) 14:00〜15:00", "第2回: 10月22日(火) 14:00〜15:00", "アーカイブ動画配信を希望"]
+        },
+        {
+          title: "セミナーで聞いてみたい内容・事前質問",
+          type: "textarea",
+          required: false,
+          description: "当日講師より回答させていただく場合がございます。"
+        }
+      ];
     } else if (hasSurvey) {
+      advice.aiReply = userPrompt
+        ? `ご要望「${userPrompt}」に基づき、顧客満足度・アンケート向けのフォーム構成案を作成しました。回答者の負担を軽減し、率直なフィードバックが集まりやすい親しみやすい導線をご提案します。`
+        : "顧客満足度・アンケート向けのフォーム構成案を作成しました。回答者の負担を軽減し、率直なフィードバックが集まりやすい親しみやすい導線をご提案します。";
       advice.recommendationTitle = "📊 顧客満足度・アンケート最適化（AIプロデュース）";
       advice.explanation = "回答への心理的負担を和らげ、率直なフィードバックが集まりやすい親しみやすい構成です。";
       advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "サービスご利用・ご満足度アンケート";
@@ -26613,6 +26764,26 @@
         "タイトル・説明文: 回答者の負担を減らし、感謝を伝えるトーン",
         "配色: 親近感と温かみを与える「ウォームオレンジ」",
         "プライバシー: データの取扱いに関する安心感を明記"
+      ];
+      advice.suggestedQuestions = [
+        {
+          title: "全体的なサービスの総合満足度",
+          type: "radio",
+          required: true,
+          options: ["大変満足", "やや満足", "普通", "やや不満", "大変不満"]
+        },
+        {
+          title: "特に満足している点・良かった機能（複数選択可）",
+          type: "checkbox",
+          required: false,
+          options: ["操作の使いやすさ", "デザインの美しさ", "サポートの迅速さ", "価格・コストパフォーマンス"]
+        },
+        {
+          title: "今後の改善点やご要望",
+          type: "textarea",
+          required: false,
+          description: "率直なご意見をお聞かせください。"
+        }
       ];
     }
 
@@ -26665,10 +26836,78 @@
     return summary;
   }
 
+  // おすすめ設問をフォームに追加するヘルパー
+  function addSuggestedQuestionToForm(suggestedQ, btnEl) {
+    let formDef = window.G || window.n || window.L;
+    if (!formDef) return;
+
+    if (!Array.isArray(formDef.sections) || formDef.sections.length === 0) {
+      formDef.sections = [{ id: 'sec_' + Date.now(), title: '基本情報', questions: [] }];
+    }
+
+    let targetSec = null;
+    if (window.r) {
+      targetSec = formDef.sections.find(s => s.id === window.r);
+    }
+    if (!targetSec) {
+      targetSec = formDef.sections[0];
+    }
+    if (!Array.isArray(targetSec.questions)) {
+      targetSec.questions = [];
+    }
+
+    // 重複チェック（同名タイトルが既にあればスキップ可能）
+    const exists = targetSec.questions.some(q => (q.title || '').trim() === (suggestedQ.title || '').trim());
+    if (exists) {
+      showGlobalToast(`設問「${suggestedQ.title}」は既に追加されています`, 'info');
+      if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerHTML = '✓ 既に追加済';
+        btnEl.style.background = '#e2e8f0';
+        btnEl.style.color = '#64748b';
+        btnEl.style.borderColor = '#cbd5e1';
+      }
+      return;
+    }
+
+    const newQ = {
+      id: 'q_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      title: suggestedQ.title,
+      type: suggestedQ.type || 'text',
+      required: !!suggestedQ.required,
+      description: suggestedQ.description || '',
+      dataKey: suggestedQ.dataKey || '',
+      unifyColumn: !!suggestedQ.dataKey,
+      options: Array.isArray(suggestedQ.options)
+        ? suggestedQ.options.map(opt => (typeof opt === 'string' ? { label: opt } : opt))
+        : []
+    };
+
+    targetSec.questions.push(newQ);
+
+    // 永続化と画面再描画
+    if (window.S) window.S(true);
+    if (window.le && targetSec.id === window.r) window.le(targetSec);
+    if (window.x) window.x();
+    if (window.renderLivePreview) window.renderLivePreview();
+
+    if (btnEl) {
+      btnEl.disabled = true;
+      btnEl.innerHTML = '✓ 追加完了';
+      btnEl.style.background = '#e2e8f0';
+      btnEl.style.color = '#15803d';
+      btnEl.style.borderColor = '#bbf7d0';
+    }
+
+    showGlobalToast(`設問「${suggestedQ.title}」をフォームに追加しました！`);
+  }
+
   // AI診断結果のUIレンダリング
   function renderGlobalAiAdvice(advice) {
     window._currentGlobalAiAdvice = advice;
 
+    const replyContainer = document.getElementById('global-ai-reply-container');
+    const replyText = document.getElementById('global-ai-reply-text');
     const recTitle = document.getElementById('global-ai-rec-title');
     const recDesc = document.getElementById('global-ai-rec-desc');
     const fieldTitle = document.getElementById('global-ai-field-title');
@@ -26681,6 +26920,18 @@
     const fieldAlert = document.getElementById('global-ai-field-alert');
     const recItems = document.getElementById('global-ai-rec-items');
 
+    // 1. AIからの回答・アドバイス欄の表示
+    if (replyContainer && replyText) {
+      const replyMsg = advice.aiReply || advice.explanation || '';
+      if (replyMsg) {
+        replyText.textContent = replyMsg;
+        replyContainer.style.display = 'block';
+      } else {
+        replyContainer.style.display = 'none';
+      }
+    }
+
+    // 2. メタ構成の表示
     if (recTitle) recTitle.textContent = advice.recommendationTitle || '🏢 フォーム全体のおすすめ最適化構成';
     if (recDesc) recDesc.textContent = advice.explanation || '設問構成と利用目的に合わせた高品質な設定案を考案しました。';
     if (fieldTitle) fieldTitle.textContent = advice.title || '-';
@@ -26704,6 +26955,129 @@
           li.textContent = item;
           recItems.appendChild(li);
         });
+      }
+    }
+
+    // 3. おすすめ設問構成案リストのレンダリング
+    const questionsContainer = document.getElementById('global-ai-suggested-questions-container');
+    const questionsList = document.getElementById('global-ai-suggested-questions-list');
+    const addAllBtn = document.getElementById('btn-add-all-suggested-questions');
+
+    if (questionsContainer && questionsList) {
+      if (Array.isArray(advice.suggestedQuestions) && advice.suggestedQuestions.length > 0) {
+        questionsContainer.style.display = 'block';
+        questionsList.innerHTML = '';
+
+        advice.suggestedQuestions.forEach((sq, idx) => {
+          const card = document.createElement('div');
+          card.style.cssText = `
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px 10px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+          `;
+
+          const left = document.createElement('div');
+          left.style.cssText = 'flex: 1; min-width: 0;';
+
+          const titleRow = document.createElement('div');
+          titleRow.style.cssText = 'display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 2px;';
+
+          const titleSpan = document.createElement('strong');
+          titleSpan.style.cssText = 'font-size: 0.78rem; color: #0f172a;';
+          titleSpan.textContent = sq.title;
+
+          const typeSpan = document.createElement('span');
+          typeSpan.style.cssText = 'font-size: 0.68rem; background: #f1f5f9; color: #475569; padding: 1px 5px; border-radius: 4px;';
+          const typeNames = {
+            text: '一行テキスト',
+            textarea: '複数行テキスト',
+            radio: 'ラジオ単一選択',
+            checkbox: 'チェック複数選択',
+            select: 'プルダウン',
+            date: '日付'
+          };
+          typeSpan.textContent = typeNames[sq.type] || sq.type || '設問';
+
+          if (sq.required) {
+            const reqSpan = document.createElement('span');
+            reqSpan.style.cssText = 'font-size: 0.65rem; background: #fee2e2; color: #dc2626; padding: 1px 4px; border-radius: 3px; font-weight: 700;';
+            reqSpan.textContent = '必須';
+            titleRow.appendChild(reqSpan);
+          }
+
+          titleRow.appendChild(titleSpan);
+          titleRow.appendChild(typeSpan);
+          left.appendChild(titleRow);
+
+          if (sq.description) {
+            const descSpan = document.createElement('div');
+            descSpan.style.cssText = 'font-size: 0.72rem; color: #64748b; line-height: 1.4; margin-top: 2px;';
+            descSpan.textContent = sq.description;
+            left.appendChild(descSpan);
+          }
+
+          if (Array.isArray(sq.options) && sq.options.length > 0) {
+            const optList = document.createElement('div');
+            optList.style.cssText = 'font-size: 0.7rem; color: #3b82f6; margin-top: 3px; display: flex; gap: 4px; flex-wrap: wrap;';
+            optList.textContent = '選択肢: ' + sq.options.map(o => (typeof o === 'string' ? o : o.label)).join(' / ');
+            left.appendChild(optList);
+          }
+
+          const addBtn = document.createElement('button');
+          addBtn.type = 'button';
+          addBtn.className = 'btn btn-sm';
+          addBtn.style.cssText = `
+            font-size: 0.72rem;
+            padding: 4px 8px;
+            white-space: nowrap;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            color: #1e293b;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+          `;
+          addBtn.innerHTML = '<span>＋</span> 追加';
+          addBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            addSuggestedQuestionToForm(sq, addBtn);
+          });
+
+          card.appendChild(left);
+          card.appendChild(addBtn);
+          questionsList.appendChild(card);
+        });
+
+        if (addAllBtn) {
+          addAllBtn.disabled = false;
+          addAllBtn.innerHTML = '<span>＋</span> 全てフォームに追加';
+          addAllBtn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            let addedCount = 0;
+            advice.suggestedQuestions.forEach(sq => {
+              addSuggestedQuestionToForm(sq);
+              addedCount++;
+            });
+            addAllBtn.disabled = true;
+            addAllBtn.innerHTML = '✓ すべて追加完了';
+            addAllBtn.style.background = '#e2e8f0';
+            addAllBtn.style.color = '#15803d';
+            showGlobalToast(`${addedCount}件の設問をフォームに追加しました！`);
+          };
+        }
+      } else {
+        questionsContainer.style.display = 'none';
       }
     }
   }
@@ -26734,7 +27108,7 @@
       `;
       document.body.appendChild(toast);
     }
-    toast.style.background = (type === 'success') ? '#10b981' : '#2563eb';
+    toast.style.background = (type === 'success') ? '#10b981' : (type === 'info' ? '#0284c7' : '#2563eb');
     toast.style.color = '#ffffff';
     toast.innerHTML = `<span>✨</span><span>${message}</span>`;
     toast.style.opacity = '1';
@@ -26899,7 +27273,7 @@
     showGlobalToast('⚡ おすすめ設定（タイトル・説明文・配色・所要時間等）を一括適用しました！');
   }
 
-  // 動的AI診断・プロデュースの実行
+  // 動的AI診断・プロデュースの実行（タイムアウト制御付き）
   async function fetchDynamicFormGlobalDiagnosis(promptMessage = '') {
     if (isGlobalAiDiagnosing) return;
     isGlobalAiDiagnosing = true;
@@ -26917,16 +27291,24 @@
       refreshBtn.disabled = true;
       refreshBtn.innerHTML = '<span>⏳</span> 分析中...';
     }
-    if (submitBtn) submitBtn.disabled = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>⏳</span> 生成中...';
+    }
 
     const formSummary = collectFormSummary();
     let advice = null;
+
+    // 7秒タイムアウト設定
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
 
     try {
       const apiKey = localStorage.getItem('synapse_gemini_api_key') || '';
       const res = await fetch('/api/regex-ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           mode: 'form_global_concierge',
           message: promptMessage,
@@ -26935,16 +27317,19 @@
         })
       });
 
+      clearTimeout(timeoutId);
+
       if (res.ok) {
         const data = await res.json();
-        if (data && data.globalAdvice) {
+        if (data && data.globalAdvice && data.globalAdvice.title) {
           advice = data.globalAdvice;
-        } else if (data && data.explanation) {
-          advice = data;
+        } else if (data && data.advice && data.advice.title) {
+          advice = data.advice;
         }
       }
     } catch (err) {
-      console.warn('[FormGlobalAI] API request failed, fallback to local rule-based advice:', err);
+      clearTimeout(timeoutId);
+      console.warn('[FormGlobalAI] API request failed or timed out, fallback to local rule-based advice:', err);
     }
 
     // API未取得または失敗時は高品質ローカルルールベース診断をフォールバック使用
@@ -26952,7 +27337,11 @@
       advice = generateLocalGlobalAdvice(formSummary, promptMessage);
     }
 
-    renderGlobalAiAdvice(advice);
+    try {
+      renderGlobalAiAdvice(advice);
+    } catch (renderErr) {
+      console.error('[FormGlobalAI] Render error:', renderErr);
+    }
 
     if (statusBadge) {
       statusBadge.textContent = 'リアルタイム全体診断';
@@ -26963,7 +27352,10 @@
       refreshBtn.disabled = false;
       refreshBtn.innerHTML = '<span>🔄</span> 再診断';
     }
-    if (submitBtn) submitBtn.disabled = false;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '生成 ✨';
+    }
     isGlobalAiDiagnosing = false;
   }
 
@@ -27028,6 +27420,17 @@
         e.preventDefault();
         const text = promptInput ? promptInput.value.trim() : '';
         fetchDynamicFormGlobalDiagnosis(text);
+      });
+    }
+
+    // テキストエリアで Ctrl+Enter / Meta+Enter で送信
+    if (promptInput) {
+      promptInput.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          const text = promptInput.value.trim();
+          fetchDynamicFormGlobalDiagnosis(text);
+        }
       });
     }
 

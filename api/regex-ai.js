@@ -37,12 +37,14 @@ module.exports = async (req, res) => {
         ? body.prompt.trim()
         : '';
 
-    // clientApiKey または userKey からクライアントキーを取得
+    // clientApiKey または userKey または apiKey からクライアントキーを取得
     const clientApiKey = (typeof body.clientApiKey === 'string' && body.clientApiKey.trim())
       ? body.clientApiKey.trim()
       : (typeof body.userKey === 'string' && body.userKey.trim())
         ? body.userKey.trim()
-        : '';
+        : (typeof body.apiKey === 'string' && body.apiKey.trim())
+          ? body.apiKey.trim()
+          : '';
 
     if (mode !== 'diagnose_question' && mode !== 'form_global_concierge') {
       if (!message || message.length === 0) {
@@ -105,10 +107,12 @@ module.exports = async (req, res) => {
     if (mode === 'form_global_concierge') {
       systemInstructionText = `
 あなたはWebフォーム構築基盤「Synapse（シナプス）」の専属チーフ・フォームデザイナー＆AIアーキテクトです。
-フォーム作成者から提供される「フォームの設問構成」「現在のタイトル・説明文」「任意の自由要望プロンプト」を多角的に分析し、
-回答者の離脱を最小限に抑え、信頼感と回答完了率を最大化する【フォームの全体設定】（タイトル、説明文、サブタイトル、テーマカラー、所要時間目安、注意事項アラート等）をトータルプロデュースしてください。
+フォーム作成者から提供される「フォームの設問構成」「現在のタイトル・説明文」「任意の自由要望・質問プロンプト」を多角的に分析し、
+回答者の離脱を最小限に抑え、信頼感と回答完了率を最大化する【フォームの全体設定】（タイトル、説明文、サブタイトル、テーマカラー、所要時間目安、注意事項アラート等）および【質問に対する回答・アドバイス】と【おすすめの設問構成案】をトータルプロデュースしてください。
 
 【デザイン・設計ルール】
+0. 質問に対する回答 (aiReply):
+   - 作成者からの要望・質問に対して、プロとしての具体的で心強い回答・解説・アドバイス（100〜200文字程度）。
 1. タイトル (title):
    - 簡潔で目的が一目で伝わり、公式感・信頼感のある日本語表記（20文字前後目安）。
 2. 説明文 (description):
@@ -121,12 +125,15 @@ module.exports = async (req, res) => {
    - backgroundColor: フォーム全体の背景色（白または微細なニュアンス色、例: #f8fafc, #f0fdf4, #fdfbf7, #f1f5f9 等）。
    - colorLabel: その配色の印象・名称（例: "ビジネス・ロイヤルブルー & クリーンホワイト"）。
 5. 所要時間目安 (estimatedTime):
-   - 設問数やセクション数から推定される無理のない回答時間（例: "目安 3〜5分"、"目安 5〜8分"）。
+   - 設問数やセクション数から推定される無理のない回答時間（例: "目安 2〜3分"、"目安 3〜5分"）。
 6. 注意事項アラート文 (alertText):
    - 回答者が事前に知っておくべき重要事項（例: "※ インボイス登録番号や口座情報の入力箇所がございますので、お手元にお控えをご用意ください。"）。
-7. 出力は必ず以下のJSONフォーマットのみ（マークダウンのコードブロックなし、生のJSON文字列のみ）:
+7. おすすめ設問構成案 (suggestedQuestions):
+   - そのフォームの目的を達成するために含めるべき必須・推奨設問を3〜5個考案（title, type: "text"|"radio"|"checkbox"|"select"|"textarea"|"date", required: boolean, description: string, options: string[]）。
+8. 出力は必ず以下のJSONフォーマットのみ（マークダウンのコードブロックなし、生のJSON文字列のみ）:
 {
-  "recommendationTitle": "短く魅力的な提案タイトル（適切な絵文字付き、例: 🏢 B2B向け高信頼フォーム構成（AIトータルプロデュース））",
+  "aiReply": "作成者からの質問・要望に対する丁寧なアドバイス回答文",
+  "recommendationTitle": "短く魅力的な提案タイトル（適切な絵文字付き、例: 💼 インボイス登録状況回収・高信頼フォーム構成）",
   "explanation": "なぜこの設定・配色・構成を推奨するかの解説（1〜2文）",
   "title": "推奨フォームタイトル",
   "description": "推奨フォーム説明文",
@@ -136,12 +143,21 @@ module.exports = async (req, res) => {
     "backgroundColor": "#f8fafc",
     "colorLabel": "信頼のビジネスブルー & クリーンホワイト"
   },
-  "estimatedTime": "目安 3〜5分",
+  "estimatedTime": "目安 2〜3分",
   "alertText": "推奨注意事項アラート文",
   "items": [
     "タイトル・説明文: 目的を明快に伝え、離脱を防ぐ丁寧な文脈に最適化",
     "配色: 信頼感を醸成する「ビジネスブルー」を適用",
     "所要時間・注意事項: 設問内容から算出した適切な目安と事前案内を提示"
+  ],
+  "suggestedQuestions": [
+    {
+      "title": "設問タイトル",
+      "type": "radio",
+      "required": true,
+      "description": "設問の補足説明",
+      "options": ["選択肢1", "選択肢2"]
+    }
   ]
 }
 `.trim();
@@ -339,7 +355,7 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
       contents: contents,
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 1000,
+        maxOutputTokens: 3500,
         responseMimeType: 'application/json'
       }
     };
@@ -388,6 +404,16 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
     }
 
     if (!response || !response.ok) {
+      if (mode === 'form_global_concierge') {
+        const fallbackAdvice = generateFallbackGlobalAdvice(body.formSummary, message);
+        return res.status(200).json({
+          success: true,
+          isConfigured: true,
+          model: 'local-fallback',
+          globalAdvice: fallbackAdvice,
+          advice: fallbackAdvice
+        });
+      }
       let detailMsg = '';
       try {
         const parsedErr = JSON.parse(lastErrorBody);
@@ -410,6 +436,16 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
     const rawText = candidate && candidate.content && candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text;
 
     if (!rawText) {
+      if (mode === 'form_global_concierge') {
+        const fallbackAdvice = generateFallbackGlobalAdvice(body.formSummary, message);
+        return res.status(200).json({
+          success: true,
+          isConfigured: true,
+          model: successfulModel,
+          globalAdvice: fallbackAdvice,
+          advice: fallbackAdvice
+        });
+      }
       return res.status(200).json({
         success: false,
         error: 'EMPTY_GEMINI_RESPONSE',
@@ -431,6 +467,13 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
     } catch (parseErr) {
       if (mode === 'diagnose_question') {
         parsedResult = null;
+      } else if (mode === 'form_global_concierge') {
+        const jsonMatch = cleanJsonStr.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            parsedResult = JSON.parse(jsonMatch[0]);
+          } catch(e) {}
+        }
       } else {
         // JSON形式から外れていた場合の正規表現フォールバック抽出
         const patternMatch = cleanJsonStr.match(/`(\^[^`]+\$)`/);
@@ -442,6 +485,12 @@ ${Array.isArray(otherQuestions) && otherQuestions.length > 0 ? otherQuestions.ma
     }
 
     if (mode === 'form_global_concierge') {
+      if (!parsedResult || typeof parsedResult !== 'object' || !parsedResult.title) {
+        parsedResult = generateFallbackGlobalAdvice(body.formSummary, message);
+      }
+      if (!parsedResult.aiReply) {
+        parsedResult.aiReply = parsedResult.explanation || 'ご要望に合わせて最適なフォーム設定と構成案を考案いたしました。';
+      }
       return res.status(200).json({
         success: true,
         isConfigured: true,
@@ -490,6 +539,7 @@ function generateFallbackGlobalAdvice(summary, userPrompt) {
   let hasRecruit = /採用|応募|求人|エントリー|履歴書|職歴|学歴|志望動機/.test(promptText);
   let hasSurvey = /アンケート|満足度|評価|感想|ご意見/.test(promptText);
   let hasSeminar = /セミナー|説明会|ウェビナー|イベント|参加/.test(promptText);
+  let hasInvoice = /インボイス|適格請求書|登録番号|税務|消費税|免税|課税/.test(promptText);
 
   if (summary && Array.isArray(summary.sections)) {
     summary.sections.forEach(s => {
@@ -498,11 +548,13 @@ function generateFallbackGlobalAdvice(summary, userPrompt) {
         if (/採用|応募|エントリー|履歴書|職歴|学歴|志望動機/.test(t)) hasRecruit = true;
         if (/満足度|アンケート|評価|感想|ご意見/.test(t)) hasSurvey = true;
         if (/セミナー|ウェビナー|説明会|イベント|参加/.test(t)) hasSeminar = true;
+        if (/インボイス|適格請求書|登録番号|税務|消費税/.test(t)) hasInvoice = true;
       });
     });
   }
 
   let advice = {
+    aiReply: "設問構成と目的に合わせた最適なフォーム全体設定と構成案を考案いたしました。以下の推奨設定やおすすめ設問をご確認ください。",
     recommendationTitle: "🏢 B2B向け高信頼フォーム構成（AIトータルプロデュース）",
     explanation: "設問構成と利用目的に合わせた高品質な設定案を考案しました。回答者の離脱を防ぎ、信頼感を醸成します。",
     title: (currentTitle && currentTitle !== '無題のフォーム' && currentTitle !== '新しいフォーム') ? currentTitle : "【公式】法人様向け 導入相談・お問い合わせフォーム",
@@ -519,10 +571,91 @@ function generateFallbackGlobalAdvice(summary, userPrompt) {
       "タイトル・説明文: 目的を明快に伝え、離脱を防ぐ丁寧な導入文に最適化",
       "配色: 信頼感を醸成する「ロイヤルブルー」を適用",
       "所要時間・注意事項: 設問内容から算出した適切な目安と事前案内を提示"
+    ],
+    suggestedQuestions: [
+      {
+        title: "会社名・法人名（屋号）",
+        type: "text",
+        required: true,
+        description: "正式な会社名または屋号をご記入ください。",
+        dataKey: "company_name"
+      },
+      {
+        title: "ご担当者様 氏名",
+        type: "text",
+        required: true,
+        description: "氏名（漢字）をご入力ください。",
+        dataKey: "representative_name"
+      },
+      {
+        title: "ご連絡先メールアドレス",
+        type: "text",
+        required: true,
+        description: "確認メールおよび回答控えをお送りいたします。",
+        dataKey: "email"
+      },
+      {
+        title: "お問い合わせ・ご相談種別",
+        type: "radio",
+        required: true,
+        description: "ご相談の内容に最も近い項目を選択してください。",
+        options: ["サービス導入のご相談", "資料請求・お見積り", "事業連携・パートナーシップ", "その他"]
+      }
     ]
   };
 
-  if (hasRecruit) {
+  if (hasInvoice) {
+    advice.aiReply = "インボイス制度（適格請求書等保存方式）に対応した事業者登録確認フォームの構成案を作成しました。登録状況の判定（登録済・申請中・免税）、Tから始まる13桁の登録番号の回収、正式事業者名、および税務・個人情報取扱い同意までスムーズに完了できる導線をご提案します。";
+    advice.recommendationTitle = "💼 インボイス登録状況・適格請求書発行事業者 確認フォーム最適化（AIプロデュース）";
+    advice.explanation = "課税・免税事業者の適切な分岐、13桁の登録番号の正確な回収、および税務・法令遵守に関する同意を確実に取得できる高信頼設計です。";
+    advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "インボイス制度対応 適格請求書発行事業者 登録確認フォーム";
+    advice.subtitle = "適格請求書発行事業者の登録状況確認および事業者番号のご提出手続き";
+    advice.description = "いつもお取引いただき誠にありがとうございます。\nインボイス制度の導入に伴い、貴社の適格請求書発行事業者としての登録状況および登録番号の確認を実施しております。\nお手数をおかけいたしますが、以下の項目をご確認・ご入力の上、ご提出くださいますようお願い申し上げます。";
+    advice.theme = {
+      primaryColor: "#0f766e",
+      backgroundColor: "#f8fafc",
+      colorLabel: "信頼感と厳格さを兼ね備えたエグゼクティブ・ティール & クリーンホワイト"
+    };
+    advice.estimatedTime = "目安 2〜3分";
+    advice.alertText = "※ 適格請求書発行事業者の「登録通知書」または国税庁公表サイトの登録番号（T+13桁）をお手元にご準備ください。";
+    advice.items = [
+      "タイトル・説明文: 目的（インボイス制度対応の登録情報回収）を明確にし、安心感を醸成",
+      "配色: 法令・税務・B2B手続きにふさわしい誠実なエグゼクティブティール",
+      "事前準備案内: 登録通知書（T+13桁）の準備を促すアラートを設置",
+      "設問構成: 登録状況の分岐、13桁の番号入力、個人情報・税務情報の取扱い同意項目を推奨"
+    ];
+    advice.suggestedQuestions = [
+      {
+        title: "適格請求書発行事業者（インボイス発行事業者）の登録状況",
+        type: "radio",
+        required: true,
+        description: "貴社の現在のインボイス登録状況をご選択ください。",
+        options: ["登録済み（登録番号あり）", "申請中（番号未着）", "免税事業者（未登録・登録予定なし）"]
+      },
+      {
+        title: "インボイス登録番号（T＋13桁の半角数字）",
+        type: "text",
+        required: true,
+        description: "国税庁から通知された適格請求書発行事業者の登録番号を入力してください。（例: T1234567890123）",
+        dataKey: "invoice_number"
+      },
+      {
+        title: "事業者名（屋号または法人名）",
+        type: "text",
+        required: true,
+        description: "登録通知書に記載されている正式名称をご記入ください。",
+        dataKey: "company_name"
+      },
+      {
+        title: "個人情報保護方針および税務情報の取扱いへの同意",
+        type: "checkbox",
+        required: true,
+        description: "ご入力いただいた事業者情報および登録番号は、適格請求書発行事業者公表システムとの照合および仕入税額控除の確認目的のみに使用いたします。",
+        options: ["プライバシーポリシーおよび税務情報の取扱いに同意する"]
+      }
+    ];
+  } else if (hasRecruit) {
+    advice.aiReply = "採用エントリー・応募者向けのフォーム構成案を作成しました。応募者の安心感を高め、熱意を引き出す丁寧なトーンと、スムーズな入力導線をご提案します。";
     advice.recommendationTitle = "🎓 採用エントリー・選考アンケート最適化（AIプロデュース）";
     advice.explanation = "求職者が安心して熱意を伝えられる、清潔感と親しみやすさのある構成を考案しました。";
     advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "【公式】採用エントリー・事前アンケートフォーム";
@@ -540,7 +673,36 @@ function generateFallbackGlobalAdvice(summary, userPrompt) {
       "配色: 誠実さと若々しさを表現する「スカイブルー」",
       "案内文: 選考プロセスを安心して進められるガイダンス"
     ];
+    advice.suggestedQuestions = [
+      {
+        title: "お名前（漢字フルネーム）",
+        type: "text",
+        required: true,
+        description: "例: 山田 太郎",
+        dataKey: "representative_name"
+      },
+      {
+        title: "メールアドレス",
+        type: "text",
+        required: true,
+        description: "選考結果のご連絡先をご入力ください。",
+        dataKey: "email"
+      },
+      {
+        title: "希望職種・ポジション",
+        type: "radio",
+        required: true,
+        options: ["エンジニア / 開発", "営業 / フィールドセールス", "マーケティング / 企画", "バックオフィス / 事務"]
+      },
+      {
+        title: "志望動機・自己PR",
+        type: "textarea",
+        required: true,
+        description: "これまでのご経験や弊社で挑戦したいことをご自由にご記入ください。"
+      }
+    ];
   } else if (hasSeminar) {
+    advice.aiReply = "セミナー・説明会参加受付向けのフォーム構成案を作成しました。参加への心理的ハードルを下げ、当日参加URLの送付案内を明快にする導線をご提案します。";
     advice.recommendationTitle = "📅 セミナー・イベント参加受付最適化（AIプロデュース）";
     advice.explanation = "申込の心理的ハードルを下げ、当日参加率を最大化する案内構成を考案しました。";
     advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "セミナー・オンライン説明会 参加申込受付フォーム";
@@ -558,7 +720,36 @@ function generateFallbackGlobalAdvice(summary, userPrompt) {
       "配色: 集中力と安心感を高める「ティールグリーン」",
       "案内文: 参加URLの送付について事前に周知"
     ];
+    advice.suggestedQuestions = [
+      {
+        title: "お名前",
+        type: "text",
+        required: true,
+        description: "参加者様のお名前をご入力ください。",
+        dataKey: "representative_name"
+      },
+      {
+        title: "メールアドレス（参加URL送信用）",
+        type: "text",
+        required: true,
+        description: "Zoom等の参加リンクをお届けいたします。",
+        dataKey: "email"
+      },
+      {
+        title: "ご希望の参加日程",
+        type: "radio",
+        required: true,
+        options: ["第1回: 10月15日(火) 14:00〜15:00", "第2回: 10月22日(火) 14:00〜15:00", "アーカイブ動画配信を希望"]
+      },
+      {
+        title: "セミナーで聞いてみたい内容・事前質問",
+        type: "textarea",
+        required: false,
+        description: "当日講師より回答させていただく場合がございます。"
+      }
+    ];
   } else if (hasSurvey) {
+    advice.aiReply = "顧客満足度・アンケート向けのフォーム構成案を作成しました。回答者の負担を軽減し、率直なフィードバックが集まりやすい親しみやすい導線をご提案します。";
     advice.recommendationTitle = "📊 顧客満足度・アンケート最適化（AIプロデュース）";
     advice.explanation = "回答への心理的負担を和らげ、率直なフィードバックが集まりやすい親しみやすい構成です。";
     advice.title = (currentTitle && !/無題|新しいフォーム/.test(currentTitle)) ? currentTitle : "サービスご利用・ご満足度アンケート";
@@ -575,6 +766,26 @@ function generateFallbackGlobalAdvice(summary, userPrompt) {
       "タイトル・説明文: 回答者の負担を減らし、感謝を伝えるトーン",
       "配色: 親近感と温かみを与える「ウォームオレンジ」",
       "プライバシー: データの取扱いに関する安心感を明記"
+    ];
+    advice.suggestedQuestions = [
+      {
+        title: "全体的なサービスの総合満足度",
+        type: "radio",
+        required: true,
+        options: ["大変満足", "やや満足", "普通", "やや不満", "大変不満"]
+      },
+      {
+        title: "特に満足している点・良かった機能（複数選択可）",
+        type: "checkbox",
+        required: false,
+        options: ["操作の使いやすさ", "デザインの美しさ", "サポートの迅速さ", "価格・コストパフォーマンス"]
+      },
+      {
+        title: "今後の改善点やご要望",
+        type: "textarea",
+        required: false,
+        description: "率直なご意見をお聞かせください。"
+      }
     ];
   }
 
